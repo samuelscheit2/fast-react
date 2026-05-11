@@ -44,6 +44,11 @@ const pluginEventSystem = require(path.join(
   'events',
   'plugin-event-system.js'
 ));
+const rootListeners = require(path.join(
+  sourceRoot,
+  'events',
+  'root-listeners.js'
+));
 
 const resourceOracle = require(path.join(
   repoRoot,
@@ -7302,8 +7307,9 @@ test('private input/change controlled restore bridge records latest-props links 
       value: 'browser-mutated'
     });
     const inputPreflight =
-      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
-        dispatch.dispatchRecord
+      createControlledInputChangePreflight(
+        dispatch,
+        `${row.queueId}-input-change-preflight`
       );
     const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
       dispatch.dispatchRecord,
@@ -7497,8 +7503,9 @@ test('private input/change controlled restore bridge records latest-props links 
     nodeName: 'INPUT'
   });
   const unsupportedPreflight =
-    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
-      unsupportedDispatch.dispatchRecord
+    createControlledInputChangePreflight(
+      unsupportedDispatch,
+      'unsupported-input-change-bridge-preflight'
     );
   assert.throws(
     () =>
@@ -7528,8 +7535,9 @@ test('private input/change controlled restore bridge records latest-props links 
     nodeName: 'INPUT'
   });
   const stalePreflight =
-    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
-      staleDispatch.dispatchRecord
+    createControlledInputChangePreflight(
+      staleDispatch,
+      'stale-input-change-bridge-preflight'
     );
   const staleIntent = gate.recordPostEventRestoreIntentFromEventLatestProps(
     staleDispatch.dispatchRecord,
@@ -8394,7 +8402,7 @@ test('private controlled restore wrapper mutation intent consumes execution and 
       code:
         controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidWrapperMutationIntentCode,
       compatibilityTarget,
-      reason: 'foreign-source-preflight'
+      reason: 'foreign-controlled-restore-queue-record'
     }
   );
 
@@ -8424,8 +8432,9 @@ test('private input/change controlled restore execution consumes fake-DOM text p
     value: 'browser-mutated'
   });
   const inputPreflight =
-    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
-      dispatch.dispatchRecord
+    createControlledInputChangePreflight(
+      dispatch,
+      'input-change-execution-preflight'
     );
   const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
     dispatch.dispatchRecord,
@@ -8995,8 +9004,9 @@ test('private input/change controlled restore execution consumes fake-DOM checkb
     nodeName: 'INPUT'
   });
   const inputPreflight =
-    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
-      dispatch.dispatchRecord
+    createControlledInputChangePreflight(
+      dispatch,
+      'checkbox-input-change-execution-preflight'
     );
   const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
     dispatch.dispatchRecord,
@@ -20887,8 +20897,11 @@ function createRootBridgeDocument() {
     nodeType: 9,
     __mutationLog: [],
     __registrations: [],
-    addEventListener(type, listener) {
-      this.__registrations.push({ listener, type });
+    addEventListener(type, listener, options) {
+      this.__registrations.push({ listener, options, type });
+    },
+    removeEventListener(type, listener) {
+      removeRootBridgeEventRegistration(this.__registrations, type, listener);
     }
   };
   document.ownerDocument = document;
@@ -20904,10 +20917,23 @@ function createRootBridgeElement(nodeName, ownerDocument) {
     parentNode: null,
     __mutationLog: [],
     __registrations: [],
-    addEventListener(type, listener) {
-      this.__registrations.push({ listener, type });
+    addEventListener(type, listener, options) {
+      this.__registrations.push({ listener, options, type });
+    },
+    removeEventListener(type, listener) {
+      removeRootBridgeEventRegistration(this.__registrations, type, listener);
     }
   };
+}
+
+function removeRootBridgeEventRegistration(registrations, type, listener) {
+  for (let index = registrations.length - 1; index >= 0; index--) {
+    const registration = registrations[index];
+    if (registration.type === type && registration.listener === listener) {
+      registrations.splice(index, 1);
+      return;
+    }
+  }
 }
 
 function createWrapperMutationIntentSources(prefix, rows) {
@@ -21011,6 +21037,20 @@ function createControlledInputEventDispatch(options) {
       options.domEventName,
       0
     );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(container);
+  const rootListenerCurrentnessGateRecord =
+    rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+      rootRegistration,
+      {
+        sourceKind: 'createRoot',
+        sourceRecord: {
+          operation: 'createRoot',
+          requestId: `controlled-input-${options.domEventName}-root-listener-currentness`,
+          requestType: 'createRoot'
+        }
+      }
+    );
 
   return {
     container,
@@ -21019,9 +21059,26 @@ function createControlledInputEventDispatch(options) {
       type: options.domEventName
     }),
     document,
+    rootListenerCurrentnessGateRecord,
+    rootRegistration,
     targetNode,
     token
   };
+}
+
+function createControlledInputChangePreflight(dispatch, requestId) {
+  return pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+    dispatch.dispatchRecord,
+    {
+      rootListenerCurrentnessGateRecord:
+        dispatch.rootListenerCurrentnessGateRecord,
+      sourceRecord: {
+        operation: 'createRoot',
+        requestId,
+        requestType: 'createRoot'
+      }
+    }
+  );
 }
 
 function createControlledLatestPropsLookup(options) {

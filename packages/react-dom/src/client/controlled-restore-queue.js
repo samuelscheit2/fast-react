@@ -25,8 +25,12 @@ const {
   INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND,
   PLUGIN_EXTRACTION_BLOCKED_CODE,
   PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS,
+  getEventDispatchRecordPayload,
   getInputChangeEventExtractionPreflightRecordPayload
 } = require('../events/plugin-event-system.js');
+const {
+  getPrivateRootListenerCurrentnessGatePayload
+} = require('../events/root-listeners.js');
 
 const controlledInputPostEventRestoreQueueGateSchemaVersion = 1;
 const controlledInputPostEventRestoreQueueGateId =
@@ -173,6 +177,8 @@ const controlledInputPostEventRestoreQueueLiveMutationPreflightPayloads =
   new WeakMap();
 const controlledInputPostEventRestoreQueueFakeDomExecutionPayloads =
   new WeakMap();
+const controlledInputPostEventRestoreQueueGateStates = new WeakMap();
+const controlledInputPostEventRestoreQueueSourcePayloads = new WeakMap();
 const defaultControlledInputPostEventRestoreQueueGate =
   createControlledInputPostEventRestoreQueueGate();
 
@@ -625,6 +631,14 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate
   });
 
   controlledInputPostEventRestoreQueueRecordPayloads.set(payload, payload);
+  bindControlledRestoreRecordToGate(payload, gateState);
+  controlledInputPostEventRestoreQueueSourcePayloads.set(
+    payload,
+    freezeRecord({
+      dispatchRecord,
+      eventDispatchPayload: getEventDispatchRecordPayload(dispatchRecord)
+    })
+  );
   return payload;
 }
 
@@ -743,6 +757,14 @@ function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatest
   });
 
   controlledInputPostEventRestoreQueueRecordPayloads.set(payload, payload);
+  bindControlledRestoreRecordToGate(payload, gateState);
+  controlledInputPostEventRestoreQueueSourcePayloads.set(
+    payload,
+    freezeRecord({
+      latestPropsRecord,
+      observationRecord
+    })
+  );
   return payload;
 }
 
@@ -754,7 +776,10 @@ function preflightControlledInputPostEventRestoreQueueWritesWithGate(
   const normalizedAdmission =
     normalizePostEventRestoreQueueWritePreflightAdmission(admission);
   const sourceRecords =
-    normalizePostEventRestoreQueueWritePreflightRecords(records);
+    normalizePostEventRestoreQueueWritePreflightRecords(
+      records,
+      gateState
+    );
   const requestSequence = gateState.nextRequestSequence++;
   const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
   const writeIntentRows = freezeArray(
@@ -808,6 +833,7 @@ function preflightControlledInputPostEventRestoreQueueWritesWithGate(
     payload,
     payload
   );
+  bindControlledRestoreRecordToGate(payload, gateState);
   return payload;
 }
 
@@ -820,6 +846,12 @@ function recordControlledInputPostEventRestoreQueueWriteExecutionWithGate(
     assertPrivateControlledInputPostEventRestoreQueueWritePreflightRecordForExecution(
       preflightRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourcePreflight,
+    gateState,
+    throwPostEventRestoreQueueWriteExecutionError,
+    'foreign-controlled-restore-queue-record'
+  );
   const normalizedAdmission =
     normalizePostEventRestoreQueueWriteExecutionAdmission(admission);
   assertPostEventRestoreQueueWriteExecutionPreflight(sourcePreflight);
@@ -896,6 +928,7 @@ function recordControlledInputPostEventRestoreQueueWriteExecutionWithGate(
     payload,
     payload
   );
+  bindControlledRestoreRecordToGate(payload, gateState);
   return payload;
 }
 
@@ -908,6 +941,12 @@ function recordControlledInputPostEventRestoreQueueFlushBlockerWithGate(
     normalizePostEventRestoreQueueFlushBlockerAdmission(admission);
   const sourcePreflight =
     assertPostEventRestoreQueueFlushBlockerSourceRecord(preflightRecord);
+  assertControlledRestoreRecordFromGate(
+    sourcePreflight,
+    gateState,
+    throwPostEventRestoreQueueFlushBlockerError,
+    'foreign-controlled-restore-queue-record'
+  );
   const requestSequence = gateState.nextRequestSequence++;
   const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
   const queueSnapshot =
@@ -958,6 +997,7 @@ function recordControlledInputPostEventRestoreQueueFlushBlockerWithGate(
     payload,
     payload
   );
+  bindControlledRestoreRecordToGate(payload, gateState);
   return payload;
 }
 
@@ -976,10 +1016,22 @@ function recordControlledInputChangeEventRestoreQueueBridgeWithGate(
     );
   const sourceRestoreRecord =
     assertPrivateControlledInputPostEventRestoreQueueRecord(restoreRecord);
+  assertControlledRestoreRecordFromGate(
+    sourceRestoreRecord,
+    gateState,
+    throwInputChangeEventRestoreQueueBridgeError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceWritePreflight =
     assertInputChangeEventRestoreQueueBridgeWritePreflight(
       writePreflightRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceWritePreflight,
+    gateState,
+    throwInputChangeEventRestoreQueueBridgeError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceWriteRow =
     findInputChangeEventRestoreQueueBridgeWriteIntentRow(
       sourceWritePreflight,
@@ -1027,6 +1079,11 @@ function recordControlledInputChangeEventRestoreQueueBridgeWithGate(
       privateControlledInputPostEventRestoreQueueWritePreflightRecordType,
     acceptedWriteIntentRowType:
       privateControlledInputPostEventRestoreQueueWriteIntentRowType,
+    controlledRestoreQueueIdentity:
+      createControlledRestoreQueueIdentityEvidence(gateState, [
+        sourceRestoreRecord,
+        sourceWritePreflight
+      ]),
     sourceInputChangePreflight:
       createInputChangeEventPreflightBridgeSourceSummary(inputPreflight),
     sourceRestoreQueueRecord:
@@ -1060,6 +1117,7 @@ function recordControlledInputChangeEventRestoreQueueBridgeWithGate(
     payload,
     payload
   );
+  bindControlledRestoreRecordToGate(payload, gateState);
   return payload;
 }
 
@@ -1080,18 +1138,42 @@ function recordControlledInputChangeEventRestoreQueueExecutionWithGate(
     );
   const sourceBridge =
     assertInputChangeEventRestoreQueueExecutionBridgeRecord(bridgeRecord);
+  assertControlledRestoreRecordFromGate(
+    sourceBridge,
+    gateState,
+    throwInputChangeEventRestoreQueueExecutionError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceWriteExecution =
     assertInputChangeEventRestoreQueueExecutionWriteExecutionRecord(
       writeExecutionRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceWriteExecution,
+    gateState,
+    throwInputChangeEventRestoreQueueExecutionError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceFlushBlocker =
     assertInputChangeEventRestoreQueueExecutionFlushBlockerRecord(
       flushBlockerRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceFlushBlocker,
+    gateState,
+    throwInputChangeEventRestoreQueueExecutionError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceWrapperIntent =
     assertInputChangeEventRestoreQueueExecutionWrapperMutationIntentRecord(
       wrapperMutationIntentRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceWrapperIntent,
+    gateState,
+    throwInputChangeEventRestoreQueueExecutionError,
+    'foreign-controlled-restore-queue-record'
+  );
   const latestPropsValidation =
     createInputChangeEventRestoreQueueExecutionLatestPropsValidation(
       inputPreflight,
@@ -1218,6 +1300,13 @@ function recordControlledInputChangeEventRestoreQueueExecutionWithGate(
     sourceWriteExecutionStatus: sourceWriteExecution.status,
     sourceFlushBlockerStatus: sourceFlushBlocker.status,
     sourceWrapperMutationIntentStatus: sourceWrapperIntent.status,
+    controlledRestoreQueueIdentity:
+      createControlledRestoreQueueIdentityEvidence(gateState, [
+        sourceBridge,
+        sourceWriteExecution,
+        sourceFlushBlocker,
+        sourceWrapperIntent
+      ]),
     executionRowCount: executionRows.length,
     acceptedRestoreKinds: freezeArray(
       executionRows.map((row) => row.acceptedRestoreKind)
@@ -1240,6 +1329,7 @@ function recordControlledInputChangeEventRestoreQueueExecutionWithGate(
     payload,
     payload
   );
+  bindControlledRestoreRecordToGate(payload, gateState);
   return payload;
 }
 
@@ -1256,6 +1346,12 @@ function recordControlledInputPostEventRestoreFakeDomExecutionWithGate(
     normalizePostEventRestoreQueueFakeDomExecutionAdmission(admission);
   const sourceRestoreRecord =
     assertPrivateControlledInputPostEventRestoreQueueRecord(restoreRecord);
+  assertControlledRestoreRecordFromGate(
+    sourceRestoreRecord,
+    gateState,
+    throwPostEventRestoreQueueFakeDomExecutionError,
+    'foreign-controlled-restore-queue-record'
+  );
   const latestPropsValidation =
     createPostEventRestoreQueueFakeDomExecutionLatestPropsValidation(
       latestPropsRecord,
@@ -1265,14 +1361,32 @@ function recordControlledInputPostEventRestoreFakeDomExecutionWithGate(
     assertPostEventRestoreQueueFakeDomExecutionWriteExecutionRecord(
       writeExecutionRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceWriteExecution,
+    gateState,
+    throwPostEventRestoreQueueFakeDomExecutionError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceFlushBlocker =
     assertPostEventRestoreQueueFakeDomExecutionFlushBlockerRecord(
       flushBlockerRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceFlushBlocker,
+    gateState,
+    throwPostEventRestoreQueueFakeDomExecutionError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceWrapperIntent =
     assertPostEventRestoreQueueFakeDomExecutionWrapperMutationIntentRecord(
       wrapperMutationIntentRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceWrapperIntent,
+    gateState,
+    throwPostEventRestoreQueueFakeDomExecutionError,
+    'foreign-controlled-restore-queue-record'
+  );
   assertPostEventRestoreQueueFakeDomExecutionSources(
     sourceRestoreRecord,
     sourceWriteExecution,
@@ -1405,6 +1519,7 @@ function recordControlledInputPostEventRestoreFakeDomExecutionWithGate(
     payload,
     payload
   );
+  bindControlledRestoreRecordToGate(payload, gateState);
   return payload;
 }
 
@@ -1422,10 +1537,22 @@ function recordControlledInputPostEventRestoreQueueWrapperMutationIntentWithGate
     assertPostEventRestoreQueueWrapperMutationIntentWriteExecutionRecord(
       writeExecutionRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceWriteExecution,
+    gateState,
+    throwPostEventRestoreQueueWrapperMutationIntentError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceFlushBlocker =
     assertPostEventRestoreQueueWrapperMutationIntentFlushBlockerRecord(
       flushBlockerRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceFlushBlocker,
+    gateState,
+    throwPostEventRestoreQueueWrapperMutationIntentError,
+    'foreign-controlled-restore-queue-record'
+  );
   assertPostEventRestoreQueueWrapperMutationIntentSources(
     sourceWriteExecution,
     sourceFlushBlocker
@@ -1522,6 +1649,7 @@ function recordControlledInputPostEventRestoreQueueWrapperMutationIntentWithGate
     payload,
     payload
   );
+  bindControlledRestoreRecordToGate(payload, gateState);
   return payload;
 }
 
@@ -1544,18 +1672,42 @@ function preflightControlledInputPostEventRestoreLiveMutationWithGate(
     );
   const sourceBridge =
     assertInputChangeEventRestoreQueueExecutionBridgeRecord(bridgeRecord);
+  assertControlledRestoreRecordFromGate(
+    sourceBridge,
+    gateState,
+    throwPostEventRestoreQueueLiveMutationPreflightError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceWriteExecution =
     assertInputChangeEventRestoreQueueExecutionWriteExecutionRecord(
       writeExecutionRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceWriteExecution,
+    gateState,
+    throwPostEventRestoreQueueLiveMutationPreflightError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceFlushBlocker =
     assertInputChangeEventRestoreQueueExecutionFlushBlockerRecord(
       flushBlockerRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceFlushBlocker,
+    gateState,
+    throwPostEventRestoreQueueLiveMutationPreflightError,
+    'foreign-controlled-restore-queue-record'
+  );
   const sourceWrapperIntent =
     assertInputChangeEventRestoreQueueExecutionWrapperMutationIntentRecord(
       wrapperMutationIntentRecord
     );
+  assertControlledRestoreRecordFromGate(
+    sourceWrapperIntent,
+    gateState,
+    throwPostEventRestoreQueueLiveMutationPreflightError,
+    'foreign-controlled-restore-queue-record'
+  );
   const latestPropsValidation =
     createInputChangeEventRestoreQueueExecutionLatestPropsValidation(
       inputPreflight,
@@ -1671,6 +1823,7 @@ function preflightControlledInputPostEventRestoreLiveMutationWithGate(
     payload,
     payload
   );
+  bindControlledRestoreRecordToGate(payload, gateState);
   return payload;
 }
 
@@ -1976,6 +2129,42 @@ function assertPrivateControlledInputPostEventRestoreQueueRecord(record) {
   throw error;
 }
 
+function bindControlledRestoreRecordToGate(record, gateState) {
+  controlledInputPostEventRestoreQueueGateStates.set(record, gateState);
+  return record;
+}
+
+function isControlledRestoreRecordFromGate(record, gateState) {
+  return controlledInputPostEventRestoreQueueGateStates.get(record) === gateState;
+}
+
+function assertControlledRestoreRecordFromGate(
+  record,
+  gateState,
+  throwError,
+  reason
+) {
+  if (isControlledRestoreRecordFromGate(record, gateState) !== true) {
+    throwError(reason, record);
+  }
+}
+
+function createControlledRestoreQueueIdentityEvidence(gateState, records) {
+  const sourceRecords = Array.isArray(records) ? records : [];
+  return freezeRecord({
+    status: 'validated-private-controlled-restore-queue-identity',
+    gateId: controlledInputPostEventRestoreQueueGateId,
+    requestIdPrefix: gateState.requestIdPrefix,
+    sourceRecordCount: sourceRecords.length,
+    sourceRecordsFromSameGate: sourceRecords.every((record) =>
+      isControlledRestoreRecordFromGate(record, gateState)
+    ),
+    crossGateReuseRejected: true,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
 function assertEventDispatchRecordForPostEventRestore(dispatchRecord) {
   if (
     !isObjectLike(dispatchRecord) ||
@@ -1986,8 +2175,23 @@ function assertEventDispatchRecordForPostEventRestore(dispatchRecord) {
     );
   }
 
+  if (getEventDispatchRecordPayload(dispatchRecord) === null) {
+    throwPostEventRestoreEventError(
+      'Expected a source-owned private React DOM event dispatch record.'
+    );
+  }
+
   if (
     dispatchRecord.blockedReason !== EVENT_DISPATCH_BLOCKED_CODE ||
+    dispatchRecord.status !== 'blocked' ||
+    dispatchRecord.browserDomEventCompatibilityClaimed !== false ||
+    dispatchRecord.publicRootBehaviorChanged !== false ||
+    dispatchRecord.syntheticEventCount !== 0 ||
+    dispatchRecord.listenerInvocationCount !== 0 ||
+    dispatchRecord.willInvokeListeners !== false ||
+    !isObjectLike(dispatchRecord.hydrationReplay) ||
+    dispatchRecord.hydrationReplay.status !== 'blocked' ||
+    dispatchRecord.hydrationReplay.queued !== false ||
     !isObjectLike(dispatchRecord.controlledStateRestore) ||
     dispatchRecord.controlledStateRestore.blockedReason !==
       CONTROLLED_STATE_RESTORE_BLOCKED_CODE ||
@@ -4047,6 +4251,15 @@ function createInputChangeEventPreflightBridgeSourceSummary(
     inputType: inputPreflight.targetType,
     targetKind: inputPreflight.targetMetadata.targetKind,
     targetEligible: inputPreflight.extractionMetadata.targetEligible,
+    rootListenerCurrentnessStatus:
+      inputPreflight.rootListenerCurrentness.status,
+    rootListenerCurrentnessSourceOwned:
+      inputPreflight.rootListenerCurrentness.sourceOwned,
+    rootListenerEventTypeCurrent:
+      inputPreflight.rootListenerCurrentness.eventTypeCurrent,
+    rootListenerContainerCurrent:
+      inputPreflight.rootListenerCurrentness
+        .rootContainerMatchesDispatchTarget,
     controlledPropName:
       inputPreflight.controlledMetadata.controlledPropName,
     controlled: inputPreflight.controlledMetadata.controlled,
@@ -4442,6 +4655,15 @@ function createInputChangeEventRestoreQueueExecutionExtractionEvidence(
     hostTag: inputPreflight.targetTag,
     inputType: inputPreflight.targetType,
     targetKind: inputPreflight.targetMetadata.targetKind,
+    rootListenerCurrentnessStatus:
+      inputPreflight.rootListenerCurrentness.status,
+    rootListenerCurrentnessSourceOwned:
+      inputPreflight.rootListenerCurrentness.sourceOwned,
+    rootListenerEventTypeCurrent:
+      inputPreflight.rootListenerCurrentness.eventTypeCurrent,
+    rootListenerContainerCurrent:
+      inputPreflight.rootListenerCurrentness
+        .rootContainerMatchesDispatchTarget,
     inputChangeExtractionPreflightAccepted: true,
     eventDispatch: false,
     syntheticEventCreated: false,
@@ -6952,6 +7174,59 @@ function createPublicControlledBehaviorBoundary() {
   });
 }
 
+function assertNoControlledRestoreQueueAdmissionSmuggling(
+  admission,
+  throwError
+) {
+  const blockedClaimFields = [
+    'browserDomEventCompatibilityClaimed',
+    'browserInputMutated',
+    'browserSyntheticEventCompatibilityClaimed',
+    'compatibilityClaimed',
+    'controlledStateRestoreInvoked',
+    'controlledStateRestoreScheduled',
+    'eventDispatch',
+    'eventDispatchAllowed',
+    'hydrationReplayCompatibilityClaimed',
+    'hostValueWritten',
+    'hostWrapperInvoked',
+    'packageCompatibilityClaimed',
+    'publicControlledBehaviorEnabled',
+    'publicDispatchEnabled',
+    'publicEventCompatibilityClaimed',
+    'publicHydrationReplayCompatibilityClaimed',
+    'publicPackageCompatibilityClaimed',
+    'publicRootBehaviorChanged',
+    'publicSyntheticEventCompatibilityClaimed',
+    'realDomMutationAllowed',
+    'restoreQueueFlushed',
+    'restoreQueueWritten',
+    'syntheticEventCompatibilityClaimed',
+    'syntheticEventCreated',
+    'syntheticEventDispatch',
+    'valueTrackerFieldWritten',
+    'willDispatchPublicEvent',
+    'willInvokePublicListeners'
+  ];
+
+  for (const field of blockedClaimFields) {
+    if (admission[field] === true) {
+      throwError('public-or-live-behavior-claimed');
+    }
+  }
+
+  if (
+    typeof admission.syntheticEventCount === 'number' &&
+    admission.syntheticEventCount > 0
+  ) {
+    throwError('public-or-live-behavior-claimed');
+  }
+
+  if (containsBlockedInputChangeSourceAlias(admission)) {
+    throwError('resource-form-or-hydration-replay-source-alias');
+  }
+}
+
 function normalizeInputChangeEventRestoreQueueBridgeAdmission(admission) {
   if (admission == null || typeof admission !== 'object') {
     throwInputChangeEventRestoreQueueBridgeError(
@@ -6964,6 +7239,10 @@ function normalizeInputChangeEventRestoreQueueBridgeAdmission(admission) {
       'explicitAdmission must be true'
     );
   }
+  assertNoControlledRestoreQueueAdmissionSmuggling(
+    admission,
+    throwInputChangeEventRestoreQueueBridgeError
+  );
 
   const queueKind = getAdmissionStringProperty(
     admission,
@@ -7036,6 +7315,10 @@ function normalizeInputChangeEventRestoreQueueExecutionAdmission(
       'explicitAdmission must be true'
     );
   }
+  assertNoControlledRestoreQueueAdmissionSmuggling(
+    admission,
+    throwInputChangeEventRestoreQueueExecutionError
+  );
 
   const queueKind = getAdmissionStringProperty(
     admission,
@@ -7140,6 +7423,10 @@ function normalizePostEventRestoreQueueFakeDomExecutionAdmission(admission) {
       'explicitAdmission must be true'
     );
   }
+  assertNoControlledRestoreQueueAdmissionSmuggling(
+    admission,
+    throwPostEventRestoreQueueFakeDomExecutionError
+  );
 
   const queueKind = getAdmissionStringProperty(
     admission,
@@ -7237,6 +7524,10 @@ function normalizePostEventRestoreQueueAdmission(admission) {
   if (admission.explicitAdmission !== true) {
     throwInvalidAdmission('explicitAdmission must be true');
   }
+  assertNoControlledRestoreQueueAdmissionSmuggling(
+    admission,
+    throwInvalidAdmission
+  );
 
   const queueKind = getAdmissionStringProperty(
     admission,
@@ -7316,6 +7607,10 @@ function normalizePostEventRestoreQueueWritePreflightAdmission(admission) {
       'explicitAdmission must be true'
     );
   }
+  assertNoControlledRestoreQueueAdmissionSmuggling(
+    admission,
+    throwPostEventRestoreQueueWritePreflightError
+  );
 
   const queueKind = getAdmissionStringProperty(
     admission,
@@ -7389,6 +7684,10 @@ function normalizePostEventRestoreQueueWriteExecutionAdmission(admission) {
       'explicitAdmission must be true'
     );
   }
+  assertNoControlledRestoreQueueAdmissionSmuggling(
+    admission,
+    throwPostEventRestoreQueueWriteExecutionError
+  );
 
   const queueKind = getAdmissionStringProperty(
     admission,
@@ -7464,6 +7763,10 @@ function normalizePostEventRestoreQueueFlushBlockerAdmission(admission) {
       'explicitAdmission must be true'
     );
   }
+  assertNoControlledRestoreQueueAdmissionSmuggling(
+    admission,
+    throwPostEventRestoreQueueFlushBlockerError
+  );
 
   const queueKind = getAdmissionStringProperty(
     admission,
@@ -7540,6 +7843,10 @@ function normalizePostEventRestoreQueueWrapperMutationIntentAdmission(
       'explicitAdmission must be true'
     );
   }
+  assertNoControlledRestoreQueueAdmissionSmuggling(
+    admission,
+    throwPostEventRestoreQueueWrapperMutationIntentError
+  );
 
   const queueKind = getAdmissionStringProperty(
     admission,
@@ -7618,6 +7925,10 @@ function normalizePostEventRestoreQueueLiveMutationPreflightAdmission(
       'explicitAdmission must be true'
     );
   }
+  assertNoControlledRestoreQueueAdmissionSmuggling(
+    admission,
+    throwPostEventRestoreQueueLiveMutationPreflightError
+  );
 
   const queueKind = getAdmissionStringProperty(
     admission,
@@ -7706,7 +8017,10 @@ function normalizePostEventRestoreQueueLiveMutationPreflightAdmission(
   };
 }
 
-function normalizePostEventRestoreQueueWritePreflightRecords(records) {
+function normalizePostEventRestoreQueueWritePreflightRecords(
+  records,
+  gateState
+) {
   const inputRecords = Array.isArray(records) ? records : [records];
   if (inputRecords.length === 0) {
     throwPostEventRestoreQueueWritePreflightError(
@@ -7718,6 +8032,12 @@ function normalizePostEventRestoreQueueWritePreflightRecords(records) {
     inputRecords.map((record) => {
       const sourceRecord =
         assertPrivateControlledInputPostEventRestoreQueueRecord(record);
+      assertControlledRestoreRecordFromGate(
+        sourceRecord,
+        gateState,
+        throwPostEventRestoreQueueWritePreflightError,
+        'foreign-controlled-restore-queue-record'
+      );
       const rejectionReason =
         getPostEventRestoreQueueWritePreflightRejectionReason(sourceRecord);
       if (rejectionReason !== null) {
@@ -7755,6 +8075,16 @@ function assertInputChangeEventExtractionPreflightForRestoreQueueBridge(
 }
 
 function getInputChangeEventExtractionPreflightBridgeRejectionReason(record) {
+  const payload = getInputChangeEventExtractionPreflightRecordPayload(record);
+  const currentnessRejectionReason =
+    getInputChangeEventExtractionPreflightCurrentnessRejectionReason(
+      record,
+      payload
+    );
+  if (currentnessRejectionReason !== null) {
+    return currentnessRejectionReason;
+  }
+
   if (
     record.kind !== INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND ||
     record.status !== PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS ||
@@ -7821,6 +8151,71 @@ function getInputChangeEventExtractionPreflightBridgeRejectionReason(record) {
     record.sideEffects.compatibilityClaimed !== false
   ) {
     return 'input-change-preflight-already-has-side-effects';
+  }
+
+  return null;
+}
+
+function getInputChangeEventExtractionPreflightCurrentnessRejectionReason(
+  record,
+  payload
+) {
+  if (payload === null || !isObjectLike(payload.eventDispatchPayload)) {
+    return 'input-change-preflight-source-not-owned';
+  }
+
+  const rootListenerCurrentnessGateRecord =
+    payload.rootListenerCurrentnessGateRecord;
+  const rootListenerCurrentnessGatePayload =
+    getPrivateRootListenerCurrentnessGatePayload(
+      rootListenerCurrentnessGateRecord
+    );
+  if (rootListenerCurrentnessGatePayload === null) {
+    return 'root-listener-currentness-not-source-owned';
+  }
+  if (
+    containsBlockedInputChangeSourceAlias(
+      rootListenerCurrentnessGatePayload.sourceRecord
+    )
+  ) {
+    return 'root-listener-currentness-source-alias';
+  }
+
+  const rootListenerCurrentness = record.rootListenerCurrentness;
+  if (
+    !isObjectLike(rootListenerCurrentness) ||
+    rootListenerCurrentness.status !==
+      'validated-input-change-root-listener-currentness' ||
+    rootListenerCurrentness.sourceOwned !== true ||
+    rootListenerCurrentness.sourceOwnership !==
+      'weakmap-root-listener-registration' ||
+    rootListenerCurrentness.currentRegistration !== true ||
+    rootListenerCurrentness.registrationActive !== true ||
+    rootListenerCurrentness.listenerStateStable !== true ||
+    rootListenerCurrentness.rootContainerMatchesDispatchTarget !== true ||
+    rootListenerCurrentness.eventTypeCurrent !== true ||
+    rootListenerCurrentness.domEventName !== record.domEventName ||
+    rootListenerCurrentness.nativeEventType !== record.nativeEventType ||
+    rootListenerCurrentness.publicDispatchEnabled !== false ||
+    rootListenerCurrentness.publicRootBehaviorChanged !== false ||
+    rootListenerCurrentness.browserDomEventCompatibilityClaimed !== false ||
+    rootListenerCurrentness.compatibilityClaimed !== false ||
+    rootListenerCurrentness.eventDispatch !== false ||
+    rootListenerCurrentness.syntheticEventDispatch !== false
+  ) {
+    return 'root-listener-currentness-not-accepted';
+  }
+
+  if (
+    record.nativeEventType !== record.domEventName ||
+    payload.eventDispatchPayload.nativeEventTarget !==
+      payload.dispatchRecord.nativeEventTarget ||
+    payload.eventDispatchPayload.targetContainer !==
+      payload.dispatchRecord.targetContainer ||
+    payload.eventDispatchPayload.targetListenerLookupRecord !==
+      payload.targetListenerLookupRecord
+  ) {
+    return 'input-change-preflight-source-target-mismatch';
   }
 
   return null;
@@ -7907,6 +8302,11 @@ function getInputChangeEventRestoreQueueBridgeRejectionReason(
 ) {
   const restoreSourceKind =
     restoreRecord.sourceKind || restoreRecord.restoreIntent?.source;
+  const inputPreflightPayload =
+    getInputChangeEventExtractionPreflightRecordPayload(inputPreflight);
+  const restoreSourcePayload =
+    controlledInputPostEventRestoreQueueSourcePayloads.get(restoreRecord) ||
+    null;
 
   if (
     restoreSourceKind !==
@@ -7922,6 +8322,16 @@ function getInputChangeEventRestoreQueueBridgeRejectionReason(
     restoreRecord.restoreIntent.controlledStateRestoreInvoked !== false
   ) {
     return 'controlled-restore-intent-not-accepted';
+  }
+  if (
+    inputPreflightPayload === null ||
+    restoreSourcePayload === null ||
+    restoreSourcePayload.dispatchRecord !==
+      inputPreflightPayload.dispatchRecord ||
+    restoreSourcePayload.eventDispatchPayload !==
+      inputPreflightPayload.eventDispatchPayload
+  ) {
+    return 'input-change-restore-dispatch-source-mismatch';
   }
   if (
     !isObjectLike(restoreRecord.latestPropsEvidence) ||
@@ -9058,6 +9468,68 @@ function bridgeArraysEqual(left, right) {
   }
 
   return true;
+}
+
+function containsBlockedInputChangeSourceAlias(source) {
+  if (!isObjectLike(source)) {
+    return false;
+  }
+
+  for (const key of [
+    '$$typeof',
+    'kind',
+    'source',
+    'sourceKind',
+    'status',
+    'operation',
+    'requestType',
+    'facadeCall',
+    'queueKind',
+    'targetKind'
+  ]) {
+    if (isBlockedInputChangeSourceAliasValue(source[key])) {
+      return true;
+    }
+  }
+
+  for (const key of [
+    'resourceFormEvidence',
+    'resourceEvidence',
+    'formEvidence',
+    'formActionEvidence',
+    'formResetEvidence',
+    'hydrationReplayEvidence',
+    'replayQueueEvidence'
+  ]) {
+    if (source[key] !== undefined) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isBlockedInputChangeSourceAliasValue(value) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes('hydrationreplay') ||
+    normalized.includes('hydration-replay') ||
+    normalized.includes('eventreplay') ||
+    normalized.includes('event-replay') ||
+    normalized.includes('replayqueue') ||
+    normalized.includes('replay-queue') ||
+    normalized.includes('resource-form') ||
+    normalized.includes('resourceform') ||
+    normalized.includes('form-action') ||
+    normalized.includes('formaction') ||
+    normalized.includes('form-reset') ||
+    normalized.includes('formreset') ||
+    normalized.includes('requestformreset')
+  );
 }
 
 function summarizeControlledProps(props) {

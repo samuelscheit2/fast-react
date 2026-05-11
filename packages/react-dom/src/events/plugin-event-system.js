@@ -8,6 +8,7 @@ const {
   createEventTargetDispatchPathRecord,
   createEventTargetNormalizationRecord,
   getEventListenerTargetLookupRecordPayload,
+  getLatestPropsFromNode,
   getPrivateRootHostOutputEventTargetRecordPayload,
   getRootOwnerFromNode,
   isPrivateRootHostOutputEventTargetRecord
@@ -129,6 +130,8 @@ const INVALID_EVENT_WRAPPER_RECORD_CODE =
   'FAST_REACT_DOM_INVALID_EVENT_WRAPPER_RECORD';
 const INVALID_EVENT_DISPATCH_RECORD_CODE =
   'FAST_REACT_DOM_INVALID_EVENT_DISPATCH_RECORD';
+const INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE =
+  'FAST_REACT_DOM_INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT';
 const INVALID_DISPATCH_LISTENER_RECORD_CODE =
   'FAST_REACT_DOM_INVALID_DISPATCH_LISTENER_RECORD';
 const INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE =
@@ -339,12 +342,14 @@ const focusBlurSyntheticEventTypes = Object.freeze({
   focusin: 'focus',
   focusout: 'blur'
 });
+const eventDispatchRecordPayloads = new WeakMap();
 const dispatchListenerRecordPayloads = new WeakMap();
 const dispatchQueueEntryRecordPayloads = new WeakMap();
 const dispatchListenerInvocationCanaryRecordPayloads = new WeakMap();
 const dispatchQueueInvocationCanaryRecordPayloads = new WeakMap();
 const eventTypeDispatchCanaryRecordPayloads = new WeakMap();
 const inputChangeEventExtractionPreflightRecordPayloads = new WeakMap();
+let rootListenersModule = null;
 const syntheticEventShapeRecordPayloads = new WeakMap();
 const syntheticEventShapeGateRecordPayloads = new WeakMap();
 const dispatchListenerErrorRouteRecordPayloads = new WeakMap();
@@ -459,6 +464,174 @@ function createInputChangePreflightPropSummary(props, propName) {
     present,
     type: present ? typeof value : 'missing'
   });
+}
+
+function createInputChangeEventExtractionPreflightError(reason) {
+  const error = new Error(
+    `Invalid private React DOM input/change event extraction preflight: ${reason}.`
+  );
+  error.code = INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE;
+  error.reason = reason;
+  return error;
+}
+
+function throwInputChangeEventExtractionPreflightError(reason) {
+  throw createInputChangeEventExtractionPreflightError(reason);
+}
+
+function getRootListenerCurrentnessGatePayload(record) {
+  if (rootListenersModule === null) {
+    rootListenersModule = require('./root-listeners.js');
+  }
+
+  const getPayload =
+    rootListenersModule.getPrivateRootListenerCurrentnessGatePayload;
+  return typeof getPayload === 'function' ? getPayload(record) : null;
+}
+
+function normalizeInputChangeEventExtractionPreflightOptions(options) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  assertNoInputChangeExtractionPublicBehaviorClaims(normalizedOptions);
+
+  const rootListenerCurrentnessGateRecord =
+    normalizedOptions.rootListenerCurrentnessGateRecord ||
+    normalizedOptions.listenerCurrentnessGateRecord ||
+    normalizedOptions.currentnessGateRecord ||
+    null;
+  if (rootListenerCurrentnessGateRecord === null) {
+    throwInputChangeEventExtractionPreflightError(
+      'missing-root-listener-currentness-gate'
+    );
+  }
+
+  assertNoInputChangeExtractionSourceAlias(
+    normalizedOptions.sourceRecord,
+    'source-record-alias'
+  );
+  assertNoInputChangeExtractionSourceAlias(
+    rootListenerCurrentnessGateRecord,
+    'root-listener-currentness-source-alias'
+  );
+
+  return Object.freeze({
+    rootListenerCurrentnessGateRecord,
+    sourceRecord: isObjectLike(normalizedOptions.sourceRecord)
+      ? normalizedOptions.sourceRecord
+      : null
+  });
+}
+
+function assertNoInputChangeExtractionPublicBehaviorClaims(options) {
+  const blockedClaimFields = [
+    'browserDomEventCompatibilityClaimed',
+    'browserInputMutated',
+    'browserListenerInstallation',
+    'browserSyntheticEventCompatibilityClaimed',
+    'compatibilityClaimed',
+    'controlledStateRestoreScheduled',
+    'eventDispatch',
+    'eventDispatchAllowed',
+    'hydrationReplayCompatibilityClaimed',
+    'listenerInstallation',
+    'packageCompatibilityClaimed',
+    'publicControlledBehaviorEnabled',
+    'publicDispatchEnabled',
+    'publicEventCompatibilityClaimed',
+    'publicHydrationReplayCompatibilityClaimed',
+    'publicListenerInstallation',
+    'publicPackageCompatibilityClaimed',
+    'publicRootBehaviorChanged',
+    'publicSyntheticEventCompatibilityClaimed',
+    'realDomMutationAllowed',
+    'restoreQueueFlushed',
+    'restoreQueueWritten',
+    'rootListenerInstallation',
+    'syntheticEventCompatibilityClaimed',
+    'syntheticEventCreated',
+    'syntheticEventDispatch',
+    'valueTrackerFieldWritten',
+    'willDispatchPublicEvent',
+    'willInvokePublicListeners'
+  ];
+
+  for (const field of blockedClaimFields) {
+    if (options[field] === true) {
+      throwInputChangeEventExtractionPreflightError(
+        'public-or-live-behavior-claimed'
+      );
+    }
+  }
+
+  if (
+    typeof options.syntheticEventCount === 'number' &&
+    options.syntheticEventCount > 0
+  ) {
+    throwInputChangeEventExtractionPreflightError(
+      'public-or-live-behavior-claimed'
+    );
+  }
+}
+
+function assertNoInputChangeExtractionSourceAlias(source, reason) {
+  if (containsBlockedInputChangeExtractionSourceAlias(source)) {
+    throwInputChangeEventExtractionPreflightError(reason);
+  }
+}
+
+function containsBlockedInputChangeExtractionSourceAlias(source) {
+  if (!isObjectLike(source)) {
+    return false;
+  }
+
+  for (const key of [
+    '$$typeof',
+    'facadeCall',
+    'kind',
+    'operation',
+    'queueKind',
+    'requestType',
+    'source',
+    'sourceKind',
+    'status',
+    'targetKind'
+  ]) {
+    if (isBlockedInputChangeExtractionSourceAlias(source[key])) {
+      return true;
+    }
+  }
+
+  return (
+    source.resourceFormEvidence !== undefined ||
+    source.resourceEvidence !== undefined ||
+    source.formEvidence !== undefined ||
+    source.formActionEvidence !== undefined ||
+    source.formResetEvidence !== undefined ||
+    source.hydrationReplayEvidence !== undefined ||
+    source.replayQueueEvidence !== undefined
+  );
+}
+
+function isBlockedInputChangeExtractionSourceAlias(value) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes('hydrationreplay') ||
+    normalized.includes('hydration-replay') ||
+    normalized.includes('eventreplay') ||
+    normalized.includes('event-replay') ||
+    normalized.includes('replayqueue') ||
+    normalized.includes('replay-queue') ||
+    normalized.includes('resource-form') ||
+    normalized.includes('resourceform') ||
+    normalized.includes('form-action') ||
+    normalized.includes('formaction') ||
+    normalized.includes('form-reset') ||
+    normalized.includes('formreset') ||
+    normalized.includes('requestformreset')
+  );
 }
 
 function createInvalidEventWrapperRecordError() {
@@ -1117,8 +1290,22 @@ function isEventTypeDispatchCanaryRecord(record) {
   return getEventTypeDispatchCanaryRecordPayload(record) !== null;
 }
 
-function createInputChangeEventExtractionPreflightRecord(dispatchRecord) {
+function createInputChangeEventExtractionPreflightRecord(
+  dispatchRecord,
+  options
+) {
   const normalizedDispatchRecord = assertEventDispatchRecord(dispatchRecord);
+  const dispatchPayload =
+    getEventDispatchRecordPayload(normalizedDispatchRecord);
+  const preflightOptions =
+    normalizeInputChangeEventExtractionPreflightOptions(options);
+  assertInputChangeEventDispatchRecordBlocked(normalizedDispatchRecord);
+  assertInputChangeEventTypeMatchesSource(normalizedDispatchRecord);
+  const rootListenerCurrentness =
+    createInputChangeEventPreflightRootListenerCurrentness(
+      normalizedDispatchRecord,
+      preflightOptions.rootListenerCurrentnessGateRecord
+    );
   const latestPropsEvidence =
     createInputChangeEventPreflightLatestPropsEvidence(
       normalizedDispatchRecord
@@ -1185,6 +1372,7 @@ function createInputChangeEventExtractionPreflightRecord(dispatchRecord) {
     publicRootBehaviorChanged: false,
     reactEventType: 'change',
     reactName: 'onChange',
+    rootListenerCurrentness,
     sideEffects,
     status: PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS,
     syntheticEventCount: 0,
@@ -1203,6 +1391,10 @@ function createInputChangeEventExtractionPreflightRecord(dispatchRecord) {
     record,
     Object.freeze({
       dispatchRecord: normalizedDispatchRecord,
+      eventDispatchPayload: dispatchPayload,
+      rootListenerCurrentnessGateRecord:
+        preflightOptions.rootListenerCurrentnessGateRecord,
+      rootListenerCurrentness,
       targetDispatchPathRecord:
         normalizedDispatchRecord.targetDispatchPathRecord,
       targetListenerLookupRecord:
@@ -1211,6 +1403,188 @@ function createInputChangeEventExtractionPreflightRecord(dispatchRecord) {
   );
 
   return record;
+}
+
+function assertInputChangeEventDispatchRecordBlocked(dispatchRecord) {
+  if (
+    dispatchRecord.admissionStatus !==
+      PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS ||
+    dispatchRecord.blockedReason !== EVENT_DISPATCH_BLOCKED_CODE ||
+    dispatchRecord.status !== 'blocked' ||
+    dispatchRecord.browserDomEventCompatibilityClaimed !== false ||
+    dispatchRecord.publicRootBehaviorChanged !== false ||
+    dispatchRecord.syntheticEventCount !== 0 ||
+    dispatchRecord.listenerInvocationCount !== 0 ||
+    dispatchRecord.willInvokeListeners !== false ||
+    !isObjectLike(dispatchRecord.controlledStateRestore) ||
+    dispatchRecord.controlledStateRestore.status !== 'blocked' ||
+    dispatchRecord.controlledStateRestore.scheduled !== false ||
+    dispatchRecord.controlledStateRestore.blockedReason !==
+      CONTROLLED_STATE_RESTORE_BLOCKED_CODE ||
+    !isObjectLike(dispatchRecord.hydrationReplay) ||
+    dispatchRecord.hydrationReplay.queued !== false ||
+    dispatchRecord.hydrationReplay.status !== 'blocked'
+  ) {
+    throwInputChangeEventExtractionPreflightError(
+      'dispatch-record-public-status-not-blocked'
+    );
+  }
+}
+
+function assertInputChangeEventTypeMatchesSource(dispatchRecord) {
+  if (dispatchRecord.nativeEventType !== dispatchRecord.domEventName) {
+    throwInputChangeEventExtractionPreflightError(
+      'native-event-type-mismatch'
+    );
+  }
+}
+
+function createInputChangeEventPreflightRootListenerCurrentness(
+  dispatchRecord,
+  rootListenerCurrentnessGateRecord
+) {
+  if (
+    !isObjectLike(rootListenerCurrentnessGateRecord) ||
+    rootListenerCurrentnessGateRecord.kind !==
+      'FastReactDomPrivateRootListenerCurrentnessGateRecord' ||
+    rootListenerCurrentnessGateRecord.status !==
+      'validated-private-root-listener-currentness-gate' ||
+    rootListenerCurrentnessGateRecord.sourceOwned !== true ||
+    rootListenerCurrentnessGateRecord.sourceOwnership !==
+      'weakmap-root-listener-registration' ||
+    rootListenerCurrentnessGateRecord.currentRegistration !== true ||
+    rootListenerCurrentnessGateRecord.registrationActive !== true ||
+    rootListenerCurrentnessGateRecord.listenerStateStable !== true ||
+    rootListenerCurrentnessGateRecord.eventDispatch !== false ||
+    rootListenerCurrentnessGateRecord.syntheticEventDispatch !== false ||
+    rootListenerCurrentnessGateRecord.publicDispatchEnabled !== false ||
+    rootListenerCurrentnessGateRecord.publicRootBehaviorChanged !== false ||
+    rootListenerCurrentnessGateRecord.browserDomEventCompatibilityClaimed !==
+      false ||
+    rootListenerCurrentnessGateRecord.compatibilityClaimed !== false ||
+    !Array.isArray(rootListenerCurrentnessGateRecord.targetRows) ||
+    !Array.isArray(rootListenerCurrentnessGateRecord.listenerRows)
+  ) {
+    throwInputChangeEventExtractionPreflightError(
+      'invalid-root-listener-currentness-gate'
+    );
+  }
+
+  if (
+    rootListenerCurrentnessGateRecord.sourceKind === 'hydrateRoot' ||
+    isBlockedInputChangeExtractionSourceAlias(
+      rootListenerCurrentnessGateRecord.sourceKind
+    )
+  ) {
+    throwInputChangeEventExtractionPreflightError(
+      'root-listener-currentness-source-alias'
+    );
+  }
+  const rootListenerCurrentnessGatePayload =
+    getRootListenerCurrentnessGatePayload(
+      rootListenerCurrentnessGateRecord
+    );
+  if (rootListenerCurrentnessGatePayload === null) {
+    throwInputChangeEventExtractionPreflightError(
+      'root-listener-currentness-not-source-owned'
+    );
+  }
+  if (
+    isBlockedInputChangeExtractionSourceAlias(
+      rootListenerCurrentnessGatePayload.options?.sourceKind
+    ) ||
+    containsBlockedInputChangeExtractionSourceAlias(
+      rootListenerCurrentnessGatePayload.sourceRecord
+    )
+  ) {
+    throwInputChangeEventExtractionPreflightError(
+      'root-listener-currentness-source-alias'
+    );
+  }
+
+  const targetContainerInfo = describeContainer(dispatchRecord.targetContainer);
+  const rootContainerRows =
+    rootListenerCurrentnessGateRecord.targetRows.filter(
+      (row) =>
+        row.targetRole === 'root-container' &&
+        row.current === true &&
+        row.eventDispatch === false &&
+        row.publicRootBehaviorChanged === false &&
+        row.browserDomEventCompatibilityClaimed === false &&
+        row.compatibilityClaimed === false
+    );
+  const rootContainerMatchesDispatchTarget = rootContainerRows.some((row) =>
+    containerInfoMatches(row.targetInfo, targetContainerInfo)
+  );
+  const phase = dispatchRecord.inCapturePhase ? 'capture' : 'bubble';
+  const eventListenerRows =
+    rootListenerCurrentnessGateRecord.listenerRows.filter(
+      (row) =>
+        row.targetRole === 'root-container' &&
+        row.domEventName === dispatchRecord.domEventName &&
+        row.phase === phase &&
+        row.current === true &&
+        row.listenerShellOwned === true &&
+        row.sourceOwned === true &&
+        row.eventDispatch === false &&
+        row.publicRootBehaviorChanged === false &&
+        row.browserDomEventCompatibilityClaimed === false &&
+        row.compatibilityClaimed === false &&
+        row.willDispatchPublicEvent === false
+    );
+
+  if (!rootContainerMatchesDispatchTarget) {
+    throwInputChangeEventExtractionPreflightError(
+      'root-listener-currentness-container-mismatch'
+    );
+  }
+
+  if (eventListenerRows.length === 0) {
+    throwInputChangeEventExtractionPreflightError(
+      'root-listener-currentness-event-type-mismatch'
+    );
+  }
+
+  return Object.freeze({
+    status: 'validated-input-change-root-listener-currentness',
+    sourceOwned: true,
+    sourceOwnership: 'weakmap-root-listener-registration',
+    gateRecordKind: rootListenerCurrentnessGateRecord.kind,
+    gateRecordStatus: rootListenerCurrentnessGateRecord.status,
+    sourceKind: rootListenerCurrentnessGateRecord.sourceKind,
+    currentRegistration: true,
+    registrationActive: true,
+    listenerStateStable: true,
+    targetContainerInfo: Object.freeze(targetContainerInfo),
+    rootContainerMatchesDispatchTarget,
+    domEventName: dispatchRecord.domEventName,
+    nativeEventType: dispatchRecord.nativeEventType,
+    phase,
+    eventTypeCurrent: true,
+    rootListenerRowCount:
+      rootListenerCurrentnessGateRecord.rootListenerRowCount,
+    listenerRowCount: rootListenerCurrentnessGateRecord.listenerRowCount,
+    currentListenerRowCount:
+      rootListenerCurrentnessGateRecord.currentListenerRowCount,
+    matchedEventListenerRowCount: eventListenerRows.length,
+    targetRowCount: rootListenerCurrentnessGateRecord.targetRowCount,
+    eventDispatch: false,
+    syntheticEventDispatch: false,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    browserDomEventCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function containerInfoMatches(left, right) {
+  return (
+    isObjectLike(left) &&
+    isObjectLike(right) &&
+    left.kind === right.kind &&
+    left.nodeName === right.nodeName &&
+    left.nodeType === right.nodeType
+  );
 }
 
 function createInputChangeEventPreflightLatestPropsEvidence(
@@ -1223,6 +1597,7 @@ function createInputChangeEventPreflightLatestPropsEvidence(
       latestProps: null,
       record: Object.freeze({
         accepted: false,
+        currentLatestPropsFresh: false,
         exposesLatestProps: false,
         latestPropsObject: false,
         latestPropsStatus: 'missing',
@@ -1233,6 +1608,7 @@ function createInputChangeEventPreflightLatestPropsEvidence(
         reason: 'missing-target-listener-lookup-record',
         registrationName: null,
         sourceRecordKind: null,
+        staleLatestPropsRejected: true,
         targetHostInstanceStatus: null,
         targetHostTag: null,
         targetResolved: false
@@ -1244,9 +1620,14 @@ function createInputChangeEventPreflightLatestPropsEvidence(
     getEventListenerTargetLookupRecordPayload(lookupRecord);
   const latestProps =
     lookupPayload === null ? null : lookupPayload.latestProps;
+  const targetNode =
+    lookupPayload === null ? null : lookupPayload.hostInstanceNode;
+  const currentLatestProps = getLatestPropsFromNode(targetNode);
   const latestPropsObject = isObjectLike(latestProps);
   const accepted =
-    lookupRecord.latestPropsStatus === 'present' && latestPropsObject;
+    lookupRecord.latestPropsStatus === 'present' &&
+    latestPropsObject &&
+    currentLatestProps === latestProps;
   const targetHostTag = getInputChangePreflightHostTag(
     lookupRecord.targetHostInstanceNode
   );
@@ -1257,6 +1638,7 @@ function createInputChangeEventPreflightLatestPropsEvidence(
     record: Object.freeze({
       accepted,
       exposesLatestProps: false,
+      currentLatestPropsFresh: currentLatestProps === latestProps,
       latestPropsObject,
       latestPropsStatus: lookupRecord.latestPropsStatus,
       listenerFound: lookupRecord.listenerFound,
@@ -1267,6 +1649,7 @@ function createInputChangeEventPreflightLatestPropsEvidence(
       rawLatestPropsRetained: false,
       registrationName: lookupRecord.registrationName,
       sourceRecordKind: lookupRecord.kind,
+      staleLatestPropsRejected: true,
       targetHostInstanceStatus:
         lookupRecord.targetHostInstanceStatus,
       targetHostTag,
@@ -4945,6 +5328,14 @@ function isFocusBlurEventBlockerGateRecord(record) {
   return getFocusBlurEventBlockerGateRecordPayload(record) !== null;
 }
 
+function getEventDispatchRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return eventDispatchRecordPayloads.get(record) || null;
+}
+
 function assertEventDispatchRecord(record) {
   if (
     !isObjectLike(record) ||
@@ -4955,6 +5346,13 @@ function assertEventDispatchRecord(record) {
   ) {
     throw createPluginEventSystemError(
       'Cannot invoke a React DOM event listener canary without a private event dispatch record.',
+      INVALID_EVENT_DISPATCH_RECORD_CODE
+    );
+  }
+
+  if (getEventDispatchRecordPayload(record) === null) {
+    throw createPluginEventSystemError(
+      'Cannot invoke a React DOM event listener canary with a cloned or caller-built event dispatch record.',
       INVALID_EVENT_DISPATCH_RECORD_CODE
     );
   }
@@ -8543,7 +8941,7 @@ function createEventDispatchRecordFromWrapperRecord(
   const targetResolutionWasResolved =
     targetDispatchPathRecord.targetInst !== null;
 
-  return Object.freeze({
+  const record = Object.freeze({
     admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
     blockedReason: EVENT_DISPATCH_BLOCKED_CODE,
     browserDomEventCompatibilityClaimed: false,
@@ -8613,6 +9011,22 @@ function createEventDispatchRecordFromWrapperRecord(
     wrapperKind: wrapperRecord.wrapperKind,
     wrapperRecord
   });
+
+  eventDispatchRecordPayloads.set(
+    record,
+    Object.freeze({
+      extractionRecord,
+      nativeEvent,
+      nativeEventTarget,
+      targetContainer: wrapperRecord.targetContainer,
+      targetDispatchPathRecord,
+      targetListenerLookupRecord,
+      targetNormalizationRecord,
+      wrapperRecord
+    })
+  );
+
+  return record;
 }
 
 function createSimpleEventReactNameMap() {
@@ -8701,6 +9115,7 @@ module.exports = {
   INVALID_DISPATCH_LISTENER_RECORD_CODE,
   INVALID_EVENT_DISPATCH_RECORD_CODE,
   INVALID_EVENT_WRAPPER_RECORD_CODE,
+  INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
   INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE,
   INVALID_PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
   INVALID_HYDRATION_REPLAY_CLICK_DISPATCH_DIAGNOSTIC_CODE,
@@ -8764,6 +9179,7 @@ module.exports = {
   getDispatchListenerRecordPayload,
   getDispatchQueueEntryRecordPayload,
   getDispatchQueueInvocationCanaryRecordPayload,
+  getEventDispatchRecordPayload,
   getEventTypeDispatchCanaryRecordPayload,
   getHydrationReplayClickDispatchDiagnosticPayload,
   getHydrationReplayTargetDispatchLinkDiagnosticPayload,

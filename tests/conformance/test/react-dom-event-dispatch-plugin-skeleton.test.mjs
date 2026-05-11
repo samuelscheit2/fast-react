@@ -3485,6 +3485,110 @@ test("plugin extraction records remain deterministic and fail closed for flag va
   );
 });
 
+test("private input/change preflight requires source-owned root listener currentness", () => {
+  const root = createEventTarget("input-change-currentness-root");
+  const input = createNode("INPUT", domContainer.ELEMENT_NODE, root);
+  input.type = "text";
+  const token = componentTree.createHostInstanceToken(
+    {kind: "InputChangeCurrentnessHost"},
+    {kind: "InputChangeCurrentnessRoot"}
+  );
+  componentTree.attachHostInstanceNode(input, token, {
+    onChange() {},
+    type: "text",
+    value: "alpha"
+  });
+  const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "input",
+    0
+  );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapperRecord,
+      createNativeEvent("input", input)
+    );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(root);
+  const rootListenerCurrentnessGateRecord =
+    rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+      rootRegistration,
+      {
+        sourceKind: "createRoot",
+        sourceRecord: {
+          operation: "createRoot",
+          requestId: "input-change-currentness-root",
+          requestType: "createRoot"
+        }
+      }
+    );
+
+  const preflight =
+    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+      dispatchRecord,
+      {rootListenerCurrentnessGateRecord}
+    );
+
+  assert.equal(preflight.rootListenerCurrentness.sourceOwned, true);
+  assert.equal(preflight.rootListenerCurrentness.eventTypeCurrent, true);
+  assert.equal(preflight.latestPropsEvidence.currentLatestPropsFresh, true);
+  assert.equal(preflight.publicDispatchEnabled, false);
+  assert.equal(preflight.browserDomEventCompatibilityClaimed, false);
+  assert.equal(preflight.syntheticEventCount, 0);
+  assert.equal(
+    pluginEventSystem.getEventDispatchRecordPayload(dispatchRecord)
+      .wrapperRecord,
+    wrapperRecord
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        {...dispatchRecord},
+        {rootListenerCurrentnessGateRecord}
+      ),
+    {
+      code: pluginEventSystem.INVALID_EVENT_DISPATCH_RECORD_CODE
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord: {
+            ...rootListenerCurrentnessGateRecord,
+            listenerRows: rootListenerCurrentnessGateRecord.listenerRows,
+            targetRows: rootListenerCurrentnessGateRecord.targetRows
+          }
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: "root-listener-currentness-not-source-owned"
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord,
+          browserDomEventCompatibilityClaimed: true
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: "public-or-live-behavior-claimed"
+    }
+  );
+
+  componentTree.detachHostInstanceToken(token);
+});
+
 test("event target normalization reports mounted host diagnostics without enabling dispatch", () => {
   const root = createEventTarget("target-root");
   const element = createNode("SPAN", domContainer.ELEMENT_NODE, root);
@@ -3805,6 +3909,17 @@ function createEventTarget(label) {
         options,
         type
       });
+    },
+    removeEventListener(type, listener, options) {
+      const index = this.__registrations.findIndex(
+        (registration) =>
+          registration.type === type &&
+          registration.listener === listener &&
+          registration.options === options
+      );
+      if (index !== -1) {
+        this.__registrations.splice(index, 1);
+      }
     }
   };
 }
