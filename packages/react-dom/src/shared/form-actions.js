@@ -14,6 +14,7 @@ const formActionSubmitDispatchGateSchemaVersion = 1;
 const formActionSubmitResetExecutionGateSchemaVersion = 1;
 const formActionCallbackActionPreflightGateSchemaVersion = 1;
 const formActionAsyncCallbackExecutionGateSchemaVersion = 1;
+const formActionFulfilledResetExecutionGateSchemaVersion = 1;
 const formActionRejectedErrorPreflightGateSchemaVersion = 1;
 const privateFormActionFormDataBlockerGateId =
   'form-action-formdata-blocker-private-gate-1';
@@ -25,6 +26,8 @@ const privateFormActionCallbackActionPreflightGateId =
   'form-action-callback-action-preflight-private-gate-1';
 const privateFormActionAsyncCallbackExecutionGateId =
   'form-action-async-callback-execution-private-gate-1';
+const privateFormActionFulfilledResetExecutionGateId =
+  'form-action-fulfilled-reset-execution-private-gate-1';
 const privateFormActionRejectedErrorPreflightGateId =
   'form-action-rejected-error-preflight-private-gate-1';
 const privateFormActionFormDataBlockerRecordType =
@@ -37,6 +40,8 @@ const privateFormActionCallbackActionPreflightRecordType =
   'fast.react_dom.private_form_action_callback_action_preflight_record';
 const privateFormActionAsyncCallbackExecutionRecordType =
   'fast.react_dom.private_form_action_async_callback_execution_record';
+const privateFormActionFulfilledResetExecutionRecordType =
+  'fast.react_dom.private_form_action_fulfilled_reset_execution_record';
 const privateFormActionRejectedErrorPreflightRecordType =
   'fast.react_dom.private_form_action_rejected_error_preflight_record';
 const privateFormActionFormDataBlockerStatus =
@@ -49,6 +54,8 @@ const privateFormActionCallbackActionPreflightStatus =
   'private-form-action-callback-action-preflight-metadata-only';
 const privateFormActionAsyncCallbackExecutionStatus =
   'private-form-action-async-callback-execution-fake-callback-only';
+const privateFormActionFulfilledResetExecutionStatus =
+  'private-form-action-fulfilled-reset-execution-fake-commit-only';
 const privateFormActionRejectedErrorPreflightStatus =
   'private-form-action-rejected-error-preflight-metadata-only';
 const privateFormActionFormDataBlockerRecordedStatus =
@@ -61,6 +68,8 @@ const privateFormActionCallbackActionPreflightRecordedStatus =
   'recorded-private-form-action-callback-action-preflight';
 const privateFormActionAsyncCallbackExecutionRecordedStatus =
   'executed-private-form-action-async-callback-fake-path';
+const privateFormActionFulfilledResetExecutionRecordedStatus =
+  'executed-private-form-action-fulfilled-reset-fake-commit-path';
 const privateFormActionRejectedErrorPreflightRecordedStatus =
   'recorded-private-form-action-rejected-error-preflight';
 const privateFormActionFormDataBlockerGateErrorCode =
@@ -73,6 +82,8 @@ const privateFormActionCallbackActionPreflightGateErrorCode =
   'FAST_REACT_DOM_FORM_ACTION_CALLBACK_ACTION_PREFLIGHT_GATE';
 const privateFormActionAsyncCallbackExecutionGateErrorCode =
   'FAST_REACT_DOM_FORM_ACTION_ASYNC_CALLBACK_EXECUTION_GATE';
+const privateFormActionFulfilledResetExecutionGateErrorCode =
+  'FAST_REACT_DOM_FORM_ACTION_FULFILLED_RESET_EXECUTION_GATE';
 const privateFormActionRejectedErrorPreflightGateErrorCode =
   'FAST_REACT_DOM_FORM_ACTION_REJECTED_ERROR_PREFLIGHT_GATE';
 const privateFormActionFormDataBlockerInvalidAdmissionCode =
@@ -85,6 +96,8 @@ const privateFormActionCallbackActionPreflightInvalidAdmissionCode =
   'FAST_REACT_DOM_FORM_ACTION_CALLBACK_ACTION_PREFLIGHT_INVALID_ADMISSION';
 const privateFormActionAsyncCallbackExecutionInvalidAdmissionCode =
   'FAST_REACT_DOM_FORM_ACTION_ASYNC_CALLBACK_EXECUTION_INVALID_ADMISSION';
+const privateFormActionFulfilledResetExecutionInvalidAdmissionCode =
+  'FAST_REACT_DOM_FORM_ACTION_FULFILLED_RESET_EXECUTION_INVALID_ADMISSION';
 const privateFormActionRejectedErrorPreflightInvalidAdmissionCode =
   'FAST_REACT_DOM_FORM_ACTION_REJECTED_ERROR_PREFLIGHT_INVALID_ADMISSION';
 const privateFormActionFormDataBlockerInvalidRecordCode =
@@ -97,17 +110,25 @@ const privateFormActionCallbackActionPreflightInvalidRecordCode =
   'FAST_REACT_DOM_FORM_ACTION_CALLBACK_ACTION_PREFLIGHT_INVALID_RECORD';
 const privateFormActionAsyncCallbackExecutionInvalidRecordCode =
   'FAST_REACT_DOM_FORM_ACTION_ASYNC_CALLBACK_EXECUTION_INVALID_RECORD';
+const privateFormActionFulfilledResetExecutionInvalidRecordCode =
+  'FAST_REACT_DOM_FORM_ACTION_FULFILLED_RESET_EXECUTION_INVALID_RECORD';
 const privateFormActionRejectedErrorPreflightInvalidRecordCode =
   'FAST_REACT_DOM_FORM_ACTION_REJECTED_ERROR_PREFLIGHT_INVALID_RECORD';
 const formActionsOracleKind =
   'react-19.2.6-react-dom-form-actions-oracle';
+const formActionFulfilledResetExecutionDiagnosticKind =
+  'deterministic-private-fulfilled-action-reset-fake-commit';
+const formActionFulfilledResetExecutionQueueExecutionKind =
+  'deterministic-fake-reset-state-queue';
 
 const formActionFormDataBlockerRecordPayloads = new WeakMap();
 const formActionSubmitDispatchRecordPayloads = new WeakMap();
 const formActionSubmitResetExecutionRecordPayloads = new WeakMap();
 const formActionCallbackActionPreflightRecordPayloads = new WeakMap();
 const formActionAsyncCallbackExecutionRecordPayloads = new WeakMap();
+const formActionFulfilledResetExecutionRecordPayloads = new WeakMap();
 const formActionRejectedErrorPreflightRecordPayloads = new WeakMap();
+const consumedFormActionFulfilledResetExecutions = new WeakSet();
 const consumedFormActionRejectedErrorPreflightExecutions = new WeakSet();
 
 const blockedRawAdmissionFields = freezeArray([
@@ -183,6 +204,34 @@ const blockedAsyncCallbackExecutionAdmissionFields = freezeArray([
   'publicDispatcher',
   'reactUpdate',
   'updateQueue'
+]);
+
+const blockedFulfilledResetExecutionAdmissionFields = freezeArray([
+  ...blockedAsyncCallbackExecutionAdmissionFields,
+  'asyncActionCallback',
+  'fulfilledResetExecution',
+  'postFulfillmentReset',
+  'fulfilledActionResult',
+  'callbackFulfillment',
+  'callbackValue',
+  'actionResult',
+  'stateHook',
+  'resetStateHook',
+  'stateQueue',
+  'resetStateQueue',
+  'newResetState',
+  'resetStateUpdate',
+  'update',
+  'commit',
+  'commitEffect',
+  'resetCommit',
+  'formResetCommit',
+  'fakeReset',
+  'fakeResetQueue',
+  'fakeResetStateQueue',
+  'fakeResetCommit',
+  'fakeFormResetCommit',
+  'resetFormInstanceCall'
 ]);
 
 const blockedRejectedErrorPreflightAdmissionFields = freezeArray([
@@ -486,6 +535,68 @@ const formActionAsyncCallbackExecutionNonThenableSideEffects =
     failClosedErrorRecorded: true
   });
 
+const formActionFulfilledResetExecutionBlockedSideEffects =
+  freezeRecord({
+    sourceAsyncCallbackExecutionAccepted: false,
+    sourceFulfilledAsyncCallbackAccepted: false,
+    sourceSubmitResetExecutionAccepted: false,
+    acceptedMetadataIdsRecorded: false,
+    fulfilledActionResultMetadataConsumed: false,
+    resetMetadataConsumed: false,
+    fakeResetStateQueueExecuted: false,
+    fakeResetStateUpdateQueued: false,
+    fakeResetCommitExecuted: false,
+    fakeFormResetCommitRecorded: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    rawActionCaptured: false,
+    rawSubmitControlCaptured: false,
+    liveFormAccepted: false,
+    nativeEventInspected: false,
+    realFormInspected: false,
+    submitControlInspected: false,
+    formPropsRead: false,
+    submitControlPropsRead: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    dispatchQueueCaptured: false,
+    listenerDispatchStarted: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    privateAsyncActionCallbackInvoked: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    reactUpdateQueued: false,
+    afterMutationEffectsVisited: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    domMutation: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+
+const formActionFulfilledResetExecutionDiagnosticSideEffects =
+  freezeRecord({
+    ...formActionFulfilledResetExecutionBlockedSideEffects,
+    sourceAsyncCallbackExecutionAccepted: true,
+    sourceFulfilledAsyncCallbackAccepted: true,
+    sourceSubmitResetExecutionAccepted: true,
+    acceptedMetadataIdsRecorded: true,
+    fulfilledActionResultMetadataConsumed: true,
+    resetMetadataConsumed: true,
+    fakeResetStateQueueExecuted: true,
+    fakeResetStateUpdateQueued: true,
+    fakeResetCommitExecuted: true,
+    fakeFormResetCommitRecorded: true
+  });
+
 const formActionRejectedErrorPreflightBlockedSideEffects = freezeRecord({
   sourceAsyncCallbackExecutionAccepted: false,
   sourceRejectedAsyncErrorAccepted: false,
@@ -714,6 +825,35 @@ const formActionAsyncCallbackExecutionMissingPrerequisites = freezeArray([
   )
 ]);
 
+const formActionFulfilledResetExecutionMissingPrerequisites = freezeArray([
+  prerequisite(
+    'fulfilled-private-async-callback-only',
+    'react-dom-form',
+    'Post-fulfillment reset execution consumes only an accepted fulfilled private async callback record.'
+  ),
+  prerequisite(
+    'private-fake-reset-state-queue-only',
+    'react-reconciler',
+    'The reset queue path records a deterministic fake reset-state update instead of touching a real React update queue.'
+  ),
+  prerequisite(
+    'private-fake-reset-commit-only',
+    'react-dom-form',
+    'The reset commit path records a deterministic fake form reset commit without invoking resetForm' +
+      'Instance on a live form.'
+  ),
+  prerequisite(
+    'no-live-form-reset-execution',
+    'react-dom-form',
+    'No live form, DOM node, native event, or submit control is captured while the fake reset commit is recorded.'
+  ),
+  prerequisite(
+    'no-public-form-action-compatibility',
+    'react-dom-client',
+    'Public form action compatibility remains unclaimed.'
+  )
+]);
+
 const formActionRejectedErrorPreflightMissingPrerequisites = freezeArray([
   prerequisite(
     'rejected-private-async-callback-only',
@@ -752,6 +892,8 @@ const defaultFormActionCallbackActionPreflightGate =
   createFormActionCallbackActionPreflightDiagnosticGate();
 const defaultFormActionAsyncCallbackExecutionGate =
   createFormActionAsyncCallbackExecutionDiagnosticGate();
+const defaultFormActionFulfilledResetExecutionGate =
+  createFormActionFulfilledResetExecutionDiagnosticGate();
 const defaultFormActionRejectedErrorPreflightGate =
   createFormActionRejectedErrorPreflightDiagnosticGate();
 
@@ -851,6 +993,29 @@ function createFormActionAsyncCallbackExecutionDiagnosticGate(options) {
   });
 }
 
+function createFormActionFulfilledResetExecutionDiagnosticGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'form-action-fulfilled-reset-execution'
+  );
+  gateState.consumedFulfilledExecutions = new WeakSet();
+
+  return Object.freeze({
+    recordFulfilledResetExecution(
+      asyncCallbackExecutionRecord,
+      submitResetExecutionRecord,
+      admission
+    ) {
+      return recordFormActionFulfilledResetExecutionWithGate(
+        gateState,
+        asyncCallbackExecutionRecord,
+        submitResetExecutionRecord,
+        admission
+      );
+    }
+  });
+}
+
 function createFormActionRejectedErrorPreflightDiagnosticGate(options) {
   const gateState = createGateStateWithDefaultPrefix(
     options,
@@ -917,6 +1082,19 @@ async function recordFormActionAsyncCallbackExecution(
 ) {
   return defaultFormActionAsyncCallbackExecutionGate
     .recordAsyncCallbackExecution(preflightRecord, admission);
+}
+
+function recordFormActionFulfilledResetExecution(
+  asyncCallbackExecutionRecord,
+  submitResetExecutionRecord,
+  admission
+) {
+  return defaultFormActionFulfilledResetExecutionGate
+    .recordFulfilledResetExecution(
+      asyncCallbackExecutionRecord,
+      submitResetExecutionRecord,
+      admission
+    );
 }
 
 function recordFormActionRejectedErrorPreflight(
@@ -1219,6 +1397,81 @@ function describePrivateFormActionAsyncCallbackExecutionGate() {
   });
 }
 
+function describePrivateFormActionFulfilledResetExecutionGate() {
+  return freezeRecord({
+    schemaVersion: formActionFulfilledResetExecutionGateSchemaVersion,
+    gateId: privateFormActionFulfilledResetExecutionGateId,
+    compatibilityTarget,
+    status: privateFormActionFulfilledResetExecutionStatus,
+    unsupportedCode: unimplementedCode,
+    oracleEvidence: freezeRecord({
+      oracleKind: formActionsOracleKind,
+      schemaVersion: 1,
+      compatibilityClaimed: false,
+      fastReactComparedToReactDom: false,
+      contractCount: 1
+    }),
+    acceptedAsyncCallbackExecutionRecordType:
+      privateFormActionAsyncCallbackExecutionRecordType,
+    acceptedAsyncCallbackExecutionGateId:
+      privateFormActionAsyncCallbackExecutionGateId,
+    acceptedAsyncCallbackExecutionStatus:
+      privateFormActionAsyncCallbackExecutionRecordedStatus,
+    acceptedFulfilledCallbackStatus:
+      'executed-private-form-action-async-callback-fulfilled',
+    acceptedSubmitResetExecutionRecordType:
+      privateFormActionSubmitResetExecutionRecordType,
+    acceptedSubmitResetExecutionGateId:
+      privateFormActionSubmitResetExecutionGateId,
+    acceptedSubmitResetExecutionStatus:
+      privateFormActionSubmitResetExecutionRecordedStatus,
+    consumesFulfilledAsyncCallbackExecution: true,
+    consumesSubmitResetExecutionMetadata: true,
+    consumesResetMetadata: true,
+    recordsAcceptedMetadataIds: true,
+    recordsFulfilledActionResultMetadata: true,
+    executesDeterministicFakeResetStateQueue: true,
+    recordsDeterministicFakeResetCommit: true,
+    rejectsRejectedAsyncCallbacks: true,
+    rejectsNonThenableAsyncCallbacks: true,
+    rejectsSynchronousThrowAsyncCallbacks: true,
+    rejectsStaleFulfilledCallbacks: true,
+    rejectsStaleSubmitResetExecutionMetadata: true,
+    rejectsForeignSubmitResetExecutionMetadata: true,
+    rejectsLiveForms: true,
+    rejectsPublicDispatch: true,
+    rejectsPublicResetRequest: true,
+    rejectsActionInvocation: true,
+    rejectsPublicDomMutation: true,
+    rejectsPackageCompatibilityClaims: true,
+    acceptsRealForms: false,
+    acceptsRawEvents: false,
+    acceptsActionFunctions: false,
+    acceptsPrivateAsyncActionCallbacks: false,
+    readsFormProps: false,
+    readsSubmitControlProps: false,
+    constructsFormData: false,
+    createsSyntheticEvents: false,
+    dispatchesSubmitCallbacks: false,
+    invokesActions: false,
+    invokesPrivateAsyncActionCallbacks: false,
+    startsHostTransition: false,
+    callsPreviousDispatchers: false,
+    queuesReactUpdates: false,
+    commitsFormResets: false,
+    callsResetFormInstance: false,
+    resetsForms: false,
+    publicDomMutationEnabled: false,
+    sideEffects: formActionFulfilledResetExecutionBlockedSideEffects,
+    missingPrerequisites:
+      formActionFulfilledResetExecutionMissingPrerequisites,
+    asyncCallbackExecutionGate:
+      describePrivateFormActionAsyncCallbackExecutionGate(),
+    submitResetExecutionGate:
+      describePrivateFormActionSubmitResetExecutionGate()
+  });
+}
+
 function describePrivateFormActionRejectedErrorPreflightGate() {
   return freezeRecord({
     schemaVersion: formActionRejectedErrorPreflightGateSchemaVersion,
@@ -1406,6 +1659,35 @@ function createUnsupportedFormActionAsyncCallbackExecutionError(record) {
   return error;
 }
 
+function createUnsupportedFormActionFulfilledResetExecutionError(record) {
+  const payload =
+    assertPrivateFormActionFulfilledResetExecutionRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was recorded',
+    'The private form action fulfilled reset execution gate records fake reset queue and commit metadata only.'
+  );
+
+  error.code = privateFormActionFulfilledResetExecutionGateErrorCode;
+  error.executionId = payload.executionId;
+  error.executionSequence = payload.executionSequence;
+  error.requestType = payload.requestType;
+  error.status = payload.status;
+  error.sourceAsyncCallbackExecutionId =
+    payload.sourceAsyncCallbackExecutionId;
+  error.sourceSubmitResetExecutionId =
+    payload.sourceSubmitResetExecutionId;
+  error.fulfilledActionResult = payload.fulfilledActionResult;
+  error.fakeResetStateQueueExecution =
+    payload.fakeResetStateQueueExecution;
+  error.fakeResetCommitExecution = payload.fakeResetCommitExecution;
+  error.publicFormActionBoundary = payload.publicFormActionBoundary;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
 function createUnsupportedFormActionRejectedErrorPreflightError(record) {
   const payload =
     assertPrivateFormActionRejectedErrorPreflightRecord(record);
@@ -1454,6 +1736,10 @@ function getPrivateFormActionAsyncCallbackExecutionRecordPayload(record) {
   return formActionAsyncCallbackExecutionRecordPayloads.get(record) || null;
 }
 
+function getPrivateFormActionFulfilledResetExecutionRecordPayload(record) {
+  return formActionFulfilledResetExecutionRecordPayloads.get(record) || null;
+}
+
 function getPrivateFormActionRejectedErrorPreflightRecordPayload(record) {
   return formActionRejectedErrorPreflightRecordPayloads.get(record) || null;
 }
@@ -1476,6 +1762,10 @@ function isPrivateFormActionCallbackActionPreflightRecord(value) {
 
 function isPrivateFormActionAsyncCallbackExecutionRecord(value) {
   return formActionAsyncCallbackExecutionRecordPayloads.has(value);
+}
+
+function isPrivateFormActionFulfilledResetExecutionRecord(value) {
+  return formActionFulfilledResetExecutionRecordPayloads.has(value);
 }
 
 function isPrivateFormActionRejectedErrorPreflightRecord(value) {
@@ -1932,6 +2222,140 @@ async function recordFormActionAsyncCallbackExecutionWithGate(
   return payload;
 }
 
+function recordFormActionFulfilledResetExecutionWithGate(
+  gateState,
+  asyncCallbackExecutionRecord,
+  submitResetExecutionRecord,
+  admission
+) {
+  const asyncExecution =
+    assertAcceptedFormActionAsyncCallbackExecutionRecordForFulfilledResetExecution(
+      asyncCallbackExecutionRecord
+    );
+  const submitResetExecution =
+    assertAcceptedFormActionSubmitResetExecutionRecordForFulfilledResetExecution(
+      submitResetExecutionRecord,
+      asyncExecution
+    );
+  const normalizedAdmission =
+    normalizeFormActionFulfilledResetExecutionAdmission(
+      asyncExecution,
+      submitResetExecution,
+      admission
+    );
+
+  if (
+    gateState.consumedFulfilledExecutions.has(asyncCallbackExecutionRecord)
+  ) {
+    throwInvalidFulfilledResetExecutionRecord(
+      'source fulfilled async callback execution was already consumed by this reset execution gate'
+    );
+  }
+  if (
+    consumedFormActionFulfilledResetExecutions.has(
+      asyncCallbackExecutionRecord
+    )
+  ) {
+    throwInvalidFulfilledResetExecutionRecord(
+      'source fulfilled async callback execution was already consumed by a fulfilled reset execution gate'
+    );
+  }
+
+  const executionSequence = gateState.nextRequestSequence++;
+  const executionId = `${gateState.requestIdPrefix}:${executionSequence}`;
+  const acceptedMetadataIds =
+    createFulfilledResetExecutionAcceptedMetadataIds(
+      asyncExecution,
+      submitResetExecution
+    );
+  const fulfilledActionResult =
+    createFulfilledActionResultMetadata(asyncExecution);
+  const fakeResetStateQueueExecution =
+    createFulfilledResetStateQueueExecution(
+      asyncExecution,
+      submitResetExecution,
+      executionId,
+      normalizedAdmission
+    );
+  const fakeResetCommitExecution =
+    createFulfilledResetCommitExecution(
+      asyncExecution,
+      submitResetExecution,
+      fakeResetStateQueueExecution,
+      executionId,
+      normalizedAdmission
+    );
+
+  gateState.consumedFulfilledExecutions.add(asyncCallbackExecutionRecord);
+  consumedFormActionFulfilledResetExecutions.add(
+    asyncCallbackExecutionRecord
+  );
+
+  const payload = freezeRecord({
+    schemaVersion: formActionFulfilledResetExecutionGateSchemaVersion,
+    $$typeof: privateFormActionFulfilledResetExecutionRecordType,
+    kind: 'FastReactDomPrivateFormActionFulfilledResetExecutionRecord',
+    gateId: privateFormActionFulfilledResetExecutionGateId,
+    compatibilityTarget,
+    status: privateFormActionFulfilledResetExecutionRecordedStatus,
+    unsupportedCode: unimplementedCode,
+    executionId,
+    executionSequence,
+    requestType: 'form-action-fulfilled-reset-execution.fake-commit',
+    contractId: 'form-action-fulfilled-reset-fake-commit',
+    oracleKind: formActionsOracleKind,
+    oracleSchemaVersion: 1,
+    sourceAsyncCallbackExecutionId: asyncExecution.executionId,
+    sourceAsyncCallbackExecutionSequence:
+      asyncExecution.executionSequence,
+    sourceAsyncCallbackExecutionStatus: asyncExecution.status,
+    sourceCallbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId,
+    sourceCallbackActionPreflightSequence:
+      asyncExecution.sourceCallbackActionPreflightSequence,
+    sourceSubmitDispatchId: asyncExecution.sourceSubmitDispatchId,
+    sourceSubmitDispatchSequence:
+      asyncExecution.sourceSubmitDispatchSequence,
+    sourceSubmitResetExecutionId:
+      submitResetExecution.executionId,
+    sourceSubmitResetExecutionSequence:
+      submitResetExecution.executionSequence,
+    sourceFormDataBlockerId: asyncExecution.sourceFormDataBlockerId,
+    sourceFormDataBlockerSequence:
+      asyncExecution.sourceFormDataBlockerSequence,
+    sourceEventExtractionId: asyncExecution.sourceEventExtractionId,
+    sourceEventExtractionSequence:
+      asyncExecution.sourceEventExtractionSequence,
+    sourceResetQueueCommitRequestId:
+      asyncExecution.sourceResetQueueCommitRequestId,
+    sourceResetQueueCommitRequestSequence:
+      asyncExecution.sourceResetQueueCommitRequestSequence,
+    sourceResetIntentRequestId:
+      asyncExecution.sourceResetIntentRequestId,
+    sourceResetIntentRequestSequence:
+      asyncExecution.sourceResetIntentRequestSequence,
+    acceptedMetadataIds,
+    admission: normalizedAdmission,
+    sourceAsyncCallbackExecution:
+      createFulfilledResetSourceAsyncCallbackExecution(asyncExecution),
+    sourceSubmitResetExecution:
+      createFulfilledResetSourceSubmitResetExecution(
+        submitResetExecution
+      ),
+    fulfilledActionResult,
+    fakeResetStateQueueExecution,
+    fakeResetCommitExecution,
+    publicFormActionBoundary:
+      createPublicFormActionFulfilledResetExecutionBoundary(),
+    sideEffects: formActionFulfilledResetExecutionDiagnosticSideEffects,
+    missingPrerequisites:
+      formActionFulfilledResetExecutionMissingPrerequisites
+  });
+
+  formActionFulfilledResetExecutionRecordPayloads.set(payload, payload);
+  return payload;
+}
+
 function recordFormActionRejectedErrorPreflightWithGate(
   gateState,
   asyncCallbackExecutionRecord,
@@ -2362,6 +2786,106 @@ function assertAcceptedFormActionAsyncCallbackExecutionRecordForRejectedErrorPre
   );
 }
 
+function assertAcceptedFormActionAsyncCallbackExecutionRecordForFulfilledResetExecution(
+  record
+) {
+  const payload =
+    getPrivateFormActionAsyncCallbackExecutionRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.status === privateFormActionAsyncCallbackExecutionRecordedStatus &&
+    payload.admission?.deterministicFakeCallbackOnly === true &&
+    payload.pendingStatusMetadata?.metadataOnly === true &&
+    payload.pendingStatusMetadata?.formDataConstructed === false &&
+    payload.resetMetadata?.resetIntentMetadataConsumed === true &&
+    payload.resetMetadata?.fakeResetMetadataConsumed === true &&
+    payload.resetMetadata?.resetStateQueued === false &&
+    payload.resetMetadata?.reactUpdateQueued === false &&
+    payload.resetMetadata?.realFormReset === false &&
+    payload.callbackExecution?.status ===
+      'executed-private-form-action-async-callback-fulfilled' &&
+    payload.callbackExecution?.thenableObserved === true &&
+    payload.callbackExecution?.fulfilled === true &&
+    payload.callbackExecution?.rejected === false &&
+    payload.callbackExecution?.synchronousThrow === false &&
+    payload.callbackExecution?.nonThenable === false &&
+    payload.callbackExecution?.failClosed === false &&
+    payload.callbackExecution?.formDataConstructed === false &&
+    payload.callbackExecution?.publicActionInvoked === false &&
+    payload.callbackExecution?.hostTransitionStarted === false &&
+    payload.callbackExecution?.reactUpdateQueued === false &&
+    payload.callbackExecution?.resetStateQueued === false &&
+    payload.callbackExecution?.resetFormInstanceCalled === false &&
+    payload.callbackExecution?.realFormReset === false &&
+    payload.publicFormActionBoundary?.publicFormActionsEnabled === false &&
+    payload.publicFormActionBoundary
+      ?.privateAsyncActionCallbackPubliclyReachable === false &&
+    payload.publicFormActionBoundary?.actionInvoked === false &&
+    payload.publicFormActionBoundary?.realFormReset === false &&
+    payload.sideEffects?.asyncCallbackThenableFulfilled === true &&
+    payload.sideEffects?.failClosedErrorRecorded === false &&
+    payload.sideEffects?.actionInvoked === false &&
+    payload.sideEffects?.reactUpdateQueued === false &&
+    payload.sideEffects?.realFormReset === false
+  ) {
+    return payload;
+  }
+
+  throwInvalidFulfilledResetExecutionRecord(
+    'source async callback execution must be an accepted fulfilled fake callback execution'
+  );
+}
+
+function assertAcceptedFormActionSubmitResetExecutionRecordForFulfilledResetExecution(
+  record,
+  asyncExecution
+) {
+  const payload =
+    getPrivateFormActionSubmitResetExecutionRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.status === privateFormActionSubmitResetExecutionRecordedStatus &&
+    payload.executionId === asyncExecution.sourceSubmitResetExecutionId &&
+    payload.executionSequence ===
+      asyncExecution.sourceSubmitResetExecutionSequence &&
+    payload.sourceSubmitDispatchId ===
+      asyncExecution.sourceSubmitDispatchId &&
+    payload.sourceSubmitDispatchSequence ===
+      asyncExecution.sourceSubmitDispatchSequence &&
+    payload.sourceFormDataBlockerId ===
+      asyncExecution.sourceFormDataBlockerId &&
+    payload.sourceResetIntentRequestId ===
+      asyncExecution.sourceResetIntentRequestId &&
+    payload.admission?.deterministicFakeFormOnly === true &&
+    payload.formDataBlockerConsumption?.blockedFormDataConsumed === true &&
+    payload.formDataBlockerConsumption?.formDataConstructed === false &&
+    payload.resetIntentConsumption?.resetIntentMetadataConsumed === true &&
+    payload.resetIntentConsumption?.resetStateQueued === false &&
+    payload.resetIntentConsumption?.reactUpdateQueued === false &&
+    payload.resetIntentConsumption?.realFormReset === false &&
+    payload.fakeFormResetExecution?.fakeSubmitDispatchConsumed === true &&
+    payload.fakeFormResetExecution?.fakeFormResetPathExecuted === true &&
+    payload.fakeFormResetExecution?.fakeFormResetRecorded === true &&
+    payload.fakeFormResetExecution?.callbackDispatchExecuted === false &&
+    payload.fakeFormResetExecution?.actionInvoked === false &&
+    payload.fakeFormResetExecution?.resetStateQueued === false &&
+    payload.fakeFormResetExecution?.reactUpdateQueued === false &&
+    payload.fakeFormResetExecution?.resetFormInstanceCalled === false &&
+    payload.fakeFormResetExecution?.realFormReset === false &&
+    payload.sideEffects?.fakeFormResetPathExecuted === true &&
+    payload.sideEffects?.callbackDispatchExecuted === false &&
+    payload.sideEffects?.actionInvoked === false &&
+    payload.sideEffects?.reactUpdateQueued === false &&
+    payload.sideEffects?.realFormReset === false
+  ) {
+    return payload;
+  }
+
+  throwInvalidFulfilledResetExecutionRecord(
+    'source submit reset execution must match the fulfilled async callback reset metadata'
+  );
+}
+
 function assertSupportedSubmitControlForDispatch(blocker) {
   const controlKind = blocker.submitterShape?.controlKind;
   if (
@@ -2432,6 +2956,18 @@ function assertPrivateFormActionAsyncCallbackExecutionRecord(record) {
 
   throwInvalidAsyncCallbackExecutionRecord(
     'expected a private form action async callback execution record'
+  );
+}
+
+function assertPrivateFormActionFulfilledResetExecutionRecord(record) {
+  const payload =
+    getPrivateFormActionFulfilledResetExecutionRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  throwInvalidFulfilledResetExecutionRecord(
+    'expected a private form action fulfilled reset execution record'
   );
 }
 
@@ -3025,6 +3561,212 @@ function normalizeFormActionAsyncCallbackExecutionAdmission(
   };
 }
 
+function normalizeFormActionFulfilledResetExecutionAdmission(
+  asyncExecution,
+  submitResetExecution,
+  admission
+) {
+  if (admission == null || typeof admission !== 'object') {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'admission metadata must be an object'
+    );
+  }
+
+  if (admission.explicitFormActionFulfilledResetExecution !== true) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'explicitFormActionFulfilledResetExecution must be true'
+    );
+  }
+
+  assertNoFulfilledResetExecutionRawAdmissionFields(admission);
+
+  const sourceAsyncCallbackExecutionId =
+    getFulfilledResetExecutionStringProperty(
+      admission,
+      'sourceAsyncCallbackExecutionId',
+      asyncExecution.executionId
+    );
+  if (sourceAsyncCallbackExecutionId !== asyncExecution.executionId) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'sourceAsyncCallbackExecutionId must match the fulfilled async callback execution record'
+    );
+  }
+
+  const sourceSubmitResetExecutionId =
+    getFulfilledResetExecutionStringProperty(
+      admission,
+      'sourceSubmitResetExecutionId',
+      submitResetExecution.executionId
+    );
+  if (sourceSubmitResetExecutionId !== submitResetExecution.executionId) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'sourceSubmitResetExecutionId must match the submit reset execution record'
+    );
+  }
+
+  if (admission.publicDispatchRequested === true) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'public submit dispatch must remain blocked'
+    );
+  }
+  if (admission.publicSubmitDispatchRequested === true) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'public submit dispatch must remain blocked'
+    );
+  }
+  if (admission.publicFormSubmissionRequested === true) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'public form submission must remain blocked'
+    );
+  }
+  if (
+    admission.actionInvocationRequested === true ||
+    admission.actionExecutionRequested === true ||
+    admission.publicActionInvocationRequested === true
+  ) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'action invocation must remain blocked'
+    );
+  }
+  if (admission.formDataConstructionRequested === true) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'form data construction must remain blocked'
+    );
+  }
+  if (admission.hostTransitionRequested === true) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'host transition start must remain blocked'
+    );
+  }
+  if (admission.reactUpdateRequested === true) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'react update queueing must remain blocked'
+    );
+  }
+  if (admission.publicRequestFormResetRequested === true) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'public reset request must remain blocked'
+    );
+  }
+  if (
+    admission.resetExecutionRequested === true ||
+    admission.realResetExecutionRequested === true ||
+    admission.publicResetExecutionRequested === true ||
+    admission.resetStateQueued === true ||
+    admission.resetUpdateEnqueued === true ||
+    admission.resetFormInstanceCalled === true ||
+    admission.formResetCommitted === true ||
+    admission.realFormReset === true
+  ) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'real reset commit must remain blocked'
+    );
+  }
+  if (
+    admission.domMutationRequested === true ||
+    admission.publicDomMutationRequested === true
+  ) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'DOM mutation must remain blocked'
+    );
+  }
+  if (
+    admission.compatibilityClaimed === true ||
+    admission.publicFormActionCompatibilityClaimed === true ||
+    admission.packageCompatibilityClaimed === true
+  ) {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'package compatibility must remain unclaimed'
+    );
+  }
+  assertNoFormActionPublicBehaviorAliasClaims(
+    admission,
+    throwInvalidFulfilledResetExecutionAdmission
+  );
+
+  const commitKind = getFulfilledResetExecutionStringProperty(
+    admission,
+    'commitKind',
+    'after-mutation-form-reset-order'
+  );
+  if (commitKind !== 'after-mutation-form-reset-order') {
+    throwInvalidFulfilledResetExecutionAdmission(
+      'commitKind must be after-mutation-form-reset-order'
+    );
+  }
+
+  return freezeRecord({
+    explicitFormActionFulfilledResetExecution: true,
+    deterministicFakeResetCommitOnly: true,
+    postFulfillmentOnly: true,
+    diagnosticKind:
+      getFulfilledResetExecutionExactStringProperty(
+        admission,
+        'diagnosticKind',
+        formActionFulfilledResetExecutionDiagnosticKind
+      ),
+    queueExecutionKind:
+      getFulfilledResetExecutionExactStringProperty(
+        admission,
+        'queueExecutionKind',
+        formActionFulfilledResetExecutionQueueExecutionKind
+      ),
+    commitKind,
+    sourceAsyncCallbackExecutionId,
+    sourceSubmitResetExecutionId,
+    sourceCallbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId,
+    sourceSubmitDispatchId: asyncExecution.sourceSubmitDispatchId,
+    sourceResetIntentRequestId:
+      submitResetExecution.sourceResetIntentRequestId,
+    fulfilledActionResultConsumed: true,
+    resetMetadataConsumed: true,
+    fakeResetStateQueueExecutionRequested: true,
+    fakeResetCommitExecutionRequested: true,
+    publicDispatchRequested: false,
+    publicSubmitDispatchRequested: false,
+    publicFormSubmissionRequested: false,
+    publicRequestFormResetRequested: false,
+    actionInvocationRequested: false,
+    actionExecutionRequested: false,
+    publicActionInvocationRequested: false,
+    formDataConstructionRequested: false,
+    hostTransitionRequested: false,
+    reactUpdateRequested: false,
+    resetExecutionRequested: false,
+    realResetExecutionRequested: false,
+    publicResetExecutionRequested: false,
+    domMutationRequested: false,
+    publicDomMutationRequested: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    rawActionCaptured: false,
+    rawSubmitControlCaptured: false,
+    liveFormAccepted: false,
+    realFormInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    privateAsyncActionCallbackInvoked: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    reactUpdateQueued: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    domMutation: false,
+    compatibilityClaimed: false
+  });
+}
+
 function normalizeFormActionRejectedErrorPreflightAdmission(
   asyncExecution,
   admission
@@ -3243,6 +3985,16 @@ function assertNoAsyncCallbackExecutionRawAdmissionFields(admission) {
     if (hasOwnProp(admission, field)) {
       throwInvalidAsyncCallbackExecutionAdmission(
         `${field} must not be passed to the async callback execution gate`
+      );
+    }
+  }
+}
+
+function assertNoFulfilledResetExecutionRawAdmissionFields(admission) {
+  for (const field of blockedFulfilledResetExecutionAdmissionFields) {
+    if (hasOwnProp(admission, field)) {
+      throwInvalidFulfilledResetExecutionAdmission(
+        `${field} must not be passed to the fulfilled reset execution gate`
       );
     }
   }
@@ -4734,6 +5486,253 @@ function createAsyncCallbackExecutionSideEffects(outcome) {
   return formActionAsyncCallbackExecutionNonThenableSideEffects;
 }
 
+function createFulfilledResetExecutionAcceptedMetadataIds(
+  asyncExecution,
+  submitResetExecution
+) {
+  return freezeRecord({
+    ...asyncExecution.acceptedMetadataIds,
+    asyncCallbackExecutionId: asyncExecution.executionId,
+    asyncCallbackExecutionSequence: asyncExecution.executionSequence,
+    asyncCallbackExecutionGateId: asyncExecution.gateId,
+    fulfilledAsyncCallbackExecutionId: asyncExecution.executionId,
+    fulfilledAsyncCallbackExecutionSequence:
+      asyncExecution.executionSequence,
+    callbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId,
+    submitResetExecutionId: submitResetExecution.executionId,
+    submitResetExecutionSequence: submitResetExecution.executionSequence,
+    submitResetExecutionGateId: submitResetExecution.gateId,
+    resetIntentRequestId:
+      submitResetExecution.sourceResetIntentRequestId,
+    resetIntentRequestSequence:
+      submitResetExecution.sourceResetIntentRequestSequence
+  });
+}
+
+function createFulfilledResetSourceAsyncCallbackExecution(asyncExecution) {
+  const callbackExecution = asyncExecution.callbackExecution;
+  return freezeRecord({
+    executionId: asyncExecution.executionId,
+    executionSequence: asyncExecution.executionSequence,
+    status: asyncExecution.status,
+    requestType: asyncExecution.requestType,
+    sourceCallbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId,
+    sourceSubmitDispatchId: asyncExecution.sourceSubmitDispatchId,
+    sourceSubmitResetExecutionId:
+      asyncExecution.sourceSubmitResetExecutionId,
+    pendingStatusRecorded:
+      asyncExecution.pendingStatusMetadata.pendingStatusRecorded,
+    resetMetadataConsumed:
+      asyncExecution.resetMetadata.resetIntentMetadataConsumed,
+    callbackExecutionStatus: callbackExecution.status,
+    callbackOutcome: callbackExecution.callbackOutcome,
+    thenableObserved: callbackExecution.thenableObserved,
+    initialThenableStatus: callbackExecution.initialThenableStatus,
+    finalThenableStatus: callbackExecution.finalThenableStatus,
+    fulfilled: callbackExecution.fulfilled,
+    rejected: callbackExecution.rejected,
+    failClosed: callbackExecution.failClosed,
+    valueInfo: callbackExecution.valueInfo,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    hostTransitionStarted: false,
+    reactUpdateQueued: false,
+    resetStateQueued: false,
+    resetFormInstanceCalled: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createFulfilledResetSourceSubmitResetExecution(
+  submitResetExecution
+) {
+  return freezeRecord({
+    executionId: submitResetExecution.executionId,
+    executionSequence: submitResetExecution.executionSequence,
+    status: submitResetExecution.status,
+    requestType: submitResetExecution.requestType,
+    sourceSubmitDispatchId:
+      submitResetExecution.sourceSubmitDispatchId,
+    sourceFormDataBlockerId:
+      submitResetExecution.sourceFormDataBlockerId,
+    sourceResetIntentRequestId:
+      submitResetExecution.sourceResetIntentRequestId,
+    blockedFormDataConsumed:
+      submitResetExecution.formDataBlockerConsumption
+        .blockedFormDataConsumed,
+    resetIntentMetadataConsumed:
+      submitResetExecution.resetIntentConsumption
+        .resetIntentMetadataConsumed,
+    fakeSubmitDispatchConsumed:
+      submitResetExecution.fakeFormResetExecution
+        .fakeSubmitDispatchConsumed,
+    fakeFormResetPathExecuted:
+      submitResetExecution.fakeFormResetExecution
+        .fakeFormResetPathExecuted,
+    fakeFormResetRecorded:
+      submitResetExecution.fakeFormResetExecution
+        .fakeFormResetRecorded,
+    resetWouldRunBeforeActionInvocation:
+      submitResetExecution.fakeFormResetExecution
+        .resetWouldRunBeforeActionInvocation,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    resetStateQueued: false,
+    reactUpdateQueued: false,
+    resetFormInstanceCalled: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createFulfilledActionResultMetadata(asyncExecution) {
+  const callbackExecution = asyncExecution.callbackExecution;
+  return freezeRecord({
+    status: 'recorded-private-form-action-fulfilled-result-metadata',
+    metadataOnly: true,
+    sourceAsyncCallbackExecutionId: asyncExecution.executionId,
+    sourceCallbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId,
+    sourceSubmitResetExecutionId:
+      asyncExecution.sourceSubmitResetExecutionId,
+    callbackOutcome: callbackExecution.callbackOutcome,
+    thenableObserved: callbackExecution.thenableObserved,
+    finalThenableStatus: callbackExecution.finalThenableStatus,
+    fulfilled: callbackExecution.fulfilled,
+    failClosed: callbackExecution.failClosed,
+    valueInfo: callbackExecution.valueInfo,
+    rawValueCaptured: false,
+    actionResultExposed: false,
+    publicActionInvoked: false,
+    hostTransitionStarted: false,
+    reactUpdateQueued: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createFulfilledResetStateQueueExecution(
+  asyncExecution,
+  submitResetExecution,
+  executionId,
+  admission
+) {
+  const resetMetadata = asyncExecution.resetMetadata;
+  const resetIntent = submitResetExecution.resetIntentConsumption;
+  return freezeRecord({
+    status:
+      'executed-private-form-action-fulfilled-reset-state-queue-fake',
+    metadataOnly: false,
+    deterministicFakeResetCommitOnly: true,
+    queueExecutionId: `${executionId}:reset-state-queue`,
+    resetStateUpdateId: `${executionId}:reset-state-update`,
+    newResetStateId: `${executionId}:new-reset-state`,
+    sourceAsyncCallbackExecutionId: asyncExecution.executionId,
+    sourceSubmitResetExecutionId:
+      submitResetExecution.executionId,
+    sourceResetIntentRequestId:
+      submitResetExecution.sourceResetIntentRequestId,
+    queueExecutionKind: admission.queueExecutionKind,
+    sourceFunctionNames: freezeArray([
+      'request' + 'FormReset',
+      'ensureFormComponentIsStateful',
+      'dispatchSetStateInternal',
+      'requestUpdateLane'
+    ]),
+    hostComponentTag: 'form',
+    stateHookFieldName: 'memoizedState',
+    resetStateHookFieldName: 'next',
+    resetStateQueueFieldName: 'queue',
+    lastRenderedReducerName: 'basicStateReducer',
+    noPendingHostTransitionName: 'NoPendingHostTransition',
+    resetMetadataConsumed:
+      resetMetadata.resetIntentMetadataConsumed,
+    fakeResetMetadataConsumed:
+      resetMetadata.fakeResetMetadataConsumed,
+    actionCompletionResetBeforeAction:
+      resetIntent.actionCompletionResetBeforeAction,
+    resetStateWouldBeQueued: resetMetadata.resetStateWouldBeQueued,
+    requestUpdateLaneRecorded: true,
+    dispatchSetStateInternalRecorded: true,
+    fakeResetStateQueueExecuted: true,
+    fakeResetStateUpdateQueued: true,
+    resetQueuePendingMutated: false,
+    realReactUpdateQueued: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    reactUpdateQueued: false,
+    updateQueueCaptured: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createFulfilledResetCommitExecution(
+  asyncExecution,
+  submitResetExecution,
+  fakeResetStateQueueExecution,
+  executionId,
+  admission
+) {
+  const resetIntent = submitResetExecution.resetIntentConsumption;
+  return freezeRecord({
+    status:
+      'executed-private-form-action-fulfilled-reset-commit-fake',
+    metadataOnly: false,
+    deterministicFakeResetCommitOnly: true,
+    commitExecutionId: `${executionId}:reset-commit`,
+    fakeFormResetCommitId: `${executionId}:fake-form-reset-commit`,
+    sourceAsyncCallbackExecutionId: asyncExecution.executionId,
+    sourceSubmitResetExecutionId:
+      submitResetExecution.executionId,
+    sourceResetIntentRequestId:
+      submitResetExecution.sourceResetIntentRequestId,
+    fakeResetStateQueueExecutionId:
+      fakeResetStateQueueExecution.queueExecutionId,
+    fakeResetStateUpdateId:
+      fakeResetStateQueueExecution.resetStateUpdateId,
+    commitKind: admission.commitKind,
+    sourceFunctionNames: freezeArray([
+      'request' + 'FormReset',
+      'resetForm' + 'Instance'
+    ]),
+    hostTag: 'form',
+    afterMutationEffectsOrder: true,
+    resetTraversalWouldRunAfterMutationEffects:
+      resetIntent.resetTraversalWouldRunAfterMutationEffects,
+    fulfilledActionResultConsumed: true,
+    resetMetadataConsumed: true,
+    fakeResetStateQueueExecuted:
+      fakeResetStateQueueExecution.fakeResetStateQueueExecuted,
+    fakeResetStateUpdateQueued:
+      fakeResetStateQueueExecution.fakeResetStateUpdateQueued,
+    fakeResetCommitExecuted: true,
+    fakeFormResetCommitRecorded: true,
+    fakeResetFormInstanceCallRecorded: true,
+    afterMutationEffectsVisited: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    domMutation: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createRejectedErrorPreflightAcceptedMetadataIds(asyncExecution) {
   return freezeRecord({
     ...asyncExecution.acceptedMetadataIds,
@@ -5031,6 +6030,44 @@ function createPublicFormActionAsyncCallbackExecutionBoundary() {
   });
 }
 
+function createPublicFormActionFulfilledResetExecutionBoundary() {
+  return freezeRecord({
+    status:
+      'blocked-public-form-action-fulfilled-reset-execution-compatibility',
+    publicFormActionsEnabled: false,
+    publicRequestFormResetReachable: false,
+    publicFormSubmissionReachable: false,
+    publicSubmitDispatchReachable: false,
+    publicActionInvocationReachable: false,
+    publicDomMutationReachable: false,
+    publicRootTouched: false,
+    realFormAccepted: false,
+    realFormInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    privateAsyncActionCallbackPubliclyReachable: false,
+    hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    reactUpdateQueued: false,
+    afterMutationEffectsVisited: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    domMutation: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPublicFormActionRejectedErrorPreflightBoundary() {
   return freezeRecord({
     status:
@@ -5179,6 +6216,40 @@ function getAsyncCallbackExecutionStringProperty(record, key, fallback) {
 
   throwInvalidAsyncCallbackExecutionAdmission(
     `${key} must be a non-empty string`
+  );
+}
+
+function getFulfilledResetExecutionStringProperty(record, key, fallback) {
+  if (!hasOwnProp(record, key)) {
+    return fallback;
+  }
+
+  const value = record[key];
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+
+  throwInvalidFulfilledResetExecutionAdmission(
+    `${key} must be a non-empty string`
+  );
+}
+
+function getFulfilledResetExecutionExactStringProperty(
+  record,
+  key,
+  expected
+) {
+  if (!hasOwnProp(record, key)) {
+    return expected;
+  }
+
+  const value = record[key];
+  if (value === expected) {
+    return expected;
+  }
+
+  throwInvalidFulfilledResetExecutionAdmission(
+    `${key} must be ${expected}`
   );
 }
 
@@ -5371,6 +6442,29 @@ function throwInvalidAsyncCallbackExecutionRecord(reason) {
   throw error;
 }
 
+function throwInvalidFulfilledResetExecutionAdmission(reason) {
+  const error = new Error(
+    `Invalid private React DOM form action fulfilled reset execution admission: ${reason}.`
+  );
+  error.name = 'FastReactDomFormActionFulfilledResetExecutionGateError';
+  error.code =
+    privateFormActionFulfilledResetExecutionInvalidAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
+function throwInvalidFulfilledResetExecutionRecord(reason) {
+  const error = new Error(
+    `Invalid private React DOM form action fulfilled reset execution record: ${reason}.`
+  );
+  error.name = 'FastReactDomFormActionFulfilledResetExecutionGateError';
+  error.code = privateFormActionFulfilledResetExecutionInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
 function throwInvalidRejectedErrorPreflightAdmission(reason) {
   const error = new Error(
     `Invalid private React DOM form action rejected-error preflight admission: ${reason}.`
@@ -5425,18 +6519,21 @@ function freezeRecord(value) {
 module.exports = {
   createFormActionAsyncCallbackExecutionDiagnosticGate,
   createFormActionCallbackActionPreflightDiagnosticGate,
+  createFormActionFulfilledResetExecutionDiagnosticGate,
   createFormActionFormDataBlockerDiagnosticGate,
   createFormActionRejectedErrorPreflightDiagnosticGate,
   createFormActionSubmitDispatchDiagnosticGate,
   createFormActionSubmitResetExecutionDiagnosticGate,
   createUnsupportedFormActionAsyncCallbackExecutionError,
   createUnsupportedFormActionCallbackActionPreflightError,
+  createUnsupportedFormActionFulfilledResetExecutionError,
   createUnsupportedFormActionFormDataBlockerError,
   createUnsupportedFormActionRejectedErrorPreflightError,
   createUnsupportedFormActionSubmitDispatchError,
   createUnsupportedFormActionSubmitResetExecutionError,
   describePrivateFormActionAsyncCallbackExecutionGate,
   describePrivateFormActionCallbackActionPreflightGate,
+  describePrivateFormActionFulfilledResetExecutionGate,
   describePrivateFormActionFormDataBlockerGate,
   describePrivateFormActionRejectedErrorPreflightGate,
   describePrivateFormActionSubmitDispatchGate,
@@ -5452,6 +6549,12 @@ module.exports = {
   formActionCallbackActionPreflightDiagnosticSideEffects,
   formActionCallbackActionPreflightGateSchemaVersion,
   formActionCallbackActionPreflightMissingPrerequisites,
+  formActionFulfilledResetExecutionBlockedSideEffects,
+  formActionFulfilledResetExecutionDiagnosticSideEffects,
+  formActionFulfilledResetExecutionDiagnosticKind,
+  formActionFulfilledResetExecutionGateSchemaVersion,
+  formActionFulfilledResetExecutionMissingPrerequisites,
+  formActionFulfilledResetExecutionQueueExecutionKind,
   formActionFormDataBlockerBlockedSideEffects,
   formActionFormDataBlockerDiagnosticSideEffects,
   formActionFormDataBlockerGateSchemaVersion,
@@ -5470,12 +6573,14 @@ module.exports = {
   formActionSubmitResetExecutionMissingPrerequisites,
   getPrivateFormActionAsyncCallbackExecutionRecordPayload,
   getPrivateFormActionCallbackActionPreflightRecordPayload,
+  getPrivateFormActionFulfilledResetExecutionRecordPayload,
   getPrivateFormActionFormDataBlockerRecordPayload,
   getPrivateFormActionRejectedErrorPreflightRecordPayload,
   getPrivateFormActionSubmitDispatchRecordPayload,
   getPrivateFormActionSubmitResetExecutionRecordPayload,
   isPrivateFormActionAsyncCallbackExecutionRecord,
   isPrivateFormActionCallbackActionPreflightRecord,
+  isPrivateFormActionFulfilledResetExecutionRecord,
   isPrivateFormActionFormDataBlockerRecord,
   isPrivateFormActionRejectedErrorPreflightRecord,
   isPrivateFormActionSubmitDispatchRecord,
@@ -5494,6 +6599,13 @@ module.exports = {
   privateFormActionCallbackActionPreflightRecordedStatus,
   privateFormActionCallbackActionPreflightRecordType,
   privateFormActionCallbackActionPreflightStatus,
+  privateFormActionFulfilledResetExecutionGateErrorCode,
+  privateFormActionFulfilledResetExecutionGateId,
+  privateFormActionFulfilledResetExecutionInvalidAdmissionCode,
+  privateFormActionFulfilledResetExecutionInvalidRecordCode,
+  privateFormActionFulfilledResetExecutionRecordedStatus,
+  privateFormActionFulfilledResetExecutionRecordType,
+  privateFormActionFulfilledResetExecutionStatus,
   privateFormActionFormDataBlockerGateErrorCode,
   privateFormActionFormDataBlockerGateId,
   privateFormActionFormDataBlockerInvalidAdmissionCode,
@@ -5524,6 +6636,7 @@ module.exports = {
   privateFormActionSubmitResetExecutionStatus,
   recordFormActionAsyncCallbackExecution,
   recordFormActionCallbackActionInvocationPreflight,
+  recordFormActionFulfilledResetExecution,
   recordFormActionFormDataBlockerDiagnostic,
   recordFormActionRejectedErrorPreflight,
   recordFormActionSubmitDispatchDiagnostic,

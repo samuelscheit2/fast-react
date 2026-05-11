@@ -17782,6 +17782,15 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
     formActions.describePrivateFormActionAsyncCallbackExecutionGate()
   );
   assert.deepEqual(
+    summary.privateFormActionFulfilledResetExecutionBoundary,
+    resourceFormGate
+      .describePrivateFormActionFulfilledResetExecutionBoundary(null)
+  );
+  assert.deepEqual(
+    summary.privateFormActionFulfilledResetExecutionBoundary,
+    formActions.describePrivateFormActionFulfilledResetExecutionGate()
+  );
+  assert.deepEqual(
     summary.privateFormActionRejectedErrorPreflightBoundary,
     resourceFormGate
       .describePrivateFormActionRejectedErrorPreflightBoundary(null)
@@ -18006,6 +18015,7 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	      submitResetExecutionMetadataRecorded: true,
 	      callbackActionPreflightMetadataRecorded: true,
 	      asyncCallbackExecutionMetadataRecorded: true,
+	      fulfilledResetExecutionMetadataRecorded: true,
 	      rejectedErrorPreflightMetadataRecorded: true,
 	      realFormAccepted: false,
 	      rawTargetCaptured: false,
@@ -18042,6 +18052,8 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	        formActions.describePrivateFormActionCallbackActionPreflightGate(),
 	      asyncCallbackExecutionGate:
 	        formActions.describePrivateFormActionAsyncCallbackExecutionGate(),
+	      fulfilledResetExecutionGate:
+	        formActions.describePrivateFormActionFulfilledResetExecutionGate(),
 	      rejectedErrorPreflightGate:
 	        formActions.describePrivateFormActionRejectedErrorPreflightGate()
 	    },
@@ -18094,6 +18106,7 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	      submitResetExecutionGateAvailable: true,
 	      callbackActionPreflightGateAvailable: true,
 	      asyncCallbackExecutionGateAvailable: true,
+	      fulfilledResetExecutionGateAvailable: true,
 	      rejectedErrorPreflightGateAvailable: true,
 	      rejectsLiveForms: true,
 	      rejectsUnsupportedSubmitControls: true,
@@ -18232,6 +18245,7 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	      admitsPrivateAsyncActionCallbacks: true,
 	      executesPrivateAsyncActionCallbacks: true,
 	      failClosedErrorsRecorded: true,
+	      fulfilledResetExecutionGateAvailable: true,
 	      rejectedErrorPreflightGateAvailable: true,
 	      rejectsLiveForms: true,
 	      rejectsPublicDispatch: true,
@@ -18257,6 +18271,64 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	      compatibilityClaimed: false,
 	      asyncCallbackExecutionGate:
 	        formActions.describePrivateFormActionAsyncCallbackExecutionGate()
+	    },
+	    formActionFulfilledResetExecutionBoundary: {
+	      gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+	      behaviorArea: null,
+	      supportedBehaviorArea: 'form-action',
+	      appliesToRequest: false,
+	      metadataGateAvailable: true,
+	      sourceRecordsAccepted: true,
+	      acceptedSourceRecordType:
+	        formActions.privateFormActionAsyncCallbackExecutionRecordType,
+	      acceptedSourceStatus:
+	        formActions.privateFormActionAsyncCallbackExecutionRecordedStatus,
+	      acceptedFulfilledCallbackStatus:
+	        'executed-private-form-action-async-callback-fulfilled',
+	      acceptedSubmitResetExecutionRecordType:
+	        formActions.privateFormActionSubmitResetExecutionRecordType,
+	      acceptedSubmitResetExecutionStatus:
+	        formActions.privateFormActionSubmitResetExecutionRecordedStatus,
+	      consumesFulfilledAsyncCallbackExecution: true,
+	      consumesSubmitResetExecutionMetadata: true,
+	      consumesResetMetadata: true,
+	      recordsFulfilledActionResultMetadata: true,
+	      executesDeterministicFakeResetStateQueue: true,
+	      recordsDeterministicFakeResetCommit: true,
+	      rejectsStaleFulfilledCallbacks: true,
+	      rejectsStaleSubmitResetExecutionMetadata: true,
+	      rejectsForeignSubmitResetExecutionMetadata: true,
+	      rejectsPublicResetRequest: true,
+	      rejectsActionInvocation: true,
+	      rejectsPublicDomMutation: true,
+	      rejectsPackageCompatibilityClaims: true,
+	      realFormAccepted: false,
+	      rawTargetCaptured: false,
+	      rawEventCaptured: false,
+	      nativeEventInspected: false,
+	      formInspected: false,
+	      submitControlInspected: false,
+	      formDataConstructed: false,
+	      syntheticEventCreated: false,
+	      listenerDispatchStarted: false,
+	      callbackDispatchExecuted: false,
+	      submitCallbackInvoked: false,
+	      privateAsyncActionCallbackInvoked: false,
+	      actionInvoked: false,
+	      publicActionInvoked: false,
+	      transitionStarted: false,
+	      resetFiberResolved: false,
+	      resetStateQueued: false,
+	      resetUpdateEnqueued: false,
+	      reactUpdateQueued: false,
+	      afterMutationEffectsVisited: false,
+	      resetFormInstanceCalled: false,
+	      formResetCommitted: false,
+	      realFormReset: false,
+	      publicRootTouched: false,
+	      compatibilityClaimed: false,
+	      fulfilledResetExecutionGate:
+	        formActions.describePrivateFormActionFulfilledResetExecutionGate()
 	    },
 	    formActionRejectedErrorPreflightBoundary: {
 	      gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
@@ -18371,6 +18443,9 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
 	      formActionAsyncCallbackApplies:
 	        record.sourceAdapterBoundary
 	          .formActionAsyncCallbackExecutionBoundary !== null,
+	      formActionFulfilledResetApplies:
+	        record.sourceAdapterBoundary
+	          .formActionFulfilledResetExecutionBoundary !== null,
 	      formActionRejectedErrorPreflightApplies:
 	        record.sourceAdapterBoundary
 	          .formActionRejectedErrorPreflightBoundary !== null,
@@ -18391,6 +18466,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
 	        formActionEventExtractionApplies: false,
 	        formActionSubmitDispatchApplies: false,
 	        formActionAsyncCallbackApplies: false,
+	        formActionFulfilledResetApplies: false,
 	        formActionRejectedErrorPreflightApplies: false,
 	        trackerBoundaryApplies: false
 	      },
@@ -18406,6 +18482,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
 	        formActionEventExtractionApplies: true,
 	        formActionSubmitDispatchApplies: true,
 	        formActionAsyncCallbackApplies: true,
+	        formActionFulfilledResetApplies: true,
 	        formActionRejectedErrorPreflightApplies: true,
 	        trackerBoundaryApplies: false
 	      },
@@ -18421,6 +18498,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
 	        formActionEventExtractionApplies: false,
 	        formActionSubmitDispatchApplies: false,
 	        formActionAsyncCallbackApplies: false,
+	        formActionFulfilledResetApplies: false,
 	        formActionRejectedErrorPreflightApplies: false,
 	        trackerBoundaryApplies: true
 	      }

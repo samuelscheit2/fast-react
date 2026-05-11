@@ -1326,6 +1326,278 @@ export async function assertPrivateFormActionAsyncCallbackExecutionGate() {
   );
 }
 
+export async function assertPrivateFormActionFulfilledResetExecutionGate() {
+  const resourceFormGate = requireReactDomPackageFile(
+    "src/resource-form-gates.js"
+  );
+  const formActions = requireReactDomPackageFile(
+    "src/shared/form-actions.js"
+  );
+  const dispatcherGate = resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: "conformance-fulfilled-reset-source"
+  });
+  const extractionGate = resourceFormGate.createFormActionEventExtractionGate({
+    requestIdPrefix: "conformance-fulfilled-reset-extraction"
+  });
+  const queueCommitGate =
+    resourceFormGate.createFormActionResetQueueCommitGate({
+      requestIdPrefix: "conformance-fulfilled-reset-queue"
+    });
+  const blockerGate =
+    formActions.createFormActionFormDataBlockerDiagnosticGate({
+      requestIdPrefix: "conformance-fulfilled-reset-blocker"
+    });
+  const dispatchGate =
+    formActions.createFormActionSubmitDispatchDiagnosticGate({
+      requestIdPrefix: "conformance-fulfilled-reset-dispatch"
+    });
+  const resetExecutionGate =
+    formActions.createFormActionSubmitResetExecutionDiagnosticGate({
+      requestIdPrefix: "conformance-fulfilled-reset-reset-execution"
+    });
+  const preflightGate =
+    formActions.createFormActionCallbackActionPreflightDiagnosticGate({
+      requestIdPrefix: "conformance-fulfilled-reset-preflight"
+    });
+  const asyncExecutionGate =
+    formActions.createFormActionAsyncCallbackExecutionDiagnosticGate({
+      requestIdPrefix: "conformance-fulfilled-reset-async"
+    });
+  const fulfilledResetGate =
+    formActions.createFormActionFulfilledResetExecutionDiagnosticGate({
+      requestIdPrefix: "conformance-fulfilled-reset"
+    });
+  const submission = dispatcherGate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: "submit",
+    submissionTrigger: "requestSubmit",
+    actionKind: "function",
+    actionSource: "form",
+    submitControlKind: "button",
+    formActionKind: "function",
+    submitterActionKind: "none",
+    defaultPrevented: false,
+    transitionScheduled: false
+  });
+  const extraction =
+    extractionGate.recordEventExtractionFromSubmissionIntent(submission);
+  const reset = dispatcherGate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: "r",
+    resetSource: "action-completion",
+    formOwnership: "react-owned",
+    transitionContext: "action"
+  });
+  const resetQueueCommit = queueCommitGate.recordResetQueueCommit(reset, {
+    explicitAdmission: true,
+    queueSource: "action-completion",
+    queueKind: "metadata-only-reset-state-queue",
+    commitKind: "after-mutation-form-reset-order",
+    hostTag: "form"
+  });
+  const blocker = blockerGate.recordFormDataBlockerDiagnostic(
+    extraction,
+    resetQueueCommit,
+    {
+      explicitFormActionFormDataBlocker: true,
+      formTargetShape: { targetKind: "form", hostTag: "form" },
+      submitterShape: { controlKind: "button", hostTag: "button" }
+    }
+  );
+  const dispatch = dispatchGate.recordSubmitDispatchDiagnostic(blocker, {
+    explicitFormActionSubmitDispatch: true,
+    submitControlKind: "button"
+  });
+  const resetExecution = resetExecutionGate.recordSubmitResetExecution(
+    dispatch,
+    {
+      explicitFormActionSubmitResetExecution: true,
+      fakeFormPath: {
+        pathId: "conformance-fulfilled-reset-fake-reset",
+        pathKind: "action-completion-submit-reset",
+        hostTag: "form",
+        resetMode: "record-only-fake-reset"
+      }
+    }
+  );
+  const preflight = preflightGate.recordCallbackActionInvocationPreflight(
+    dispatch,
+    resetExecution,
+    {
+      explicitFormActionCallbackActionPreflight: true
+    }
+  );
+  const asyncExecution = await asyncExecutionGate.recordAsyncCallbackExecution(
+    preflight,
+    {
+      explicitFormActionAsyncCallbackExecution: true,
+      async asyncActionCallback(payload) {
+        assert.equal(Object.isFrozen(payload), true);
+        assert.equal(payload.formDataConstructed, false);
+        await Promise.resolve();
+        return { ok: true };
+      }
+    }
+  );
+  const record = fulfilledResetGate.recordFulfilledResetExecution(
+    asyncExecution,
+    resetExecution,
+    {
+      explicitFormActionFulfilledResetExecution: true,
+      sourceAsyncCallbackExecutionId: asyncExecution.executionId,
+      sourceSubmitResetExecutionId: resetExecution.executionId
+    }
+  );
+  const summary =
+    formActions.describePrivateFormActionFulfilledResetExecutionGate();
+
+  assert.equal(
+    summary.gateId,
+    formActions.privateFormActionFulfilledResetExecutionGateId
+  );
+  assert.equal(
+    summary.status,
+    formActions.privateFormActionFulfilledResetExecutionStatus
+  );
+  assert.equal(summary.consumesFulfilledAsyncCallbackExecution, true);
+  assert.equal(summary.consumesSubmitResetExecutionMetadata, true);
+  assert.equal(summary.recordsFulfilledActionResultMetadata, true);
+  assert.equal(summary.executesDeterministicFakeResetStateQueue, true);
+  assert.equal(summary.recordsDeterministicFakeResetCommit, true);
+  assert.equal(summary.rejectsRejectedAsyncCallbacks, true);
+  assert.equal(summary.rejectsNonThenableAsyncCallbacks, true);
+  assert.equal(summary.rejectsSynchronousThrowAsyncCallbacks, true);
+  assert.equal(summary.rejectsForeignSubmitResetExecutionMetadata, true);
+  assert.equal(summary.rejectsPublicDomMutation, true);
+  assert.equal(summary.rejectsPackageCompatibilityClaims, true);
+  assert.equal(summary.constructsFormData, false);
+  assert.equal(summary.invokesActions, false);
+  assert.equal(summary.invokesPrivateAsyncActionCallbacks, false);
+  assert.equal(summary.queuesReactUpdates, false);
+  assert.equal(summary.commitsFormResets, false);
+  assert.equal(summary.resetsForms, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    formActions.formActionFulfilledResetExecutionBlockedSideEffects
+  );
+  assert.deepEqual(
+    resourceFormGate.describePrivateFormActionFulfilledResetExecutionBoundary(
+      null
+    ),
+    summary
+  );
+
+  assert.equal(
+    formActions.isPrivateFormActionFulfilledResetExecutionRecord(record),
+    true
+  );
+  assert.equal(
+    formActions.getPrivateFormActionFulfilledResetExecutionRecordPayload(
+      record
+    ),
+    record
+  );
+  assert.equal(
+    record.status,
+    formActions.privateFormActionFulfilledResetExecutionRecordedStatus
+  );
+  assert.equal(
+    record.sourceAsyncCallbackExecutionId,
+    asyncExecution.executionId
+  );
+  assert.equal(
+    record.sourceSubmitResetExecutionId,
+    resetExecution.executionId
+  );
+  assert.equal(
+    record.admission.diagnosticKind,
+    formActions.formActionFulfilledResetExecutionDiagnosticKind
+  );
+  assert.equal(
+    record.admission.queueExecutionKind,
+    formActions.formActionFulfilledResetExecutionQueueExecutionKind
+  );
+  assert.equal(record.fulfilledActionResult.fulfilled, true);
+  assert.equal(record.fulfilledActionResult.actionResultExposed, false);
+  assert.equal(
+    record.fakeResetStateQueueExecution.queueExecutionKind,
+    formActions.formActionFulfilledResetExecutionQueueExecutionKind
+  );
+  assert.equal(
+    record.fakeResetStateQueueExecution.fakeResetStateQueueExecuted,
+    true
+  );
+  assert.equal(
+    record.fakeResetStateQueueExecution.fakeResetStateUpdateQueued,
+    true
+  );
+  assert.equal(record.fakeResetStateQueueExecution.reactUpdateQueued, false);
+  assert.equal(
+    record.fakeResetCommitExecution.fakeResetCommitExecuted,
+    true
+  );
+  assert.equal(
+    record.fakeResetCommitExecution.fakeFormResetCommitRecorded,
+    true
+  );
+  assert.equal(record.fakeResetCommitExecution.resetFormInstanceCalled, false);
+  assert.equal(record.fakeResetCommitExecution.realFormReset, false);
+  assert.equal(record.publicFormActionBoundary.publicFormActionsEnabled, false);
+  assert.equal(record.publicFormActionBoundary.reactUpdateQueued, false);
+  assert.equal(record.publicFormActionBoundary.domMutation, false);
+  assert.deepEqual(
+    record.sideEffects,
+    formActions.formActionFulfilledResetExecutionDiagnosticSideEffects
+  );
+  assert.equal(record.sideEffects.reactUpdateQueued, false);
+  assert.equal(record.sideEffects.realFormReset, false);
+
+  for (const { admission, reason } of [
+    {
+      admission: {
+        explicitFormActionFulfilledResetExecution: true,
+        diagnosticKind: "real-react-update-queue"
+      },
+      reason:
+        "diagnosticKind must be deterministic-private-fulfilled-action-reset-fake-commit"
+    },
+    {
+      admission: {
+        explicitFormActionFulfilledResetExecution: true,
+        queueExecutionKind: "real-react-update-queue"
+      },
+      reason:
+        "queueExecutionKind must be deterministic-fake-reset-state-queue"
+    },
+    {
+      admission: {
+        explicitFormActionFulfilledResetExecution: true,
+        reactUpdateQueued: true
+      },
+      reason: "react update queueing must remain blocked"
+    }
+  ]) {
+    assert.throws(
+      () =>
+        formActions
+          .createFormActionFulfilledResetExecutionDiagnosticGate()
+          .recordFulfilledResetExecution(
+            asyncExecution,
+            resetExecution,
+            admission
+          ),
+      {
+        code:
+          formActions
+            .privateFormActionFulfilledResetExecutionInvalidAdmissionCode,
+        compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+        reason
+      },
+      reason
+    );
+  }
+}
+
 export async function assertPrivateFormActionRejectedErrorPreflightGate() {
   const resourceFormGate = requireReactDomPackageFile(
     "src/resource-form-gates.js"
