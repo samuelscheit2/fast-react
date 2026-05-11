@@ -1192,6 +1192,29 @@ impl HostWorkResult {
         self.detached_hosts
     }
 
+    #[cfg(test)]
+    pub(crate) fn from_detached_hosts_for_canary(
+        root: FiberRootId,
+        work_in_progress: FiberId,
+        root_children: Vec<FiberId>,
+        completed_children: Vec<FiberId>,
+        detached_hosts: DetachedHostRecords,
+    ) -> Self {
+        let root_child = root_children.first().copied();
+        let completed_child = completed_children.first().copied();
+        Self {
+            root,
+            work_in_progress,
+            root_child,
+            root_children,
+            completed_child,
+            completed_children,
+            detached_hosts,
+            sync_flush_host_work_epoch: 0,
+            consumed_sync_flush_host_mutations: Vec::new(),
+        }
+    }
+
     fn sync_flush_host_mutation_execution_identity(
         &self,
         request: SyncFlushHostMutationExecutionRequestForCanary,
@@ -3858,6 +3881,399 @@ fn validate_sync_flush_host_mutation_request_matches_record(
             SyncFlushHostMutationExecutionErrorForCanary::StaleFinishedWorkEvidence {
                 root: request.root(),
                 order: request.order(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushDeletedSubtreeTeardownExecutionDiagnosticForCanary {
+    sync_flush_request: SyncFlushHostMutationExecutionRequestForCanary,
+    deletion_teardown: TestHostRootDeletionTeardownExecutionDiagnosticForCanary,
+}
+
+impl SyncFlushDeletedSubtreeTeardownExecutionDiagnosticForCanary {
+    #[must_use]
+    pub(crate) const fn sync_flush_request(
+        &self,
+    ) -> SyncFlushHostMutationExecutionRequestForCanary {
+        self.sync_flush_request
+    }
+
+    #[must_use]
+    pub(crate) const fn deletion_teardown(
+        &self,
+    ) -> &TestHostRootDeletionTeardownExecutionDiagnosticForCanary {
+        &self.deletion_teardown
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.sync_flush_request.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn order(&self) -> usize {
+        self.sync_flush_request.order()
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.sync_flush_request.finished_work()
+    }
+
+    #[must_use]
+    pub(crate) fn ref_cleanup_return_callbacks_invoked(&self) -> bool {
+        self.deletion_teardown
+            .ref_cleanup_return_callbacks_invoked()
+    }
+
+    #[must_use]
+    pub(crate) fn passive_destroy_callbacks_invoked(&self) -> bool {
+        self.deletion_teardown.passive_destroy_callbacks_invoked()
+    }
+
+    #[must_use]
+    pub(crate) const fn private_host_subtree_detachment_applied(&self) -> bool {
+        self.deletion_teardown
+            .private_host_subtree_detachment_applied()
+    }
+
+    #[must_use]
+    pub(crate) const fn private_opt_in_sync_flush_teardown_requested(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_unmount_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_ref_or_effect_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary {
+    SyncFlushHostMutation(SyncFlushHostMutationExecutionErrorForCanary),
+    DeletedSubtreeTeardown(TestHostRootDeletionTeardownExecutionErrorForCanary),
+    MismatchedRootOwnership {
+        expected_root: FiberRootId,
+        actual_root: FiberRootId,
+    },
+    MismatchedFinishedWork {
+        root: FiberRootId,
+        expected_finished_work: FiberId,
+        actual_finished_work: FiberId,
+    },
+    MismatchedCommittedCurrent {
+        root: FiberRootId,
+        expected_current: FiberId,
+        actual_current: FiberId,
+    },
+    MismatchedSyncFlushDeletionLanes {
+        root: FiberRootId,
+        sync_flush_render_lanes: Lanes,
+        deletion_finished_lanes: Lanes,
+        sync_flush_remaining_lanes: Lanes,
+        deletion_remaining_lanes: Lanes,
+        sync_flush_pending_lanes: Lanes,
+        deletion_pending_lanes: Lanes,
+    },
+}
+
+impl Display for SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SyncFlushHostMutation(error) => Display::fmt(error, formatter),
+            Self::DeletedSubtreeTeardown(error) => Display::fmt(error, formatter),
+            Self::MismatchedRootOwnership {
+                expected_root,
+                actual_root,
+            } => write!(
+                formatter,
+                "sync-flush deleted-subtree teardown root ownership mismatch: expected root {}, found root {}",
+                expected_root.raw(),
+                actual_root.raw()
+            ),
+            Self::MismatchedFinishedWork {
+                root,
+                expected_finished_work,
+                actual_finished_work,
+            } => write!(
+                formatter,
+                "sync-flush deleted-subtree teardown finished-work mismatch for root {}: expected fiber slot {}, found fiber slot {}",
+                root.raw(),
+                expected_finished_work.slot().get(),
+                actual_finished_work.slot().get()
+            ),
+            Self::MismatchedCommittedCurrent {
+                root,
+                expected_current,
+                actual_current,
+            } => write!(
+                formatter,
+                "sync-flush deleted-subtree teardown committed current mismatch for root {}: expected fiber slot {}, found fiber slot {}",
+                root.raw(),
+                expected_current.slot().get(),
+                actual_current.slot().get()
+            ),
+            Self::MismatchedSyncFlushDeletionLanes {
+                root,
+                sync_flush_render_lanes,
+                deletion_finished_lanes,
+                sync_flush_remaining_lanes,
+                deletion_remaining_lanes,
+                sync_flush_pending_lanes,
+                deletion_pending_lanes,
+            } => write!(
+                formatter,
+                "sync-flush deleted-subtree teardown lanes mismatch for root {}: render {:?}/finished {:?}, remaining {:?}/{:?}, pending {:?}/{:?}",
+                root.raw(),
+                sync_flush_render_lanes,
+                deletion_finished_lanes,
+                sync_flush_remaining_lanes,
+                deletion_remaining_lanes,
+                sync_flush_pending_lanes,
+                deletion_pending_lanes
+            ),
+        }
+    }
+}
+
+impl Error for SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::SyncFlushHostMutation(error) => Some(error),
+            Self::DeletedSubtreeTeardown(error) => Some(error),
+            Self::MismatchedRootOwnership { .. }
+            | Self::MismatchedFinishedWork { .. }
+            | Self::MismatchedCommittedCurrent { .. }
+            | Self::MismatchedSyncFlushDeletionLanes { .. } => None,
+        }
+    }
+}
+
+impl From<SyncFlushHostMutationExecutionErrorForCanary>
+    for SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary
+{
+    fn from(error: SyncFlushHostMutationExecutionErrorForCanary) -> Self {
+        Self::SyncFlushHostMutation(error)
+    }
+}
+
+impl From<TestHostRootDeletionTeardownExecutionErrorForCanary>
+    for SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary
+{
+    fn from(error: TestHostRootDeletionTeardownExecutionErrorForCanary) -> Self {
+        Self::DeletedSubtreeTeardown(error)
+    }
+}
+
+impl From<HostWorkError> for SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary {
+    fn from(error: HostWorkError) -> Self {
+        Self::SyncFlushHostMutation(SyncFlushHostMutationExecutionErrorForCanary::HostWork(
+            error,
+        ))
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private canary composes accepted sync-flush and deleted-subtree source evidence"
+)]
+pub(crate) fn execute_sync_flush_deleted_subtree_teardown_for_canary<E>(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    sync_flush_record: &SyncFlushRootRecord,
+    sync_flush_diagnostics: SyncFlushRootHostOutputCommitDiagnosticsForCanary,
+    sync_flush_request: SyncFlushHostMutationExecutionRequestForCanary,
+    deletion_handoff: &HostRootFinishedWorkCommitHandoffRecordForCanary,
+    source_deletion_request: TestHostRootDeletionTeardownExecutionRequestForCanary,
+    deletion_request: TestHostRootDeletionTeardownExecutionRequestForCanary,
+    host_work: &mut HostWorkResult,
+    executor: &mut E,
+) -> Result<
+    SyncFlushDeletedSubtreeTeardownExecutionDiagnosticForCanary,
+    SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary,
+>
+where
+    E: DeletedSubtreeRefCleanupReturnExecutor + PassiveEffectDestroyCallbackExecutor,
+{
+    let source_sync_request = sync_flush_host_mutation_execution_request_for_canary(
+        sync_flush_record,
+        sync_flush_diagnostics,
+    )?;
+    validate_sync_flush_host_mutation_request_matches_record(
+        sync_flush_request,
+        sync_flush_record,
+    )?;
+    if sync_flush_request != source_sync_request {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root: sync_flush_request.root(),
+                order: sync_flush_request.order(),
+            }
+            .into(),
+        );
+    }
+
+    let rebuilt_deletion_request = test_host_root_deletion_teardown_execution_request_for_canary(
+        deletion_handoff,
+        source_deletion_request.request_order(),
+    )?;
+    if rebuilt_deletion_request != source_deletion_request
+        || source_deletion_request != deletion_request
+        || !source_deletion_request.matches_source_handoff(deletion_handoff)
+        || !source_deletion_request.has_required_source_evidence()
+    {
+        return Err(
+            TestHostRootDeletionTeardownExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root: deletion_request.root(),
+                commit_order: deletion_request.commit_order(),
+                request_order: deletion_request.request_order(),
+            }
+            .into(),
+        );
+    }
+
+    validate_sync_flush_deleted_subtree_teardown_identity(
+        sync_flush_request,
+        source_deletion_request,
+    )?;
+
+    let root = store
+        .root(sync_flush_request.root())
+        .map_err(HostWorkError::from)?;
+    if root.current() != sync_flush_request.committed_current() {
+        return Err(HostWorkError::CommitCurrentMismatch {
+            root: sync_flush_request.root(),
+            expected: sync_flush_request.committed_current(),
+            actual: root.current(),
+        }
+        .into());
+    }
+
+    if host_work.root() != sync_flush_request.root() {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedRootOwnership {
+                expected_root: sync_flush_request.root(),
+                actual_root: host_work.root(),
+            }
+            .into(),
+        );
+    }
+
+    if host_work.work_in_progress() != sync_flush_request.finished_work() {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedFinishedWork {
+                root: sync_flush_request.root(),
+                expected_finished_work: sync_flush_request.finished_work(),
+                actual_finished_work: host_work.work_in_progress(),
+            }
+            .into(),
+        );
+    }
+
+    let execution_identity =
+        host_work.sync_flush_host_mutation_execution_identity(sync_flush_request);
+    if host_work.has_consumed_sync_flush_host_mutation_execution(execution_identity) {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::ReplayedHostMutationExecution {
+                root: sync_flush_request.root(),
+                order: sync_flush_request.order(),
+                finished_work: sync_flush_request.finished_work(),
+            }
+            .into(),
+        );
+    }
+
+    host_work.mark_sync_flush_host_mutation_execution_consumed(execution_identity);
+
+    let deletion_teardown = execute_test_host_root_deletion_teardown_after_commit_for_canary(
+        store,
+        host,
+        deletion_handoff,
+        source_deletion_request,
+        deletion_request,
+        host_work.detached_hosts_mut(),
+        executor,
+    )?;
+
+    Ok(
+        SyncFlushDeletedSubtreeTeardownExecutionDiagnosticForCanary {
+            sync_flush_request,
+            deletion_teardown,
+        },
+    )
+}
+
+fn validate_sync_flush_deleted_subtree_teardown_identity(
+    sync_flush_request: SyncFlushHostMutationExecutionRequestForCanary,
+    deletion_request: TestHostRootDeletionTeardownExecutionRequestForCanary,
+) -> Result<(), SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary> {
+    if sync_flush_request.root() != deletion_request.root() {
+        return Err(
+            SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary::MismatchedRootOwnership {
+                expected_root: sync_flush_request.root(),
+                actual_root: deletion_request.root(),
+            },
+        );
+    }
+
+    if sync_flush_request.finished_work() != deletion_request.finished_work() {
+        return Err(
+            SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary::MismatchedFinishedWork {
+                root: sync_flush_request.root(),
+                expected_finished_work: sync_flush_request.finished_work(),
+                actual_finished_work: deletion_request.finished_work(),
+            },
+        );
+    }
+
+    if sync_flush_request.committed_current() != deletion_request.committed_current() {
+        return Err(
+            SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary::MismatchedCommittedCurrent {
+                root: sync_flush_request.root(),
+                expected_current: sync_flush_request.committed_current(),
+                actual_current: deletion_request.committed_current(),
+            },
+        );
+    }
+
+    if sync_flush_request.finished_lanes() != deletion_request.finished_lanes()
+        || sync_flush_request.remaining_lanes() != deletion_request.remaining_lanes()
+        || sync_flush_request.pending_lanes() != deletion_request.pending_lanes()
+    {
+        return Err(
+            SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary::MismatchedSyncFlushDeletionLanes {
+                root: sync_flush_request.root(),
+                sync_flush_render_lanes: sync_flush_request.render_lanes(),
+                deletion_finished_lanes: deletion_request.finished_lanes(),
+                sync_flush_remaining_lanes: sync_flush_request.remaining_lanes(),
+                deletion_remaining_lanes: deletion_request.remaining_lanes(),
+                sync_flush_pending_lanes: sync_flush_request.pending_lanes(),
+                deletion_pending_lanes: deletion_request.pending_lanes(),
             },
         );
     }
