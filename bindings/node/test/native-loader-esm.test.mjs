@@ -225,6 +225,26 @@ assert.equal(
   nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
 );
 assert.equal(
+  nativeBindingManifest.nativeRootBridgeRequestShape.batchLifecycleConsumer,
+  nativeRootBridgeRequestShape.batchLifecycleConsumer
+);
+assert.equal(
+  nativeRootBridgeRequestShape.batchLifecycleConsumer.consumerStatus,
+  'consumed-native-root-bridge-batch-lifecycle-records'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.batchLifecycleConsumer.model,
+  'fast-react-napi.NativeRootBridgeBatchLifecycleConsumer'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.batchLifecycleConsumer.nativeExecution,
+  false
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.batchLifecycleConsumer.cleanupHookEvidenceStatuses,
+  ['not-required', 'accepted', 'rejected']
+);
+assert.equal(
   nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
     .preflightStatus,
   'preflighted-native-root-bridge-worker-thread-teardown-boundary'
@@ -799,6 +819,43 @@ assert.deepEqual(
     .rustAdmissionSmokeRecord,
   shapeGate.rustHandleTableAdmissionSmoke.smokeRecords[2]
     .rustAdmissionSmokeRecord
+);
+assert.equal(
+  shapeGate.batchLifecycleConsumer.consumerStatus,
+  nativeRootBridgeRequestShape.batchLifecycleConsumer.consumerStatus
+);
+assert.equal(shapeGate.batchLifecycleConsumer.requestCount, 3);
+assert.equal(shapeGate.batchLifecycleConsumer.consumedBatchRecordCount, 3);
+assert.equal(
+  shapeGate.batchLifecycleConsumer.cleanupHookCallablePreflightAccepted,
+  true
+);
+assert.deepEqual(
+  shapeGate.batchLifecycleConsumer.rows.map((row) => row.kind),
+  ['create', 'render', 'unmount']
+);
+assert.deepEqual(
+  shapeGate.batchLifecycleConsumer.rows.map(
+    (row) => row.cleanupHookEvidenceStatus
+  ),
+  ['not-required', 'accepted', 'accepted']
+);
+assert.deepEqual(
+  shapeGate.batchLifecycleConsumer.rows.map((row) => row.rootHandleAction),
+  ['admit-root-handle', 'validate-active-root-handle', 'retire-root-handle']
+);
+assert.equal(
+  shapeGate.batchLifecycleConsumer.rows.every(
+    (row) =>
+      row.nativeAddonLoaded === false &&
+      row.nativeExecution === false &&
+      row.rendererExecution === false &&
+      row.reconcilerExecution === false &&
+      row.nodeWorkerThreadsExecution === false &&
+      row.napiCleanupHookExecution === false &&
+      row.publicNativeCompatibility === false
+  ),
+  true
 );
 assert.deepEqual(
   shapeGate.validationRecords.map((record) => record.lifecycleTransition),

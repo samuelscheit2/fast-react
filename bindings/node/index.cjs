@@ -67,6 +67,16 @@ const nativeRootBridgeWorkerThreadCleanupHookRootArgumentIdentityToken =
 const nativeRootBridgeWorkerThreadCleanupHookValueArgumentIdentityToken =
   'private-cleanup-hook-arg:worker-764-value-slot-3';
 const nativeRootBridgeWorkerThreadCleanupHookCount = 2;
+const nativeRootBridgeBatchLifecycleConsumerStatus =
+  'consumed-native-root-bridge-batch-lifecycle-records';
+const nativeRootBridgeBatchLifecycleConsumerModel =
+  'fast-react-napi.NativeRootBridgeBatchLifecycleConsumer';
+const nativeRootBridgeBatchLifecycleConsumerCleanupHookNotRequiredStatus =
+  'not-required';
+const nativeRootBridgeBatchLifecycleConsumerCleanupHookAcceptedStatus =
+  'accepted';
+const nativeRootBridgeBatchLifecycleConsumerCleanupHookRejectedStatus =
+  'rejected';
 const nativeRootBridgeJsonTransportBatchResponseSequenceGateStatus =
   'diagnosed-native-root-bridge-json-batch-response-sequence';
 const nativeRootBridgeJsonTransportBatchResponseSequenceBatchId =
@@ -429,6 +439,44 @@ const nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFields =
     'nativePackageCompatibilityClaimed',
     'packageCompatibilityClaimed'
   ]);
+const nativeRootBridgeBatchLifecycleConsumerCleanupHookStatuses =
+  Object.freeze([
+    nativeRootBridgeBatchLifecycleConsumerCleanupHookNotRequiredStatus,
+    nativeRootBridgeBatchLifecycleConsumerCleanupHookAcceptedStatus,
+    nativeRootBridgeBatchLifecycleConsumerCleanupHookRejectedStatus
+  ]);
+const nativeRootBridgeBatchLifecycleConsumerRowFields = Object.freeze([
+  'id',
+  'batchIndex',
+  'requestId',
+  'kind',
+  'lifecycleTransition',
+  'rootHandleAction',
+  'rootHandleStateBefore',
+  'rootHandleStateAfter',
+  'rootHandleCurrentGeneration',
+  'valueHandleAction',
+  'valueHandleCurrentGeneration',
+  'retiredRootSourceErrorCode',
+  'cleanupHookEvidenceRequired',
+  'cleanupHookEvidenceStatus',
+  'cleanupHookEvidenceRowId',
+  'cleanupHookSourceRowId',
+  'cleanupHookSourceHandleKind',
+  'cleanupHookCanonicalExecutableEvidence',
+  'status',
+  'code',
+  'sourceErrorCode',
+  'boundaryErrorCode',
+  'nativeAddonLoaded',
+  'nativeExecution',
+  'rendererExecution',
+  'reconcilerExecution',
+  'nodeWorkerThreadsExecution',
+  'napiCleanupHookExecution',
+  'publicNativeCompatibility',
+  'reactBehaviorError'
+]);
 const nativeRootBridgeJsonTransportParseErrorCodes = Object.freeze({
   expectedObject:
     'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_EXPECTED_OBJECT',
@@ -1394,6 +1442,140 @@ function hasNativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaim(
   );
 }
 
+function createNativeRootBridgeBatchLifecycleConsumer({
+  handleAdmissionPreflight,
+  jsonTransportSmoke,
+  rustHandleTableAdmissionSmoke
+}) {
+  const batchGate = jsonTransportSmoke.parserGate.batchedRecordGate;
+  const cleanupHookCallable =
+    nativeRootBridgeWorkerThreadCleanupHookPreflight
+      .validateCleanupHookEvidenceRows;
+  const cleanupHookPreflight = cleanupHookCallable(
+    nativeRootBridgeWorkerThreadCleanupHookPreflight.rows
+  );
+  const rows = Object.freeze(
+    batchGate.lifecycleRows.map((lifecycleRow, index) =>
+      freezeNativeRootBridgeBatchLifecycleConsumerRow({
+        lifecycleRow,
+        smokeRecord: rustHandleTableAdmissionSmoke.smokeRecords[index],
+        cleanupHookPreflight
+      })
+    )
+  );
+
+  return Object.freeze({
+    consumerStatus: nativeRootBridgeBatchLifecycleConsumerStatus,
+    model: nativeRootBridgeBatchLifecycleConsumerModel,
+    validationModel: nativeRootBridgeRequestValidationModel,
+    handleTableModel: nativeRootBridgeHandleTableModel,
+    batchGateStatus: batchGate.batchGateStatus,
+    cleanupHookPreflightStatus: cleanupHookPreflight.preflightStatus,
+    cleanupHookCallableName: 'validateCleanupHookEvidenceRows',
+    requestCount: handleAdmissionPreflight.requestCount,
+    consumedBatchRecordCount: rows.length,
+    acceptedBatchRecordCount: rows.filter(
+      (row) =>
+        row.status === nativeRootBridgeJsonTransportBatchLifecycleStatusAccepted
+    ).length,
+    cleanupHookCallablePreflightAccepted:
+      cleanupHookPreflight.canonicalExecutableEvidenceAccepted,
+    acceptedCleanupEvidenceCount:
+      cleanupHookPreflight.acceptedCleanupEvidenceCount,
+    rejectedCleanupEvidenceCount:
+      cleanupHookPreflight.rejectedCleanupEvidenceCount,
+    cleanupHookEvidenceStatuses:
+      nativeRootBridgeBatchLifecycleConsumerCleanupHookStatuses,
+    batchLifecycleConsumerRowFields:
+      nativeRootBridgeBatchLifecycleConsumerRowFields,
+    rows,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  });
+}
+
+function freezeNativeRootBridgeBatchLifecycleConsumerRow({
+  lifecycleRow,
+  smokeRecord,
+  cleanupHookPreflight
+}) {
+  const cleanupHookRow =
+    getNativeRootBridgeBatchLifecycleConsumerCleanupHookRow(
+      lifecycleRow.kind,
+      cleanupHookPreflight
+    );
+  const cleanupHookEvidenceStatus =
+    cleanupHookRow === null
+      ? nativeRootBridgeBatchLifecycleConsumerCleanupHookNotRequiredStatus
+      : cleanupHookRow.status;
+
+  return Object.freeze({
+    id: `batch-lifecycle-consumer-${lifecycleRow.batchIndex}-${lifecycleRow.kind}`,
+    batchIndex: lifecycleRow.batchIndex,
+    requestId: lifecycleRow.requestId,
+    kind: lifecycleRow.kind,
+    lifecycleTransition: lifecycleRow.lifecycleTransition,
+    rootHandleAction: smokeRecord.rootHandleAction,
+    rootHandleStateBefore: smokeRecord.rootHandleStateBefore,
+    rootHandleStateAfter: smokeRecord.rootHandleStateAfter,
+    rootHandleCurrentGeneration: smokeRecord.rootHandleCurrentGeneration,
+    valueHandleAction: smokeRecord.valueHandleAction,
+    valueHandleCurrentGeneration: smokeRecord.valueHandleCurrentGeneration,
+    retiredRootSourceErrorCode: smokeRecord.retiredRootSourceErrorCode,
+    cleanupHookEvidenceRequired: cleanupHookRow !== null,
+    cleanupHookEvidenceStatus,
+    cleanupHookEvidenceRowId: cleanupHookRow?.id ?? null,
+    cleanupHookSourceRowId: cleanupHookRow?.sourceRowId ?? null,
+    cleanupHookSourceHandleKind: cleanupHookRow?.sourceHandleKind ?? null,
+    cleanupHookCanonicalExecutableEvidence:
+      cleanupHookRow?.canonicalExecutableEvidence ?? null,
+    status: lifecycleRow.status,
+    code: lifecycleRow.code,
+    sourceErrorCode: lifecycleRow.sourceErrorCode,
+    boundaryErrorCode: lifecycleRow.boundaryErrorCode,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  });
+}
+
+function getNativeRootBridgeBatchLifecycleConsumerCleanupHookRow(
+  kind,
+  cleanupHookPreflight
+) {
+  const expectedHandleKind =
+    kind === nativeRootBridgeRequestKindRender
+      ? nativeRootBridgeHandleKindValue
+      : kind === nativeRootBridgeRequestKindUnmount
+        ? nativeRootBridgeHandleKindRoot
+        : null;
+
+  if (expectedHandleKind === null) {
+    return null;
+  }
+
+  return (
+    cleanupHookPreflight.rows.find(
+      (row) =>
+        row.status ===
+          nativeRootBridgeBatchLifecycleConsumerCleanupHookAcceptedStatus &&
+        row.canonicalExecutableEvidence === true &&
+        row.sourceHandleKind === expectedHandleKind
+    ) ?? null
+  );
+}
+
 const nativeBoundaryErrorCodeMap = Object.freeze({
   unsupportedNativeExecution: unavailableErrorCode,
   rustNativeExportsNotBuilt: rustNativeExportsNotBuiltErrorCode,
@@ -1786,6 +1968,29 @@ const nativeRootBridgeWorkerThreadCleanupHookPreflight =
     })
   ]);
 
+const nativeRootBridgeBatchLifecycleConsumer = Object.freeze({
+  consumerStatus: nativeRootBridgeBatchLifecycleConsumerStatus,
+  model: nativeRootBridgeBatchLifecycleConsumerModel,
+  validationModel: nativeRootBridgeRequestValidationModel,
+  handleTableModel: nativeRootBridgeHandleTableModel,
+  batchGateStatus: nativeRootBridgeBatchedJsonTransportGateStatus,
+  cleanupHookPreflightStatus:
+    nativeRootBridgeWorkerThreadCleanupHookPreflightStatus,
+  cleanupHookCallableName: 'validateCleanupHookEvidenceRows',
+  cleanupHookEvidenceStatuses:
+    nativeRootBridgeBatchLifecycleConsumerCleanupHookStatuses,
+  batchLifecycleConsumerRowFields:
+    nativeRootBridgeBatchLifecycleConsumerRowFields,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  nodeWorkerThreadsExecution: false,
+  napiCleanupHookExecution: false,
+  publicNativeCompatibility: false,
+  reactBehaviorError: false
+});
+
 const nativeRootBridgeRequestShape = Object.freeze({
   gateStatus: nativeRootBridgeRequestShapeGateStatus,
   validationModel: nativeRootBridgeRequestValidationModel,
@@ -1810,6 +2015,7 @@ const nativeRootBridgeRequestShape = Object.freeze({
     nativeRootBridgeWorkerThreadTeardownExecutablePreflight,
   workerThreadCleanupHookPreflight:
     nativeRootBridgeWorkerThreadCleanupHookPreflight,
+  batchLifecycleConsumer: nativeRootBridgeBatchLifecycleConsumer,
   validationErrorCodes: nativeRootBridgeValidationErrorCodes
 });
 
@@ -1852,6 +2058,12 @@ function createNativeRootBridgeRequestShapeGate(requests) {
     );
   const jsonTransportSmoke =
     createNativeRootBridgeJsonTransportSmoke(validationRecords);
+  const batchLifecycleConsumer =
+    createNativeRootBridgeBatchLifecycleConsumer({
+      handleAdmissionPreflight,
+      jsonTransportSmoke,
+      rustHandleTableAdmissionSmoke
+    });
 
   return Object.freeze({
     gateStatus: nativeRootBridgeRequestShapeGateStatus,
@@ -1862,6 +2074,7 @@ function createNativeRootBridgeRequestShapeGate(requests) {
     handleAdmissionPreflight,
     rustHandleTableAdmissionSmoke,
     jsonTransportSmoke,
+    batchLifecycleConsumer,
     nativeAddonLoaded: false,
     nativeExecution: false,
     rendererExecution: false,

@@ -70,6 +70,12 @@ mod root_bridge_requests {
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_ARGUMENT_IDENTITY_TOKEN: &str =
         "private-cleanup-hook-arg:worker-764-value-slot-3";
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_COUNT: u8 = 2;
+    pub(crate) const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_STATUS: &str =
+        "consumed-native-root-bridge-batch-lifecycle-records";
+    const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_MODEL: &str =
+        "fast-react-napi.NativeRootBridgeBatchLifecycleConsumer";
+    const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_CLEANUP_HOOK_NOT_REQUIRED_STATUS: &str =
+        "not-required";
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) enum NativeRootBridgeRequestKind {
@@ -3166,6 +3172,378 @@ mod root_bridge_requests {
         stale_or_forged_cleanup_evidence_rejected: bool,
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeBatchLifecycleConsumer {
+        status: &'static str,
+        model: &'static str,
+        validation_model: &'static str,
+        handle_table_model: &'static str,
+        batch_gate_status: &'static str,
+        cleanup_hook_preflight_status: &'static str,
+        request_count: usize,
+        consumed_batch_record_count: usize,
+        accepted_batch_record_count: usize,
+        cleanup_hook_callable_preflight_accepted: bool,
+        accepted_cleanup_evidence_count: usize,
+        rejected_cleanup_evidence_count: usize,
+        rows: Vec<NativeRootBridgeBatchLifecycleConsumerRow>,
+        node_worker_threads_execution: bool,
+        napi_cleanup_hook_execution: bool,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        public_native_compatibility: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeBatchLifecycleConsumer {
+        #[must_use]
+        pub(crate) const fn status(&self) -> &'static str {
+            self.status
+        }
+
+        #[must_use]
+        pub(crate) const fn model(&self) -> &'static str {
+            self.model
+        }
+
+        #[must_use]
+        pub(crate) const fn validation_model(&self) -> &'static str {
+            self.validation_model
+        }
+
+        #[must_use]
+        pub(crate) const fn handle_table_model(&self) -> &'static str {
+            self.handle_table_model
+        }
+
+        #[must_use]
+        pub(crate) const fn batch_gate_status(&self) -> &'static str {
+            self.batch_gate_status
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_preflight_status(&self) -> &'static str {
+            self.cleanup_hook_preflight_status
+        }
+
+        #[must_use]
+        pub(crate) const fn request_count(&self) -> usize {
+            self.request_count
+        }
+
+        #[must_use]
+        pub(crate) const fn consumed_batch_record_count(&self) -> usize {
+            self.consumed_batch_record_count
+        }
+
+        #[must_use]
+        pub(crate) const fn accepted_batch_record_count(&self) -> usize {
+            self.accepted_batch_record_count
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_callable_preflight_accepted(&self) -> bool {
+            self.cleanup_hook_callable_preflight_accepted
+        }
+
+        #[must_use]
+        pub(crate) const fn accepted_cleanup_evidence_count(&self) -> usize {
+            self.accepted_cleanup_evidence_count
+        }
+
+        #[must_use]
+        pub(crate) const fn rejected_cleanup_evidence_count(&self) -> usize {
+            self.rejected_cleanup_evidence_count
+        }
+
+        #[must_use]
+        pub(crate) fn rows(&self) -> &[NativeRootBridgeBatchLifecycleConsumerRow] {
+            &self.rows
+        }
+
+        #[must_use]
+        pub(crate) const fn node_worker_threads_execution(&self) -> bool {
+            self.node_worker_threads_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn napi_cleanup_hook_execution(&self) -> bool {
+            self.napi_cleanup_hook_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_compatibility(&self) -> bool {
+            self.public_native_compatibility
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeBatchLifecycleConsumerRow {
+        id: String,
+        batch_index: usize,
+        request_id: u64,
+        kind: &'static str,
+        lifecycle_transition: Option<NativeRootBridgeLifecycleTransition>,
+        root_handle_action: NativeRootBridgeHandleAdmissionAction,
+        root_handle_state_before: Option<NativeRootBridgeRootHandleState>,
+        root_handle_state_after: NativeRootBridgeRootHandleState,
+        root_handle_current_generation: u64,
+        value_handle_action: Option<NativeRootBridgeHandleAdmissionAction>,
+        value_handle_current_generation: Option<u64>,
+        retired_root_source_error_code: Option<&'static str>,
+        cleanup_hook_evidence_required: bool,
+        cleanup_hook_evidence_status: &'static str,
+        cleanup_hook_evidence_row_id: Option<&'static str>,
+        cleanup_hook_source_row_id: Option<&'static str>,
+        cleanup_hook_source_handle_kind: Option<BridgeHandleKind>,
+        cleanup_hook_canonical_executable_evidence: Option<bool>,
+        status: NativeRootBridgeBatchedJsonTransportLifecycleStatus,
+        code: Option<&'static str>,
+        source_error_code: Option<&'static str>,
+        boundary_error_code: Option<&'static str>,
+        node_worker_threads_execution: bool,
+        napi_cleanup_hook_execution: bool,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        public_native_compatibility: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeBatchLifecycleConsumerRow {
+        fn new(
+            lifecycle_row: &NativeRootBridgeBatchedJsonTransportLifecycleRow,
+            smoke_record: NativeRootBridgeHandleTableAdmissionSmokeRecord,
+            cleanup_hook_row: Option<NativeRootBridgeWorkerThreadCleanupHookPreflightRow>,
+        ) -> Self {
+            Self {
+                id: format!(
+                    "batch-lifecycle-consumer-{}-{}",
+                    lifecycle_row.batch_index(),
+                    lifecycle_row.kind()
+                ),
+                batch_index: lifecycle_row.batch_index(),
+                request_id: lifecycle_row.request_id(),
+                kind: lifecycle_row.kind(),
+                lifecycle_transition: lifecycle_row.lifecycle_transition(),
+                root_handle_action: smoke_record.root_handle_action(),
+                root_handle_state_before: smoke_record.root_handle_state_before(),
+                root_handle_state_after: smoke_record.root_handle_state_after(),
+                root_handle_current_generation: smoke_record.root_handle_current_generation(),
+                value_handle_action: smoke_record.value_handle_action(),
+                value_handle_current_generation: smoke_record.value_handle_current_generation(),
+                retired_root_source_error_code: smoke_record.retired_root_source_error_code(),
+                cleanup_hook_evidence_required: cleanup_hook_row.is_some(),
+                cleanup_hook_evidence_status: cleanup_hook_row.map_or(
+                    NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_CLEANUP_HOOK_NOT_REQUIRED_STATUS,
+                    |row| row.status().code(),
+                ),
+                cleanup_hook_evidence_row_id: cleanup_hook_row.map(|row| row.id()),
+                cleanup_hook_source_row_id: cleanup_hook_row.map(|row| row.source_row_id()),
+                cleanup_hook_source_handle_kind: cleanup_hook_row
+                    .map(|row| row.source_handle_kind()),
+                cleanup_hook_canonical_executable_evidence: cleanup_hook_row
+                    .map(|row| row.canonical_executable_evidence()),
+                status: lifecycle_row.status(),
+                code: lifecycle_row.code(),
+                source_error_code: lifecycle_row.source_error_code(),
+                boundary_error_code: lifecycle_row.boundary_error_code(),
+                node_worker_threads_execution: false,
+                napi_cleanup_hook_execution: false,
+                native_addon_loaded: false,
+                native_execution: false,
+                renderer_execution: false,
+                reconciler_execution: false,
+                public_native_compatibility: false,
+                react_behavior_error: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) fn id(&self) -> &str {
+            &self.id
+        }
+
+        #[must_use]
+        pub(crate) const fn batch_index(&self) -> usize {
+            self.batch_index
+        }
+
+        #[must_use]
+        pub(crate) const fn request_id(&self) -> u64 {
+            self.request_id
+        }
+
+        #[must_use]
+        pub(crate) const fn kind(&self) -> &'static str {
+            self.kind
+        }
+
+        #[must_use]
+        pub(crate) const fn lifecycle_transition(
+            &self,
+        ) -> Option<NativeRootBridgeLifecycleTransition> {
+            self.lifecycle_transition
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_action(&self) -> NativeRootBridgeHandleAdmissionAction {
+            self.root_handle_action
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_state_before(
+            &self,
+        ) -> Option<NativeRootBridgeRootHandleState> {
+            self.root_handle_state_before
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_state_after(&self) -> NativeRootBridgeRootHandleState {
+            self.root_handle_state_after
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_current_generation(&self) -> u64 {
+            self.root_handle_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn value_handle_action(
+            &self,
+        ) -> Option<NativeRootBridgeHandleAdmissionAction> {
+            self.value_handle_action
+        }
+
+        #[must_use]
+        pub(crate) const fn value_handle_current_generation(&self) -> Option<u64> {
+            self.value_handle_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn retired_root_source_error_code(&self) -> Option<&'static str> {
+            self.retired_root_source_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_evidence_required(&self) -> bool {
+            self.cleanup_hook_evidence_required
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_evidence_status(&self) -> &'static str {
+            self.cleanup_hook_evidence_status
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_evidence_row_id(&self) -> Option<&'static str> {
+            self.cleanup_hook_evidence_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_row_id(&self) -> Option<&'static str> {
+            self.cleanup_hook_source_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_handle_kind(&self) -> Option<BridgeHandleKind> {
+            self.cleanup_hook_source_handle_kind
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_canonical_executable_evidence(&self) -> Option<bool> {
+            self.cleanup_hook_canonical_executable_evidence
+        }
+
+        #[must_use]
+        pub(crate) const fn status(&self) -> NativeRootBridgeBatchedJsonTransportLifecycleStatus {
+            self.status
+        }
+
+        #[must_use]
+        pub(crate) const fn code(&self) -> Option<&'static str> {
+            self.code
+        }
+
+        #[must_use]
+        pub(crate) const fn source_error_code(&self) -> Option<&'static str> {
+            self.source_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn boundary_error_code(&self) -> Option<&'static str> {
+            self.boundary_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn node_worker_threads_execution(&self) -> bool {
+            self.node_worker_threads_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn napi_cleanup_hook_execution(&self) -> bool {
+            self.napi_cleanup_hook_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_compatibility(&self) -> bool {
+            self.public_native_compatibility
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
+    }
+
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) struct NativeRootBridgeTransportWorkerThreadTeardownRow {
         id: &'static str,
@@ -4657,6 +5035,75 @@ mod root_bridge_requests {
         )
     }
 
+    pub(crate) fn native_root_bridge_batch_lifecycle_consumer_for_json(
+        json: &str,
+    ) -> Result<NativeRootBridgeBatchLifecycleConsumer, NativeRootBridgeJsonTransportParseError>
+    {
+        let gate = parse_native_root_bridge_json_transport_for_gate(json)?;
+        Ok(native_root_bridge_batch_lifecycle_consumer_for_gate(&gate))
+    }
+
+    pub(crate) fn native_root_bridge_batch_lifecycle_consumer_for_gate(
+        gate: &NativeRootBridgeJsonTransportParserGate,
+    ) -> NativeRootBridgeBatchLifecycleConsumer {
+        let cleanup_hook_preflight =
+            validate_native_root_bridge_worker_thread_cleanup_hook_preflight_rows(
+                native_root_bridge_worker_thread_cleanup_hook_preflight()
+                    .rows()
+                    .iter()
+                    .copied(),
+            );
+        let rows = gate
+            .batched_record_gate()
+            .lifecycle_rows()
+            .iter()
+            .zip(gate.admission_smoke().admission_records().iter().copied())
+            .map(|(lifecycle_row, smoke_record)| {
+                NativeRootBridgeBatchLifecycleConsumerRow::new(
+                    lifecycle_row,
+                    smoke_record,
+                    cleanup_hook_row_for_batch_lifecycle_consumer(
+                        lifecycle_row.kind(),
+                        &cleanup_hook_preflight,
+                    ),
+                )
+            })
+            .collect::<Vec<_>>();
+        let accepted_batch_record_count = rows
+            .iter()
+            .filter(|row| {
+                row.status() == NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted
+            })
+            .count();
+
+        NativeRootBridgeBatchLifecycleConsumer {
+            status: NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_STATUS,
+            model: NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_MODEL,
+            validation_model: super::NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL,
+            handle_table_model: super::NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL,
+            batch_gate_status: gate.batched_record_gate().status(),
+            cleanup_hook_preflight_status: cleanup_hook_preflight.status(),
+            request_count: gate.request_records().len(),
+            consumed_batch_record_count: rows.len(),
+            accepted_batch_record_count,
+            cleanup_hook_callable_preflight_accepted: cleanup_hook_preflight
+                .canonical_executable_evidence_accepted(),
+            accepted_cleanup_evidence_count: cleanup_hook_preflight
+                .accepted_cleanup_evidence_count(),
+            rejected_cleanup_evidence_count: cleanup_hook_preflight
+                .rejected_cleanup_evidence_count(),
+            rows,
+            node_worker_threads_execution: false,
+            napi_cleanup_hook_execution: false,
+            native_addon_loaded: false,
+            native_execution: false,
+            renderer_execution: false,
+            reconciler_execution: false,
+            public_native_compatibility: false,
+            react_behavior_error: false,
+        }
+    }
+
     fn validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows_for_preflight(
         executable_preflight: &NativeRootBridgeWorkerThreadTeardownExecutablePreflight,
         evidence_rows: impl IntoIterator<Item = NativeRootBridgeWorkerThreadCleanupHookEvidence>,
@@ -4777,6 +5224,23 @@ mod root_bridge_requests {
         }
 
         cleanup_hook_canonical_role_for_source(row.source_row_id(), row.source_handle_kind())
+    }
+
+    fn cleanup_hook_row_for_batch_lifecycle_consumer(
+        kind: &str,
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+    ) -> Option<NativeRootBridgeWorkerThreadCleanupHookPreflightRow> {
+        let expected_handle_kind = match kind {
+            "render" => BridgeHandleKind::Value,
+            "unmount" => BridgeHandleKind::Root,
+            _ => return None,
+        };
+
+        cleanup_hook_preflight.rows().iter().copied().find(|row| {
+            row.status() == NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted
+                && row.canonical_executable_evidence()
+                && row.source_handle_kind() == expected_handle_kind
+        })
     }
 
     fn worker_thread_teardown_json_transport_payload() -> &'static str {
@@ -7435,6 +7899,7 @@ mod tests {
         BridgeHandleTableError, PlaceholderRootRecord, PlaceholderValueRecord,
     };
     use crate::root_bridge_requests::{
+        NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_STATUS,
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_CANONICAL_SET_MISMATCH_CODE,
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE,
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_IDENTITY_MISMATCH_CODE,
@@ -7443,6 +7908,7 @@ mod tests {
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM_CODE,
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_STALE_EVIDENCE_CODE,
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS,
+        NativeRootBridgeBatchLifecycleConsumer, NativeRootBridgeBatchLifecycleConsumerRow,
         NativeRootBridgeBatchResponseErrorRowStatus, NativeRootBridgeBatchResponseTeardownState,
         NativeRootBridgeBatchedJsonTransportLifecycleState,
         NativeRootBridgeBatchedJsonTransportLifecycleStatus, NativeRootBridgeCreateRequest,
@@ -7459,6 +7925,7 @@ mod tests {
         NativeRootBridgeWorkerThreadCleanupHookEvidence,
         NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
         NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus,
+        native_root_bridge_batch_lifecycle_consumer_for_json,
         native_root_bridge_batched_json_transport_error_rows,
         native_root_bridge_cross_environment_teardown_gate,
         native_root_bridge_json_transport_error_diagnostic_rows,
@@ -8365,6 +8832,227 @@ mod tests {
                 && !row.reconciler_execution()
                 && !row.react_behavior_error()
         }));
+    }
+
+    #[test]
+    fn native_root_bridge_batch_lifecycle_consumer_consumes_create_render_unmount_records() {
+        fn assert_consumer_inert(consumer: &NativeRootBridgeBatchLifecycleConsumer) {
+            assert!(!consumer.node_worker_threads_execution());
+            assert!(!consumer.napi_cleanup_hook_execution());
+            assert!(!consumer.native_addon_loaded());
+            assert!(!consumer.native_execution());
+            assert!(!consumer.renderer_execution());
+            assert!(!consumer.reconciler_execution());
+            assert!(!consumer.public_native_compatibility());
+            assert!(!consumer.react_behavior_error());
+        }
+
+        fn assert_row_inert(row: &NativeRootBridgeBatchLifecycleConsumerRow) {
+            assert!(!row.node_worker_threads_execution());
+            assert!(!row.napi_cleanup_hook_execution());
+            assert!(!row.native_addon_loaded());
+            assert!(!row.native_execution());
+            assert!(!row.renderer_execution());
+            assert!(!row.reconciler_execution());
+            assert!(!row.public_native_compatibility());
+            assert!(!row.react_behavior_error());
+        }
+
+        let json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":845,"root_handle":{"environment_id":845,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":845,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":845,"root_handle":{"environment_id":845,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":845,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":3,"kind":"unmount","environment_id":845,"root_handle":{"environment_id":845,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"}]}"#;
+
+        let consumer = native_root_bridge_batch_lifecycle_consumer_for_json(json).unwrap();
+        let rows = consumer.rows();
+
+        assert_eq!(
+            consumer.status(),
+            NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_STATUS
+        );
+        assert_eq!(
+            consumer.model(),
+            "fast-react-napi.NativeRootBridgeBatchLifecycleConsumer"
+        );
+        assert_eq!(
+            consumer.validation_model(),
+            NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL
+        );
+        assert_eq!(
+            consumer.handle_table_model(),
+            NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL
+        );
+        assert_eq!(
+            consumer.batch_gate_status(),
+            NATIVE_ROOT_BRIDGE_BATCHED_JSON_TRANSPORT_GATE_STATUS
+        );
+        assert_eq!(
+            consumer.cleanup_hook_preflight_status(),
+            NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PREFLIGHT_STATUS
+        );
+        assert_eq!(consumer.request_count(), 3);
+        assert_eq!(consumer.consumed_batch_record_count(), 3);
+        assert_eq!(consumer.accepted_batch_record_count(), 3);
+        assert!(consumer.cleanup_hook_callable_preflight_accepted());
+        assert_eq!(consumer.accepted_cleanup_evidence_count(), 2);
+        assert_eq!(consumer.rejected_cleanup_evidence_count(), 2);
+        assert_consumer_inert(&consumer);
+
+        assert_eq!(rows.len(), 3);
+        assert_eq!(
+            rows.iter().map(|row| row.id()).collect::<Vec<_>>(),
+            [
+                "batch-lifecycle-consumer-0-create",
+                "batch-lifecycle-consumer-1-render",
+                "batch-lifecycle-consumer-2-unmount"
+            ]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.batch_index()).collect::<Vec<_>>(),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.request_id()).collect::<Vec<_>>(),
+            [1, 2, 3]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.kind()).collect::<Vec<_>>(),
+            ["create", "render", "unmount"]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.lifecycle_transition())
+                .collect::<Vec<_>>(),
+            [
+                Some(NativeRootBridgeLifecycleTransition::NoneToActive),
+                Some(NativeRootBridgeLifecycleTransition::ActiveToActive),
+                Some(NativeRootBridgeLifecycleTransition::ActiveToRetired)
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.root_handle_action())
+                .collect::<Vec<_>>(),
+            [
+                NativeRootBridgeHandleAdmissionAction::AdmitRoot,
+                NativeRootBridgeHandleAdmissionAction::ValidateActiveRoot,
+                NativeRootBridgeHandleAdmissionAction::RetireRoot
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.root_handle_state_before())
+                .collect::<Vec<_>>(),
+            [
+                None,
+                Some(NativeRootBridgeRootHandleState::Active),
+                Some(NativeRootBridgeRootHandleState::Active)
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.root_handle_state_after())
+                .collect::<Vec<_>>(),
+            [
+                NativeRootBridgeRootHandleState::Active,
+                NativeRootBridgeRootHandleState::Active,
+                NativeRootBridgeRootHandleState::Retired
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.root_handle_current_generation())
+                .collect::<Vec<_>>(),
+            [1, 1, 2]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.value_handle_action())
+                .collect::<Vec<_>>(),
+            [
+                Some(NativeRootBridgeHandleAdmissionAction::AdmitValue),
+                Some(NativeRootBridgeHandleAdmissionAction::AdmitValue),
+                None
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.value_handle_current_generation())
+                .collect::<Vec<_>>(),
+            [Some(1), Some(1), None]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.retired_root_source_error_code())
+                .collect::<Vec<_>>(),
+            [None, None, Some("FAST_REACT_NAPI_STALE_HANDLE")]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_evidence_required())
+                .collect::<Vec<_>>(),
+            [false, true, true]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_evidence_status())
+                .collect::<Vec<_>>(),
+            [
+                "not-required",
+                NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted.code(),
+                NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted.code()
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_evidence_row_id())
+                .collect::<Vec<_>>(),
+            [
+                None,
+                Some("cleanup-hook-worker-value-after-root-release"),
+                Some("cleanup-hook-worker-root-before-value-release")
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_row_id())
+                .collect::<Vec<_>>(),
+            [
+                None,
+                Some("worker-render-value-stale-executable-preflight"),
+                Some("worker-render-root-stale-executable-preflight")
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_handle_kind())
+                .collect::<Vec<_>>(),
+            [
+                None,
+                Some(BridgeHandleKind::Value),
+                Some(BridgeHandleKind::Root)
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_canonical_executable_evidence())
+                .collect::<Vec<_>>(),
+            [None, Some(true), Some(true)]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.status()).collect::<Vec<_>>(),
+            [
+                NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted,
+                NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted,
+                NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted
+            ]
+        );
+        assert!(rows.iter().all(|row| {
+            row.code().is_none()
+                && row.source_error_code().is_none()
+                && row.boundary_error_code().is_none()
+        }));
+
+        for row in rows {
+            assert_row_inert(row);
+        }
     }
 
     #[test]

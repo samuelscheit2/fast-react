@@ -944,6 +944,59 @@ const expectedNativeRootBridgeWorkerThreadCleanupHookPreflight = {
   publicNativeCompatibility: false,
   reactBehaviorError: false
 };
+const expectedNativeRootBridgeBatchLifecycleConsumerRowFields = [
+  'id',
+  'batchIndex',
+  'requestId',
+  'kind',
+  'lifecycleTransition',
+  'rootHandleAction',
+  'rootHandleStateBefore',
+  'rootHandleStateAfter',
+  'rootHandleCurrentGeneration',
+  'valueHandleAction',
+  'valueHandleCurrentGeneration',
+  'retiredRootSourceErrorCode',
+  'cleanupHookEvidenceRequired',
+  'cleanupHookEvidenceStatus',
+  'cleanupHookEvidenceRowId',
+  'cleanupHookSourceRowId',
+  'cleanupHookSourceHandleKind',
+  'cleanupHookCanonicalExecutableEvidence',
+  'status',
+  'code',
+  'sourceErrorCode',
+  'boundaryErrorCode',
+  'nativeAddonLoaded',
+  'nativeExecution',
+  'rendererExecution',
+  'reconcilerExecution',
+  'nodeWorkerThreadsExecution',
+  'napiCleanupHookExecution',
+  'publicNativeCompatibility',
+  'reactBehaviorError'
+];
+const expectedNativeRootBridgeBatchLifecycleConsumer = {
+  consumerStatus: 'consumed-native-root-bridge-batch-lifecycle-records',
+  model: 'fast-react-napi.NativeRootBridgeBatchLifecycleConsumer',
+  validationModel: 'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+  handleTableModel: 'fast-react-napi.BridgeHandleTable',
+  batchGateStatus: 'validated-native-root-bridge-batched-json-transport-records',
+  cleanupHookPreflightStatus:
+    'preflighted-native-root-bridge-worker-thread-cleanup-hook-order',
+  cleanupHookCallableName: 'validateCleanupHookEvidenceRows',
+  cleanupHookEvidenceStatuses: ['not-required', 'accepted', 'rejected'],
+  batchLifecycleConsumerRowFields:
+    expectedNativeRootBridgeBatchLifecycleConsumerRowFields,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  nodeWorkerThreadsExecution: false,
+  napiCleanupHookExecution: false,
+  publicNativeCompatibility: false,
+  reactBehaviorError: false
+};
 
 const expectedPackageExports = {
   '.': {
@@ -1274,6 +1327,7 @@ const expectedNativeRootBridgeRequestShape = {
     expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflight,
   workerThreadCleanupHookPreflight:
     expectedNativeRootBridgeWorkerThreadCleanupHookPreflight,
+  batchLifecycleConsumer: expectedNativeRootBridgeBatchLifecycleConsumer,
   validationErrorCodes: {
     createAfterRootCreated:
       'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
@@ -1475,6 +1529,11 @@ for (const shapeValue of [
   native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
     .cleanupHookPreflightRowFields,
   native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows,
+  native.nativeRootBridgeRequestShape.batchLifecycleConsumer,
+  native.nativeRootBridgeRequestShape.batchLifecycleConsumer
+    .cleanupHookEvidenceStatuses,
+  native.nativeRootBridgeRequestShape.batchLifecycleConsumer
+    .batchLifecycleConsumerRowFields,
   native.nativeRootBridgeRequestShape.validationErrorCodes
 ]) {
   assert.ok(Object.isFrozen(shapeValue));
@@ -1496,6 +1555,9 @@ assertNativeRootBridgeWorkerThreadCleanupHookPreflight(
 );
 assertNativeRootBridgeWorkerThreadCleanupHookPreflightRejectsForgery(
   native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+);
+assertNativeRootBridgeBatchLifecycleConsumerMetadata(
+  native.nativeRootBridgeRequestShape.batchLifecycleConsumer
 );
 
 const document = createDocument('native-request-shape');
@@ -1563,6 +1625,9 @@ assertNativeRootBridgeJsonTransportSmoke(nativeShapeGate.jsonTransportSmoke, {
   rootId: 1,
   rootSlot: 1
 });
+assertNativeRootBridgeBatchLifecycleConsumer(
+  nativeShapeGate.batchLifecycleConsumer
+);
 assert.deepEqual(
   nativeShapeGate.validationRecords.map((record) => record.lifecycleTransition),
   ['none->active', 'active->active', 'active->retired']
@@ -3422,6 +3487,178 @@ function assertNativeRootBridgeWorkerThreadCleanupHookPreflightRejectsForgery(
       name: 'AssertionError'
     }
   );
+}
+
+function assertNativeRootBridgeBatchLifecycleConsumerMetadata(consumer) {
+  assert.equal(Object.isFrozen(consumer), true);
+  assert.equal(Object.isFrozen(consumer.cleanupHookEvidenceStatuses), true);
+  assert.equal(Object.isFrozen(consumer.batchLifecycleConsumerRowFields), true);
+  assert.deepEqual(consumer, expectedNativeRootBridgeBatchLifecycleConsumer);
+  assert.equal(
+    consumer.consumerStatus,
+    'consumed-native-root-bridge-batch-lifecycle-records'
+  );
+  assert.equal(
+    consumer.model,
+    'fast-react-napi.NativeRootBridgeBatchLifecycleConsumer'
+  );
+  assert.equal(
+    consumer.batchGateStatus,
+    'validated-native-root-bridge-batched-json-transport-records'
+  );
+  assert.equal(
+    consumer.cleanupHookPreflightStatus,
+    'preflighted-native-root-bridge-worker-thread-cleanup-hook-order'
+  );
+  assert.deepEqual(
+    consumer.cleanupHookEvidenceStatuses,
+    ['not-required', 'accepted', 'rejected']
+  );
+  assert.deepEqual(
+    consumer.batchLifecycleConsumerRowFields,
+    expectedNativeRootBridgeBatchLifecycleConsumerRowFields
+  );
+  assert.equal(consumer.nativeAddonLoaded, false);
+  assert.equal(consumer.nativeExecution, false);
+  assert.equal(consumer.rendererExecution, false);
+  assert.equal(consumer.reconcilerExecution, false);
+  assert.equal(consumer.nodeWorkerThreadsExecution, false);
+  assert.equal(consumer.napiCleanupHookExecution, false);
+  assert.equal(consumer.publicNativeCompatibility, false);
+  assert.equal(consumer.reactBehaviorError, false);
+}
+
+function assertNativeRootBridgeBatchLifecycleConsumer(consumer) {
+  assert.equal(Object.isFrozen(consumer), true);
+  assert.equal(Object.isFrozen(consumer.cleanupHookEvidenceStatuses), true);
+  assert.equal(Object.isFrozen(consumer.batchLifecycleConsumerRowFields), true);
+  assert.equal(Object.isFrozen(consumer.rows), true);
+  assert.equal(
+    consumer.consumerStatus,
+    'consumed-native-root-bridge-batch-lifecycle-records'
+  );
+  assert.equal(
+    consumer.model,
+    'fast-react-napi.NativeRootBridgeBatchLifecycleConsumer'
+  );
+  assert.equal(
+    consumer.validationModel,
+    'fast-react-napi.NativeRootBridgeRequestSequenceValidator'
+  );
+  assert.equal(consumer.handleTableModel, 'fast-react-napi.BridgeHandleTable');
+  assert.equal(
+    consumer.batchGateStatus,
+    'validated-native-root-bridge-batched-json-transport-records'
+  );
+  assert.equal(
+    consumer.cleanupHookPreflightStatus,
+    'preflighted-native-root-bridge-worker-thread-cleanup-hook-order'
+  );
+  assert.equal(consumer.cleanupHookCallableName, 'validateCleanupHookEvidenceRows');
+  assert.equal(consumer.requestCount, 3);
+  assert.equal(consumer.consumedBatchRecordCount, 3);
+  assert.equal(consumer.acceptedBatchRecordCount, 3);
+  assert.equal(consumer.cleanupHookCallablePreflightAccepted, true);
+  assert.equal(consumer.acceptedCleanupEvidenceCount, 2);
+  assert.equal(consumer.rejectedCleanupEvidenceCount, 2);
+  assert.deepEqual(
+    consumer.cleanupHookEvidenceStatuses,
+    ['not-required', 'accepted', 'rejected']
+  );
+  assert.deepEqual(
+    consumer.batchLifecycleConsumerRowFields,
+    expectedNativeRootBridgeBatchLifecycleConsumerRowFields
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.id),
+    [
+      'batch-lifecycle-consumer-0-create',
+      'batch-lifecycle-consumer-1-render',
+      'batch-lifecycle-consumer-2-unmount'
+    ]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.kind),
+    ['create', 'render', 'unmount']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.lifecycleTransition),
+    ['none->active', 'active->active', 'active->retired']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.rootHandleAction),
+    ['admit-root-handle', 'validate-active-root-handle', 'retire-root-handle']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.rootHandleStateBefore),
+    [null, 'active', 'active']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.rootHandleStateAfter),
+    ['active', 'active', 'retired']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.rootHandleCurrentGeneration),
+    [1, 1, 2]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.valueHandleAction),
+    ['admit-value-handle', 'admit-value-handle', null]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.cleanupHookEvidenceRequired),
+    [false, true, true]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.cleanupHookEvidenceStatus),
+    ['not-required', 'accepted', 'accepted']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.cleanupHookEvidenceRowId),
+    [
+      null,
+      'cleanup-hook-worker-value-after-root-release',
+      'cleanup-hook-worker-root-before-value-release'
+    ]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.cleanupHookSourceHandleKind),
+    [null, 'value', 'root']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.cleanupHookCanonicalExecutableEvidence),
+    [null, true, true]
+  );
+  assert.equal(
+    consumer.rows[2].retiredRootSourceErrorCode,
+    'FAST_REACT_NAPI_STALE_HANDLE'
+  );
+
+  for (const row of consumer.rows) {
+    assert.equal(Object.isFrozen(row), true);
+    assert.deepEqual(Object.keys(row), consumer.batchLifecycleConsumerRowFields);
+    assert.equal(row.status, 'accepted');
+    assert.equal(row.code, null);
+    assert.equal(row.sourceErrorCode, null);
+    assert.equal(row.boundaryErrorCode, null);
+    assert.equal(row.nativeAddonLoaded, false);
+    assert.equal(row.nativeExecution, false);
+    assert.equal(row.rendererExecution, false);
+    assert.equal(row.reconcilerExecution, false);
+    assert.equal(row.nodeWorkerThreadsExecution, false);
+    assert.equal(row.napiCleanupHookExecution, false);
+    assert.equal(row.publicNativeCompatibility, false);
+    assert.equal(row.reactBehaviorError, false);
+  }
+
+  assert.equal(consumer.nativeAddonLoaded, false);
+  assert.equal(consumer.nativeExecution, false);
+  assert.equal(consumer.rendererExecution, false);
+  assert.equal(consumer.reconcilerExecution, false);
+  assert.equal(consumer.nodeWorkerThreadsExecution, false);
+  assert.equal(consumer.napiCleanupHookExecution, false);
+  assert.equal(consumer.publicNativeCompatibility, false);
+  assert.equal(consumer.reactBehaviorError, false);
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {
