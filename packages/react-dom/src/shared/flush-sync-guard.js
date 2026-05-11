@@ -355,7 +355,7 @@ function createPublicReactDomFlushSyncBlockedCurrentnessReport(
   publicFlushSyncBlockedCurrentnessReports.add(report);
   publicFlushSyncBlockedCurrentnessReportOverrideKeys.set(
     report,
-    freezeArray(Object.keys(normalizedOptions))
+    getOwnOptionKeys(normalizedOptions)
   );
   return report;
 }
@@ -1115,6 +1115,10 @@ function freezeRecord(record) {
 
 function freezeArray(array) {
   return Object.freeze(array.slice());
+}
+
+function getOwnOptionKeys(options) {
+  return freezeArray(Reflect.ownKeys(Object(options)));
 }
 
 function freezeStringArray(value, fallback) {

@@ -188,6 +188,18 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
     }),
     'public-react-dom-flush-sync-currentness-caller-overrides'
   );
+  const nonEnumerableScenarioOverride = {};
+  Object.defineProperty(nonEnumerableScenarioOverride, 'scenarios', {
+    configurable: true,
+    enumerable: false,
+    value: report.scenarios
+  });
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(
+      nonEnumerableScenarioOverride
+    ),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
   assertFlushSyncCurrentnessRejected(
     guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
       publicFlushSyncCompatibilityClaimed: true

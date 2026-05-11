@@ -1042,6 +1042,22 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
     }),
     "unsupported-placeholder-hook-currentness-caller-overrides"
   );
+  const nonEnumerablePlaceholderOverride = {};
+  Object.defineProperty(
+    nonEnumerablePlaceholderOverride,
+    "publicExportsPlaceholderBlocked",
+    {
+      configurable: true,
+      enumerable: false,
+      value: true
+    }
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport(
+      nonEnumerablePlaceholderOverride
+    ),
+    "unsupported-placeholder-hook-currentness-caller-overrides"
+  );
   assertUnsupportedCurrentnessRejected(
     hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
       publicShapeBlockers: [

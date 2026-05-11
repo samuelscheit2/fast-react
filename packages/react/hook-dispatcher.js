@@ -2084,7 +2084,7 @@ function createUnsupportedPlaceholderHookCurrentnessReport(overrides = {}) {
   unsupportedPlaceholderHookCurrentnessReports.add(report);
   unsupportedPlaceholderHookCurrentnessReportOverrideKeys.set(
     report,
-    freezeArray(Object.keys(normalized))
+    getOwnOptionKeys(normalized)
   );
   return report;
 }
@@ -2769,6 +2769,10 @@ function hasBlockedUnsupportedPlaceholderHookIdGeneration(report) {
 
 function freezeArray(values) {
   return Object.freeze(values.slice());
+}
+
+function getOwnOptionKeys(options) {
+  return freezeArray(Reflect.ownKeys(Object(options)));
 }
 
 function freezeRecord(record) {
