@@ -562,6 +562,18 @@ test('private hydration target claiming records one blocked replay target-dispat
       .getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
         execution
       );
+  const canonicalExecutionPayload =
+    hydrationGate
+      .assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+        execution,
+        {
+          dispatchRecord,
+          hydrationBoundaryRecord: fixture.record,
+          targetClaimingDiagnostic: claim,
+          targetDispatchLinkDiagnostic: targetDispatchLink
+        }
+      );
+  assert.equal(canonicalExecutionPayload, payload);
   assert.equal(payload.hydrationBoundaryRecord, fixture.record);
   assert.equal(payload.targetClaimingDiagnostic, claim);
   assert.equal(payload.targetDispatchLinkDiagnostic, targetDispatchLink);
@@ -580,6 +592,24 @@ test('private hydration target claiming records one blocked replay target-dispat
       execution
     ),
     true
+  );
+  assert.throws(
+    () =>
+      hydrationGate
+        .assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+          Object.freeze({...execution}),
+          {
+            dispatchRecord,
+            hydrationBoundaryRecord: fixture.record,
+            targetClaimingDiagnostic: claim,
+            targetDispatchLinkDiagnostic: targetDispatchLink
+          }
+        ),
+    {
+      code:
+        hydrationGate
+          .INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE
+    }
   );
   assert.equal(dispatchRecord.hydrationReplay.queued, false);
   assert.deepEqual(fixture.container.__registrations, []);

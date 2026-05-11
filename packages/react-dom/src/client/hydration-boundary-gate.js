@@ -1287,6 +1287,160 @@ function isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
   return hydrationClaimedReplayTargetDispatchExecutionPayloads.has(value);
 }
 
+function assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+  record,
+  expected
+) {
+  const expectedEvidence =
+    expected && typeof expected === 'object' ? expected : {};
+  const payload =
+    getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(record);
+  if (
+    payload === null ||
+    !record ||
+    typeof record !== 'object' ||
+    !Object.isFrozen(record) ||
+    record.kind !==
+      HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_RECORD_KIND ||
+    record.gateId !==
+      privateHydrationClaimedReplayTargetDispatchExecutionGateId ||
+    record.status !==
+      privateHydrationClaimedReplayTargetDispatchExecutionStatus ||
+    record.diagnosticOnly !== true ||
+    record.readOnly !== true ||
+    record.compatibilityClaimed !== false ||
+    record.browserDomEventCompatibilityClaimed !== false ||
+    record.publicRootBehaviorChanged !== false ||
+    record.publicHydrationCompatibilityClaimed !== false ||
+    record.publicHydrationReplayCompatibilityClaimed !== false ||
+    record.publicHydrationTargetClaimed !== false ||
+    record.publicHydrateRootSupported !== false ||
+    record.publicDispatchEnabled !== false ||
+    record.eventReplayInstalled !== false ||
+    record.eventReplaySupported !== false ||
+    record.hydrationReplaySupported !== false ||
+    record.queueMutationAllowed !== false ||
+    record.replayQueuesDrained !== false ||
+    record.eventsReplayed !== false ||
+    record.eventDispatch !== false ||
+    record.willDispatch !== false ||
+    record.willHydrate !== false ||
+    record.willReplay !== false ||
+    record.targetClaimAccepted !== true ||
+    record.targetClaimExecuted !== false ||
+    record.targetDispatchLinkAccepted !== true ||
+    record.replayTargetDispatchExecutionRecorded !== true ||
+    record.replayTargetDispatchExecutionBlocked !== true ||
+    record.dispatchExecutionRecorded !== true ||
+    record.dispatchExecutionBlocked !== true ||
+    record.targetDispatchExecuted !== false ||
+    record.eventReplayDispatchAttempted !== false ||
+    record.pluginDispatchEventForPluginEventSystemCalled !== false ||
+    record.nativeEventRedispatched !== false ||
+    record.syntheticEventCreated !== false ||
+    record.listenerInvocationCount !== 0 ||
+    record.willInvokeListeners !== false ||
+    record.hydrateInstanceCalled !== false ||
+    record.hydrateTextInstanceCalled !== false ||
+    record.replayQueueDrained !== false ||
+    record.queued !== false ||
+    record.recoverableErrorsQueued !== false ||
+    record.onRecoverableErrorInvoked !== false ||
+    record.publicOnRecoverableErrorInvoked !== false ||
+    record.targetClaimingDiagnostic !==
+      payload.targetClaimingDiagnostic ||
+    record.targetDispatchLinkDiagnostic !==
+      payload.targetDispatchLinkDiagnostic ||
+    record.dispatchRecord !== payload.dispatchRecord ||
+    record.markerRow !== payload.markerRow ||
+    record.ownershipDiagnostics !== payload.ownershipDiagnostics ||
+    record.ownershipRow !== payload.ownershipRow ||
+    record.recoverableErrorMetadata !== payload.recoverableErrorMetadata ||
+    record.clickReplayDispatchDiagnostic !==
+      payload.clickReplayDispatchDiagnostic ||
+    !isPrivateHydrationBoundaryRecord(payload.hydrationBoundaryRecord) ||
+    payload.targetClaimingDiagnosticPayload === null ||
+    payload.targetClaimingDiagnosticPayload === undefined ||
+    payload.targetDispatchLinkPayload === null ||
+    payload.targetDispatchLinkPayload === undefined ||
+    payload.targetDispatchLinkPayload.dispatchRecord !==
+      payload.dispatchRecord ||
+    payload.targetDispatchLinkPayload.targetDispatchPathRecord !==
+      record.targetDispatchPathRecord
+  ) {
+    throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
+      'Hydration claimed replay target-dispatch execution requires canonical immutable private replay metadata.'
+    );
+  }
+
+  if (
+    record.clickReplayDispatchDiagnostic !== null &&
+    (payload.clickReplayDispatchDiagnosticPayload === null ||
+      payload.clickReplayDispatchDiagnosticPayload === undefined ||
+      payload.clickReplayDispatchDiagnosticPayload
+        .targetClaimingDiagnostic !== payload.targetClaimingDiagnostic ||
+      payload.clickReplayDispatchDiagnosticPayload
+        .targetDispatchLinkDiagnostic !==
+        payload.targetDispatchLinkDiagnostic ||
+      payload.clickReplayDispatchDiagnosticPayload.dispatchRecord !==
+        payload.dispatchRecord ||
+      record.clickReplayDispatchDiagnostic.publicDispatchEnabled !== false ||
+      record.clickReplayDispatchDiagnostic.liveEventListenerInstalled !==
+        false ||
+      record.clickReplayDispatchDiagnostic.eventReplayInstalled !== false ||
+      record.clickReplayDispatchDiagnostic.eventDispatch !== false ||
+      record.clickReplayDispatchDiagnostic.targetDispatchExecuted !==
+        false ||
+      record.clickReplayDispatchDiagnostic
+        .eventReplayDispatchAttempted !== false ||
+      record.clickReplayDispatchDiagnostic.syntheticEventCreated !== false ||
+      record.clickReplayDispatchDiagnostic.listenerInvocationCount !== 0 ||
+      record.clickReplayDispatchDiagnostic.willInvokeListeners !== false)
+  ) {
+    throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
+      'Hydration claimed replay target-dispatch execution requires blocked click replay dispatch metadata.'
+    );
+  }
+
+  if (
+    expectedEvidence.hydrationBoundaryRecord !== undefined &&
+    payload.hydrationBoundaryRecord !==
+      expectedEvidence.hydrationBoundaryRecord
+  ) {
+    throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
+      'Hydration claimed replay target-dispatch execution must match the expected hydration boundary record.'
+    );
+  }
+  if (
+    expectedEvidence.targetClaimingDiagnostic !== undefined &&
+    payload.targetClaimingDiagnostic !==
+      expectedEvidence.targetClaimingDiagnostic
+  ) {
+    throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
+      'Hydration claimed replay target-dispatch execution must match the expected target-claiming diagnostic.'
+    );
+  }
+  if (
+    expectedEvidence.targetDispatchLinkDiagnostic !== undefined &&
+    payload.targetDispatchLinkDiagnostic !==
+      expectedEvidence.targetDispatchLinkDiagnostic
+  ) {
+    throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
+      'Hydration claimed replay target-dispatch execution must match the expected target-dispatch link.'
+    );
+  }
+  if (
+    expectedEvidence.dispatchRecord !== undefined &&
+    payload.dispatchRecord !== expectedEvidence.dispatchRecord
+  ) {
+    throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
+      'Hydration claimed replay target-dispatch execution must match the expected dispatch record.'
+    );
+  }
+
+  return payload;
+}
+
 function createHydrationTextMismatchRecoverableErrorPreflightRecord(
   hydrationBoundaryRecord,
   acceptedBoundaryMetadataDiagnostics,
@@ -5136,6 +5290,7 @@ module.exports = {
   acceptedHydrationBoundaryMetadataContracts,
   acceptedHydrationMarkerContracts,
   assertAcceptedHydrationMarkerOracle,
+  assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
   assertCanonicalPrivateHydrationTargetClaimingDiagnostic,
   createHydrationClaimedReplayTargetDispatchExecutionRecord,
   createHydrationReplayOwnershipGateDiagnostic,
