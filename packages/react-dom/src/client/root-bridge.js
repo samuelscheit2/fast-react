@@ -8110,11 +8110,14 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
 }
 
 function createPublicFacadeNestedHostOutputUpdateNativeHandoff(context) {
+  const activeHostOutputSnapshot =
+    createActiveNestedHostOutputSnapshotForNativeUpdateHandoff(context);
   const nativeHandoffRecord =
     getPublicFacadeNestedHostOutputUpdateNativeHandoffRecord(context);
   return validatePublicFacadeNestedHostOutputUpdateNativeHandoff(
     context,
-    nativeHandoffRecord
+    nativeHandoffRecord,
+    activeHostOutputSnapshot
   );
 }
 
@@ -8159,7 +8162,8 @@ function getPublicFacadeNestedHostOutputUpdateNativeHandoffRecord(context) {
 
 function validatePublicFacadeNestedHostOutputUpdateNativeHandoff(
   context,
-  nativeHandoffRecord
+  nativeHandoffRecord,
+  activeHostOutputSnapshot
 ) {
   const createValidation = validateRootBridgeRequestRecord(
     context.createRecord
@@ -8217,7 +8221,10 @@ function validatePublicFacadeNestedHostOutputUpdateNativeHandoff(
     );
   }
 
-  assertActiveNestedHostOutputForNativeUpdateHandoff(context);
+  assertActiveNestedHostOutputForNativeUpdateHandoff(
+    context,
+    activeHostOutputSnapshot
+  );
 
   if (!isWeakMapKey(nativeHandoffRecord)) {
     throwInvalidRootPublicFacadeHostOutputUpdate(
@@ -8290,7 +8297,10 @@ function validatePublicFacadeNestedHostOutputUpdateNativeHandoff(
   };
 }
 
-function assertActiveNestedHostOutputForNativeUpdateHandoff(context) {
+function assertActiveNestedHostOutputForNativeUpdateHandoff(
+  context,
+  activeHostOutputSnapshot
+) {
   const parentNode = getMountedNestedHostOutputNodeForNativeUpdateHandoff(
     context.nestedMount.parentToken
   );
@@ -8304,10 +8314,8 @@ function assertActiveNestedHostOutputForNativeUpdateHandoff(context) {
     parentNode !== context.nestedMount.parentNode ||
     childNode !== context.nestedMount.childNode ||
     textNode !== context.nestedMount.textNode ||
-    context.container.firstChild !== context.nestedMount.parentNode ||
-    context.nestedMount.parentNode.firstChild !==
-      context.nestedMount.childNode ||
-    context.nestedMount.childNode.firstChild !== context.nestedMount.textNode ||
+    !activeNestedHostOutputTopologyMatches(context) ||
+    !activeNestedHostOutputSnapshotMatches(context, activeHostOutputSnapshot) ||
     getRootOwnerFromHostInstanceToken(context.nestedMount.parentToken) !==
       context.createRecord.owner ||
     getRootOwnerFromHostInstanceToken(context.nestedMount.childToken) !==
@@ -8354,6 +8362,85 @@ function assertActiveNestedHostOutputForNativeUpdateHandoff(context) {
   }
 }
 
+function createActiveNestedHostOutputSnapshotForNativeUpdateHandoff(context) {
+  return freezeRecord({
+    childNode: createActiveHostOutputNodeSnapshot(
+      context.nestedMount.childNode
+    ),
+    containerChildren: snapshotChildNodes(context.container),
+    containerTextContent: context.container.textContent,
+    parentNode: createActiveHostOutputNodeSnapshot(
+      context.nestedMount.parentNode
+    ),
+    textNode: freezeRecord({
+      nodeValue: context.nestedMount.textNode.nodeValue,
+      snapshot: createActiveHostOutputNodeSnapshot(
+        context.nestedMount.textNode
+      )
+    })
+  });
+}
+
+function createActiveHostOutputNodeSnapshot(node) {
+  return freezeRecord({
+    attributes: snapshotStringMap(node.attributes),
+    childNodes: snapshotChildNodes(node),
+    ownProperties: snapshotOwnProperties(node),
+    style: snapshotStyleObject(node.style),
+    textContent: node.textContent
+  });
+}
+
+function activeNestedHostOutputTopologyMatches(context) {
+  return (
+    childNodesMatch(context.container, freezeArray([
+      context.nestedMount.parentNode
+    ])) &&
+    childNodesMatch(context.nestedMount.parentNode, freezeArray([
+      context.nestedMount.childNode
+    ])) &&
+    childNodesMatch(context.nestedMount.childNode, freezeArray([
+      context.nestedMount.textNode
+    ])) &&
+    childNodesMatch(context.nestedMount.textNode, freezeArray([])) &&
+    getFirstChild(context.container) === context.nestedMount.parentNode &&
+    getFirstChild(context.nestedMount.parentNode) ===
+      context.nestedMount.childNode &&
+    getFirstChild(context.nestedMount.childNode) ===
+      context.nestedMount.textNode
+  );
+}
+
+function activeNestedHostOutputSnapshotMatches(context, snapshot) {
+  return (
+    childNodesMatch(context.container, snapshot.containerChildren) &&
+    context.container.textContent === snapshot.containerTextContent &&
+    activeHostOutputNodeSnapshotMatches(
+      context.nestedMount.parentNode,
+      snapshot.parentNode
+    ) &&
+    activeHostOutputNodeSnapshotMatches(
+      context.nestedMount.childNode,
+      snapshot.childNode
+    ) &&
+    context.nestedMount.textNode.nodeValue === snapshot.textNode.nodeValue &&
+    activeHostOutputNodeSnapshotMatches(
+      context.nestedMount.textNode,
+      snapshot.textNode.snapshot
+    )
+  );
+}
+
+function activeHostOutputNodeSnapshotMatches(node, snapshot) {
+  return (
+    childNodesMatch(node, snapshot.childNodes) &&
+    node.textContent === snapshot.textContent &&
+    stringMapMatches(node.attributes, snapshot.attributes) &&
+    styleObjectMatches(node.style, snapshot.style) &&
+    ownPropertiesMatch(node, snapshot.ownProperties)
+  );
+}
+
 function activeHostOutputNodeMatchesProps(node, tag, props) {
   const payload = diffDomPropertyPayload(tag, {}, props);
   for (let index = 0; index < payload.length; index += 1) {
@@ -8387,6 +8474,121 @@ function activeHostOutputNodeMatchesPayloadEntry(node, entry) {
     default:
       return false;
   }
+}
+
+function snapshotChildNodes(node) {
+  return freezeArray(Array.isArray(node.childNodes) ? node.childNodes : []);
+}
+
+function childNodesMatch(node, expectedChildren) {
+  if (!Array.isArray(node.childNodes)) {
+    return expectedChildren.length === 0;
+  }
+  if (node.childNodes.length !== expectedChildren.length) {
+    return false;
+  }
+  for (let index = 0; index < expectedChildren.length; index += 1) {
+    if (node.childNodes[index] !== expectedChildren[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function snapshotStringMap(map) {
+  if (!(map instanceof Map)) {
+    return null;
+  }
+  return freezeArray(
+    Array.from(map.entries())
+      .map(([key, value]) => freezeRecord({
+        key: String(key),
+        value: String(value)
+      }))
+      .sort(compareSnapshotEntries)
+  );
+}
+
+function stringMapMatches(map, snapshot) {
+  if (snapshot === null) {
+    return !(map instanceof Map);
+  }
+  if (!(map instanceof Map) || map.size !== snapshot.length) {
+    return false;
+  }
+  for (const entry of snapshot) {
+    if (!map.has(entry.key) || String(map.get(entry.key)) !== entry.value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function snapshotStyleObject(style) {
+  if (style === null || typeof style !== 'object') {
+    return null;
+  }
+  return freezeRecord({
+    mapProperties: snapshotStringMap(style.properties),
+    ownProperties: snapshotOwnProperties(style, ['ownerElement'])
+  });
+}
+
+function styleObjectMatches(style, snapshot) {
+  if (snapshot === null) {
+    return style === null || typeof style !== 'object';
+  }
+  return (
+    style !== null &&
+    typeof style === 'object' &&
+    stringMapMatches(style.properties, snapshot.mapProperties) &&
+    ownPropertiesMatch(style, snapshot.ownProperties, ['ownerElement'])
+  );
+}
+
+function snapshotOwnProperties(value, ignoredKeys) {
+  if (value === null || typeof value !== 'object') {
+    return freezeArray([]);
+  }
+  const ignored = new Set(ignoredKeys || []);
+  return freezeArray(
+    Reflect.ownKeys(value)
+      .filter((key) => !ignored.has(key))
+      .map((key) => freezeRecord({
+        key,
+        value: value[key]
+      }))
+      .sort(compareSnapshotEntries)
+  );
+}
+
+function ownPropertiesMatch(value, snapshot, ignoredKeys) {
+  if (value === null || typeof value !== 'object') {
+    return snapshot.length === 0;
+  }
+  const ignored = new Set(ignoredKeys || []);
+  const keys = Reflect.ownKeys(value)
+    .filter((key) => !ignored.has(key))
+    .sort(compareSnapshotKeys);
+  if (keys.length !== snapshot.length) {
+    return false;
+  }
+  for (let index = 0; index < snapshot.length; index += 1) {
+    const expected = snapshot[index];
+    const key = keys[index];
+    if (key !== expected.key || value[key] !== expected.value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function compareSnapshotEntries(left, right) {
+  return compareSnapshotKeys(left.key, right.key);
+}
+
+function compareSnapshotKeys(left, right) {
+  return String(left).localeCompare(String(right));
 }
 
 function getActiveHostOutputAttribute(node, attributeName) {

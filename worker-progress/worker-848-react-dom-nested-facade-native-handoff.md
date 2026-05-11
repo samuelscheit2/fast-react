@@ -42,6 +42,15 @@
 - Added negative coverage where a factory creates the canonical handoff, mutates
   text, child attributes, child style properties, or parent attributes, returns
   the handoff, and the nested update fails closed.
+- Second audit follow-up: snapshot the exact active fake-DOM host output before
+  invoking the private native handoff factory, then require the post-factory
+  live output to match with no extra attributes, own properties, styles, or child
+  nodes on the container, parent host, child host, or text node.
+- Strengthened topology validation from first-child identity to exact
+  container/parent/child/text child counts, so extra siblings at any level fail
+  closed before diagnostic metadata is exposed.
+- Added negative coverage for extra child and parent attributes, extra child own
+  properties, extra style state, and extra topology siblings.
 
 ## Commands Run
 

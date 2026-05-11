@@ -10410,6 +10410,18 @@ test('private react-dom/client facade nested host-output native handoff fails cl
       }
     },
     {
+      label: 'child-extra-attribute',
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.setAttribute('data-extra', 'tampered');
+      }
+    },
+    {
+      label: 'child-extra-property',
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.extraNativeHandoffProperty = 'tampered';
+      }
+    },
+    {
       label: 'child-style-tamper',
       initialElement: initialStyleElement,
       mutate({childHostInstanceNode}) {
@@ -10419,9 +10431,40 @@ test('private react-dom/client facade nested host-output native handoff fails cl
       options: {withStyleTarget: true}
     },
     {
+      label: 'child-extra-style',
+      initialElement: initialStyleElement,
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.style.backgroundColor = 'red';
+      },
+      nextElement: nextStyleElement,
+      options: {withStyleTarget: true}
+    },
+    {
       label: 'parent-attribute-tamper',
       mutate({parentHostInstanceNode}) {
         parentHostInstanceNode.setAttribute('data-shell', 'tampered');
+      }
+    },
+    {
+      label: 'parent-extra-attribute',
+      mutate({parentHostInstanceNode}) {
+        parentHostInstanceNode.setAttribute('data-extra', 'tampered');
+      }
+    },
+    {
+      label: 'extra-child-sibling',
+      mutate({childHostInstanceNode, container}) {
+        childHostInstanceNode.appendChild(
+          container.ownerDocument.createTextNode('')
+        );
+      }
+    },
+    {
+      label: 'extra-parent-child-sibling',
+      mutate({parentHostInstanceNode, container}) {
+        parentHostInstanceNode.appendChild(
+          container.ownerDocument.createTextNode('')
+        );
       }
     }
   ];
