@@ -9872,6 +9872,8 @@ test('private react-dom/client facade nested host-output update diagnostic targe
   const adapter = descriptor.value({
     createRenderAdmissionIdPrefix: 'facade-nested-admission',
     hostOutputUpdateIdPrefix: 'facade-nested-handoff',
+    nativeEnvironmentId: 848,
+    nativeHandoffIdPrefix: 'facade-nested-native',
     publicFacadeNestedHostOutputUpdateIdPrefix:
       'facade-nested-diagnostic',
     requestIdPrefix: 'facade-nested-request',
@@ -9938,6 +9940,16 @@ test('private react-dom/client facade nested host-output update diagnostic targe
     diagnostic.hostOutputUpdateStatus,
     rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
   );
+  assert.equal(diagnostic.nativeHandoffId, 'facade-nested-native:3');
+  assert.equal(
+    diagnostic.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    diagnostic.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_RENDER
+  );
+  assert.equal(diagnostic.nativeRequestRecord.environmentId, 848);
   assert.deepEqual(diagnostic.nestedHostPath, [
     'HostRoot',
     'HostComponent',
@@ -10007,6 +10019,7 @@ test('private react-dom/client facade nested host-output update diagnostic targe
       'public-facade-create-root-record',
       'public-facade-nested-host-output-render-record',
       'public-facade-root-render-update-record',
+      'private-native-update-request-handoff',
       'nested-host-output-path',
       'parent-child-token-identity',
       'host-output-update-handoff',
@@ -10034,6 +10047,7 @@ test('private react-dom/client facade nested host-output update diagnostic targe
   assert.equal(diagnostic.publicCreateRootEnabled, false);
   assert.equal(diagnostic.publicRootExecution, false);
   assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.nativeUpdateRequestMirrored, true);
   assert.equal(diagnostic.nativeExecution, false);
   assert.equal(diagnostic.reconcilerExecution, false);
   assert.equal(diagnostic.rootScheduled, false);
@@ -10069,6 +10083,20 @@ test('private react-dom/client facade nested host-output update diagnostic targe
   assert.equal(hidden.initialElement, initialElement);
   assert.equal(hidden.element, nextElement);
   assert.equal(hidden.hostOutputUpdatePayload, handoffPayload);
+  assert.equal(
+    rootBridge.getNativeRootBridgeHandoffPayload(hidden.nativeHandoffRecord),
+    hidden.nativeHandoffPayload
+  );
+  assert.equal(hidden.nativeHandoffPayload.sourceRecord, hidden.updateRecord);
+  assert.equal(hidden.nativeHandoffPayload.value, nextElement);
+  assert.equal(hidden.nativeHandoffRecord.nativeExecution, false);
+  assert.equal(hidden.nativeHandoffRecord.reconcilerExecution, false);
+  assert.equal(hidden.nativeHandoffRecord.domMutation, false);
+  assert.equal(hidden.nativeHandoffRecord.markerWrites, false);
+  assert.equal(hidden.nativeHandoffRecord.listenerInstallation, false);
+  assert.equal(hidden.nativeHandoffRecord.hydration, false);
+  assert.equal(hidden.nativeHandoffRecord.eventDispatch, false);
+  assert.equal(hidden.nativeHandoffRecord.compatibilityClaimed, false);
   assert.equal(handoffPayload.sourceRecord, hidden.updateRecord);
   assert.equal(handoffPayload.hostInstanceNode, childNode);
   assert.equal(handoffPayload.hostInstanceToken, hidden.childHostInstanceToken);
@@ -10155,6 +10183,425 @@ test('private react-dom/client facade nested host-output update diagnostic targe
     entrypoint: 'react-dom/client',
     exportName: 'createRoot'
   });
+});
+
+test('private react-dom/client facade nested host-output native handoff fails closed', () => {
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const initialElement = {
+    props: {
+      children: {
+        props: {
+          children: 'nested initial native guard',
+          className: 'native-guard-child-initial',
+          'data-phase': 'initial',
+          id: 'native-guard-child'
+        },
+        type: 'span'
+      },
+      id: 'native-guard-parent',
+      'data-shell': 'stable'
+    },
+    type: 'section'
+  };
+  const nextElement = {
+    props: {
+      children: {
+        props: {
+          children: 'nested updated native guard',
+          className: 'native-guard-child-updated',
+          'data-phase': 'updated',
+          id: 'native-guard-child',
+          title: 'updated native guard'
+        },
+        type: 'span'
+      },
+      id: 'native-guard-parent',
+      'data-shell': 'stable'
+    },
+    type: 'section'
+  };
+
+  const initialStyleElement = {
+    props: {
+      children: {
+        props: {
+          children: 'nested initial native guard',
+          id: 'native-guard-child',
+          style: {
+            color: 'blue',
+            opacity: 0.25
+          }
+        },
+        type: 'span'
+      },
+      id: 'native-guard-parent'
+    },
+    type: 'section'
+  };
+  const nextStyleElement = {
+    props: {
+      children: {
+        props: {
+          children: 'nested updated native guard',
+          id: 'native-guard-child',
+          style: {
+            color: 'green',
+            opacity: 0.5
+          }
+        },
+        type: 'span'
+      },
+      id: 'native-guard-parent'
+    },
+    type: 'section'
+  };
+
+  function createScenario(label, options) {
+    const document = createDocument(label);
+    if (options && options.withStyleTarget) {
+      const createDocumentElement = document.createElement;
+      document.createElement = function createFakeElementWithStyle(tagName) {
+        const element = createDocumentElement.call(this, tagName);
+        element.style = {
+          setProperty(name, value) {
+            this[String(name)] = String(value);
+          }
+        };
+        return element;
+      };
+    }
+    const container = createElement('DIV', document);
+    if (options && options.withStyleContainer) {
+      container.style = {
+        setProperty(name, value) {
+          this[String(name)] = String(value);
+        }
+      };
+    }
+    const adapter = descriptor.value({
+      createRenderAdmissionIdPrefix: `${label}-admission`,
+      hostOutputUpdateIdPrefix: `${label}-handoff`,
+      nativeEnvironmentId: 848,
+      nativeHandoffIdPrefix: `${label}-native`,
+      publicFacadeNestedHostOutputUpdateIdPrefix: `${label}-diagnostic`,
+      requestIdPrefix: `${label}-request`,
+      rootIdPrefix: `${label}-root`,
+      sideEffectIdPrefix: `${label}-side-effect`,
+      updateIdPrefix: `${label}-update`
+    });
+    const root = adapter.createRoot(container);
+    return {
+      adapter,
+      container,
+      document,
+      root
+    };
+  }
+
+  function assertRejectedScenario(scenario, options) {
+    const expectedContainerRegistrations =
+      options && Object.prototype.hasOwnProperty.call(
+        options,
+        'containerRegistrations'
+      )
+        ? options.containerRegistrations
+        : 0;
+    assert.deepEqual(
+      scenario.adapter.getRootNestedHostOutputUpdateDiagnostics(scenario.root),
+      []
+    );
+    assert.equal(scenario.container.childNodes.length, 0);
+    assert.equal(rootMarkers.getContainerRoot(scenario.container), null);
+    assert.equal(listenerRegistry.hasListeningMarker(scenario.container), false);
+    assert.equal(listenerRegistry.hasListeningMarker(scenario.document), false);
+    assert.equal(
+      scenario.container.__registrations.length,
+      expectedContainerRegistrations
+    );
+    assert.equal(scenario.document.__registrations.length, 0);
+  }
+
+  const clonedScenario = createScenario('nested-native-cloned');
+  let clonedFactoryCalled = false;
+  assert.throws(
+    () =>
+      clonedScenario.adapter.updateNestedHostOutput(
+        clonedScenario.root,
+        initialElement,
+        nextElement,
+        {
+          nativeHandoffRecordFactory({bridge, updateRecord}) {
+            clonedFactoryCalled = true;
+            const handoff = bridge.createNativeRequestHandoff(updateRecord);
+            return Object.freeze({
+              ...handoff,
+              nativeRequestRecord: Object.freeze({
+                ...handoff.nativeRequestRecord
+              })
+            });
+          }
+        }
+      ),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE'
+    }
+  );
+  assert.equal(clonedFactoryCalled, true);
+  assertRejectedScenario(clonedScenario);
+
+  const foreignBridge = rootBridge.createPrivateRootBridgeShell({
+    nativeEnvironmentId: 1848,
+    nativeHandoffIdPrefix: 'nested-native-foreign-native',
+    requestIdPrefix: 'nested-native-foreign-request',
+    rootIdPrefix: 'nested-native-foreign-root',
+    updateIdPrefix: 'nested-native-foreign-update'
+  });
+  const foreignContainer = createElement(
+    'DIV',
+    createDocument('nested-native-foreign-container')
+  );
+  const foreignCreate = foreignBridge.createClientRoot(foreignContainer);
+  const foreignUpdate = foreignBridge.renderContainer(foreignCreate.handle, {
+    props: {
+      children: 'foreign native update'
+    },
+    type: 'section'
+  });
+  const foreignHandoff =
+    foreignBridge.createNativeRequestHandoff(foreignUpdate);
+  const foreignScenario = createScenario('nested-native-foreign');
+  assert.throws(
+    () =>
+      foreignScenario.adapter.updateNestedHostOutput(
+        foreignScenario.root,
+        initialElement,
+        nextElement,
+        {
+          nativeHandoffRecord: foreignHandoff
+        }
+      ),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE'
+    }
+  );
+  assertRejectedScenario(foreignScenario);
+
+  const staleScenario = createScenario('nested-native-stale');
+  let staleFactoryCalled = false;
+  assert.throws(
+    () =>
+      staleScenario.adapter.updateNestedHostOutput(
+        staleScenario.root,
+        initialElement,
+        nextElement,
+        {
+          nativeHandoffRecordFactory({bridge, rootHandle, updateRecord}) {
+            staleFactoryCalled = true;
+            const handoff = bridge.createNativeRequestHandoff(updateRecord);
+            bridge.renderContainer(rootHandle, nextElement);
+            return handoff;
+          }
+        }
+      ),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE'
+    }
+  );
+  assert.equal(staleFactoryCalled, true);
+  assertRejectedScenario(staleScenario);
+
+  const tamperScenarios = [
+    {
+      label: 'text-tamper',
+      mutate({textInstance}) {
+        textInstance.nodeValue = 'tampered nested native guard';
+      }
+    },
+    {
+      label: 'child-attribute-tamper',
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.setAttribute('data-phase', 'tampered');
+      }
+    },
+    {
+      label: 'child-extra-attribute',
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.setAttribute('data-extra', 'tampered');
+      }
+    },
+    {
+      label: 'child-extra-property',
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.extraNativeHandoffProperty = 'tampered';
+      }
+    },
+    {
+      label: 'child-style-tamper',
+      initialElement: initialStyleElement,
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.style.color = 'purple';
+      },
+      nextElement: nextStyleElement,
+      options: {withStyleTarget: true}
+    },
+    {
+      label: 'child-extra-style',
+      initialElement: initialStyleElement,
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.style.backgroundColor = 'red';
+      },
+      nextElement: nextStyleElement,
+      options: {withStyleTarget: true}
+    },
+    {
+      label: 'parent-attribute-tamper',
+      mutate({parentHostInstanceNode}) {
+        parentHostInstanceNode.setAttribute('data-shell', 'tampered');
+      }
+    },
+    {
+      label: 'parent-extra-attribute',
+      mutate({parentHostInstanceNode}) {
+        parentHostInstanceNode.setAttribute('data-extra', 'tampered');
+      }
+    },
+    {
+      label: 'container-extra-attribute',
+      mutate({container}) {
+        container.setAttribute('data-container-extra', 'tampered');
+      }
+    },
+    {
+      label: 'container-extra-property',
+      mutate({container}) {
+        container.extraNativeHandoffProperty = 'tampered';
+      }
+    },
+    {
+      label: 'container-extra-style',
+      mutate({container}) {
+        container.style.backgroundColor = 'red';
+      },
+      options: {withStyleContainer: true}
+    },
+    {
+      assertRejectedOptions: {containerRegistrations: 1},
+      label: 'container-listener-install',
+      mutate({container}) {
+        container.addEventListener(
+          'click',
+          function onContainerNativeHandoffClick() {}
+        );
+      }
+    },
+    {
+      label: 'parent-listener-install',
+      mutate({parentHostInstanceNode}) {
+        parentHostInstanceNode.addEventListener(
+          'click',
+          function onParentNativeHandoffClick() {}
+        );
+      }
+    },
+    {
+      label: 'child-listener-install',
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.addEventListener(
+          'click',
+          function onChildNativeHandoffClick() {}
+        );
+      }
+    },
+    {
+      label: 'text-listener-install',
+      mutate({textInstance}) {
+        textInstance.addEventListener(
+          'click',
+          function onTextNativeHandoffClick() {}
+        );
+      }
+    },
+    {
+      label: 'extra-child-sibling',
+      mutate({childHostInstanceNode, container}) {
+        childHostInstanceNode.appendChild(
+          container.ownerDocument.createTextNode('')
+        );
+      }
+    },
+    {
+      label: 'extra-parent-child-sibling',
+      mutate({parentHostInstanceNode, container}) {
+        parentHostInstanceNode.appendChild(
+          container.ownerDocument.createTextNode('')
+        );
+      }
+    }
+  ];
+  for (const tamper of tamperScenarios) {
+    const scenario = createScenario(
+      `nested-native-${tamper.label}`,
+      tamper.options
+    );
+    let factoryCalled = false;
+    assert.throws(
+      () =>
+        scenario.adapter.updateNestedHostOutput(
+          scenario.root,
+          tamper.initialElement || initialElement,
+          tamper.nextElement || nextElement,
+          {
+            nativeHandoffRecordFactory(factoryContext) {
+              factoryCalled = true;
+              const handoff = factoryContext.bridge.createNativeRequestHandoff(
+                factoryContext.updateRecord
+              );
+              tamper.mutate(factoryContext);
+              return handoff;
+            }
+          }
+        ),
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE'
+      }
+    );
+    assert.equal(factoryCalled, true, tamper.label);
+    assertRejectedScenario(scenario, tamper.assertRejectedOptions);
+  }
+
+  const mismatchedHostOutputScenario =
+    createScenario('nested-native-mismatched-host-output');
+  let mismatchedHostOutputFactoryCalled = false;
+  assert.throws(
+    () =>
+      mismatchedHostOutputScenario.adapter.updateNestedHostOutput(
+        mismatchedHostOutputScenario.root,
+        initialElement,
+        nextElement,
+        {
+          nativeHandoffRecordFactory({
+            bridge,
+            childHostInstanceNode,
+            updateRecord
+          }) {
+            mismatchedHostOutputFactoryCalled = true;
+            const handoff = bridge.createNativeRequestHandoff(updateRecord);
+            componentTree.detachHostInstanceSubtree(childHostInstanceNode, {
+              includeRoot: true
+            });
+            return handoff;
+          }
+        }
+      ),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE'
+    }
+  );
+  assert.equal(mismatchedHostOutputFactoryCalled, true);
+  assertRejectedScenario(mismatchedHostOutputScenario);
 });
 
 test('private react-dom/client facade root.unmount clears active host output metadata', () => {

@@ -3049,6 +3049,8 @@ test("React DOM client private facade nested host-output update stays diagnostic
   };
   const adapter = descriptor.value({
     hostOutputUpdateIdPrefix: "facade-conformance-nested-handoff",
+    nativeEnvironmentId: 848,
+    nativeHandoffIdPrefix: "facade-conformance-nested-native",
     publicFacadeNestedHostOutputUpdateIdPrefix:
       "facade-conformance-nested-update",
     requestIdPrefix: "facade-conformance-nested-request",
@@ -3084,6 +3086,19 @@ test("React DOM client private facade nested host-output update stays diagnostic
     diagnostic.hostOutputUpdateHandoffId,
     "facade-conformance-nested-handoff:1"
   );
+  assert.equal(
+    diagnostic.nativeHandoffId,
+    "facade-conformance-nested-native:3"
+  );
+  assert.equal(
+    diagnostic.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    diagnostic.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_RENDER
+  );
+  assert.equal(diagnostic.nativeRequestRecord.environmentId, 848);
   assert.deepEqual(diagnostic.nestedHostPath, [
     "HostRoot",
     "HostComponent",
@@ -3119,6 +3134,7 @@ test("React DOM client private facade nested host-output update stays diagnostic
       "public-facade-create-root-record",
       "public-facade-nested-host-output-render-record",
       "public-facade-root-render-update-record",
+      "private-native-update-request-handoff",
       "nested-host-output-path",
       "parent-child-token-identity",
       "host-output-update-handoff",
@@ -3132,6 +3148,7 @@ test("React DOM client private facade nested host-output update stays diagnostic
   assert.equal(diagnostic.publicCreateRootEnabled, false);
   assert.equal(diagnostic.publicRootExecution, false);
   assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.nativeUpdateRequestMirrored, true);
   assert.equal(diagnostic.nativeExecution, false);
   assert.equal(diagnostic.reconcilerExecution, false);
   assert.equal(diagnostic.rootScheduled, false);
@@ -3155,6 +3172,12 @@ test("React DOM client private facade nested host-output update stays diagnostic
   ]);
   assert.equal(hidden.createRecord, create);
   assert.equal(hidden.hostOutputUpdateHandoff.latestPropsPublished, true);
+  assert.equal(
+    rootBridge.getNativeRootBridgeHandoffPayload(hidden.nativeHandoffRecord),
+    hidden.nativeHandoffPayload
+  );
+  assert.equal(hidden.nativeHandoffPayload.sourceRecord, hidden.updateRecord);
+  assert.equal(hidden.nativeHandoffPayload.value, nextElement);
   assert.equal(
     rootBridge.getPrivateRootRecordPayload(hidden.updateRecord).element,
     nextElement

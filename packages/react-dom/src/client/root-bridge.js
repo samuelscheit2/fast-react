@@ -147,6 +147,7 @@ const {
   PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND,
   PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_STATUS,
+  diffDomPropertyPayload,
   recordPrivateDomStyleObjectDiffDiagnostics
 } = require('../dom-host/property-payload.js');
 const {
@@ -2510,6 +2511,12 @@ const ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES 
       accepted: true,
       reason:
         'The diagnostic routes the nested child update through a bridge-owned render request record.'
+    }),
+    freezeRecord({
+      id: 'private-native-update-request-handoff',
+      accepted: true,
+      reason:
+        'The private nested root.render update request was mirrored as an inert native root request handoff.'
     }),
     freezeRecord({
       id: 'nested-host-output-path',
@@ -7874,6 +7881,8 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
   let updateRecord = null;
   let hostOutputUpdateHandoff = null;
   let hostOutputUpdatePayload = null;
+  let nativeHandoffRecord = null;
+  let nativeHandoffPayload = null;
 
   try {
     sideEffectRecord = payload.bridge.applyCreateRootSideEffects(
@@ -7924,6 +7933,26 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
         'Public-facade nested host-output update requires an applied host-output update handoff.'
       );
     }
+    const nativeHandoff = createPublicFacadeNestedHostOutputUpdateNativeHandoff(
+      {
+        bridge: payload.bridge,
+        container: createPayload.container,
+        admissionRecord,
+        createRecord,
+        element: nextElement,
+        hostOutputUpdateHandoff,
+        hostOutputUpdatePayload,
+        initialRenderRecord: renderRecord,
+        nativeOptions: options,
+        nestedMount,
+        normalized,
+        rootHandle: payload.rootHandle,
+        sideEffectRecord,
+        updateRecord
+      }
+    );
+    nativeHandoffRecord = nativeHandoff.record;
+    nativeHandoffPayload = nativeHandoff.payload;
   } catch (error) {
     cleanupPublicFacadeNestedHostOutputUpdateAfterFailure({
       bridge: payload.bridge,
@@ -7984,6 +8013,10 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     hostOutputUpdateHandoffSequence:
       hostOutputUpdateHandoff.handoffSequence,
     hostOutputUpdateStatus: hostOutputUpdateHandoff.updateStatus,
+    nativeHandoffId: nativeHandoffRecord.handoffId,
+    nativeHandoffStatus: nativeHandoffRecord.handoffStatus,
+    nativeRequestKind: nativeHandoffRecord.nativeRequestRecord.kind,
+    nativeRequestRecord: nativeHandoffRecord.nativeRequestRecord,
     nestedHostPath: freezeArray([
       'HostRoot',
       'HostComponent',
@@ -8026,6 +8059,7 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     publicRootObjectExposed: false,
     publicRootExecution: false,
     publicRootCompatibilitySurface: false,
+    nativeUpdateRequestMirrored: true,
     nativeExecution: false,
     reconcilerExecution: false,
     rootScheduled: false,
@@ -8055,6 +8089,8 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     initialElement,
     initialRenderRecord: renderRecord,
     latestPropsAfterUpdate,
+    nativeHandoffPayload,
+    nativeHandoffRecord,
     nestedMount,
     normalizedUpdate: normalized,
     parentHostInstanceNode: nestedMount.parentNode,
@@ -8071,6 +8107,700 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
   });
   payload.hostOutputNestedUpdateRecords.push(diagnosticRecord);
   return diagnosticRecord;
+}
+
+function createPublicFacadeNestedHostOutputUpdateNativeHandoff(context) {
+  const activeHostOutputSnapshot =
+    createActiveNestedHostOutputSnapshotForNativeUpdateHandoff(context);
+  const nativeHandoffRecord =
+    getPublicFacadeNestedHostOutputUpdateNativeHandoffRecord(context);
+  return validatePublicFacadeNestedHostOutputUpdateNativeHandoff(
+    context,
+    nativeHandoffRecord,
+    activeHostOutputSnapshot
+  );
+}
+
+function getPublicFacadeNestedHostOutputUpdateNativeHandoffRecord(context) {
+  const options = context.nativeOptions;
+  if (options && typeof options === 'object') {
+    if (
+      Object.prototype.hasOwnProperty.call(
+        options,
+        'nativeHandoffRecordFactory'
+      )
+    ) {
+      if (typeof options.nativeHandoffRecordFactory !== 'function') {
+        throwInvalidRootPublicFacadeHostOutputUpdate(
+          'Public-facade nested host-output update native handoff factories must be functions.'
+        );
+      }
+      return options.nativeHandoffRecordFactory(
+        freezeRecord({
+          bridge: context.bridge,
+          childHostInstanceNode: context.nestedMount.childNode,
+          childHostInstanceToken: context.nestedMount.childToken,
+          container: context.container,
+          hostOutputUpdateHandoff: context.hostOutputUpdateHandoff,
+          parentHostInstanceNode: context.nestedMount.parentNode,
+          parentHostInstanceToken: context.nestedMount.parentToken,
+          rootHandle: context.rootHandle,
+          textInstance: context.nestedMount.textNode,
+          textToken: context.nestedMount.textToken,
+          updateRecord: context.updateRecord
+        })
+      );
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(options, 'nativeHandoffRecord')
+    ) {
+      return options.nativeHandoffRecord;
+    }
+  }
+  return context.bridge.createNativeRequestHandoff(context.updateRecord);
+}
+
+function validatePublicFacadeNestedHostOutputUpdateNativeHandoff(
+  context,
+  nativeHandoffRecord,
+  activeHostOutputSnapshot
+) {
+  const createValidation = validateRootBridgeRequestRecord(
+    context.createRecord
+  );
+  const initialRenderValidation = validateRootBridgeRequestRecord(
+    context.initialRenderRecord
+  );
+  const updateValidation = validateHostOutputUpdateRequestRecord(
+    context.updateRecord,
+    throwInvalidRootPublicFacadeHostOutputUpdate
+  );
+
+  if (
+    createValidation.operation !== 'create' ||
+    initialRenderValidation.operation !== 'render' ||
+    updateValidation.operation !== 'render' ||
+    createValidation.bridgeState !== initialRenderValidation.bridgeState ||
+    createValidation.bridgeState !== updateValidation.bridgeState
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update native handoff requires matching create, initial render, and update records.'
+    );
+  }
+
+  const admissionPayload =
+    rootCreateRenderAdmissionPayloads.get(context.admissionRecord);
+  if (
+    admissionPayload === undefined ||
+    context.admissionRecord.$$typeof !==
+      privateRootCreateRenderAdmissionRecordType ||
+    context.admissionRecord.admissionStatus !==
+      ROOT_BRIDGE_CREATE_RENDER_ADMITTED ||
+    context.admissionRecord.nativeExecution !== false ||
+    context.admissionRecord.reconcilerExecution !== false ||
+    context.admissionRecord.compatibilityClaimed !== false ||
+    admissionPayload.createRecord !== context.createRecord ||
+    admissionPayload.renderRecord !== context.initialRenderRecord ||
+    admissionPayload.sideEffectRecord !== context.sideEffectRecord
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update native handoff requires the accepted private create/render admission.'
+    );
+  }
+
+  const updatePayload = rootRecordPayloads.get(context.updateRecord);
+  if (
+    updatePayload === undefined ||
+    updatePayload.rootHandle !== context.rootHandle ||
+    updatePayload.element !== context.element ||
+    context.updateRecord.requestSequence <=
+      context.initialRenderRecord.requestSequence
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update native handoff requires the matching root.render update request.'
+    );
+  }
+
+  assertActiveNestedHostOutputForNativeUpdateHandoff(
+    context,
+    activeHostOutputSnapshot
+  );
+
+  if (!isWeakMapKey(nativeHandoffRecord)) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update requires a private native handoff record.'
+    );
+  }
+  const nativeHandoffPayload =
+    rootNativeHandoffPayloads.get(nativeHandoffRecord);
+  if (
+    nativeHandoffPayload === undefined ||
+    nativeHandoffPayload.sourceRecord !== context.updateRecord ||
+    nativeHandoffPayload.sourcePayload !== updatePayload ||
+    nativeHandoffPayload.value !== context.element
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update requires the canonical native handoff for its root.render update request.'
+    );
+  }
+
+  const nativeRequestRecord = nativeHandoffRecord.nativeRequestRecord;
+  if (
+    nativeHandoffRecord.$$typeof !== privateRootNativeHandoffRecordType ||
+    nativeHandoffRecord.kind !==
+      'FastReactDomPrivateRootNativeRequestHandoffRecord' ||
+    nativeHandoffRecord.operation !== 'render' ||
+    nativeHandoffRecord.handoffStatus !==
+      ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED ||
+    nativeHandoffRecord.sourceRequestId !== context.updateRecord.requestId ||
+    nativeHandoffRecord.sourceRequestSequence !==
+      context.updateRecord.requestSequence ||
+    nativeHandoffRecord.sourceRequestType !==
+      context.updateRecord.requestType ||
+    nativeHandoffRecord.sourceLifecycleStatusBefore !==
+      context.updateRecord.lifecycleStatusBefore ||
+    nativeHandoffRecord.sourceLifecycleStatusAfter !==
+      context.updateRecord.lifecycleStatusAfter ||
+    nativeHandoffRecord.rootId !== context.updateRecord.rootId ||
+    nativeHandoffRecord.rootKind !== context.updateRecord.rootKind ||
+    nativeHandoffRecord.rootTag !== context.updateRecord.rootTag ||
+    nativeHandoffRecord.nativeExecution !== false ||
+    nativeHandoffRecord.reconcilerExecution !== false ||
+    nativeHandoffRecord.domMutation !== false ||
+    nativeHandoffRecord.markerWrites !== false ||
+    nativeHandoffRecord.listenerInstallation !== false ||
+    nativeHandoffRecord.hydration !== false ||
+    nativeHandoffRecord.eventDispatch !== false ||
+    nativeHandoffRecord.compatibilityClaimed !== false ||
+    nativeRequestRecord === null ||
+    typeof nativeRequestRecord !== 'object' ||
+    nativeRequestRecord.kind !== NATIVE_ROOT_BRIDGE_REQUEST_RENDER ||
+    nativeRequestRecord.requestId !== context.updateRecord.requestSequence ||
+    nativeRequestRecord.environmentId !==
+      updateValidation.rootHandleState.nativeRootHandle.environmentId ||
+    nativeRequestRecord.rootHandle !==
+      updateValidation.rootHandleState.nativeRootHandle ||
+    nativeRequestRecord.rootId !==
+      updateValidation.rootHandleState.nativeRootId ||
+    nativeRequestRecord.valueHandle !== updatePayload.nativeValueHandle ||
+    nativeRequestRecord.rootHandleState !==
+      NATIVE_ROOT_BRIDGE_ROOT_HANDLE_ACTIVE
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update native handoff does not match the accepted root.render update request.'
+    );
+  }
+
+  return {
+    payload: nativeHandoffPayload,
+    record: nativeHandoffRecord
+  };
+}
+
+function assertActiveNestedHostOutputForNativeUpdateHandoff(
+  context,
+  activeHostOutputSnapshot
+) {
+  const parentNode = getMountedNestedHostOutputNodeForNativeUpdateHandoff(
+    context.nestedMount.parentToken
+  );
+  const childNode = getMountedNestedHostOutputNodeForNativeUpdateHandoff(
+    context.nestedMount.childToken
+  );
+  const textNode = getMountedNestedHostOutputNodeForNativeUpdateHandoff(
+    context.nestedMount.textToken
+  );
+  if (
+    parentNode !== context.nestedMount.parentNode ||
+    childNode !== context.nestedMount.childNode ||
+    textNode !== context.nestedMount.textNode ||
+    !activeNestedHostOutputTopologyMatches(context) ||
+    !activeNestedHostOutputSnapshotMatches(context, activeHostOutputSnapshot) ||
+    getRootOwnerFromHostInstanceToken(context.nestedMount.parentToken) !==
+      context.createRecord.owner ||
+    getRootOwnerFromHostInstanceToken(context.nestedMount.childToken) !==
+      context.createRecord.owner ||
+    getRootOwnerFromHostInstanceToken(context.nestedMount.textToken) !==
+      context.createRecord.owner ||
+    context.hostOutputUpdateHandoff.updateStatus !==
+      ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED ||
+    context.hostOutputUpdatePayload.sourceRecord !== context.updateRecord ||
+    context.hostOutputUpdatePayload.hostInstanceToken !==
+      context.nestedMount.childToken ||
+    context.hostOutputUpdatePayload.hostInstanceNode !==
+      context.nestedMount.childNode ||
+    context.hostOutputUpdatePayload.textInstance !==
+      context.nestedMount.textNode ||
+    context.hostOutputUpdatePayload.previousProps !==
+      context.normalized.initial.childProps ||
+    context.hostOutputUpdatePayload.nextProps !==
+      context.normalized.next.childProps ||
+    context.hostOutputUpdatePayload.latestPropsPublished !== true ||
+    getLatestPropsFromHostInstanceToken(context.nestedMount.parentToken) !==
+      context.normalized.initial.parentProps ||
+    getLatestPropsFromHostInstanceToken(context.nestedMount.childToken) !==
+      context.normalized.next.childProps ||
+    textNode.nodeValue !== context.normalized.next.text ||
+    textNode.textContent !== context.normalized.next.text ||
+    context.nestedMount.childNode.textContent !== context.normalized.next.text ||
+    context.nestedMount.parentNode.textContent !== context.normalized.next.text ||
+    context.container.textContent !== context.normalized.next.text ||
+    !activeHostOutputNodeMatchesProps(
+      context.nestedMount.parentNode,
+      context.normalized.initial.parentType,
+      context.normalized.initial.parentProps
+    ) ||
+    !activeHostOutputNodeMatchesProps(
+      context.nestedMount.childNode,
+      context.normalized.next.childType,
+      context.normalized.next.childProps
+    )
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update native handoff requires active matching fake-DOM host output.'
+    );
+  }
+}
+
+function createActiveNestedHostOutputSnapshotForNativeUpdateHandoff(context) {
+  return freezeRecord({
+    childNode: createActiveHostOutputNodeSnapshot(
+      context.nestedMount.childNode
+    ),
+    containerNode: createActiveHostOutputNodeSnapshot(context.container),
+    parentNode: createActiveHostOutputNodeSnapshot(
+      context.nestedMount.parentNode
+    ),
+    textNode: freezeRecord({
+      nodeValue: context.nestedMount.textNode.nodeValue,
+      snapshot: createActiveHostOutputNodeSnapshot(
+        context.nestedMount.textNode
+      )
+    })
+  });
+}
+
+function createActiveHostOutputNodeSnapshot(node) {
+  return freezeRecord({
+    attributes: snapshotStringMap(node.attributes),
+    childNodes: snapshotChildNodes(node),
+    eventListenerState: snapshotEventListenerState(node),
+    ownProperties: snapshotOwnProperties(node),
+    style: snapshotStyleObject(node.style),
+    textContent: node.textContent
+  });
+}
+
+function activeNestedHostOutputTopologyMatches(context) {
+  return (
+    childNodesMatch(context.container, freezeArray([
+      context.nestedMount.parentNode
+    ])) &&
+    childNodesMatch(context.nestedMount.parentNode, freezeArray([
+      context.nestedMount.childNode
+    ])) &&
+    childNodesMatch(context.nestedMount.childNode, freezeArray([
+      context.nestedMount.textNode
+    ])) &&
+    childNodesMatch(context.nestedMount.textNode, freezeArray([])) &&
+    getFirstChild(context.container) === context.nestedMount.parentNode &&
+    getFirstChild(context.nestedMount.parentNode) ===
+      context.nestedMount.childNode &&
+    getFirstChild(context.nestedMount.childNode) ===
+      context.nestedMount.textNode
+  );
+}
+
+function activeNestedHostOutputSnapshotMatches(context, snapshot) {
+  return (
+    activeHostOutputNodeSnapshotMatches(
+      context.container,
+      snapshot.containerNode
+    ) &&
+    activeHostOutputNodeSnapshotMatches(
+      context.nestedMount.parentNode,
+      snapshot.parentNode
+    ) &&
+    activeHostOutputNodeSnapshotMatches(
+      context.nestedMount.childNode,
+      snapshot.childNode
+    ) &&
+    context.nestedMount.textNode.nodeValue === snapshot.textNode.nodeValue &&
+    activeHostOutputNodeSnapshotMatches(
+      context.nestedMount.textNode,
+      snapshot.textNode.snapshot
+    )
+  );
+}
+
+function activeHostOutputNodeSnapshotMatches(node, snapshot) {
+  return (
+    childNodesMatch(node, snapshot.childNodes) &&
+    node.textContent === snapshot.textContent &&
+    stringMapMatches(node.attributes, snapshot.attributes) &&
+    styleObjectMatches(node.style, snapshot.style) &&
+    eventListenerStateMatches(node, snapshot.eventListenerState) &&
+    ownPropertiesMatch(node, snapshot.ownProperties)
+  );
+}
+
+function activeHostOutputNodeMatchesProps(node, tag, props) {
+  const payload = diffDomPropertyPayload(tag, {}, props);
+  for (let index = 0; index < payload.length; index += 1) {
+    const entry = payload[index];
+    if (entry.kind === ENTRY_NON_PAYLOAD) {
+      continue;
+    }
+    if (!activeHostOutputNodeMatchesPayloadEntry(node, entry)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function activeHostOutputNodeMatchesPayloadEntry(node, entry) {
+  switch (entry.kind) {
+    case ENTRY_SET_ATTRIBUTE:
+      return getActiveHostOutputAttribute(node, entry.attributeName) ===
+        entry.value;
+    case ENTRY_REMOVE_ATTRIBUTE:
+      return getActiveHostOutputAttribute(node, entry.attributeName) === null;
+    case ENTRY_SET_PROPERTY:
+      return node[entry.propertyName] === entry.value;
+    case ENTRY_REMOVE_PROPERTY:
+      return node[entry.propertyName] === null;
+    case ENTRY_SET_STYLE:
+    case ENTRY_REMOVE_STYLE:
+      return getActiveHostOutputStyleValue(node, entry) === entry.value;
+    case ENTRY_SET_INNER_HTML:
+      return node.innerHTML === entry.value;
+    default:
+      return false;
+  }
+}
+
+function snapshotChildNodes(node) {
+  return freezeArray(Array.isArray(node.childNodes) ? node.childNodes : []);
+}
+
+function childNodesMatch(node, expectedChildren) {
+  if (!Array.isArray(node.childNodes)) {
+    return expectedChildren.length === 0;
+  }
+  if (node.childNodes.length !== expectedChildren.length) {
+    return false;
+  }
+  for (let index = 0; index < expectedChildren.length; index += 1) {
+    if (node.childNodes[index] !== expectedChildren[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function snapshotEventListenerState(node) {
+  return freezeRecord({
+    registrations: snapshotEventListenerEntries(node.__registrations),
+    removals: snapshotEventListenerEntries(node.__removals)
+  });
+}
+
+function eventListenerStateMatches(node, snapshot) {
+  return (
+    eventListenerEntriesMatch(node.__registrations, snapshot.registrations) &&
+    eventListenerEntriesMatch(node.__removals, snapshot.removals)
+  );
+}
+
+function snapshotEventListenerEntries(entries) {
+  if (!Array.isArray(entries)) {
+    return null;
+  }
+  return freezeArray(
+    entries.map((entry) =>
+      snapshotEventListenerValue(entry, 4, new WeakSet())
+    )
+  );
+}
+
+function eventListenerEntriesMatch(entries, snapshot) {
+  if (snapshot === null) {
+    return !Array.isArray(entries);
+  }
+  if (!Array.isArray(entries) || entries.length !== snapshot.length) {
+    return false;
+  }
+  for (let index = 0; index < snapshot.length; index += 1) {
+    if (
+      !eventListenerValueMatches(
+        entries[index],
+        snapshot[index],
+        4,
+        new WeakSet()
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function snapshotEventListenerValue(value, depth, seen) {
+  if (value === null || typeof value !== 'object') {
+    return freezeRecord({
+      kind: 'value',
+      value
+    });
+  }
+  if (depth === 0 || seen.has(value)) {
+    return freezeRecord({
+      kind: 'reference',
+      value
+    });
+  }
+  if (Array.isArray(value)) {
+    seen.add(value);
+    const entries = freezeArray(
+      value.map((entry) =>
+        snapshotEventListenerValue(entry, depth - 1, seen)
+      )
+    );
+    seen.delete(value);
+    return freezeRecord({
+      entries,
+      kind: 'array'
+    });
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return freezeRecord({
+      kind: 'reference',
+      value
+    });
+  }
+  seen.add(value);
+  const entries = freezeArray(
+    Reflect.ownKeys(value)
+      .map((key) => freezeRecord({
+        key,
+        value: snapshotEventListenerValue(value[key], depth - 1, seen)
+      }))
+      .sort(compareSnapshotEntries)
+  );
+  seen.delete(value);
+  return freezeRecord({
+    entries,
+    kind: 'object'
+  });
+}
+
+function eventListenerValueMatches(value, snapshot, depth, seen) {
+  switch (snapshot.kind) {
+    case 'value':
+    case 'reference':
+      return value === snapshot.value;
+    case 'array':
+      return eventListenerArrayValueMatches(value, snapshot, depth, seen);
+    case 'object':
+      return eventListenerObjectValueMatches(value, snapshot, depth, seen);
+    default:
+      return false;
+  }
+}
+
+function eventListenerArrayValueMatches(value, snapshot, depth, seen) {
+  if (
+    depth === 0 ||
+    !Array.isArray(value) ||
+    value.length !== snapshot.entries.length ||
+    seen.has(value)
+  ) {
+    return false;
+  }
+  seen.add(value);
+  for (let index = 0; index < snapshot.entries.length; index += 1) {
+    if (
+      !eventListenerValueMatches(
+        value[index],
+        snapshot.entries[index],
+        depth - 1,
+        seen
+      )
+    ) {
+      seen.delete(value);
+      return false;
+    }
+  }
+  seen.delete(value);
+  return true;
+}
+
+function eventListenerObjectValueMatches(value, snapshot, depth, seen) {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    depth === 0 ||
+    seen.has(value)
+  ) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return false;
+  }
+  const keys = Reflect.ownKeys(value).sort(compareSnapshotKeys);
+  if (keys.length !== snapshot.entries.length) {
+    return false;
+  }
+  seen.add(value);
+  for (let index = 0; index < snapshot.entries.length; index += 1) {
+    const expected = snapshot.entries[index];
+    const key = keys[index];
+    if (
+      key !== expected.key ||
+      !eventListenerValueMatches(
+        value[key],
+        expected.value,
+        depth - 1,
+        seen
+      )
+    ) {
+      seen.delete(value);
+      return false;
+    }
+  }
+  seen.delete(value);
+  return true;
+}
+
+function snapshotStringMap(map) {
+  if (!(map instanceof Map)) {
+    return null;
+  }
+  return freezeArray(
+    Array.from(map.entries())
+      .map(([key, value]) => freezeRecord({
+        key: String(key),
+        value: String(value)
+      }))
+      .sort(compareSnapshotEntries)
+  );
+}
+
+function stringMapMatches(map, snapshot) {
+  if (snapshot === null) {
+    return !(map instanceof Map);
+  }
+  if (!(map instanceof Map) || map.size !== snapshot.length) {
+    return false;
+  }
+  for (const entry of snapshot) {
+    if (!map.has(entry.key) || String(map.get(entry.key)) !== entry.value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function snapshotStyleObject(style) {
+  if (style === null || typeof style !== 'object') {
+    return null;
+  }
+  return freezeRecord({
+    mapProperties: snapshotStringMap(style.properties),
+    ownProperties: snapshotOwnProperties(style, ['ownerElement'])
+  });
+}
+
+function styleObjectMatches(style, snapshot) {
+  if (snapshot === null) {
+    return style === null || typeof style !== 'object';
+  }
+  return (
+    style !== null &&
+    typeof style === 'object' &&
+    stringMapMatches(style.properties, snapshot.mapProperties) &&
+    ownPropertiesMatch(style, snapshot.ownProperties, ['ownerElement'])
+  );
+}
+
+function snapshotOwnProperties(value, ignoredKeys) {
+  if (value === null || typeof value !== 'object') {
+    return freezeArray([]);
+  }
+  const ignored = new Set(ignoredKeys || []);
+  return freezeArray(
+    Reflect.ownKeys(value)
+      .filter((key) => !ignored.has(key))
+      .map((key) => freezeRecord({
+        key,
+        value: value[key]
+      }))
+      .sort(compareSnapshotEntries)
+  );
+}
+
+function ownPropertiesMatch(value, snapshot, ignoredKeys) {
+  if (value === null || typeof value !== 'object') {
+    return snapshot.length === 0;
+  }
+  const ignored = new Set(ignoredKeys || []);
+  const keys = Reflect.ownKeys(value)
+    .filter((key) => !ignored.has(key))
+    .sort(compareSnapshotKeys);
+  if (keys.length !== snapshot.length) {
+    return false;
+  }
+  for (let index = 0; index < snapshot.length; index += 1) {
+    const expected = snapshot[index];
+    const key = keys[index];
+    if (key !== expected.key || value[key] !== expected.value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function compareSnapshotEntries(left, right) {
+  return compareSnapshotKeys(left.key, right.key);
+}
+
+function compareSnapshotKeys(left, right) {
+  return String(left).localeCompare(String(right));
+}
+
+function getActiveHostOutputAttribute(node, attributeName) {
+  if (typeof node.getAttribute === 'function') {
+    return node.getAttribute(attributeName);
+  }
+  if (node.attributes instanceof Map) {
+    return node.attributes.has(attributeName)
+      ? String(node.attributes.get(attributeName))
+      : null;
+  }
+  return null;
+}
+
+function getActiveHostOutputStyleValue(node, entry) {
+  const style = node.style;
+  if (style === null || typeof style !== 'object') {
+    return null;
+  }
+  if (style.properties instanceof Map && style.properties.has(entry.styleName)) {
+    return String(style.properties.get(entry.styleName));
+  }
+  const value = style[entry.styleName];
+  return value == null ? '' : String(value);
+}
+
+function getMountedNestedHostOutputNodeForNativeUpdateHandoff(token) {
+  try {
+    return assertMountedHostInstanceToken(token);
+  } catch (error) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update native handoff requires mounted fake-DOM host output.'
+    );
+  }
 }
 
 function unmountPrivateRootPublicFacadeHostOutput(root, element, options) {
