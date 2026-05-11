@@ -4916,6 +4916,8 @@ test("React DOM public root facade remains blocked with hydration resource/form 
     "hydration-replay-ownership",
     hydrationGate
       .privateHydrationTextMismatchRecoverableErrorRoutingMetadataId,
+    hydrationGate
+      .privateHydrationRecoverableErrorBoundaryAdmissionMetadataId,
     "resource-map-commit",
     "stylesheet-load-error-state",
     "form-action-event-extraction",
@@ -4925,6 +4927,7 @@ test("React DOM public root facade remains blocked with hydration resource/form 
     hydrationGate.privateHydrationReplayOwnershipGateId,
     hydrationGate
       .privateHydrationTextMismatchRecoverableErrorRoutingExecutionGateId,
+    hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionGateId,
     resourceFormGate.privateResourceHintResourceMapCommitGateId,
     resourceFormGate.privateResourceHintStylesheetLoadErrorStateGateId,
     resourceFormGate.privateFormActionEventExtractionGateId,

@@ -1789,6 +1789,317 @@ test('private hydration replay error metadata connects ownership rows to root op
   );
 });
 
+test('private hydration recoverable error boundary admission consumes current hydrateRoot replay lifecycle evidence', () => {
+  const recoverableErrorCalls = [];
+
+  function onRecoverableError(error) {
+    recoverableErrorCalls.push(error.message);
+  }
+
+  const scenario = createHydrationRecoverableBoundaryAdmissionScenario({
+    actualText: 'server boundary text',
+    expectedText: 'client boundary text',
+    hydrationOptions: {
+      identifierPrefix: 'recoverable-boundary-admission-',
+      onRecoverableError
+    },
+    label: 'recoverable-boundary-admission'
+  });
+  const admission = createHydrationRecoverableBoundaryAdmission(scenario, {
+    options: {
+      source: 'hydration-boundary-test-recoverable-boundary-admission'
+    }
+  });
+
+  assert.equal(
+    hydrationGate
+      .isPrivateHydrationRecoverableErrorBoundaryAdmissionRecord(
+        admission
+      ),
+    true
+  );
+  assert.equal(
+    admission.kind,
+    hydrationGate.HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_RECORD_KIND
+  );
+  assert.equal(
+    admission.gateId,
+    hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionGateId
+  );
+  assert.equal(
+    admission.metadataId,
+    hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionMetadataId
+  );
+  assert.equal(
+    admission.status,
+    hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionStatus
+  );
+  assert.equal(Object.isFrozen(admission), true);
+  assert.equal(admission.privateAdmission, true);
+  assert.equal(admission.diagnosticOnly, true);
+  assert.equal(admission.readOnly, true);
+  assert.equal(admission.compatibilityClaimed, false);
+  assert.equal(admission.publicHydrationCompatibilityClaimed, false);
+  assert.equal(admission.publicHydrationReplayCompatibilityClaimed, false);
+  assert.equal(admission.publicHydrateRootSupported, false);
+  assert.equal(admission.publicRootExecution, false);
+  assert.equal(admission.nativeExecution, false);
+  assert.equal(admission.reconcilerExecution, false);
+  assert.equal(admission.hydration, false);
+  assert.equal(admission.domMutation, false);
+  assert.equal(admission.eventDispatch, false);
+  assert.equal(admission.eventsReplayed, false);
+  assert.equal(admission.replayQueuesDrained, false);
+  assert.equal(admission.recoverableErrorsQueued, false);
+  assert.equal(admission.onRecoverableErrorInvoked, false);
+  assert.equal(admission.publicOnRecoverableErrorInvoked, false);
+  assert.equal(admission.rootErrorCallbackInvocationCount, 0);
+  assert.equal(admission.rootRecordId, 'recoverable-boundary-admission-boundary:1');
+  assert.equal(
+    admission.acceptedBoundaryMetadataDiagnostics,
+    scenario.hydrateRecord.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    admission.acceptedBoundaryMetadataId,
+    hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionMetadataId
+  );
+  assert.equal(
+    admission.acceptedBoundaryMetadataRow.recordType,
+    hydrationGate.HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_RECORD_KIND
+  );
+  assert.equal(
+    admission.recoverableErrorPreflightRecord,
+    scenario.recoverableErrorPreflight
+  );
+  assert.equal(admission.recoverableErrorPreflightAccepted, true);
+  assert.equal(
+    admission.targetClaimingDiagnostic,
+    scenario.targetClaimingDiagnostic
+  );
+  assert.equal(admission.targetClaimAccepted, true);
+  assert.equal(admission.targetClaimExecuted, false);
+  assert.equal(admission.replayExecutionRecord, scenario.replayExecutionRecord);
+  assert.equal(admission.replayExecutionAccepted, true);
+  assert.equal(admission.replayTargetDispatchExecutionBlocked, true);
+  assert.equal(
+    admission.sourceHydrateRootPreflightKind,
+    'FastReactDomPrivateHydrateRootPublicFacadePreflightRecord'
+  );
+  assert.equal(
+    admission.sourceEventReplayPreflightKind,
+    'FastReactDomPrivateHydrateRootPublicFacadeEventReplayPreflightRecord'
+  );
+  assert.equal(
+    admission.sourceExecutionPreflightKind,
+    'FastReactDomPrivateHydrateRootPublicFacadeExecutionPreflightRecord'
+  );
+  assert.equal(
+    admission.sourceLifecycleRequestBoundaryKind,
+    'FastReactDomPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord'
+  );
+  assert.equal(admission.sourceLifecycleBoundarySourceOwned, true);
+  assert.equal(admission.sourceLifecycleBoundaryActive, true);
+  assert.equal(admission.sourceLifecycleBoundaryCurrent, true);
+  assert.equal(admission.sourceLifecycleContainerSnapshotCurrent, true);
+  assert.equal(admission.markerPathCurrent, true);
+  assert.equal(admission.markerPathCurrentStatus, 'current-marker-row-retained');
+  assert.equal(admission.targetPathCurrent, true);
+  assert.equal(admission.targetPathCurrentStatus, 'current-target-path-retained');
+  assert.equal(admission.targetPathResolvedToDispatchTarget, true);
+  assert.equal(admission.targetPathUniqueInContainer, true);
+  assert.equal(admission.targetPathParentChainRetained, true);
+  assert.equal(admission.targetContainerMatchesBoundaryRecord, true);
+  assert.equal(admission.hydratableLookupTargetPathRetained, true);
+  assert.equal(admission.markerPath, 'container.childNodes[0]');
+  assert.equal(admission.targetPath, 'container.childNodes[1]');
+  assert.equal(admission.recoverableErrorMetadataAccepted, true);
+  assert.equal(admission.recoverableErrorMetadataCount, 1);
+  assert.equal(admission.queuedRecoverableErrorCount, 0);
+  assert.equal(admission.wouldQueueRecoverableErrorCount, 1);
+  assert.equal(admission.rootOptionCallbackConfigured, true);
+  assert.deepEqual(
+    admission.recoverableErrorBoundaryRows.map((row) => [
+      row.metadataId,
+      row.markerPath,
+      row.targetPath,
+      row.markerPathCurrent,
+      row.targetPathCurrent,
+      row.replayExecutionAccepted,
+      row.queuedRecoverableError,
+      row.onRecoverableErrorInvoked,
+      row.compatibilityClaimed
+    ]),
+    [
+      [
+        hydrationGate
+          .privateHydrationRecoverableErrorBoundaryAdmissionMetadataId,
+        'container.childNodes[0]',
+        'container.childNodes[1]',
+        true,
+        true,
+        true,
+        false,
+        false,
+        false
+      ]
+    ]
+  );
+
+  const payload =
+    hydrationGate
+      .getPrivateHydrationRecoverableErrorBoundaryAdmissionPayload(
+        admission
+      );
+  assert.equal(payload.hydrationBoundaryRecord, scenario.hydrationBoundaryRecord);
+  assert.equal(payload.hydrationOptions, scenario.hydrationOptions);
+  assert.equal(
+    payload.recoverableErrorPreflightRecord,
+    scenario.recoverableErrorPreflight
+  );
+  assert.equal(payload.targetClaimingDiagnostic, scenario.targetClaimingDiagnostic);
+  assert.equal(payload.replayExecutionRecord, scenario.replayExecutionRecord);
+  assert.equal(
+    payload.sourceLedger.lifecycleRequestBoundary,
+    scenario.lifecycleRequestBoundary
+  );
+  assert.equal(
+    payload.currentTargetPathEvidence.targetPathResolution.node,
+    scenario.boundaryTarget
+  );
+  assert.deepEqual(recoverableErrorCalls, []);
+  assert.deepEqual(scenario.container.__registrations, []);
+  assert.deepEqual(scenario.document.__registrations, []);
+});
+
+test('private hydration recoverable error boundary admission rejects stale cloned cross-root lifecycle and alias evidence', () => {
+  const scenario = createHydrationRecoverableBoundaryAdmissionScenario({
+    actualText: 'server stale text',
+    expectedText: 'client stale text',
+    hydrationOptions: {
+      identifierPrefix: 'recoverable-boundary-negative-',
+      onRecoverableError() {}
+    },
+    label: 'recoverable-boundary-negative'
+  });
+  const other = createHydrationRecoverableBoundaryAdmissionScenario({
+    actualText: 'server other text',
+    expectedText: 'client other text',
+    hydrationOptions: {
+      identifierPrefix: 'recoverable-boundary-other-',
+      onRecoverableError() {}
+    },
+    label: 'recoverable-boundary-other'
+  });
+  const invalidAdmission = {
+    code:
+      hydrationGate.INVALID_HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_CODE
+  };
+
+  assert.throws(
+    () =>
+      createHydrationRecoverableBoundaryAdmission(scenario, {
+        recoverableErrorPreflightRecord: Object.freeze({
+          ...scenario.recoverableErrorPreflight
+        })
+      }),
+    invalidAdmission
+  );
+  assert.throws(
+    () =>
+      createHydrationRecoverableBoundaryAdmission(scenario, {
+        targetClaimingDiagnostic: Object.freeze({
+          ...scenario.targetClaimingDiagnostic
+        })
+      }),
+    invalidAdmission
+  );
+  assert.throws(
+    () =>
+      createHydrationRecoverableBoundaryAdmission(scenario, {
+        replayExecutionRecord: Object.freeze({
+          ...scenario.replayExecutionRecord
+        })
+      }),
+    invalidAdmission
+  );
+  assert.throws(
+    () =>
+      createHydrationRecoverableBoundaryAdmission(scenario, {
+        options: {
+          lifecycleRequestBoundary: undefined
+        }
+      }),
+    invalidAdmission
+  );
+  assert.throws(
+    () =>
+      createHydrationRecoverableBoundaryAdmission(scenario, {
+        options: {
+          eventReplayPreflightRecord: other.eventReplayPreflightRecord,
+          executionPreflightRecord: other.executionPreflightRecord,
+          hydrateRootPreflightRecord: other.hydrateRecord,
+          lifecycleRequestBoundary: other.lifecycleRequestBoundary
+        }
+      }),
+    invalidAdmission
+  );
+  assert.throws(
+    () =>
+      createHydrationRecoverableBoundaryAdmission(scenario, {
+        options: {
+          onRecoverableError: scenario.hydrationOptions.onRecoverableError
+        }
+      }),
+    invalidAdmission
+  );
+  assert.throws(
+    () =>
+      createHydrationRecoverableBoundaryAdmission(scenario, {
+        options: {
+          rootOptions: scenario.hydrationOptions
+        }
+      }),
+    invalidAdmission
+  );
+
+  const staleMarker = createHydrationRecoverableBoundaryAdmissionScenario({
+    actualText: 'server stale marker text',
+    expectedText: 'client stale marker text',
+    hydrationOptions: {
+      identifierPrefix: 'recoverable-boundary-stale-marker-',
+      onRecoverableError() {}
+    },
+    label: 'recoverable-boundary-stale-marker'
+  });
+  staleMarker.container.childNodes[0] = createComment('&');
+  assert.throws(
+    () => createHydrationRecoverableBoundaryAdmission(staleMarker),
+    invalidAdmission
+  );
+
+  const staleTarget = createHydrationRecoverableBoundaryAdmissionScenario({
+    actualText: 'server stale target text',
+    expectedText: 'client stale target text',
+    hydrationOptions: {
+      identifierPrefix: 'recoverable-boundary-stale-target-',
+      onRecoverableError() {}
+    },
+    label: 'recoverable-boundary-stale-target'
+  });
+  const replacementTarget = createElement('BUTTON', staleTarget.document);
+  replacementTarget.parentNode = staleTarget.container;
+  staleTarget.container.childNodes[1] = replacementTarget;
+  assert.throws(
+    () => createHydrationRecoverableBoundaryAdmission(staleTarget),
+    invalidAdmission
+  );
+
+  assert.deepEqual(scenario.container.__registrations, []);
+  assert.deepEqual(scenario.document.__registrations, []);
+  assert.deepEqual(other.container.__registrations, []);
+  assert.deepEqual(other.document.__registrations, []);
+});
+
 test('public hydrateRoot remains an unsupported placeholder with no guard side effects', () => {
   const document = createDocument('public');
   const container = createElement('DIV', document);
@@ -1831,6 +2142,8 @@ function expectedAcceptedPrivateMetadataIds() {
     'hydration-replay-ownership',
     hydrationGate
       .privateHydrationTextMismatchRecoverableErrorRoutingMetadataId,
+    hydrationGate
+      .privateHydrationRecoverableErrorBoundaryAdmissionMetadataId,
     'resource-map-commit',
     'stylesheet-load-error-state',
     'form-action-event-extraction',
@@ -1843,6 +2156,7 @@ function expectedAcceptedPrivateMetadataGateIds() {
     hydrationGate.privateHydrationReplayOwnershipGateId,
     hydrationGate
       .privateHydrationTextMismatchRecoverableErrorRoutingExecutionGateId,
+    hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionGateId,
     resourceFormGate.privateResourceHintResourceMapCommitGateId,
     resourceFormGate.privateResourceHintStylesheetLoadErrorStateGateId,
     resourceFormGate.privateFormActionEventExtractionGateId,
@@ -1907,7 +2221,7 @@ function assertAcceptedPrivateMetadataDiagnostics(diagnostics, expected) {
   assert.equal(diagnostics.resetQueueCommitted, false);
   assert.equal(diagnostics.formResetCommitted, false);
   assert.equal(diagnostics.realFormReset, false);
-  assert.equal(diagnostics.metadataIdCount, 6);
+  assert.equal(diagnostics.metadataIdCount, 7);
   assert.deepEqual(
     diagnostics.metadataIds,
     expectedAcceptedPrivateMetadataIds()
@@ -1919,6 +2233,7 @@ function assertAcceptedPrivateMetadataDiagnostics(diagnostics, expected) {
   assert.deepEqual(diagnostics.acceptedRecordTypes, [
     hydrationGate.HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
     hydrationGate.HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
+    hydrationGate.HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_RECORD_KIND,
     resourceFormGate.privateResourceHintResourceMapCommitRecordType,
     resourceFormGate.privateResourceHintStylesheetLoadErrorStateRecordType,
     resourceFormGate.privateFormActionEventExtractionRecordType,
@@ -1927,6 +2242,7 @@ function assertAcceptedPrivateMetadataDiagnostics(diagnostics, expected) {
   assert.deepEqual(diagnostics.acceptedStatuses, [
     'blocked-replay-ownership-retained-through-drain-order',
     'blocked-hydration-text-mismatch-recoverable-error-metadata-recorded',
+    hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionStatus,
     resourceFormGate.privateResourceHintResourceMapCommitStatus,
     resourceFormGate.privateResourceHintStylesheetLoadErrorStateStatus,
     resourceFormGate.privateFormActionEventExtractionRecordedStatus,
@@ -1968,6 +2284,22 @@ function assertAcceptedPrivateMetadataDiagnostics(diagnostics, expected) {
           hydrationGate.HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
         acceptedStatus:
           'blocked-hydration-text-mismatch-recoverable-error-metadata-recorded',
+        compatibilityClaimed: false,
+        promotesHydration: false,
+        promotesRootRender: false
+      },
+      {
+        metadataId:
+          hydrationGate
+            .privateHydrationRecoverableErrorBoundaryAdmissionMetadataId,
+        category: 'hydration',
+        gateId:
+          hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionGateId,
+        recordType:
+          hydrationGate
+            .HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_RECORD_KIND,
+        acceptedStatus:
+          hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionStatus,
         compatibilityClaimed: false,
         promotesHydration: false,
         promotesRootRender: false
@@ -2754,6 +3086,126 @@ function createHydrationRecoverableRoutingScenario({
     ownershipDiagnostics,
     replayMetadata
   };
+}
+
+function createHydrationRecoverableBoundaryAdmissionScenario({
+  actualText,
+  expectedText,
+  hydrationOptions,
+  label
+}) {
+  const document = createDocument(label);
+  const container = createElement('DIV', document);
+  const boundaryTarget = createElement('BUTTON', document);
+  boundaryTarget.parentNode = container;
+  container.childNodes = [
+    createComment('$'),
+    boundaryTarget,
+    createComment('/$'),
+    createText(actualText)
+  ];
+
+  const preflight = rootBridge.createPrivateHydrateRootPublicFacadePreflight({
+    hydrateIdPrefix: `${label}-hydrate`,
+    hydrationRecordIdPrefix: `${label}-boundary`,
+    publicFacadeHydratePreflightIdPrefix: `${label}-preflight`,
+    requestIdPrefix: `${label}-request`
+  });
+  const initialChildren = {
+    props: {
+      children: expectedText
+    },
+    type: 'App'
+  };
+  const hydrateRecord = preflight.hydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+  const dispatchRecord = createHydrationClickDispatchRecord(
+    container,
+    boundaryTarget
+  );
+  const targetClaimingPreflightRecord = preflight.preflightTargetClaiming(
+    hydrateRecord,
+    dispatchRecord,
+    {
+      source: `${label}-target-claiming-preflight`
+    }
+  );
+  const eventReplayPreflightRecord = preflight.preflightEventReplay(
+    targetClaimingPreflightRecord,
+    {
+      source: `${label}-event-replay-preflight`
+    }
+  );
+  const executionPreflightRecord = preflight.preflightExecution(
+    eventReplayPreflightRecord,
+    {
+      source: `${label}-execution-preflight`
+    }
+  );
+
+  return {
+    boundaryTarget,
+    container,
+    dispatchRecord,
+    document,
+    eventReplayPreflightRecord,
+    executionPreflightRecord,
+    hydrateRecord,
+    hydrationBoundaryRecord: hydrateRecord.hydrationBoundaryRecord,
+    hydrationOptions,
+    initialChildren,
+    lifecycleRequestBoundary: hydrateRecord.lifecycleRequestBoundary,
+    preflight,
+    recoverableErrorPreflight: hydrateRecord.recoverableErrorPreflight,
+    replayExecutionRecord: eventReplayPreflightRecord.replayExecutionRecord,
+    targetClaimingDiagnostic:
+      targetClaimingPreflightRecord.targetClaimingDiagnostic,
+    targetClaimingPreflightRecord
+  };
+}
+
+function createHydrationRecoverableBoundaryAdmission(
+  scenario,
+  overrides
+) {
+  const overrideValues =
+    overrides && typeof overrides === 'object' ? overrides : {};
+  const options = {
+    enableRecoverableErrorBoundaryAdmission: true,
+    eventReplayPreflightRecord: scenario.eventReplayPreflightRecord,
+    executionPreflightRecord: scenario.executionPreflightRecord,
+    hydrateRootPreflightRecord: scenario.hydrateRecord,
+    hydrationOptions: scenario.hydrationOptions,
+    lifecycleRequestBoundary: scenario.lifecycleRequestBoundary,
+    ...(overrideValues.options || {})
+  };
+
+  return hydrationGate.createHydrationRecoverableErrorBoundaryAdmissionRecord(
+    overrideValues.hydrationBoundaryRecord ||
+      scenario.hydrationBoundaryRecord,
+    overrideValues.acceptedBoundaryMetadataDiagnostics ||
+      scenario.hydrateRecord.acceptedPrivateMetadataDiagnostics,
+    overrideValues.recoverableErrorPreflightRecord ||
+      scenario.recoverableErrorPreflight,
+    overrideValues.targetClaimingDiagnostic ||
+      scenario.targetClaimingDiagnostic,
+    overrideValues.replayExecutionRecord || scenario.replayExecutionRecord,
+    options
+  );
+}
+
+function createHydrationClickDispatchRecord(container, target) {
+  return pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      'click',
+      eventSystemFlags.IS_CAPTURE_PHASE
+    ),
+    createNativeEvent('click', target)
+  );
 }
 
 function createUnsupportedHydrateRootScenario(label) {
