@@ -2921,7 +2921,15 @@ test('private form reset/action preflight negative matrix rejects stale public a
       reason: 'public submit dispatch must remain blocked'
     },
     {
+      field: 'publicSubmitDispatchReachable',
+      reason: 'public submit dispatch must remain blocked'
+    },
+    {
       field: 'publicFormSubmissionRequested',
+      reason: 'public form submission must remain blocked'
+    },
+    {
+      field: 'publicFormSubmissionReachable',
       reason: 'public form submission must remain blocked'
     },
     {
@@ -2929,7 +2937,15 @@ test('private form reset/action preflight negative matrix rejects stale public a
       reason: 'public reset request must remain blocked'
     },
     {
+      field: 'publicRequestFormResetReachable',
+      reason: 'public reset request must remain blocked'
+    },
+    {
       field: 'publicActionInvocationRequested',
+      reason: 'action invocation must remain blocked'
+    },
+    {
+      field: 'publicActionInvocationReachable',
       reason: 'action invocation must remain blocked'
     },
     {
@@ -2945,6 +2961,14 @@ test('private form reset/action preflight negative matrix rejects stale public a
       reason: 'react update queueing must remain blocked'
     },
     {
+      field: 'reactUpdate',
+      reason: 'react update queueing must remain blocked'
+    },
+    {
+      field: 'updateQueue',
+      reason: 'react update queueing must remain blocked'
+    },
+    {
       field: 'resetExecutionRequested',
       reason: 'reset execution must remain blocked'
     },
@@ -2953,7 +2977,23 @@ test('private form reset/action preflight negative matrix rejects stale public a
       reason: 'DOM mutation must remain blocked'
     },
     {
+      field: 'domMutation',
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      field: 'publicDomMutationEnabled',
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
       field: 'packageCompatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    },
+    {
+      field: 'publicPackageCompatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    },
+    {
+      field: 'packageExportCompatibilityClaimed',
       reason: 'package compatibility must remain unclaimed'
     }
   ]) {
@@ -3023,7 +3063,15 @@ test('private form reset/action preflight negative matrix rejects stale public a
       reason: 'public submit dispatch must remain blocked'
     },
     {
+      field: 'publicSubmitDispatchReachable',
+      reason: 'public submit dispatch must remain blocked'
+    },
+    {
       field: 'publicFormSubmissionRequested',
+      reason: 'public form submission must remain blocked'
+    },
+    {
+      field: 'publicFormSubmissionReachable',
       reason: 'public form submission must remain blocked'
     },
     {
@@ -3031,7 +3079,15 @@ test('private form reset/action preflight negative matrix rejects stale public a
       reason: 'public reset request must remain blocked'
     },
     {
+      field: 'publicRequestFormResetReachable',
+      reason: 'public reset request must remain blocked'
+    },
+    {
       field: 'publicActionInvocationRequested',
+      reason: 'action invocation must remain blocked'
+    },
+    {
+      field: 'publicActionInvocationReachable',
       reason: 'action invocation must remain blocked'
     },
     {
@@ -3039,11 +3095,35 @@ test('private form reset/action preflight negative matrix rejects stale public a
       reason: 'react update queueing must remain blocked'
     },
     {
+      field: 'reactUpdate',
+      reason: 'react update queueing must remain blocked'
+    },
+    {
+      field: 'updateQueue',
+      reason: 'react update queueing must remain blocked'
+    },
+    {
       field: 'domMutationRequested',
       reason: 'DOM mutation must remain blocked'
     },
     {
+      field: 'domMutation',
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      field: 'publicDomMutationEnabled',
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
       field: 'publicFormActionCompatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    },
+    {
+      field: 'publicPackageCompatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    },
+    {
+      field: 'packageExportCompatibilityClaimed',
       reason: 'package compatibility must remain unclaimed'
     }
   ]) {
@@ -4011,7 +4091,15 @@ test('private form action rejected-error preflight records rejected async action
       reason: 'public submit dispatch must remain blocked'
     },
     {
+      field: 'publicSubmitDispatchReachable',
+      reason: 'public submit dispatch must remain blocked'
+    },
+    {
       field: 'publicFormSubmissionRequested',
+      reason: 'public form submission must remain blocked'
+    },
+    {
+      field: 'publicFormSubmissionReachable',
       reason: 'public form submission must remain blocked'
     },
     {
@@ -4019,11 +4107,35 @@ test('private form action rejected-error preflight records rejected async action
       reason: 'action invocation must remain blocked'
     },
     {
+      field: 'publicActionInvocationReachable',
+      reason: 'action invocation must remain blocked'
+    },
+    {
+      field: 'publicRequestFormResetReachable',
+      reason: 'public reset request must remain blocked'
+    },
+    {
+      field: 'reactUpdate',
+      reason: 'reactUpdate must not be passed to the rejected-error preflight gate'
+    },
+    {
+      field: 'updateQueue',
+      reason: 'updateQueue must not be passed to the rejected-error preflight gate'
+    },
+    {
       field: 'domMutationRequested',
       reason: 'DOM mutation must remain blocked'
     },
     {
       field: 'publicDomMutationRequested',
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      field: 'domMutation',
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      field: 'publicDomMutationEnabled',
       reason: 'DOM mutation must remain blocked'
     },
     {
@@ -4036,6 +4148,14 @@ test('private form action rejected-error preflight records rejected async action
     },
     {
       field: 'packageCompatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    },
+    {
+      field: 'publicPackageCompatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    },
+    {
+      field: 'packageExportCompatibilityClaimed',
       reason: 'package compatibility must remain unclaimed'
     }
   ]) {

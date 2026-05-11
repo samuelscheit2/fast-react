@@ -16,6 +16,10 @@
 - Kept public resource/form behavior blocked; no public resource dispatch,
   form submit/reset/action execution, DOM mutation, error routing, package
   surface, or compatibility path was admitted.
+- Audit follow-up added broader alias blockers for reset/action preflight and
+  rejected-error preflight admissions, including public submit/reset/action
+  reachability, DOM mutation enablement, React update/updateQueue aliases, and
+  public package/export compatibility claims.
 
 ## Changed Files
 
@@ -25,6 +29,12 @@
     path raw/public metadata rejection.
   - Tightened callback/action preflight admission with source dispatch/reset
     execution ID checks and public behavior/package blockers.
+  - Audit follow-up: added shared fail-closed alias checks for
+    `publicSubmitDispatchReachable`, `publicRequestFormResetReachable`,
+    `publicActionInvocationReachable`, `domMutation`,
+    `publicDomMutationEnabled`, `reactUpdate`, `updateQueue`,
+    `publicPackageCompatibilityClaimed`, and
+    `packageExportCompatibilityClaimed`.
   - Added frozen reset/action public-blocker metadata to callback/action
     preflight records and unsupported errors.
   - Expanded public form action boundaries for submit-reset and
@@ -38,6 +48,8 @@
   - Added accepted metadata assertions for the new public blockers.
   - Added reset/action preflight negative matrix coverage for stale, foreign,
     fake, raw, public, and package-claim inputs.
+  - Audit follow-up: expanded reset/action and rejected-error negative
+    matrices to cover broader public/update/package alias claims.
   - Updated exact root/source-adapter boundary shape assertions.
 - `worker-progress/worker-823-resource-form-reset-action-private-preflight.md`
   - This handoff.
@@ -54,6 +66,17 @@
 - `node tests/smoke/package-surface-guard.mjs`
 - `node tests/smoke/import-entrypoints.mjs`
 - `git diff --check`
+- Audit follow-up:
+  - `node --check packages/react-dom/src/shared/form-actions.js`
+  - `node --check packages/react-dom/src/resource-form-gates.js`
+  - `node --check packages/react-dom/src/resource-form-internals-gate.js`
+  - `node --check packages/react-dom/test/resource-form-unsupported-gates.test.js`
+  - `node --test --test-name-pattern "submit reset execution|callback/action invocation preflight|reset/action preflight|rejected-error|fake metadata negative matrix" packages/react-dom/test/resource-form-unsupported-gates.test.js`
+  - `node --test packages/react-dom/test/resource-form-unsupported-gates.test.js`
+  - `npm run check --workspace @fast-react/react-dom`
+  - `node tests/smoke/package-surface-guard.mjs`
+  - `node tests/smoke/import-entrypoints.mjs`
+  - `git diff --check`
 
 ## Evidence Gathered
 
@@ -72,6 +95,8 @@
   source IDs fail before record creation.
 - Package-surface and import smoke checks still pass, so no public package
   compatibility was added.
+- Audit follow-up proves the broader alias names cannot be smuggled through
+  admission as ignored false-positive compatibility evidence.
 
 ## Verification
 
@@ -86,6 +111,15 @@ Passed:
 - Package surface smoke passed.
 - Import entrypoints smoke passed.
 - `git diff --check` passed.
+- Audit follow-up:
+  - Focused alias/resource/form package pattern: 7 tests passed.
+  - Full `packages/react-dom/test/resource-form-unsupported-gates.test.js`:
+    58 tests passed.
+  - `npm run check --workspace @fast-react/react-dom`: 180 tests passed plus
+    import-entrypoint smoke passed.
+  - Package surface smoke passed.
+  - Import entrypoints smoke passed.
+  - `git diff --check` passed.
 
 `npm` printed the existing `minimum-release-age` warning; it did not affect the
 result.

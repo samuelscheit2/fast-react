@@ -2670,6 +2670,10 @@ function normalizeFormActionSubmitResetExecutionAdmission(
       'package compatibility must remain unclaimed'
     );
   }
+  assertNoFormActionPublicBehaviorAliasClaims(
+    admission,
+    throwInvalidSubmitResetExecutionAdmission
+  );
 
   const fakeFormPath = normalizeSubmitResetExecutionFakeFormPath(
     submitDispatch,
@@ -2842,6 +2846,10 @@ function normalizeFormActionCallbackActionPreflightAdmission(
       'package compatibility must remain unclaimed'
     );
   }
+  assertNoFormActionPublicBehaviorAliasClaims(
+    admission,
+    throwInvalidCallbackActionPreflightAdmission
+  );
 
   return freezeRecord({
     explicitFormActionCallbackActionPreflight: true,
@@ -3119,6 +3127,10 @@ function normalizeFormActionRejectedErrorPreflightAdmission(
       'package compatibility must remain unclaimed'
     );
   }
+  assertNoFormActionPublicBehaviorAliasClaims(
+    admission,
+    throwInvalidRejectedErrorPreflightAdmission
+  );
 
   return freezeRecord({
     explicitFormActionRejectedErrorPreflight: true,
@@ -3243,6 +3255,53 @@ function assertNoRejectedErrorPreflightRawAdmissionFields(admission) {
         `${field} must not be passed to the rejected-error preflight gate`
       );
     }
+  }
+}
+
+function assertNoFormActionPublicBehaviorAliasClaims(
+  admission,
+  throwInvalidAdmission
+) {
+  if (
+    admission.publicSubmitDispatchReachable === true ||
+    admission.submitDispatchReachable === true
+  ) {
+    throwInvalidAdmission('public submit dispatch must remain blocked');
+  }
+  if (admission.publicFormSubmissionReachable === true) {
+    throwInvalidAdmission('public form submission must remain blocked');
+  }
+  if (
+    admission.publicRequestFormResetReachable === true ||
+    admission.publicFormResetReachable === true
+  ) {
+    throwInvalidAdmission('public reset request must remain blocked');
+  }
+  if (
+    admission.publicActionInvocationReachable === true ||
+    admission.publicActionInvoked === true
+  ) {
+    throwInvalidAdmission('action invocation must remain blocked');
+  }
+  if (
+    admission.domMutation === true ||
+    admission.publicDomMutationEnabled === true ||
+    admission.publicDomMutationReachable === true
+  ) {
+    throwInvalidAdmission('DOM mutation must remain blocked');
+  }
+  if (
+    admission.reactUpdate === true ||
+    admission.reactUpdateQueued === true ||
+    hasOwnProp(admission, 'updateQueue')
+  ) {
+    throwInvalidAdmission('react update queueing must remain blocked');
+  }
+  if (
+    admission.publicPackageCompatibilityClaimed === true ||
+    admission.packageExportCompatibilityClaimed === true
+  ) {
+    throwInvalidAdmission('package compatibility must remain unclaimed');
   }
 }
 
