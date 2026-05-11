@@ -64,6 +64,7 @@ const privateResourceFormExecutionAdmissionSourceTokenPolicy =
   'source-owned-identifiers-statuses-functions-fields-and-constants';
 const privateResourceFormExecutionAdmissionWorkerIds = freezeArray([
   'worker-829-resource-root-map-storage-private-execution',
+  'worker-952-react-dom-resource-hints-currentness',
   'worker-830-form-action-fulfilled-reset-fake-commit',
   'worker-883-resource-form-lifecycle-boundary-hardening',
   'worker-893-resource-form-reset-lifecycle-execution',
@@ -146,6 +147,7 @@ const rootExecutionConsumerSideEffects = freezeRecord({
   rootExecutionConsumerInvoked: true,
   worker850AdmissionLedgerBoundaryRecorded: true,
   resourceRootMapStorageExecutionConsumed: true,
+  resourceRootMapStorageRootLifecycleConsumed: true,
   formFulfilledResetExecutionConsumed: true,
   formFulfilledResetCurrentnessConsumed: true,
   deterministicFakeRootMapStorageConsumed: true,
@@ -394,7 +396,8 @@ function recordResourceFormRootExecutionConsumerWithGate(
   const resourceExecution =
     assertResourceRootMapStorageExecutionForRootConsumer(
       resourceRootMapStorageExecutionRecord,
-      rootBridgeAdmission
+      rootBridgeAdmission,
+      lifecycleBoundary
     );
   const fulfilledResetExecution =
     assertFormFulfilledResetExecutionForRootConsumer(
@@ -583,6 +586,12 @@ function assertRootLifecycleRequestBoundaryForRootConsumer(
   rootBridgeAdmission,
   lifecycleBoundary
 ) {
+  if (rootBridgeAdmission.operation !== 'render') {
+    throwInvalidRootExecutionConsumerRecord(
+      'root lifecycle request boundary must come from a render operation'
+    );
+  }
+
   if (
     !rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
       rootBridgeAdmission,
@@ -627,12 +636,19 @@ function assertRootLifecycleRequestBoundaryForRootConsumer(
     );
   }
 
+  if (lifecycleBoundary.sourceOperation !== 'render') {
+    throwInvalidRootExecutionConsumerRecord(
+      'root lifecycle request boundary must come from a render operation'
+    );
+  }
+
   return lifecycleBoundary;
 }
 
 function assertResourceRootMapStorageExecutionForRootConsumer(
   record,
-  rootBridgeAdmission
+  rootBridgeAdmission,
+  lifecycleBoundary
 ) {
   const payload =
     internalsGate.getPrivateResourceHintRootMapStorageRecordPayload(record);
@@ -688,8 +704,134 @@ function assertResourceRootMapStorageExecutionForRootConsumer(
     );
   }
 
+  assertResourceRootMapStorageRootLifecycleForRootConsumer(
+    record,
+    payload,
+    rootBridgeAdmission,
+    lifecycleBoundary
+  );
   assertResourceRootMapStorageExecutionPlanForRootConsumer(payload);
   return payload;
+}
+
+function assertResourceRootMapStorageRootLifecycleForRootConsumer(
+  record,
+  payload,
+  rootBridgeAdmission,
+  lifecycleBoundary
+) {
+  const rootExecutionBoundary = payload.rootExecutionBoundary;
+  const rootIdentity =
+    internalsGate
+      .getPrivateResourceHintRootMapStorageRootIdentityPayload(record);
+  const lifecyclePayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      lifecycleBoundary
+    );
+
+  if (
+    rootIdentity === null ||
+    rootExecutionBoundary == null ||
+    typeof rootExecutionBoundary !== 'object' ||
+    lifecyclePayload === null
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource root-map storage execution root lifecycle identity must be source-owned'
+    );
+  }
+
+  if (
+    rootIdentity.rootBridgeAdmission !== rootBridgeAdmission ||
+    rootIdentity.rootLifecycleRequestBoundary !== lifecycleBoundary ||
+    rootIdentity.rootLifecyclePayload !== lifecyclePayload ||
+    rootIdentity.bridgeState !== lifecyclePayload.bridgeState ||
+    rootIdentity.rootHandleState !== lifecyclePayload.rootHandleState ||
+    rootIdentity.sourceRecord !== lifecyclePayload.sourceRecord ||
+    rootIdentity.container !== lifecyclePayload.rootHandleState.container ||
+    rootIdentity.containerInfo !==
+      lifecyclePayload.rootHandleState.containerInfo ||
+    rootIdentity.rootExecutionBoundary !== rootExecutionBoundary ||
+    !rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      rootBridgeAdmission,
+      lifecycleBoundary
+    )
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource root-map storage execution root lifecycle identity must match root bridge admission and lifecycle boundary'
+    );
+  }
+
+  if (
+    rootExecutionBoundary.$$typeof !==
+      internalsGate
+        .privateResourceHintRootMapStorageRootLifecycleBoundaryRecordType ||
+    rootExecutionBoundary.kind !==
+      'FastReactDomPrivateResourceHintRootMapStorageRootLifecycleBoundaryRecord' ||
+    rootExecutionBoundary.status !==
+      internalsGate
+        .privateResourceHintRootMapStorageRootLifecycleBoundaryStatus ||
+    rootExecutionBoundary.sourceRootBridgeAdmissionId !==
+      rootBridgeAdmission.requestId ||
+    rootExecutionBoundary.sourceRootBridgeAdmissionStatus !==
+      rootBridgeAdmission.admissionStatus ||
+    rootExecutionBoundary.sourceRootRequestId !==
+      lifecycleBoundary.sourceRequestId ||
+    rootExecutionBoundary.sourceRootRequestSequence !==
+      lifecycleBoundary.sourceRequestSequence ||
+    rootExecutionBoundary.sourceRootRequestType !==
+      lifecycleBoundary.sourceRequestType ||
+    rootExecutionBoundary.sourceRootOperation !==
+      lifecycleBoundary.sourceOperation ||
+    rootExecutionBoundary.sourceRootOperation !== 'render' ||
+    rootExecutionBoundary.sourceRootLifecycleBoundaryId !==
+      lifecycleBoundary.boundaryId ||
+    rootExecutionBoundary.sourceRootLifecycleBoundaryStatus !==
+      lifecycleBoundary.boundaryStatus ||
+    rootExecutionBoundary.rootId !== rootBridgeAdmission.rootId ||
+    rootExecutionBoundary.rootKind !== rootBridgeAdmission.rootKind ||
+    rootExecutionBoundary.rootTag !== rootBridgeAdmission.rootTag ||
+    rootExecutionBoundary.rootContainerInfo !==
+      lifecyclePayload.rootHandleState.containerInfo ||
+    rootExecutionBoundary.sourceLifecycleStatusBefore !==
+      lifecycleBoundary.sourceLifecycleStatusBefore ||
+    rootExecutionBoundary.sourceLifecycleStatusAfter !==
+      lifecycleBoundary.sourceLifecycleStatusAfter ||
+    rootExecutionBoundary.lifecycleTransition !==
+      lifecycleBoundary.lifecycleTransition ||
+    rootExecutionBoundary.activeLifecycleStatus !==
+      lifecycleBoundary.activeLifecycleStatus ||
+    rootExecutionBoundary.lifecycleRequestVersion !==
+      lifecycleBoundary.lifecycleRequestVersion ||
+    rootExecutionBoundary.sourceOwnedRootLifecycleBoundary !== true ||
+    rootExecutionBoundary.activeRootLifecycle !== true ||
+    rootExecutionBoundary.requestBoundaryCurrent !== true ||
+    rootExecutionBoundary.publicRootExecution !== false ||
+    rootExecutionBoundary.nativeExecution !== false ||
+    rootExecutionBoundary.reconcilerExecution !== false ||
+    rootExecutionBoundary.domMutation !== false ||
+    rootExecutionBoundary.markerWrites !== false ||
+    rootExecutionBoundary.listenerInstallation !== false ||
+    rootExecutionBoundary.hydration !== false ||
+    rootExecutionBoundary.eventDispatch !== false ||
+    rootExecutionBoundary.compatibilityClaimed !== false ||
+    !sameStringArray(rootExecutionBoundary.sourceOwnedTokens, [
+      internalsGate
+        .privateResourceHintRootMapStorageRootLifecycleBoundaryRecordType,
+      internalsGate
+        .privateResourceHintRootMapStorageRootLifecycleBoundaryStatus,
+      rootBridge.privateRootAdmissionRecordType,
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+      rootBridge.privateRootLifecycleRequestBoundaryRecordType,
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
+      rootBridgeAdmission.rootId,
+      lifecycleBoundary.boundaryId,
+      lifecycleBoundary.lifecycleTransition
+    ])
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource root-map storage execution root lifecycle identity must remain source-owned current metadata'
+    );
+  }
 }
 
 function assertResourceRootMapStorageExecutionPlanForRootConsumer(payload) {
@@ -1284,6 +1426,7 @@ function createRootLifecycleConsumerBoundary(lifecycleBoundary) {
 function createResourceRootMapStorageConsumerBoundary(resourceExecution) {
   const plan = resourceExecution.rootMapStorageExecutionPlan;
   const snapshot = resourceExecution.rootMapStorageSnapshot;
+  const rootExecutionBoundary = resourceExecution.rootExecutionBoundary;
   return freezeRecord({
     status: privateResourceFormRootExecutionConsumerStatus,
     sourceWorkerId:
@@ -1297,9 +1440,31 @@ function createResourceRootMapStorageConsumerBoundary(resourceExecution) {
       resourceExecution.rootMapStorageExecutionId,
     sourceRootMapStoragePreflightId:
       resourceExecution.sourceRootMapStoragePreflightId,
+    rootExecutionBoundaryId: rootExecutionBoundary.boundaryId,
+    rootExecutionBoundaryStatus: rootExecutionBoundary.status,
+    sourceRootBridgeAdmissionId:
+      rootExecutionBoundary.sourceRootBridgeAdmissionId,
+    sourceRootBridgeAdmissionStatus:
+      rootExecutionBoundary.sourceRootBridgeAdmissionStatus,
+    sourceRootLifecycleBoundaryId:
+      rootExecutionBoundary.sourceRootLifecycleBoundaryId,
+    sourceRootLifecycleBoundaryStatus:
+      rootExecutionBoundary.sourceRootLifecycleBoundaryStatus,
+    sourceRootOperation: rootExecutionBoundary.sourceRootOperation,
     rootId: plan.rootId,
     rootKind: plan.rootKind,
+    rootTag: rootExecutionBoundary.rootTag,
     ownerRootId: plan.ownerRootId,
+    rootContainerInfo: rootExecutionBoundary.rootContainerInfo,
+    sourceLifecycleStatusBefore:
+      rootExecutionBoundary.sourceLifecycleStatusBefore,
+    sourceLifecycleStatusAfter:
+      rootExecutionBoundary.sourceLifecycleStatusAfter,
+    lifecycleTransition: rootExecutionBoundary.lifecycleTransition,
+    activeLifecycleStatus:
+      rootExecutionBoundary.activeLifecycleStatus,
+    lifecycleRequestVersion:
+      rootExecutionBoundary.lifecycleRequestVersion,
     rowCount: resourceExecution.rootMapStorageExecutionRows.length,
     hoistableStylesRowCount: snapshot.hoistableStylesMapSize,
     hoistableScriptsRowCount: snapshot.hoistableScriptsMapSize,
@@ -1320,10 +1485,18 @@ function createResourceRootMapStorageConsumerBoundary(resourceExecution) {
       resourceExecution.storageAdmission.executionKind,
       plan.storageKind,
       snapshot.snapshotKind,
-      resourceExecution.rootMapStorageValidationBoundary.status
+      resourceExecution.rootMapStorageValidationBoundary.status,
+      rootExecutionBoundary.$$typeof,
+      rootExecutionBoundary.status,
+      rootExecutionBoundary.sourceRootBridgeAdmissionStatus,
+      rootExecutionBoundary.sourceRootLifecycleBoundaryStatus
     ]),
     sourceOwnedRowsConsumed: true,
+    sourceOwnedRootLifecycleBoundaryConsumed: true,
     deterministicFakeRootMapStorageConsumed: true,
+    activeRootLifecycle: true,
+    requestBoundaryCurrent: true,
+    sourceOwnedRootLifecycleBoundary: true,
     rootResourceStorageMutated: plan.rootResourceStorageMutated,
     fakeRootResourceStorageMutated: plan.rootResourceStorageMutated,
     fakeHoistableStylesMapMutated: plan.hoistableStylesMapMutated,
@@ -1334,6 +1507,10 @@ function createResourceRootMapStorageConsumerBoundary(resourceExecution) {
     publicResourceMapCommitBehavior: false,
     publicScriptModuleResourceDispatch: false,
     publicStylesheetLoadStateDispatch: false,
+    publicRootExecution: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
     compatibilityClaimed: false
   });
 }
@@ -2271,6 +2448,12 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
       internalsGate.privateResourceHintRootMapStorageStatus,
     acceptedResourceRootMapStorageExecutionStatus:
       internalsGate.privateResourceHintRootMapStorageExecutionStatus,
+    acceptedResourceRootMapStorageRootLifecycleBoundaryRecordType:
+      internalsGate
+        .privateResourceHintRootMapStorageRootLifecycleBoundaryRecordType,
+    acceptedResourceRootMapStorageRootLifecycleBoundaryStatus:
+      internalsGate
+        .privateResourceHintRootMapStorageRootLifecycleBoundaryStatus,
     acceptedFormFulfilledResetRecordType:
       formActions.privateFormActionFulfilledResetExecutionRecordType,
     acceptedFormFulfilledResetStatus:
@@ -2291,14 +2474,19 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
     consumesFormFulfilledResetExecution: true,
     consumesFormFulfilledResetCurrentness: true,
     requiresSourceOwnedActiveRootLifecycleRequestBoundary: true,
+    requiresCurrentRenderRootLifecycleRequestBoundary: true,
+    requiresResourceRootMapStorageRootLifecycleIdentity: true,
     requiresFormFulfilledResetRootLifecycleIdentity: true,
     requiresSourceOwnedPrivateRecords: true,
     requiresWorker850AdmissionLedgerBoundary: true,
     rejectsStaleRootLifecycleSnapshots: true,
+    rejectsWrongRootLifecycleOperation: true,
     rejectsCrossRootLifecycleSourceRecords: true,
     rejectsCallerBuiltLifecycleSourceRecords: true,
     rejectsStaleRootMapStorageRecords: true,
+    rejectsRootlessResourceRootMapStorageRecords: true,
     rejectsCrossRootResourceRecords: true,
+    rejectsCrossContainerResourceRecords: true,
     rejectsRootlessFormFulfilledResetRecords: true,
     rejectsStaleFormFulfilledResetRecords: true,
     rejectsFormFulfilledResetReplayAfterGenerationAdvance: true,
@@ -2307,6 +2495,8 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
     rejectsClonedRecords: true,
     rejectsCallerSuppliedSourceTokens: true,
     rejectsPublicCompatibilityAliases: true,
+    rejectsNativeRustExecutionClaims: true,
+    rejectsWorker910Evidence: true,
     deterministicFakeResourceEvidenceOnly: true,
     deterministicFakeFormEvidenceOnly: true,
     publicRootExecution: false,
@@ -2490,7 +2680,10 @@ function assertNoRootExecutionConsumerPublicClaims(admission) {
     'publicRootExecution',
     'rootExecutionRequested',
     'nativeExecution',
+    'rustExecution',
+    'nativeRustExecution',
     'reconcilerExecution',
+    'hydrationExecution',
     'publicPackageCompatibilityClaimed',
     'publicPackageExportsCompatibilityClaimed',
     'packageCompatibilityClaimed',
@@ -2518,7 +2711,11 @@ function assertNoRootExecutionConsumerCallerSourceTokens(admission) {
     'sourceRootRequestSequence',
     'sourceRootRequestType',
     'sourceRootOperation',
+    'rootBridgeAdmission',
     'sourceResourceRootMapStorageExecutionId',
+    'resourceRootMapStorageRootLifecycleBoundary',
+    'rootMapStorageRootLifecycleBoundary',
+    'rootLifecycleIdentity',
     'sourceFormFulfilledResetExecutionId',
     'sourceRootMapStoragePreflightId',
     'sourceAsyncCallbackExecutionId',
@@ -2532,6 +2729,7 @@ function assertNoRootExecutionConsumerCallerSourceTokens(admission) {
     'fakeResetCommitExecution',
     'rootExecutionBoundary',
     'rootExecutionBoundaryId',
+    'rootExecutionBoundaryStatus',
     'rootLifecycleRequestBoundary',
     'rootContainerInfo',
     'lifecycleTransition',
@@ -2540,7 +2738,15 @@ function assertNoRootExecutionConsumerCallerSourceTokens(admission) {
     'ledgerStatus',
     'workerId',
     'workerIds',
+    'sourceWorkerId',
     'sourceTokenPolicy',
+    'worker910Evidence',
+    'worker910HydrationEvidence',
+    'hydrateRootRecoverableErrorBoundary',
+    'hydrationRecoverableErrorRouting',
+    'hydrationRootBridgeEvidence',
+    'hydrationBoundary',
+    'rootBridgeExportsAlias',
     'executionKind',
     'storageKind',
     'snapshotKind',
