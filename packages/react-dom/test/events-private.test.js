@@ -1168,6 +1168,27 @@ test('private root listener currentness gate rejects cloned stale aliased and mu
           {
             sourceKind: 'hydrateRoot',
             sourceRecord: {
+              kind: 'FastReactDomHydrationReplayEventQueueDiagnostic',
+              operation: 'private-hydration-replay-target-dispatch-link',
+              requestType: 'hydrateRoot',
+              status: 'controlled-private-hydration-replay-target-dispatch-link'
+            }
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+        reason: 'hydration-replay-source-alias'
+      }
+    );
+    assert.throws(
+      () =>
+        rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+          aliasFixture.rootRegistration,
+          {
+            sourceKind: 'hydrateRoot',
+            sourceRecord: {
               facadeCall: 'createRoot',
               requestType: 'createRoot'
             }
@@ -1453,6 +1474,288 @@ test('private root click dispatch gate rejects listener registration changes aft
   }
 });
 
+test('private root focus/blur dispatch execution rejects stale registrations and missing root shells before invoking', () => {
+  const staleFixture = createPrivateFocusBlurDelegationFixture(
+    'focus-gate-stale-registration'
+  );
+  const staleCalls = [];
+  const staleListenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      staleFixture.targetNode,
+      'focusin',
+      false,
+      () => {
+        staleCalls.push('stale-registration-invoked');
+      }
+    );
+  const staleRootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(staleFixture.container);
+  const staleCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    staleRootRegistration,
+    'focus-gate-stale-registration'
+  );
+
+  rootListeners.revertRootListenersForPrivateRoot(staleRootRegistration);
+  try {
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+          staleRootRegistration,
+          staleFixture.hostOutputPayload,
+          staleListenerRecord,
+          {
+            domEventName: 'focusin',
+            rootListenerCurrentnessGateRecord: staleCurrentnessGate
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'stale-registration-record'
+      }
+    );
+    assert.deepEqual(staleCalls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      staleListenerRecord
+    );
+    componentTree.detachHostInstanceToken(staleFixture.token);
+  }
+
+  const shellFixture = createPrivateFocusBlurDelegationFixture(
+    'focus-gate-missing-shells'
+  );
+  const shellCalls = [];
+  const shellListenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      shellFixture.targetNode,
+      'focusout',
+      false,
+      () => {
+        shellCalls.push('missing-shell-invoked');
+      }
+    );
+  const firstRootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(shellFixture.container);
+  const sameContainerRootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(shellFixture.container);
+  const sameContainerCurrentnessGate =
+    createPrivateRootDispatchCurrentnessGate(
+      sameContainerRootRegistration,
+      'focus-gate-missing-shells'
+    );
+
+  try {
+    assert.equal(sameContainerCurrentnessGate.registrationCount, 0);
+    assert.equal(
+      sameContainerCurrentnessGate.sameContainerDedupeCurrent,
+      true
+    );
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+          sameContainerRootRegistration,
+          shellFixture.hostOutputPayload,
+          shellListenerRecord,
+          {
+            domEventName: 'focusout',
+            rootListenerCurrentnessGateRecord:
+              sameContainerCurrentnessGate
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'missing-root-listener-shell'
+      }
+    );
+    assert.deepEqual(shellCalls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      shellListenerRecord
+    );
+    rootListeners.revertRootListenersForPrivateRoot(
+      sameContainerRootRegistration
+    );
+    rootListeners.revertRootListenersForPrivateRoot(firstRootRegistration);
+    componentTree.detachHostInstanceToken(shellFixture.token);
+  }
+});
+
+test('private root focus/blur dispatch execution rejects forged currentness listener and phase aliases before invoking', () => {
+  const fixture = createPrivateFocusBlurDelegationFixture(
+    'focus-gate-currentness-source'
+  );
+  const foreignFixture = createPrivateFocusBlurDelegationFixture(
+    'focus-gate-currentness-foreign'
+  );
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'focusin',
+      false,
+      () => {
+        calls.push('invalid-focus-currentness-invoked');
+      }
+    );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+  const foreignRootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(
+      foreignFixture.container
+    );
+  const rootCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    rootRegistration,
+    'focus-gate-currentness-source'
+  );
+  const foreignCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    foreignRootRegistration,
+    'focus-gate-currentness-foreign'
+  );
+  const registrationCountBeforeMutation =
+    fixture.container.__registrations.length;
+
+  try {
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+          rootRegistration,
+          fixture.hostOutputPayload,
+          listenerRecord,
+          {
+            domEventName: 'focusin',
+            rootListenerCurrentnessGateRecord: {
+              ...rootCurrentnessGate
+            }
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'invalid-root-listener-currentness-gate'
+      }
+    );
+
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+          rootRegistration,
+          fixture.hostOutputPayload,
+          listenerRecord,
+          {
+            domEventName: 'focusin',
+            rootListenerCurrentnessGateRecord: foreignCurrentnessGate
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'root-listener-currentness-registration-mismatch'
+      }
+    );
+
+    fixture.container.__registrations.push({
+      listener() {},
+      options: false,
+      type: 'focusin'
+    });
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+          rootRegistration,
+          fixture.hostOutputPayload,
+          listenerRecord,
+          {
+            domEventName: 'focusin',
+            rootListenerCurrentnessGateRecord: rootCurrentnessGate
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'root-listener-currentness-changed-after-capture'
+      }
+    );
+    fixture.container.__registrations.length =
+      registrationCountBeforeMutation;
+
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+          rootRegistration,
+          fixture.hostOutputPayload,
+          {...listenerRecord},
+          {
+            domEventName: 'focusin',
+            rootListenerCurrentnessGateRecord: rootCurrentnessGate
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'stale-listener-record'
+      }
+    );
+
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+          rootRegistration,
+          fixture.hostOutputPayload,
+          listenerRecord,
+          {
+            domEventName: 'focusin',
+            phase: 'capture',
+            rootListenerCurrentnessGateRecord: rootCurrentnessGate
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'unsupported-event-phase'
+      }
+    );
+
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+          rootRegistration,
+          fixture.hostOutputPayload,
+          listenerRecord,
+          {
+            domEventName: 'focusout',
+            rootListenerCurrentnessGateRecord: rootCurrentnessGate
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'unsupported-event-type'
+      }
+    );
+    assert.deepEqual(calls, []);
+  } finally {
+    fixture.container.__registrations.length =
+      registrationCountBeforeMutation;
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    rootListeners.revertRootListenersForPrivateRoot(
+      foreignRootRegistration
+    );
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    componentTree.detachHostInstanceToken(foreignFixture.token);
+    componentTree.detachHostInstanceToken(fixture.token);
+  }
+});
+
 test('private root dispatch gates reject forged public synthetic and browser claims before invoking', () => {
   const fixture = createPrivateClickDelegationFixture(
     'click-gate-forged-claims'
@@ -1485,6 +1788,12 @@ test('private root dispatch gates reject forged public synthetic and browser cla
     },
     {
       syntheticEventCount: 1
+    },
+    {
+      packageCompatibilityClaimed: true
+    },
+    {
+      syntheticEventCompatibilityClaimed: true
     }
   ];
 
@@ -1536,26 +1845,46 @@ test('private root dispatch gates reject forged public synthetic and browser cla
     'focus-gate-forged-claims'
   );
 
+  const focusForgedClaimOptions = [
+    {
+      packageCompatibilityClaimed: true
+    },
+    {
+      publicEventCompatibilityClaimed: true
+    },
+    {
+      syntheticEventCompatibilityClaimed: true
+    },
+    {
+      syntheticFocusEventCreation: true
+    },
+    {
+      willCreateSyntheticFocusEvent: true
+    }
+  ];
+
   try {
-    assert.throws(
-      () =>
-        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
-          focusRootRegistration,
-          focusFixture.hostOutputPayload,
-          focusListenerRecord,
-          {
-            domEventName: 'focusout',
-            rootListenerCurrentnessGateRecord: focusCurrentnessGate,
-            willCreateSyntheticFocusEvent: true
-          }
-        ),
-      {
-        code:
-          rootListeners
-            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
-        reason: 'public-behavior-claimed'
-      }
-    );
+    for (const forgedClaimOption of focusForgedClaimOptions) {
+      assert.throws(
+        () =>
+          rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+            focusRootRegistration,
+            focusFixture.hostOutputPayload,
+            focusListenerRecord,
+            {
+              domEventName: 'focusout',
+              rootListenerCurrentnessGateRecord: focusCurrentnessGate,
+              ...forgedClaimOption
+            }
+          ),
+        {
+          code:
+            rootListeners
+              .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+          reason: 'public-behavior-claimed'
+        }
+      );
+    }
     assert.deepEqual(focusCalls, []);
   } finally {
     listenerRegistry.removePrivateEventListenerQueueEntry(
@@ -2033,15 +2362,28 @@ test('private focus/blur dispatch execution routes one accepted fake focus liste
     assert.equal(execution.listenerInvocationCount, 1);
     assert.equal(execution.privateListenerInvoked, true);
     assert.equal(execution.publicDispatchEnabled, false);
+    assert.equal(execution.publicEventCompatibilityClaimed, false);
+    assert.equal(execution.publicPackageCompatibilityClaimed, false);
     assert.equal(execution.publicRootBehaviorChanged, false);
+    assert.equal(execution.publicSyntheticEventCompatibilityClaimed, false);
     assert.equal(execution.browserDomEventCompatibilityClaimed, false);
+    assert.equal(execution.packageCompatibilityClaimed, false);
+    assert.equal(execution.hydrationReplayQueued, false);
+    assert.equal(execution.hydrationReplayStatus, 'blocked');
     assert.equal(
       execution.rootListenerCurrentnessGateStatus,
       rootListeners.PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_STATUS
     );
+    assert.equal(execution.rootListenerCurrentnessSourceKind, 'createRoot');
     assert.equal(execution.rootListenerCurrentnessSourceOwned, true);
+    assert.equal(execution.rootListenerShellPairCurrent, true);
+    assert.equal(execution.rootListenerCaptureShellOwned, true);
+    assert.equal(execution.rootListenerBubbleShellOwned, true);
     assert.equal(execution.syntheticEventCount, 0);
+    assert.equal(execution.syntheticEventCompatibilityClaimed, false);
     assert.equal(execution.syntheticFocusEventCreation, false);
+    assert.equal(execution.pluginDispatchMetadataSourceOwned, true);
+    assert.equal(execution.sourceOwnedPluginDispatchMetadata, true);
     assert.equal(
       execution.pluginExecutionRecordKind,
       pluginEventSystem
@@ -2060,6 +2402,15 @@ test('private focus/blur dispatch execution routes one accepted fake focus liste
       payload.rootListenerCurrentnessGatePayload.listenerRegistrationRecord,
       rootRegistration
     );
+    assert.equal(
+      payload.rootListenerShellBinding.captureListenerSetKey,
+      execution.rootListenerCaptureSetKey
+    );
+    assert.equal(
+      payload.rootListenerShellBinding.bubbleListenerSetKey,
+      execution.rootListenerBubbleSetKey
+    );
+    assert.equal(payload.rootListenerShellBinding.shellPairCurrent, true);
     assert.equal(payload.dispatchRecord.domEventName, 'focusin');
     assert.equal(
       payload.dispatchRecord.extractionRecord.domEventName,
@@ -2072,6 +2423,18 @@ test('private focus/blur dispatch execution routes one accepted fake focus liste
       payload.dispatchListenerRecord
     );
     assert.equal(pluginPayload.listenerQueueEntryRecord, listenerRecord);
+    assert.equal(
+      payload.pluginExecutionRecord.sourceOwnedPluginDispatchMetadata,
+      true
+    );
+    assert.equal(
+      payload.pluginExecutionRecord.syntheticEventCompatibilityClaimed,
+      false
+    );
+    assert.equal(
+      payload.pluginExecutionRecord.packageCompatibilityClaimed,
+      false
+    );
 
     assert.deepEqual(calls.map(call => [
       call.type,
@@ -2092,6 +2455,103 @@ test('private focus/blur dispatch execution routes one accepted fake focus liste
     ]);
     assert.equal(Object.isFrozen(calls[0].event), true);
     assert.equal(Object.hasOwn(calls[0].event, 'nativeEvent'), false);
+    assert.equal(fixture.targetNode.__registrations.length, 0);
+    assert.equal(fixture.container.__registrations.length, 138);
+    assert.equal(fixture.document.__registrations.length, 1);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    componentTree.detachHostInstanceToken(fixture.token);
+  }
+});
+
+test('private focus/blur dispatch execution routes capture blur through current root shells', () => {
+  const fixture = createPrivateFocusBlurDelegationFixture(
+    'focus-blur-execution-capture-blur'
+  );
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'focusout',
+      true,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      },
+      {
+        listenerType:
+          'accepted-private-focus-blur-capture-execution-test'
+      }
+    );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+  const rootCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    rootRegistration,
+    'focus-blur-execution-capture-blur'
+  );
+
+  try {
+    const execution =
+      rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+        rootRegistration,
+        fixture.hostOutputPayload,
+        listenerRecord,
+        {
+          domEventName: 'focusout',
+          phase: 'capture',
+          rootListenerCurrentnessGateRecord: rootCurrentnessGate
+        }
+      );
+    const payload =
+      rootListeners.getPrivateRootFocusBlurEventDispatchExecutionPayload(
+        execution
+      );
+
+    assert.equal(execution.domEventName, 'focusout');
+    assert.equal(execution.phase, 'capture');
+    assert.equal(execution.inCapturePhase, true);
+    assert.equal(execution.reactName, 'onBlur');
+    assert.equal(execution.registrationName, 'onBlurCapture');
+    assert.equal(execution.syntheticEventType, 'blur');
+    assert.equal(execution.eventPriorityName, 'DiscreteEventPriority');
+    assert.equal(execution.listenerInvocationCount, 1);
+    assert.equal(execution.privateListenerInvoked, true);
+    assert.equal(execution.rootListenerShellPairCurrent, true);
+    assert.equal(
+      execution.rootListenerSetKey,
+      execution.rootListenerCaptureSetKey
+    );
+    assert.equal(execution.rootListenerCurrentnessSourceKind, 'createRoot');
+    assert.equal(execution.publicDispatchEnabled, false);
+    assert.equal(execution.publicEventCompatibilityClaimed, false);
+    assert.equal(execution.publicPackageCompatibilityClaimed, false);
+    assert.equal(execution.syntheticEventCompatibilityClaimed, false);
+    assert.equal(execution.willCreateSyntheticFocusEvent, false);
+    assert.equal(execution.willInvokePublicListeners, false);
+    assert.equal(payload.rootListenerRecord.isCapturePhaseListener, true);
+    assert.equal(payload.rootListenerShellBinding.shellPairCurrent, true);
+    assert.equal(payload.dispatchRecord.domEventName, 'focusout');
+    assert.equal(payload.dispatchListenerRecord.phase, 'capture');
+    assert.equal(
+      payload.pluginExecutionRecord.sourceOwnedPluginDispatchMetadata,
+      true
+    );
+
+    assert.deepEqual(calls, [
+      {
+        currentTarget: fixture.targetNode,
+        registrationName: 'onBlurCapture',
+        target: fixture.targetNode,
+        targetInst: fixture.token,
+        type: 'focusout'
+      }
+    ]);
     assert.equal(fixture.targetNode.__registrations.length, 0);
     assert.equal(fixture.container.__registrations.length, 138);
     assert.equal(fixture.document.__registrations.length, 1);

@@ -607,6 +607,12 @@ function invokePrivateRootFocusBlurEventDispatchExecution(
     throwRootFocusBlurEventDispatchExecutionError,
     'Private root focus/blur event dispatch execution requires capture and bubble root listener shells.'
   );
+  const rootListenerShellBinding =
+    assertPrivateRootFocusBlurRootListenerShellBinding(
+      rootListenerCurrentness.currentState,
+      focusBlurListeners,
+      diagnosticOptions.domEventName
+    );
   const rootListenerRecord =
     diagnosticOptions.phase === 'capture'
       ? focusBlurListeners.capture
@@ -660,6 +666,11 @@ function invokePrivateRootFocusBlurEventDispatchExecution(
     eventSystemFlags: dispatchRecord.eventSystemFlags,
     fakeDomEventDispatchExecution: true,
     focusBlurEventDispatchExecution: true,
+    hydrationReplayBlockedReason:
+      dispatchRecord.hydrationReplay.blockedReason,
+    hydrationReplayCompatibilityClaimed: false,
+    hydrationReplayQueued: dispatchRecord.hydrationReplay.queued,
+    hydrationReplayStatus: dispatchRecord.hydrationReplay.status,
     inCapturePhase: dispatchRecord.inCapturePhase,
     invocationRecordKind:
       invocationRecord === null ? null : invocationRecord.kind,
@@ -681,13 +692,29 @@ function invokePrivateRootFocusBlurEventDispatchExecution(
     pluginExecutionStatus: pluginExecutionRecord.status,
     portalOwnerRootAvailable:
       pluginExecutionRecord.portalOwnerRootAvailable,
+    packageCompatibilityClaimed: false,
+    pluginDispatchMetadataSourceOwned: pluginExecutionPayload !== null,
     privateListenerInvoked: pluginExecutionRecord.privateListenerInvoked,
     privateListenerQueue: true,
     publicDispatchBlocked: true,
     publicDispatchEnabled: false,
+    publicEventCompatibilityClaimed: false,
+    publicHydrationReplayCompatibilityClaimed: false,
+    publicPackageCompatibilityClaimed: false,
     publicRootBehaviorChanged: false,
+    publicSyntheticEventCompatibilityClaimed: false,
     reactName: pluginExecutionRecord.reactName,
     registrationName: pluginExecutionRecord.registrationName,
+    rootListenerBubbleSetKey: focusBlurListeners.bubble.listenerSetKey,
+    rootListenerBubbleShellCurrent:
+      rootListenerShellBinding.bubbleCurrent,
+    rootListenerBubbleShellOwned:
+      rootListenerShellBinding.bubbleShellOwned,
+    rootListenerCaptureSetKey: focusBlurListeners.capture.listenerSetKey,
+    rootListenerCaptureShellCurrent:
+      rootListenerShellBinding.captureCurrent,
+    rootListenerCaptureShellOwned:
+      rootListenerShellBinding.captureShellOwned,
     rootListenerCurrentnessGateKind:
       rootListenerCurrentness.gateRecord.kind,
     rootListenerCurrentnessGateStatus:
@@ -697,9 +724,13 @@ function invokePrivateRootFocusBlurEventDispatchExecution(
     rootListenerCurrentnessSourceOwned: true,
     rootListenerDispatchOrder: freezeArray([diagnosticOptions.phase]),
     rootListenerSetKey: rootListenerRecord.listenerSetKey,
+    rootListenerShellPairCurrent:
+      rootListenerShellBinding.shellPairCurrent,
+    sourceOwnedPluginDispatchMetadata: pluginExecutionPayload !== null,
     selectedFromProcessingOrder:
       pluginExecutionRecord.selectedFromProcessingOrder,
     status: PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_STATUS,
+    syntheticEventCompatibilityClaimed: false,
     syntheticEventCount: 0,
     syntheticEventStatus: 'blocked-not-created',
     syntheticEventType: pluginExecutionRecord.syntheticEventType,
@@ -730,6 +761,7 @@ function invokePrivateRootFocusBlurEventDispatchExecution(
       rootListenerCurrentnessState:
         rootListenerCurrentness.currentState,
       rootListenerRecord,
+      rootListenerShellBinding,
       targetPayload,
       targetRecord
     })
@@ -2178,13 +2210,21 @@ function normalizePrivateRootListenerCurrentnessSourceKind(sourceKind) {
 function assertNoPrivateRootListenerCurrentnessPublicBehaviorClaims(options) {
   const blockedClaimFields = [
     'browserDomEventCompatibilityClaimed',
+    'browserSyntheticEventCompatibilityClaimed',
     'compatibilityClaimed',
     'eventDispatch',
+    'hydrationReplayCompatibilityClaimed',
     'listenerInstallation',
+    'packageCompatibilityClaimed',
+    'publicEventCompatibilityClaimed',
     'publicDispatchEnabled',
+    'publicHydrationReplayCompatibilityClaimed',
     'publicListenerInstallation',
+    'publicPackageCompatibilityClaimed',
     'publicRootBehaviorChanged',
+    'publicSyntheticEventCompatibilityClaimed',
     'rootListenerInstallation',
+    'syntheticEventCompatibilityClaimed',
     'syntheticEventDispatch',
     'willDispatchPublicEvent'
   ];
@@ -2206,15 +2246,23 @@ function assertNoPrivateRootDispatchGatePublicBehaviorClaims(
   const blockedClaimFields = [
     'browserDomEventCompatibilityClaimed',
     'browserListenerInstallation',
+    'browserSyntheticEventCompatibilityClaimed',
     'compatibilityClaimed',
     'eventDispatch',
     'gateInstalledBrowserListener',
+    'hydrationReplayCompatibilityClaimed',
     'listenerInstallation',
+    'packageCompatibilityClaimed',
+    'publicEventCompatibilityClaimed',
     'publicDispatchEnabled',
+    'publicHydrationReplayCompatibilityClaimed',
     'publicListenerInstallation',
+    'publicPackageCompatibilityClaimed',
     'publicPortalBubblingEnabled',
     'publicRootBehaviorChanged',
+    'publicSyntheticEventCompatibilityClaimed',
     'rootListenerInstallation',
+    'syntheticEventCompatibilityClaimed',
     'syntheticEventDispatch',
     'syntheticFocusEventCreation',
     'willCreateSyntheticFocusEvent',
@@ -2253,6 +2301,23 @@ function assertPrivateRootListenerCurrentnessSourceRecord(
   const requestType = getMaybeStringProperty(sourceRecord, 'requestType');
   const facadeCall = getMaybeStringProperty(sourceRecord, 'facadeCall');
   const operation = getMaybeStringProperty(sourceRecord, 'operation');
+  const source = getMaybeStringProperty(sourceRecord, 'source');
+  const kind = getMaybeStringProperty(sourceRecord, 'kind');
+  const status = getMaybeStringProperty(sourceRecord, 'status');
+
+  if (
+    isHydrationReplaySourceAlias(requestType) ||
+    isHydrationReplaySourceAlias(facadeCall) ||
+    isHydrationReplaySourceAlias(operation) ||
+    isHydrationReplaySourceAlias(source) ||
+    isHydrationReplaySourceAlias(kind) ||
+    isHydrationReplaySourceAlias(status)
+  ) {
+    throwRootListenerCurrentnessGateError(
+      'Private root listener currentness diagnostics cannot consume hydration replay evidence as root listener source evidence.',
+      'hydration-replay-source-alias'
+    );
+  }
 
   if (
     sourceKind === 'createRoot' &&
@@ -2279,6 +2344,22 @@ function assertPrivateRootListenerCurrentnessSourceRecord(
       'source-kind-alias-mismatch'
     );
   }
+}
+
+function isHydrationReplaySourceAlias(value) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes('hydrationreplay') ||
+    normalized.includes('hydration-replay') ||
+    normalized.includes('eventreplay') ||
+    normalized.includes('event-replay') ||
+    normalized.includes('replayqueue') ||
+    normalized.includes('replay-queue')
+  );
 }
 
 function assertPrivateRootDispatchListenerCurrentnessGate(
@@ -2521,6 +2602,75 @@ function assertAcceptedPrivateFocusBlurListenerQueueEntry(
   }
 
   return payload;
+}
+
+function assertPrivateRootFocusBlurRootListenerShellBinding(
+  currentnessState,
+  focusBlurListeners,
+  domEventName
+) {
+  const captureRow = findCurrentRootListenerShellRow(
+    currentnessState,
+    focusBlurListeners.capture,
+    domEventName,
+    'capture'
+  );
+  const bubbleRow = findCurrentRootListenerShellRow(
+    currentnessState,
+    focusBlurListeners.bubble,
+    domEventName,
+    'bubble'
+  );
+
+  if (captureRow === null || bubbleRow === null) {
+    throwRootFocusBlurEventDispatchExecutionError(
+      'Private root focus/blur event dispatch execution requires current capture and bubble root listener shell evidence.',
+      'missing-root-listener-shell'
+    );
+  }
+
+  return freezeRecord({
+    bubbleCurrent: bubbleRow.current,
+    bubbleListenerSetKey: bubbleRow.listenerSetKey,
+    bubbleShellOwned: bubbleRow.listenerShellOwned,
+    captureCurrent: captureRow.current,
+    captureListenerSetKey: captureRow.listenerSetKey,
+    captureShellOwned: captureRow.listenerShellOwned,
+    domEventName,
+    shellPairCurrent:
+      captureRow.current === true &&
+      bubbleRow.current === true &&
+      captureRow.listenerShellOwned === true &&
+      bubbleRow.listenerShellOwned === true
+  });
+}
+
+function findCurrentRootListenerShellRow(
+  currentnessState,
+  listenerRecord,
+  domEventName,
+  phase
+) {
+  if (
+    currentnessState === null ||
+    typeof currentnessState !== 'object' ||
+    !Array.isArray(currentnessState.listenerRows)
+  ) {
+    return null;
+  }
+
+  const row = currentnessState.listenerRows.find(
+    (candidateRow) =>
+      candidateRow.targetRole === 'root-container' &&
+      candidateRow.domEventName === domEventName &&
+      candidateRow.phase === phase &&
+      candidateRow.listenerSetKey === listenerRecord.listenerSetKey &&
+      candidateRow.eventSystemFlags === listenerRecord.eventSystemFlags &&
+      candidateRow.current === true &&
+      candidateRow.listenerShellOwned === true
+  );
+
+  return row === undefined ? null : row;
 }
 
 function getInstalledRootListenerPair(

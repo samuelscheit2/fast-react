@@ -122,6 +122,22 @@ test("private event listener wrappers select priority entry points but stay iner
       expectedWrapperKind: eventListener.DISCRETE_EVENT_WRAPPER
     },
     {
+      domEventName: "focusin",
+      eventSystemFlags: 0,
+      expectedDispatcherName: "dispatchDiscreteEvent",
+      expectedPriorityLabel: "discrete",
+      expectedPriorityName: "DiscreteEventPriority",
+      expectedWrapperKind: eventListener.DISCRETE_EVENT_WRAPPER
+    },
+    {
+      domEventName: "focusout",
+      eventSystemFlags: rootListeners.IS_CAPTURE_PHASE,
+      expectedDispatcherName: "dispatchDiscreteEvent",
+      expectedPriorityLabel: "discrete",
+      expectedPriorityName: "DiscreteEventPriority",
+      expectedWrapperKind: eventListener.DISCRETE_EVENT_WRAPPER
+    },
+    {
       domEventName: "wheel",
       eventSystemFlags: 0,
       expectedDispatcherName: "dispatchContinuousEvent",
@@ -248,6 +264,8 @@ test("private event listener wrapper records cover supported DOM event names", (
 test("root listener shells carry private priority metadata without dispatching", () => {
   const target = createEventTarget("root-listener-target");
   const listener = rootListeners.listenToNativeEvent("click", false, target);
+  const focusOutCaptureListener =
+    rootListeners.listenToNativeEvent("focusout", true, target);
 
   assert.equal(listener.__FAST_REACT_DOM_EVENT_SHELL__, true);
   assert.equal(listener.__FAST_REACT_DOM_EVENT_WRAPPER__, true);
@@ -264,7 +282,28 @@ test("root listener shells carry private priority metadata without dispatching",
     eventListener.DISCRETE_EVENT_WRAPPER
   );
   assert.equal(listener(createNativeEvent("click")), undefined);
-  assert.equal(target.__registrations.length, 1);
+  assert.equal(focusOutCaptureListener.__FAST_REACT_DOM_EVENT_SHELL__, true);
+  assert.equal(
+    focusOutCaptureListener.__FAST_REACT_DOM_EVENT_NAME__,
+    "focusout"
+  );
+  assert.equal(
+    focusOutCaptureListener.__FAST_REACT_DOM_EVENT_FLAGS__,
+    rootListeners.IS_CAPTURE_PHASE
+  );
+  assert.equal(
+    focusOutCaptureListener.__FAST_REACT_DOM_EVENT_PRIORITY_NAME__,
+    "DiscreteEventPriority"
+  );
+  assert.equal(
+    focusOutCaptureListener.__FAST_REACT_DOM_EVENT_WRAPPER_KIND__,
+    eventListener.DISCRETE_EVENT_WRAPPER
+  );
+  assert.equal(
+    focusOutCaptureListener(createNativeEvent("focusout")),
+    undefined
+  );
+  assert.equal(target.__registrations.length, 2);
 });
 
 test("root listener installation wires every shell to a priority wrapper record", () => {

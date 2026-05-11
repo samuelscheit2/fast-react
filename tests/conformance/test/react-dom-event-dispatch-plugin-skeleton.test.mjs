@@ -3401,6 +3401,24 @@ test("plugin extraction records remain deterministic and fail closed for flag va
     "onFocus"
   );
   assert.equal(
+    pluginEventSystem.getSimpleEventRegistrationName(
+      "focusin",
+      eventSystemFlags.IS_CAPTURE_PHASE
+    ),
+    "onFocusCapture"
+  );
+  assert.equal(
+    pluginEventSystem.getSimpleEventRegistrationName("focusout", 0),
+    "onBlur"
+  );
+  assert.equal(
+    pluginEventSystem.getSimpleEventRegistrationName(
+      "focusout",
+      eventSystemFlags.IS_CAPTURE_PHASE
+    ),
+    "onBlurCapture"
+  );
+  assert.equal(
     pluginEventSystem.getSimpleEventRegistrationName("change", 0),
     null
   );
@@ -3745,6 +3763,20 @@ test("private dispatch skeleton does not change public React DOM exports", () =>
     false
   );
   assert.equal(
+    Object.hasOwn(
+      reactDomClient,
+      "invokePrivateRootFocusBlurEventDispatchExecution"
+    ),
+    false
+  );
+  assert.equal(
+    Object.hasOwn(
+      reactDom,
+      "invokePrivateRootFocusBlurEventDispatchExecution"
+    ),
+    false
+  );
+  assert.equal(
     Object.hasOwn(reactDomClient, "registerPrivateEventListenerQueueEntry"),
     false
   );
@@ -3755,7 +3787,8 @@ test("private dispatch skeleton does not change public React DOM exports", () =>
     "./src/events/event-system-flags",
     "./src/events/get-event-target",
     "./src/events/listener-registry",
-    "./src/events/plugin-event-system"
+    "./src/events/plugin-event-system",
+    "./src/events/root-listeners"
   ]) {
     assert.equal(exportedSubpaths.includes(subpath), false, subpath);
     assert.equal(exportedSubpaths.includes(`${subpath}.js`), false, subpath);
