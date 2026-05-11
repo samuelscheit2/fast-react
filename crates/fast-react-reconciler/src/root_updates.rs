@@ -23,6 +23,8 @@ use crate::{
     UpdateId, UpdatePriorityState, UpdateQueueError, enqueue_concurrent_host_root_update,
     finish_queueing_concurrent_updates, request_update_lane,
 };
+#[cfg(test)]
+use crate::{HostRootRenderPhaseRecord, RootRenderExitStatus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RootUpdateLaneSourcePriority {
@@ -1224,6 +1226,908 @@ fn validate_host_root_accepted_callback_order_matches_commit_for_canary(
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+    sequence: usize,
+    update: UpdateId,
+    lane: Lane,
+    source_lanes: Lanes,
+    pending_lanes_after_enqueue: Lanes,
+    selected_next_lanes_after_enqueue: Lanes,
+}
+
+#[cfg(test)]
+impl HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+    #[must_use]
+    const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    const fn update(self) -> UpdateId {
+        self.update
+    }
+
+    #[must_use]
+    const fn lane(self) -> Lane {
+        self.lane
+    }
+
+    #[must_use]
+    const fn source_lanes(self) -> Lanes {
+        self.source_lanes
+    }
+
+    #[must_use]
+    const fn pending_lanes_after_enqueue(self) -> Lanes {
+        self.pending_lanes_after_enqueue
+    }
+
+    #[must_use]
+    const fn selected_next_lanes_after_enqueue(self) -> Lanes {
+        self.selected_next_lanes_after_enqueue
+    }
+
+    #[must_use]
+    const fn committed_by_finished_lanes(self, finished_lanes: Lanes) -> bool {
+        self.source_lanes.is_subset_of(finished_lanes)
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootUpdateQueueLaneHandoffRecordForCanary {
+    root: FiberRootId,
+    current: FiberId,
+    finished_work: FiberId,
+    current_update_queue: UpdateQueueHandle,
+    work_in_progress_update_queue: UpdateQueueHandle,
+    pending_lanes_before_render: Lanes,
+    selected_next_lanes_before_render: Lanes,
+    finished_lanes: Lanes,
+    remaining_lanes: Lanes,
+    pending_lanes_after_render: Lanes,
+    update_records: Vec<HostRootUpdateQueueLaneHandoffUpdateRecordForCanary>,
+    current_queue_base_updates: Vec<UpdateId>,
+    applied_update_count: usize,
+    skipped_update_count: usize,
+    resulting_element: RootElementHandle,
+}
+
+#[cfg(test)]
+impl HostRootUpdateQueueLaneHandoffRecordForCanary {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn current(&self) -> FiberId {
+        self.current
+    }
+
+    #[must_use]
+    const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    const fn current_update_queue(&self) -> UpdateQueueHandle {
+        self.current_update_queue
+    }
+
+    #[must_use]
+    const fn work_in_progress_update_queue(&self) -> UpdateQueueHandle {
+        self.work_in_progress_update_queue
+    }
+
+    #[must_use]
+    const fn pending_lanes_before_render(&self) -> Lanes {
+        self.pending_lanes_before_render
+    }
+
+    #[must_use]
+    const fn selected_next_lanes_before_render(&self) -> Lanes {
+        self.selected_next_lanes_before_render
+    }
+
+    #[must_use]
+    const fn finished_lanes(&self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    const fn remaining_lanes(&self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    const fn pending_lanes_after_render(&self) -> Lanes {
+        self.pending_lanes_after_render
+    }
+
+    #[must_use]
+    fn update_records(&self) -> &[HostRootUpdateQueueLaneHandoffUpdateRecordForCanary] {
+        &self.update_records
+    }
+
+    #[must_use]
+    fn current_queue_base_updates(&self) -> &[UpdateId] {
+        &self.current_queue_base_updates
+    }
+
+    #[must_use]
+    const fn applied_update_count(&self) -> usize {
+        self.applied_update_count
+    }
+
+    #[must_use]
+    const fn skipped_update_count(&self) -> usize {
+        self.skipped_update_count
+    }
+
+    #[must_use]
+    const fn resulting_element(&self) -> RootElementHandle {
+        self.resulting_element
+    }
+
+    #[must_use]
+    fn update_sequence_ids(&self) -> Vec<UpdateId> {
+        self.update_records
+            .iter()
+            .map(|record| record.update())
+            .collect()
+    }
+
+    #[must_use]
+    fn records_in_update_sequence_order(&self) -> bool {
+        self.update_records
+            .iter()
+            .enumerate()
+            .all(|(sequence, record)| record.sequence() == sequence)
+    }
+
+    #[must_use]
+    fn records_have_distinct_compatible_lanes(&self) -> bool {
+        self.update_records
+            .iter()
+            .enumerate()
+            .all(|(index, record)| {
+                record.committed_by_finished_lanes(self.finished_lanes)
+                    && self
+                        .update_records
+                        .iter()
+                        .skip(index + 1)
+                        .all(|next| record.lane() != next.lane())
+            })
+    }
+
+    #[must_use]
+    fn root_current_not_switched_by_handoff(&self) -> bool {
+        self.current != self.finished_work
+    }
+
+    #[must_use]
+    const fn work_loop_or_commit_consumer_required(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    const fn public_root_rendering_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    fn proves_source_owned_lane_handoff(&self) -> bool {
+        !self.update_records.is_empty()
+            && self.records_in_update_sequence_order()
+            && self.records_have_distinct_compatible_lanes()
+            && self.update_sequence_ids() == self.current_queue_base_updates
+            && self.pending_lanes_before_render == self.finished_lanes.merge(self.remaining_lanes)
+            && self.pending_lanes_after_render == self.pending_lanes_before_render
+            && self.selected_next_lanes_before_render == self.finished_lanes
+            && self.remaining_lanes.is_empty()
+            && self.applied_update_count == self.update_records.len()
+            && self.skipped_update_count == 0
+            && self.root_current_not_switched_by_handoff()
+            && self.work_loop_or_commit_consumer_required()
+            && self.public_root_rendering_blocked()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootUpdateQueueLaneHandoffErrorForCanary {
+    FiberRootStore(FiberRootStoreError),
+    FiberTopology(FiberTopologyError),
+    UpdateQueue(UpdateQueueError),
+    EmptyAcceptedUpdates {
+        root: FiberRootId,
+    },
+    RenderRootMismatch {
+        expected: FiberRootId,
+        actual: FiberRootId,
+    },
+    ReplayedHandoffRecord {
+        root: FiberRootId,
+        expected_current: FiberId,
+        actual_current: FiberId,
+    },
+    RenderPhaseWorkMismatch {
+        root: FiberRootId,
+        expected: Option<FiberId>,
+        actual: FiberId,
+    },
+    RenderPhaseLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    RenderPhaseNotCompleted {
+        root: FiberRootId,
+        status: RootRenderExitStatus,
+    },
+    SourceQueueMismatch {
+        root: FiberRootId,
+        expected: UpdateQueueHandle,
+        actual: UpdateQueueHandle,
+    },
+    WorkInProgressQueueMismatch {
+        root: FiberRootId,
+        expected: UpdateQueueHandle,
+        actual: UpdateQueueHandle,
+    },
+    CrossRootQueueRecord {
+        expected: FiberRootId,
+        actual: FiberRootId,
+        update: UpdateId,
+    },
+    ScheduleFiberMismatch {
+        root: FiberRootId,
+        update: UpdateId,
+        expected: FiberId,
+        actual: FiberId,
+    },
+    QueueOrderMismatch {
+        root: FiberRootId,
+        queue: UpdateQueueHandle,
+        expected_updates: Vec<UpdateId>,
+        actual_updates: Vec<UpdateId>,
+    },
+    StalePendingLanes {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    WrongLaneMetadata {
+        root: FiberRootId,
+        queue: UpdateQueueHandle,
+        update: UpdateId,
+        expected_lane: Lane,
+        actual_lanes: Lanes,
+    },
+    SkippedLaneCommitted {
+        root: FiberRootId,
+        update: UpdateId,
+        skipped_lanes: Lanes,
+        finished_lanes: Lanes,
+        remaining_lanes: Lanes,
+    },
+    RenderLanesDoNotMatchSelectedPriority {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    AppliedUpdateCountMismatch {
+        root: FiberRootId,
+        expected: usize,
+        actual: usize,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootUpdateQueueLaneHandoffErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::UpdateQueue(error) => Display::fmt(error, formatter),
+            Self::EmptyAcceptedUpdates { root } => write!(
+                formatter,
+                "root {} has no accepted HostRoot updates for queue/lane handoff",
+                root.raw()
+            ),
+            Self::RenderRootMismatch { expected, actual } => write!(
+                formatter,
+                "HostRoot queue/lane handoff expected root {}, got render root {}",
+                expected.raw(),
+                actual.raw()
+            ),
+            Self::ReplayedHandoffRecord {
+                root,
+                expected_current,
+                actual_current,
+            } => write!(
+                formatter,
+                "root {} HostRoot queue/lane handoff was replayed after current moved from fiber {} to {}",
+                root.raw(),
+                expected_current.slot().get(),
+                actual_current.slot().get()
+            ),
+            Self::RenderPhaseWorkMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} render phase work {:?} does not match HostRoot queue/lane handoff fiber {}",
+                root.raw(),
+                expected.map(|fiber| fiber.slot().get()),
+                actual.slot().get()
+            ),
+            Self::RenderPhaseLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} render phase lanes {:?} do not match HostRoot queue/lane handoff lanes {:?}",
+                root.raw(),
+                expected,
+                actual
+            ),
+            Self::RenderPhaseNotCompleted { root, status } => write!(
+                formatter,
+                "root {} render phase must be completed before HostRoot queue/lane handoff, found {:?}",
+                root.raw(),
+                status
+            ),
+            Self::SourceQueueMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} HostRoot queue/lane handoff expected source queue {}, got {}",
+                root.raw(),
+                expected.raw(),
+                actual.raw()
+            ),
+            Self::WorkInProgressQueueMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} HostRoot queue/lane handoff expected work-in-progress queue {}, got {}",
+                root.raw(),
+                expected.raw(),
+                actual.raw()
+            ),
+            Self::CrossRootQueueRecord {
+                expected,
+                actual,
+                update,
+            } => write!(
+                formatter,
+                "HostRoot update {} belongs to root {}, expected root {}",
+                update.raw(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::ScheduleFiberMismatch {
+                root,
+                update,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} HostRoot update {} scheduled fiber {}, expected current fiber {}",
+                root.raw(),
+                update.raw(),
+                actual.slot().get(),
+                expected.slot().get()
+            ),
+            Self::QueueOrderMismatch {
+                root,
+                queue,
+                expected_updates,
+                actual_updates,
+            } => write!(
+                formatter,
+                "root {} queue {} update order mismatch; expected {:?}, actual {:?}",
+                root.raw(),
+                queue.raw(),
+                expected_updates,
+                actual_updates
+            ),
+            Self::StalePendingLanes {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} stale pending lanes for HostRoot queue/lane handoff; expected {:?}, actual {:?}",
+                root.raw(),
+                expected,
+                actual
+            ),
+            Self::WrongLaneMetadata {
+                root,
+                queue,
+                update,
+                expected_lane,
+                actual_lanes,
+            } => write!(
+                formatter,
+                "root {} queue {} update {} claimed lane {:?}, actual lanes {:?}",
+                root.raw(),
+                queue.raw(),
+                update.raw(),
+                expected_lane,
+                actual_lanes
+            ),
+            Self::SkippedLaneCommitted {
+                root,
+                update,
+                skipped_lanes,
+                finished_lanes,
+                remaining_lanes,
+            } => write!(
+                formatter,
+                "root {} update {} with lanes {:?} was treated as committed by finished lanes {:?}; remaining lanes {:?}",
+                root.raw(),
+                update.raw(),
+                skipped_lanes,
+                finished_lanes,
+                remaining_lanes
+            ),
+            Self::RenderLanesDoNotMatchSelectedPriority {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} selected priority lanes {:?} do not match rendered finished lanes {:?}",
+                root.raw(),
+                expected,
+                actual
+            ),
+            Self::AppliedUpdateCountMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} applied {} HostRoot updates, expected {}",
+                root.raw(),
+                actual,
+                expected
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootUpdateQueueLaneHandoffErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberRootStore(error) => Some(error),
+            Self::FiberTopology(error) => Some(error),
+            Self::UpdateQueue(error) => Some(error),
+            Self::EmptyAcceptedUpdates { .. }
+            | Self::RenderRootMismatch { .. }
+            | Self::ReplayedHandoffRecord { .. }
+            | Self::RenderPhaseWorkMismatch { .. }
+            | Self::RenderPhaseLanesMismatch { .. }
+            | Self::RenderPhaseNotCompleted { .. }
+            | Self::SourceQueueMismatch { .. }
+            | Self::WorkInProgressQueueMismatch { .. }
+            | Self::CrossRootQueueRecord { .. }
+            | Self::ScheduleFiberMismatch { .. }
+            | Self::QueueOrderMismatch { .. }
+            | Self::StalePendingLanes { .. }
+            | Self::WrongLaneMetadata { .. }
+            | Self::SkippedLaneCommitted { .. }
+            | Self::RenderLanesDoNotMatchSelectedPriority { .. }
+            | Self::AppliedUpdateCountMismatch { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<FiberRootStoreError> for HostRootUpdateQueueLaneHandoffErrorForCanary {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::FiberRootStore(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FiberTopologyError> for HostRootUpdateQueueLaneHandoffErrorForCanary {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+#[cfg(test)]
+impl From<UpdateQueueError> for HostRootUpdateQueueLaneHandoffErrorForCanary {
+    fn from(error: UpdateQueueError) -> Self {
+        Self::UpdateQueue(error)
+    }
+}
+
+#[cfg(test)]
+fn host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    accepted_updates: &[UpdateContainerResult],
+    render: HostRootRenderPhaseRecord,
+) -> Result<
+    HostRootUpdateQueueLaneHandoffRecordForCanary,
+    HostRootUpdateQueueLaneHandoffErrorForCanary,
+> {
+    if accepted_updates.is_empty() {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::EmptyAcceptedUpdates { root: root_id },
+        );
+    }
+
+    if render.root() != root_id {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::RenderRootMismatch {
+                expected: root_id,
+                actual: render.root(),
+            },
+        );
+    }
+
+    validate_completed_render_shape_for_update_queue_lane_handoff(store, root_id, render)?;
+
+    let root = store.root(root_id)?;
+    let current = root.current();
+    let current_update_queue = render.current_update_queue();
+    let work_in_progress_update_queue = render.work_in_progress_update_queue();
+    let actual_current_queue = store.fiber_arena().get(render.current())?.update_queue();
+    if actual_current_queue != current_update_queue {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::SourceQueueMismatch {
+                root: root_id,
+                expected: current_update_queue,
+                actual: actual_current_queue,
+            },
+        );
+    }
+
+    let actual_work_in_progress_queue = store
+        .fiber_arena()
+        .get(render.work_in_progress())?
+        .update_queue();
+    if actual_work_in_progress_queue != work_in_progress_update_queue {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::WorkInProgressQueueMismatch {
+                root: root_id,
+                expected: work_in_progress_update_queue,
+                actual: actual_work_in_progress_queue,
+            },
+        );
+    }
+
+    let expected_updates = accepted_updates
+        .iter()
+        .map(UpdateContainerResult::update)
+        .collect::<Vec<_>>();
+    for result in accepted_updates {
+        validate_accepted_update_matches_render_source_for_handoff(
+            store,
+            root_id,
+            current,
+            current_update_queue,
+            render,
+            result,
+        )?;
+    }
+
+    let current_queue_base_updates = store.update_queues().base_updates(current_update_queue)?;
+    if current_queue_base_updates != expected_updates {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::QueueOrderMismatch {
+                root: root_id,
+                queue: current_update_queue,
+                expected_updates,
+                actual_updates: current_queue_base_updates,
+            },
+        );
+    }
+
+    let pending_lanes_before_render = accepted_updates
+        .last()
+        .expect("accepted updates is not empty")
+        .pending_lanes_after_enqueue();
+    let selected_next_lanes_before_render = accepted_updates
+        .last()
+        .expect("accepted updates is not empty")
+        .selected_next_lanes();
+    let pending_lanes_after_render = root.lanes().pending_lanes();
+    if pending_lanes_after_render != pending_lanes_before_render {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::StalePendingLanes {
+                root: root_id,
+                expected: pending_lanes_before_render,
+                actual: pending_lanes_after_render,
+            },
+        );
+    }
+
+    if pending_lanes_before_render != render.render_lanes().merge(render.remaining_lanes()) {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::StalePendingLanes {
+                root: root_id,
+                expected: render.render_lanes().merge(render.remaining_lanes()),
+                actual: pending_lanes_before_render,
+            },
+        );
+    }
+
+    let mut update_records = Vec::with_capacity(accepted_updates.len());
+    for (sequence, result) in accepted_updates.iter().enumerate() {
+        let source_lanes = store
+            .update_queues()
+            .update(result.update())?
+            .lane()
+            .remove_lane(Lane::OFFSCREEN);
+
+        if !source_lanes.is_subset_of(render.render_lanes())
+            || render.remaining_lanes().contains_any(source_lanes)
+        {
+            return Err(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::SkippedLaneCommitted {
+                    root: root_id,
+                    update: result.update(),
+                    skipped_lanes: source_lanes,
+                    finished_lanes: render.render_lanes(),
+                    remaining_lanes: render.remaining_lanes(),
+                },
+            );
+        }
+
+        update_records.push(HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+            sequence,
+            update: result.update(),
+            lane: result.lane(),
+            source_lanes,
+            pending_lanes_after_enqueue: result.pending_lanes_after_enqueue(),
+            selected_next_lanes_after_enqueue: result.selected_next_lanes(),
+        });
+    }
+
+    if selected_next_lanes_before_render != render.render_lanes() {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::RenderLanesDoNotMatchSelectedPriority {
+                root: root_id,
+                expected: selected_next_lanes_before_render,
+                actual: render.render_lanes(),
+            },
+        );
+    }
+
+    if render.applied_update_count() != accepted_updates.len() {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::AppliedUpdateCountMismatch {
+                root: root_id,
+                expected: accepted_updates.len(),
+                actual: render.applied_update_count(),
+            },
+        );
+    }
+
+    Ok(HostRootUpdateQueueLaneHandoffRecordForCanary {
+        root: root_id,
+        current,
+        finished_work: render.finished_work(),
+        current_update_queue,
+        work_in_progress_update_queue,
+        pending_lanes_before_render,
+        selected_next_lanes_before_render,
+        finished_lanes: render.render_lanes(),
+        remaining_lanes: render.remaining_lanes(),
+        pending_lanes_after_render,
+        update_records,
+        current_queue_base_updates,
+        applied_update_count: render.applied_update_count(),
+        skipped_update_count: render.skipped_update_count(),
+        resulting_element: render.resulting_element(),
+    })
+}
+
+#[cfg(test)]
+fn validate_host_root_update_queue_lane_handoff_record_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
+) -> Result<(), HostRootUpdateQueueLaneHandoffErrorForCanary> {
+    let root = store.root(handoff.root)?;
+    if root.current() != handoff.current {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::ReplayedHandoffRecord {
+                root: handoff.root,
+                expected_current: handoff.current,
+                actual_current: root.current(),
+            },
+        );
+    }
+
+    let scheduling = root.scheduling();
+    if scheduling.work_in_progress() != Some(handoff.finished_work) {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::RenderPhaseWorkMismatch {
+                root: handoff.root,
+                expected: scheduling.work_in_progress(),
+                actual: handoff.finished_work,
+            },
+        );
+    }
+
+    if scheduling.work_in_progress_root_render_lanes() != handoff.finished_lanes {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::RenderPhaseLanesMismatch {
+                root: handoff.root,
+                expected: scheduling.work_in_progress_root_render_lanes(),
+                actual: handoff.finished_lanes,
+            },
+        );
+    }
+
+    if root.lanes().pending_lanes() != handoff.pending_lanes_after_render {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::StalePendingLanes {
+                root: handoff.root,
+                expected: handoff.pending_lanes_after_render,
+                actual: root.lanes().pending_lanes(),
+            },
+        );
+    }
+
+    let current_queue_base_updates = store
+        .update_queues()
+        .base_updates(handoff.current_update_queue)?;
+    if current_queue_base_updates != handoff.current_queue_base_updates {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::QueueOrderMismatch {
+                root: handoff.root,
+                queue: handoff.current_update_queue,
+                expected_updates: handoff.current_queue_base_updates.clone(),
+                actual_updates: current_queue_base_updates,
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn validate_completed_render_shape_for_update_queue_lane_handoff<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    render: HostRootRenderPhaseRecord,
+) -> Result<(), HostRootUpdateQueueLaneHandoffErrorForCanary> {
+    let root = store.root(root_id)?;
+    let current = root.current();
+    if current != render.current() {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::ReplayedHandoffRecord {
+                root: root_id,
+                expected_current: render.current(),
+                actual_current: current,
+            },
+        );
+    }
+
+    let scheduling = root.scheduling();
+    if scheduling.work_in_progress() != Some(render.work_in_progress()) {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::RenderPhaseWorkMismatch {
+                root: root_id,
+                expected: scheduling.work_in_progress(),
+                actual: render.work_in_progress(),
+            },
+        );
+    }
+
+    if scheduling.work_in_progress_root_render_lanes() != render.render_lanes() {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::RenderPhaseLanesMismatch {
+                root: root_id,
+                expected: scheduling.work_in_progress_root_render_lanes(),
+                actual: render.render_lanes(),
+            },
+        );
+    }
+
+    if scheduling.render_exit_status() != RootRenderExitStatus::Completed {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::RenderPhaseNotCompleted {
+                root: root_id,
+                status: scheduling.render_exit_status(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn validate_accepted_update_matches_render_source_for_handoff<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    current: FiberId,
+    current_update_queue: UpdateQueueHandle,
+    render: HostRootRenderPhaseRecord,
+    result: &UpdateContainerResult,
+) -> Result<(), HostRootUpdateQueueLaneHandoffErrorForCanary> {
+    if result.schedule().root() != root_id {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::CrossRootQueueRecord {
+                expected: root_id,
+                actual: result.schedule().root(),
+                update: result.update(),
+            },
+        );
+    }
+
+    if result.queue() != current_update_queue {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::SourceQueueMismatch {
+                root: root_id,
+                expected: current_update_queue,
+                actual: result.queue(),
+            },
+        );
+    }
+
+    if result.queue() == render.work_in_progress_update_queue() {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::SourceQueueMismatch {
+                root: root_id,
+                expected: current_update_queue,
+                actual: result.queue(),
+            },
+        );
+    }
+
+    if result.schedule().fiber() != current {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::ScheduleFiberMismatch {
+                root: root_id,
+                update: result.update(),
+                expected: current,
+                actual: result.schedule().fiber(),
+            },
+        );
+    }
+
+    let actual_lanes = store
+        .update_queues()
+        .update(result.update())?
+        .lane()
+        .remove_lane(Lane::OFFSCREEN);
+    if actual_lanes != result.lane().to_lanes()
+        || result.lane_choice().lane() != result.lane()
+        || result.schedule().lane() != result.lane()
+    {
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::WrongLaneMetadata {
+                root: root_id,
+                queue: current_update_queue,
+                update: result.update(),
+                expected_lane: result.lane(),
+                actual_lanes,
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::RootOptions;
@@ -1579,6 +2483,310 @@ mod tests {
                 actual_pending_lanes: Lanes::SYNC.merge(Lanes::DEFAULT)
             }
         );
+    }
+
+    #[test]
+    fn root_updates_host_root_queue_lane_handoff_records_distinct_lane_render_evidence() {
+        let (mut store, root_id, host) = root_store();
+        let first_element = RootElementHandle::from_raw(8961);
+        let second_element = RootElementHandle::from_raw(8962);
+
+        let first = update_container(&mut store, root_id, first_element, None).unwrap();
+        let second = update_container_sync(&mut store, root_id, second_element, None).unwrap();
+        let selected_lanes = second.selected_next_lanes();
+        let render = render_host_root_for_lanes(&mut store, root_id, selected_lanes).unwrap();
+
+        let handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second.clone()],
+            render,
+        )
+        .unwrap();
+
+        assert_eq!(handoff.root(), root_id);
+        assert_eq!(handoff.current(), render.current());
+        assert_eq!(handoff.finished_work(), render.finished_work());
+        assert_eq!(
+            handoff.current_update_queue(),
+            render.current_update_queue()
+        );
+        assert_eq!(
+            handoff.work_in_progress_update_queue(),
+            render.work_in_progress_update_queue()
+        );
+        assert_ne!(
+            handoff.current_update_queue(),
+            handoff.work_in_progress_update_queue()
+        );
+        assert_eq!(
+            handoff.pending_lanes_before_render(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert_eq!(
+            handoff.selected_next_lanes_before_render(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert_eq!(handoff.finished_lanes(), Lanes::SYNC.merge(Lanes::DEFAULT));
+        assert_eq!(handoff.remaining_lanes(), Lanes::NO);
+        assert_eq!(
+            handoff.pending_lanes_after_render(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert_eq!(handoff.applied_update_count(), 2);
+        assert_eq!(handoff.skipped_update_count(), 0);
+        assert_eq!(handoff.resulting_element(), second_element);
+        assert_eq!(
+            handoff.update_sequence_ids(),
+            vec![first.update(), second.update()]
+        );
+        assert_eq!(
+            handoff.current_queue_base_updates(),
+            &[first.update(), second.update()]
+        );
+        assert!(handoff.records_in_update_sequence_order());
+        assert!(handoff.records_have_distinct_compatible_lanes());
+        assert!(handoff.root_current_not_switched_by_handoff());
+        assert!(handoff.work_loop_or_commit_consumer_required());
+        assert!(handoff.public_root_rendering_blocked());
+        assert!(handoff.proves_source_owned_lane_handoff());
+
+        let records = handoff.update_records();
+        assert_eq!(records[0].sequence(), 0);
+        assert_eq!(records[0].update(), first.update());
+        assert_eq!(records[0].lane(), Lane::DEFAULT);
+        assert_eq!(records[0].source_lanes(), Lanes::DEFAULT);
+        assert_eq!(records[0].pending_lanes_after_enqueue(), Lanes::DEFAULT);
+        assert_eq!(
+            records[0].selected_next_lanes_after_enqueue(),
+            Lanes::DEFAULT
+        );
+        assert!(records[0].committed_by_finished_lanes(handoff.finished_lanes()));
+        assert_eq!(records[1].sequence(), 1);
+        assert_eq!(records[1].update(), second.update());
+        assert_eq!(records[1].lane(), Lane::SYNC);
+        assert_eq!(records[1].source_lanes(), Lanes::SYNC);
+        assert_eq!(
+            records[1].pending_lanes_after_enqueue(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert_eq!(
+            records[1].selected_next_lanes_after_enqueue(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert!(records[1].committed_by_finished_lanes(handoff.finished_lanes()));
+
+        validate_host_root_update_queue_lane_handoff_record_for_canary(&store, &handoff).unwrap();
+        assert_eq!(store.root(root_id).unwrap().current(), render.current());
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_updates_host_root_queue_lane_handoff_rejects_stale_after_another_update() {
+        let (mut store, root_id, _host) = root_store();
+        let first =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8963), None).unwrap();
+        let second =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8964), None)
+                .unwrap();
+        let stale_extra =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8965), None).unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, second.selected_next_lanes()).unwrap();
+
+        let error = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second.clone()],
+            render,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueLaneHandoffErrorForCanary::QueueOrderMismatch {
+                root: root_id,
+                queue: first.queue(),
+                expected_updates: vec![first.update(), second.update()],
+                actual_updates: vec![first.update(), second.update(), stale_extra.update()]
+            }
+        );
+    }
+
+    #[test]
+    fn root_updates_host_root_queue_lane_handoff_rejects_wrong_lane_metadata() {
+        let (mut store, root_id, _host) = root_store();
+        let first =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8966), None).unwrap();
+        let second =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8967), None)
+                .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, second.selected_next_lanes()).unwrap();
+        let mut wrong_lane = second.clone();
+        wrong_lane.lane = Lane::DEFAULT;
+        wrong_lane.lane_choice = first.lane_choice();
+        wrong_lane.schedule = RootScheduleUpdateRecord {
+            lane: Lane::DEFAULT,
+            ..wrong_lane.schedule
+        };
+
+        let error = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first, wrong_lane],
+            render,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueLaneHandoffErrorForCanary::WrongLaneMetadata {
+                root: root_id,
+                queue: second.queue(),
+                update: second.update(),
+                expected_lane: Lane::DEFAULT,
+                actual_lanes: Lanes::SYNC
+            }
+        );
+    }
+
+    #[test]
+    fn root_updates_host_root_queue_lane_handoff_rejects_cross_root_records() {
+        let (mut store, root_id, _host) = root_store();
+        let other_root = store
+            .create_client_root(FakeContainer::new(896), RootOptions::new())
+            .unwrap();
+        let wrong_root_update =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8968), None).unwrap();
+        let other_update = update_container(
+            &mut store,
+            other_root,
+            RootElementHandle::from_raw(8969),
+            None,
+        )
+        .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, other_root, other_update.selected_next_lanes())
+                .unwrap();
+
+        let error = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            other_root,
+            std::slice::from_ref(&wrong_root_update),
+            render,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueLaneHandoffErrorForCanary::CrossRootQueueRecord {
+                expected: other_root,
+                actual: root_id,
+                update: wrong_root_update.update()
+            }
+        );
+    }
+
+    #[test]
+    fn root_updates_host_root_queue_lane_handoff_rejects_caller_built_cloned_queue_rows() {
+        let (mut store, root_id, _host) = root_store();
+        let first =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8970), None).unwrap();
+        let second =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8971), None)
+                .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, second.selected_next_lanes()).unwrap();
+        let mut caller_built = first.clone();
+        caller_built.queue = render.work_in_progress_update_queue();
+
+        let error = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[caller_built, second],
+            render,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueLaneHandoffErrorForCanary::SourceQueueMismatch {
+                root: root_id,
+                expected: first.queue(),
+                actual: render.work_in_progress_update_queue()
+            }
+        );
+    }
+
+    #[test]
+    fn root_updates_host_root_queue_lane_handoff_rejects_replayed_records_after_commit() {
+        let (mut store, root_id, _host) = root_store();
+        let first =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8972), None).unwrap();
+        let second =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8973), None)
+                .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, second.selected_next_lanes()).unwrap();
+        let handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first, second],
+            render,
+        )
+        .unwrap();
+        validate_host_root_update_queue_lane_handoff_record_for_canary(&store, &handoff).unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let error =
+            validate_host_root_update_queue_lane_handoff_record_for_canary(&store, &handoff)
+                .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueLaneHandoffErrorForCanary::ReplayedHandoffRecord {
+                root: root_id,
+                expected_current: render.current(),
+                actual_current: commit.current()
+            }
+        );
+        assert_eq!(commit.current(), render.finished_work());
+    }
+
+    #[test]
+    fn root_updates_host_root_queue_lane_handoff_rejects_treating_skipped_lanes_as_committed() {
+        let (mut store, root_id, _host) = root_store();
+        let skipped_default =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8974), None).unwrap();
+        let committed_sync =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8975), None)
+                .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+
+        let error = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[skipped_default.clone(), committed_sync],
+            render,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueLaneHandoffErrorForCanary::SkippedLaneCommitted {
+                root: root_id,
+                update: skipped_default.update(),
+                skipped_lanes: Lanes::DEFAULT,
+                finished_lanes: Lanes::SYNC,
+                remaining_lanes: Lanes::DEFAULT
+            }
+        );
+        assert_eq!(render.applied_update_count(), 1);
+        assert_eq!(render.skipped_update_count(), 1);
+        assert_eq!(render.remaining_lanes(), Lanes::DEFAULT);
     }
 
     #[test]
