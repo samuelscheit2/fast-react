@@ -17,6 +17,7 @@ use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use fast_react_core::FiberId;
 use fast_react_host_config::{
     HostCapability, HostCapabilitySet, HostChild, HostChildKind, HostCommit, HostCreation,
     HostError, HostFiberTokenPhase, HostFiberTokenRef, HostFiberTokenTarget,
@@ -36,13 +37,15 @@ use fast_react_reconciler::{
     TestRendererHostOutputCanaryError, TestRendererHostOutputCanaryFixture,
     TestRendererHostOutputCanaryPreparedFibers, TestRendererHostOutputCanaryUpdatedFibers,
     UpdateContainerResult, commit_finished_host_root, ensure_root_is_scheduled,
-    finish_test_renderer_host_output_canary_fibers, inspect_test_renderer_committed_fiber_tree,
-    inspect_test_renderer_host_output_canary_commit,
+    finish_test_renderer_host_output_canary_fibers,
+    inspect_reconciler_direct_multi_child_committed_fiber_tree,
+    inspect_test_renderer_committed_fiber_tree, inspect_test_renderer_host_output_canary_commit,
     prepare_test_renderer_host_output_canary_fibers,
     prepare_test_renderer_host_output_unmount_canary_fibers,
     prepare_test_renderer_host_output_unmount_ref_passive_cleanup_canary,
     prepare_test_renderer_host_output_update_canary_fibers, process_root_schedule_in_microtask,
-    render_host_root_for_lanes, scheduled_roots, update_container, update_container_sync,
+    record_reconciler_direct_multi_child_committed_fiber_source, render_host_root_for_lanes,
+    scheduled_roots, update_container, update_container_sync,
 };
 
 pub const TEST_RENDERER_NAME: &str = "fast-react-test-renderer";
@@ -3542,6 +3545,10 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTIT
     "fast-react-test-renderer.tojson.direct-multi-child-host-text.row-identity";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_STATUS: &str =
     "private-tojson-direct-multi-child-host-text-row-bound-to-current-fiber-commit";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_RECONCILER_INSPECTION_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.tojson.direct-multi-child-host-text.reconciler-source-inspection";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_RECONCILER_INSPECTION_STATUS: &str =
+    "private-tojson-direct-multi-child-host-text-reconciler-source-current-inspection-consumed-public-native-package-blocked";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-unmount-nested-source-report-gate";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS: &str =
@@ -9491,6 +9498,220 @@ impl TestRendererPrivateDirectMultiChildHostTextRowIdentity {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateDirectMultiChildHostTextReconcilerInspectionEvidence {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    renderer_id: TestRendererId,
+    root_scheduled_update_sequence: usize,
+    public_surface: &'static str,
+    source_previous_current: TestRendererFiberHandleDiagnostics,
+    source_committed_current: TestRendererFiberHandleDiagnostics,
+    source_component_fiber: TestRendererFiberHandleDiagnostics,
+    source_stable_text_fiber: TestRendererFiberHandleDiagnostics,
+    source_placed_text_fiber: TestRendererFiberHandleDiagnostics,
+    source_current_topology_recorded: bool,
+    source_host_node_state_nodes_present: bool,
+    inspection_shape_name: &'static str,
+    inspection_current_shape: [&'static str; 4],
+    inspection_store_current: TestRendererFiberHandleDiagnostics,
+    inspection_root_child_count: usize,
+    inspection_host_component_child_count: usize,
+    inspection_host_text_count: usize,
+    inspection_host_component_state_node_raw: u64,
+    inspection_stable_text_state_node_raw: u64,
+    inspection_placed_text_state_node_raw: u64,
+    inspection_finished_work_after_commit_cleared: bool,
+    inspection_finished_lanes_after_commit_bits: u32,
+    render_lanes_bits: u32,
+    commit_finished_lanes_bits: u32,
+    source_public_serialization_blocked: bool,
+    source_test_renderer_public_compatibility_blocked: bool,
+    source_native_execution_blocked: bool,
+    source_package_compatibility_blocked: bool,
+    inspection_public_serialization_blocked: bool,
+    inspection_test_renderer_public_compatibility_blocked: bool,
+    inspection_native_execution_blocked: bool,
+    inspection_package_compatibility_blocked: bool,
+    public_native_package_js_surfaces_blocked: bool,
+}
+
+impl TestRendererPrivateDirectMultiChildHostTextReconcilerInspectionEvidence {
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[cfg(test)]
+    const fn renderer_id(self) -> TestRendererId {
+        self.renderer_id
+    }
+
+    #[must_use]
+    pub const fn root_scheduled_update_sequence(self) -> usize {
+        self.root_scheduled_update_sequence
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source_previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.source_previous_current
+    }
+
+    #[must_use]
+    pub const fn source_committed_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.source_committed_current
+    }
+
+    #[must_use]
+    pub const fn source_component_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.source_component_fiber
+    }
+
+    #[must_use]
+    pub const fn source_stable_text_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.source_stable_text_fiber
+    }
+
+    #[must_use]
+    pub const fn source_placed_text_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.source_placed_text_fiber
+    }
+
+    #[must_use]
+    pub const fn source_current_topology_recorded(self) -> bool {
+        self.source_current_topology_recorded
+    }
+
+    #[must_use]
+    pub const fn source_host_node_state_nodes_present(self) -> bool {
+        self.source_host_node_state_nodes_present
+    }
+
+    #[must_use]
+    pub const fn inspection_shape_name(self) -> &'static str {
+        self.inspection_shape_name
+    }
+
+    #[must_use]
+    pub const fn inspection_current_shape(self) -> [&'static str; 4] {
+        self.inspection_current_shape
+    }
+
+    #[must_use]
+    pub const fn inspection_store_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.inspection_store_current
+    }
+
+    #[must_use]
+    pub const fn inspection_root_child_count(self) -> usize {
+        self.inspection_root_child_count
+    }
+
+    #[must_use]
+    pub const fn inspection_host_component_child_count(self) -> usize {
+        self.inspection_host_component_child_count
+    }
+
+    #[must_use]
+    pub const fn inspection_host_text_count(self) -> usize {
+        self.inspection_host_text_count
+    }
+
+    #[must_use]
+    pub const fn inspection_host_component_state_node_raw(self) -> u64 {
+        self.inspection_host_component_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn inspection_stable_text_state_node_raw(self) -> u64 {
+        self.inspection_stable_text_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn inspection_placed_text_state_node_raw(self) -> u64 {
+        self.inspection_placed_text_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn inspection_finished_work_after_commit_cleared(self) -> bool {
+        self.inspection_finished_work_after_commit_cleared
+    }
+
+    #[must_use]
+    pub const fn inspection_finished_lanes_after_commit_bits(self) -> u32 {
+        self.inspection_finished_lanes_after_commit_bits
+    }
+
+    #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_finished_lanes_bits(self) -> u32 {
+        self.commit_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub fn public_native_package_js_surfaces_blocked(self) -> bool {
+        self.source_public_serialization_blocked
+            && self.source_test_renderer_public_compatibility_blocked
+            && self.source_native_execution_blocked
+            && self.source_package_compatibility_blocked
+            && self.inspection_public_serialization_blocked
+            && self.inspection_test_renderer_public_compatibility_blocked
+            && self.inspection_native_execution_blocked
+            && self.inspection_package_compatibility_blocked
+            && self.public_native_package_js_surfaces_blocked
+    }
+
+    #[must_use]
+    pub fn source_bound_reconciler_direct_inspection_accepted(self) -> bool {
+        self.diagnostic_name()
+            == TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_RECONCILER_INSPECTION_DIAGNOSTIC_NAME
+            && self.status()
+                == TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_RECONCILER_INSPECTION_STATUS
+            && self.public_surface() == "create().update -> create().toJSON"
+            && self.source_previous_current() != self.source_committed_current()
+            && self.source_committed_current() == self.inspection_store_current()
+            && self.source_current_topology_recorded()
+            && self.source_host_node_state_nodes_present()
+            && self.inspection_shape_name() == "HostRoot->HostComponent->[HostText,HostText]"
+            && self.inspection_current_shape()
+                == TEST_RENDERER_PRIVATE_TREE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE
+            && self.inspection_root_child_count() == 1
+            && self.inspection_host_component_child_count() == 2
+            && self.inspection_host_text_count() == 2
+            && self.inspection_host_component_state_node_raw() != 0
+            && self.inspection_stable_text_state_node_raw() != 0
+            && self.inspection_placed_text_state_node_raw() != 0
+            && self.inspection_finished_work_after_commit_cleared()
+            && self.inspection_finished_lanes_after_commit_bits() == 0
+            && self.render_lanes_bits() != 0
+            && self.render_lanes_bits() == self.commit_finished_lanes_bits()
+            && self.source_component_fiber() != self.source_stable_text_fiber()
+            && self.source_component_fiber() != self.source_placed_text_fiber()
+            && self.source_stable_text_fiber() != self.source_placed_text_fiber()
+            && self.public_native_package_js_surfaces_blocked()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection {
     diagnostic_name: &'static str,
     status: &'static str,
@@ -9535,6 +9756,12 @@ pub struct TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection {
     lifecycle_evidence_accepted: bool,
     identity_evidence_accepted: bool,
     row_identity_accepted: bool,
+    source_reconciler_inspection_diagnostic_name: &'static str,
+    source_reconciler_inspection_status: &'static str,
+    reconciler_direct_source_recorded: bool,
+    reconciler_direct_inspection_accepted: bool,
+    reconciler_direct_current_topology_matches_output: bool,
+    reconciler_direct_public_native_package_blocked: bool,
     current_root_matches_commit: bool,
     finished_work_matches_current_root: bool,
     lanes_match: bool,
@@ -9773,6 +10000,36 @@ impl TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection {
     }
 
     #[must_use]
+    pub const fn source_reconciler_inspection_diagnostic_name(self) -> &'static str {
+        self.source_reconciler_inspection_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_reconciler_inspection_status(self) -> &'static str {
+        self.source_reconciler_inspection_status
+    }
+
+    #[must_use]
+    pub const fn reconciler_direct_source_recorded(self) -> bool {
+        self.reconciler_direct_source_recorded
+    }
+
+    #[must_use]
+    pub const fn reconciler_direct_inspection_accepted(self) -> bool {
+        self.reconciler_direct_inspection_accepted
+    }
+
+    #[must_use]
+    pub const fn reconciler_direct_current_topology_matches_output(self) -> bool {
+        self.reconciler_direct_current_topology_matches_output
+    }
+
+    #[must_use]
+    pub const fn reconciler_direct_public_native_package_blocked(self) -> bool {
+        self.reconciler_direct_public_native_package_blocked
+    }
+
+    #[must_use]
     pub const fn current_root_matches_commit(self) -> bool {
         self.current_root_matches_commit
     }
@@ -9889,6 +10146,10 @@ impl TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection {
             && self.lifecycle_evidence_accepted()
             && self.identity_evidence_accepted()
             && self.row_identity_accepted()
+            && self.reconciler_direct_source_recorded()
+            && self.reconciler_direct_inspection_accepted()
+            && self.reconciler_direct_current_topology_matches_output()
+            && self.reconciler_direct_public_native_package_blocked()
             && self.current_root_matches_commit()
             && self.finished_work_matches_current_root()
             && self.lanes_match()
@@ -17703,6 +17964,24 @@ impl TestRendererRoot {
         Ok(row_identity)
     }
 
+    pub fn describe_private_direct_multi_child_host_text_reconciler_inspection_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+    ) -> Result<
+        TestRendererPrivateDirectMultiChildHostTextReconcilerInspectionEvidence,
+        TestRendererRootError,
+    > {
+        let evidence = self
+            .private_direct_multi_child_host_text_reconciler_inspection_evidence_for_canary(
+                output,
+            )?;
+        self.validate_private_direct_multi_child_host_text_reconciler_inspection_for_canary(
+            output, evidence,
+        )?;
+
+        Ok(evidence)
+    }
+
     pub fn describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
         &self,
         output: &TestRendererHostParentPlacedHostOutput,
@@ -17710,6 +17989,9 @@ impl TestRendererRoot {
         lifecycle: Option<&TestRendererPrivateRootLifecycleExecutionEvidence>,
         identity: Option<TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate>,
         row_identity: Option<TestRendererPrivateDirectMultiChildHostTextRowIdentity>,
+        reconciler_inspection: Option<
+            TestRendererPrivateDirectMultiChildHostTextReconcilerInspectionEvidence,
+        >,
     ) -> Result<
         TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection,
         TestRendererRootError,
@@ -17739,6 +18021,13 @@ impl TestRendererRoot {
             return Err(
                 Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
                     "direct-multi-child-host-text-row-identity-missing",
+                ),
+            );
+        };
+        let Some(reconciler_inspection) = reconciler_inspection else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-reconciler-inspection-missing",
                 ),
             );
         };
@@ -17803,6 +18092,10 @@ impl TestRendererRoot {
             output,
             row_identity,
             expected_row,
+        )?;
+        self.validate_private_direct_multi_child_host_text_reconciler_inspection_for_canary(
+            output,
+            reconciler_inspection,
         )?;
 
         let root_node = self
@@ -17888,6 +18181,12 @@ impl TestRendererRoot {
                 ),
             );
         }
+        let reconciler_direct_current_topology_matches_output = reconciler_inspection
+            .source_component_fiber()
+            == fiber_handle!(component_fiber)
+            && reconciler_inspection.source_stable_text_fiber() == fiber_handle!(stable_text_fiber)
+            && reconciler_inspection.source_placed_text_fiber() == fiber_handle!(placed_text_fiber)
+            && reconciler_inspection.inspection_store_current() == fiber_handle!(store_current);
 
         let placement_handoff_accepted = output.host_parent_placement_apply_count() > 0
             && commit.has_test_only_host_parent_placement_apply_for_canary(
@@ -17942,6 +18241,16 @@ impl TestRendererRoot {
             lifecycle_evidence_accepted: lifecycle.source_owned_execution_accepted(),
             identity_evidence_accepted: identity.identity_admission_available(),
             row_identity_accepted: true,
+            source_reconciler_inspection_diagnostic_name: reconciler_inspection.diagnostic_name(),
+            source_reconciler_inspection_status: reconciler_inspection.status(),
+            reconciler_direct_source_recorded: reconciler_inspection
+                .source_current_topology_recorded()
+                && reconciler_inspection.source_host_node_state_nodes_present(),
+            reconciler_direct_inspection_accepted: reconciler_inspection
+                .source_bound_reconciler_direct_inspection_accepted(),
+            reconciler_direct_current_topology_matches_output,
+            reconciler_direct_public_native_package_blocked: reconciler_inspection
+                .public_native_package_js_surfaces_blocked(),
             current_root_matches_commit: store_current == commit.current(),
             finished_work_matches_current_root: render.finished_work() == commit.current()
                 && commit.current() == store_current,
@@ -20444,6 +20753,221 @@ impl TestRendererRoot {
             reason,
         }
         .into()
+    }
+
+    fn private_direct_multi_child_host_text_current_fibers_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+    ) -> Result<(FiberId, FiberId, FiberId), TestRendererRootError> {
+        let commit = output.commit();
+        if commit.root() != self.root_id {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_foreign_error(
+                    "direct-multi-child-host-text-cross-root-current-mismatch",
+                ),
+            );
+        }
+
+        let root_node = self
+            .store
+            .fiber_arena()
+            .get(commit.current())
+            .map_err(FiberRootStoreError::from)?;
+        let Some(component_fiber) = root_node.child() else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-current-child-topology-mismatch",
+                ),
+            );
+        };
+        let component_node = self
+            .store
+            .fiber_arena()
+            .get(component_fiber)
+            .map_err(FiberRootStoreError::from)?;
+        let Some(stable_text_fiber) = component_node.child() else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-current-child-topology-mismatch",
+                ),
+            );
+        };
+        let stable_text_node = self
+            .store
+            .fiber_arena()
+            .get(stable_text_fiber)
+            .map_err(FiberRootStoreError::from)?;
+        let Some(placed_text_fiber) = stable_text_node.sibling() else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-current-child-topology-mismatch",
+                ),
+            );
+        };
+
+        Ok((component_fiber, stable_text_fiber, placed_text_fiber))
+    }
+
+    fn private_direct_multi_child_host_text_reconciler_inspection_evidence_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+    ) -> Result<
+        TestRendererPrivateDirectMultiChildHostTextReconcilerInspectionEvidence,
+        TestRendererRootError,
+    > {
+        self.validate_private_multi_child_host_text_output_for_canary(output)?;
+        let (component_fiber, stable_text_fiber, placed_text_fiber) =
+            self.private_direct_multi_child_host_text_current_fibers_for_canary(output)?;
+        let commit = output.commit();
+        let source = record_reconciler_direct_multi_child_committed_fiber_source(
+            &self.store,
+            commit,
+            component_fiber,
+            stable_text_fiber,
+            placed_text_fiber,
+        )
+        .map_err(|_| {
+            Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                "direct-multi-child-host-text-reconciler-source-mismatch",
+            )
+        })?;
+        let inspection =
+            inspect_reconciler_direct_multi_child_committed_fiber_tree(&self.store, source)
+                .map_err(|_| {
+                    Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                        "direct-multi-child-host-text-reconciler-inspection-mismatch",
+                    )
+                })?;
+        inspection
+            .validate_against_store(&self.store)
+            .map_err(|_| {
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_stale_error(
+                    "direct-multi-child-host-text-reconciler-inspection-stale",
+                )
+            })?;
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let source_public_serialization_blocked = source.public_serialization_blocked();
+        let source_test_renderer_public_compatibility_blocked =
+            source.test_renderer_public_compatibility_blocked();
+        let source_native_execution_blocked = source.native_execution_blocked();
+        let source_package_compatibility_blocked = source.package_compatibility_blocked();
+        let inspection_public_serialization_blocked = inspection.public_serialization_blocked();
+        let inspection_test_renderer_public_compatibility_blocked =
+            inspection.test_renderer_public_compatibility_blocked();
+        let inspection_native_execution_blocked = inspection.native_execution_blocked();
+        let inspection_package_compatibility_blocked = inspection.package_compatibility_blocked();
+
+        Ok(
+            TestRendererPrivateDirectMultiChildHostTextReconcilerInspectionEvidence {
+                diagnostic_name:
+                    TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_RECONCILER_INSPECTION_DIAGNOSTIC_NAME,
+                status:
+                    TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_RECONCILER_INSPECTION_STATUS,
+                root: self.root_id,
+                renderer_id: self.renderer.renderer_id,
+                root_scheduled_update_sequence: output.scheduled_update_sequence(),
+                public_surface: "create().update -> create().toJSON",
+                source_previous_current: fiber_handle!(source.previous_current()),
+                source_committed_current: fiber_handle!(source.committed_current()),
+                source_component_fiber: fiber_handle!(source.component()),
+                source_stable_text_fiber: fiber_handle!(source.first_text()),
+                source_placed_text_fiber: fiber_handle!(source.second_text()),
+                source_current_topology_recorded: source.source_current_topology_recorded(),
+                source_host_node_state_nodes_present: source.host_node_store_state_nodes_present(),
+                inspection_shape_name: inspection.shape_name(),
+                inspection_current_shape:
+                    TEST_RENDERER_PRIVATE_TREE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE,
+                inspection_store_current: fiber_handle!(inspection.store_current()),
+                inspection_root_child_count: inspection.tree().root_children().len(),
+                inspection_host_component_child_count: inspection.tree().host_texts().len(),
+                inspection_host_text_count: inspection.tree().host_texts().len(),
+                inspection_host_component_state_node_raw: inspection
+                    .host_component()
+                    .state_node()
+                    .raw(),
+                inspection_stable_text_state_node_raw: inspection.first_text().state_node().raw(),
+                inspection_placed_text_state_node_raw: inspection.second_text().state_node().raw(),
+                inspection_finished_work_after_commit_cleared: inspection
+                    .finished_work_after_commit()
+                    .is_none(),
+                inspection_finished_lanes_after_commit_bits: inspection
+                    .finished_lanes_after_commit()
+                    .bits(),
+                render_lanes_bits: inspection.render_lanes().bits(),
+                commit_finished_lanes_bits: inspection.commit_finished_lanes().bits(),
+                source_public_serialization_blocked,
+                source_test_renderer_public_compatibility_blocked,
+                source_native_execution_blocked,
+                source_package_compatibility_blocked,
+                inspection_public_serialization_blocked,
+                inspection_test_renderer_public_compatibility_blocked,
+                inspection_native_execution_blocked,
+                inspection_package_compatibility_blocked,
+                public_native_package_js_surfaces_blocked: true,
+            },
+        )
+    }
+
+    fn validate_private_direct_multi_child_host_text_reconciler_inspection_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+        evidence: TestRendererPrivateDirectMultiChildHostTextReconcilerInspectionEvidence,
+    ) -> Result<(), TestRendererRootError> {
+        if evidence.root() != self.root_id || evidence.renderer_id != self.renderer.renderer_id {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_foreign_error(
+                    "direct-multi-child-host-text-reconciler-inspection-mismatch",
+                ),
+            );
+        }
+        if evidence.root_scheduled_update_sequence() != self.scheduled_updates.len()
+            || evidence.root_scheduled_update_sequence() != output.scheduled_update_sequence()
+        {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_stale_error(
+                    "direct-multi-child-host-text-reconciler-inspection-stale",
+                ),
+            );
+        }
+        if !evidence.public_native_package_js_surfaces_blocked() {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_public_error(
+                    "public-or-native-package-js-compatibility-claim",
+                ),
+            );
+        }
+        if !evidence.source_bound_reconciler_direct_inspection_accepted() {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-reconciler-inspection-mismatch",
+                ),
+            );
+        }
+
+        let expected = self
+            .private_direct_multi_child_host_text_reconciler_inspection_evidence_for_canary(
+                output,
+            )?;
+        if evidence != expected {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-reconciler-inspection-mismatch",
+                ),
+            );
+        }
+
+        Ok(())
     }
 
     fn validate_private_direct_multi_child_host_text_row_identity_for_canary(
@@ -25905,8 +26429,17 @@ mod tests {
     #[test]
     fn root_private_direct_multi_child_host_text_committed_fiber_inspection_consumes_source_owned_current_topology()
      {
-        let (root, output, route, lifecycle, identity, row, row_identity, inspection) =
-            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+        let (
+            root,
+            output,
+            route,
+            lifecycle,
+            identity,
+            row,
+            row_identity,
+            reconciler_inspection,
+            inspection,
+        ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
 
         assert_eq!(
             inspection.diagnostic_name(),
@@ -25993,6 +26526,90 @@ mod tests {
         assert!(row_identity.public_native_package_js_surfaces_blocked());
         assert!(row_identity.source_owned_current_row_identity_accepted());
         assert_eq!(
+            reconciler_inspection.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_RECONCILER_INSPECTION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            reconciler_inspection.status(),
+            TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_RECONCILER_INSPECTION_STATUS
+        );
+        assert_eq!(reconciler_inspection.root(), root.root_id());
+        assert_eq!(
+            reconciler_inspection.renderer_id(),
+            root.renderer.renderer_id
+        );
+        assert_eq!(
+            reconciler_inspection.root_scheduled_update_sequence(),
+            output.scheduled_update_sequence()
+        );
+        assert_eq!(
+            reconciler_inspection.public_surface(),
+            "create().update -> create().toJSON"
+        );
+        assert_eq!(
+            reconciler_inspection.source_committed_current(),
+            row_identity.commit_current()
+        );
+        assert_eq!(
+            reconciler_inspection.inspection_store_current(),
+            row_identity.store_current()
+        );
+        assert_eq!(
+            reconciler_inspection.source_component_fiber(),
+            row_identity.host_component_fiber()
+        );
+        assert_eq!(
+            reconciler_inspection.source_stable_text_fiber(),
+            row_identity.stable_text_fiber()
+        );
+        assert_eq!(
+            reconciler_inspection.source_placed_text_fiber(),
+            row_identity.placed_text_fiber()
+        );
+        assert!(reconciler_inspection.source_current_topology_recorded());
+        assert!(reconciler_inspection.source_host_node_state_nodes_present());
+        assert_eq!(
+            reconciler_inspection.inspection_shape_name(),
+            "HostRoot->HostComponent->[HostText,HostText]"
+        );
+        assert_eq!(
+            reconciler_inspection.inspection_current_shape(),
+            TEST_RENDERER_PRIVATE_TREE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE
+        );
+        assert_eq!(reconciler_inspection.inspection_root_child_count(), 1);
+        assert_eq!(
+            reconciler_inspection.inspection_host_component_child_count(),
+            2
+        );
+        assert_eq!(reconciler_inspection.inspection_host_text_count(), 2);
+        assert_eq!(
+            reconciler_inspection.inspection_host_component_state_node_raw(),
+            output.parent_state_node_raw()
+        );
+        assert_ne!(
+            reconciler_inspection.inspection_stable_text_state_node_raw(),
+            0
+        );
+        assert_eq!(
+            reconciler_inspection.inspection_placed_text_state_node_raw(),
+            output.placed_text_state_node_raw()
+        );
+        assert!(reconciler_inspection.inspection_finished_work_after_commit_cleared());
+        assert_eq!(
+            reconciler_inspection.inspection_finished_lanes_after_commit_bits(),
+            0
+        );
+        assert_eq!(
+            reconciler_inspection.render_lanes_bits(),
+            route.render_lanes_bits()
+        );
+        assert_eq!(
+            reconciler_inspection.commit_finished_lanes_bits(),
+            route.commit_finished_lanes_bits()
+        );
+        assert!(reconciler_inspection.public_native_package_js_surfaces_blocked());
+        assert!(reconciler_inspection.source_bound_reconciler_direct_inspection_accepted());
+        assert_eq!(
             inspection.host_output_update_kind(),
             TestRendererRootUpdateKind::Update
         );
@@ -26071,6 +26688,18 @@ mod tests {
         assert!(inspection.lifecycle_evidence_accepted());
         assert!(inspection.identity_evidence_accepted());
         assert!(inspection.row_identity_accepted());
+        assert_eq!(
+            inspection.source_reconciler_inspection_diagnostic_name(),
+            reconciler_inspection.diagnostic_name()
+        );
+        assert_eq!(
+            inspection.source_reconciler_inspection_status(),
+            reconciler_inspection.status()
+        );
+        assert!(inspection.reconciler_direct_source_recorded());
+        assert!(inspection.reconciler_direct_inspection_accepted());
+        assert!(inspection.reconciler_direct_current_topology_matches_output());
+        assert!(inspection.reconciler_direct_public_native_package_blocked());
         assert!(inspection.current_root_matches_commit());
         assert!(inspection.finished_work_matches_current_root());
         assert!(inspection.lanes_match());
@@ -26093,8 +26722,17 @@ mod tests {
     #[test]
     fn root_private_direct_multi_child_host_text_committed_fiber_inspection_rejects_missing_stale_or_replayed_source_rows()
      {
-        let (root, output, route, lifecycle, identity, _row, row_identity, _inspection) =
-            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+        let (
+            root,
+            output,
+            route,
+            lifecycle,
+            identity,
+            _row,
+            row_identity,
+            reconciler_inspection,
+            _inspection,
+        ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
 
         assert_direct_multi_child_host_text_inspection_error_reason(
             root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
@@ -26103,6 +26741,7 @@ mod tests {
                 Some(&lifecycle),
                 Some(identity),
                 Some(row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-route-evidence-missing",
@@ -26117,6 +26756,7 @@ mod tests {
                 Some(&lifecycle),
                 Some(identity),
                 Some(row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "multi-child-host-text-route-update-sequence-stale",
@@ -26130,6 +26770,7 @@ mod tests {
             _other_identity,
             _other_row,
             _other_row_identity,
+            _other_reconciler_inspection,
             _other_inspection,
         ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
         assert_direct_multi_child_host_text_inspection_error_reason(
@@ -26139,6 +26780,7 @@ mod tests {
                 Some(&lifecycle),
                 Some(identity),
                 Some(row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-cross-root-current-mismatch",
@@ -26151,6 +26793,7 @@ mod tests {
                 None,
                 Some(identity),
                 Some(row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-lifecycle-evidence-missing",
@@ -26165,6 +26808,7 @@ mod tests {
                 Some(&cloned_lifecycle),
                 Some(identity),
                 Some(row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "multi-child-host-text-lifecycle-evidence-mismatch",
@@ -26177,6 +26821,7 @@ mod tests {
                 Some(&lifecycle),
                 None,
                 Some(row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-finished-work-identity-missing",
@@ -26189,17 +26834,40 @@ mod tests {
                 Some(&lifecycle),
                 Some(identity),
                 None,
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-row-identity-missing",
+        );
+
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row_identity),
+                None,
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-reconciler-inspection-missing",
         );
     }
 
     #[test]
     fn root_private_direct_multi_child_host_text_committed_fiber_inspection_rejects_same_shape_foreign_row_identity()
      {
-        let (root, output, route, lifecycle, identity, row, row_identity, _inspection) =
-            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+        let (
+            root,
+            output,
+            route,
+            lifecycle,
+            identity,
+            row,
+            row_identity,
+            reconciler_inspection,
+            _inspection,
+        ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
         let (
             _other_root,
             _other_output,
@@ -26208,6 +26876,7 @@ mod tests {
             _other_identity,
             other_row,
             other_row_identity,
+            _other_reconciler_inspection,
             _other_inspection,
         ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
 
@@ -26224,6 +26893,7 @@ mod tests {
                 Some(&lifecycle),
                 Some(identity),
                 Some(other_row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-row-identity-mismatch",
@@ -26231,10 +26901,120 @@ mod tests {
     }
 
     #[test]
+    fn root_private_direct_multi_child_host_text_committed_fiber_inspection_rejects_caller_shaped_reconciler_evidence()
+     {
+        let (
+            root,
+            output,
+            route,
+            lifecycle,
+            identity,
+            _row,
+            row_identity,
+            reconciler_inspection,
+            _inspection,
+        ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+
+        let mut missing_source_topology = reconciler_inspection;
+        missing_source_topology.source_current_topology_recorded = false;
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row_identity),
+                Some(missing_source_topology),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-reconciler-inspection-mismatch",
+        );
+
+        let mut caller_shaped_direct_child = reconciler_inspection;
+        caller_shaped_direct_child.source_component_fiber =
+            reconciler_inspection.source_placed_text_fiber();
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row_identity),
+                Some(caller_shaped_direct_child),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-reconciler-inspection-mismatch",
+        );
+
+        let mut stale_reconciler_inspection = reconciler_inspection;
+        stale_reconciler_inspection.root_scheduled_update_sequence += 1;
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row_identity),
+                Some(stale_reconciler_inspection),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-reconciler-inspection-stale",
+        );
+
+        let (
+            _other_root,
+            _other_output,
+            _other_route,
+            _other_lifecycle,
+            _other_identity,
+            _other_row,
+            _other_row_identity,
+            other_reconciler_inspection,
+            _other_inspection,
+        ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row_identity),
+                Some(other_reconciler_inspection),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-reconciler-inspection-mismatch",
+        );
+
+        let mut native_claim = reconciler_inspection;
+        native_claim.source_native_execution_blocked = false;
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row_identity),
+                Some(native_claim),
+            )
+            .unwrap_err(),
+            "public-or-native-package-js-compatibility-claim",
+        );
+    }
+
+    #[test]
     fn root_private_direct_multi_child_host_text_committed_fiber_inspection_rejects_row_topology_lane_current_and_public_aliases()
      {
-        let (root, output, route, lifecycle, identity, _row, row_identity, _inspection) =
-            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+        let (
+            root,
+            output,
+            route,
+            lifecycle,
+            identity,
+            _row,
+            row_identity,
+            reconciler_inspection,
+            _inspection,
+        ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
 
         let mut wrong_kind_route = route;
         wrong_kind_route.host_output_update_kind = TestRendererRootUpdateKind::Create;
@@ -26245,6 +27025,7 @@ mod tests {
                 Some(&lifecycle),
                 Some(identity),
                 Some(row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "multi-child-host-text-route-metadata-stale",
@@ -26262,6 +27043,7 @@ mod tests {
                 Some(&lifecycle),
                 Some(identity),
                 Some(wrong_kind_row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-row-identity-mismatch",
@@ -26276,6 +27058,7 @@ mod tests {
                 Some(&lifecycle),
                 Some(lane_drift_identity),
                 Some(row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "multi-child-host-text-finished-work-identity-lane-mismatch",
@@ -26292,6 +27075,7 @@ mod tests {
                 Some(&lifecycle),
                 Some(identity),
                 Some(stale_topology_row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-current-child-topology-mismatch",
@@ -26305,6 +27089,7 @@ mod tests {
             cross_identity,
             _cross_row,
             cross_row_identity,
+            cross_reconciler_inspection,
             _cross_inspection,
         ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
         assert_direct_multi_child_host_text_inspection_error_reason(
@@ -26314,6 +27099,7 @@ mod tests {
                 Some(&cross_lifecycle),
                 Some(cross_identity),
                 Some(cross_row_identity),
+                Some(cross_reconciler_inspection),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-cross-root-current-mismatch",
@@ -26328,6 +27114,7 @@ mod tests {
                 Some(&lifecycle),
                 Some(public_alias_identity),
                 Some(row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap_err(),
             "public-or-native-package-js-compatibility-claim",
@@ -26619,6 +27406,7 @@ mod tests {
         TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate,
         TestRendererPrivateToJsonHostOutputRow,
         TestRendererPrivateDirectMultiChildHostTextRowIdentity,
+        TestRendererPrivateDirectMultiChildHostTextReconcilerInspectionEvidence,
         TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection,
     ) {
         let (root, output, route, lifecycle, identity) =
@@ -26629,6 +27417,9 @@ mod tests {
         let row_identity = root
             .describe_private_direct_multi_child_host_text_row_identity_for_canary(&output)
             .unwrap();
+        let reconciler_inspection = root
+            .describe_private_direct_multi_child_host_text_reconciler_inspection_for_canary(&output)
+            .unwrap();
         let inspection = root
             .describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
                 &output,
@@ -26636,6 +27427,7 @@ mod tests {
                 Some(&lifecycle),
                 Some(identity),
                 Some(row_identity),
+                Some(reconciler_inspection),
             )
             .unwrap();
 
@@ -26647,6 +27439,7 @@ mod tests {
             identity,
             row,
             row_identity,
+            reconciler_inspection,
             inspection,
         )
     }
