@@ -15,9 +15,10 @@
   module-local WeakMap provenance: `hydration-boundary-gate.js` lazily reads
   the existing exact-record root-bridge payload getters during admission and
   caches the immutable real root-bridge export when the root-bridge-owned
-  recoverable-error preflight is created. Cloned hydrateRoot preflight,
-  event-replay preflight, execution preflight, and lifecycle boundary records
-  remain absent from source-owned provenance.
+  recoverable-error preflight is created. The cache entry must be a completed
+  Node-loaded CommonJS module, not an object-literal `require.cache` preseed.
+  Cloned hydrateRoot preflight, event-replay preflight, execution preflight,
+  and lifecycle boundary records remain absent from source-owned provenance.
 - `hydration-boundary-gate.js` no longer accepts
   `options.hydrateRootSourceLedgerContext` as authority; forged caller
   preflight-state arrays are ignored and cloned records are absent from the
@@ -25,10 +26,11 @@
 - Added a fresh-process regression that pre-seeds both
   `require.cache[rootBridgePath]` and
   `require.cache[hydrateRootSourceLedgerPath]` with fake source-ledger
-  readers/writers before importing the real hydration gate. The fake public
-  ledger module is visible to callers, but cloned/forged records still reject
-  and the real root-bridge source path still admits after the fake root bridge
-  cache entry is removed.
+  readers/writers before importing the real hydration gate. The fake root bridge
+  cache entry uses a non-writable/non-configurable `exports` descriptor and fake
+  `isPrivate...` plus payload readers. The fake public ledger module is visible
+  to callers, but cloned/forged records still reject and the real root-bridge
+  source path still admits after the fake root bridge cache entry is discarded.
 - Added a fresh-process regression for the audit reproduction: a caller-created
   recoverable-error preflight with forged `preflightState` arrays containing
   cloned hydrate/event/execution/lifecycle records rejects.
@@ -60,7 +62,8 @@
 3. Hydration boundary admission reads root-bridge module-local WeakMap payloads
    through the existing private payload getters for the exact records supplied
    to admission. The root-bridge module reference is cached only from the real
-   immutable cache entry.
+   immutable Node-loaded CommonJS module entry; object-literal cache preloads
+   are deleted before the real root-bridge file is required.
 4. Caller-provided `hydrateRootSourceLedgerContext` objects are ignored by
    recoverable-error preflight creation and cannot seed admission provenance.
 5. Forged root-bridge and hydrate-root-source-ledger cache modules can still
@@ -95,7 +98,7 @@
 ## Evidence Gathered
 
 - Focused hydration-boundary tests pass, including the fresh-process forged
-  preflight-state regression, the pre-load fake root-bridge plus fake
+  preflight-state regression, the pre-load immutable fake root-bridge plus fake
   hydrate-root-source-ledger cache-poisoning regression, the post-load fake
   root-bridge cache replacement regression, and the new
   stack-spoof/first-token-binding negative.

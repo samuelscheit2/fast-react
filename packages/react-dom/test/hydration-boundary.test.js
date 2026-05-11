@@ -2374,6 +2374,18 @@ const fakeRootBridgeCacheExports = Object.freeze({
   },
   getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload(record) {
     return sourceLedgerFakePayloads.get(record) || null;
+  },
+  isPrivateHydrateRootPublicFacadePreflightRecord(record) {
+    return sourceLedgerFakePayloads.has(record);
+  },
+  isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(record) {
+    return sourceLedgerFakePayloads.has(record);
+  },
+  isPrivateHydrateRootPublicFacadeExecutionPreflightRecord(record) {
+    return sourceLedgerFakePayloads.has(record);
+  },
+  isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(record) {
+    return sourceLedgerFakePayloads.has(record);
   }
 });
 const fakeHydrateRootSourceLedgerExports = Object.freeze({
@@ -2397,12 +2409,18 @@ const fakeHydrateRootSourceLedgerExports = Object.freeze({
   }
 });
 
-require.cache[rootBridgeCacheKey] = {
+const fakeRootBridgeCacheEntry = {
   id: rootBridgeCacheKey,
   filename: rootBridgeCacheKey,
-  loaded: true,
-  exports: fakeRootBridgeCacheExports
+  loaded: true
 };
+Object.defineProperty(fakeRootBridgeCacheEntry, 'exports', {
+  configurable: false,
+  enumerable: true,
+  value: fakeRootBridgeCacheExports,
+  writable: false
+});
+require.cache[rootBridgeCacheKey] = fakeRootBridgeCacheEntry;
 require.cache[sourceLedgerCacheKey] = {
   id: sourceLedgerCacheKey,
   filename: sourceLedgerCacheKey,
@@ -2419,14 +2437,61 @@ const hydrateRootSourceLedger = require(path.join(
   'src/client/hydrate-root-source-ledger.js'
 ));
 assert.equal(require(rootBridgePath), fakeRootBridgeCacheExports);
+assert.equal(
+  Object.getOwnPropertyDescriptor(
+    require.cache[rootBridgeCacheKey],
+    'exports'
+  ).writable,
+  false
+);
+assert.equal(
+  Object.getOwnPropertyDescriptor(
+    require.cache[rootBridgeCacheKey],
+    'exports'
+  ).configurable,
+  false
+);
 assert.equal(hydrateRootSourceLedger, fakeHydrateRootSourceLedgerExports);
-delete require.cache[rootBridgeCacheKey];
-const rootBridge = require(rootBridgePath);
-assert.notEqual(rootBridge, fakeRootBridgeCacheExports);
 const domContainer = require(path.join(
   packageRoot,
   'src/client/dom-container.js'
 ));
+const poisonDocument = createDocument('immutable-fake-root-bridge-preload');
+const poisonContainer = createElement('DIV', poisonDocument);
+poisonContainer.childNodes = [createComment('$'), createComment('/$')];
+const poisonHydrationOptions = {
+  identifierPrefix: 'immutable-fake-root-bridge-preload-'
+};
+const poisonGate = hydrationGate.createHydrationBoundaryGate({
+  recordIdPrefix: 'immutable-fake-root-bridge-preload'
+});
+const poisonBoundaryRecord = poisonGate.recordUnsupportedHydrateRoot(
+  poisonContainer,
+  {
+    props: {
+      children: 'client text'
+    },
+    type: 'App'
+  },
+  poisonHydrationOptions
+);
+const poisonRecoverableErrorPreflight =
+  hydrationGate.createHydrationTextMismatchRecoverableErrorPreflightRecord(
+    poisonBoundaryRecord,
+    poisonBoundaryRecord.acceptedPrivateMetadataDiagnostics,
+    poisonBoundaryRecord.recoverableErrorMetadata,
+    {
+      enableRecoverableErrorPreflight: true,
+      hydrationOptions: poisonHydrationOptions,
+      source: 'private-hydrate-root-public-facade-recoverable-error-preflight'
+    }
+  );
+assert.equal(
+  poisonRecoverableErrorPreflight.status,
+  hydrationGate.privateHydrationTextMismatchRecoverableErrorPreflightStatus
+);
+const rootBridge = require(rootBridgePath);
+assert.notEqual(rootBridge, fakeRootBridgeCacheExports);
 const eventListener = require(path.join(
   packageRoot,
   'src/events/react-dom-event-listener.js'

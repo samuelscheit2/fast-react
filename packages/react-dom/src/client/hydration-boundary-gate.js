@@ -5063,6 +5063,16 @@ function rememberPrivateHydrateRootSourceLedgerRootBridgeModule() {
     return hydrateRootSourceLedgerRootBridgeModule;
   }
   const rootBridgePath = require.resolve('./root-bridge.js');
+  const cacheEntry = require.cache[rootBridgePath];
+  if (
+    cacheEntry &&
+    !isPrivateHydrateRootSourceLedgerRootBridgeCacheEntry(
+      rootBridgePath,
+      cacheEntry.exports
+    )
+  ) {
+    delete require.cache[rootBridgePath];
+  }
   const rootBridge = require(rootBridgePath);
   if (
     !isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) ||
@@ -5084,16 +5094,31 @@ function isPrivateHydrateRootSourceLedgerRootBridgeCacheEntry(
   const cacheEntry = require.cache[rootBridgePath];
   if (
     !cacheEntry ||
+    !(cacheEntry instanceof module.constructor) ||
     cacheEntry.filename !== rootBridgePath ||
-    cacheEntry.loaded !== true
+    cacheEntry.loaded !== true ||
+    cacheEntry.path !== require('node:path').dirname(rootBridgePath)
   ) {
     return false;
   }
+  const moduleSymbols = Object.getOwnPropertySymbols(cacheEntry);
+  const hasCommonJSFormat = moduleSymbols.some(
+    (symbol) =>
+      String(symbol) === 'Symbol(kFormat)' &&
+      cacheEntry[symbol] === 'commonjs'
+  );
+  const hasCompletedExecution = moduleSymbols.some(
+    (symbol) =>
+      String(symbol) === 'Symbol(kIsExecuting)' &&
+      cacheEntry[symbol] === false
+  );
   const exportsDescriptor = Object.getOwnPropertyDescriptor(
     cacheEntry,
     'exports'
   );
   return (
+    hasCommonJSFormat &&
+    hasCompletedExecution &&
     exportsDescriptor !== undefined &&
     exportsDescriptor.value === rootBridge &&
     exportsDescriptor.writable === false &&
