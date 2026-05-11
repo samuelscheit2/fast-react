@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -330,6 +331,24 @@ export const PRIVATE_ADMISSION_754_766_EXPECTED_PACKAGE_SURFACE =
   freezeRecord({
     react: packageSurface({
       packagePath: "packages/react/package.json",
+      manifest: {
+        name: "@fast-react/react",
+        version: "0.0.0",
+        private: true,
+        description: "React compatibility package placeholder for Fast React.",
+        license: null,
+        type: "commonjs",
+        main: "./index.js",
+        scripts: {
+          check: "node ../../tests/smoke/import-entrypoints.mjs",
+          test: "node ../../tests/smoke/import-entrypoints.mjs"
+        },
+        dependencies: null,
+        peerDependencies: null,
+        engines: {
+          node: ">=26.0.0"
+        }
+      },
       packageExports: {
         ".": {
           "react-server": "./react.react-server.js",
@@ -395,10 +414,83 @@ export const PRIVATE_ADMISSION_754_766_EXPECTED_PACKAGE_SURFACE =
         "useSyncExternalStore",
         "useTransition",
         "version"
-      ]
+      ],
+      subpathRuntimeExports: freezeRecord({
+        "packages/react/react.react-server.js": freezeArray([
+          "Children",
+          "Fragment",
+          "Profiler",
+          "StrictMode",
+          "Suspense",
+          "__SERVER_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+          "cache",
+          "cacheSignal",
+          "captureOwnerStack",
+          "cloneElement",
+          "createElement",
+          "createRef",
+          "forwardRef",
+          "isValidElement",
+          "lazy",
+          "memo",
+          "use",
+          "useCallback",
+          "useDebugValue",
+          "useId",
+          "useMemo",
+          "version"
+        ]),
+        "packages/react/jsx-runtime.js": freezeArray([
+          "Fragment",
+          "jsx",
+          "jsxs"
+        ]),
+        "packages/react/jsx-runtime.react-server.js": freezeArray([
+          "Fragment",
+          "jsx",
+          "jsxDEV",
+          "jsxs"
+        ]),
+        "packages/react/jsx-dev-runtime.js": freezeArray([
+          "Fragment",
+          "jsxDEV"
+        ]),
+        "packages/react/jsx-dev-runtime.react-server.js": freezeArray([
+          "Fragment",
+          "jsx",
+          "jsxDEV",
+          "jsxs"
+        ]),
+        "packages/react/compiler-runtime.js": freezeArray(["c"])
+      })
     }),
     reactDom: packageSurface({
       packagePath: "packages/react-dom/package.json",
+      manifest: {
+        name: "@fast-react/react-dom",
+        version: "0.0.0",
+        private: true,
+        description:
+          "React DOM compatibility package placeholder for Fast React.",
+        license: null,
+        type: "commonjs",
+        main: "./index.js",
+        scripts: {
+          check:
+            "node --test test/*.test.js && node ../../tests/smoke/import-entrypoints.mjs",
+          test:
+            "node --test test/*.test.js && node ../../tests/smoke/import-entrypoints.mjs"
+        },
+        dependencies: {
+          scheduler: "^0.27.0"
+        },
+        peerDependencies: {
+          "@fast-react/react": "0.0.0"
+        },
+        engines: {
+          node: ">=26.0.0"
+        }
+      },
       packageExports: {
         ".": {
           "react-server": "./react-dom.react-server.js",
@@ -487,11 +579,135 @@ export const PRIVATE_ADMISSION_754_766_EXPECTED_PACKAGE_SURFACE =
           "hydrateRoot",
           "version"
         ]),
-        "packages/react-dom/test-utils.js": freezeArray(["act"])
+        "packages/react-dom/test-utils.js": freezeArray(["act"]),
+        "packages/react-dom/profiling.js": freezeArray([
+          "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+          "createPortal",
+          "createRoot",
+          "flushSync",
+          "hydrateRoot",
+          "preconnect",
+          "prefetchDNS",
+          "preinit",
+          "preinitModule",
+          "preload",
+          "preloadModule",
+          "requestFormReset",
+          "unstable_batchedUpdates",
+          "useFormState",
+          "useFormStatus",
+          "version"
+        ]),
+        "packages/react-dom/react-dom.react-server.js": freezeArray([
+          "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+          "preconnect",
+          "prefetchDNS",
+          "preinit",
+          "preinitModule",
+          "preload",
+          "preloadModule",
+          "version"
+        ]),
+        "packages/react-dom/server.node.js": freezeArray([
+          "renderToPipeableStream",
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume",
+          "resumeToPipeableStream",
+          "version"
+        ]),
+        "packages/react-dom/server.browser.js": freezeArray([
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume",
+          "version"
+        ]),
+        "packages/react-dom/server.edge.js": freezeArray([
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume",
+          "version"
+        ]),
+        "packages/react-dom/server.bun.js": freezeArray([
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume",
+          "version"
+        ]),
+        "packages/react-dom/static.node.js": freezeArray([
+          "prerender",
+          "prerenderToNodeStream",
+          "resumeAndPrerender",
+          "resumeAndPrerenderToNodeStream",
+          "version"
+        ]),
+        "packages/react-dom/static.browser.js": freezeArray([
+          "prerender",
+          "resumeAndPrerender",
+          "version"
+        ]),
+        "packages/react-dom/static.edge.js": freezeArray([
+          "prerender",
+          "resumeAndPrerender",
+          "version"
+        ])
+      }),
+      runtimeThrowSubpaths: freezeRecord({
+        "packages/react-dom/client.react-server.js": freezeRecord({
+          status: "throws",
+          exportKeys: [],
+          errorName: "FastReactDomReactServerUnsupportedError",
+          errorCode: "FAST_REACT_REACT_SERVER_UNSUPPORTED"
+        }),
+        "packages/react-dom/server.react-server.js": freezeRecord({
+          status: "throws",
+          exportKeys: [],
+          errorName: "FastReactDomReactServerUnsupportedError",
+          errorCode: "FAST_REACT_REACT_SERVER_UNSUPPORTED"
+        }),
+        "packages/react-dom/static.react-server.js": freezeRecord({
+          status: "throws",
+          exportKeys: [],
+          errorName: "FastReactDomReactServerUnsupportedError",
+          errorCode: "FAST_REACT_REACT_SERVER_UNSUPPORTED"
+        }),
+        "packages/react-dom/profiling.react-server.js": freezeRecord({
+          status: "throws",
+          exportKeys: [],
+          errorName: "FastReactDomReactServerUnsupportedError",
+          errorCode: "FAST_REACT_REACT_SERVER_UNSUPPORTED"
+        })
       })
     }),
     reactTestRenderer: packageSurface({
       packagePath: "packages/react-test-renderer/package.json",
+      manifest: {
+        name: "@fast-react/react-test-renderer",
+        version: "0.0.0",
+        private: true,
+        description:
+          "React Test Renderer compatibility package placeholder for Fast React.",
+        license: null,
+        type: null,
+        main: "index.js",
+        scripts: {
+          check: "node ../../tests/smoke/import-entrypoints.mjs",
+          test: "node ../../tests/smoke/import-entrypoints.mjs"
+        },
+        dependencies: {
+          scheduler: "^0.27.0"
+        },
+        peerDependencies: {
+          "@fast-react/react": "0.0.0"
+        },
+        engines: {
+          node: ">=26.0.0"
+        }
+      },
       packageExports: null,
       runtimePath: "packages/react-test-renderer",
       runtimeExportKeys: [
@@ -504,6 +720,24 @@ export const PRIVATE_ADMISSION_754_766_EXPECTED_PACKAGE_SURFACE =
     }),
     scheduler: packageSurface({
       packagePath: "packages/scheduler/package.json",
+      manifest: {
+        name: "scheduler",
+        version: "0.27.0",
+        private: true,
+        description: "Scheduler compatibility package placeholder for Fast React.",
+        license: "MIT",
+        type: null,
+        main: null,
+        scripts: {
+          check: "node ../../tests/smoke/import-entrypoints.mjs",
+          test: "node ../../tests/smoke/import-entrypoints.mjs"
+        },
+        dependencies: null,
+        peerDependencies: null,
+        engines: {
+          node: ">=26.0.0"
+        }
+      },
       packageExports: null,
       runtimePath: "packages/scheduler",
       runtimeExportKeys: [
@@ -558,6 +792,26 @@ export const PRIVATE_ADMISSION_754_766_EXPECTED_PACKAGE_SURFACE =
     }),
     native: packageSurface({
       packagePath: "bindings/node/package.json",
+      manifest: {
+        name: "@fast-react/native",
+        version: "0.0.0",
+        private: true,
+        description: "Node loader placeholder for the Fast React native binding.",
+        license: null,
+        type: "module",
+        main: "./index.cjs",
+        scripts: {
+          build: "cargo build -p fast-react-napi",
+          check:
+            "node ./test/native-loader.test.cjs && node ./test/native-no-load-guard.test.cjs && node ./test/native-loader-esm.test.mjs",
+          test: "npm run check"
+        },
+        dependencies: null,
+        peerDependencies: null,
+        engines: {
+          node: ">=22.0.0"
+        }
+      },
       packageExports: {
         ".": {
           import: "./index.mjs",
@@ -571,6 +825,27 @@ export const PRIVATE_ADMISSION_754_766_EXPECTED_PACKAGE_SURFACE =
         "FastReactNativeBindingUnavailableError",
         "bindingStatus",
         "createNativeRootBridgeRequestShapeGate",
+        "getNativeBindingLoadPlan",
+        "loadNativeBinding",
+        "nativeAddonName",
+        "nativeBindingManifest",
+        "nativeRootBridgeRequestShape",
+        "nativeTargetMatrix",
+        "nodeApiVersionFloor",
+        "optionalPackagePrefix",
+        "packageName",
+        "platformArtifactPolicy",
+        "platformPackages",
+        "supportedNativeTargets",
+        "supportedNodeEngineRange",
+        "unavailableErrorCode"
+      ],
+      esmRuntimePath: "bindings/node/index.mjs",
+      esmRuntimeExportKeys: [
+        "FastReactNativeBindingUnavailableError",
+        "bindingStatus",
+        "createNativeRootBridgeRequestShapeGate",
+        "default",
         "getNativeBindingLoadPlan",
         "loadNativeBinding",
         "nativeAddonName",
@@ -1313,6 +1588,9 @@ export function evaluatePrivateAdmission754766Gate({
       return row.promotion !== "rejected";
     })
     .map((row) => row.workerId);
+  const unrecognizedWorkerIds = evaluatedRows
+    .filter((row) => row.recognized !== true)
+    .map((row) => row.workerId);
 
   const violations = [];
   if (
@@ -1332,6 +1610,11 @@ export function evaluatePrivateAdmission754766Gate({
     violations,
     "private-admission-evidence-file-or-token-missing",
     evidenceTokenMismatches
+  );
+  pushIdsViolation(
+    violations,
+    "required-private-admission-row-not-recognized",
+    unrecognizedWorkerIds
   );
   pushRowsViolation(
     violations,
@@ -1416,6 +1699,7 @@ export function evaluatePrivateAdmission754766Gate({
     blockedAdmissionClaimViolations.length === 0;
   const packageSurfaceRecognized = packageSurfaceMismatches.length === 0;
   const staticReadOnlyRecognized = staticReadOnlyViolations.length === 0;
+  const rowAdmissionRecognized = unrecognizedWorkerIds.length === 0;
   const compatibilityClaimed =
     compatibilityClaimWorkerIds.length > 0 ||
     publicCompatibilityViolations.length > 0 ||
@@ -1426,6 +1710,7 @@ export function evaluatePrivateAdmission754766Gate({
     manifest.missingWorkerIds.length === 0 &&
     manifest.unexpectedWorkerIds.length === 0 &&
     manifest.duplicateWorkerIds.length === 0 &&
+    rowAdmissionRecognized &&
     evidenceRecognized &&
     acceptedDiagnosticsRecognized &&
     priorLedgerContextRecognized &&
@@ -1443,6 +1728,7 @@ export function evaluatePrivateAdmission754766Gate({
       ? PRIVATE_ADMISSION_754_766_GATE_STATUS
       : PRIVATE_ADMISSION_754_766_VIOLATION_STATUS,
     privateDiagnosticsRecognized,
+    rowAdmissionRecognized,
     evidenceRecognized,
     acceptedDiagnosticsRecognized,
     priorLedgerContextRecognized,
@@ -1455,7 +1741,11 @@ export function evaluatePrivateAdmission754766Gate({
     compatibilityClaimed,
     publicCompatibilityClaimed,
     queueWorkers: PRIVATE_ADMISSION_754_766_WORKERS,
-    recognizedWorkerIds: freezeArray(evaluatedRows.map((row) => row.workerId)),
+    recognizedWorkerIds: freezeArray(
+      evaluatedRows
+        .filter((row) => row.recognized === true)
+        .map((row) => row.workerId)
+    ),
     publicCompatibilityViolationIds: freezeArray(publicCompatibilityViolations),
     blockedAdmissionClaimViolationIds: freezeArray(
       blockedAdmissionClaimViolations
@@ -1476,10 +1766,21 @@ export function readPackageSurface({ workspaceRoot = DEFAULT_WORKSPACE_ROOT } = 
           const packageJson = JSON.parse(
             readFileSync(join(workspaceRoot, expected.packagePath), "utf8")
           );
+          const manifest = readManifestSurface(packageJson, expected.manifest);
           const runtimeExportKeys =
             expected.runtimePath == null
               ? []
-              : readRuntimeExportKeys({ workspaceRoot, path: expected.runtimePath });
+              : readRuntimeExportKeys({
+                  workspaceRoot,
+                  path: expected.runtimePath
+                });
+          const esmRuntimeExportKeys =
+            expected.esmRuntimePath == null
+              ? []
+              : readEsmRuntimeExportKeys({
+                  workspaceRoot,
+                  path: expected.esmRuntimePath
+                });
           const subpathRuntimeExports = freezeRecord(
             Object.fromEntries(
               Object.keys(expected.subpathRuntimeExports).map((subpath) => [
@@ -1488,15 +1789,27 @@ export function readPackageSurface({ workspaceRoot = DEFAULT_WORKSPACE_ROOT } = 
               ])
             )
           );
+          const runtimeThrowSubpaths = freezeRecord(
+            Object.fromEntries(
+              Object.keys(expected.runtimeThrowSubpaths).map((subpath) => [
+                subpath,
+                readRuntimeThrowResult({ workspaceRoot, path: subpath })
+              ])
+            )
+          );
 
           return [
             packageName,
             packageSurface({
               packagePath: expected.packagePath,
+              manifest,
               packageExports: packageJson.exports ?? null,
               runtimePath: expected.runtimePath,
               runtimeExportKeys,
-              subpathRuntimeExports
+              esmRuntimePath: expected.esmRuntimePath,
+              esmRuntimeExportKeys,
+              subpathRuntimeExports,
+              runtimeThrowSubpaths
             })
           ];
         }
@@ -1547,21 +1860,36 @@ function guard({
 
 function packageSurface({
   packagePath,
+  manifest,
   packageExports,
   runtimePath,
   runtimeExportKeys,
-  subpathRuntimeExports = {}
+  esmRuntimePath = null,
+  esmRuntimeExportKeys = [],
+  subpathRuntimeExports = {},
+  runtimeThrowSubpaths = {}
 }) {
   return freezeRecord({
     packagePath,
+    manifest: freezeJson(manifest),
     packageExports: freezeJson(packageExports),
     runtimePath,
     runtimeExportKeys: freezeArray(runtimeExportKeys),
+    esmRuntimePath,
+    esmRuntimeExportKeys: freezeArray(esmRuntimeExportKeys),
     subpathRuntimeExports: freezeRecord(
       Object.fromEntries(
         Object.entries(subpathRuntimeExports).map(([path, keys]) => [
           path,
           freezeArray(keys)
+        ])
+      )
+    ),
+    runtimeThrowSubpaths: freezeRecord(
+      Object.fromEntries(
+        Object.entries(runtimeThrowSubpaths).map(([path, result]) => [
+          path,
+          freezeJson(result)
         ])
       )
     )
@@ -1753,9 +2081,25 @@ function readWorkspaceFile({ fileCache, path, workspaceRoot }) {
   return result;
 }
 
+function readManifestSurface(packageJson, expectedManifest) {
+  return freezeRecord(
+    Object.fromEntries(
+      Object.keys(expectedManifest).map((key) => [
+        key,
+        freezeJson(Object.hasOwn(packageJson, key) ? packageJson[key] : null)
+      ])
+    )
+  );
+}
+
 function readRuntimeExportKeys({ workspaceRoot, path }) {
   const require = createRequire(
-    pathToFileURL(join(workspaceRoot, "tests/conformance/src/private-admission-754-766-gate.mjs"))
+    pathToFileURL(
+      join(
+        workspaceRoot,
+        "tests/conformance/src/private-admission-754-766-gate.mjs"
+      )
+    )
   );
   const previousNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = "development";
@@ -1769,6 +2113,61 @@ function readRuntimeExportKeys({ workspaceRoot, path }) {
       process.env.NODE_ENV = previousNodeEnv;
     }
   }
+}
+
+function readRuntimeThrowResult({ workspaceRoot, path }) {
+  const require = createRequire(
+    pathToFileURL(
+      join(
+        workspaceRoot,
+        "tests/conformance/src/private-admission-754-766-gate.mjs"
+      )
+    )
+  );
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "development";
+  try {
+    const moduleValue = require(join(workspaceRoot, path));
+    return freezeRecord({
+      status: "ok",
+      exportKeys: freezeArray(Object.keys(moduleValue).sort()),
+      errorName: null,
+      errorCode: null
+    });
+  } catch (error) {
+    return freezeRecord({
+      status: "throws",
+      exportKeys: freezeArray([]),
+      errorName: error instanceof Error ? error.name : null,
+      errorCode:
+        error && typeof error === "object" && "code" in error
+          ? error.code
+          : null
+    });
+  } finally {
+    if (previousNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  }
+}
+
+function readEsmRuntimeExportKeys({ workspaceRoot, path }) {
+  const moduleUrl = pathToFileURL(join(workspaceRoot, path)).href;
+  const script = [
+    `const moduleValue = await import(${JSON.stringify(moduleUrl)});`,
+    "console.log(JSON.stringify(Object.keys(moduleValue).sort()));"
+  ].join("\n");
+  const output = execFileSync(
+    process.execPath,
+    ["--input-type=module", "-e", script],
+    {
+      encoding: "utf8",
+      env: { ...process.env, NODE_ENV: "development" }
+    }
+  );
+  return freezeArray(JSON.parse(output));
 }
 
 function compareRequiredArrayByWorker({

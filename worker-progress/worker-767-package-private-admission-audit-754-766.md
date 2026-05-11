@@ -23,6 +23,11 @@
 - Added focused guard checks for public compatibility promotion, unchanged
   public package surfaces, static/read-only ledger mode, and stale/alias/clone
   blockers where the accepted workers introduced them.
+- Acceptance-audit fix: expanded the package-surface snapshot to pin React
+  JSX/compiler/react-server public subpaths, React DOM client/server/static/
+  profiling/test-utils/react-server public subpaths, native CJS and ESM export
+  keys, and public manifest fields. The gate now also fails unknown private
+  admission kinds instead of only computing `recognized`.
 
 ## Changed Files
 
@@ -70,15 +75,17 @@
   private act export, React DOM root-bridge export, react-test-renderer private
   sibling admission export, Scheduler delayed producer export, or native
   execution export.
+- Acceptance-audit regression tests now reject public subpath export drift,
+  native ESM drift, public manifest drift, and unknown admission kinds.
 
 ## Commands Run
 
 - `node --check tests/conformance/src/private-admission-754-766-gate.mjs`
 - `node --check tests/conformance/test/private-admission-754-766-gate.test.mjs`
 - `node --test tests/conformance/test/private-admission-754-766-gate.test.mjs`
-  - passed, 7 tests.
+  - passed, 10 tests after the acceptance-audit fix.
 - `node --test tests/conformance/test/private-admission-746-753-gate.test.mjs tests/conformance/test/private-admission-754-766-gate.test.mjs`
-  - passed, 15 tests.
+  - passed, 18 tests after the acceptance-audit fix.
 - `npm run check:package-surface`
   - passed; npm printed the existing `minimum-release-age` warning.
 - `node tests/smoke/import-entrypoints.mjs`

@@ -137,6 +137,7 @@ test("private admission 754-766 gate recognizes accepted static evidence without
 
   assert.equal(gate.status, PRIVATE_ADMISSION_754_766_GATE_STATUS);
   assert.equal(gate.privateDiagnosticsRecognized, true);
+  assert.equal(gate.rowAdmissionRecognized, true);
   assert.equal(gate.evidenceRecognized, true);
   assert.equal(gate.acceptedDiagnosticsRecognized, true);
   assert.equal(gate.priorLedgerContextRecognized, true);
@@ -335,12 +336,34 @@ test("private admission 754-766 gate pins public package surfaces", () => {
     "./compiler-runtime",
     "./package.json"
   ]);
+  assert.equal(react.manifest.main, "./index.js");
+  assert.equal(react.manifest.type, "commonjs");
   assert.equal(react.runtimeExportKeys.includes("act"), true);
   assert.equal(
     react.runtimeExportKeys.includes("__FAST_REACT_PRIVATE_ACT_DISPATCHER_GATE__"),
     false
   );
+  assert.deepEqual(react.subpathRuntimeExports["packages/react/jsx-runtime.js"], [
+    "Fragment",
+    "jsx",
+    "jsxs"
+  ]);
+  assert.deepEqual(
+    react.subpathRuntimeExports["packages/react/jsx-dev-runtime.js"],
+    ["Fragment", "jsxDEV"]
+  );
+  assert.deepEqual(
+    react.subpathRuntimeExports["packages/react/compiler-runtime.js"],
+    ["c"]
+  );
+  assert.equal(
+    react.subpathRuntimeExports[
+      "packages/react/react.react-server.js"
+    ].includes("act"),
+    false
+  );
 
+  assert.equal(reactDom.manifest.dependencies.scheduler, "^0.27.0");
   assert.equal(
     Object.keys(reactDom.packageExports).includes("./test-utils"),
     true
@@ -357,7 +380,51 @@ test("private admission 754-766 gate pins public package surfaces", () => {
     reactDom.subpathRuntimeExports["packages/react-dom/test-utils.js"],
     ["act"]
   );
+  assert.deepEqual(
+    reactDom.subpathRuntimeExports["packages/react-dom/profiling.js"],
+    [
+      "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+      "createPortal",
+      "createRoot",
+      "flushSync",
+      "hydrateRoot",
+      "preconnect",
+      "prefetchDNS",
+      "preinit",
+      "preinitModule",
+      "preload",
+      "preloadModule",
+      "requestFormReset",
+      "unstable_batchedUpdates",
+      "useFormState",
+      "useFormStatus",
+      "version"
+    ]
+  );
+  assert.deepEqual(
+    reactDom.subpathRuntimeExports["packages/react-dom/server.node.js"],
+    [
+      "renderToPipeableStream",
+      "renderToReadableStream",
+      "renderToStaticMarkup",
+      "renderToString",
+      "resume",
+      "resumeToPipeableStream",
+      "version"
+    ]
+  );
+  assert.deepEqual(
+    reactDom.subpathRuntimeExports["packages/react-dom/static.edge.js"],
+    ["prerender", "resumeAndPrerender", "version"]
+  );
+  assert.equal(
+    reactDom.runtimeThrowSubpaths[
+      "packages/react-dom/client.react-server.js"
+    ].errorCode,
+    "FAST_REACT_REACT_SERVER_UNSUPPORTED"
+  );
 
+  assert.equal(reactTestRenderer.manifest.main, "index.js");
   assert.equal(reactTestRenderer.packageExports, null);
   assert.deepEqual(reactTestRenderer.runtimeExportKeys, [
     "_Scheduler",
@@ -373,6 +440,7 @@ test("private admission 754-766 gate pins public package surfaces", () => {
     false
   );
 
+  assert.equal(scheduler.manifest.license, "MIT");
   assert.equal(scheduler.packageExports, null);
   assert.equal(
     scheduler.runtimeExportKeys.includes(
@@ -387,9 +455,14 @@ test("private admission 754-766 gate pins public package surfaces", () => {
     true
   );
 
+  assert.equal(native.manifest.type, "module");
   assert.deepEqual(Object.keys(native.packageExports), [".", "./package.json"]);
   assert.equal(native.runtimeExportKeys.includes("loadNativeBinding"), true);
   assert.equal(native.runtimeExportKeys.includes("nativeExecution"), false);
+  assert.equal(native.esmRuntimePath, "bindings/node/index.mjs");
+  assert.equal(native.esmRuntimeExportKeys.includes("default"), true);
+  assert.equal(native.esmRuntimeExportKeys.includes("loadNativeBinding"), true);
+  assert.equal(native.esmRuntimeExportKeys.includes("nativeExecution"), false);
 });
 
 test("private admission 754-766 gate rejects public compatibility promotion", () => {
@@ -505,6 +578,96 @@ test("private admission 754-766 gate rejects public package surface changes", ()
   assert.equal(gate.privateDiagnosticsRecognized, false);
   assert.equal(gate.packageSurfaceRecognized, false);
   assertViolationIds(gate, ["public-package-surface-mismatch"]);
+});
+
+test("private admission 754-766 gate rejects public subpath and native ESM drift", () => {
+  const baseSurface = evaluatePrivateAdmission754766Gate().packageSurface;
+  const gate = evaluatePrivateAdmission754766Gate({
+    expectedPackageSurface: {
+      ...baseSurface,
+      react: {
+        ...baseSurface.react,
+        subpathRuntimeExports: {
+          ...baseSurface.react.subpathRuntimeExports,
+          "packages/react/jsx-runtime.js": [
+            ...baseSurface.react.subpathRuntimeExports[
+              "packages/react/jsx-runtime.js"
+            ],
+            "__FAST_REACT_PRIVATE_JSX_DIAGNOSTIC__"
+          ]
+        }
+      },
+      reactDom: {
+        ...baseSurface.reactDom,
+        subpathRuntimeExports: {
+          ...baseSurface.reactDom.subpathRuntimeExports,
+          "packages/react-dom/profiling.js": [
+            ...baseSurface.reactDom.subpathRuntimeExports[
+              "packages/react-dom/profiling.js"
+            ],
+            "__FAST_REACT_PRIVATE_ROOT_BRIDGE__"
+          ]
+        }
+      },
+      native: {
+        ...baseSurface.native,
+        esmRuntimeExportKeys: [
+          ...baseSurface.native.esmRuntimeExportKeys,
+          "nativeExecution"
+        ]
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_754_766_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.packageSurfaceRecognized, false);
+  assertViolationIds(gate, ["public-package-surface-mismatch"]);
+});
+
+test("private admission 754-766 gate rejects public manifest drift", () => {
+  const baseSurface = evaluatePrivateAdmission754766Gate().packageSurface;
+  const gate = evaluatePrivateAdmission754766Gate({
+    expectedPackageSurface: {
+      ...baseSurface,
+      react: {
+        ...baseSurface.react,
+        manifest: {
+          ...baseSurface.react.manifest,
+          main: "./private-act-dispatcher-gate.js"
+        }
+      },
+      native: {
+        ...baseSurface.native,
+        manifest: {
+          ...baseSurface.native.manifest,
+          type: "commonjs"
+        }
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_754_766_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.packageSurfaceRecognized, false);
+  assertViolationIds(gate, ["public-package-surface-mismatch"]);
+});
+
+test("private admission 754-766 gate rejects unknown private admission kinds", () => {
+  const gate = evaluatePrivateAdmission754766Gate({
+    rowOverrides: {
+      [worker754]: {
+        privateAdmission: "accepted-private-unregistered-worker-754-kind"
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_754_766_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.rowAdmissionRecognized, false);
+  assert.equal(gate.rowsByWorker[worker754].recognized, false);
+  assert.equal(gate.recognizedWorkerIds.includes(worker754), false);
+  assertViolationIds(gate, ["required-private-admission-row-not-recognized"]);
 });
 
 test("private admission 754-766 gate rejects runtime execution claims in the static ledger", () => {
