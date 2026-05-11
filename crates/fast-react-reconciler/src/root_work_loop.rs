@@ -7632,6 +7632,153 @@ mod tests {
     }
 
     #[test]
+    fn root_work_loop_finished_work_metadata_handoff_rejects_stale_render_records() {
+        let (mut missing_store, missing_root, missing_host) = root_store();
+        let missing_current = missing_store.root(missing_root).unwrap().current();
+        update_container(
+            &mut missing_store,
+            missing_root,
+            RootElementHandle::from_raw(43_100),
+            None,
+        )
+        .unwrap();
+        let missing_render =
+            render_host_root_for_lanes(&mut missing_store, missing_root, Lanes::DEFAULT).unwrap();
+        missing_store
+            .root_mut(missing_root)
+            .unwrap()
+            .scheduling_mut()
+            .clear_render_phase_work();
+
+        let missing_error =
+            handoff_completed_host_root_render_to_finished_work_commit_metadata_for_canary(
+                &mut missing_store,
+                missing_render,
+                10,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            missing_error,
+            HostRootRenderFinishedWorkCommitMetadataHandoffError::RenderPhaseWorkMismatch {
+                root: missing_root,
+                expected: None,
+                actual: missing_render.work_in_progress(),
+            }
+        );
+        assert_eq!(
+            missing_store.root(missing_root).unwrap().current(),
+            missing_current
+        );
+        assert_eq!(
+            missing_store.root(missing_root).unwrap().finished_work(),
+            None
+        );
+        assert_eq!(
+            missing_store.root(missing_root).unwrap().finished_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(missing_host.operations(), Vec::<&'static str>::new());
+
+        let (mut lane_store, lane_root, lane_host) = root_store();
+        let lane_current = lane_store.root(lane_root).unwrap().current();
+        update_container(
+            &mut lane_store,
+            lane_root,
+            RootElementHandle::from_raw(43_101),
+            None,
+        )
+        .unwrap();
+        let lane_render =
+            render_host_root_for_lanes(&mut lane_store, lane_root, Lanes::DEFAULT).unwrap();
+        let stale_lane_render = HostRootRenderPhaseRecord {
+            render_lanes: Lanes::SYNC,
+            ..lane_render
+        };
+
+        let lane_error =
+            handoff_completed_host_root_render_to_finished_work_commit_metadata_for_canary(
+                &mut lane_store,
+                stale_lane_render,
+                11,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            lane_error,
+            HostRootRenderFinishedWorkCommitMetadataHandoffError::RenderPhaseLanesMismatch {
+                root: lane_root,
+                expected: Lanes::DEFAULT,
+                actual: Lanes::SYNC,
+            }
+        );
+        assert_eq!(lane_store.root(lane_root).unwrap().current(), lane_current);
+        assert_eq!(lane_store.root(lane_root).unwrap().finished_work(), None);
+        assert_eq!(
+            lane_store.root(lane_root).unwrap().finished_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(lane_host.operations(), Vec::<&'static str>::new());
+
+        let (mut incomplete_store, incomplete_root, incomplete_host) = root_store();
+        let incomplete_current = incomplete_store.root(incomplete_root).unwrap().current();
+        update_container(
+            &mut incomplete_store,
+            incomplete_root,
+            RootElementHandle::from_raw(43_102),
+            None,
+        )
+        .unwrap();
+        let incomplete_render =
+            render_host_root_for_lanes(&mut incomplete_store, incomplete_root, Lanes::DEFAULT)
+                .unwrap();
+        incomplete_store
+            .root_mut(incomplete_root)
+            .unwrap()
+            .scheduling_mut()
+            .record_render_phase_work(
+                incomplete_render.work_in_progress(),
+                Lanes::DEFAULT,
+                RootRenderExitStatus::Incomplete,
+            );
+
+        let incomplete_error =
+            handoff_completed_host_root_render_to_finished_work_commit_metadata_for_canary(
+                &mut incomplete_store,
+                incomplete_render,
+                12,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            incomplete_error,
+            HostRootRenderFinishedWorkCommitMetadataHandoffError::RenderPhaseNotCompleted {
+                root: incomplete_root,
+                status: RootRenderExitStatus::Incomplete,
+            }
+        );
+        assert_eq!(
+            incomplete_store.root(incomplete_root).unwrap().current(),
+            incomplete_current
+        );
+        assert_eq!(
+            incomplete_store
+                .root(incomplete_root)
+                .unwrap()
+                .finished_work(),
+            None
+        );
+        assert_eq!(
+            incomplete_store
+                .root(incomplete_root)
+                .unwrap()
+                .finished_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(incomplete_host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn root_work_loop_lane_priority_canary_records_sync_and_default_without_callbacks() {
         let (mut store, root_id, host) = root_store();
         let default =
@@ -12269,6 +12416,85 @@ mod tests {
         assert_eq!(
             host.operations().len(),
             record.host_operation_count_after_commit()
+        );
+    }
+
+    #[test]
+    fn root_work_loop_complete_work_commit_handoff_rejects_finished_lanes_mismatch() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let element = source.insert_host_element_with_text("section", "stale lanes");
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, element, None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let complete_work = handoff_completed_host_root_render_to_test_complete_work(
+            &mut store, &mut host, render, &source,
+        )
+        .unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .record_finished_work_for_canary(render.finished_work(), render.render_lanes());
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, render, 31).unwrap();
+        let host_operation_count_after_complete_work = host.operations().len();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .record_finished_work_for_canary(
+                render.finished_work(),
+                Lanes::from(Lane::SYNC_HYDRATION),
+            );
+
+        let error = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            render,
+            Some(pending),
+            32,
+        )
+        .unwrap_err();
+
+        assert_eq!(complete_work.root(), root_id);
+        assert_eq!(
+            complete_work.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(
+            complete_work.root_child_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(pending.root_finished_work(), Some(render.finished_work()));
+        assert_eq!(pending.root_finished_lanes(), Lanes::DEFAULT);
+        assert!(matches!(
+            error,
+            HostRootFinishedWorkCommitHandoffErrorForCanary::FinishedWorkRootMetadataMismatch {
+                root,
+                expected_finished_work,
+                actual_finished_work,
+                expected_finished_lanes,
+                actual_finished_lanes,
+            } if root == root_id
+                && expected_finished_work == Some(render.finished_work())
+                && actual_finished_work == Some(render.finished_work())
+                && expected_finished_lanes == Lanes::DEFAULT
+                && actual_finished_lanes == Lanes::from(Lane::SYNC_HYDRATION)
+        ));
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(
+            store.root(root_id).unwrap().finished_work(),
+            Some(render.finished_work())
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().finished_lanes(),
+            Lanes::from(Lane::SYNC_HYDRATION)
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render.finished_work())
+        );
+        assert_eq!(
+            host.operations().len(),
+            host_operation_count_after_complete_work
         );
     }
 

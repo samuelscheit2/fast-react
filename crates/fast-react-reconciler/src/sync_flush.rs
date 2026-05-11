@@ -3234,6 +3234,57 @@ mod tests {
     }
 
     #[test]
+    fn sync_flush_root_commit_continuation_rejects_finished_lanes_mismatch() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(66_321));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .record_finished_work_for_canary(
+                render_phase.finished_work(),
+                Lanes::from(Lane::SYNC_HYDRATION),
+            );
+
+        let continuation = commit_sync_flush_root_finished_work_continuation_for_canary(
+            &mut store,
+            &ExecutionContextState::new(),
+            rendered_record,
+        )
+        .unwrap();
+
+        assert_eq!(
+            continuation.status(),
+            SyncFlushRootCommitContinuationStatusForCanary::RejectedStaleFinishedWorkHandoff
+        );
+        assert_eq!(continuation.root(), root_id);
+        assert_eq!(continuation.selected_lanes(), Lanes::SYNC);
+        assert!(!continuation.accepted_finished_work_handoff());
+        assert!(!continuation.produced_one_inert_commit_record());
+        assert!(!continuation.public_flush_sync_compatibility_claimed());
+        assert!(!continuation.executes_passive_effects());
+        assert_eq!(continuation.commit(), None);
+        assert_eq!(continuation.commit_result_identity(), None);
+        let handoff = continuation.handoff_identity().unwrap();
+        assert_eq!(
+            handoff.root_finished_work_before_commit(),
+            Some(render_phase.finished_work())
+        );
+        assert_eq!(
+            handoff.root_finished_lanes_before_commit(),
+            Lanes::from(Lane::SYNC_HYDRATION)
+        );
+        assert_eq!(handoff.finished_lanes(), Lanes::SYNC);
+        assert!(!handoff.accepted_current_finished_work_record_shape());
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn sync_flush_root_commit_continuation_rejects_foreign_finished_work_handoff() {
         let host = RecordingHost::default();
         let mut store = FiberRootStore::<RecordingHost>::new();
