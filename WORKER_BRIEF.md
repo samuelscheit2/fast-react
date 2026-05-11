@@ -27,6 +27,9 @@ for published package behavior and exact runtime output.
 ## Worker Rules
 
 - Work only on your assigned objective and write scope.
+- Your files may overlap with other active workers when the orchestrator chose
+  parallelism. Do not revert or overwrite other workers; make your change
+  internally coherent and document overlap risks for the orchestrator.
 - Record progress in `worker-progress/<worker-id>.md`.
 - You are running as a managed Codex subagent launched by the orchestrator.
 - Use the assigned git worktree path from your prompt for all reads (except for the react repo), edits, and

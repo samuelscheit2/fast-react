@@ -45,63 +45,56 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
-`9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted and cleaned up. Workers 715-766 have also been accepted and are no
-longer active; accepted private evidence still keeps public root, act,
-Scheduler timing, hydration, serialization, native execution, package
-compatibility, and broad renderer compatibility blocked.
+Top-level cap: 30 workers. Workers 767-784 have been accepted and cleaned up.
+Accepted private evidence still keeps public root, act, Scheduler timing,
+hydration, serialization, native execution, package compatibility, and broad
+renderer compatibility blocked.
 
-Workers 767-774 are running in isolated worktrees:
+Active workers are running in isolated worktrees:
 
-- Worker 767: package-private admission audit ledger for Workers 754-766.
-- Worker 768: package-root sibling-text private admission.
-- Worker 769: CJS sibling-text `toTree` private admission.
-- Worker 770: hydrateRoot target-claiming preflight.
-- Worker 771: native cleanup-hook/order preflight.
-- Worker 772: Scheduler delayed renderer-root producer gate.
-- Worker 773: React DOM test-utils act expired Scheduler handoff.
-- Worker 774: native teardown executable preflight JS mirror.
+- Worker 785: Rust reconciler managed child placement/delete private handoff.
+- Worker 786: hydrateRoot private event replay preflight.
+- Worker 787: CJS sibling-text `toJSON` private admission.
+
+These workers intentionally have some historical overlap with accepted areas
+when that improves throughput. Resolve merge conflicts by preserving accepted
+private blockers and canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Audit and merge Workers 767-774 as they complete. Expect overlap in
-   react-test-renderer serialization/create-routing tests and Scheduler/React
-   act diagnostics; resolve conflicts by preserving all accepted private
-   blockers and canonical evidence requirements.
-2. Select the next runtime or research queue from accepted private evidence:
-   Worker 745's narrow sibling-text identity gate, Worker 744's 737-738 ledger,
-   Worker 742's delayed act/root Scheduler mock diagnostic, Worker 741's
-   hydrateRoot preflight, Worker 740's native teardown mirror, Worker 738's
-   sibling-text handoff/report, Worker 736's nested source-report identity,
-   Worker 735's sibling snapshot blocker, and remaining private blockers. Keep
-   public root, act, flushSync, hooks/effects, test-renderer, React DOM, public
-   serialization, JS/CJS, native bridge, package compatibility, and broad
-   sibling/multichild identity admission blocked until each private gate is
-   proven.
-3. Audit and merge completed workers one at a time or in a small non-conflicting
-   batch, with focused reruns before each merge and full workspace checks after
-   the batch.
+1. Audit and merge Workers 785-787 as they complete. Expect overlap in Rust
+   root-commit/host-work, React DOM hydration/root facade tests, and
+   react-test-renderer serialization/create-routing tests.
+2. Launch additional workers from accepted private evidence when a task has a
+   narrow proof boundary: delayed Scheduler/React act diagnostics, hydrateRoot
+   marker/listener/target/recoverable-error rows, resource/form fake metadata,
+   and sibling-text serialization/native evidence.
+3. Prefer parallelizable independent proofs even when they may conflict in test
+   files. Resolve conflicts during merge by keeping all accepted negative tests,
+   blockers, and source-ownership checks.
 4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
 
-- Scheduler work can move beyond Worker 742's private delayed act/root mock
-  diagnostic only after public Scheduler timing, public `act`/root semantics,
-  renderer/effect execution, public flush helper behavior, and compatibility are
-  proven together.
+- Scheduler work can move beyond the accepted delayed renderer-root producer and
+  React delayed mock preflight only after public Scheduler timing, public
+  `act`/root semantics, renderer/effect execution, public flush helper
+  behavior, and compatibility are proven together.
 - Native worker-thread teardown can move beyond Worker 740's inert package
   mirror only after executable native addon loading, cleanup hooks, scheduling,
   renderer/reconciler output, and no-stale-value behavior are proven together.
-- Public `hydrateRoot` remains blocked after Worker 741's private preflight.
-  Future hydration work must prove real root creation, marker/listener
-  behavior, recoverable error routing, event replay, and DOM mutation semantics
-  against React 19.2.6.
+- Public `hydrateRoot` remains blocked after accepted marker/listener,
+  target-claiming, and recoverable-error preflights. Future hydration work must
+  prove real root creation, marker/listener behavior, recoverable error routing,
+  event replay, and DOM mutation semantics against React 19.2.6.
 - Future sibling-text native execution or JS/CJS serialization work should
-  consume Worker 745's dedicated private identity gate explicitly. Public
+  consume the dedicated private sibling-text identity gates explicitly. Public
   sibling-text serialization, package compatibility, native bridge
   loading/execution, and broad multichild identity remain blocked.
+- Resource and form work remains private/fake after accepted root-map storage
+  and rejected-error preflights. Public resources, forms, reset/action
+  invocation, DOM/head mutation, and package compatibility remain blocked.
 - Worker 736's nested `toJSON` source-report identity and Worker 733's unmount
   identity gates remain available private evidence for later native or
   serialization gates. JS/CJS, public serialization, native bridge

@@ -29,6 +29,48 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 767-784
+
+- Workers 767, 781, 782, and 784 added audit/ledger and private cleanup
+  evidence: package-private admission coverage for Workers 754-766, passive
+  destroy/create scheduler preflight, test-renderer root handoff clone/tamper
+  audit, and native cleanup-hook JS mirror.
+- Workers 768 and 769 advanced sibling-text admission. The accepted 769 fix
+  requires CJS production `toTree` sibling-text admission to validate
+  `committedFiberInspection` with development parity; public serialization,
+  native execution, package compatibility, and broad multichild identity remain
+  blocked.
+- Workers 770 and 776 advanced hydrateRoot private preflights. Target-claiming
+  and recoverable-error metadata are validated without root execution, DOM
+  mutation, event replay, listener installation, callback invocation, or public
+  hydration compatibility.
+- Workers 771 and 774 added private native cleanup-hook/order and teardown
+  preflight mirrors while keeping native addon loading, renderer/reconciler
+  execution, and public native compatibility blocked.
+- Workers 772 and 775 advanced delayed Scheduler/React act diagnostics. The
+  accepted 772 fix binds delayed renderer-root source proof to the scheduled
+  callback and nested act/root entry identities; Worker 775 lets React preflight
+  delayed mock diagnostics only as private nested expired evidence.
+- Worker 773 added React DOM test-utils act expired Scheduler handoff evidence
+  without opening public `act`.
+- Worker 777 added nested DOM click-order evidence while public dispatch
+  compatibility remains blocked.
+- Workers 778 and 779 added resource/form private preflights. Worker 778 records
+  root-map storage rows with source-owned fake resource metadata; Worker 779
+  records rejected form-action error metadata. Follow-up coverage directly
+  rejects public resource/form dispatch claims and public submit dispatch.
+- Worker 780 added Rust-only dangerousHTML/text-reset handoff evidence across
+  complete-work, root-commit, and host-work. Root commit validates metadata
+  before switching current; host-work consumes the private test-host
+  `commit_update` / `reset_text_content` paths only.
+- The batch was accepted after focused React act/Scheduler, React DOM
+  hydration/root/resource/form, react-test-renderer serialization/create-routing,
+  Rust fmt/clippy/focused tests, package-surface guards, import-smoke,
+  conflict-marker scans, and `git diff --check`. Public root, public `act`,
+  public Scheduler timing, public hydration, public resources/forms, public
+  serialization, native execution, package compatibility, and broad renderer
+  compatibility remain blocked.
+
 ### Workers 747, 762-766
 
 - Worker 747 added a private React act consumer for Scheduler mock expired

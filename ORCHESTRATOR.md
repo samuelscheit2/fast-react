@@ -38,7 +38,10 @@ The orchestrator goal is continuous. Do not call
 - Workers read `WORKER_BRIEF.md`, not this file.
 - Worker prompts must include all context needed to work independently, the
   assigned worktree path, explicit write scope, verification expectations, and
-  non-overlap boundaries.
+  expected overlap boundaries.
+- Prefer useful parallelism over avoiding every merge conflict. Slight file
+  overlap is acceptable when the tasks are independently valuable and the
+  conflict can be resolved by preserving accepted private evidence and blockers.
 - Use `task_name` as the stable subagent id. It must use lowercase letters,
   digits, and underscores; map it to the hyphenated
   `worker-progress/<worker-id>.md` filename in the worker prompt when needed.
