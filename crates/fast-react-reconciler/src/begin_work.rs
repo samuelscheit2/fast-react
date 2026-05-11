@@ -4747,6 +4747,18 @@ fn begin_work_function_component_bailout_blocker(
     })
 }
 
+#[cfg(test)]
+pub(crate) fn begin_work_function_component_bailout_blocker_for_test(
+    arena: &mut FiberArena,
+    request: BeginWorkRequest,
+    context_dependencies: &[FunctionComponentContextDependencyRecord],
+) -> Result<
+    FunctionComponentBeginWorkBailoutBlockerRecord,
+    FunctionComponentBeginWorkBailoutBlockerError,
+> {
+    begin_work_function_component_bailout_blocker(arena, request, context_dependencies)
+}
+
 pub(crate) fn begin_work(
     arena: &mut FiberArena,
     request: BeginWorkRequest,

@@ -28,6 +28,8 @@ use fast_react_core::{
     ContextHandle, ContextValueHandle, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle,
     StateHandle, UpdateQueueHandle,
 };
+#[cfg(test)]
+use fast_react_core::{FiberTypeHandle, StateNodeHandle};
 use fast_react_host_config::HostTypes;
 
 #[cfg(test)]
@@ -73,6 +75,8 @@ use crate::{
         ContextProviderBeginWorkRequest, ContextProviderUseContextBeginWorkRecord,
         ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord,
         ContextProviderUseContextSingleChildBeginWorkRecord,
+        FunctionComponentBeginWorkBailoutBlockerError,
+        FunctionComponentBeginWorkBailoutBlockerRecord,
         FunctionComponentSingleChildBeginWorkRecord, FunctionComponentUseStateBeginWorkRecord,
         HostRootOneLevelChildSet, HostRootOneLevelChildSetBeginWorkError,
         HostRootOneLevelChildSetBeginWorkRecord, HostRootOneLevelChildSetEntry,
@@ -83,7 +87,8 @@ use crate::{
         begin_work_context_provider_child, begin_work_context_provider_use_context_child,
         begin_work_context_provider_use_context_single_child,
         begin_work_context_provider_use_context_single_child_for_complete_traversal,
-        begin_work_host_root_one_level_child_set,
+        begin_work_function_component_bailout_blocker_for_test,
+        begin_work_function_component_use_context, begin_work_host_root_one_level_child_set,
         begin_work_nested_context_provider_two_consumer_use_context_children,
         begin_work_reconcile_function_component_single_child, begin_work_with_use_state,
     },
@@ -2062,6 +2067,995 @@ impl HostRootFunctionComponentSingleChildCompleteWorkHandoffRecord {
     const fn child_tag(self) -> FiberTag {
         self.begin_work.single_child().child_tag()
     }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary {
+    Public,
+    PublicRoot,
+    ReactDom,
+    NativeRenderer,
+    ReactTestRenderer,
+    Scheduler,
+    Package,
+}
+
+#[cfg(test)]
+impl HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Public => "public FunctionComponent bailout",
+            Self::PublicRoot => "public root",
+            Self::ReactDom => "React DOM",
+            Self::NativeRenderer => "native renderer",
+            Self::ReactTestRenderer => "React Test Renderer",
+            Self::Scheduler => "Scheduler",
+            Self::Package => "package",
+        }
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct HostRootFunctionComponentBailoutCompatibilityClaimsForCanary {
+    public_compatibility_claimed: bool,
+    public_root_compatibility_claimed: bool,
+    react_dom_compatibility_claimed: bool,
+    native_renderer_compatibility_claimed: bool,
+    test_renderer_compatibility_claimed: bool,
+    scheduler_compatibility_claimed: bool,
+    package_compatibility_claimed: bool,
+}
+
+#[cfg(test)]
+impl HostRootFunctionComponentBailoutCompatibilityClaimsForCanary {
+    const fn none() -> Self {
+        Self {
+            public_compatibility_claimed: false,
+            public_root_compatibility_claimed: false,
+            react_dom_compatibility_claimed: false,
+            native_renderer_compatibility_claimed: false,
+            test_renderer_compatibility_claimed: false,
+            scheduler_compatibility_claimed: false,
+            package_compatibility_claimed: false,
+        }
+    }
+
+    const fn with_claim(
+        mut self,
+        surface: HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary,
+    ) -> Self {
+        match surface {
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Public => {
+                self.public_compatibility_claimed = true;
+            }
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::PublicRoot => {
+                self.public_root_compatibility_claimed = true;
+            }
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::ReactDom => {
+                self.react_dom_compatibility_claimed = true;
+            }
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::NativeRenderer => {
+                self.native_renderer_compatibility_claimed = true;
+            }
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::ReactTestRenderer => {
+                self.test_renderer_compatibility_claimed = true;
+            }
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Scheduler => {
+                self.scheduler_compatibility_claimed = true;
+            }
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Package => {
+                self.package_compatibility_claimed = true;
+            }
+        }
+        self
+    }
+
+    const fn claimed_surface(
+        self,
+    ) -> Option<HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary> {
+        if self.public_compatibility_claimed {
+            return Some(HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Public);
+        }
+        if self.public_root_compatibility_claimed {
+            return Some(HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::PublicRoot);
+        }
+        if self.react_dom_compatibility_claimed {
+            return Some(HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::ReactDom);
+        }
+        if self.native_renderer_compatibility_claimed {
+            return Some(
+                HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::NativeRenderer,
+            );
+        }
+        if self.test_renderer_compatibility_claimed {
+            return Some(
+                HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::ReactTestRenderer,
+            );
+        }
+        if self.scheduler_compatibility_claimed {
+            return Some(HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Scheduler);
+        }
+        if self.package_compatibility_claimed {
+            return Some(HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Package);
+        }
+        None
+    }
+
+    const fn compatibility_claim_blocked(self) -> bool {
+        self.claimed_surface().is_none()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootFunctionComponentBailoutConsumerRequestForCanary {
+    function_component_work_in_progress: FiberId,
+    compatibility_claims: HostRootFunctionComponentBailoutCompatibilityClaimsForCanary,
+}
+
+#[cfg(test)]
+impl HostRootFunctionComponentBailoutConsumerRequestForCanary {
+    const fn new(function_component_work_in_progress: FiberId) -> Self {
+        Self {
+            function_component_work_in_progress,
+            compatibility_claims:
+                HostRootFunctionComponentBailoutCompatibilityClaimsForCanary::none(),
+        }
+    }
+
+    const fn with_compatibility_claim(
+        mut self,
+        surface: HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary,
+    ) -> Self {
+        self.compatibility_claims = self.compatibility_claims.with_claim(surface);
+        self
+    }
+
+    const fn function_component_work_in_progress(self) -> FiberId {
+        self.function_component_work_in_progress
+    }
+
+    const fn compatibility_claims(
+        self,
+    ) -> HostRootFunctionComponentBailoutCompatibilityClaimsForCanary {
+        self.compatibility_claims
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootFunctionComponentSingleChildMountBailoutSourceForCanary {
+    root: FiberRootId,
+    root_token: StateNodeHandle,
+    previous_current: FiberId,
+    committed_current: FiberId,
+    root_element: RootElementHandle,
+    render_lanes: Lanes,
+    finished_work_after_commit: Option<FiberId>,
+    finished_lanes_after_commit: Lanes,
+    function_component: FiberId,
+    function_component_type: FiberTypeHandle,
+    function_component_pending_props: PropsHandle,
+    function_component_memoized_props: PropsHandle,
+    single_child: FunctionComponentSingleChildReconciliationRecord,
+    complete_work: HostRootCompleteWorkHandoffRecord,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+    child: FiberId,
+    child_tag: FiberTag,
+    child_element: RootElementHandle,
+    child_props: PropsHandle,
+    source_owned_mount_path_recorded: bool,
+    caller_built: bool,
+    compatibility_claims: HostRootFunctionComponentBailoutCompatibilityClaimsForCanary,
+}
+
+#[cfg(test)]
+impl HostRootFunctionComponentSingleChildMountBailoutSourceForCanary {
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    const fn root_token(&self) -> StateNodeHandle {
+        self.root_token
+    }
+
+    const fn previous_current(&self) -> FiberId {
+        self.previous_current
+    }
+
+    const fn committed_current(&self) -> FiberId {
+        self.committed_current
+    }
+
+    const fn root_element(&self) -> RootElementHandle {
+        self.root_element
+    }
+
+    const fn render_lanes(&self) -> Lanes {
+        self.render_lanes
+    }
+
+    const fn function_component(&self) -> FiberId {
+        self.function_component
+    }
+
+    const fn function_component_type(&self) -> FiberTypeHandle {
+        self.function_component_type
+    }
+
+    const fn function_component_memoized_props(&self) -> PropsHandle {
+        self.function_component_memoized_props
+    }
+
+    const fn single_child(&self) -> FunctionComponentSingleChildReconciliationRecord {
+        self.single_child
+    }
+
+    const fn complete_work(&self) -> HostRootCompleteWorkHandoffRecord {
+        self.complete_work
+    }
+
+    const fn finished_work_handoff(&self) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        &self.finished_work_handoff
+    }
+
+    const fn child(&self) -> FiberId {
+        self.child
+    }
+
+    const fn child_tag(&self) -> FiberTag {
+        self.child_tag
+    }
+
+    const fn child_element(&self) -> RootElementHandle {
+        self.child_element
+    }
+
+    const fn child_props(&self) -> PropsHandle {
+        self.child_props
+    }
+
+    const fn source_owned_mount_path_recorded(&self) -> bool {
+        self.source_owned_mount_path_recorded
+    }
+
+    const fn caller_built(&self) -> bool {
+        self.caller_built
+    }
+
+    const fn public_compatibility_claimed(&self) -> bool {
+        self.compatibility_claims.public_compatibility_claimed
+    }
+
+    const fn public_root_compatibility_claimed(&self) -> bool {
+        self.compatibility_claims.public_root_compatibility_claimed
+    }
+
+    const fn react_dom_compatibility_claimed(&self) -> bool {
+        self.compatibility_claims.react_dom_compatibility_claimed
+    }
+
+    const fn native_renderer_compatibility_claimed(&self) -> bool {
+        self.compatibility_claims
+            .native_renderer_compatibility_claimed
+    }
+
+    const fn test_renderer_compatibility_claimed(&self) -> bool {
+        self.compatibility_claims
+            .test_renderer_compatibility_claimed
+    }
+
+    const fn scheduler_compatibility_claimed(&self) -> bool {
+        self.compatibility_claims.scheduler_compatibility_claimed
+    }
+
+    const fn package_compatibility_claimed(&self) -> bool {
+        self.compatibility_claims.package_compatibility_claimed
+    }
+
+    const fn compatibility_claim_blocked(&self) -> bool {
+        self.compatibility_claims.compatibility_claim_blocked()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootFunctionComponentBailoutConsumerRecordForCanary {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    previous_current: FiberId,
+    function_component_current: FiberId,
+    function_component_work_in_progress: FiberId,
+    mount_source: HostRootFunctionComponentSingleChildMountBailoutSourceForCanary,
+    bailout_blocker: FunctionComponentBeginWorkBailoutBlockerRecord,
+    root_current_before: FiberId,
+    root_current_after: FiberId,
+    host_operation_count_before: usize,
+    host_operation_count_after: usize,
+}
+
+#[cfg(test)]
+impl HostRootFunctionComponentBailoutConsumerRecordForCanary {
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    const fn previous_current(&self) -> FiberId {
+        self.previous_current
+    }
+
+    const fn function_component_current(&self) -> FiberId {
+        self.function_component_current
+    }
+
+    const fn function_component_work_in_progress(&self) -> FiberId {
+        self.function_component_work_in_progress
+    }
+
+    const fn mount_source(
+        &self,
+    ) -> &HostRootFunctionComponentSingleChildMountBailoutSourceForCanary {
+        &self.mount_source
+    }
+
+    const fn bailout_blocker(&self) -> FunctionComponentBeginWorkBailoutBlockerRecord {
+        self.bailout_blocker
+    }
+
+    const fn root_current_before(&self) -> FiberId {
+        self.root_current_before
+    }
+
+    const fn root_current_after(&self) -> FiberId {
+        self.root_current_after
+    }
+
+    const fn host_operation_count_before(&self) -> usize {
+        self.host_operation_count_before
+    }
+
+    const fn host_operation_count_after(&self) -> usize {
+        self.host_operation_count_after
+    }
+
+    fn same_props_proven(&self) -> bool {
+        self.bailout_blocker.pending_props() == self.bailout_blocker.memoized_props()
+    }
+
+    const fn no_relevant_component_lanes(&self) -> bool {
+        !self
+            .bailout_blocker
+            .current_lanes_before()
+            .contains_any(self.bailout_blocker.render_lanes())
+    }
+
+    const fn no_context_lane(&self) -> bool {
+        !self
+            .bailout_blocker
+            .context_dependency_lanes()
+            .contains_any(self.bailout_blocker.render_lanes())
+    }
+
+    const fn no_child_lane_traversal(&self) -> bool {
+        !self
+            .bailout_blocker
+            .child_lanes()
+            .contains_any(self.bailout_blocker.render_lanes())
+            && self.bailout_blocker.child_to_visit().is_none()
+            && self.bailout_blocker.child_traversal_blocked()
+    }
+
+    const fn component_invocation_blocked(&self) -> bool {
+        true
+    }
+
+    const fn host_output_unchanged(&self) -> bool {
+        self.host_operation_count_before == self.host_operation_count_after
+    }
+
+    fn current_switch_blocked(&self) -> bool {
+        self.root_current_before == self.root_current_after
+    }
+
+    fn consumed_worker_921_begin_work_blocker(&self) -> bool {
+        self.bailout_blocker.current() == self.function_component_current
+            && self.bailout_blocker.work_in_progress() == self.function_component_work_in_progress
+            && self.same_props_proven()
+            && self.no_relevant_component_lanes()
+            && self.no_context_lane()
+            && self.no_child_lane_traversal()
+    }
+
+    const fn public_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    const fn public_root_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    const fn native_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    const fn scheduler_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    const fn package_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    const fn compatibility_claim_blocked(&self) -> bool {
+        !self.public_compatibility_claimed()
+            && !self.public_root_compatibility_claimed()
+            && !self.react_dom_compatibility_claimed()
+            && !self.native_renderer_compatibility_claimed()
+            && !self.test_renderer_compatibility_claimed()
+            && !self.scheduler_compatibility_claimed()
+            && !self.package_compatibility_claimed()
+            && self.mount_source.compatibility_claim_blocked()
+    }
+
+    fn public_renderer_behavior_blocked(&self) -> bool {
+        self.compatibility_claim_blocked()
+            && self.component_invocation_blocked()
+            && self.host_output_unchanged()
+            && self.current_switch_blocked()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootFunctionComponentBailoutConsumerErrorForCanary {
+    FiberRootStore(FiberRootStoreError),
+    FiberTopology(FiberTopologyError),
+    RenderPhase(Box<HostRootCompleteWorkHandoffError>),
+    ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
+    BeginWorkBailout(FunctionComponentBeginWorkBailoutBlockerError),
+    MissingFunctionComponentChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+    },
+    ExpectedFunctionComponentChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+    FunctionComponentWorkMismatch {
+        expected: FiberId,
+        actual: FiberId,
+    },
+    FunctionComponentAlternateMismatch {
+        current: FiberId,
+        work_in_progress: FiberId,
+        actual_alternate: Option<FiberId>,
+    },
+    SourceMismatch {
+        field: &'static str,
+    },
+    MissingAcceptedMountEvidence {
+        field: &'static str,
+    },
+    StaleOrClonedMountEvidence {
+        field: &'static str,
+    },
+    CallerShapedMountEvidence,
+    CompatibilityClaim {
+        surface: HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary,
+    },
+    HostOutputMutated {
+        before: usize,
+        after: usize,
+    },
+    RootCurrentSwitched {
+        before: FiberId,
+        after: FiberId,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootFunctionComponentBailoutConsumerErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::RenderPhase(error) => Display::fmt(error, formatter),
+            Self::ChildPreflight(error) => Display::fmt(error, formatter),
+            Self::BeginWorkBailout(error) => Display::fmt(error, formatter),
+            Self::MissingFunctionComponentChild {
+                root,
+                host_root_work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has no FunctionComponent child for private FunctionComponent bailout consumer",
+                root.raw(),
+                host_root_work_in_progress.slot().get()
+            ),
+            Self::ExpectedFunctionComponentChild {
+                root,
+                host_root_work_in_progress,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} child {} must be FunctionComponent for private FunctionComponent bailout consumer, found {:?}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+            Self::FunctionComponentWorkMismatch { expected, actual } => write!(
+                formatter,
+                "private FunctionComponent bailout consumer expected work-in-progress {}, found root child {}",
+                expected.slot().get(),
+                actual.slot().get()
+            ),
+            Self::FunctionComponentAlternateMismatch {
+                current,
+                work_in_progress,
+                actual_alternate,
+            } => write!(
+                formatter,
+                "private FunctionComponent bailout consumer expected work-in-progress {} to alternate current {}, found {:?}",
+                work_in_progress.slot().get(),
+                current.slot().get(),
+                actual_alternate.map(|fiber| fiber.slot().get())
+            ),
+            Self::SourceMismatch { field } => write!(
+                formatter,
+                "private FunctionComponent bailout mount source mismatch at {field}"
+            ),
+            Self::MissingAcceptedMountEvidence { field } => write!(
+                formatter,
+                "private FunctionComponent bailout consumer missing accepted single-child mount evidence at {field}"
+            ),
+            Self::StaleOrClonedMountEvidence { field } => write!(
+                formatter,
+                "private FunctionComponent bailout consumer rejected stale/cloned mount evidence at {field}"
+            ),
+            Self::CallerShapedMountEvidence => write!(
+                formatter,
+                "private FunctionComponent bailout consumer rejected caller-shaped mount evidence"
+            ),
+            Self::CompatibilityClaim { surface } => write!(
+                formatter,
+                "private FunctionComponent bailout consumer cannot claim {} compatibility",
+                surface.as_str()
+            ),
+            Self::HostOutputMutated { before, after } => write!(
+                formatter,
+                "private FunctionComponent bailout consumer expected host output operations to stay at {before}, found {after}"
+            ),
+            Self::RootCurrentSwitched { before, after } => write!(
+                formatter,
+                "private FunctionComponent bailout consumer expected current root {} to remain current, found {}",
+                before.slot().get(),
+                after.slot().get()
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootFunctionComponentBailoutConsumerErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberRootStore(error) => Some(error),
+            Self::FiberTopology(error) => Some(error),
+            Self::RenderPhase(error) => Some(error),
+            Self::ChildPreflight(error) => Some(error),
+            Self::BeginWorkBailout(error) => Some(error),
+            Self::MissingFunctionComponentChild { .. }
+            | Self::ExpectedFunctionComponentChild { .. }
+            | Self::FunctionComponentWorkMismatch { .. }
+            | Self::FunctionComponentAlternateMismatch { .. }
+            | Self::SourceMismatch { .. }
+            | Self::MissingAcceptedMountEvidence { .. }
+            | Self::StaleOrClonedMountEvidence { .. }
+            | Self::CallerShapedMountEvidence
+            | Self::CompatibilityClaim { .. }
+            | Self::HostOutputMutated { .. }
+            | Self::RootCurrentSwitched { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<FiberRootStoreError> for HostRootFunctionComponentBailoutConsumerErrorForCanary {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::FiberRootStore(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FiberTopologyError> for HostRootFunctionComponentBailoutConsumerErrorForCanary {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FunctionComponentBeginWorkBailoutBlockerError>
+    for HostRootFunctionComponentBailoutConsumerErrorForCanary
+{
+    fn from(error: FunctionComponentBeginWorkBailoutBlockerError) -> Self {
+        Self::BeginWorkBailout(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootChildBeginWorkPreflightError>
+    for HostRootFunctionComponentBailoutConsumerErrorForCanary
+{
+    fn from(error: HostRootChildBeginWorkPreflightError) -> Self {
+        Self::ChildPreflight(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+fn record_function_component_single_child_mount_bailout_source_for_canary(
+    store: &FiberRootStore<RecordingHost>,
+    render: HostRootRenderPhaseRecord,
+    function_component: FiberId,
+    single_child: FunctionComponentSingleChildReconciliationRecord,
+    complete_work: HostRootCompleteWorkHandoffRecord,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+) -> Result<
+    HostRootFunctionComponentSingleChildMountBailoutSourceForCanary,
+    HostRootFunctionComponentBailoutConsumerErrorForCanary,
+> {
+    let child = complete_work.completed_child().ok_or(
+        HostRootFunctionComponentBailoutConsumerErrorForCanary::MissingAcceptedMountEvidence {
+            field: "complete_work.completed_child",
+        },
+    )?;
+    let child_tag = complete_work.completed_child_tag().ok_or(
+        HostRootFunctionComponentBailoutConsumerErrorForCanary::MissingAcceptedMountEvidence {
+            field: "complete_work.completed_child_tag",
+        },
+    )?;
+    if single_child.function_component() != function_component {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::SourceMismatch {
+                field: "single_child.function_component",
+            },
+        );
+    }
+    if complete_work.root() != render.root()
+        || complete_work.host_root_work_in_progress() != render.work_in_progress()
+        || complete_work.root_child() != Some(function_component)
+        || complete_work.root_child_tag() != Some(FiberTag::FunctionComponent)
+        || complete_work.completed_child() != Some(child)
+        || complete_work.completed_child_tag() != Some(single_child.child_tag())
+        || complete_work.resulting_element() != single_child.child_element()
+    {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::SourceMismatch {
+                field: "complete_work",
+            },
+        );
+    }
+    let commit = finished_work_handoff.commit();
+    if commit.root() != render.root()
+        || commit.previous_current() != render.current()
+        || commit.current() != render.work_in_progress()
+        || commit.finished_lanes() != render.render_lanes()
+        || finished_work_handoff.current_after_commit() != render.work_in_progress()
+    {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::SourceMismatch {
+                field: "finished_work_handoff",
+            },
+        );
+    }
+
+    let function_node = store.fiber_arena().get(function_component)?;
+    let child_node = store.fiber_arena().get(child)?;
+    Ok(
+        HostRootFunctionComponentSingleChildMountBailoutSourceForCanary {
+            root: render.root(),
+            root_token: render.root().state_node_handle(),
+            previous_current: render.current(),
+            committed_current: render.work_in_progress(),
+            root_element: render.resulting_element(),
+            render_lanes: render.render_lanes(),
+            finished_work_after_commit: finished_work_handoff.finished_work_after_commit(),
+            finished_lanes_after_commit: finished_work_handoff.finished_lanes_after_commit(),
+            function_component,
+            function_component_type: function_node.fiber_type(),
+            function_component_pending_props: function_node.pending_props(),
+            function_component_memoized_props: function_node.memoized_props(),
+            single_child,
+            complete_work,
+            finished_work_handoff,
+            child,
+            child_tag,
+            child_element: single_child.child_element(),
+            child_props: child_node.memoized_props(),
+            source_owned_mount_path_recorded: true,
+            caller_built: false,
+            compatibility_claims:
+                HostRootFunctionComponentBailoutCompatibilityClaimsForCanary::none(),
+        },
+    )
+}
+
+#[cfg(test)]
+fn validate_function_component_single_child_mount_bailout_source_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    source: &HostRootFunctionComponentSingleChildMountBailoutSourceForCanary,
+) -> Result<(), HostRootFunctionComponentBailoutConsumerErrorForCanary> {
+    if let Some(surface) = source.compatibility_claims.claimed_surface() {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::CompatibilityClaim { surface },
+        );
+    }
+    if source.caller_built {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::CallerShapedMountEvidence,
+        );
+    }
+    if !source.source_owned_mount_path_recorded {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::MissingAcceptedMountEvidence {
+                field: "source_owned_mount_path_recorded",
+            },
+        );
+    }
+    if source.root_token != source.root.state_node_handle() {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::SourceMismatch {
+                field: "root_token",
+            },
+        );
+    }
+    if !source
+        .finished_work_handoff
+        .proves_private_finished_work_commit_execution()
+        || !source.finished_work_handoff.mutation_execution_blocked()
+        || !source.finished_work_handoff.public_root_rendering_blocked()
+        || !source
+            .finished_work_handoff
+            .effects_refs_and_hydration_blocked()
+    {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::MissingAcceptedMountEvidence {
+                field: "finished_work_handoff",
+            },
+        );
+    }
+
+    let commit = source.finished_work_handoff.commit();
+    if commit.root() != source.root
+        || commit.previous_current() != source.previous_current
+        || commit.current() != source.committed_current
+        || commit.finished_lanes() != source.render_lanes
+    {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::SourceMismatch {
+                field: "commit",
+            },
+        );
+    }
+
+    let root = store.root(source.root)?;
+    if root.current() != source.committed_current {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::StaleOrClonedMountEvidence {
+                field: "root.current",
+            },
+        );
+    }
+    if root.finished_work() != source.finished_work_after_commit {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::StaleOrClonedMountEvidence {
+                field: "root.finished_work",
+            },
+        );
+    }
+    if root.finished_lanes() != source.finished_lanes_after_commit {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::StaleOrClonedMountEvidence {
+                field: "root.finished_lanes",
+            },
+        );
+    }
+
+    let root_node = store.fiber_arena().get(source.committed_current)?;
+    if root_node.tag() != FiberTag::HostRoot || root_node.child() != Some(source.function_component)
+    {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::StaleOrClonedMountEvidence {
+                field: "committed_root.child",
+            },
+        );
+    }
+    let function_node = store.fiber_arena().get(source.function_component)?;
+    if function_node.tag() != FiberTag::FunctionComponent
+        || function_node.fiber_type() != source.function_component_type
+        || function_node.pending_props() != source.function_component_pending_props
+        || function_node.memoized_props() != source.function_component_memoized_props
+        || function_node.child() != Some(source.child)
+        || function_node.sibling().is_some()
+    {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::StaleOrClonedMountEvidence {
+                field: "function_component",
+            },
+        );
+    }
+    let child_node = store.fiber_arena().get(source.child)?;
+    if child_node.tag() != source.child_tag
+        || child_node.return_fiber() != Some(source.function_component)
+        || child_node.memoized_props() != source.child_props
+    {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::StaleOrClonedMountEvidence {
+                field: "single_child",
+            },
+        );
+    }
+    if source.single_child.function_component() != source.function_component
+        || source.single_child.child_element() != source.child_element
+        || source.single_child.child_tag() != source.child_tag
+        || source.single_child.child_props() != source.child_props
+        || source.complete_work.root() != source.root
+        || source.complete_work.host_root_work_in_progress() != source.committed_current
+        || source.complete_work.root_child() != Some(source.function_component)
+        || source.complete_work.completed_child() != Some(source.child)
+        || source.complete_work.completed_child_tag() != Some(source.child_tag)
+    {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::SourceMismatch {
+                field: "source_rows",
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    source: &HostRootFunctionComponentSingleChildMountBailoutSourceForCanary,
+    request: HostRootFunctionComponentBailoutConsumerRequestForCanary,
+    context_store: &FunctionComponentContextRenderStore,
+) -> Result<
+    HostRootFunctionComponentBailoutConsumerRecordForCanary,
+    HostRootFunctionComponentBailoutConsumerErrorForCanary,
+> {
+    if let Some(surface) = request.compatibility_claims().claimed_surface() {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::CompatibilityClaim { surface },
+        );
+    }
+    validate_function_component_single_child_mount_bailout_source_for_canary(store, source)?;
+    validate_completed_host_root_render_for_complete_work_handoff(store, render).map_err(
+        |error| {
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::RenderPhase(Box::new(error))
+        },
+    )?;
+
+    if render.root() != source.root {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::SourceMismatch {
+                field: "render.root",
+            },
+        );
+    }
+    if render.current() != source.committed_current {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::StaleOrClonedMountEvidence {
+                field: "render.current",
+            },
+        );
+    }
+
+    let root_current_before = store.root(source.root)?.current();
+    let host_operation_count_before = host.operations().len();
+    let validated = validate_host_root_child_preflight(
+        store,
+        render.root(),
+        render.work_in_progress(),
+        render.render_lanes(),
+    )?;
+    let child = validated.child.ok_or(
+        HostRootFunctionComponentBailoutConsumerErrorForCanary::MissingFunctionComponentChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    let child_tag = validated.child_tag.ok_or(
+        HostRootFunctionComponentBailoutConsumerErrorForCanary::MissingFunctionComponentChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    if child != request.function_component_work_in_progress() {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::FunctionComponentWorkMismatch {
+                expected: request.function_component_work_in_progress(),
+                actual: child,
+            },
+        );
+    }
+    if child_tag != FiberTag::FunctionComponent {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::ExpectedFunctionComponentChild {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                child,
+                tag: child_tag,
+            },
+        );
+    }
+    let actual_alternate = store.fiber_arena().get(child)?.alternate();
+    if actual_alternate != Some(source.function_component) {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::FunctionComponentAlternateMismatch {
+                current: source.function_component,
+                work_in_progress: child,
+                actual_alternate,
+            },
+        );
+    }
+
+    let bailout_blocker = begin_work_function_component_bailout_blocker_for_test(
+        store.fiber_arena_mut(),
+        BeginWorkRequest::new(child, render.render_lanes()),
+        context_store.context_dependencies(),
+    )?;
+    let root_current_after = store.root(source.root)?.current();
+    let host_operation_count_after = host.operations().len();
+    if root_current_after != root_current_before {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::RootCurrentSwitched {
+                before: root_current_before,
+                after: root_current_after,
+            },
+        );
+    }
+    if host_operation_count_after != host_operation_count_before {
+        return Err(
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::HostOutputMutated {
+                before: host_operation_count_before,
+                after: host_operation_count_after,
+            },
+        );
+    }
+
+    Ok(HostRootFunctionComponentBailoutConsumerRecordForCanary {
+        root: render.root(),
+        host_root_work_in_progress: render.work_in_progress(),
+        previous_current: source.previous_current,
+        function_component_current: source.function_component,
+        function_component_work_in_progress: child,
+        mount_source: source.clone(),
+        bailout_blocker,
+        root_current_before,
+        root_current_after,
+        host_operation_count_before,
+        host_operation_count_after,
+    })
 }
 
 #[cfg(test)]
@@ -7481,6 +8475,95 @@ mod tests {
             finished_work_handoff,
             host_work,
         }
+    }
+
+    struct FunctionComponentBailoutConsumerFixture {
+        store: FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        host: RecordingHost,
+        source: HostRootFunctionComponentSingleChildMountBailoutSourceForCanary,
+        render: HostRootRenderPhaseRecord,
+        function_component_work_in_progress: FiberId,
+    }
+
+    fn function_component_bailout_consumer_fixture(
+        raw: u64,
+    ) -> FunctionComponentBailoutConsumerFixture {
+        let (mut store, root_id, mut host) = root_store();
+        let mut host_source = TestHostTree::new();
+        let child_element = host_source.insert_text("function bailout mounted child");
+        let mount = function_component_single_child_commit_fixture(
+            &mut store,
+            &mut host,
+            root_id,
+            &host_source,
+            RootElementHandle::from_raw(raw),
+            child_element,
+        );
+        let source = record_function_component_single_child_mount_bailout_source_for_canary(
+            &store,
+            mount.render,
+            mount.function_component,
+            mount.single_child,
+            mount.complete_work,
+            mount.finished_work_handoff.clone(),
+        )
+        .unwrap();
+
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(raw + 10_000),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let function_component_work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(
+                source.function_component(),
+                source.function_component_memoized_props(),
+            )
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(
+                render.work_in_progress(),
+                &[function_component_work_in_progress],
+            )
+            .unwrap();
+
+        FunctionComponentBailoutConsumerFixture {
+            store,
+            root_id,
+            host,
+            source,
+            render,
+            function_component_work_in_progress,
+        }
+    }
+
+    fn assert_function_component_bailout_consumer_failure_is_inert(
+        fixture: &FunctionComponentBailoutConsumerFixture,
+        host_operation_count_before: usize,
+    ) {
+        assert_eq!(
+            fixture.store.root(fixture.root_id).unwrap().current(),
+            fixture.source.committed_current()
+        );
+        assert_eq!(fixture.host.operations().len(), host_operation_count_before);
+        assert_eq!(
+            fixture.store.root(fixture.root_id).unwrap().finished_work(),
+            None
+        );
+        assert_eq!(
+            fixture
+                .store
+                .root(fixture.root_id)
+                .unwrap()
+                .finished_lanes(),
+            Lanes::NO
+        );
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20603,6 +21686,662 @@ mod tests {
             expected_operations.push("append_child_to_container");
             assert_eq!(host.operations(), expected_operations);
         }
+    }
+
+    #[test]
+    fn root_work_loop_function_component_bailout_consumes_begin_work_blocker_after_single_child_mount()
+     {
+        let mut fixture = function_component_bailout_consumer_fixture(982_001);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(
+            fixture.source.function_component_type(),
+            Ok(FunctionComponentOutputHandle::from_raw(982_901)),
+        );
+        let context_store = FunctionComponentContextRenderStore::new();
+        let operations_before = fixture.host.operations();
+        let root_current_before = fixture.store.root(fixture.root_id).unwrap().current();
+
+        let record =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut fixture.store,
+                &fixture.host,
+                fixture.render,
+                &fixture.source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    fixture.function_component_work_in_progress,
+                ),
+                &context_store,
+            )
+            .unwrap();
+
+        assert_eq!(record.root(), fixture.root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            fixture.render.work_in_progress()
+        );
+        assert_eq!(record.previous_current(), fixture.source.previous_current());
+        assert_eq!(
+            record.function_component_current(),
+            fixture.source.function_component()
+        );
+        assert_eq!(
+            record.function_component_work_in_progress(),
+            fixture.function_component_work_in_progress
+        );
+        assert_eq!(record.mount_source().root(), fixture.root_id);
+        assert_eq!(
+            record.mount_source().root_token(),
+            fixture.root_id.state_node_handle()
+        );
+        assert_eq!(
+            record.mount_source().root_element(),
+            RootElementHandle::from_raw(982_001)
+        );
+        assert_eq!(record.mount_source().render_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            record.mount_source().single_child(),
+            fixture.source.single_child()
+        );
+        assert_eq!(
+            record.mount_source().complete_work(),
+            fixture.source.complete_work()
+        );
+        assert_eq!(
+            record
+                .mount_source()
+                .finished_work_handoff()
+                .current_after_commit(),
+            fixture.source.committed_current()
+        );
+        assert_eq!(record.mount_source().child(), fixture.source.child());
+        assert_eq!(
+            record.mount_source().child_tag(),
+            fixture.source.child_tag()
+        );
+        assert_eq!(
+            record.mount_source().child_element(),
+            fixture.source.child_element()
+        );
+        assert_eq!(
+            record.mount_source().child_props(),
+            fixture.source.child_props()
+        );
+        assert!(record.mount_source().source_owned_mount_path_recorded());
+        assert!(!record.mount_source().caller_built());
+        assert!(!record.mount_source().public_compatibility_claimed());
+        assert!(!record.mount_source().public_root_compatibility_claimed());
+        assert!(!record.mount_source().react_dom_compatibility_claimed());
+        assert!(
+            !record
+                .mount_source()
+                .native_renderer_compatibility_claimed()
+        );
+        assert!(!record.mount_source().test_renderer_compatibility_claimed());
+        assert!(!record.mount_source().scheduler_compatibility_claimed());
+        assert!(!record.mount_source().package_compatibility_claimed());
+        assert!(record.mount_source().compatibility_claim_blocked());
+
+        let blocker = record.bailout_blocker();
+        assert_eq!(blocker.current(), fixture.source.function_component());
+        assert_eq!(
+            blocker.work_in_progress(),
+            fixture.function_component_work_in_progress
+        );
+        assert_eq!(
+            blocker.pending_props(),
+            fixture.source.function_component_memoized_props()
+        );
+        assert_eq!(
+            blocker.memoized_props(),
+            fixture.source.function_component_memoized_props()
+        );
+        assert_eq!(blocker.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(blocker.context_dependency_count(), 0);
+        assert_eq!(blocker.context_dependency_lanes(), Lanes::NO);
+        assert_eq!(blocker.child_to_visit(), None);
+        assert!(blocker.child_traversal_blocked());
+        assert!(record.same_props_proven());
+        assert!(record.no_relevant_component_lanes());
+        assert!(record.no_context_lane());
+        assert!(record.no_child_lane_traversal());
+        assert!(record.consumed_worker_921_begin_work_blocker());
+        assert!(record.component_invocation_blocked());
+        assert!(record.host_output_unchanged());
+        assert!(record.current_switch_blocked());
+        assert!(record.public_renderer_behavior_blocked());
+        assert!(record.compatibility_claim_blocked());
+        assert!(!record.public_compatibility_claimed());
+        assert!(!record.public_root_compatibility_claimed());
+        assert!(!record.react_dom_compatibility_claimed());
+        assert!(!record.native_renderer_compatibility_claimed());
+        assert!(!record.test_renderer_compatibility_claimed());
+        assert!(!record.scheduler_compatibility_claimed());
+        assert!(!record.package_compatibility_claimed());
+        assert_eq!(registry.calls(), &[]);
+        assert_eq!(fixture.host.operations(), operations_before);
+        assert_eq!(
+            record.host_operation_count_before(),
+            operations_before.len()
+        );
+        assert_eq!(record.host_operation_count_after(), operations_before.len());
+        assert_eq!(record.root_current_before(), root_current_before);
+        assert_eq!(record.root_current_after(), root_current_before);
+        assert_eq!(
+            fixture.store.root(fixture.root_id).unwrap().current(),
+            fixture.source.committed_current()
+        );
+        assert_eq!(
+            fixture.store.root(fixture.root_id).unwrap().finished_work(),
+            None
+        );
+        assert_eq!(
+            fixture
+                .store
+                .root(fixture.root_id)
+                .unwrap()
+                .finished_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            fixture
+                .store
+                .fiber_arena()
+                .get(fixture.function_component_work_in_progress)
+                .unwrap()
+                .child(),
+            None
+        );
+    }
+
+    #[test]
+    fn root_work_loop_function_component_bailout_rejects_props_lanes_context_and_child_lanes() {
+        let mut props_fixture = function_component_bailout_consumer_fixture(982_020);
+        let props_operations = props_fixture.host.operations().len();
+        let changed_props = PropsHandle::from_raw(982_021);
+        props_fixture
+            .store
+            .fiber_arena_mut()
+            .get_mut(props_fixture.function_component_work_in_progress)
+            .unwrap()
+            .set_pending_props(changed_props);
+        let props_error =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut props_fixture.store,
+                &props_fixture.host,
+                props_fixture.render,
+                &props_fixture.source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    props_fixture.function_component_work_in_progress,
+                ),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            props_error,
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::BeginWorkBailout(
+                FunctionComponentBeginWorkBailoutBlockerError::PropsChanged {
+                    pending_props,
+                    ..
+                }
+            ) if pending_props == changed_props
+        ));
+        assert_function_component_bailout_consumer_failure_is_inert(
+            &props_fixture,
+            props_operations,
+        );
+
+        let mut lane_fixture = function_component_bailout_consumer_fixture(982_030);
+        let lane_operations = lane_fixture.host.operations().len();
+        lane_fixture
+            .store
+            .fiber_arena_mut()
+            .get_mut(lane_fixture.source.function_component())
+            .unwrap()
+            .set_lanes(Lanes::DEFAULT.merge_lane(Lane::TRANSITION_1));
+        let lane_error =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut lane_fixture.store,
+                &lane_fixture.host,
+                lane_fixture.render,
+                &lane_fixture.source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    lane_fixture.function_component_work_in_progress,
+                ),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            lane_error,
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::BeginWorkBailout(
+                FunctionComponentBeginWorkBailoutBlockerError::ScheduledUpdate {
+                    current_lanes,
+                    ..
+                }
+            ) if current_lanes == Lanes::DEFAULT.merge_lane(Lane::TRANSITION_1)
+        ));
+        assert_function_component_bailout_consumer_failure_is_inert(&lane_fixture, lane_operations);
+
+        let mut context_fixture = function_component_bailout_consumer_fixture(982_040);
+        let context_operations = context_fixture.host.operations().len();
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(982_041);
+        let previous_value = context_value(982_042);
+        let next_value = context_value(982_043);
+        let context = context_store.create_context(default_value);
+        let provider_snapshot = context_store
+            .push_provider(context, previous_value)
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            context_fixture.source.function_component_type(),
+            UseContextBehavior::ReadOnce { context },
+        );
+        let context_render = begin_work_function_component_use_context(
+            context_fixture.store.fiber_arena_mut(),
+            BeginWorkRequest::new(
+                context_fixture.function_component_work_in_progress,
+                Lanes::DEFAULT,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap()
+        .render();
+        context_store.restore_snapshot(provider_snapshot).unwrap();
+        let propagation = propagate_context_change_to_function_component_dependencies(
+            &mut context_fixture.store,
+            &mut context_store,
+            context_render,
+            FunctionComponentContextChangePropagationRequest::new(
+                ContextValueChange::new(context, previous_value, next_value),
+                Lanes::DEFAULT,
+            ),
+        )
+        .unwrap();
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(propagation.marked_dependency_count(), 1);
+        let context_error =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut context_fixture.store,
+                &context_fixture.host,
+                context_fixture.render,
+                &context_fixture.source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    context_fixture.function_component_work_in_progress,
+                ),
+                &context_store,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            context_error,
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::BeginWorkBailout(
+                FunctionComponentBeginWorkBailoutBlockerError::ContextChanged {
+                    context_dependency_count: 1,
+                    context_dependency_lanes,
+                    ..
+                }
+            ) if context_dependency_lanes == Lanes::DEFAULT
+        ));
+        assert_function_component_bailout_consumer_failure_is_inert(
+            &context_fixture,
+            context_operations,
+        );
+
+        let mut child_lane_fixture = function_component_bailout_consumer_fixture(982_050);
+        let child_lane_operations = child_lane_fixture.host.operations().len();
+        let child_work_in_progress = child_lane_fixture
+            .store
+            .fiber_arena_mut()
+            .create_work_in_progress(
+                child_lane_fixture.source.child(),
+                child_lane_fixture.source.child_props(),
+            )
+            .unwrap();
+        child_lane_fixture
+            .store
+            .fiber_arena_mut()
+            .set_children(
+                child_lane_fixture.function_component_work_in_progress,
+                &[child_work_in_progress],
+            )
+            .unwrap();
+        child_lane_fixture
+            .store
+            .fiber_arena_mut()
+            .get_mut(child_lane_fixture.function_component_work_in_progress)
+            .unwrap()
+            .set_child_lanes(Lanes::DEFAULT);
+        let child_lane_error =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut child_lane_fixture.store,
+                &child_lane_fixture.host,
+                child_lane_fixture.render,
+                &child_lane_fixture.source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    child_lane_fixture.function_component_work_in_progress,
+                ),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            child_lane_error,
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::BeginWorkBailout(
+                FunctionComponentBeginWorkBailoutBlockerError::ChildLanesIntersectRenderLanes {
+                    child: Some(child),
+                    child_lanes,
+                    ..
+                }
+            ) if child == child_work_in_progress && child_lanes == Lanes::DEFAULT
+        ));
+        assert_function_component_bailout_consumer_failure_is_inert(
+            &child_lane_fixture,
+            child_lane_operations,
+        );
+    }
+
+    #[test]
+    fn root_work_loop_function_component_bailout_rejects_memo_and_unsupported_tag_smuggling() {
+        for (index, tag) in [FiberTag::MemoComponent, FiberTag::SimpleMemoComponent]
+            .into_iter()
+            .enumerate()
+        {
+            let mut fixture = function_component_bailout_consumer_fixture(982_100 + index as u64);
+            let operations = fixture.host.operations().len();
+            let smuggled = fixture.store.fiber_arena_mut().create_fiber(
+                tag,
+                None,
+                fixture.source.function_component_memoized_props(),
+                FiberMode::NO,
+            );
+            fixture
+                .store
+                .fiber_arena_mut()
+                .set_children(fixture.render.work_in_progress(), &[smuggled])
+                .unwrap();
+
+            let error = consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut fixture.store,
+                &fixture.host,
+                fixture.render,
+                &fixture.source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(smuggled),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+
+            assert!(matches!(
+                error,
+                HostRootFunctionComponentBailoutConsumerErrorForCanary::ExpectedFunctionComponentChild {
+                    child,
+                    tag: actual,
+                    ..
+                } if child == smuggled && actual == tag
+            ));
+            assert_function_component_bailout_consumer_failure_is_inert(&fixture, operations);
+        }
+
+        let mut unsupported_fixture = function_component_bailout_consumer_fixture(982_120);
+        let operations = unsupported_fixture.host.operations().len();
+        let unsupported = unsupported_fixture.store.fiber_arena_mut().create_fiber(
+            FiberTag::ViewTransition,
+            None,
+            PropsHandle::from_raw(982_121),
+            FiberMode::NO,
+        );
+        unsupported_fixture
+            .store
+            .fiber_arena_mut()
+            .set_children(
+                unsupported_fixture.render.work_in_progress(),
+                &[unsupported],
+            )
+            .unwrap();
+        let error =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut unsupported_fixture.store,
+                &unsupported_fixture.host,
+                unsupported_fixture.render,
+                &unsupported_fixture.source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(unsupported),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::ChildPreflight(error)
+                if matches!(
+                    *error,
+                    HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
+                        fiber,
+                        tag: FiberTag::ViewTransition,
+                        ..
+                    } if fiber == unsupported
+                )
+        ));
+        assert_function_component_bailout_consumer_failure_is_inert(
+            &unsupported_fixture,
+            operations,
+        );
+    }
+
+    #[test]
+    fn root_work_loop_function_component_bailout_rejects_stale_cloned_and_caller_shaped_mount_evidence()
+     {
+        let mut caller_fixture = function_component_bailout_consumer_fixture(982_200);
+        let caller_operations = caller_fixture.host.operations().len();
+        let mut caller_source = caller_fixture.source.clone();
+        caller_source.caller_built = true;
+        let caller_error =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut caller_fixture.store,
+                &caller_fixture.host,
+                caller_fixture.render,
+                &caller_source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    caller_fixture.function_component_work_in_progress,
+                ),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+        assert_eq!(
+            caller_error,
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::CallerShapedMountEvidence
+        );
+        assert_function_component_bailout_consumer_failure_is_inert(
+            &caller_fixture,
+            caller_operations,
+        );
+
+        let mut missing_fixture = function_component_bailout_consumer_fixture(982_210);
+        let missing_operations = missing_fixture.host.operations().len();
+        let mut missing_source = missing_fixture.source.clone();
+        missing_source.source_owned_mount_path_recorded = false;
+        let missing_error =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut missing_fixture.store,
+                &missing_fixture.host,
+                missing_fixture.render,
+                &missing_source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    missing_fixture.function_component_work_in_progress,
+                ),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+        assert_eq!(
+            missing_error,
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::MissingAcceptedMountEvidence {
+                field: "source_owned_mount_path_recorded"
+            }
+        );
+        assert_function_component_bailout_consumer_failure_is_inert(
+            &missing_fixture,
+            missing_operations,
+        );
+
+        let mut caller_row_fixture = function_component_bailout_consumer_fixture(982_220);
+        let caller_row_operations = caller_row_fixture.host.operations().len();
+        let mut caller_row_source = caller_row_fixture.source.clone();
+        caller_row_source.child_props = PropsHandle::from_raw(982_221);
+        let caller_row_error =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut caller_row_fixture.store,
+                &caller_row_fixture.host,
+                caller_row_fixture.render,
+                &caller_row_source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    caller_row_fixture.function_component_work_in_progress,
+                ),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+        assert_eq!(
+            caller_row_error,
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::StaleOrClonedMountEvidence {
+                field: "single_child"
+            }
+        );
+        assert_function_component_bailout_consumer_failure_is_inert(
+            &caller_row_fixture,
+            caller_row_operations,
+        );
+
+        let mut stale_fixture = function_component_bailout_consumer_fixture(982_230);
+        let stale_source = stale_fixture.source.clone();
+        let stale_render = stale_fixture.render;
+        let stale_work_in_progress = stale_fixture.function_component_work_in_progress;
+        let mut replacement_source = TestHostTree::new();
+        let replacement = replacement_source.insert_text("replacement after cloned source");
+        update_container(
+            &mut stale_fixture.store,
+            stale_fixture.root_id,
+            replacement,
+            None,
+        )
+        .unwrap();
+        let replacement_render = render_host_root_for_lanes(
+            &mut stale_fixture.store,
+            stale_fixture.root_id,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        let _replacement_complete = handoff_completed_host_root_render_to_test_complete_work(
+            &mut stale_fixture.store,
+            &mut stale_fixture.host,
+            replacement_render,
+            &replacement_source,
+        )
+        .unwrap();
+        let _replacement_commit =
+            commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+                &mut stale_fixture.store,
+                replacement_render,
+                982_231,
+                982_232,
+            )
+            .unwrap();
+        let operations_after_replacement = stale_fixture.host.operations().len();
+
+        let stale_error =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut stale_fixture.store,
+                &stale_fixture.host,
+                stale_render,
+                &stale_source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    stale_work_in_progress,
+                ),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+        assert_eq!(
+            stale_error,
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::StaleOrClonedMountEvidence {
+                field: "root.current"
+            }
+        );
+        assert_eq!(
+            stale_fixture.host.operations().len(),
+            operations_after_replacement
+        );
+        assert_ne!(
+            stale_fixture
+                .store
+                .root(stale_fixture.root_id)
+                .unwrap()
+                .current(),
+            stale_source.committed_current()
+        );
+    }
+
+    #[test]
+    fn root_work_loop_function_component_bailout_rejects_public_renderer_scheduler_and_package_claims()
+     {
+        for (index, surface) in [
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Public,
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::PublicRoot,
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::ReactDom,
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::NativeRenderer,
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::ReactTestRenderer,
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Scheduler,
+            HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Package,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut fixture = function_component_bailout_consumer_fixture(982_300 + index as u64);
+            let operations = fixture.host.operations().len();
+            let error = consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut fixture.store,
+                &fixture.host,
+                fixture.render,
+                &fixture.source,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    fixture.function_component_work_in_progress,
+                )
+                .with_compatibility_claim(surface),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+
+            assert_eq!(
+                error,
+                HostRootFunctionComponentBailoutConsumerErrorForCanary::CompatibilityClaim {
+                    surface
+                }
+            );
+            assert_function_component_bailout_consumer_failure_is_inert(&fixture, operations);
+        }
+
+        let mut source_claim_fixture = function_component_bailout_consumer_fixture(982_330);
+        let operations = source_claim_fixture.host.operations().len();
+        let mut source_claim = source_claim_fixture.source.clone();
+        source_claim.compatibility_claims =
+            HostRootFunctionComponentBailoutCompatibilityClaimsForCanary::none()
+                .with_claim(HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Package);
+        let error =
+            consume_root_work_loop_function_component_bailout_after_single_child_mount_for_canary(
+                &mut source_claim_fixture.store,
+                &source_claim_fixture.host,
+                source_claim_fixture.render,
+                &source_claim,
+                HostRootFunctionComponentBailoutConsumerRequestForCanary::new(
+                    source_claim_fixture.function_component_work_in_progress,
+                ),
+                &FunctionComponentContextRenderStore::new(),
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootFunctionComponentBailoutConsumerErrorForCanary::CompatibilityClaim {
+                surface: HostRootFunctionComponentBailoutCompatibilitySurfaceForCanary::Package
+            }
+        );
+        assert_function_component_bailout_consumer_failure_is_inert(
+            &source_claim_fixture,
+            operations,
+        );
     }
 
     #[test]
