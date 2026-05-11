@@ -51,6 +51,27 @@ export const PRIVATE_DIAGNOSTIC_COMPATIBILITY_STATUS =
 export const DIAGNOSTIC_TIMING_STATUS = "diagnostic-only";
 export const TIMING_DATA_POLICY = "diagnostic-until-compatible";
 
+const RESULT_PROPERTY_NAMES = Object.freeze([
+  "schemaVersion",
+  "kind",
+  "manifestId",
+  "generatedTimestampIncluded",
+  "scenarioResults"
+]);
+
+const SCENARIO_RESULT_PROPERTY_NAMES = Object.freeze([
+  "scenarioId",
+  "implementation",
+  "lane",
+  "timingStatus"
+]);
+
+const ACCEPTED_GATE_COMMAND_PREFIXES = Object.freeze([
+  "cargo test ",
+  "node --test ",
+  "npm run "
+]);
+
 const DEFAULT_BENCHMARK_ROOT = path.resolve(
   fileURLToPath(new URL("..", import.meta.url))
 );
@@ -237,6 +258,7 @@ export function validateBenchmarkResult(result, options = {}) {
     return [`${label}: result must be a JSON object`];
   }
 
+  validateAllowedProperties(result, RESULT_PROPERTY_NAMES, label, errors);
   requireEqual(result.schemaVersion, 1, `${label}: schemaVersion`, errors);
   requireEqual(
     result.kind,
@@ -265,6 +287,17 @@ export function validateBenchmarkResult(result, options = {}) {
   const scenarioById = new Map(
     (manifest?.scenarios ?? []).map((scenario) => [scenario.id, scenario])
   );
+  const gateById = new Map(
+    (manifest?.conformanceGates ?? []).map((gate) => [gate.id, gate])
+  );
+  const requiredScenarioIds = Array.isArray(manifest?.requiredScenarioIds)
+    ? manifest.requiredScenarioIds.filter(
+        (scenarioId) => typeof scenarioId === "string"
+      )
+    : [];
+  const requiredScenarioIdSet = new Set(requiredScenarioIds);
+  const coveredRequiredScenarioIds = new Set();
+  const seenScenarioLaneRows = new Set();
 
   for (const scenarioResult of result.scenarioResults) {
     if (!isPlainObject(scenarioResult)) {
@@ -272,6 +305,15 @@ export function validateBenchmarkResult(result, options = {}) {
       continue;
     }
 
+    const scenarioResultLabel = `${label}: result scenario ${String(
+      scenarioResult.scenarioId
+    )}`;
+    validateAllowedProperties(
+      scenarioResult,
+      SCENARIO_RESULT_PROPERTY_NAMES,
+      scenarioResultLabel,
+      errors
+    );
     requireString(
       scenarioResult.scenarioId,
       `${label}: scenarioResult.scenarioId`,
@@ -284,6 +326,19 @@ export function validateBenchmarkResult(result, options = {}) {
     );
     requireString(scenarioResult.lane, `${label}: scenarioResult.lane`, errors);
 
+    if (
+      typeof scenarioResult.scenarioId === "string" &&
+      typeof scenarioResult.lane === "string"
+    ) {
+      const rowKey = `${scenarioResult.scenarioId}\u0000${scenarioResult.lane}`;
+      if (seenScenarioLaneRows.has(rowKey)) {
+        errors.push(
+          `${label}: duplicate result row for scenario ${scenarioResult.scenarioId} lane ${scenarioResult.lane}`
+        );
+      }
+      seenScenarioLaneRows.add(rowKey);
+    }
+
     if (!TIMING_STATUSES.includes(scenarioResult.timingStatus)) {
       errors.push(
         `${label}: unknown timingStatus ${String(
@@ -291,6 +346,15 @@ export function validateBenchmarkResult(result, options = {}) {
         )} for result scenario ${String(scenarioResult.scenarioId)}`
       );
       continue;
+    }
+
+    if (
+      typeof scenarioResult.scenarioId === "string" &&
+      !requiredScenarioIdSet.has(scenarioResult.scenarioId)
+    ) {
+      errors.push(
+        `${scenarioResultLabel}: scenarioId is not listed in manifest.requiredScenarioIds`
+      );
     }
 
     const scenario = scenarioById.get(scenarioResult.scenarioId);
@@ -303,12 +367,31 @@ export function validateBenchmarkResult(result, options = {}) {
       continue;
     }
 
-    validateTimingCompatibilityPair(
-      scenario.compatibilityStatus,
-      scenarioResult.timingStatus,
-      `${label}: result scenario ${scenarioResult.scenarioId}`,
+    if (requiredScenarioIdSet.has(scenarioResult.scenarioId)) {
+      coveredRequiredScenarioIds.add(scenarioResult.scenarioId);
+    }
+
+    const gates = collectScenarioGates(
+      scenario,
+      gateById,
+      scenarioResultLabel,
       errors
     );
+    validateResultTimingAdmission(
+      scenario,
+      scenarioResult.timingStatus,
+      gates,
+      scenarioResultLabel,
+      errors
+    );
+  }
+
+  for (const requiredScenarioId of requiredScenarioIds) {
+    if (!coveredRequiredScenarioIds.has(requiredScenarioId)) {
+      errors.push(
+        `${label}: missing required scenario result ${requiredScenarioId}`
+      );
+    }
   }
 
   return errors;
@@ -366,6 +449,24 @@ function validateSchemaFiles({ benchmarkRoot }, errors) {
     resultSchema.$defs?.timingStatus?.enum,
     TIMING_STATUSES,
     "benchmark result schema: timingStatus enum",
+    errors
+  );
+  requireEqual(
+    resultSchema.additionalProperties,
+    false,
+    "benchmark result schema: additionalProperties",
+    errors
+  );
+  requireEqual(
+    resultSchema.$defs?.scenarioResult?.additionalProperties,
+    false,
+    "benchmark result schema: scenarioResult additionalProperties",
+    errors
+  );
+  requireExactArray(
+    resultSchema.$defs?.scenarioResult?.required,
+    SCENARIO_RESULT_PROPERTY_NAMES,
+    "benchmark result schema: scenarioResult required",
     errors
   );
   requireExactArray(
@@ -675,6 +776,95 @@ function validateTimingCompatibilityPair(
   }
 }
 
+function collectScenarioGates(scenario, gateById, label, errors) {
+  if (!Array.isArray(scenario.conformanceGateIds)) {
+    errors.push(
+      `${label}: manifest scenario conformanceGateIds must be an array`
+    );
+    return [];
+  }
+
+  const gates = [];
+  for (const gateId of scenario.conformanceGateIds) {
+    const gate = gateById.get(gateId);
+    if (!gate) {
+      errors.push(`${label}: unknown conformance gate ${String(gateId)}`);
+      continue;
+    }
+    gates.push(gate);
+  }
+  return gates;
+}
+
+function validateResultTimingAdmission(
+  scenario,
+  timingStatus,
+  gates,
+  label,
+  errors
+) {
+  validateTimingCompatibilityPair(
+    scenario.compatibilityStatus,
+    timingStatus,
+    label,
+    errors
+  );
+
+  if (timingStatus === "not-collected") {
+    return;
+  }
+
+  if (timingStatus === DIAGNOSTIC_TIMING_STATUS) {
+    if (!isPrivateDiagnosticScenario(scenario)) {
+      errors.push(
+        `${label}: diagnostic-only result timing requires a private diagnostic scenario with compatibilityStatus ${PRIVATE_DIAGNOSTIC_COMPATIBILITY_STATUS} and timingStatus ${DIAGNOSTIC_TIMING_STATUS}; public performance proof is blocked`
+      );
+      return;
+    }
+    validateDiagnosticPrivateGateAdmission(gates, label, errors);
+    return;
+  }
+
+  if (CLAIM_CAPABLE_TIMING_STATUSES.includes(timingStatus)) {
+    if (!CLAIM_CAPABLE_TIMING_STATUSES.includes(scenario.timingStatus)) {
+      errors.push(
+        `${label}: timingStatus ${timingStatus} requires a claim-capable manifest scenario timingStatus`
+      );
+    }
+    if (scenario.compatibilityStatus === GREEN_COMPATIBILITY_STATUS) {
+      validateResultGreenGateAdmission(gates, label, errors);
+    }
+    return;
+  }
+
+  if (timingStatus !== scenario.timingStatus) {
+    errors.push(
+      `${label}: timingStatus ${timingStatus} is not admitted by manifest scenario timingStatus ${String(
+        scenario.timingStatus
+      )}`
+    );
+  }
+}
+
+function validateResultGreenGateAdmission(gates, label, errors) {
+  if (gates.length === 0) {
+    errors.push(`${label}: claim-capable timing requires conformance gates`);
+    return;
+  }
+
+  for (const gate of gates) {
+    if (
+      gate.acceptedGate?.status !== "green-admitted" ||
+      gate.acceptedGate?.admitted !== true ||
+      gate.acceptedGate?.compatibilityClaimed !== true
+    ) {
+      errors.push(
+        `${label}: claim-capable timing requires ${gate.id} acceptedGate.status=green-admitted, admitted=true, and compatibilityClaimed=true`
+      );
+    }
+  }
+}
+
 function validateAcceptedGate(acceptedGate, label, errors) {
   if (acceptedGate === undefined) {
     return;
@@ -686,6 +876,7 @@ function validateAcceptedGate(acceptedGate, label, errors) {
 
   requireString(acceptedGate.id, `${label}.id`, errors);
   requireString(acceptedGate.command, `${label}.command`, errors);
+  validateRunnableAcceptedGateCommand(acceptedGate.command, label, errors);
   if (!ACCEPTED_GATE_STATUSES.includes(acceptedGate.status)) {
     errors.push(`${label}: unknown status ${String(acceptedGate.status)}`);
   }
@@ -723,6 +914,41 @@ function validateAcceptedGate(acceptedGate, label, errors) {
         acceptedGate.status
       )} requires admitted=false and compatibilityClaimed=false`
     );
+  }
+}
+
+function validateRunnableAcceptedGateCommand(command, label, errors) {
+  if (typeof command !== "string" || command.length === 0) {
+    return;
+  }
+
+  if (/[`$<>;|]/.test(command) || command.includes("||")) {
+    errors.push(
+      `${label}.command must be runnable command segments joined only with &&`
+    );
+  }
+
+  const segments = command.split("&&").map((segment) => segment.trim());
+  if (
+    segments.length === 0 ||
+    segments.some((segment) => segment.length === 0)
+  ) {
+    errors.push(`${label}.command must contain non-empty command segments`);
+    return;
+  }
+
+  for (const segment of segments) {
+    if (
+      !ACCEPTED_GATE_COMMAND_PREFIXES.some((prefix) =>
+        segment.startsWith(prefix)
+      )
+    ) {
+      errors.push(
+        `${label}.command segment ${JSON.stringify(
+          segment
+        )} must start with npm run, node --test, or cargo test`
+      );
+    }
   }
 }
 
@@ -879,6 +1105,15 @@ function requireExactArray(actual, expected, label, errors) {
     errors.push(
       `${label} must equal ${JSON.stringify(expected)}; saw ${JSON.stringify(actual)}`
     );
+  }
+}
+
+function validateAllowedProperties(value, allowedProperties, label, errors) {
+  const allowedPropertySet = new Set(allowedProperties);
+  for (const propertyName of Object.keys(value)) {
+    if (!allowedPropertySet.has(propertyName)) {
+      errors.push(`${label}: unsupported property ${propertyName}`);
+    }
   }
 }
 

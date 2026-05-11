@@ -27,6 +27,7 @@
     },
     "scenarioResults": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "$ref": "#/$defs/scenarioResult"
       }
@@ -47,7 +48,7 @@
     },
     "scenarioResult": {
       "type": "object",
-      "additionalProperties": true,
+      "additionalProperties": false,
       "required": ["scenarioId", "implementation", "lane", "timingStatus"],
       "properties": {
         "scenarioId": {

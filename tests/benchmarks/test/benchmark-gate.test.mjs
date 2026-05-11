@@ -411,10 +411,143 @@ test("benchmark result gate rejects green timing for blocked scenarios", () => {
   );
 });
 
+test("benchmark result gate accepts complete blocked rows without timing metrics", () => {
+  const result = buildResultForManifest(rootManifest);
+
+  const errors = validateBenchmarkResult(result, {
+    manifestById: new Map([[rootManifest.manifestId, rootManifest]])
+  });
+
+  assert.deepEqual(errors, []);
+});
+
+test("benchmark result gate accepts complete private diagnostic rows only as diagnostics", () => {
+  const result = buildResultForManifest(privateDiagnosticManifest, {
+    implementation: "fast-react-private-diagnostic",
+    lane: "default-node-development-private-diagnostic"
+  });
+
+  const errors = validateBenchmarkResult(result, {
+    manifestById: new Map([
+      [privateDiagnosticManifest.manifestId, privateDiagnosticManifest]
+    ])
+  });
+
+  assert.deepEqual(errors, []);
+});
+
+test("benchmark result gate rejects omitted required scenarios", () => {
+  const result = buildResultForManifest(rootManifest);
+  result.scenarioResults = result.scenarioResults.filter(
+    (scenarioResult) => scenarioResult.scenarioId !== "initial-host-render"
+  );
+
+  const errors = validateBenchmarkResult(result, {
+    manifestById: new Map([[rootManifest.manifestId, rootManifest]])
+  });
+
+  assert.match(
+    errors.join("\n"),
+    /missing required scenario result initial-host-render/
+  );
+});
+
+test("benchmark result gate rejects duplicate scenario and lane rows", () => {
+  const result = buildResultForManifest(rootManifest);
+  result.scenarioResults.push({
+    ...result.scenarioResults[0],
+    implementation: "fast-react-js-dev-duplicate"
+  });
+
+  const errors = validateBenchmarkResult(result, {
+    manifestById: new Map([[rootManifest.manifestId, rootManifest]])
+  });
+
+  assert.match(
+    errors.join("\n"),
+    /duplicate result row for scenario create-root-no-render lane default-node-development/
+  );
+});
+
+test("benchmark result gate rejects timing-shaped extra properties", () => {
+  const result = buildResultForManifest(rootManifest);
+  result.summary = { status: "blocked" };
+  result.scenarioResults[0].meanMs = 1.23;
+
+  const errors = validateBenchmarkResult(result, {
+    manifestById: new Map([[rootManifest.manifestId, rootManifest]])
+  });
+
+  const joined = errors.join("\n");
+  assert.match(joined, /unsupported property summary/);
+  assert.match(joined, /unsupported property meanMs/);
+});
+
+test("benchmark result gate rejects unsupported non-comparable timing claims", () => {
+  const result = buildResultForManifest(rootManifest);
+  result.scenarioResults[0].timingStatus = "compared-not-compatible";
+
+  const errors = validateBenchmarkResult(result, {
+    manifestById: new Map([[rootManifest.manifestId, rootManifest]])
+  });
+
+  assert.match(
+    errors.join("\n"),
+    /timingStatus compared-not-compatible is not admitted by manifest scenario timingStatus blocked-by-conformance/
+  );
+});
+
+test("benchmark result gate rejects public diagnostic timing proof", () => {
+  const result = buildResultForManifest(rootManifest);
+  result.scenarioResults[0].timingStatus = "diagnostic-only";
+
+  const errors = validateBenchmarkResult(result, {
+    manifestById: new Map([[rootManifest.manifestId, rootManifest]])
+  });
+
+  assert.match(
+    errors.join("\n"),
+    /diagnostic-only result timing requires a private diagnostic scenario.*public performance proof is blocked/
+  );
+});
+
+test("benchmark accepted gates reject decorative non-runnable commands", () => {
+  const manifest = clone(privateDiagnosticManifest);
+  manifest.conformanceGates[0].acceptedGate.command =
+    "Worker 957 says this benchmark passed";
+
+  const errors = validateBenchmarkManifest(manifest, { repoRoot });
+
+  assert.match(
+    errors.join("\n"),
+    /command segment "Worker 957 says this benchmark passed" must start with npm run, node --test, or cargo test/
+  );
+});
+
 function readManifest(fileName) {
   return JSON.parse(
     readFileSync(path.join(benchmarkRoot, "manifests", fileName), "utf8")
   );
+}
+
+function buildResultForManifest(manifest, options = {}) {
+  return {
+    schemaVersion: 1,
+    kind: "fast-react-benchmark-result",
+    manifestId: manifest.manifestId,
+    generatedTimestampIncluded: false,
+    scenarioResults: manifest.requiredScenarioIds.map((scenarioId) => {
+      const scenario = manifest.scenarios.find(
+        (entry) => entry.id === scenarioId
+      );
+      return {
+        scenarioId,
+        implementation: options.implementation ?? "fast-react-js-dev",
+        lane: options.lane ?? "default-node-development",
+        timingStatus: options.timingStatus ?? scenario.timingStatus
+      };
+    })
+  };
 }
 
 function clone(value) {
