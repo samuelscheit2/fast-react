@@ -85,12 +85,18 @@ const hydrateRootAcceptedPrivateMetadataRowBlockedPublicFields =
     'promotesRootRender'
   ]);
 
-test('private root bridge native handoff mirrors create/render/unmount records only', () => {
+test('private root bridge native handoff mirrors create/render/update/unmount records only', () => {
   const document = createDocument('native-handoff');
   const container = createElement('DIV', document);
   const element = {
     props: {
       children: 'hello'
+    },
+    type: 'span'
+  };
+  const updatedElement = {
+    props: {
+      children: 'hello again'
     },
     type: 'span'
   };
@@ -104,17 +110,27 @@ test('private root bridge native handoff mirrors create/render/unmount records o
     identifierPrefix: 'native-bridge-'
   });
   const render = bridge.renderContainer(create.handle, element, callback);
+  const update = bridge.renderContainer(
+    create.handle,
+    updatedElement,
+    callback
+  );
   const unmount = bridge.unmountContainer(create.handle);
   const secondUnmount = bridge.unmountContainer(create.handle);
 
   const createHandoff = bridge.createNativeRequestHandoff(create);
   const renderHandoff = bridge.createNativeRequestHandoff(render);
+  const updateHandoff = bridge.createNativeRequestHandoff(update);
   const unmountHandoff = bridge.createNativeRequestHandoff(unmount);
   const secondUnmountHandoff = bridge.createNativeRequestHandoff(secondUnmount);
 
   assert.equal(
     rootBridge.createNativeRootBridgeHandoffRecord(render),
     renderHandoff
+  );
+  assert.equal(
+    rootBridge.createNativeRootBridgeHandoffRecord(update),
+    updateHandoff
   );
   assert.equal(bridge.createNativeRequestHandoff(create), createHandoff);
 
@@ -160,19 +176,42 @@ test('private root bridge native handoff mirrors create/render/unmount records o
     createHandoff.nativeRequestRecord.rootHandle
   );
 
-  assertNativeHandoff(unmountHandoff, {
+  assertNativeHandoff(updateHandoff, {
     handoffId: 'handoff:3',
     handoffSequence: 3,
-    operation: 'unmount',
-    sourceLifecycleStatusAfter: rootBridge.ROOT_LIFECYCLE_UNMOUNTED,
+    operation: 'render',
+    sourceLifecycleStatusAfter: rootBridge.ROOT_LIFECYCLE_RENDERED,
     sourceLifecycleStatusBefore: rootBridge.ROOT_LIFECYCLE_RENDERED,
     sourceRequestId: 'request:3',
     sourceRequestSequence: 3,
+    sourceRequestType: 'root.render'
+  });
+  assertNativeRequestRecord(updateHandoff.nativeRequestRecord, {
+    kind: rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_RENDER,
+    requestId: 3,
+    rootHandleState: rootBridge.NATIVE_ROOT_BRIDGE_ROOT_HANDLE_ACTIVE,
+    rootSlot: 1,
+    rootValue: 1,
+    valueSlot: 4
+  });
+  assert.equal(
+    updateHandoff.nativeRequestRecord.rootHandle,
+    createHandoff.nativeRequestRecord.rootHandle
+  );
+
+  assertNativeHandoff(unmountHandoff, {
+    handoffId: 'handoff:4',
+    handoffSequence: 4,
+    operation: 'unmount',
+    sourceLifecycleStatusAfter: rootBridge.ROOT_LIFECYCLE_UNMOUNTED,
+    sourceLifecycleStatusBefore: rootBridge.ROOT_LIFECYCLE_RENDERED,
+    sourceRequestId: 'request:4',
+    sourceRequestSequence: 4,
     sourceRequestType: 'root.unmount'
   });
   assertNativeRequestRecord(unmountHandoff.nativeRequestRecord, {
     kind: rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT,
-    requestId: 3,
+    requestId: 4,
     rootHandleState: rootBridge.NATIVE_ROOT_BRIDGE_ROOT_HANDLE_RETIRED,
     rootSlot: 1,
     rootValue: 1,
@@ -184,18 +223,18 @@ test('private root bridge native handoff mirrors create/render/unmount records o
   );
 
   assertNativeHandoff(secondUnmountHandoff, {
-    handoffId: 'handoff:4',
-    handoffSequence: 4,
+    handoffId: 'handoff:5',
+    handoffSequence: 5,
     operation: 'unmount',
     sourceLifecycleStatusAfter: rootBridge.ROOT_LIFECYCLE_UNMOUNTED,
     sourceLifecycleStatusBefore: rootBridge.ROOT_LIFECYCLE_UNMOUNTED,
-    sourceRequestId: 'request:4',
-    sourceRequestSequence: 4,
+    sourceRequestId: 'request:5',
+    sourceRequestSequence: 5,
     sourceRequestType: 'root.unmount'
   });
   assertNativeRequestRecord(secondUnmountHandoff.nativeRequestRecord, {
     kind: rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT,
-    requestId: 4,
+    requestId: 5,
     rootHandleState: rootBridge.NATIVE_ROOT_BRIDGE_ROOT_HANDLE_RETIRED,
     rootSlot: 1,
     rootValue: 1,
@@ -219,6 +258,14 @@ test('private root bridge native handoff mirrors create/render/unmount records o
     element
   );
   assert.equal(
+    rootBridge.getNativeRootBridgeHandoffPayload(updateHandoff).sourceRecord,
+    update
+  );
+  assert.equal(
+    rootBridge.getNativeRootBridgeHandoffPayload(updateHandoff).value,
+    updatedElement
+  );
+  assert.equal(
     rootBridge.getNativeRootBridgeHandoffPayload(unmountHandoff).value,
     null
   );
@@ -228,6 +275,7 @@ test('private root bridge native handoff mirrors create/render/unmount records o
 
   assertHiddenNativePayload(createHandoff);
   assertHiddenNativePayload(renderHandoff);
+  assertHiddenNativePayload(updateHandoff);
   assertHiddenNativePayload(unmountHandoff);
   assertBridgeDidNotTouchContainer(container, document);
 });
@@ -9472,6 +9520,8 @@ test('private react-dom/client facade host-output update diagnostic routes root.
     createRenderAdmissionIdPrefix: 'facade-update-admission',
     hostOutputUpdateIdPrefix: 'facade-update-handoff',
     initialHostOutputIdPrefix: 'facade-update-initial',
+    nativeEnvironmentId: 843,
+    nativeHandoffIdPrefix: 'facade-update-native',
     publicFacadeHostOutputRenderIdPrefix: 'facade-update-render',
     publicFacadeHostOutputUpdateIdPrefix: 'facade-update-diagnostic',
     requestIdPrefix: 'facade-update-request',
@@ -9551,6 +9601,16 @@ test('private react-dom/client facade host-output update diagnostic routes root.
     updateDiagnostic.hostOutputUpdateStatus,
     rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
   );
+  assert.equal(updateDiagnostic.nativeHandoffId, 'facade-update-native:3');
+  assert.equal(
+    updateDiagnostic.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    updateDiagnostic.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_RENDER
+  );
+  assert.equal(updateDiagnostic.nativeRequestRecord.environmentId, 843);
   assert.equal(updateDiagnostic.hostType, 'main');
   assert.equal(updateDiagnostic.containerChildCount, 1);
   assert.equal(updateDiagnostic.hostChildCount, 1);
@@ -9597,6 +9657,7 @@ test('private react-dom/client facade host-output update diagnostic routes root.
       'public-facade-create-root-record',
       'public-facade-initial-host-output-render',
       'public-facade-root-render-update-record',
+      'private-native-update-request-handoff',
       'host-output-update-handoff',
       'fake-dom-property-update',
       'property-payload-evidence',
@@ -9623,6 +9684,7 @@ test('private react-dom/client facade host-output update diagnostic routes root.
   assert.equal(updateDiagnostic.publicRootCreated, false);
   assert.equal(updateDiagnostic.publicRootExecution, false);
   assert.equal(updateDiagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(updateDiagnostic.nativeUpdateRequestMirrored, true);
   assert.equal(updateDiagnostic.nativeExecution, false);
   assert.equal(updateDiagnostic.reconcilerExecution, false);
   assert.equal(updateDiagnostic.rootScheduled, false);
@@ -9657,6 +9719,14 @@ test('private react-dom/client facade host-output update diagnostic routes root.
   assert.equal(updateHidden.initialHostOutputPayload, initialHandoffPayload);
   assert.equal(updateHidden.hostOutputUpdatePayload, updateHandoffPayload);
   assert.equal(updateHidden.updateRecord, updateRecord);
+  assert.equal(
+    rootBridge.getNativeRootBridgeHandoffPayload(
+      updateHidden.nativeHandoffRecord
+    ),
+    updateHidden.nativeHandoffPayload
+  );
+  assert.equal(updateHidden.nativeHandoffPayload.sourceRecord, updateRecord);
+  assert.equal(updateHidden.nativeHandoffPayload.value, nextElement);
   assert.equal(updateHidden.callback, updateCallback);
   assert.equal(updateHidden.element, nextElement);
   assert.equal(
@@ -10103,6 +10173,8 @@ test('private react-dom/client facade root.unmount clears active host output met
     rootBridge.privateRootPublicFacadeAdapterSymbol
   );
   const adapter = descriptor.value({
+    nativeEnvironmentId: 844,
+    nativeHandoffIdPrefix: 'facade-root-unmount-native',
     publicFacadeHostOutputRenderIdPrefix: 'facade-root-unmount-render',
     publicFacadeHostOutputUnmountCleanupIdPrefix:
       'facade-root-unmount-cleanup-diagnostic',
@@ -10163,6 +10235,19 @@ test('private react-dom/client facade root.unmount clears active host output met
   assert.equal(diagnostic.unmountRequestId, unmount.requestId);
   assert.equal(diagnostic.renderRequestId, renderDiagnostic.renderRequestId);
   assert.equal(
+    diagnostic.nativeHandoffId,
+    'facade-root-unmount-native:3'
+  );
+  assert.equal(
+    diagnostic.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    diagnostic.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT
+  );
+  assert.equal(diagnostic.nativeRequestRecord.environmentId, 844);
+  assert.equal(
     diagnostic.diagnosticStatus,
     rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED
   );
@@ -10179,8 +10264,18 @@ test('private react-dom/client facade root.unmount clears active host output met
   assert.equal(diagnostic.publicRootUnmounted, false);
   assert.equal(diagnostic.publicRootExecution, false);
   assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.nativeUnmountRequestMirrored, true);
+  assert.equal(diagnostic.nativeExecution, false);
   assert.equal(diagnostic.compatibilityClaimed, false);
   assert.equal(cleanupPayload.unmountRecord, unmount);
+  assert.equal(
+    rootBridge.getNativeRootBridgeHandoffPayload(
+      cleanupPayload.nativeHandoffRecord
+    ),
+    cleanupPayload.nativeHandoffPayload
+  );
+  assert.equal(cleanupPayload.nativeHandoffPayload.sourceRecord, unmount);
+  assert.equal(cleanupPayload.nativeHandoffPayload.value, null);
   assert.equal(handoffPayload.active, false);
   assert.deepEqual(container.childNodes, []);
   assert.equal(hostNode.parentNode, null);
@@ -10346,6 +10441,7 @@ test('private react-dom/client facade root.unmount links ref detach and passive 
       'public-facade-create-root-record',
       'public-facade-root-render-record',
       'public-facade-root-unmount-record',
+      'private-native-unmount-request-handoff',
       'root-marker-setup-cleanup',
       'root-listener-setup-cleanup',
       'create-render-admission',
@@ -10560,6 +10656,8 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
   const adapter = descriptor.value({
     createRenderAdmissionIdPrefix: 'facade-unmount-admission',
     initialHostOutputIdPrefix: 'facade-unmount-initial',
+    nativeEnvironmentId: 845,
+    nativeHandoffIdPrefix: 'facade-unmount-native',
     publicFacadeHostOutputUnmountCleanupIdPrefix:
       'facade-unmount-diagnostic',
     requestIdPrefix: 'facade-unmount-request',
@@ -10665,6 +10763,16 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
     diagnostic.unmountAdmissionStatus,
     rootBridge.ROOT_BRIDGE_UNMOUNT_ADMITTED
   );
+  assert.equal(diagnostic.nativeHandoffId, 'facade-unmount-native:3');
+  assert.equal(
+    diagnostic.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    diagnostic.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT
+  );
+  assert.equal(diagnostic.nativeRequestRecord.environmentId, 845);
   assert.equal(
     diagnostic.rootUnmountOwnership.rootHandleMatchesCreateRecord,
     true
@@ -10699,6 +10807,7 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
       'public-facade-create-root-record',
       'public-facade-root-render-record',
       'public-facade-root-unmount-record',
+      'private-native-unmount-request-handoff',
       'root-marker-setup-cleanup',
       'root-listener-setup-cleanup',
       'create-render-admission',
@@ -10732,6 +10841,7 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
   assert.equal(diagnostic.publicRootCompatibilitySurface, false);
   assert.equal(diagnostic.publicRootUnmounted, false);
   assert.equal(diagnostic.publicRootBehaviorChanged, false);
+  assert.equal(diagnostic.nativeUnmountRequestMirrored, true);
   assert.equal(diagnostic.nativeExecution, false);
   assert.equal(diagnostic.reconcilerExecution, false);
   assert.equal(diagnostic.rootScheduled, false);
@@ -10784,6 +10894,14 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
   assert.equal(hidden.hostOutputPayload, handoffPayload);
   assert.equal(hidden.unmountCleanupRecord, cleanup);
   assert.equal(hidden.unmountCleanupPayload, cleanupPayload);
+  assert.equal(
+    rootBridge.getNativeRootBridgeHandoffPayload(
+      hidden.nativeHandoffRecord
+    ),
+    hidden.nativeHandoffPayload
+  );
+  assert.equal(hidden.nativeHandoffPayload.sourceRecord, unmount);
+  assert.equal(hidden.nativeHandoffPayload.value, null);
   assert.equal(hidden.sideEffectRecord.sideEffectStatus, rootBridge.ROOT_BRIDGE_MARK_LISTEN_APPLIED);
   assert.equal(hidden.renderCallback, renderCallback);
   assert.equal(hidden.unmountCallback, unmountCallback);
