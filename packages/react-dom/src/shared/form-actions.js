@@ -5937,6 +5937,25 @@ function normalizeFormActionFulfilledResetRootLifecycleBinding(binding) {
     !rootBridge.isSourceOwnedPrivateRootBridgeAdmissionRecord(
       rootBridgeAdmission
     ) ||
+    !rootBridge.isPrivateRootLifecycleRequestBoundaryRecord(
+      rootLifecycleRequestBoundary
+    )
+  ) {
+    throwInvalidFulfilledResetExecutionRecord(
+      'root lifecycle binding for fulfilled reset execution must be source-owned active and current'
+    );
+  }
+
+  if (
+    rootBridgeAdmission.operation !== 'render' ||
+    rootLifecycleRequestBoundary.sourceOperation !== 'render'
+  ) {
+    throwInvalidFulfilledResetExecutionRecord(
+      'root lifecycle binding for fulfilled reset execution must come from a render operation'
+    );
+  }
+
+  if (
     !rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
       rootBridgeAdmission,
       rootLifecycleRequestBoundary
