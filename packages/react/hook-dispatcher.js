@@ -29,6 +29,7 @@ const privateContextHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateTransitionHookDispatchers = new WeakSet();
 const privateTransitionHookDispatcherMetadataByDispatcher = new WeakMap();
 const unsupportedPlaceholderHookCurrentnessReports = new WeakSet();
+const unsupportedPlaceholderHookSurfaceCurrentnessRowsByReport = new WeakMap();
 
 const effectRegistrationFieldNames = Object.freeze([
   'hook',
@@ -529,6 +530,150 @@ const unsupportedPlaceholderHookIdGenerationReport = freezeRecord({
   claimsHydrationIdPrefix: false,
   compatibilityClaimed: false
 });
+const unsupportedPlaceholderHookServerAvailableHookNames = freezeArray([
+  'useId',
+  'useDebugValue'
+]);
+const unsupportedPlaceholderHookServerAbsentHookNames = freezeArray([
+  'useActionState',
+  'useOptimistic',
+  'useSyncExternalStore',
+  'useEffectEvent'
+]);
+const unsupportedPlaceholderHookSurfaceCurrentnessFieldNames = freezeArray([
+  'surfaceId',
+  'source',
+  'entrypoint',
+  'moduleShape',
+  'sameAsRootExport',
+  'hookNames',
+  'availableHookNames',
+  'absentHookNames',
+  'placeholderThrowHookNames',
+  'unexpectedReturnHookNames',
+  'unexpectedErrorHookNames',
+  'probeSideEffectNames',
+  'publicExportsPlaceholderOrAbsentBlocked',
+  'dispatcherRoutingBlocked',
+  'dispatcherPrerequisitesBlocked',
+  'rootSchedulingBlocked',
+  'callbackInvocationBlocked',
+  'externalStoreInvocationBlocked',
+  'idGenerationBlocked',
+  'debugValueInstrumentationBlocked',
+  'publicCompatibilityClaimed',
+  'compatibilityClaimed'
+]);
+const unsupportedPlaceholderHookSurfaceCurrentnessArrayFieldNames =
+  freezeArray([
+    'hookNames',
+    'availableHookNames',
+    'absentHookNames',
+    'placeholderThrowHookNames',
+    'unexpectedReturnHookNames',
+    'unexpectedErrorHookNames',
+    'probeSideEffectNames'
+  ]);
+const unsupportedPlaceholderHookSurfaceCurrentnessRows =
+  freezeSurfaceCurrentnessRows([
+    {
+      surfaceId: 'react-root',
+      source: 'packages/react/index.js',
+      entrypoint: 'react',
+      moduleShape: 'default-root',
+      sameAsRootExport: true,
+      hookNames: unsupportedPlaceholderHookNames,
+      availableHookNames: unsupportedPlaceholderHookNames,
+      absentHookNames: [],
+      placeholderThrowHookNames: unsupportedPlaceholderHookNames,
+      unexpectedReturnHookNames: [],
+      unexpectedErrorHookNames: [],
+      probeSideEffectNames: [],
+      publicExportsPlaceholderOrAbsentBlocked: true,
+      dispatcherRoutingBlocked: true,
+      dispatcherPrerequisitesBlocked: true,
+      rootSchedulingBlocked: true,
+      callbackInvocationBlocked: true,
+      externalStoreInvocationBlocked: true,
+      idGenerationBlocked: true,
+      debugValueInstrumentationBlocked: true,
+      publicCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    },
+    {
+      surfaceId: 'react-cjs-development',
+      source: 'packages/react/cjs/react.development.js',
+      entrypoint: 'react',
+      moduleShape: 'cjs-root-alias',
+      sameAsRootExport: true,
+      hookNames: unsupportedPlaceholderHookNames,
+      availableHookNames: unsupportedPlaceholderHookNames,
+      absentHookNames: [],
+      placeholderThrowHookNames: unsupportedPlaceholderHookNames,
+      unexpectedReturnHookNames: [],
+      unexpectedErrorHookNames: [],
+      probeSideEffectNames: [],
+      publicExportsPlaceholderOrAbsentBlocked: true,
+      dispatcherRoutingBlocked: true,
+      dispatcherPrerequisitesBlocked: true,
+      rootSchedulingBlocked: true,
+      callbackInvocationBlocked: true,
+      externalStoreInvocationBlocked: true,
+      idGenerationBlocked: true,
+      debugValueInstrumentationBlocked: true,
+      publicCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    },
+    {
+      surfaceId: 'react-cjs-production',
+      source: 'packages/react/cjs/react.production.js',
+      entrypoint: 'react',
+      moduleShape: 'cjs-root-alias',
+      sameAsRootExport: true,
+      hookNames: unsupportedPlaceholderHookNames,
+      availableHookNames: unsupportedPlaceholderHookNames,
+      absentHookNames: [],
+      placeholderThrowHookNames: unsupportedPlaceholderHookNames,
+      unexpectedReturnHookNames: [],
+      unexpectedErrorHookNames: [],
+      probeSideEffectNames: [],
+      publicExportsPlaceholderOrAbsentBlocked: true,
+      dispatcherRoutingBlocked: true,
+      dispatcherPrerequisitesBlocked: true,
+      rootSchedulingBlocked: true,
+      callbackInvocationBlocked: true,
+      externalStoreInvocationBlocked: true,
+      idGenerationBlocked: true,
+      debugValueInstrumentationBlocked: true,
+      publicCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    },
+    {
+      surfaceId: 'react-server',
+      source: 'packages/react/react.react-server.js',
+      entrypoint: 'react react-server',
+      moduleShape: 'react-server-root',
+      sameAsRootExport: false,
+      hookNames: unsupportedPlaceholderHookNames,
+      availableHookNames: unsupportedPlaceholderHookServerAvailableHookNames,
+      absentHookNames: unsupportedPlaceholderHookServerAbsentHookNames,
+      placeholderThrowHookNames:
+        unsupportedPlaceholderHookServerAvailableHookNames,
+      unexpectedReturnHookNames: [],
+      unexpectedErrorHookNames: [],
+      probeSideEffectNames: [],
+      publicExportsPlaceholderOrAbsentBlocked: true,
+      dispatcherRoutingBlocked: true,
+      dispatcherPrerequisitesBlocked: true,
+      rootSchedulingBlocked: true,
+      callbackInvocationBlocked: true,
+      externalStoreInvocationBlocked: true,
+      idGenerationBlocked: true,
+      debugValueInstrumentationBlocked: true,
+      publicCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    }
+  ]);
 const unsupportedPlaceholderHookMissingDispatcherPrerequisites = freezeArray([
   'dispatcher.useActionState',
   'dispatcher.useOptimistic',
@@ -664,6 +809,12 @@ const privateUnsupportedPlaceholderHookBlockerMetadata = freezeRecord({
   idGenerationReportFieldNames:
     unsupportedPlaceholderHookIdGenerationReportFieldNames,
   idGenerationReport: unsupportedPlaceholderHookIdGenerationReport,
+  surfaceCurrentnessFieldNames:
+    unsupportedPlaceholderHookSurfaceCurrentnessFieldNames,
+  surfaceCurrentnessRows:
+    unsupportedPlaceholderHookSurfaceCurrentnessRows,
+  cjsSurfaceCurrentnessBlocked: true,
+  reactServerSurfaceCurrentnessBlocked: true,
   missingDispatcherPrerequisites:
     unsupportedPlaceholderHookMissingDispatcherPrerequisites,
   missingSchedulerPrerequisites:
@@ -688,6 +839,7 @@ const privateUnsupportedPlaceholderHookBlockerMetadataArrayKeys = freezeArray([
   'callbackInvocationReportFieldNames',
   'externalStoreInvocationReportFieldNames',
   'idGenerationReportFieldNames',
+  'surfaceCurrentnessFieldNames',
   'missingDispatcherPrerequisites',
   'missingSchedulerPrerequisites',
   'missingRootLanePrerequisites',
@@ -1642,8 +1794,199 @@ function recordPrivateStartTransitionDispatcherRouting(callback, metadata) {
   });
 }
 
+function createUnsupportedPlaceholderHookSurfaceCurrentnessRows(
+  rowOverridesBySurfaceId
+) {
+  const rootReact = require('./index.js');
+  const cjsDevelopmentReact = require('./cjs/react.development.js');
+  const cjsProductionReact = require('./cjs/react.production.js');
+  const reactServer = require('./react.react-server.js');
+  const rowOverrides = rowOverridesBySurfaceId ?? {};
+  const previousDispatcher = ReactSharedInternals.H;
+
+  ReactSharedInternals.H = null;
+
+  try {
+    return freezeSurfaceCurrentnessRows(
+      [
+        describeUnsupportedPlaceholderHookSurfaceCurrentness({
+          surfaceId: 'react-root',
+          source: 'packages/react/index.js',
+          entrypoint: 'react',
+          moduleShape: 'default-root',
+          moduleExports: rootReact,
+          rootExports: rootReact
+        }),
+        describeUnsupportedPlaceholderHookSurfaceCurrentness({
+          surfaceId: 'react-cjs-development',
+          source: 'packages/react/cjs/react.development.js',
+          entrypoint: 'react',
+          moduleShape: 'cjs-root-alias',
+          moduleExports: cjsDevelopmentReact,
+          rootExports: rootReact
+        }),
+        describeUnsupportedPlaceholderHookSurfaceCurrentness({
+          surfaceId: 'react-cjs-production',
+          source: 'packages/react/cjs/react.production.js',
+          entrypoint: 'react',
+          moduleShape: 'cjs-root-alias',
+          moduleExports: cjsProductionReact,
+          rootExports: rootReact
+        }),
+        describeUnsupportedPlaceholderHookSurfaceCurrentness({
+          surfaceId: 'react-server',
+          source: 'packages/react/react.react-server.js',
+          entrypoint: 'react react-server',
+          moduleShape: 'react-server-root',
+          moduleExports: reactServer,
+          rootExports: rootReact
+        })
+      ].map((row) =>
+        Object.prototype.hasOwnProperty.call(rowOverrides, row.surfaceId)
+          ? { ...row, ...rowOverrides[row.surfaceId] }
+          : row
+      )
+    );
+  } finally {
+    ReactSharedInternals.H = previousDispatcher;
+  }
+}
+
+function describeUnsupportedPlaceholderHookSurfaceCurrentness({
+  surfaceId,
+  source,
+  entrypoint,
+  moduleShape,
+  moduleExports,
+  rootExports
+}) {
+  const availableHookNames = [];
+  const absentHookNames = [];
+  const placeholderThrowHookNames = [];
+  const unexpectedReturnHookNames = [];
+  const unexpectedErrorHookNames = [];
+  const probeSideEffectNames = [];
+  const probeArgsByHookName =
+    createUnsupportedPlaceholderHookProbeArgs(probeSideEffectNames);
+
+  for (const hookName of unsupportedPlaceholderHookNames) {
+    if (!Object.prototype.hasOwnProperty.call(moduleExports, hookName)) {
+      absentHookNames.push(hookName);
+      continue;
+    }
+
+    availableHookNames.push(hookName);
+
+    try {
+      moduleExports[hookName].apply(
+        moduleExports,
+        probeArgsByHookName[hookName]
+      );
+      unexpectedReturnHookNames.push(hookName);
+    } catch (error) {
+      if (isUnsupportedPlaceholderHookProbeError(error, hookName)) {
+        placeholderThrowHookNames.push(hookName);
+      } else {
+        unexpectedErrorHookNames.push(hookName);
+      }
+    }
+  }
+
+  return {
+    surfaceId,
+    source,
+    entrypoint: moduleExports.__FAST_REACT_ENTRYPOINT__ ?? entrypoint,
+    moduleShape,
+    sameAsRootExport: moduleExports === rootExports,
+    hookNames: unsupportedPlaceholderHookNames,
+    availableHookNames,
+    absentHookNames,
+    placeholderThrowHookNames,
+    unexpectedReturnHookNames,
+    unexpectedErrorHookNames,
+    probeSideEffectNames,
+    publicExportsPlaceholderOrAbsentBlocked: true,
+    dispatcherRoutingBlocked: true,
+    dispatcherPrerequisitesBlocked: true,
+    rootSchedulingBlocked: true,
+    callbackInvocationBlocked: true,
+    externalStoreInvocationBlocked: true,
+    idGenerationBlocked: true,
+    debugValueInstrumentationBlocked: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function createUnsupportedPlaceholderHookProbeArgs(sideEffects) {
+  return {
+    useActionState: [
+      () => {
+        sideEffects.push('useActionStateAction');
+        return 'action';
+      },
+      'initial',
+      '/permalink'
+    ],
+    useOptimistic: [
+      'passthrough',
+      () => {
+        sideEffects.push('useOptimisticReducer');
+        return 'optimistic';
+      }
+    ],
+    useSyncExternalStore: [
+      () => {
+        sideEffects.push('useSyncExternalStoreSubscribe');
+        return () => {
+          sideEffects.push('useSyncExternalStoreUnsubscribe');
+        };
+      },
+      () => {
+        sideEffects.push('useSyncExternalStoreGetSnapshot');
+        return 'snapshot';
+      },
+      () => {
+        sideEffects.push('useSyncExternalStoreGetServerSnapshot');
+        return 'serverSnapshot';
+      }
+    ],
+    useEffectEvent: [
+      () => {
+        sideEffects.push('useEffectEventCallback');
+      }
+    ],
+    useId: [],
+    useDebugValue: [
+      'debug-value',
+      () => {
+        sideEffects.push('useDebugValueFormatter');
+        return 'debug';
+      }
+    ]
+  };
+}
+
+function isUnsupportedPlaceholderHookProbeError(error, hookName) {
+  return (
+    isObjectLike(error) &&
+    error.name === 'FastReactUnimplementedError' &&
+    error.code === 'FAST_REACT_UNIMPLEMENTED' &&
+    error.entrypoint === 'react' &&
+    error.exportName === hookName &&
+    error.compatibilityTarget === 'react@19.2.6'
+  );
+}
+
 function createUnsupportedPlaceholderHookCurrentnessReport(overrides = {}) {
   const normalized = overrides ?? {};
+  const hasSurfaceCurrentnessRowsOverride =
+    Object.prototype.hasOwnProperty.call(normalized, 'surfaceCurrentnessRows');
+  const surfaceCurrentnessRows = hasSurfaceCurrentnessRowsOverride
+    ? freezeSurfaceCurrentnessRows(normalized.surfaceCurrentnessRows)
+    : createUnsupportedPlaceholderHookSurfaceCurrentnessRows(
+        normalized.surfaceCurrentnessRowOverrides
+      );
   const report = freezeRecord({
     kind: unsupportedPlaceholderHookCurrentnessReportKind,
     version: unsupportedPlaceholderHookCurrentnessReportVersion,
@@ -1676,6 +2019,15 @@ function createUnsupportedPlaceholderHookCurrentnessReport(overrides = {}) {
       ...unsupportedPlaceholderHookIdGenerationReport,
       ...(normalized.idGenerationReport ?? {})
     }),
+    surfaceCurrentnessFieldNames: freezeArray(
+      normalized.surfaceCurrentnessFieldNames ??
+        unsupportedPlaceholderHookSurfaceCurrentnessFieldNames
+    ),
+    surfaceCurrentnessRows,
+    cjsSurfaceCurrentnessBlocked:
+      normalized.cjsSurfaceCurrentnessBlocked ?? true,
+    reactServerSurfaceCurrentnessBlocked:
+      normalized.reactServerSurfaceCurrentnessBlocked ?? true,
     publicExportsPlaceholderBlocked:
       normalized.publicExportsPlaceholderBlocked ?? true,
     compatibilityClaimed: normalized.compatibilityClaimed ?? false,
@@ -1721,6 +2073,13 @@ function createUnsupportedPlaceholderHookCurrentnessReport(overrides = {}) {
       normalized.claimsHydrationIdPrefix ?? false
   });
 
+  if (!hasSurfaceCurrentnessRowsOverride) {
+    unsupportedPlaceholderHookSurfaceCurrentnessRowsByReport.set(
+      report,
+      surfaceCurrentnessRows
+    );
+  }
+
   unsupportedPlaceholderHookCurrentnessReports.add(report);
   return report;
 }
@@ -1741,6 +2100,9 @@ function consumeUnsupportedPlaceholderHookCurrentnessReport(report) {
     currentnessStatus: report.status,
     compatibilityTarget: 'react@19.2.6',
     hookNames: report.hookNames,
+    surfaceCurrentnessRows: report.surfaceCurrentnessRows,
+    cjsSurfaceCurrentnessBlocked: true,
+    reactServerSurfaceCurrentnessBlocked: true,
     publicExportsPlaceholderBlocked: true,
     dispatcherRoutingBlocked: true,
     dispatcherPrerequisitesReady: false,
@@ -2026,7 +2388,9 @@ function isPrivateUnsupportedPlaceholderHookBlockerMetadata(metadata) {
     metadata.capability !==
       privateUnsupportedPlaceholderHookBlockerMetadata.capability ||
     metadata.compatibilityTarget !==
-      privateUnsupportedPlaceholderHookBlockerMetadata.compatibilityTarget
+      privateUnsupportedPlaceholderHookBlockerMetadata.compatibilityTarget ||
+    metadata.cjsSurfaceCurrentnessBlocked !== true ||
+    metadata.reactServerSurfaceCurrentnessBlocked !== true
   ) {
     return false;
   }
@@ -2079,6 +2443,10 @@ function isPrivateUnsupportedPlaceholderHookBlockerMetadata(metadata) {
       metadata.idGenerationReport,
       privateUnsupportedPlaceholderHookBlockerMetadata.idGenerationReport,
       unsupportedPlaceholderHookIdGenerationReportFieldNames
+    ) &&
+    hasSameSurfaceCurrentnessRows(
+      metadata.surfaceCurrentnessRows,
+      privateUnsupportedPlaceholderHookBlockerMetadata.surfaceCurrentnessRows
     )
   );
 }
@@ -2102,6 +2470,12 @@ function validateUnsupportedPlaceholderHookCurrentnessReport(report) {
     report.status !== unsupportedPlaceholderHookCurrentnessStatus ||
     report.compatibilityTarget !== 'react@19.2.6' ||
     !hasSameStringArray(report.hookNames, unsupportedPlaceholderHookNames) ||
+    !hasSameStringArray(
+      report.surfaceCurrentnessFieldNames,
+      unsupportedPlaceholderHookSurfaceCurrentnessFieldNames
+    ) ||
+    report.cjsSurfaceCurrentnessBlocked !== true ||
+    report.reactServerSurfaceCurrentnessBlocked !== true ||
     report.publicExportsPlaceholderBlocked !== true
   ) {
     return 'unsupported-placeholder-hook-currentness-shape';
@@ -2135,6 +2509,22 @@ function validateUnsupportedPlaceholderHookCurrentnessReport(report) {
     )
   ) {
     return 'unsupported-placeholder-hook-currentness-blocker-currentness';
+  }
+
+  if (
+    unsupportedPlaceholderHookSurfaceCurrentnessRowsByReport.get(report) !==
+    report.surfaceCurrentnessRows
+  ) {
+    return 'unsupported-placeholder-hook-currentness-surface-currentness-source-proof';
+  }
+
+  if (
+    !hasSameSurfaceCurrentnessRows(
+      report.surfaceCurrentnessRows,
+      unsupportedPlaceholderHookSurfaceCurrentnessRows
+    )
+  ) {
+    return 'unsupported-placeholder-hook-currentness-surface-currentness';
   }
 
   if (!hasBlockedUnsupportedPlaceholderHookPublicCompatibilityClaims(report)) {
@@ -2261,6 +2651,48 @@ function hasSameRecordArrayFields(actual, expected, fieldNames) {
   return true;
 }
 
+function hasSameSurfaceCurrentnessRows(actual, expected) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) {
+    return false;
+  }
+
+  for (let index = 0; index < expected.length; index += 1) {
+    if (!hasSameSurfaceCurrentnessRow(actual[index], expected[index])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasSameSurfaceCurrentnessRow(actual, expected) {
+  if (!isObjectLike(actual) || !Object.isFrozen(actual)) {
+    return false;
+  }
+
+  for (const fieldName of unsupportedPlaceholderHookSurfaceCurrentnessFieldNames) {
+    const expectedValue = expected[fieldName];
+    const actualValue = actual[fieldName];
+
+    if (
+      unsupportedPlaceholderHookSurfaceCurrentnessArrayFieldNames.includes(
+        fieldName
+      )
+    ) {
+      if (!hasSameStringArray(actualValue, expectedValue)) {
+        return false;
+      }
+      continue;
+    }
+
+    if (actualValue !== expectedValue) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function hasBlockedUnsupportedPlaceholderHookPublicCompatibilityClaims(report) {
   for (const flagName of unsupportedPlaceholderHookPublicCompatibilityFalseFlags) {
     if (report[flagName] !== false) {
@@ -2329,6 +2761,28 @@ function freezeArray(values) {
 
 function freezeRecord(record) {
   return Object.freeze(record);
+}
+
+function freezeSurfaceCurrentnessRow(row) {
+  const surfaceRow = {};
+
+  for (const fieldName of unsupportedPlaceholderHookSurfaceCurrentnessFieldNames) {
+    if (
+      unsupportedPlaceholderHookSurfaceCurrentnessArrayFieldNames.includes(
+        fieldName
+      )
+    ) {
+      surfaceRow[fieldName] = freezeArray(row[fieldName] ?? []);
+    } else {
+      surfaceRow[fieldName] = row[fieldName];
+    }
+  }
+
+  return freezeRecord(surfaceRow);
+}
+
+function freezeSurfaceCurrentnessRows(rows) {
+  return freezeArray((rows ?? []).map(freezeSurfaceCurrentnessRow));
 }
 
 function freezeRecordArray(records) {
@@ -2449,6 +2903,8 @@ module.exports = {
   recordPrivateStartTransitionDispatcherRouting,
   resolveDispatcher,
   transitionHookNames,
+  unsupportedPlaceholderHookSurfaceCurrentnessFieldNames,
+  unsupportedPlaceholderHookSurfaceCurrentnessRows,
   unsupportedPlaceholderHookCurrentnessConsumptionStatus,
   unsupportedPlaceholderHookCurrentnessStatus,
   unsupportedPlaceholderHookNames,
