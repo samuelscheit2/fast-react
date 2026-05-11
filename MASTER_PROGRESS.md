@@ -29,6 +29,42 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 959 Docs Refresh and Workers 946, 951, and 950
+
+- Worker 959 refreshed coordination docs for the `39e695e1` baseline after
+  Worker 945 and Worker 947 were accepted, moved their accepted facts into
+  history, and kept then-unaccepted live queue entries in current/future
+  planning only. It was accepted at `d9b0fe5c` (`Merge worker 959 docs refresh
+  after worker 947`) with no runtime compatibility claim change.
+- Worker 946 wired the private test-renderer direct multi-child committed-fiber
+  path to the accepted Worker 936 source-bound reconciler inspection. The
+  private canary now requires reconciler-sourced direct-child evidence alongside
+  route, lifecycle, finished-work identity, and row identity evidence while the
+  generic reconciler inspection boundary and public serialization,
+  `ReactTestInstance`, native bridge/execution, JS/CJS/package, and broad
+  multi-child compatibility remain blocked.
+- Worker 951 hardened the private Rust cleanup-generation currentness canary so
+  cleanup handoff rows are bound to canonical source row IDs, lifecycle row
+  identity, cleanup-hook worker-thread/environment identity, cleanup generation,
+  root/value handle identity, and consumed reentry guard status. Audit
+  follow-up coverage rejects forged cleanup-hook evidence IDs before replay-key
+  insertion while native addon loading, real N-API cleanup-hook execution,
+  worker-thread teardown, renderer/reconciler output, package exports, and
+  public native compatibility remain blocked.
+- Worker 950 added an internal-only, source-owned React Children traversal
+  currentness report and consumer for React 19.2.6 `ReactChildren`,
+  `ReactClient.Children`, and symbol anchors. It validates private traversal,
+  key/path escaping, iterable, warning-state, thenable/error, and lazy-blocker
+  probes while preserving public `React.Children` exports, the checked oracle,
+  package keys, and explicit blockers for lazy traversal, renderer/root/portal,
+  owner/ref, full React Children parity, and package compatibility.
+- The accepted state for this batch is current main `c155d301`
+  (`Merge worker 950 React children traversal currentness`) after merge commits
+  `d9b0fe5c`, `7c7fc91c`, `a7386312`, and `c155d301`, with focused
+  test-renderer/reconciler, native cleanup, React Children oracle/currentness,
+  package-surface/import-smoke, formatting, and `git diff --check` evidence
+  recorded in worker reports and git history.
+
 ### Workers 945 and 947
 
 - Worker 945 refreshed coordination docs for the `4b5902a5` baseline, moved

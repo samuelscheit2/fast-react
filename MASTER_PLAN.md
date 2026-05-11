@@ -47,12 +47,12 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Accepted implementation baseline for this branch
 includes Workers 803-837, 842-846, 848-852, 855-860, 862-874, 878-883,
-885-893, 895-896, 898-902, 904, 906-909, 912-930, 932-934, 936-944, and
-947; coordination history includes docs refresh Workers 922, 931, 935, and
-945. Current baseline is `39e695e1`
-(`Merge worker 947 React DOM root bridge smoke fix`). Worker 853's competing
-test-renderer branch was rejected as redundant after Worker 844 was accepted;
-do not use it as accepted input.
+885-893, 895-896, 898-902, 904, 906-909, 912-930, 932-934, 936-947, and
+950-951; coordination history includes docs refresh Workers 922, 931, 935,
+945, and 959. Current baseline is `c155d301`
+(`Merge worker 950 React children traversal currentness`). Worker 853's
+competing test-renderer branch was rejected as redundant after Worker 844 was
+accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
@@ -60,11 +60,8 @@ Current orchestration queue:
   admission after repeated audits found cloned/fake root-bridge admission
   paths. The repair remains unaccepted and active as fix3 input only; do not
   treat any Worker 910 evidence as accepted until a fresh audited merge lands.
-- Worker 946: test-renderer direct inspection consumer lane.
 - Worker 948: Rust finished-work commit queue-lane currentness lane.
 - Worker 949: Scheduler postTask/mock variant currentness lane.
-- Worker 950: React Children traversal blocker currentness lane.
-- Worker 951: native cleanup hook worker-thread currentness lane.
 - Worker 952: React DOM resource hints currentness lane.
 - Worker 953: private-admission 932-944 ledger hardening lane.
 - Worker 954: HostWork root child replacement execution lane.
@@ -72,19 +69,17 @@ Current orchestration queue:
 - Worker 956: React `useRef` private dispatcher currentness lane.
 - Worker 957: benchmark result false-green hardening lane.
 - Worker 958: React DOM input change extraction currentness lane.
-- Worker 959: docs-only refresh for the `39e695e1` baseline and expanded
-  current queue.
 
-Workers 949, 950, and 951 have branch-local commits but are not accepted until
-merged to main. If Worker 910 or Workers 946, 948-959 merge after this branch
-point, update this section and move accepted facts into `MASTER_PROGRESS.md` in
-the next docs pass.
+Workers 948-949 and 952-958 remain unaccepted until merged to main. If
+Worker 910 or Workers 948-949 and 952-958 merge after this branch point,
+update this section and move accepted facts into `MASTER_PROGRESS.md` in the
+next docs pass.
 
-Accepted private evidence through `39e695e1` still keeps public
+Accepted private evidence through `c155d301` still keeps public
 root/render/unmount, `act`, `react-dom/test-utils.act`, `flushSync`, Scheduler
 timing, hydration, resources/forms, serialization, native/reconciler execution,
-unsupported hook behavior, event dispatch, package compatibility, and broad
-renderer compatibility blocked.
+React Children traversal parity, unsupported hook behavior, event dispatch,
+package compatibility, and broad renderer compatibility blocked.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -92,13 +87,13 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat the accepted branch baseline through `39e695e1` as private evidence
+1. Treat the accepted branch baseline through `c155d301` as private evidence
    only. Public package, root, native, React DOM, test-renderer, Scheduler,
    `act`, `react-dom/test-utils.act`, hydration, resource/form,
-   serialization, unsupported hook, event dispatch, and `flushSync`
-   compatibility still require fail-closed gates and dual-run oracle evidence.
-2. Review Worker 910 fix3, Workers 946 and 948-958, and this docs refresh
-   against the accepted
+   serialization, React Children lazy/full traversal, unsupported hook, event
+   dispatch, and `flushSync` compatibility still require fail-closed gates and
+   dual-run oracle evidence.
+2. Review Worker 910 fix3 and Workers 948-949 and 952-958 against the accepted
    source-owned lifecycle, hydration, `act`, deletion, sync-flush, HostRoot
    lane handoff, scheduler continuation/currentness,
    reconciler/test-renderer direct multi-child fiber inspection,
@@ -140,12 +135,13 @@ canonical evidence requirements.
   direct multi-child fiber inspection, Worker 902 private act/update lifecycle
   boundary evidence, Worker 932 CJS production private act/update lifecycle
   parity evidence, Worker 936 source-bound reconciler generic direct
-  multi-child inspection, and Worker 941 CJS production TestInstance
-  currentness. Worker 917 remains reconciler-owned inspection context that
-  keeps the generic test-renderer boundary fail-closed. Worker 853 remains
-  rejected/redundant. Public serialization, `ReactTestInstance`, JS/CJS/package
-  compatibility, native bridge loading/execution, root/act/Scheduler
-  compatibility, and broad multichild identity remain blocked.
+  multi-child inspection, Worker 941 CJS production TestInstance currentness,
+  and Worker 946 private test-renderer direct inspection consumer evidence.
+  Worker 917 remains reconciler-owned inspection context that keeps the generic
+  test-renderer boundary fail-closed. Worker 853 remains rejected/redundant.
+  Public serialization, `ReactTestInstance`, JS/CJS/package compatibility,
+  native bridge loading/execution, root/act/Scheduler compatibility, and broad
+  multichild identity remain blocked.
 - React DOM facade/native handoffs may use accepted Worker 848 nested facade
   native handoff metadata, Worker 869 fake-DOM lifecycle snapshots, Worker 874
   private lifecycle request/snapshot boundary hardening, Worker 880 root update
@@ -191,10 +187,16 @@ canonical evidence requirements.
   generation admission ledger, plus Worker 892's private cleanup-generation
   consumer, Worker 908's cleanup-generation currentness gate, Worker 923's
   cleanup currentness admission ledger, Worker 924's worker-thread/environment
-  cleanup currentness, and Worker 940's cleanup re-entry/retirement
-  currentness. Executable native addon loading, cleanup hooks, scheduling,
+  cleanup currentness, Worker 940's cleanup re-entry/retirement currentness,
+  and Worker 951's cleanup-hook worker-thread/source-row currentness hardening.
+  Executable native addon loading, cleanup hooks, scheduling,
   renderer/reconciler output, worker-thread teardown, public no-stale-value
   behavior, public native compatibility, and package exports remain blocked.
+- React Children helper work can consume accepted Worker 950's private
+  source-owned traversal currentness report only as fail-closed evidence.
+  Lazy traversal, renderer/root/portal behavior, owner/ref integration, full
+  React Children parity, public package compatibility, and package-wide React
+  behavior remain blocked until separately oracle-backed.
 - React hook facade work can consume accepted Worker 916 transition blocker
   currentness, Worker 918 render-phase update ownership evidence, Worker 926
   hook staging failure-preservation currentness, Worker 929 unsupported
@@ -232,8 +234,9 @@ canonical evidence requirements.
   multi-child fiber identity proof, Worker 917's reconciler-owned direct
   committed-fiber inspection, Worker 920's host-node update currentness, Worker
   936's source-bound generic inspection, Worker 941's CJS TestInstance
-  currentness, Worker 944's root update native handoff currentness, and Worker
-  947's private root-bridge cleanup-after-update smoke fix only after preserving
+  currentness, Worker 944's root update native handoff currentness, Worker
+  946's private test-renderer direct inspection consumer, and Worker 947's
+  private root-bridge cleanup-after-update smoke fix only after preserving
   source-owned handoff rows, store-backed row lane metadata, scheduler/commit
   identity, direct child fiber handles, scoped host update currentness, latest
   accepted host-output update identity, and public blockers before any wider
