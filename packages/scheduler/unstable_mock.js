@@ -56,6 +56,12 @@ const privateSchedulerMockExpiredActRootWorkDiagnosticsBrand = Symbol.for(
   privateSchedulerMockExpiredActRootWorkDiagnosticsKind
 );
 const privateSchedulerMockExpiredActRootWorkDiagnosticsVersion = 1;
+const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind =
+  'fast-react.scheduler.mock-expired-act-root-work-source-validator-module-record';
+const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey =
+  Symbol.for(
+    privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind
+  );
 const privateSchedulerMockDelayedActRootWorkMetadataKind =
   'fast-react.scheduler.mock-delayed-act-root-work-metadata';
 const privateSchedulerMockDelayedActRootWorkMetadataBrand = Symbol.for(
@@ -107,7 +113,12 @@ const scheduler =
     ? require('./cjs/scheduler-unstable_mock.production.js')
     : require('./cjs/scheduler-unstable_mock.development.js');
 
-module.exports = createPrivateSchedulerMockDiagnosticsWrapper(scheduler);
+const wrappedScheduler = createPrivateSchedulerMockDiagnosticsWrapper(scheduler);
+installSchedulerMockExpiredActRootWorkSourceValidatorModuleRecord(
+  wrappedScheduler
+);
+
+module.exports = wrappedScheduler;
 
 function freezeSchedulerOwnedExpiredActRootWorkSource(value) {
   schedulerMockExpiredActRootWorkSources.add(value);
@@ -122,6 +133,31 @@ function isSchedulerMockExpiredActRootWorkSource(value) {
   return (
     isObjectLike(value) &&
     schedulerMockExpiredActRootWorkSources.has(value)
+  );
+}
+
+function installSchedulerMockExpiredActRootWorkSourceValidatorModuleRecord(
+  targetScheduler
+) {
+  const diagnostics =
+    targetScheduler.unstable_flushExpired[
+      privateActQueueFlushDiagnosticsExport
+    ];
+  const moduleRecord = Object.freeze({
+    status: privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind,
+    diagnostics,
+    schedulerMockExpiredActRootWorkSourceValidator
+  });
+
+  Object.defineProperty(
+    module,
+    privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey,
+    {
+      configurable: false,
+      enumerable: false,
+      value: moduleRecord,
+      writable: false
+    }
   );
 }
 
@@ -158,10 +194,10 @@ function createPrivateSchedulerMockDiagnosticsWrapper(sourceScheduler) {
           )
         : value;
     Object.defineProperty(wrappedScheduler, key, {
-      configurable: typeof value !== 'function',
+      configurable: true,
       enumerable: true,
       value: wrappedValue,
-      writable: typeof value !== 'function'
+      writable: true
     });
   }
 

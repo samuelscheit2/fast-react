@@ -84,6 +84,12 @@ const privateSchedulerMockExpiredActRootWorkDiagnosticsBrand = Symbol.for(
   privateSchedulerMockExpiredActRootWorkDiagnosticsKind
 );
 const privateSchedulerMockExpiredActRootWorkDiagnosticsVersion = 1;
+const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind =
+  'fast-react.scheduler.mock-expired-act-root-work-source-validator-module-record';
+const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey =
+  Symbol.for(
+    privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind
+  );
 const privateSchedulerMockExpiredActRootWorkMetadataKind =
   'fast-react.scheduler.mock-expired-act-root-work-metadata';
 const privateSchedulerMockExpiredActRootWorkMetadataVersion = 1;
@@ -374,7 +380,12 @@ function includesString(value, expectedValues) {
 }
 
 function getSchedulerMockExpiredActRootWorkSourceValidator() {
-  const Scheduler = loadSchedulerMockForExpiredActRootWorkSourceProof();
+  const schedulerModule = loadSchedulerMockForExpiredActRootWorkSourceProof();
+  if (schedulerModule === null) {
+    return null;
+  }
+
+  const {Scheduler, moduleRecord} = schedulerModule;
   if (!isObjectLike(Scheduler)) {
     return null;
   }
@@ -385,32 +396,39 @@ function getSchedulerMockExpiredActRootWorkSourceValidator() {
   );
   if (
     flushExpiredDescriptor === undefined ||
-    flushExpiredDescriptor.configurable !== false ||
     flushExpiredDescriptor.enumerable !== true ||
-    flushExpiredDescriptor.writable !== false ||
     typeof flushExpiredDescriptor.value !== 'function'
   ) {
     return null;
   }
 
-  const flushExpired = flushExpiredDescriptor.value;
-  const diagnosticsDescriptor = Object.getOwnPropertyDescriptor(
-    flushExpired,
-    privateActQueueFlushDiagnosticsExport
+  const sourceRecordDescriptor = Object.getOwnPropertyDescriptor(
+    moduleRecord,
+    privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey
   );
   if (
-    diagnosticsDescriptor === undefined ||
-    diagnosticsDescriptor.configurable !== false ||
-    diagnosticsDescriptor.enumerable !== false ||
-    diagnosticsDescriptor.writable !== false ||
+    sourceRecordDescriptor === undefined ||
+    sourceRecordDescriptor.configurable !== false ||
+    sourceRecordDescriptor.enumerable !== false ||
+    sourceRecordDescriptor.writable !== false
+  ) {
+    return null;
+  }
+
+  const sourceRecord = sourceRecordDescriptor.value;
+  if (
+    !isObjectLike(sourceRecord) ||
+    !Object.isFrozen(sourceRecord) ||
+    sourceRecord.status !==
+      privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind ||
     !isAcceptedSchedulerPrivateActQueueFlushDiagnostics(
-      diagnosticsDescriptor.value
+      sourceRecord.diagnostics
     )
   ) {
     return null;
   }
 
-  const diagnostics = diagnosticsDescriptor.value;
+  const diagnostics = sourceRecord.diagnostics;
   if (
     diagnostics.mockSchedulerExpiredActRootWorkDiagnosticsReady !== true ||
     diagnostics.providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics !==
@@ -420,10 +438,12 @@ function getSchedulerMockExpiredActRootWorkSourceValidator() {
   }
 
   const validator =
-    diagnostics.schedulerMockExpiredActRootWorkSourceValidator;
+    sourceRecord.schedulerMockExpiredActRootWorkSourceValidator;
   if (
     !isObjectLike(validator) ||
     !Object.isFrozen(validator) ||
+    validator !==
+      diagnostics.schedulerMockExpiredActRootWorkSourceValidator ||
     validator.status !==
       'fast-react.scheduler.mock-expired-act-root-work-source-validator' ||
     typeof validator.isSchedulerMockExpiredActRootWorkSource !== 'function'
@@ -446,13 +466,17 @@ function getSchedulerMockExpiredActRootWorkSourceValidator() {
 
 function loadSchedulerMockForExpiredActRootWorkSourceProof() {
   try {
-    return require('../scheduler/unstable_mock.js');
+    return loadSchedulerMockModuleForExpiredActRootWorkSourceProof(
+      require.resolve('../scheduler/unstable_mock.js')
+    );
   } catch (relativeError) {
     if (relativeError === null || relativeError.code !== 'MODULE_NOT_FOUND') {
       throw relativeError;
     }
     try {
-      return require('scheduler/unstable_mock.js');
+      return loadSchedulerMockModuleForExpiredActRootWorkSourceProof(
+        require.resolve('scheduler/unstable_mock.js')
+      );
     } catch (packageError) {
       if (packageError === null || packageError.code !== 'MODULE_NOT_FOUND') {
         throw packageError;
@@ -460,6 +484,17 @@ function loadSchedulerMockForExpiredActRootWorkSourceProof() {
       return null;
     }
   }
+}
+
+function loadSchedulerMockModuleForExpiredActRootWorkSourceProof(
+  resolvedModulePath
+) {
+  const Scheduler = require(resolvedModulePath);
+  const moduleRecord = require.cache[resolvedModulePath];
+  if (moduleRecord === undefined || moduleRecord === null) {
+    return null;
+  }
+  return {Scheduler, moduleRecord};
 }
 
 function hasSchedulerMockExpiredActRootWorkSourceProof(value) {

@@ -347,6 +347,64 @@ test("scheduler mock oracle exposes react-test-renderer flush helper metadata fr
   }
 });
 
+test("workspace scheduler mock public flush helper descriptors stay oracle-compatible", () => {
+  for (const mode of SCHEDULER_MOCK_PROBE_MODES) {
+    const Scheduler = loadFreshSchedulerMock(mode.nodeEnv);
+    const fastReactValue = fastReactOperationValue(
+      mode.id,
+      "scheduler-mock-export-shape"
+    );
+
+    for (const [key, expectedValue] of
+      REACT_TEST_RENDERER_SCHEDULER_FLUSH_HELPER_METADATA) {
+      const expectedDescriptor = descriptorFor(
+        fastReactValue.descriptors,
+        key
+      );
+      const actualDescriptor = Object.getOwnPropertyDescriptor(
+        Scheduler,
+        key
+      );
+      assert.deepEqual(
+        {
+          kind: "data",
+          configurable: actualDescriptor.configurable,
+          enumerable: actualDescriptor.enumerable,
+          writable: actualDescriptor.writable,
+          value: {
+            type: typeof actualDescriptor.value,
+            name: actualDescriptor.value.name,
+            length: actualDescriptor.value.length
+          }
+        },
+        {
+          kind: expectedDescriptor.kind,
+          configurable: true,
+          enumerable: true,
+          writable: true,
+          value: expectedValue
+        },
+        `${mode.id}:${key}`
+      );
+
+      const originalHelper = Scheduler[key];
+      const fakeHelper = function schedulerMockReplacementProbe() {};
+      try {
+        Scheduler[key] = fakeHelper;
+        assert.equal(Scheduler[key], fakeHelper, `${mode.id}:${key}`);
+      } finally {
+        Object.defineProperty(Scheduler, key, {
+          configurable: true,
+          enumerable: true,
+          value: originalHelper,
+          writable: true
+        });
+      }
+      assert.equal(Scheduler[key], originalHelper, `${mode.id}:${key}`);
+    }
+  }
+});
+
 test("scheduler mock private act queue diagnostics drain only accepted internal test queues", () => {
   const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
 

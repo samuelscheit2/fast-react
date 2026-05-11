@@ -1448,6 +1448,8 @@ test("package-private React act gate consumes Scheduler mock expired act/root di
     ]) {
       assertSchedulerFlushHelperRejectsFakeValidatorMutation(
         Scheduler,
+        gate,
+        report,
         helperName,
         `${nodeEnv}:${helperName}`
       );
@@ -4036,11 +4038,18 @@ function cloneFrozenObject(value, overrides = {}) {
 
 function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
   Scheduler,
+  gate,
+  report,
   helperName,
   label
 ) {
   const originalHelper = Scheduler[helperName];
-  const fakeHelper = createFakeSchedulerFlushHelperWithPrivateDiagnostics();
+  const originalDiagnostics =
+    originalHelper[privateActQueueFlushDiagnosticsExport];
+  const fakeHelper =
+    createFakeSchedulerFlushHelperWithPrivateDiagnostics(
+      originalDiagnostics
+    );
   const helperDescriptor = Object.getOwnPropertyDescriptor(
     Scheduler,
     helperName
@@ -4055,9 +4064,9 @@ function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
       value: helperDescriptor.value
     },
     {
-      configurable: false,
+      configurable: true,
       enumerable: true,
-      writable: false,
+      writable: true,
       value: originalHelper
     },
     label
@@ -4072,21 +4081,34 @@ function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
   );
 
   try {
-    Scheduler[helperName] = fakeHelper;
-  } catch (error) {
-    assert.equal(error instanceof TypeError, true, label);
-  }
-  assert.equal(Scheduler[helperName], originalHelper, label);
-  assert.equal(
-    Reflect.defineProperty(Scheduler, helperName, {
+    try {
+      Scheduler[helperName] = fakeHelper;
+    } catch (error) {
+      assert.equal(error instanceof TypeError, true, label);
+    }
+    assert.equal(Scheduler[helperName], fakeHelper, label);
+
+    if (helperName === "unstable_flushExpired") {
+      assert.equal(
+        gate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(report),
+        true,
+        `${label}:original-report-with-replaced-helper`
+      );
+      assertSchedulerMockExpiredDiagnosticsRejected(
+        gate,
+        cloneExpiredActRootWorkReport(report),
+        "scheduler-expired-act-root-diagnostics-source-proof",
+        `${label}:cloned-report-with-replaced-helper`
+      );
+    }
+  } finally {
+    Object.defineProperty(Scheduler, helperName, {
       configurable: true,
       enumerable: true,
-      value: fakeHelper,
+      value: originalHelper,
       writable: true
-    }),
-    false,
-    label
-  );
+    });
+  }
   assert.equal(Scheduler[helperName], originalHelper, label);
   assert.equal(
     Reflect.defineProperty(
@@ -4141,7 +4163,32 @@ function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
   );
 }
 
-function createFakeSchedulerFlushHelperWithPrivateDiagnostics() {
+function assertSchedulerMockExpiredDiagnosticsRejected(
+  gate,
+  diagnostics,
+  reason,
+  label
+) {
+  assert.equal(
+    gate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(diagnostics),
+    false,
+    label
+  );
+  assert.throws(
+    () => gate.consumeSchedulerMockExpiredActRootWorkDiagnostics(diagnostics),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", label);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", label);
+      assert.equal(error.reason, reason, label);
+      return true;
+    },
+    label
+  );
+}
+
+function createFakeSchedulerFlushHelperWithPrivateDiagnostics(
+  originalDiagnostics
+) {
   const fakeHelper = function () {};
   Object.defineProperty(
     fakeHelper,
@@ -4149,15 +4196,16 @@ function createFakeSchedulerFlushHelperWithPrivateDiagnostics() {
     {
       configurable: false,
       enumerable: false,
-      value: createFakeSchedulerPrivateDiagnostics(),
+      value: createFakeSchedulerPrivateDiagnostics(originalDiagnostics),
       writable: false
     }
   );
   return Object.freeze(fakeHelper);
 }
 
-function createFakeSchedulerPrivateDiagnostics() {
+function createFakeSchedulerPrivateDiagnostics(originalDiagnostics = {}) {
   return Object.freeze({
+    ...originalDiagnostics,
     status: "private-scheduler-act-queue-flush-diagnostics",
     exportName: privateActQueueFlushDiagnosticsExport,
     providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics: true,
