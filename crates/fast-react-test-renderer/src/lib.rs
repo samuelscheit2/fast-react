@@ -3481,6 +3481,10 @@ pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAM
     "fast-react-test-renderer.serialization.private-unmount-nested-source-report-gate";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS: &str =
     "private-unmount-nested-source-report-admission-validated-public-native-package-blocked";
+pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISSING_REASON: &str =
+    "unmount-nested-source-report-admission-gate-missing";
+pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISMATCH_REASON: &str =
+    "unmount-nested-source-report-admission-gate-mismatch";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-update-host-output-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID: &str =
@@ -6918,6 +6922,9 @@ pub struct TestRendererPrivateToJsonNativeExecutionEvidence {
     consumes_accepted_host_output_row: bool,
     source_finished_work_identity_diagnostic_name: Option<&'static str>,
     consumes_private_sibling_text_finished_work_identity_gate: bool,
+    source_unmount_nested_source_report_admission_gate_diagnostic_name: Option<&'static str>,
+    source_unmount_nested_source_report_admission_gate_status: Option<&'static str>,
+    consumes_private_unmount_nested_source_report_admission_gate: bool,
     minimal_tree_shape: bool,
     public_to_json_available: bool,
     public_serialization_available: bool,
@@ -7029,6 +7036,25 @@ impl TestRendererPrivateToJsonNativeExecutionEvidence {
     }
 
     #[must_use]
+    pub const fn source_unmount_nested_source_report_admission_gate_diagnostic_name(
+        &self,
+    ) -> Option<&'static str> {
+        self.source_unmount_nested_source_report_admission_gate_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_unmount_nested_source_report_admission_gate_status(
+        &self,
+    ) -> Option<&'static str> {
+        self.source_unmount_nested_source_report_admission_gate_status
+    }
+
+    #[must_use]
+    pub const fn consumes_private_unmount_nested_source_report_admission_gate(&self) -> bool {
+        self.consumes_private_unmount_nested_source_report_admission_gate
+    }
+
+    #[must_use]
     pub const fn minimal_tree_shape(&self) -> bool {
         self.minimal_tree_shape
     }
@@ -7087,6 +7113,9 @@ pub struct TestRendererPrivateToTreeNativeExecutionEvidence {
     consumes_accepted_host_output_row: bool,
     source_finished_work_identity_diagnostic_name: Option<&'static str>,
     consumes_private_sibling_text_finished_work_identity_gate: bool,
+    source_unmount_nested_source_report_admission_gate_diagnostic_name: Option<&'static str>,
+    source_unmount_nested_source_report_admission_gate_status: Option<&'static str>,
+    consumes_private_unmount_nested_source_report_admission_gate: bool,
     minimal_tree_shape: bool,
     function_component_above_host_output_shape: bool,
     public_to_tree_available: bool,
@@ -7201,6 +7230,25 @@ impl TestRendererPrivateToTreeNativeExecutionEvidence {
     #[must_use]
     pub const fn consumes_private_sibling_text_finished_work_identity_gate(&self) -> bool {
         self.consumes_private_sibling_text_finished_work_identity_gate
+    }
+
+    #[must_use]
+    pub const fn source_unmount_nested_source_report_admission_gate_diagnostic_name(
+        &self,
+    ) -> Option<&'static str> {
+        self.source_unmount_nested_source_report_admission_gate_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_unmount_nested_source_report_admission_gate_status(
+        &self,
+    ) -> Option<&'static str> {
+        self.source_unmount_nested_source_report_admission_gate_status
+    }
+
+    #[must_use]
+    pub const fn consumes_private_unmount_nested_source_report_admission_gate(&self) -> bool {
+        self.consumes_private_unmount_nested_source_report_admission_gate
     }
 
     #[must_use]
@@ -14467,6 +14515,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: true,
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
+            source_unmount_nested_source_report_admission_gate_status: None,
+            consumes_private_unmount_nested_source_report_admission_gate: false,
             minimal_tree_shape,
             public_to_json_available: false,
             public_serialization_available: false,
@@ -14475,6 +14526,40 @@ impl TestRendererRoot {
             native_execution_available: false,
             compatibility_claimed: false,
         })
+    }
+
+    pub fn describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+        &self,
+        output: &TestRendererUnmountedHostOutput,
+        execution: TestRendererUnmountNativeBridgeAdmission,
+        identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
+        gate: Option<TestRendererPrivateUnmountNestedSourceReportAdmissionGate>,
+    ) -> Result<TestRendererPrivateToJsonNativeExecutionEvidence, TestRendererRootError> {
+        let Some(gate) = gate else {
+            return self.private_to_json_native_execution_record_error(
+                "unmount",
+                TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISSING_REASON,
+            );
+        };
+        self.validate_private_to_json_unmount_native_execution_record_for_canary(execution)?;
+        let row = self.describe_private_to_json_host_output_unmount_row_for_canary(output)?;
+        if let Err(reason) = self
+            .validate_private_unmount_nested_source_report_gate_for_native_execution_canary(
+                gate, execution, row,
+            )
+        {
+            return self.private_to_json_native_execution_record_error("unmount", reason);
+        }
+
+        let mut evidence = self
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                output, execution, identity,
+            )?;
+        evidence.source_unmount_nested_source_report_admission_gate_diagnostic_name =
+            Some(gate.diagnostic_name());
+        evidence.source_unmount_nested_source_report_admission_gate_status = Some(gate.status());
+        evidence.consumes_private_unmount_nested_source_report_admission_gate = true;
+        Ok(evidence)
     }
 
     pub fn describe_private_tree_metadata_for_canary(
@@ -14670,6 +14755,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: true,
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
+            source_unmount_nested_source_report_admission_gate_status: None,
+            consumes_private_unmount_nested_source_report_admission_gate: false,
             minimal_tree_shape,
             function_component_above_host_output_shape: false,
             public_to_tree_available: false,
@@ -14679,6 +14767,40 @@ impl TestRendererRoot {
             native_execution_available: false,
             compatibility_claimed: false,
         })
+    }
+
+    pub fn describe_private_to_tree_after_unmount_nested_source_report_native_execution_for_canary(
+        &self,
+        output: &TestRendererUnmountedHostOutput,
+        execution: TestRendererUnmountNativeBridgeAdmission,
+        identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
+        gate: Option<TestRendererPrivateUnmountNestedSourceReportAdmissionGate>,
+    ) -> Result<TestRendererPrivateToTreeNativeExecutionEvidence, TestRendererRootError> {
+        let Some(gate) = gate else {
+            return self.private_to_tree_native_execution_record_error(
+                "unmount",
+                TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISSING_REASON,
+            );
+        };
+        self.validate_private_to_tree_unmount_native_execution_record_for_canary(execution)?;
+        let row = self.describe_private_to_json_host_output_unmount_row_for_canary(output)?;
+        if let Err(reason) = self
+            .validate_private_unmount_nested_source_report_gate_for_native_execution_canary(
+                gate, execution, row,
+            )
+        {
+            return self.private_to_tree_native_execution_record_error("unmount", reason);
+        }
+
+        let mut evidence = self
+            .describe_private_to_tree_after_unmount_native_execution_for_canary(
+                output, execution, identity,
+            )?;
+        evidence.source_unmount_nested_source_report_admission_gate_diagnostic_name =
+            Some(gate.diagnostic_name());
+        evidence.source_unmount_nested_source_report_admission_gate_status = Some(gate.status());
+        evidence.consumes_private_unmount_nested_source_report_admission_gate = true;
+        Ok(evidence)
     }
 
     pub fn describe_private_to_json_finished_work_identity_gate_for_canary(
@@ -15701,6 +15823,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: true,
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
+            source_unmount_nested_source_report_admission_gate_status: None,
+            consumes_private_unmount_nested_source_report_admission_gate: false,
             minimal_tree_shape,
             public_to_json_available: false,
             public_serialization_available: false,
@@ -15798,6 +15923,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: result.host_output_row().is_some(),
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
+            source_unmount_nested_source_report_admission_gate_status: None,
+            consumes_private_unmount_nested_source_report_admission_gate: false,
             minimal_tree_shape,
             public_to_json_available: false,
             public_serialization_available: false,
@@ -15892,6 +16020,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: report.host_output_row().is_some(),
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
+            source_unmount_nested_source_report_admission_gate_status: None,
+            consumes_private_unmount_nested_source_report_admission_gate: false,
             minimal_tree_shape,
             function_component_above_host_output_shape,
             public_to_tree_available: false,
@@ -15985,6 +16116,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: true,
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
+            source_unmount_nested_source_report_admission_gate_status: None,
+            consumes_private_unmount_nested_source_report_admission_gate: false,
             minimal_tree_shape: false,
             function_component_above_host_output_shape,
             public_to_tree_available: false,
@@ -17099,6 +17233,48 @@ impl TestRendererRoot {
         }
         if !gate.public_native_package_js_surfaces_blocked() {
             return Err("public-or-native-package-js-compatibility-claim");
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_unmount_nested_source_report_gate_for_native_execution_canary(
+        &self,
+        gate: TestRendererPrivateUnmountNestedSourceReportAdmissionGate,
+        execution: TestRendererUnmountNativeBridgeAdmission,
+        row: TestRendererPrivateToJsonHostOutputRow,
+    ) -> Result<(), &'static str> {
+        Self::validate_private_unmount_nested_source_report_admission_gate_for_canary(gate)?;
+        if !gate.private_admission_ready()
+            || gate.unmount_root() != self.root_id
+            || gate.unmount_admission_record_id() != execution.diagnostic_id()
+            || gate.unmount_admission_status() != execution.status()
+            || gate.unmount_host_output_shape() != row.host_output_shape()
+            || gate.unmount_host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            || gate.unmount_host_node_cleanup_count() != execution.host_node_cleanup_count()
+            || gate.unmount_cleanup_order_record_count() != execution.cleanup_order_record_count()
+            || gate.nested_source_report_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+            || gate.nested_host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::NestedHostText
+            || gate.nested_source_node_count() != 4
+            || gate.nested_host_component_count() != 2
+            || gate.nested_host_text_count() != 2
+            || row.id() != TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
+            || row.host_output_update_kind() != TestRendererRootUpdateKind::Unmount
+            || row.current_root_child_count() != 0
+            || row.current_host_component_count() != 0
+            || row.current_host_text_count() != 0
+            || !row.dependency_diagnostics().public_surfaces_blocked()
+            || !execution.rust_unmount_cleanup_handoff_executed()
+            || !execution.host_output_produced()
+            || execution.native_bridge_available()
+            || execution.native_execution()
+        {
+            return Err(
+                TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISMATCH_REASON,
+            );
         }
 
         Ok(())
@@ -21683,6 +21859,31 @@ mod tests {
         (root, unmounted, handoff, admission, identity)
     }
 
+    fn accepted_unmount_nested_source_report_gate_for_unmount_root(
+        unmount_root: &TestRendererRoot,
+        unmounted: &TestRendererUnmountedHostOutput,
+        handoff: TestRendererUnmountDeletionCommitHandoffDiagnostics,
+        admission: TestRendererUnmountNativeBridgeAdmission,
+        unmount_identity: TestRendererPrivateSerializationFinishedWorkIdentityGate,
+    ) -> TestRendererPrivateUnmountNestedSourceReportAdmissionGate {
+        let (nested_root, nested_output, nested_route, nested_report, nested_identity) =
+            nested_source_report_identity_inputs_for_canary();
+
+        TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+            &nested_root,
+            &nested_output,
+            nested_route,
+            Some(&nested_report),
+            Some(nested_identity),
+            unmount_root,
+            unmounted,
+            Some(handoff),
+            admission,
+            Some(unmount_identity),
+        )
+        .unwrap()
+    }
+
     #[test]
     fn root_lifecycle_update_and_outcome_codes_are_stable_for_private_bridges() {
         assert_eq!(TestRendererRootLifecycle::Active.code(), "Active");
@@ -24597,6 +24798,189 @@ mod tests {
             )
             .unwrap_err(),
             "public-or-native-package-js-compatibility-claim"
+        );
+    }
+
+    #[test]
+    fn root_private_unmount_nested_source_report_to_json_native_execution_consumes_gate() {
+        let (unmount_root, unmounted, handoff, admission, identity) =
+            accepted_unmount_identity_for_root(false, true);
+        let gate = accepted_unmount_nested_source_report_gate_for_unmount_root(
+            &unmount_root,
+            &unmounted,
+            handoff,
+            admission,
+            identity,
+        );
+
+        let evidence = unmount_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(identity),
+                Some(gate),
+            )
+            .unwrap();
+
+        assert_eq!(evidence.operation(), "unmount");
+        assert_eq!(
+            evidence.public_surface(),
+            "create().unmount -> create().toJSON"
+        );
+        assert_eq!(
+            evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+        );
+        assert_eq!(
+            evidence.host_output_row().unwrap().id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
+        );
+        assert!(evidence.consumes_accepted_native_unmount_execution_record());
+        assert!(evidence.consumes_private_to_json_evidence());
+        assert!(evidence.consumes_accepted_host_output_row());
+        assert_eq!(
+            evidence.source_unmount_nested_source_report_admission_gate_diagnostic_name(),
+            Some(TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAME)
+        );
+        assert_eq!(
+            evidence.source_unmount_nested_source_report_admission_gate_status(),
+            Some(TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS)
+        );
+        assert!(evidence.consumes_private_unmount_nested_source_report_admission_gate());
+        assert!(evidence.minimal_tree_shape());
+        assert!(!evidence.public_to_json_available());
+        assert!(!evidence.public_serialization_available());
+        assert!(!evidence.native_bridge_available());
+        assert!(!evidence.native_execution_available());
+        assert!(!evidence.compatibility_claimed());
+
+        let error = unmount_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(identity),
+                None,
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "unmount",
+            TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISSING_REASON,
+        );
+
+        let mut stale_gate = gate;
+        stale_gate.unmount_host_node_cleanup_count += 1;
+        let error = unmount_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(identity),
+                Some(stale_gate),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "unmount",
+            TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISMATCH_REASON,
+        );
+    }
+
+    #[test]
+    fn root_private_unmount_nested_source_report_to_tree_native_execution_consumes_gate() {
+        let (unmount_root, unmounted, handoff, admission, json_identity) =
+            accepted_unmount_identity_for_root(false, true);
+        let tree_identity = unmount_root
+            .describe_private_to_tree_unmount_finished_work_identity_gate_for_canary(
+                &unmounted,
+                Some(&handoff),
+            )
+            .unwrap();
+        let gate = accepted_unmount_nested_source_report_gate_for_unmount_root(
+            &unmount_root,
+            &unmounted,
+            handoff,
+            admission,
+            json_identity,
+        );
+
+        let evidence = unmount_root
+            .describe_private_to_tree_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(tree_identity),
+                Some(gate),
+            )
+            .unwrap();
+
+        assert_eq!(evidence.operation(), "unmount");
+        assert_eq!(
+            evidence.public_surface(),
+            "create().unmount -> create().toTree"
+        );
+        assert_eq!(
+            evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            evidence.source_tree_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+        );
+        assert!(evidence.consumes_accepted_native_unmount_execution_record());
+        assert!(evidence.consumes_private_to_tree_evidence());
+        assert!(evidence.consumes_accepted_host_output_row());
+        assert_eq!(
+            evidence.source_unmount_nested_source_report_admission_gate_diagnostic_name(),
+            Some(TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAME)
+        );
+        assert_eq!(
+            evidence.source_unmount_nested_source_report_admission_gate_status(),
+            Some(TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS)
+        );
+        assert!(evidence.consumes_private_unmount_nested_source_report_admission_gate());
+        assert!(evidence.minimal_tree_shape());
+        assert!(!evidence.function_component_above_host_output_shape());
+        assert!(!evidence.public_to_tree_available());
+        assert!(!evidence.public_serialization_available());
+        assert!(!evidence.native_bridge_available());
+        assert!(!evidence.native_execution_available());
+        assert!(!evidence.compatibility_claimed());
+
+        let error = unmount_root
+            .describe_private_to_tree_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(tree_identity),
+                None,
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "unmount",
+            TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISSING_REASON,
+        );
+
+        let mut stale_gate = gate;
+        stale_gate.unmount_root = FiberRootId::new(stale_gate.unmount_root().raw() + 1).unwrap();
+        let error = unmount_root
+            .describe_private_to_tree_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(tree_identity),
+                Some(stale_gate),
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "unmount",
+            TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISMATCH_REASON,
         );
     }
 
