@@ -279,6 +279,8 @@ const privateRootPublicFacadeNestedHostOutputUpdateRecordType =
   'fast.react_dom.private_root_public_facade_nested_host_output_update_record';
 const privateRootPublicFacadeHostOutputUnmountCleanupRecordType =
   'fast.react_dom.private_root_public_facade_host_output_unmount_cleanup_record';
+const privateRootPublicFacadeRootUnmountLifecycleExecutionRecordType =
+  'fast.react_dom.private_root_public_facade_root_unmount_lifecycle_execution_record';
 const privateRootPublicFacadeLifecycleContainerSnapshotRecordType =
   'fast.react_dom.private_root_public_facade_lifecycle_container_snapshot_record';
 const privateRootPublicFacadeAdapterSymbol = Symbol.for(
@@ -403,6 +405,8 @@ const ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-public-facade-nested-host-output-update-diagnostic';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED =
   'cleaned-private-root-public-facade-host-output-unmount-cleanup-diagnostic';
+const ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_LIFECYCLE_EXECUTION_ACCEPTED =
+  'accepted-private-root-public-facade-root-unmount-lifecycle-execution';
 const ROOT_BRIDGE_PUBLIC_FACADE_LIFECYCLE_CONTAINER_SNAPSHOT_ACCEPTED =
   'accepted-private-root-public-facade-lifecycle-container-snapshot';
 const ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_PASSIVE_EVIDENCE_ACCEPTED =
@@ -2980,6 +2984,12 @@ const rootPublicFacadeRootCommitHostUpdateSourceRowPayloads =
 const rootPublicFacadeRootCommitHostUpdateConsumedRows = new WeakMap();
 const rootPublicFacadeNestedHostOutputUpdatePayloads = new WeakMap();
 const rootPublicFacadeHostOutputUnmountCleanupPayloads = new WeakMap();
+const rootPublicFacadeRootUnmountLifecycleExecutionPayloads =
+  new WeakMap();
+const rootPublicFacadeRootUnmountLifecycleExecutionSourceRowPayloads =
+  new WeakMap();
+const rootPublicFacadeRootUnmountLifecycleExecutionConsumedRows =
+  new WeakMap();
 const rootPublicFacadeLifecycleContainerSnapshotPayloads = new WeakMap();
 const rootPublicFacadeLifecycleContainerSnapshotCaptures = new WeakMap();
 
@@ -6329,9 +6339,28 @@ function createPrivateRootPublicFacadeRoot(
     unmount: {
       enumerable: true,
       value: function unmount() {
-        const callback = arguments.length > 0 ? arguments[0] : undefined;
+        const options =
+          normalizePrivateRootPublicFacadeRootUnmountOptions(arguments);
+        const callback = options.callback;
         const activeHostOutput =
           getActivePrivateRootPublicFacadeHostOutputRender(payload);
+        const preparedUnmount =
+          activeHostOutput === null
+            ? null
+            : preparePrivateRootPublicFacadeRootUnmountLifecycleExecution({
+                activeHostOutput,
+                cleanupSource: 'root.unmount',
+                createPayload: rootRecordPayloads.get(createRecord),
+                createRecord,
+                latestRender:
+                  getLatestPrivateRootPublicFacadeHostOutputRenderRequest(
+                    payload,
+                    activeHostOutput
+                  ),
+                options: options.value,
+                payload,
+                unmountCallback: callback
+              });
         const lifecycleRequestBoundary =
           createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
         const record = adapterState.bridge.unmountContainer(
@@ -6347,12 +6376,19 @@ function createPrivateRootPublicFacadeRoot(
           record,
           lifecycleRequestBoundary
         );
+        if (preparedUnmount !== null) {
+          assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionMatchesRecord(
+            preparedUnmount.lifecycleExecution,
+            record
+          );
+        }
         if (activeHostOutput !== null && !record.noOp) {
           unmountPrivateRootPublicFacadeActiveHostOutputFromPayload(
             payload,
             activeHostOutput,
             record,
-            callback
+            callback,
+            preparedUnmount
           );
         }
         return record;
@@ -6431,6 +6467,48 @@ function isPrivateRootPublicFacadeRootRenderOptionsObject(value) {
     Object.prototype.hasOwnProperty.call(
       value,
       'rootCommitHostComponentUpdateMetadataFactory'
+    )
+  );
+}
+
+function normalizePrivateRootPublicFacadeRootUnmountOptions(args) {
+  const first = args.length > 0 ? args[0] : undefined;
+  if (isPrivateRootPublicFacadeRootUnmountOptionsObject(first)) {
+    return {
+      callback: getPublicFacadeRootUnmountCallback(first),
+      value: first
+    };
+  }
+  return {
+    callback: first,
+    value: {
+      callback: first
+    }
+  };
+}
+
+function isPrivateRootPublicFacadeRootUnmountOptionsObject(value) {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    Array.isArray(value)
+  ) {
+    return false;
+  }
+  return (
+    Object.prototype.hasOwnProperty.call(value, 'callback') ||
+    Object.prototype.hasOwnProperty.call(value, 'unmountCallback') ||
+    Object.prototype.hasOwnProperty.call(
+      value,
+      'rootUnmountLifecycleExecutionFactory'
+    ) ||
+    Object.prototype.hasOwnProperty.call(
+      value,
+      'rootUnmountLifecycleExecutionRecord'
+    ) ||
+    Object.prototype.hasOwnProperty.call(
+      value,
+      'rootUnmountLifecycleMetadataFactory'
     )
   );
 }
@@ -9844,8 +9922,10 @@ function unmountPrivateRootPublicFacadeHostOutputFromPayload(
   let renderRecord = null;
   let admissionRecord = null;
   let hostOutputHandoff = null;
+  let hostOutputPayload = null;
   let unmountRecord = null;
   let unmountCleanupRecord = null;
+  let preparedUnmount = null;
   let unmountRefPassiveEvidence = null;
   const renderCallback =
     getPublicFacadeHostOutputUnmountRenderCallback(options);
@@ -9880,12 +9960,64 @@ function unmountPrivateRootPublicFacadeHostOutputFromPayload(
     );
     hostOutputHandoff =
       payload.bridge.applyInitialRenderHostOutput(admissionRecord);
-    unmountRecord = payload.root.unmount(unmountCallback);
+    hostOutputPayload =
+      rootInitialHostOutputHandoffPayloads.get(hostOutputHandoff);
+    if (hostOutputPayload === undefined) {
+      throwInvalidRootPublicFacadeHostOutputUnmount(
+        'Public-facade host-output unmount cleanup requires an applied initial host-output handoff.'
+      );
+    }
+    const unmountLifecycleSourceContainerSnapshotBefore =
+      capturePrivateRootPublicFacadeLifecycleContainerSnapshot(
+        createPayload.container
+      );
+    assertPrivateRootPublicFacadeLifecycleContainerSnapshotCapture(
+      'unmount',
+      createPayload.container,
+      unmountLifecycleSourceContainerSnapshotBefore
+    );
+    preparedUnmount =
+      preparePrivateRootPublicFacadeRootUnmountLifecycleExecution({
+        activeHostOutput: null,
+        cleanupSource: 'adapter.unmountHostOutput',
+        createPayload,
+        createRecord,
+        hostOutputHandoff,
+        hostOutputPayload,
+        latestRender: {
+          callback: renderCallback,
+          element,
+          renderRecord
+        },
+        options,
+        payload,
+        sourceContainerSnapshotBefore:
+          unmountLifecycleSourceContainerSnapshotBefore,
+        unmountCallback
+      });
+    const unmountLifecycleRequestBoundary =
+      createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
+    unmountRecord = payload.bridge.unmountContainer(
+      createRecord.handle,
+      unmountCallback
+    );
+    payload.requestRecords.push(unmountRecord);
+    payload.unmountRecords.push(unmountRecord);
+    assertPrivateRootPublicFacadeLifecycleNewSourceRecord(
+      payload,
+      createRecord,
+      'unmount',
+      unmountRecord,
+      unmountLifecycleRequestBoundary
+    );
+    assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionMatchesRecord(
+      preparedUnmount.lifecycleExecution,
+      unmountRecord
+    );
     unmountRefPassiveEvidence =
       createPrivateRootPublicFacadeUnmountRefPassiveEvidence({
         element,
-        hostOutputPayload:
-          rootInitialHostOutputHandoffPayloads.get(hostOutputHandoff),
+        hostOutputPayload,
         payload,
         unmountRecord
       });
@@ -9903,13 +10035,6 @@ function unmountPrivateRootPublicFacadeHostOutputFromPayload(
     throw error;
   }
 
-  const hostOutputPayload =
-    rootInitialHostOutputHandoffPayloads.get(hostOutputHandoff);
-  if (hostOutputPayload === undefined) {
-    throwInvalidRootPublicFacadeHostOutputUnmount(
-      'Public-facade host-output unmount cleanup requires an applied initial host-output handoff.'
-    );
-  }
   const unmountCleanupPayload =
     rootUnmountHostOutputCleanupPayloads.get(unmountCleanupRecord);
   if (unmountCleanupPayload === undefined) {
@@ -9931,6 +10056,7 @@ function unmountPrivateRootPublicFacadeHostOutputFromPayload(
     renderRecord,
     sideEffectRecord,
     sourceContainerSnapshotBefore,
+    unmountLifecycleExecution: preparedUnmount.lifecycleExecution,
     unmountCallback,
     unmountCleanupPayload,
     unmountCleanupRecord,
@@ -9943,7 +10069,8 @@ function unmountPrivateRootPublicFacadeActiveHostOutputFromPayload(
   payload,
   activeHostOutput,
   unmountRecord,
-  unmountCallback
+  unmountCallback,
+  preparedUnmount
 ) {
   const createRecord = payload.createRecord;
   const createPayload = rootRecordPayloads.get(createRecord);
@@ -9968,14 +10095,7 @@ function unmountPrivateRootPublicFacadeActiveHostOutputFromPayload(
   let unmountCleanupPayload = null;
   let unmountRefPassiveEvidence = null;
   const sourceContainerSnapshotBefore =
-    capturePrivateRootPublicFacadeLifecycleContainerSnapshot(
-      createPayload.container
-    );
-  assertPrivateRootPublicFacadeLifecycleContainerSnapshotCapture(
-    'unmount',
-    createPayload.container,
-    sourceContainerSnapshotBefore
-  );
+    preparedUnmount.sourceContainerSnapshotBefore;
 
   try {
     sideEffectRecord = payload.bridge.applyCreateRootSideEffects(
@@ -10027,6 +10147,7 @@ function unmountPrivateRootPublicFacadeActiveHostOutputFromPayload(
     renderRecord: latestRender.renderRecord,
     sideEffectRecord,
     sourceContainerSnapshotBefore,
+    unmountLifecycleExecution: preparedUnmount.lifecycleExecution,
     unmountCallback,
     unmountCleanupPayload,
     unmountCleanupRecord,
@@ -10048,6 +10169,7 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
   renderRecord,
   sideEffectRecord,
   sourceContainerSnapshotBefore,
+  unmountLifecycleExecution,
   unmountCallback,
   unmountCleanupPayload,
   unmountCleanupRecord,
@@ -10071,6 +10193,9 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
     payload.bridge.createNativeRequestHandoff(unmountRecord);
   const nativeHandoffPayload =
     rootNativeHandoffPayloads.get(nativeHandoffRecord) || null;
+  consumePrivateRootPublicFacadeRootUnmountLifecycleExecution(
+    unmountLifecycleExecution
+  );
   const sourceContainerSnapshot =
     createPrivateRootPublicFacadeLifecycleContainerSnapshotRecord({
       before: sourceContainerSnapshotBefore,
@@ -10114,6 +10239,22 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
     unmountLifecycleStatusAfter: unmountRecord.lifecycleStatusAfter,
     unmountNoOp: unmountRecord.noOp === true,
     unmountSync: unmountRecord.sync === true,
+    rootUnmountLifecycleExecutionStatus:
+      unmountLifecycleExecution.record.executionStatus,
+    rootUnmountLifecycleExecutionConsumed:
+      unmountLifecycleExecution.payload.consumed,
+    rootUnmountLifecycleExecutionRecord:
+      unmountLifecycleExecution.record,
+    rootUnmountLifecycleExecutionSourceOwned:
+      unmountLifecycleExecution.record.sourceOwned,
+    rootUnmountLifecycleRequestBoundaryCurrent:
+      unmountLifecycleExecution.record.requestBoundaryCurrent,
+    rootUnmountLifecycleSnapshotOwned:
+      unmountLifecycleExecution.record.sourceContainerSnapshotOwned,
+    rootUnmountLifecycleSnapshotBeforeChildCount:
+      unmountLifecycleExecution.record.sourceContainerSnapshotBeforeChildCount,
+    rootUnmountLifecycleFinishedWorkHandoffId:
+      unmountLifecycleExecution.record.rootWorkLoopFinishedWorkHandoffId,
     sideEffectId: sideEffectRecord.sideEffectId,
     sideEffectSequence: sideEffectRecord.sideEffectSequence,
     setupSideEffectStatus: sideEffectRecord.sideEffectStatus,
@@ -10273,6 +10414,8 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
       rootPublicFacadeLifecycleContainerSnapshotPayloads.get(
         sourceContainerSnapshot
       ),
+    unmountLifecycleExecutionPayload: unmountLifecycleExecution.payload,
+    unmountLifecycleExecutionRecord: unmountLifecycleExecution.record,
     unmountCallback,
     unmountCleanupPayload,
     unmountCleanupRecord,
@@ -10281,6 +10424,766 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
   });
   payload.hostOutputUnmountCleanupRecords.push(diagnosticRecord);
   return diagnosticRecord;
+}
+
+function preparePrivateRootPublicFacadeRootUnmountLifecycleExecution({
+  activeHostOutput,
+  cleanupSource,
+  createPayload,
+  createRecord,
+  hostOutputHandoff,
+  hostOutputPayload,
+  latestRender,
+  options,
+  payload,
+  sourceContainerSnapshotBefore,
+  unmountCallback
+}) {
+  if (createPayload === undefined || createPayload === null) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Expected a private React DOM createRoot record for public-facade root.unmount lifecycle execution.'
+    );
+  }
+  const resolvedHostOutputHandoff =
+    hostOutputHandoff ||
+    (activeHostOutput === null
+      ? null
+      : activeHostOutput.renderPayload.hostOutputHandoff);
+  const resolvedHostOutputPayload =
+    hostOutputPayload ||
+    (activeHostOutput === null ? null : activeHostOutput.hostOutputPayload);
+  if (
+    resolvedHostOutputHandoff === null ||
+    resolvedHostOutputPayload === null ||
+    resolvedHostOutputPayload.active !== true
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Private public-facade root.unmount lifecycle execution requires an active host-output handoff.'
+    );
+  }
+
+  const snapshotBefore =
+    sourceContainerSnapshotBefore ||
+    capturePrivateRootPublicFacadeLifecycleContainerSnapshot(
+      createPayload.container
+    );
+  assertPrivateRootPublicFacadeLifecycleContainerSnapshotCapture(
+    'unmount',
+    createPayload.container,
+    snapshotBefore
+  );
+
+  const expectedSource =
+    createPrivateRootPublicFacadeRootUnmountExpectedSource({
+      activeHostOutput,
+      cleanupSource,
+      createPayload,
+      createRecord,
+      hostOutputHandoff: resolvedHostOutputHandoff,
+      hostOutputPayload: resolvedHostOutputPayload,
+      latestRender,
+      payload,
+      sourceContainerSnapshotBefore: snapshotBefore,
+      unmountCallback
+    });
+  assertPrivateRootPublicFacadeRootUnmountExpectedSourceCurrent(
+    payload,
+    expectedSource,
+    latestRender,
+    snapshotBefore,
+    resolvedHostOutputPayload
+  );
+
+  return {
+    expectedSource,
+    lifecycleExecution:
+      resolvePrivateRootPublicFacadeRootUnmountLifecycleExecution({
+        activeHostOutput,
+        createPayload,
+        createRecord,
+        expectedSource,
+        hostOutputHandoff: resolvedHostOutputHandoff,
+        hostOutputPayload: resolvedHostOutputPayload,
+        latestRender,
+        options,
+        payload,
+        sourceContainerSnapshotBefore: snapshotBefore
+      }),
+    sourceContainerSnapshotBefore: snapshotBefore
+  };
+}
+
+function resolvePrivateRootPublicFacadeRootUnmountLifecycleExecution({
+  activeHostOutput,
+  createPayload,
+  createRecord,
+  expectedSource,
+  hostOutputHandoff,
+  hostOutputPayload,
+  latestRender,
+  options,
+  payload,
+  sourceContainerSnapshotBefore
+}) {
+  const option =
+    getPrivateRootPublicFacadeRootUnmountLifecycleExecutionOption(options);
+  const context =
+    createPrivateRootPublicFacadeRootUnmountLifecycleExecutionFactoryContext({
+      activeHostOutput,
+      createPayload,
+      createRecord,
+      expectedSource,
+      hostOutputHandoff,
+      hostOutputPayload,
+      latestRender,
+      payload,
+      sourceContainerSnapshotBefore
+    });
+
+  let executionRecord;
+  if (option.kind === 'record') {
+    executionRecord = option.record;
+  } else if (option.kind === 'factory') {
+    executionRecord = option.factory(context);
+  } else {
+    const metadata =
+      option.kind === 'metadataFactory'
+        ? option.factory(context)
+        : {
+            lifecycleRows: [
+              context.createRootUnmountLifecycleExecutionRow({
+                kind:
+                  'FastReactDomPrivateRootPublicFacadeRootUnmountLifecycleSourceRow',
+                rowIndex: 0
+              })
+            ],
+            source:
+              'fast-react-dom-public-facade-root-unmount-lifecycle'
+          };
+    executionRecord =
+      context.createRootUnmountLifecycleExecutionRecord(metadata);
+  }
+
+  return assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
+    expectedSource,
+    payload,
+    record: executionRecord,
+    sourceContainerSnapshotBefore
+  });
+}
+
+function getPrivateRootPublicFacadeRootUnmountLifecycleExecutionOption(
+  options
+) {
+  if (!isObjectOrFunction(options)) {
+    return {
+      kind: 'none'
+    };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rootUnmountLifecycleExecutionRecord'
+    )
+  ) {
+    return {
+      kind: 'record',
+      record: options.rootUnmountLifecycleExecutionRecord
+    };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rootUnmountLifecycleExecutionFactory'
+    )
+  ) {
+    if (typeof options.rootUnmountLifecycleExecutionFactory !== 'function') {
+      throwInvalidRootPublicFacadeHostOutputUnmount(
+        'Public-facade root.unmount lifecycle execution factories must be functions.'
+      );
+    }
+    return {
+      factory: options.rootUnmountLifecycleExecutionFactory,
+      kind: 'factory'
+    };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rootUnmountLifecycleMetadataFactory'
+    )
+  ) {
+    if (typeof options.rootUnmountLifecycleMetadataFactory !== 'function') {
+      throwInvalidRootPublicFacadeHostOutputUnmount(
+        'Public-facade root.unmount lifecycle metadata factories must be functions.'
+      );
+    }
+    return {
+      factory: options.rootUnmountLifecycleMetadataFactory,
+      kind: 'metadataFactory'
+    };
+  }
+  return {
+    kind: 'none'
+  };
+}
+
+function createPrivateRootPublicFacadeRootUnmountExpectedSource({
+  activeHostOutput,
+  cleanupSource,
+  createPayload,
+  createRecord,
+  hostOutputHandoff,
+  hostOutputPayload,
+  latestRender,
+  payload,
+  sourceContainerSnapshotBefore,
+  unmountCallback
+}) {
+  const handleState = getPrivateRootHandleState(payload.rootHandle);
+  const bridgeState = handleState.bridgeState;
+  const requestSequence = bridgeState.nextRequestSequence;
+  const updateSequence = bridgeState.nextUpdateSequence;
+  const latestLifecycleRequest = handleState.latestLifecycleRequestRecord;
+  const rootWorkLoopFinishedWorkRecord =
+    activeHostOutput === null
+      ? null
+      : activeHostOutput.renderPayload.rootWorkLoopFinishedWorkRecord;
+  return freezeRecord({
+    entrypoint: 'react-dom/client',
+    operation: 'unmount',
+    requestId: `${bridgeState.requestIdPrefix}:${requestSequence}`,
+    requestSequence,
+    requestType: 'root.unmount',
+    sequence: updateSequence,
+    updateId: `${bridgeState.updateIdPrefix}:${updateSequence}`,
+    cleanupSource,
+    createRequestId: createRecord.requestId,
+    createRequestSequence: createRecord.requestSequence,
+    rootId: createRecord.rootId,
+    rootKind: createRecord.rootKind,
+    rootTag: createRecord.rootTag,
+    lifecycleStatusBefore: handleState.lifecycleStatus,
+    lifecycleStatusAfter: ROOT_LIFECYCLE_UNMOUNTED,
+    lifecycleRequestVersionBefore: handleState.lifecycleRequestVersion,
+    lifecycleRequestVersionAfter: handleState.lifecycleRequestVersion + 1,
+    latestLifecycleRequestId:
+      latestLifecycleRequest === null
+        ? null
+        : latestLifecycleRequest.requestId,
+    latestLifecycleRequestSequence:
+      latestLifecycleRequest === null
+        ? null
+        : latestLifecycleRequest.requestSequence,
+    latestRenderRequestId: latestRender.renderRecord.requestId,
+    latestRenderRequestSequence: latestRender.renderRecord.requestSequence,
+    latestRenderUpdateId: latestRender.renderRecord.updateId,
+    latestRenderElementInfo: describeBridgeValue(latestRender.element),
+    hostOutputHandoffId: hostOutputHandoff.handoffId,
+    hostOutputHandoffSequence: hostOutputHandoff.handoffSequence,
+    hostOutputHandoffStatus: hostOutputHandoff.handoffStatus,
+    hostOutputHandoffActive: hostOutputPayload.active === true,
+    rootWorkLoopFinishedWorkHandoffId:
+      rootWorkLoopFinishedWorkRecord === null
+        ? null
+        : rootWorkLoopFinishedWorkRecord.handoffId,
+    rootWorkLoopFinishedWorkStatus:
+      rootWorkLoopFinishedWorkRecord === null
+        ? null
+        : rootWorkLoopFinishedWorkRecord.handoffStatus,
+    sourceContainerSnapshotBeforeChildCount:
+      getChildNodeCountFromLifecycleSnapshot(sourceContainerSnapshotBefore),
+    sourceContainerSnapshotBeforeTextContent:
+      sourceContainerSnapshotBefore.textContent,
+    containerInfo: freezeRecord(describeContainer(createPayload.container)),
+    callbackInfo: describeBridgeValue(unmountCallback),
+    publicRootExecution: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    browserDomMutation: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPrivateRootPublicFacadeRootUnmountLifecycleExecutionFactoryContext({
+  activeHostOutput,
+  createPayload,
+  createRecord,
+  expectedSource,
+  hostOutputHandoff,
+  hostOutputPayload,
+  latestRender,
+  payload,
+  sourceContainerSnapshotBefore
+}) {
+  return freezeRecord({
+    activeHostOutputRecord:
+      activeHostOutput === null ? null : activeHostOutput.record,
+    createRecord,
+    expectedSourceRecord: expectedSource,
+    hostOutputHandoff,
+    hostOutputPayload,
+    latestRenderRecord: latestRender.renderRecord,
+    rootHandle: payload.rootHandle,
+    sourceContainerSnapshotBefore,
+    createRootUnmountLifecycleExecutionRow(row) {
+      return createPrivateRootPublicFacadeRootUnmountLifecycleSourceRow({
+        expectedSource,
+        row
+      });
+    },
+    createRootUnmountLifecycleExecutionRecord(metadata) {
+      return createPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
+        createPayload,
+        createRecord,
+        expectedSource,
+        hostOutputHandoff,
+        hostOutputPayload,
+        metadata,
+        payload,
+        sourceContainerSnapshotBefore
+      });
+    }
+  });
+}
+
+function createPrivateRootPublicFacadeRootUnmountLifecycleSourceRow({
+  expectedSource,
+  row
+}) {
+  if (!isObjectOrFunction(row)) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount lifecycle execution rows must be objects.'
+    );
+  }
+  assertNoPublicFacadeRootUnmountLifecycleAliasClaims(row);
+  const ownedRow = freezeRecord({...row});
+  rootPublicFacadeRootUnmountLifecycleExecutionSourceRowPayloads.set(
+    ownedRow,
+    freezeRecord({
+      expectedSource,
+      sourceRow: row
+    })
+  );
+  return ownedRow;
+}
+
+function assertNoPublicFacadeRootUnmountLifecycleAliasClaims(row) {
+  const blockedFields = [
+    'publicRootExecution',
+    'publicRootUnmount',
+    'publicRootUnmounted',
+    'publicRootCompatibilitySurface',
+    'publicRootUnmountCompatibilityClaimed',
+    'nativeExecution',
+    'rustExecution',
+    'reconcilerExecution',
+    'packageCompatibilityClaimed',
+    'compatibilityClaimed',
+    'sourceSyntaxAlias',
+    'proseAlias',
+    'testTitleAlias',
+    'errorMessageAlias'
+  ];
+  for (const field of blockedFields) {
+    if (Object.prototype.hasOwnProperty.call(row, field)) {
+      throwInvalidRootPublicFacadeHostOutputUnmount(
+        'Public-facade root.unmount lifecycle execution rejected public, native, Rust, package, prose, test-title, error-message, or source-syntax alias claims.'
+      );
+    }
+  }
+}
+
+function createPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
+  createPayload,
+  createRecord,
+  expectedSource,
+  hostOutputHandoff,
+  hostOutputPayload,
+  metadata,
+  payload,
+  sourceContainerSnapshotBefore
+}) {
+  assertPrivateRootPublicFacadeRootUnmountExpectedSourceCurrent(
+    payload,
+    expectedSource,
+    {
+      renderRecord: {
+        requestId: expectedSource.latestRenderRequestId,
+        requestSequence: expectedSource.latestRenderRequestSequence
+      }
+    },
+    sourceContainerSnapshotBefore,
+    hostOutputPayload
+  );
+  const normalizedMetadata =
+    normalizePrivateRootPublicFacadeRootUnmountLifecycleMetadata(
+      metadata
+    );
+  assertPrivateRootPublicFacadeRootUnmountLifecycleRowsSourceOwned(
+    normalizedMetadata.lifecycleRows,
+    expectedSource
+  );
+  assertPrivateRootPublicFacadeRootUnmountLifecycleRowsFresh(
+    normalizedMetadata.lifecycleRows
+  );
+
+  const executionId =
+    `${expectedSource.updateId}:root-unmount-lifecycle-execution`;
+  const record = freezeRecord({
+    $$typeof:
+      privateRootPublicFacadeRootUnmountLifecycleExecutionRecordType,
+    kind:
+      'FastReactDomPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord',
+    operation: 'public-facade-root-unmount-lifecycle-execution',
+    executionId,
+    executionStatus:
+      ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_LIFECYCLE_EXECUTION_ACCEPTED,
+    entrypoint: expectedSource.entrypoint,
+    sameEntrypoint: expectedSource.entrypoint === 'react-dom/client',
+    sourceOwned: true,
+    sourceRequestId: expectedSource.requestId,
+    sourceRequestSequence: expectedSource.requestSequence,
+    sourceRequestType: expectedSource.requestType,
+    sourceUpdateId: expectedSource.updateId,
+    sourceLifecycleStatusBefore: expectedSource.lifecycleStatusBefore,
+    sourceLifecycleStatusAfter: expectedSource.lifecycleStatusAfter,
+    lifecycleRequestVersionBefore:
+      expectedSource.lifecycleRequestVersionBefore,
+    lifecycleRequestVersionAfter:
+      expectedSource.lifecycleRequestVersionAfter,
+    latestLifecycleRequestId: expectedSource.latestLifecycleRequestId,
+    latestLifecycleRequestSequence:
+      expectedSource.latestLifecycleRequestSequence,
+    latestRenderRequestId: expectedSource.latestRenderRequestId,
+    latestRenderUpdateId: expectedSource.latestRenderUpdateId,
+    createRequestId: createRecord.requestId,
+    rootId: expectedSource.rootId,
+    rootKind: expectedSource.rootKind,
+    rootTag: expectedSource.rootTag,
+    cleanupSource: expectedSource.cleanupSource,
+    hostOutputHandoffId: hostOutputHandoff.handoffId,
+    hostOutputHandoffStatus: hostOutputHandoff.handoffStatus,
+    rootWorkLoopFinishedWorkHandoffId:
+      expectedSource.rootWorkLoopFinishedWorkHandoffId,
+    rootWorkLoopFinishedWorkStatus:
+      expectedSource.rootWorkLoopFinishedWorkStatus,
+    sourceContainerSnapshotOwned:
+      rootPublicFacadeLifecycleContainerSnapshotCaptures.get(
+        sourceContainerSnapshotBefore
+      )?.container === createPayload.container,
+    sourceContainerSnapshotBeforeChildCount:
+      expectedSource.sourceContainerSnapshotBeforeChildCount,
+    sourceContainerSnapshotBeforeTextContent:
+      expectedSource.sourceContainerSnapshotBeforeTextContent,
+    lifecycleMetadataSource: normalizedMetadata.source,
+    lifecycleMetadataRowCount:
+      normalizedMetadata.lifecycleRows.length,
+    lifecycleRowsFrozen:
+      normalizedMetadata.lifecycleRows.every((row) => Object.isFrozen(row)),
+    requestBoundaryCurrent: true,
+    consumed: false,
+    replayRejected: true,
+    fakeDomMutation: false,
+    domMutation: false,
+    browserDomMutation: false,
+    publicRootExecution: false,
+    publicRootCompatibilitySurface: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false
+  });
+
+  rootPublicFacadeRootUnmountLifecycleExecutionPayloads.set(record, {
+    createPayload,
+    createRecord,
+    consumed: false,
+    expectedSource,
+    hostOutputHandoff,
+    hostOutputPayload,
+    lifecycleRows: normalizedMetadata.lifecycleRows,
+    metadata,
+    normalizedMetadata,
+    payload,
+    rootHandle: payload.rootHandle,
+    sourceContainerSnapshotBefore
+  });
+  return record;
+}
+
+function normalizePrivateRootPublicFacadeRootUnmountLifecycleMetadata(
+  metadata
+) {
+  if (!isObjectOrFunction(metadata)) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount lifecycle execution metadata must be an object.'
+    );
+  }
+  const lifecycleRows = Array.isArray(metadata.lifecycleRows)
+    ? metadata.lifecycleRows
+    : Array.isArray(metadata.rows)
+      ? metadata.rows
+      : null;
+  if (lifecycleRows === null || lifecycleRows.length === 0) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount lifecycle execution requires source-owned lifecycle rows.'
+    );
+  }
+  return freezeRecord({
+    lifecycleRows: freezeArray(lifecycleRows),
+    source:
+      typeof metadata.source === 'string'
+        ? metadata.source
+        : 'fast-react-dom-public-facade-root-unmount-lifecycle'
+  });
+}
+
+function assertPrivateRootPublicFacadeRootUnmountLifecycleRowsSourceOwned(
+  rows,
+  expectedSource
+) {
+  for (const row of rows) {
+    const rowPayload =
+      rootPublicFacadeRootUnmountLifecycleExecutionSourceRowPayloads.get(
+        row
+      );
+    if (
+      rowPayload === undefined ||
+      !Object.isFrozen(row) ||
+      !privateRootPublicFacadeRootUnmountExpectedSourceMatches(
+        rowPayload.expectedSource,
+        expectedSource
+      )
+    ) {
+      throwInvalidRootPublicFacadeHostOutputUnmount(
+        'Public-facade root.unmount lifecycle execution rejected a stale, cross-root, cloned, or caller-built lifecycle row.'
+      );
+    }
+  }
+}
+
+function assertPrivateRootPublicFacadeRootUnmountLifecycleRowsFresh(rows) {
+  for (const row of rows) {
+    if (
+      rootPublicFacadeRootUnmountLifecycleExecutionConsumedRows.has(row)
+    ) {
+      throwInvalidRootPublicFacadeHostOutputUnmount(
+        'Public-facade root.unmount lifecycle execution rejected a replayed lifecycle row.'
+      );
+    }
+  }
+}
+
+function assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
+  expectedSource,
+  payload,
+  record,
+  sourceContainerSnapshotBefore
+}) {
+  if (!isWeakMapKey(record)) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount requires a source-owned lifecycle execution record.'
+    );
+  }
+  const executionPayload =
+    rootPublicFacadeRootUnmountLifecycleExecutionPayloads.get(record);
+  if (
+    executionPayload === undefined ||
+    record.$$typeof !==
+      privateRootPublicFacadeRootUnmountLifecycleExecutionRecordType ||
+    record.executionStatus !==
+      ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_LIFECYCLE_EXECUTION_ACCEPTED ||
+    record.entrypoint !== 'react-dom/client' ||
+    record.sameEntrypoint !== true ||
+    record.sourceOwned !== true ||
+    record.requestBoundaryCurrent !== true ||
+    record.sourceContainerSnapshotOwned !== true ||
+    record.fakeDomMutation !== false ||
+    record.nativeExecution !== false ||
+    record.reconcilerExecution !== false ||
+    record.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount requires an intact source-owned lifecycle execution record.'
+    );
+  }
+  if (executionPayload.consumed) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount rejected a replayed lifecycle execution record.'
+    );
+  }
+  if (
+    executionPayload.payload !== payload ||
+    executionPayload.sourceContainerSnapshotBefore !==
+      sourceContainerSnapshotBefore ||
+    !privateRootPublicFacadeRootUnmountExpectedSourceMatches(
+      executionPayload.expectedSource,
+      expectedSource
+    )
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount rejected stale, cross-root, cloned, or caller-built lifecycle execution metadata.'
+    );
+  }
+  assertPrivateRootPublicFacadeRootUnmountExpectedSourceCurrent(
+    payload,
+    expectedSource,
+    {
+      renderRecord: {
+        requestId: expectedSource.latestRenderRequestId,
+        requestSequence: expectedSource.latestRenderRequestSequence
+      }
+    },
+    sourceContainerSnapshotBefore,
+    executionPayload.hostOutputPayload
+  );
+  assertPrivateRootPublicFacadeRootUnmountLifecycleRowsFresh(
+    executionPayload.lifecycleRows
+  );
+  return {
+    payload: executionPayload,
+    record
+  };
+}
+
+function assertPrivateRootPublicFacadeRootUnmountExpectedSourceCurrent(
+  payload,
+  expectedSource,
+  latestRender,
+  sourceContainerSnapshotBefore,
+  hostOutputPayload
+) {
+  const handleState = getPrivateRootHandleState(payload.rootHandle);
+  const bridgeState = handleState.bridgeState;
+  const latestLifecycleRequest = handleState.latestLifecycleRequestRecord;
+  const currentSnapshotPayload =
+    rootPublicFacadeLifecycleContainerSnapshotCaptures.get(
+      sourceContainerSnapshotBefore
+    );
+  if (
+    handleState.lifecycleStatus !== expectedSource.lifecycleStatusBefore ||
+    handleState.lifecycleRequestVersion !==
+      expectedSource.lifecycleRequestVersionBefore ||
+    bridgeState.nextRequestSequence !== expectedSource.requestSequence ||
+    bridgeState.nextUpdateSequence !== expectedSource.sequence ||
+    latestLifecycleRequest === null ||
+    latestLifecycleRequest.requestId !==
+      expectedSource.latestLifecycleRequestId ||
+    latestLifecycleRequest.requestSequence !==
+      expectedSource.latestLifecycleRequestSequence ||
+    latestRender.renderRecord.requestId !==
+      expectedSource.latestRenderRequestId ||
+    latestRender.renderRecord.requestSequence !==
+      expectedSource.latestRenderRequestSequence ||
+    currentSnapshotPayload === undefined ||
+    currentSnapshotPayload.container !==
+      rootRecordPayloads.get(payload.createRecord)?.container ||
+    getChildNodeCount(currentSnapshotPayload.container) !==
+      expectedSource.sourceContainerSnapshotBeforeChildCount ||
+    hostOutputPayload.active !== true
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount lifecycle execution metadata is stale for the current root lifecycle request boundary.'
+    );
+  }
+}
+
+function privateRootPublicFacadeRootUnmountExpectedSourceMatches(
+  left,
+  right
+) {
+  return (
+    left !== null &&
+    right !== null &&
+    left.entrypoint === right.entrypoint &&
+    left.operation === right.operation &&
+    left.requestId === right.requestId &&
+    left.requestSequence === right.requestSequence &&
+    left.requestType === right.requestType &&
+    left.sequence === right.sequence &&
+    left.updateId === right.updateId &&
+    left.rootId === right.rootId &&
+    left.rootKind === right.rootKind &&
+    left.rootTag === right.rootTag &&
+    left.lifecycleStatusBefore === right.lifecycleStatusBefore &&
+    left.lifecycleStatusAfter === right.lifecycleStatusAfter &&
+    left.lifecycleRequestVersionBefore ===
+      right.lifecycleRequestVersionBefore &&
+    left.lifecycleRequestVersionAfter ===
+      right.lifecycleRequestVersionAfter &&
+    left.latestLifecycleRequestId === right.latestLifecycleRequestId &&
+    left.latestLifecycleRequestSequence ===
+      right.latestLifecycleRequestSequence &&
+    left.latestRenderRequestId === right.latestRenderRequestId &&
+    left.latestRenderRequestSequence ===
+      right.latestRenderRequestSequence &&
+    left.latestRenderUpdateId === right.latestRenderUpdateId &&
+    left.hostOutputHandoffId === right.hostOutputHandoffId &&
+    left.sourceContainerSnapshotBeforeChildCount ===
+      right.sourceContainerSnapshotBeforeChildCount
+  );
+}
+
+function assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionMatchesRecord(
+  execution,
+  unmountRecord
+) {
+  const expectedSource = execution.payload.expectedSource;
+  if (
+    unmountRecord.requestId !== expectedSource.requestId ||
+    unmountRecord.requestSequence !== expectedSource.requestSequence ||
+    unmountRecord.requestType !== expectedSource.requestType ||
+    unmountRecord.sequence !== expectedSource.sequence ||
+    unmountRecord.updateId !== expectedSource.updateId ||
+    unmountRecord.rootId !== expectedSource.rootId ||
+    unmountRecord.rootKind !== expectedSource.rootKind ||
+    unmountRecord.rootTag !== expectedSource.rootTag ||
+    unmountRecord.lifecycleStatusBefore !==
+      expectedSource.lifecycleStatusBefore ||
+    unmountRecord.lifecycleStatusAfter !==
+      expectedSource.lifecycleStatusAfter ||
+    unmountRecord.renderCount !==
+      getPrivateRootHandleState(execution.payload.rootHandle).renderCount
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount lifecycle execution metadata did not match the active root.unmount request record.'
+    );
+  }
+
+  const handleState = getPrivateRootHandleState(execution.payload.rootHandle);
+  if (
+    handleState.latestLifecycleRequestRecord !== unmountRecord ||
+    handleState.lifecycleStatus !== ROOT_LIFECYCLE_UNMOUNTED ||
+    handleState.lifecycleRequestVersion !==
+      expectedSource.lifecycleRequestVersionAfter
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount lifecycle execution requires the current unmount request boundary.'
+    );
+  }
+}
+
+function consumePrivateRootPublicFacadeRootUnmountLifecycleExecution(
+  execution
+) {
+  assertPrivateRootPublicFacadeRootUnmountLifecycleRowsFresh(
+    execution.payload.lifecycleRows
+  );
+  execution.payload.consumed = true;
+  for (const row of execution.payload.lifecycleRows) {
+    rootPublicFacadeRootUnmountLifecycleExecutionConsumedRows.set(
+      row,
+      freezeRecord({
+        executionRecord: execution.record
+      })
+    );
+  }
 }
 
 function createPrivateRootPublicFacadeUnmountRefPassiveEvidence({
@@ -13375,6 +14278,21 @@ function getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload(record) {
 
 function isPrivateRootPublicFacadeHostOutputUnmountCleanupRecord(value) {
   return rootPublicFacadeHostOutputUnmountCleanupPayloads.has(value);
+}
+
+function getPrivateRootPublicFacadeRootUnmountLifecycleExecutionPayload(
+  record
+) {
+  return (
+    rootPublicFacadeRootUnmountLifecycleExecutionPayloads.get(record) ||
+    null
+  );
+}
+
+function isPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord(
+  value
+) {
+  return rootPublicFacadeRootUnmountLifecycleExecutionPayloads.has(value);
 }
 
 function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
@@ -24628,6 +25546,17 @@ function getPublicFacadeHostOutputUnmountCallback(options) {
   return undefined;
 }
 
+function getPublicFacadeRootUnmountCallback(options) {
+  if (
+    options &&
+    typeof options === 'object' &&
+    Object.prototype.hasOwnProperty.call(options, 'callback')
+  ) {
+    return options.callback;
+  }
+  return getPublicFacadeHostOutputUnmountCallback(options);
+}
+
 function cleanupPublicFacadeHostOutputRenderAfterFailure({
   bridge,
   error,
@@ -25470,6 +26399,7 @@ module.exports = {
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED,
+  ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_LIFECYCLE_EXECUTION_ACCEPTED,
   ROOT_BRIDGE_PUBLIC_FACADE_LIFECYCLE_CONTAINER_SNAPSHOT_ACCEPTED,
   ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_PASSIVE_DESTROY_EVIDENCE_ACCEPTED,
   ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_PASSIVE_DESTROY_ORDERING_ACCEPTED,
@@ -25596,6 +26526,7 @@ module.exports = {
   getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload,
   getPrivateRootPublicFacadeNestedHostOutputUpdatePayload,
   getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload,
+  getPrivateRootPublicFacadeRootUnmountLifecycleExecutionPayload,
   getPrivateRootPublicFacadeAdapterPayload,
   getPrivateRootPublicFacadePreflightPayload,
   getPrivateRootPublicFacadePreflightRecordPayload,
@@ -25652,6 +26583,7 @@ module.exports = {
   isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord,
   isPrivateRootPublicFacadeNestedHostOutputUpdateRecord,
   isPrivateRootPublicFacadeHostOutputUnmountCleanupRecord,
+  isPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord,
   isPrivateRootPublicFacadeAdapter,
   isPrivateRootPublicFacadePreflight,
   isPrivateRootPublicFacadePreflightRecord,
@@ -25709,6 +26641,7 @@ module.exports = {
   privateRootPublicFacadeLifecycleContainerSnapshotRecordType,
   privateRootPublicFacadeNestedHostOutputUpdateRecordType,
   privateRootPublicFacadeHostOutputUnmountCleanupRecordType,
+  privateRootPublicFacadeRootUnmountLifecycleExecutionRecordType,
   privateHydrateRootPublicFacadeMarkerListenerPreflightRecordType,
   privateHydrateRootPublicFacadeEventReplayPreflightRecordType,
   privateHydrateRootPublicFacadeExecutionPreflightRecordType,

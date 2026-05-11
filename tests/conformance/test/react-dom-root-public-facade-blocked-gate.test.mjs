@@ -3667,6 +3667,15 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
     rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT
   );
   assert.equal(diagnostic.nativeRequestRecord.environmentId, 844);
+  assert.equal(
+    diagnostic.rootUnmountLifecycleExecutionStatus,
+    rootBridge
+      .ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_LIFECYCLE_EXECUTION_ACCEPTED
+  );
+  assert.equal(diagnostic.rootUnmountLifecycleExecutionConsumed, true);
+  assert.equal(diagnostic.rootUnmountLifecycleExecutionSourceOwned, true);
+  assert.equal(diagnostic.rootUnmountLifecycleRequestBoundaryCurrent, true);
+  assert.equal(diagnostic.rootUnmountLifecycleSnapshotOwned, true);
   assert.deepEqual(
     diagnostic.acceptedCapabilities.map((capability) => capability.id),
     [
