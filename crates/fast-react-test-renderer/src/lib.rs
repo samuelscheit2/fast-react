@@ -2294,7 +2294,13 @@ impl TestRendererSiblingTextHostOutput {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererHostParentPlacedHostOutput {
+    scheduled_update_sequence: usize,
     render: HostRootRenderPhaseRecord,
+    updated_fibers: TestRendererHostOutputCanaryCurrentFibers,
+    placed_text_fiber: TestRendererFiberHandleDiagnostics,
+    placed_text_props_raw: u64,
+    parent_state_node_raw: u64,
+    placed_text_state_node_raw: u64,
     commit: HostRootCommitRecord,
     commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
     previous_snapshot: TestContainerSnapshot,
@@ -2305,8 +2311,38 @@ pub struct TestRendererHostParentPlacedHostOutput {
 
 impl TestRendererHostParentPlacedHostOutput {
     #[must_use]
+    pub const fn scheduled_update_sequence(&self) -> usize {
+        self.scheduled_update_sequence
+    }
+
+    #[must_use]
     pub const fn render(&self) -> HostRootRenderPhaseRecord {
         self.render
+    }
+
+    #[must_use]
+    pub const fn updated_fibers(&self) -> TestRendererHostOutputCanaryCurrentFibers {
+        self.updated_fibers
+    }
+
+    #[must_use]
+    pub const fn placed_text_fiber(&self) -> TestRendererFiberHandleDiagnostics {
+        self.placed_text_fiber
+    }
+
+    #[must_use]
+    pub const fn placed_text_props_raw(&self) -> u64 {
+        self.placed_text_props_raw
+    }
+
+    #[must_use]
+    pub const fn parent_state_node_raw(&self) -> u64 {
+        self.parent_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn placed_text_state_node_raw(&self) -> u64 {
+        self.placed_text_state_node_raw
     }
 
     #[must_use]
@@ -3022,6 +3058,7 @@ pub struct TestRendererPrivateUpdateRouteAdmissionRecord {
     status: &'static str,
     public_surface: &'static str,
     root: FiberRootId,
+    renderer_id: TestRendererId,
     scheduled_update_sequence: usize,
     request_api: &'static str,
     source_diagnostic_name: &'static str,
@@ -3066,6 +3103,10 @@ impl TestRendererPrivateUpdateRouteAdmissionRecord {
     #[must_use]
     pub const fn root(self) -> FiberRootId {
         self.root
+    }
+
+    const fn renderer_id(self) -> TestRendererId {
+        self.renderer_id
     }
 
     #[must_use]
@@ -3490,6 +3531,10 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_DIAGNOSTIC_NAME: &
     "fast-react-test-renderer.tojson.sibling-text.finished-work-identity";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_STATUS: &str =
     "private-tojson-sibling-text-finished-work-identity-validated-public-tojson-blocked";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.tojson.multi-child-host-text.finished-work-identity";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_STATUS: &str =
+    "private-tojson-multi-child-host-text-lifecycle-native-finished-work-validated-public-blocked";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-unmount-nested-source-report-gate";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS: &str =
@@ -3504,6 +3549,8 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-nested-host-output-update-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-sibling-text-host-output-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID: &str =
+    "react-test-renderer-tojson-multi-child-host-text-output-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-unmount-host-output-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_UNMOUNT_ROW_STATUS: &str =
@@ -3634,6 +3681,16 @@ pub const TEST_RENDERER_PRIVATE_TREE_COMPOSITE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE:
     "FunctionComponent",
     "HostText",
     "HostComponent",
+    "HostText",
+];
+pub const TEST_RENDERER_PRIVATE_TREE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE: [&str; 4] =
+    ["HostRoot", "HostComponent", "HostText", "HostText"];
+pub const TEST_RENDERER_PRIVATE_TREE_COMPOSITE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE: [&str;
+    5] = [
+    "HostRoot",
+    "FunctionComponent",
+    "HostComponent",
+    "HostText",
     "HostText",
 ];
 pub const TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE: &str = "CanaryFunctionComponent";
@@ -6368,6 +6425,7 @@ impl TestRendererPrivateToJsonHostOutputDependencyDiagnostics {
 pub enum TestRendererPrivateToJsonHostOutputShape {
     EmptyRoot,
     SingleHostText,
+    MultiChildHostText,
     NestedHostText,
     SiblingText,
 }
@@ -6378,6 +6436,7 @@ impl TestRendererPrivateToJsonHostOutputShape {
         match self {
             Self::EmptyRoot => "EmptyRoot",
             Self::SingleHostText => "SingleHostText",
+            Self::MultiChildHostText => "MultiChildHostText",
             Self::NestedHostText => "NestedHostText",
             Self::SiblingText => "SiblingText",
         }
@@ -7204,6 +7263,9 @@ pub struct TestRendererPrivateToJsonNativeExecutionEvidence {
     consumes_accepted_host_output_row: bool,
     source_finished_work_identity_diagnostic_name: Option<&'static str>,
     consumes_private_sibling_text_finished_work_identity_gate: bool,
+    source_lifecycle_execution_diagnostic_name: Option<&'static str>,
+    source_lifecycle_execution_status: Option<&'static str>,
+    consumes_private_root_lifecycle_execution: bool,
     source_unmount_nested_source_report_admission_gate_diagnostic_name: Option<&'static str>,
     source_unmount_nested_source_report_admission_gate_status: Option<&'static str>,
     consumes_private_unmount_nested_source_report_admission_gate: bool,
@@ -7318,6 +7380,21 @@ impl TestRendererPrivateToJsonNativeExecutionEvidence {
     }
 
     #[must_use]
+    pub const fn source_lifecycle_execution_diagnostic_name(&self) -> Option<&'static str> {
+        self.source_lifecycle_execution_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_lifecycle_execution_status(&self) -> Option<&'static str> {
+        self.source_lifecycle_execution_status
+    }
+
+    #[must_use]
+    pub const fn consumes_private_root_lifecycle_execution(&self) -> bool {
+        self.consumes_private_root_lifecycle_execution
+    }
+
+    #[must_use]
     pub const fn source_unmount_nested_source_report_admission_gate_diagnostic_name(
         &self,
     ) -> Option<&'static str> {
@@ -7395,6 +7472,9 @@ pub struct TestRendererPrivateToTreeNativeExecutionEvidence {
     consumes_accepted_host_output_row: bool,
     source_finished_work_identity_diagnostic_name: Option<&'static str>,
     consumes_private_sibling_text_finished_work_identity_gate: bool,
+    source_lifecycle_execution_diagnostic_name: Option<&'static str>,
+    source_lifecycle_execution_status: Option<&'static str>,
+    consumes_private_root_lifecycle_execution: bool,
     source_unmount_nested_source_report_admission_gate_diagnostic_name: Option<&'static str>,
     source_unmount_nested_source_report_admission_gate_status: Option<&'static str>,
     consumes_private_unmount_nested_source_report_admission_gate: bool,
@@ -7512,6 +7592,21 @@ impl TestRendererPrivateToTreeNativeExecutionEvidence {
     #[must_use]
     pub const fn consumes_private_sibling_text_finished_work_identity_gate(&self) -> bool {
         self.consumes_private_sibling_text_finished_work_identity_gate
+    }
+
+    #[must_use]
+    pub const fn source_lifecycle_execution_diagnostic_name(&self) -> Option<&'static str> {
+        self.source_lifecycle_execution_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_lifecycle_execution_status(&self) -> Option<&'static str> {
+        self.source_lifecycle_execution_status
+    }
+
+    #[must_use]
+    pub const fn consumes_private_root_lifecycle_execution(&self) -> bool {
+        self.consumes_private_root_lifecycle_execution
     }
 
     #[must_use]
@@ -8670,6 +8765,441 @@ impl TestRendererPrivateToJsonSiblingTextFinishedWorkIdentityGate {
     #[must_use]
     pub const fn consumes_worker_738_report_row(self) -> bool {
         self.consumes_worker_738_report_row
+    }
+
+    #[must_use]
+    pub const fn consumes_committed_host_root_finished_work_identity(self) -> bool {
+        self.consumes_committed_host_root_finished_work_identity
+    }
+
+    #[must_use]
+    pub const fn consumes_committed_host_root_finished_work_lanes(self) -> bool {
+        self.consumes_committed_host_root_finished_work_lanes
+    }
+
+    #[must_use]
+    pub const fn identity_admission_available(self) -> bool {
+        self.identity_admission_available
+    }
+
+    #[must_use]
+    pub const fn broad_multichild_identity_available(self) -> bool {
+        self.broad_multichild_identity_available
+    }
+
+    #[must_use]
+    pub const fn public_to_json_available(self) -> bool {
+        self.public_to_json_available
+    }
+
+    #[must_use]
+    pub const fn public_to_tree_available(self) -> bool {
+        self.public_to_tree_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_available(self) -> bool {
+        self.public_test_instance_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn public_route_available(self) -> bool {
+        self.public_route_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_loading_available(self) -> bool {
+        self.native_bridge_loading_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn js_facade_available(self) -> bool {
+        self.js_facade_available
+    }
+
+    #[must_use]
+    pub const fn cjs_facade_available(self) -> bool {
+        self.cjs_facade_available
+    }
+
+    #[must_use]
+    pub const fn package_compatibility_claimed(self) -> bool {
+        self.package_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+
+    #[must_use]
+    pub fn public_native_package_js_surfaces_blocked(self) -> bool {
+        !self.public_to_json_available()
+            && !self.public_to_tree_available()
+            && !self.public_test_instance_available()
+            && !self.public_serialization_available()
+            && !self.public_route_available()
+            && !self.native_bridge_loading_available()
+            && !self.native_bridge_available()
+            && !self.native_execution_available()
+            && !self.js_facade_available()
+            && !self.cjs_facade_available()
+            && !self.package_compatibility_claimed()
+            && !self.compatibility_claimed()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    renderer_id: TestRendererId,
+    root_scheduled_update_sequence: usize,
+    public_surface: &'static str,
+    source_execution_record_id: &'static str,
+    source_execution_status: &'static str,
+    source_lifecycle_diagnostic_name: &'static str,
+    source_lifecycle_status: &'static str,
+    worker_895_report_row_id: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_shape: TestRendererPrivateToJsonHostOutputShape,
+    root_node_kind: TestRendererPrivateJsonNodeKind,
+    child_fiber_tag_order: [&'static str; 3],
+    root_child_count: usize,
+    source_node_count: usize,
+    route_render_current: TestRendererFiberHandleDiagnostics,
+    route_render_finished_work: TestRendererFiberHandleDiagnostics,
+    route_commit_previous_current: TestRendererFiberHandleDiagnostics,
+    route_commit_current: TestRendererFiberHandleDiagnostics,
+    route_render_lanes_bits: u32,
+    route_commit_finished_lanes_bits: u32,
+    lifecycle_scheduled_update_sequence: usize,
+    lifecycle_host_output_shape: TestRendererPrivateToJsonHostOutputShape,
+    lifecycle_root_child_count: usize,
+    lifecycle_host_component_count: usize,
+    lifecycle_host_text_count: usize,
+    render_current: TestRendererFiberHandleDiagnostics,
+    render_finished_work: TestRendererFiberHandleDiagnostics,
+    commit_previous_current: TestRendererFiberHandleDiagnostics,
+    commit_current: TestRendererFiberHandleDiagnostics,
+    report_finished_work: TestRendererFiberHandleDiagnostics,
+    render_lanes_bits: u32,
+    commit_finished_lanes_bits: u32,
+    report_finished_lanes_bits: u32,
+    commit_remaining_lanes_bits: u32,
+    commit_pending_lanes_bits: u32,
+    route_handles_match_committed_update: bool,
+    route_lanes_match_committed_update: bool,
+    lifecycle_matches_committed_update: bool,
+    commit_current_matches_render_finished_work: bool,
+    commit_previous_current_matches_render_current: bool,
+    report_finished_work_matches_commit_current: bool,
+    report_lanes_match_commit_lanes: bool,
+    host_output_snapshot_current: bool,
+    report_host_output_row_matches_output: bool,
+    child_order_matches_current_snapshot: bool,
+    host_parent_placement_apply_count: usize,
+    real_multi_child_handoff_available: bool,
+    consumes_update_route_admission: bool,
+    consumes_root_lifecycle_execution: bool,
+    consumes_multi_child_host_output: bool,
+    consumes_committed_host_root_finished_work_identity: bool,
+    consumes_committed_host_root_finished_work_lanes: bool,
+    identity_admission_available: bool,
+    broad_multichild_identity_available: bool,
+    public_to_json_available: bool,
+    public_to_tree_available: bool,
+    public_test_instance_available: bool,
+    public_serialization_available: bool,
+    public_route_available: bool,
+    native_bridge_loading_available: bool,
+    native_bridge_available: bool,
+    native_execution_available: bool,
+    js_facade_available: bool,
+    cjs_facade_available: bool,
+    package_compatibility_claimed: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate {
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    const fn renderer_id(self) -> TestRendererId {
+        self.renderer_id
+    }
+
+    #[must_use]
+    pub const fn root_scheduled_update_sequence(self) -> usize {
+        self.root_scheduled_update_sequence
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source_execution_record_id(self) -> &'static str {
+        self.source_execution_record_id
+    }
+
+    #[must_use]
+    pub const fn source_execution_status(self) -> &'static str {
+        self.source_execution_status
+    }
+
+    #[must_use]
+    pub const fn source_lifecycle_diagnostic_name(self) -> &'static str {
+        self.source_lifecycle_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_lifecycle_status(self) -> &'static str {
+        self.source_lifecycle_status
+    }
+
+    #[must_use]
+    pub const fn worker_895_report_row_id(self) -> &'static str {
+        self.worker_895_report_row_id
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_shape
+    }
+
+    #[must_use]
+    pub const fn root_node_kind(self) -> TestRendererPrivateJsonNodeKind {
+        self.root_node_kind
+    }
+
+    #[must_use]
+    pub const fn child_fiber_tag_order(self) -> [&'static str; 3] {
+        self.child_fiber_tag_order
+    }
+
+    #[must_use]
+    pub const fn root_child_count(self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub const fn source_node_count(self) -> usize {
+        self.source_node_count
+    }
+
+    #[must_use]
+    pub const fn route_render_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.route_render_current
+    }
+
+    #[must_use]
+    pub const fn route_render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.route_render_finished_work
+    }
+
+    #[must_use]
+    pub const fn route_commit_previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.route_commit_previous_current
+    }
+
+    #[must_use]
+    pub const fn route_commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.route_commit_current
+    }
+
+    #[must_use]
+    pub const fn route_render_lanes_bits(self) -> u32 {
+        self.route_render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn route_commit_finished_lanes_bits(self) -> u32 {
+        self.route_commit_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn lifecycle_scheduled_update_sequence(self) -> usize {
+        self.lifecycle_scheduled_update_sequence
+    }
+
+    #[must_use]
+    pub const fn lifecycle_host_output_shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.lifecycle_host_output_shape
+    }
+
+    #[must_use]
+    pub const fn lifecycle_root_child_count(self) -> usize {
+        self.lifecycle_root_child_count
+    }
+
+    #[must_use]
+    pub const fn lifecycle_host_component_count(self) -> usize {
+        self.lifecycle_host_component_count
+    }
+
+    #[must_use]
+    pub const fn lifecycle_host_text_count(self) -> usize {
+        self.lifecycle_host_text_count
+    }
+
+    #[must_use]
+    pub const fn render_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_current
+    }
+
+    #[must_use]
+    pub const fn render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_previous_current
+    }
+
+    #[must_use]
+    pub const fn commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_current
+    }
+
+    #[must_use]
+    pub const fn report_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.report_finished_work
+    }
+
+    #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_finished_lanes_bits(self) -> u32 {
+        self.commit_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn report_finished_lanes_bits(self) -> u32 {
+        self.report_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_remaining_lanes_bits(self) -> u32 {
+        self.commit_remaining_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_pending_lanes_bits(self) -> u32 {
+        self.commit_pending_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn route_handles_match_committed_update(self) -> bool {
+        self.route_handles_match_committed_update
+    }
+
+    #[must_use]
+    pub const fn route_lanes_match_committed_update(self) -> bool {
+        self.route_lanes_match_committed_update
+    }
+
+    #[must_use]
+    pub const fn lifecycle_matches_committed_update(self) -> bool {
+        self.lifecycle_matches_committed_update
+    }
+
+    #[must_use]
+    pub const fn commit_current_matches_render_finished_work(self) -> bool {
+        self.commit_current_matches_render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current_matches_render_current(self) -> bool {
+        self.commit_previous_current_matches_render_current
+    }
+
+    #[must_use]
+    pub const fn report_finished_work_matches_commit_current(self) -> bool {
+        self.report_finished_work_matches_commit_current
+    }
+
+    #[must_use]
+    pub const fn report_lanes_match_commit_lanes(self) -> bool {
+        self.report_lanes_match_commit_lanes
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn report_host_output_row_matches_output(self) -> bool {
+        self.report_host_output_row_matches_output
+    }
+
+    #[must_use]
+    pub const fn child_order_matches_current_snapshot(self) -> bool {
+        self.child_order_matches_current_snapshot
+    }
+
+    #[must_use]
+    pub const fn host_parent_placement_apply_count(self) -> usize {
+        self.host_parent_placement_apply_count
+    }
+
+    #[must_use]
+    pub const fn real_multi_child_handoff_available(self) -> bool {
+        self.real_multi_child_handoff_available
+    }
+
+    #[must_use]
+    pub const fn consumes_update_route_admission(self) -> bool {
+        self.consumes_update_route_admission
+    }
+
+    #[must_use]
+    pub const fn consumes_root_lifecycle_execution(self) -> bool {
+        self.consumes_root_lifecycle_execution
+    }
+
+    #[must_use]
+    pub const fn consumes_multi_child_host_output(self) -> bool {
+        self.consumes_multi_child_host_output
     }
 
     #[must_use]
@@ -13328,6 +13858,7 @@ impl TestRendererRoot {
                 status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
                 public_surface: "create().update",
                 root: self.root_id,
+                renderer_id: self.renderer.renderer_id,
                 scheduled_update_sequence,
                 request_api: "TestRendererRoot::update",
                 source_diagnostic_name: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME,
@@ -13485,6 +14016,7 @@ impl TestRendererRoot {
             status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
             public_surface: "create().update",
             root: self.root_id,
+            renderer_id: self.renderer.renderer_id,
             scheduled_update_sequence: output.scheduled_update_sequence(),
             request_api: "TestRendererRoot::update",
             source_diagnostic_name: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME,
@@ -13509,6 +14041,216 @@ impl TestRendererRoot {
             native_execution_available: false,
             compatibility_claimed: false,
         })
+    }
+
+    pub fn describe_private_multi_child_host_text_update_route_admission_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+    ) -> Result<TestRendererPrivateUpdateRouteAdmissionRecord, TestRendererRootError> {
+        if self.lifecycle != TestRendererRootLifecycle::Active {
+            return Err(TestRendererPrivateUpdateRouteError::RootNotActive {
+                lifecycle: self.lifecycle,
+            }
+            .into());
+        }
+        let Some(scheduled_update) = self.scheduled_updates.last() else {
+            return Err(TestRendererPrivateUpdateRouteError::MissingScheduledUpdate.into());
+        };
+        if scheduled_update.kind() != TestRendererRootUpdateKind::Update {
+            return Err(
+                TestRendererPrivateUpdateRouteError::UnexpectedScheduledUpdateKind {
+                    actual: scheduled_update.kind(),
+                }
+                .into(),
+            );
+        }
+        if output.scheduled_update_sequence() != self.scheduled_updates.len() {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "multi-child-host-text-output-update-sequence-stale",
+                }
+                .into(),
+            );
+        }
+
+        self.validate_private_multi_child_host_text_output_for_canary(output)?;
+
+        let render = output.render();
+        let commit = output.commit();
+        if render.root() != self.root_id || commit.root() != self.root_id {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "multi-child-host-text-route-root-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.current() != render.finished_work()
+            || commit.previous_current() != render.current()
+        {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "multi-child-host-text-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.finished_lanes() != render.render_lanes()
+            || commit.remaining_lanes().bits() != 0
+            || commit.pending_lanes().bits() != 0
+        {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "multi-child-host-text-lane-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        Ok(TestRendererPrivateUpdateRouteAdmissionRecord {
+            record_id: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
+            status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
+            public_surface: "create().update",
+            root: self.root_id,
+            renderer_id: self.renderer.renderer_id,
+            scheduled_update_sequence: output.scheduled_update_sequence(),
+            request_api: "TestRendererRoot::update",
+            source_diagnostic_name: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME,
+            source_diagnostic_status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS,
+            lifecycle: self.lifecycle,
+            scheduled_update_kind: scheduled_update.kind(),
+            host_output_update_kind: TestRendererRootUpdateKind::Update,
+            render_current: fiber_handle!(render.current()),
+            render_finished_work: fiber_handle!(render.finished_work()),
+            commit_previous_current: fiber_handle!(commit.previous_current()),
+            commit_current: fiber_handle!(commit.current()),
+            render_lanes_bits: render.render_lanes().bits(),
+            commit_finished_lanes_bits: commit.finished_lanes().bits(),
+            consumes_accepted_host_root_update_queue_metadata: true,
+            consumes_accepted_root_work_loop_metadata: true,
+            consumes_accepted_host_output_metadata: true,
+            rejects_stale_root_lifecycle: true,
+            rejects_stale_host_output: true,
+            rejects_missing_update_queue_evidence: true,
+            public_root_update_available: false,
+            public_serialization_available: false,
+            native_execution_available: false,
+            compatibility_claimed: false,
+        })
+    }
+
+    fn validate_private_multi_child_host_text_output_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+    ) -> Result<(), TestRendererRootError> {
+        self.validate_serialization_gate_commit(output.commit())?;
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-snapshot-stale",
+                }
+                .into(),
+            );
+        }
+
+        let previous_shape =
+            Self::private_to_json_host_output_shape_from_snapshot(output.previous_snapshot());
+        let current_shape =
+            Self::private_to_json_host_output_shape_from_snapshot(output.snapshot());
+        if previous_shape.shape() != TestRendererPrivateToJsonHostOutputShape::SingleHostText
+            || current_shape.shape() != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            || current_shape.host_component_count() != 1
+            || current_shape.host_text_count() != 2
+            || current_shape.root_text_count() != 0
+            || current_shape.max_host_component_depth() != 1
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-shape-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        let [TestNodeSnapshot::Element(previous_element)] = output.previous_snapshot().children()
+        else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-previous-topology-mismatch",
+                }
+                .into(),
+            );
+        };
+        let [TestNodeSnapshot::Text(_previous_text)] = previous_element.children() else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-previous-topology-mismatch",
+                }
+                .into(),
+            );
+        };
+
+        let [TestNodeSnapshot::Element(element)] = output.snapshot().children() else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-topology-mismatch",
+                }
+                .into(),
+            );
+        };
+        let [
+            TestNodeSnapshot::Text(first),
+            TestNodeSnapshot::Text(second),
+        ] = element.children()
+        else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-topology-mismatch",
+                }
+                .into(),
+            );
+        };
+        if first.is_hidden()
+            || second.is_hidden()
+            || second.text() != output.placed_text_snapshot().text()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-order-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        if output.host_parent_placement_apply_count() == 0
+            || !output
+                .commit()
+                .has_test_only_host_parent_placement_apply_for_canary(
+                    output.parent_state_node_raw(),
+                    output.placed_text_state_node_raw(),
+                )
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-placement-evidence-missing",
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
     }
 
     pub fn describe_private_update_native_bridge_admission_for_canary(
@@ -13728,6 +14470,34 @@ impl TestRendererRoot {
             TestRendererRootUpdateKind::Update,
             TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID,
             Some(TestRendererPrivateToJsonHostOutputShape::NestedHostText),
+            output.previous_snapshot(),
+            output.snapshot(),
+        )
+    }
+
+    pub fn describe_private_to_json_multi_child_host_text_output_row_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+    ) -> Result<TestRendererPrivateToJsonHostOutputRow, TestRendererRootError> {
+        self.validate_private_multi_child_host_text_output_for_canary(output)?;
+
+        let Some(last_update) = self.scheduled_updates.last() else {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Update,
+                actual: TestRendererRootUpdateKind::Create,
+            });
+        };
+        if last_update.kind() != TestRendererRootUpdateKind::Update {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Update,
+                actual: last_update.kind(),
+            });
+        }
+
+        Self::private_to_json_host_output_row_with_shape(
+            TestRendererRootUpdateKind::Update,
+            TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID,
+            Some(TestRendererPrivateToJsonHostOutputShape::MultiChildHostText),
             output.previous_snapshot(),
             output.snapshot(),
         )
@@ -14518,6 +15288,45 @@ impl TestRendererRoot {
         ))
     }
 
+    pub fn describe_private_root_multi_child_host_text_update_lifecycle_execution_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+        execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+    ) -> Result<TestRendererPrivateRootLifecycleExecutionEvidence, TestRendererRootError> {
+        self.validate_private_root_multi_child_host_text_lifecycle_execution_for_canary(
+            output, execution,
+        )?;
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(&current_snapshot);
+        let TestNodeSnapshot::Element(element) = &current_snapshot.children()[0] else {
+            unreachable!("multi-child HostText lifecycle validation requires a HostComponent root")
+        };
+        let element_type = element.element_type().clone();
+        let props = element.props().clone();
+
+        Ok(Self::private_root_lifecycle_execution_evidence(
+            self.root_id,
+            self.renderer.renderer_id,
+            "update",
+            "create().update",
+            execution.record_id(),
+            execution.status(),
+            output.scheduled_update_sequence(),
+            self.lifecycle,
+            execution.scheduled_update_kind(),
+            execution.host_output_update_kind(),
+            shape,
+            Some(output.previous_snapshot().clone()),
+            current_snapshot,
+            Some(element_type),
+            Some(props),
+            Some(output.placed_text_snapshot().text().to_owned()),
+            None,
+            0,
+            output.host_parent_placement_apply_count(),
+        ))
+    }
+
     pub fn describe_private_root_unmount_lifecycle_execution_for_canary(
         &self,
         output: &TestRendererUnmountedHostOutput,
@@ -14750,6 +15559,118 @@ impl TestRendererRoot {
             return Self::private_root_lifecycle_execution_record_error(
                 "update",
                 "executed-snapshot-shape-mismatch",
+            );
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_root_multi_child_host_text_lifecycle_execution_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+        execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+    ) -> Result<(), TestRendererRootError> {
+        if execution.record_id() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+            || execution.status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+            || execution.public_surface() != "create().update"
+            || execution.request_api() != "TestRendererRoot::update"
+            || execution.source_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME
+            || execution.source_diagnostic_status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "source-row-identity-mismatch",
+            );
+        }
+        if execution.root() != self.root_id || execution.renderer_id() != self.renderer.renderer_id
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "source-owner-mismatch",
+            );
+        }
+        if execution.lifecycle() != self.lifecycle
+            || execution.lifecycle() != TestRendererRootLifecycle::Active
+            || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Update
+            || execution.host_output_update_kind() != TestRendererRootUpdateKind::Update
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "source-kind-or-lifecycle-mismatch",
+            );
+        }
+        if output.scheduled_update_sequence() != self.scheduled_updates.len()
+            || execution.scheduled_update_sequence() != output.scheduled_update_sequence()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "source-update-sequence-stale",
+            );
+        }
+        if !execution.consumes_accepted_host_root_update_queue_metadata()
+            || !execution.consumes_accepted_root_work_loop_metadata()
+            || !execution.consumes_accepted_host_output_metadata()
+            || !execution.rejects_stale_root_lifecycle()
+            || !execution.rejects_stale_host_output()
+            || !execution.rejects_missing_update_queue_evidence()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "source-execution-not-accepted",
+            );
+        }
+        if execution.public_root_update_available()
+            || execution.public_serialization_available()
+            || execution.native_execution_available()
+            || execution.compatibility_claimed()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "public-native-js-act-compatibility-claim",
+            );
+        }
+
+        self.validate_private_multi_child_host_text_output_for_canary(output)?;
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(output.snapshot());
+        if shape.shape() != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "executed-snapshot-shape-mismatch",
+            );
+        }
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let render = output.render();
+        let commit = output.commit();
+        if execution.render_current() != fiber_handle!(render.current())
+            || execution.render_finished_work() != fiber_handle!(render.finished_work())
+            || execution.commit_previous_current() != fiber_handle!(commit.previous_current())
+            || execution.commit_current() != fiber_handle!(commit.current())
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "host-output-handoff-mismatch",
+            );
+        }
+        if execution.render_lanes_bits() == 0
+            || execution.render_lanes_bits() != render.render_lanes().bits()
+            || execution.commit_finished_lanes_bits() != commit.finished_lanes().bits()
+            || render.render_lanes().bits() != commit.finished_lanes().bits()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "host-output-lane-mismatch",
             );
         }
 
@@ -15167,6 +16088,45 @@ impl TestRendererRoot {
         Ok(evidence)
     }
 
+    pub fn describe_private_to_json_after_multi_child_host_text_update_native_execution_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+        execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+        lifecycle: &TestRendererPrivateRootLifecycleExecutionEvidence,
+        identity: Option<TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate>,
+    ) -> Result<TestRendererPrivateToJsonNativeExecutionEvidence, TestRendererRootError> {
+        self.validate_private_to_json_update_native_execution_record_for_canary(execution)?;
+        let row =
+            self.describe_private_to_json_multi_child_host_text_output_row_for_canary(output)?;
+        let identity = self
+            .validate_private_to_json_multi_child_host_text_native_execution_identity_for_canary(
+                output, execution, lifecycle, identity,
+            )
+            .map_err(|reason| {
+                TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                    operation: "update",
+                    reason,
+                }
+            })?;
+
+        let mut evidence = self.private_to_json_native_execution_evidence_from_host_output_row(
+            "update",
+            "create().update -> create().toJSON",
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
+            false,
+            true,
+            false,
+            row,
+            output.snapshot(),
+        )?;
+        evidence.source_finished_work_identity_diagnostic_name = Some(identity.diagnostic_name());
+        evidence.source_lifecycle_execution_diagnostic_name = Some(lifecycle.diagnostic_name());
+        evidence.source_lifecycle_execution_status = Some(lifecycle.status());
+        evidence.consumes_private_root_lifecycle_execution = true;
+        Ok(evidence)
+    }
+
     pub fn describe_private_to_json_sibling_text_update_native_execution_from_snapshot_for_diagnostics(
         &self,
         previous_snapshot: &TestContainerSnapshot,
@@ -15409,6 +16369,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: true,
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_lifecycle_execution_diagnostic_name: None,
+            source_lifecycle_execution_status: None,
+            consumes_private_root_lifecycle_execution: false,
             source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
             source_unmount_nested_source_report_admission_gate_status: None,
             consumes_private_unmount_nested_source_report_admission_gate: false,
@@ -15587,6 +16550,43 @@ impl TestRendererRoot {
         Ok(evidence)
     }
 
+    pub fn describe_private_to_tree_after_multi_child_host_text_update_native_execution_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+        execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+        lifecycle: &TestRendererPrivateRootLifecycleExecutionEvidence,
+        identity: Option<TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate>,
+    ) -> Result<TestRendererPrivateToTreeNativeExecutionEvidence, TestRendererRootError> {
+        self.validate_private_to_tree_update_native_execution_record_for_canary(execution)?;
+        let row =
+            self.describe_private_to_json_multi_child_host_text_output_row_for_canary(output)?;
+        let identity = self
+            .validate_private_to_json_multi_child_host_text_native_execution_identity_for_canary(
+                output, execution, lifecycle, identity,
+            )
+            .map_err(|reason| {
+                TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                    operation: "update",
+                    reason,
+                }
+            })?;
+
+        let mut evidence = self
+            .private_to_tree_native_execution_evidence_from_multi_child_host_text_row(
+                "update",
+                "create().update -> create().toTree",
+                TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
+                TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
+                row,
+                output.snapshot(),
+            )?;
+        evidence.source_finished_work_identity_diagnostic_name = Some(identity.diagnostic_name());
+        evidence.source_lifecycle_execution_diagnostic_name = Some(lifecycle.diagnostic_name());
+        evidence.source_lifecycle_execution_status = Some(lifecycle.status());
+        evidence.consumes_private_root_lifecycle_execution = true;
+        Ok(evidence)
+    }
+
     pub fn describe_private_to_tree_after_unmount_native_execution_for_canary(
         &self,
         output: &TestRendererUnmountedHostOutput,
@@ -15649,6 +16649,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: true,
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_lifecycle_execution_diagnostic_name: None,
+            source_lifecycle_execution_status: None,
+            consumes_private_root_lifecycle_execution: false,
             source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
             source_unmount_nested_source_report_admission_gate_status: None,
             consumes_private_unmount_nested_source_report_admission_gate: false,
@@ -15863,6 +16866,141 @@ impl TestRendererRoot {
             compatibility_claimed: false,
         };
         Self::validate_private_to_json_sibling_text_finished_work_identity_gate_for_canary(gate)
+            .map_err(|reason| {
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason,
+                }
+            })?;
+
+        Ok(gate)
+    }
+
+    pub fn describe_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+        route: TestRendererPrivateUpdateRouteAdmissionRecord,
+        lifecycle: &TestRendererPrivateRootLifecycleExecutionEvidence,
+    ) -> Result<TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate, TestRendererRootError>
+    {
+        self.validate_private_to_json_multi_child_host_text_update_route_admission_record_for_identity(route)?;
+        self.validate_private_multi_child_host_text_lifecycle_execution_for_identity(
+            output, route, lifecycle,
+        )?;
+
+        let row =
+            self.describe_private_to_json_multi_child_host_text_output_row_for_canary(output)?;
+        let render = output.render();
+        let commit = output.commit();
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let render_current = fiber_handle!(render.current());
+        let render_finished_work = fiber_handle!(render.finished_work());
+        let commit_previous_current = fiber_handle!(commit.previous_current());
+        let commit_current = fiber_handle!(commit.current());
+        let child_order_matches_current_snapshot =
+            Self::private_multi_child_host_text_snapshot_has_order(output.snapshot());
+        let gate = TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate {
+            diagnostic_name:
+                TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_STATUS,
+            root: self.root_id,
+            renderer_id: self.renderer.renderer_id,
+            root_scheduled_update_sequence: output.scheduled_update_sequence(),
+            public_surface: "create().update -> create().toJSON",
+            source_execution_record_id: route.record_id(),
+            source_execution_status: route.status(),
+            source_lifecycle_diagnostic_name: lifecycle.diagnostic_name(),
+            source_lifecycle_status: lifecycle.status(),
+            worker_895_report_row_id: row.id(),
+            host_output_update_kind: row.host_output_update_kind(),
+            host_output_shape: row.host_output_shape(),
+            root_node_kind: TestRendererPrivateJsonNodeKind::HostComponent,
+            child_fiber_tag_order: ["HostComponent", "HostText", "HostText"],
+            root_child_count: row.current_root_child_count(),
+            source_node_count: row.current_host_component_count() + row.current_host_text_count(),
+            route_render_current: route.render_current(),
+            route_render_finished_work: route.render_finished_work(),
+            route_commit_previous_current: route.commit_previous_current(),
+            route_commit_current: route.commit_current(),
+            route_render_lanes_bits: route.render_lanes_bits(),
+            route_commit_finished_lanes_bits: route.commit_finished_lanes_bits(),
+            lifecycle_scheduled_update_sequence: lifecycle.scheduled_update_sequence(),
+            lifecycle_host_output_shape: lifecycle.host_output_shape(),
+            lifecycle_root_child_count: lifecycle.root_child_count(),
+            lifecycle_host_component_count: lifecycle.host_component_count(),
+            lifecycle_host_text_count: lifecycle.host_text_count(),
+            render_current,
+            render_finished_work,
+            commit_previous_current,
+            commit_current,
+            report_finished_work: commit_current,
+            render_lanes_bits: render.render_lanes().bits(),
+            commit_finished_lanes_bits: commit.finished_lanes().bits(),
+            report_finished_lanes_bits: commit.finished_lanes().bits(),
+            commit_remaining_lanes_bits: commit.remaining_lanes().bits(),
+            commit_pending_lanes_bits: commit.pending_lanes().bits(),
+            route_handles_match_committed_update: route.render_current() == render_current
+                && route.render_finished_work() == render_finished_work
+                && route.commit_previous_current() == commit_previous_current
+                && route.commit_current() == commit_current,
+            route_lanes_match_committed_update: route.render_lanes_bits()
+                == render.render_lanes().bits()
+                && route.commit_finished_lanes_bits() == commit.finished_lanes().bits(),
+            lifecycle_matches_committed_update: lifecycle.root() == self.root_id
+                && lifecycle.renderer_id == self.renderer.renderer_id
+                && lifecycle.scheduled_update_sequence() == output.scheduled_update_sequence()
+                && lifecycle.host_output_shape()
+                    == TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+                && lifecycle.root_child_count() == 1
+                && lifecycle.host_component_count() == 1
+                && lifecycle.host_text_count() == 2
+                && lifecycle.source_owned_execution_accepted()
+                && lifecycle.public_surfaces_blocked(),
+            commit_current_matches_render_finished_work: commit.current() == render.finished_work(),
+            commit_previous_current_matches_render_current: commit.previous_current()
+                == render.current(),
+            report_finished_work_matches_commit_current: true,
+            report_lanes_match_commit_lanes: true,
+            host_output_snapshot_current: true,
+            report_host_output_row_matches_output: row.host_output_shape()
+                == TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+                && row.current_root_child_count() == 1
+                && row.current_host_component_count() == 1
+                && row.current_host_text_count() == 2,
+            child_order_matches_current_snapshot,
+            host_parent_placement_apply_count: output.host_parent_placement_apply_count(),
+            real_multi_child_handoff_available: output.host_parent_placement_apply_count() > 0,
+            consumes_update_route_admission: true,
+            consumes_root_lifecycle_execution: true,
+            consumes_multi_child_host_output: true,
+            consumes_committed_host_root_finished_work_identity: true,
+            consumes_committed_host_root_finished_work_lanes: true,
+            identity_admission_available: true,
+            broad_multichild_identity_available: false,
+            public_to_json_available: false,
+            public_to_tree_available: false,
+            public_test_instance_available: false,
+            public_serialization_available: false,
+            public_route_available: false,
+            native_bridge_loading_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            js_facade_available: false,
+            cjs_facade_available: false,
+            package_compatibility_claimed: false,
+            compatibility_claimed: false,
+        };
+        Self::validate_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(gate)
             .map_err(|reason| {
                 TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
                     reason,
@@ -16601,6 +17739,7 @@ impl TestRendererRoot {
                 TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID
                     | TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID
                     | TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+                    | TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
             ),
             TestRendererRootUpdateKind::Unmount => {
                 row_id == TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
@@ -16621,6 +17760,9 @@ impl TestRendererRoot {
             }
             TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID => {
                 Some(TestRendererPrivateToJsonHostOutputShape::SiblingText)
+            }
+            TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID => {
+                Some(TestRendererPrivateToJsonHostOutputShape::MultiChildHostText)
             }
             TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID => {
                 Some(TestRendererPrivateToJsonHostOutputShape::EmptyRoot)
@@ -16734,6 +17876,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: true,
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_lifecycle_execution_diagnostic_name: None,
+            source_lifecycle_execution_status: None,
+            consumes_private_root_lifecycle_execution: false,
             source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
             source_unmount_nested_source_report_admission_gate_status: None,
             consumes_private_unmount_nested_source_report_admission_gate: false,
@@ -16765,6 +17910,14 @@ impl TestRendererRoot {
                     && row.current_root_child_count() == 1
                     && shape.host_component_count() == 1
                     && shape.host_text_count() == 1
+                    && shape.root_text_count() == 0
+                    && shape.max_host_component_depth() == 1
+            }
+            TestRendererPrivateToJsonHostOutputShape::MultiChildHostText => {
+                row.host_output_update_kind() == TestRendererRootUpdateKind::Update
+                    && row.current_root_child_count() == 1
+                    && shape.host_component_count() == 1
+                    && shape.host_text_count() == 2
                     && shape.root_text_count() == 0
                     && shape.max_host_component_depth() == 1
             }
@@ -16834,6 +17987,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: result.host_output_row().is_some(),
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_lifecycle_execution_diagnostic_name: None,
+            source_lifecycle_execution_status: None,
+            consumes_private_root_lifecycle_execution: false,
             source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
             source_unmount_nested_source_report_admission_gate_status: None,
             consumes_private_unmount_nested_source_report_admission_gate: false,
@@ -16931,6 +18087,9 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: report.host_output_row().is_some(),
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_lifecycle_execution_diagnostic_name: None,
+            source_lifecycle_execution_status: None,
+            consumes_private_root_lifecycle_execution: false,
             source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
             source_unmount_nested_source_report_admission_gate_status: None,
             consumes_private_unmount_nested_source_report_admission_gate: false,
@@ -17027,6 +18186,109 @@ impl TestRendererRoot {
             consumes_accepted_host_output_row: true,
             source_finished_work_identity_diagnostic_name: None,
             consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_lifecycle_execution_diagnostic_name: None,
+            source_lifecycle_execution_status: None,
+            consumes_private_root_lifecycle_execution: false,
+            source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
+            source_unmount_nested_source_report_admission_gate_status: None,
+            consumes_private_unmount_nested_source_report_admission_gate: false,
+            minimal_tree_shape: false,
+            function_component_above_host_output_shape,
+            public_to_tree_available: false,
+            public_serialization_available: false,
+            public_route_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            compatibility_claimed: false,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn private_to_tree_native_execution_evidence_from_multi_child_host_text_row(
+        &self,
+        operation: &'static str,
+        public_surface: &'static str,
+        source_execution_record_id: &'static str,
+        source_execution_status: &'static str,
+        row: TestRendererPrivateToJsonHostOutputRow,
+        snapshot: &TestContainerSnapshot,
+    ) -> Result<TestRendererPrivateToTreeNativeExecutionEvidence, TestRendererRootError> {
+        Self::validate_private_to_json_host_output_row(
+            row.host_output_update_kind(),
+            Some(row),
+            Some(TestRendererPrivateToJsonHostOutputShape::MultiChildHostText),
+        )?;
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(snapshot);
+        if shape.shape() != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            || shape.shape() != row.host_output_shape()
+        {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostOutputRowShapeMismatch {
+                    row_id: row.id(),
+                    expected: TestRendererPrivateToJsonHostOutputShape::MultiChildHostText,
+                    actual: shape.shape(),
+                }
+                .into(),
+            );
+        }
+        if row.current_root_child_count() != snapshot.children().len()
+            || row.current_host_component_count() != shape.host_component_count()
+            || row.current_host_text_count() != shape.host_text_count()
+            || row.current_root_text_count() != shape.root_text_count()
+            || row.current_max_host_component_depth() != shape.max_host_component_depth()
+        {
+            return self.private_to_tree_native_execution_record_error(
+                operation,
+                "host-output-row-counts-stale",
+            );
+        }
+        if !Self::private_to_json_native_execution_shape_is_accepted(row, shape) {
+            return self.private_to_tree_native_execution_record_error(
+                operation,
+                "accepted-multi-child-host-text-output-row-shape-missing",
+            );
+        }
+
+        let rendered_root =
+            Self::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics(
+                snapshot,
+            );
+        let function_component_above_host_output_shape =
+            Self::private_to_tree_rendered_root_wraps_multi_child_host_text_output(&rendered_root);
+        if !function_component_above_host_output_shape {
+            return self.private_to_tree_native_execution_record_error(
+                operation,
+                "function-component-above-multi-child-host-text-output-shape-missing",
+            );
+        }
+
+        Ok(TestRendererPrivateToTreeNativeExecutionEvidence {
+            diagnostic_name: TEST_RENDERER_PRIVATE_TO_TREE_NATIVE_EXECUTION_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_TO_TREE_NATIVE_EXECUTION_STATUS,
+            root: self.root_id,
+            operation,
+            public_surface,
+            source_execution_record_id,
+            source_execution_status,
+            source_tree_diagnostic_name: TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME,
+            host_output_update_kind: row.host_output_update_kind(),
+            host_output_shape: row.host_output_shape(),
+            host_output_row: Some(row),
+            rendered_root,
+            source_fiber_count:
+                TEST_RENDERER_PRIVATE_TREE_COMPOSITE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE
+                    .len(),
+            root_child_count: snapshot.children().len(),
+            consumes_accepted_native_create_execution_record: false,
+            consumes_accepted_native_update_execution_record: true,
+            consumes_accepted_native_unmount_execution_record: false,
+            consumes_private_to_tree_evidence: true,
+            consumes_accepted_host_output_row: true,
+            source_finished_work_identity_diagnostic_name: None,
+            consumes_private_sibling_text_finished_work_identity_gate: false,
+            source_lifecycle_execution_diagnostic_name: None,
+            source_lifecycle_execution_status: None,
+            consumes_private_root_lifecycle_execution: false,
             source_unmount_nested_source_report_admission_gate_diagnostic_name: None,
             source_unmount_nested_source_report_admission_gate_status: None,
             consumes_private_unmount_nested_source_report_admission_gate: false,
@@ -17164,6 +18426,28 @@ impl TestRendererRoot {
             && host_component.rendered()[0].as_text().is_some()
     }
 
+    fn private_to_tree_rendered_root_wraps_multi_child_host_text_output(
+        rendered_root: &TestRendererPrivateTreeRenderedRoot,
+    ) -> bool {
+        let Some(component) = rendered_root.as_function_component() else {
+            return false;
+        };
+        let Some(host_component) = component.rendered().as_host_component() else {
+            return false;
+        };
+        component.node_type() == TestRendererPrivateTreeNodeType::Component
+            && component.component_type() == TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE
+            && component.props().attributes().is_empty()
+            && !component.instance_available()
+            && component.wraps_committed_host_output()
+            && host_component.node_type() == TestRendererPrivateTreeNodeType::Host
+            && !host_component.instance_available()
+            && host_component.rendered_child_count() == 2
+            && host_component.rendered().len() == 2
+            && host_component.rendered()[0].as_text().is_some()
+            && host_component.rendered()[1].as_text().is_some()
+    }
+
     #[allow(
         clippy::too_many_arguments,
         reason = "native serialization admission must mirror the finished-work identity proof"
@@ -17256,6 +18540,308 @@ impl TestRendererRoot {
             || identity.compatibility_claimed()
         {
             return Err("public-or-native-compatibility-claim");
+        }
+
+        Ok(identity)
+    }
+
+    fn validate_private_to_json_multi_child_host_text_update_route_admission_record_for_identity(
+        &self,
+        route: TestRendererPrivateUpdateRouteAdmissionRecord,
+    ) -> Result<(), TestRendererRootError> {
+        if route.record_id() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+            || route.status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+            || route.root() != self.root_id
+            || route.renderer_id() != self.renderer.renderer_id
+            || route.public_surface() != "create().update"
+            || route.request_api() != "TestRendererRoot::update"
+            || route.source_diagnostic_name() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME
+            || route.source_diagnostic_status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS
+            || route.lifecycle() != self.lifecycle
+            || route.lifecycle() != TestRendererRootLifecycle::Active
+            || route.scheduled_update_kind() != TestRendererRootUpdateKind::Update
+            || route.host_output_update_kind() != TestRendererRootUpdateKind::Update
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-route-metadata-stale",
+                }
+                .into(),
+            );
+        }
+        if route.scheduled_update_sequence() != self.scheduled_updates.len() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "multi-child-host-text-route-update-sequence-stale",
+                }
+                .into(),
+            );
+        }
+        if !route.consumes_accepted_host_root_update_queue_metadata()
+            || !route.consumes_accepted_root_work_loop_metadata()
+            || !route.consumes_accepted_host_output_metadata()
+            || !route.rejects_stale_root_lifecycle()
+            || !route.rejects_stale_host_output()
+            || !route.rejects_missing_update_queue_evidence()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-route-accepted-evidence-missing",
+                }
+                .into(),
+            );
+        }
+        if route.public_root_update_available()
+            || route.public_serialization_available()
+            || route.native_execution_available()
+            || route.compatibility_claimed()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                    reason: "public-or-native-compatibility-claim",
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_multi_child_host_text_lifecycle_execution_for_identity(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+        route: TestRendererPrivateUpdateRouteAdmissionRecord,
+        lifecycle: &TestRendererPrivateRootLifecycleExecutionEvidence,
+    ) -> Result<(), TestRendererRootError> {
+        if lifecycle.diagnostic_name()
+            != TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_DIAGNOSTIC_NAME
+            || lifecycle.status() != TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_STATUS
+            || lifecycle.root() != self.root_id
+            || lifecycle.renderer_id != self.renderer.renderer_id
+            || lifecycle.operation() != "update"
+            || lifecycle.public_surface() != "create().update"
+            || lifecycle.source_execution_record_id() != route.record_id()
+            || lifecycle.source_execution_status() != route.status()
+            || lifecycle.scheduled_update_sequence() != output.scheduled_update_sequence()
+            || lifecycle.scheduled_update_sequence() != self.scheduled_updates.len()
+            || lifecycle.lifecycle() != self.lifecycle
+            || lifecycle.lifecycle() != TestRendererRootLifecycle::Active
+            || lifecycle.scheduled_update_kind() != TestRendererRootUpdateKind::Update
+            || lifecycle.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || lifecycle.host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            || lifecycle.root_child_count() != 1
+            || lifecycle.previous_root_child_count() != 1
+            || lifecycle.host_component_count() != 1
+            || lifecycle.host_text_count() != 2
+            || lifecycle.host_update_apply_count() != output.host_parent_placement_apply_count()
+            || !lifecycle.source_owned_execution_accepted()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "multi-child-host-text-lifecycle-evidence-mismatch",
+                }
+                .into(),
+            );
+        }
+        if lifecycle.snapshot() != output.snapshot()
+            || lifecycle.previous_snapshot() != Some(output.previous_snapshot())
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "multi-child-host-text-lifecycle-snapshot-stale",
+                }
+                .into(),
+            );
+        }
+        if lifecycle.public_root_available()
+            || lifecycle.public_serialization_available()
+            || lifecycle.public_test_instance_available()
+            || lifecycle.public_act_available()
+            || lifecycle.public_scheduler_available()
+            || lifecycle.native_bridge_available()
+            || lifecycle.native_execution_available()
+            || lifecycle.js_package_available()
+            || lifecycle.compatibility_claimed()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                    reason: "public-or-native-package-js-compatibility-claim",
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn private_multi_child_host_text_snapshot_has_order(snapshot: &TestContainerSnapshot) -> bool {
+        let [TestNodeSnapshot::Element(element)] = snapshot.children() else {
+            return false;
+        };
+        let [
+            TestNodeSnapshot::Text(first),
+            TestNodeSnapshot::Text(second),
+        ] = element.children()
+        else {
+            return false;
+        };
+        !element.is_hidden()
+            && !element.is_detached()
+            && !first.is_hidden()
+            && !second.is_hidden()
+            && first.text() != second.text()
+    }
+
+    fn validate_private_to_json_multi_child_host_text_native_execution_identity_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+        execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+        lifecycle: &TestRendererPrivateRootLifecycleExecutionEvidence,
+        identity: Option<TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate>,
+    ) -> Result<TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate, &'static str> {
+        let Some(identity) = identity else {
+            return Err("finished-work-identity-missing");
+        };
+
+        Self::validate_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(
+            identity,
+        )?;
+
+        if lifecycle.diagnostic_name()
+            != TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_DIAGNOSTIC_NAME
+            || lifecycle.status() != TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_STATUS
+            || lifecycle.root() != self.root_id
+            || lifecycle.renderer_id != self.renderer.renderer_id
+            || lifecycle.operation() != "update"
+            || lifecycle.public_surface() != "create().update"
+            || lifecycle.source_execution_record_id() != execution.record_id()
+            || lifecycle.source_execution_status() != execution.status()
+            || lifecycle.scheduled_update_sequence() != output.scheduled_update_sequence()
+            || lifecycle.scheduled_update_sequence() != self.scheduled_updates.len()
+            || lifecycle.lifecycle() != self.lifecycle
+            || lifecycle.lifecycle() != TestRendererRootLifecycle::Active
+            || lifecycle.scheduled_update_kind() != TestRendererRootUpdateKind::Update
+            || lifecycle.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || lifecycle.host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            || lifecycle.root_child_count() != 1
+            || lifecycle.previous_root_child_count() != 1
+            || lifecycle.host_component_count() != 1
+            || lifecycle.host_text_count() != 2
+            || lifecycle.host_update_apply_count() != output.host_parent_placement_apply_count()
+            || !lifecycle.source_owned_execution_accepted()
+        {
+            return Err("multi-child-host-text-lifecycle-evidence-mismatch");
+        }
+        if lifecycle.snapshot() != output.snapshot()
+            || lifecycle.previous_snapshot() != Some(output.previous_snapshot())
+        {
+            return Err("multi-child-host-text-lifecycle-snapshot-stale");
+        }
+        if lifecycle.public_root_available()
+            || lifecycle.public_serialization_available()
+            || lifecycle.public_test_instance_available()
+            || lifecycle.public_act_available()
+            || lifecycle.public_scheduler_available()
+            || lifecycle.native_bridge_available()
+            || lifecycle.native_execution_available()
+            || lifecycle.js_package_available()
+            || lifecycle.compatibility_claimed()
+        {
+            return Err("public-or-native-package-js-compatibility-claim");
+        }
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let render = output.render();
+        let commit = output.commit();
+        if identity.root() != self.root_id
+            || identity.renderer_id() != self.renderer.renderer_id
+            || identity.root_scheduled_update_sequence() != self.scheduled_updates.len()
+            || identity.root_scheduled_update_sequence() != output.scheduled_update_sequence()
+        {
+            return Err("finished-work-identity-stale");
+        }
+        if identity.public_surface() != "create().update -> create().toJSON"
+            || identity.source_execution_record_id() != execution.record_id()
+            || identity.source_execution_status() != execution.status()
+            || identity.source_lifecycle_diagnostic_name() != lifecycle.diagnostic_name()
+            || identity.source_lifecycle_status() != lifecycle.status()
+        {
+            return Err("finished-work-identity-source-report-mismatch");
+        }
+        if execution.scheduled_update_sequence() != output.scheduled_update_sequence()
+            || execution.root() != self.root_id
+            || execution.renderer_id() != self.renderer.renderer_id
+            || render.root() != self.root_id
+            || commit.root() != self.root_id
+        {
+            return Err("update-admission-handoff-mismatch");
+        }
+        if execution.render_current() != fiber_handle!(render.current())
+            || execution.render_finished_work() != fiber_handle!(render.finished_work())
+            || execution.commit_previous_current() != fiber_handle!(commit.previous_current())
+            || execution.commit_current() != fiber_handle!(commit.current())
+        {
+            return Err("update-admission-handoff-mismatch");
+        }
+        if identity.route_render_current() != execution.render_current()
+            || identity.route_render_finished_work() != execution.render_finished_work()
+            || identity.route_commit_previous_current() != execution.commit_previous_current()
+            || identity.route_commit_current() != execution.commit_current()
+        {
+            return Err("multi-child-host-text-finished-work-identity-route-mismatch");
+        }
+        if identity.render_current() != fiber_handle!(render.current())
+            || identity.render_finished_work() != fiber_handle!(render.finished_work())
+            || identity.commit_previous_current() != fiber_handle!(commit.previous_current())
+            || identity.commit_current() != fiber_handle!(commit.current())
+            || identity.report_finished_work() != fiber_handle!(commit.current())
+        {
+            return Err("multi-child-host-text-finished-work-identity-handoff-mismatch");
+        }
+        let actual_current = self
+            .store
+            .root(self.root_id)
+            .map_err(|_| "finished-work-identity-root-stale")?
+            .current();
+        if identity.commit_current() != fiber_handle!(actual_current) {
+            return Err("finished-work-identity-stale");
+        }
+        if execution.render_lanes_bits() == 0
+            || execution.render_lanes_bits() != render.render_lanes().bits()
+            || execution.commit_finished_lanes_bits() != commit.finished_lanes().bits()
+            || render.render_lanes().bits() != commit.finished_lanes().bits()
+        {
+            return Err("update-admission-lane-mismatch");
+        }
+        if identity.render_lanes_bits() != execution.render_lanes_bits()
+            || identity.commit_finished_lanes_bits() != execution.commit_finished_lanes_bits()
+            || identity.report_finished_lanes_bits() != execution.commit_finished_lanes_bits()
+            || identity.commit_remaining_lanes_bits() != 0
+            || identity.commit_pending_lanes_bits() != 0
+        {
+            return Err("multi-child-host-text-finished-work-identity-lane-mismatch");
+        }
+        if identity.lifecycle_scheduled_update_sequence() != lifecycle.scheduled_update_sequence()
+            || identity.lifecycle_host_output_shape() != lifecycle.host_output_shape()
+            || identity.lifecycle_root_child_count() != lifecycle.root_child_count()
+            || identity.lifecycle_host_component_count() != lifecycle.host_component_count()
+            || identity.lifecycle_host_text_count() != lifecycle.host_text_count()
+            || !identity.lifecycle_matches_committed_update()
+            || !identity.consumes_root_lifecycle_execution()
+        {
+            return Err("multi-child-host-text-lifecycle-evidence-mismatch");
         }
 
         Ok(identity)
@@ -17750,6 +19336,101 @@ impl TestRendererRoot {
             || !gate.identity_admission_available()
         {
             return Err("sibling-text-finished-work-evidence-not-consumed");
+        }
+        if gate.broad_multichild_identity_available() {
+            return Err("broad-multichild-identity-unexpectedly-open");
+        }
+        if !gate.public_native_package_js_surfaces_blocked() {
+            return Err("public-or-native-package-js-compatibility-claim");
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(
+        gate: TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate,
+    ) -> Result<(), &'static str> {
+        if gate.diagnostic_name()
+            != TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_DIAGNOSTIC_NAME
+            || gate.status() != TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_STATUS
+        {
+            return Err("multi-child-host-text-finished-work-identity-diagnostic-mismatch");
+        }
+        if gate.public_surface() != "create().update -> create().toJSON"
+            || gate.source_execution_record_id()
+                != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+            || gate.source_execution_status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+            || gate.source_lifecycle_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_DIAGNOSTIC_NAME
+            || gate.source_lifecycle_status()
+                != TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_STATUS
+        {
+            return Err("multi-child-host-text-finished-work-identity-source-mismatch");
+        }
+        if gate.worker_895_report_row_id()
+            != TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
+            || gate.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || gate.host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            || gate.root_node_kind() != TestRendererPrivateJsonNodeKind::HostComponent
+            || gate.child_fiber_tag_order() != ["HostComponent", "HostText", "HostText"]
+            || gate.root_child_count() != 1
+            || gate.source_node_count() != 3
+        {
+            return Err("multi-child-host-text-report-row-or-shape-mismatch");
+        }
+        if !gate.route_handles_match_committed_update()
+            || gate.route_render_current() != gate.render_current()
+            || gate.route_render_finished_work() != gate.render_finished_work()
+            || gate.route_commit_previous_current() != gate.commit_previous_current()
+            || gate.route_commit_current() != gate.commit_current()
+        {
+            return Err("multi-child-host-text-route-finished-work-identity-mismatch");
+        }
+        if !gate.lifecycle_matches_committed_update()
+            || gate.lifecycle_scheduled_update_sequence() != gate.root_scheduled_update_sequence()
+            || gate.lifecycle_host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            || gate.lifecycle_root_child_count() != 1
+            || gate.lifecycle_host_component_count() != 1
+            || gate.lifecycle_host_text_count() != 2
+        {
+            return Err("multi-child-host-text-lifecycle-evidence-mismatch");
+        }
+        if !gate.commit_current_matches_render_finished_work()
+            || !gate.commit_previous_current_matches_render_current()
+            || !gate.report_finished_work_matches_commit_current()
+            || gate.render_finished_work() != gate.commit_current()
+            || gate.report_finished_work() != gate.commit_current()
+            || gate.commit_previous_current() != gate.render_current()
+        {
+            return Err("multi-child-host-text-finished-work-identity-mismatch");
+        }
+        if gate.render_lanes_bits() == 0
+            || gate.route_render_lanes_bits != gate.render_lanes_bits()
+            || gate.route_commit_finished_lanes_bits != gate.commit_finished_lanes_bits()
+            || gate.render_lanes_bits() != gate.commit_finished_lanes_bits()
+            || gate.report_finished_lanes_bits() != gate.commit_finished_lanes_bits()
+            || gate.commit_remaining_lanes_bits() != 0
+            || gate.commit_pending_lanes_bits() != 0
+            || !gate.route_lanes_match_committed_update()
+            || !gate.report_lanes_match_commit_lanes()
+        {
+            return Err("multi-child-host-text-finished-work-identity-lane-mismatch");
+        }
+        if !gate.host_output_snapshot_current()
+            || !gate.report_host_output_row_matches_output()
+            || !gate.child_order_matches_current_snapshot()
+            || gate.host_parent_placement_apply_count() == 0
+            || !gate.real_multi_child_handoff_available()
+            || !gate.consumes_update_route_admission()
+            || !gate.consumes_root_lifecycle_execution()
+            || !gate.consumes_multi_child_host_output()
+            || !gate.consumes_committed_host_root_finished_work_identity()
+            || !gate.consumes_committed_host_root_finished_work_lanes()
+            || !gate.identity_admission_available()
+        {
+            return Err("multi-child-host-text-finished-work-evidence-not-consumed");
         }
         if gate.broad_multichild_identity_available() {
             return Err("broad-multichild-identity-unexpectedly-open");
@@ -18487,6 +20168,7 @@ impl TestRendererRoot {
             return self.private_to_json_native_execution_record_error("update", "status-mismatch");
         }
         if execution.root() != self.root_id
+            || execution.renderer_id() != self.renderer.renderer_id
             || execution.public_surface() != "create().update"
             || execution.request_api() != "TestRendererRoot::update"
             || execution.source_diagnostic_name()
@@ -18654,6 +20336,7 @@ impl TestRendererRoot {
             return self.private_to_tree_native_execution_record_error("update", "status-mismatch");
         }
         if execution.root() != self.root_id
+            || execution.renderer_id() != self.renderer.renderer_id
             || execution.public_surface() != "create().update"
             || execution.request_api() != "TestRendererRoot::update"
             || execution.source_diagnostic_name()
@@ -19110,6 +20793,7 @@ impl TestRendererRoot {
             None,
         )?;
         self.scheduled_updates.push(scheduled);
+        let scheduled_update_sequence = self.scheduled_updates.len();
         let render = self
             .render_latest_scheduled_host_root_for_commit_handoff()?
             .expect("host-parent placement canary schedules an update before rendering");
@@ -19182,8 +20866,25 @@ impl TestRendererRoot {
         });
         self.current_nested_host_output = None;
 
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
         Ok(TestRendererHostParentPlacedHostOutput {
+            scheduled_update_sequence,
             render,
+            updated_fibers: next_fibers,
+            placed_text_fiber: fiber_handle!(placed_text_fiber),
+            placed_text_props_raw,
+            parent_state_node_raw,
+            placed_text_state_node_raw: child_state_node_raw,
             commit,
             commit_diagnostics,
             previous_snapshot,
@@ -20209,6 +21910,8 @@ impl TestRendererRoot {
             TestRendererPrivateToJsonHostOutputShape::SiblingText
         } else if max_host_component_depth > 1 {
             TestRendererPrivateToJsonHostOutputShape::NestedHostText
+        } else if host_text_count > 1 {
+            TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
         } else {
             TestRendererPrivateToJsonHostOutputShape::SingleHostText
         };
@@ -20278,7 +21981,8 @@ impl TestRendererRoot {
                     fiber_inspection,
                 )
             }
-            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            | TestRendererPrivateToJsonHostOutputShape::EmptyRoot
             | TestRendererPrivateToJsonHostOutputShape::SingleHostText
             | TestRendererPrivateToJsonHostOutputShape::NestedHostText => {
                 Self::private_json_nodes_from_component_and_fibers(component, fiber_inspection)
@@ -20298,32 +22002,36 @@ impl TestRendererRoot {
             );
         }
 
-        vec![
-            TestRendererPrivateJsonNodeDiagnostic {
-                ordinal: 0,
-                node_kind: TestRendererPrivateJsonNodeKind::HostComponent,
-                parent_ordinal: None,
-                child_ordinals: vec![1],
-                fiber: Self::private_json_fiber_diagnostic(fiber_inspection.host_component()),
-                element_type: Some(component.element_type().clone()),
-                props: Some(component.props().clone()),
-                text: None,
-                hidden: component.is_hidden(),
-                detached: component.is_detached(),
-            },
-            TestRendererPrivateJsonNodeDiagnostic {
-                ordinal: 1,
+        let child_ordinals: Vec<usize> = (1..=component.text_children().len()).collect();
+        let mut nodes = vec![TestRendererPrivateJsonNodeDiagnostic {
+            ordinal: 0,
+            node_kind: TestRendererPrivateJsonNodeKind::HostComponent,
+            parent_ordinal: None,
+            child_ordinals,
+            fiber: Self::private_json_fiber_diagnostic(fiber_inspection.host_component()),
+            element_type: Some(component.element_type().clone()),
+            props: Some(component.props().clone()),
+            text: None,
+            hidden: component.is_hidden(),
+            detached: component.is_detached(),
+        }];
+
+        for (index, text) in component.text_children().iter().enumerate() {
+            nodes.push(TestRendererPrivateJsonNodeDiagnostic {
+                ordinal: index + 1,
                 node_kind: TestRendererPrivateJsonNodeKind::Text,
                 parent_ordinal: Some(0),
                 child_ordinals: Vec::new(),
-                fiber: Self::private_json_fiber_diagnostic(fiber_inspection.host_text()),
+                fiber: Self::private_json_fiber_diagnostic(fiber_inspection.host_texts()[index]),
                 element_type: None,
                 props: None,
-                text: Some(component.text_child().text().to_owned()),
-                hidden: component.text_child().is_hidden(),
+                text: Some(text.text().to_owned()),
+                hidden: text.is_hidden(),
                 detached: false,
-            },
-        ]
+            });
+        }
+
+        nodes
     }
 
     fn private_json_sibling_text_nodes_from_snapshot_and_fibers(
@@ -20441,7 +22149,8 @@ impl TestRendererRoot {
             TestRendererPrivateToJsonHostOutputShape::SiblingText => {
                 Self::describe_private_to_json_host_shape_from_snapshot_for_diagnostics(snapshot)
             }
-            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            | TestRendererPrivateToJsonHostOutputShape::EmptyRoot
             | TestRendererPrivateToJsonHostOutputShape::SingleHostText
             | TestRendererPrivateToJsonHostOutputShape::NestedHostText => {
                 Self::private_json_rendered_root_from_component(component)
@@ -20690,6 +22399,9 @@ impl TestRendererRoot {
             TestRendererPrivateToJsonHostOutputShape::SiblingText => {
                 Self::private_json_component_from_sibling_text_snapshot(snapshot)
             }
+            TestRendererPrivateToJsonHostOutputShape::MultiChildHostText => {
+                Self::private_json_component_from_multi_child_host_text_snapshot(snapshot)
+            }
             TestRendererPrivateToJsonHostOutputShape::EmptyRoot
             | TestRendererPrivateToJsonHostOutputShape::SingleHostText
             | TestRendererPrivateToJsonHostOutputShape::NestedHostText => {
@@ -20737,6 +22449,48 @@ impl TestRendererRoot {
         Ok(Self::private_json_component_from_text_children(
             element,
             vec![Self::private_json_text_from_snapshot(text)],
+        ))
+    }
+
+    fn private_json_component_from_multi_child_host_text_snapshot(
+        snapshot: &TestContainerSnapshot,
+    ) -> Result<
+        TestRendererPrivateJsonHostComponentDiagnostic,
+        TestRendererPrivateJsonSerializationError,
+    > {
+        if snapshot.children().len() != 1 {
+            return Err(TestRendererPrivateJsonSerializationError::RootChildCount {
+                actual: snapshot.children().len(),
+            });
+        }
+
+        let TestNodeSnapshot::Element(element) = &snapshot.children()[0] else {
+            return Err(TestRendererPrivateJsonSerializationError::RootChildIsText);
+        };
+        if element.children().len() < 2 {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostComponentChildCount {
+                    element_type: element.element_type().clone(),
+                    actual: element.children().len(),
+                },
+            );
+        }
+
+        let mut text_children = Vec::with_capacity(element.children().len());
+        for child in element.children() {
+            let TestNodeSnapshot::Text(text) = child else {
+                return Err(
+                    TestRendererPrivateJsonSerializationError::HostComponentChildIsElement {
+                        element_type: element.element_type().clone(),
+                    },
+                );
+            };
+            text_children.push(Self::private_json_text_from_snapshot(text));
+        }
+
+        Ok(Self::private_json_component_from_text_children(
+            element,
+            text_children,
         ))
     }
 
@@ -22783,6 +24537,153 @@ mod tests {
     }
 
     #[test]
+    fn root_private_multi_child_host_text_lifecycle_and_identity_consume_real_update_handoff() {
+        let (root, output, route, lifecycle, identity) =
+            multi_child_host_text_identity_inputs_for_canary();
+        let row = root
+            .describe_private_to_json_multi_child_host_text_output_row_for_canary(&output)
+            .unwrap();
+
+        assert_eq!(route.root(), root.root_id());
+        assert_eq!(route.renderer_id(), root.renderer.renderer_id);
+        assert_eq!(
+            route.scheduled_update_sequence(),
+            output.scheduled_update_sequence()
+        );
+        assert_eq!(
+            route.render_current().slot(),
+            output.render().current().slot().get()
+        );
+        assert_eq!(
+            lifecycle.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(lifecycle.root(), root.root_id());
+        assert_eq!(lifecycle.renderer_id, root.renderer.renderer_id);
+        assert_eq!(lifecycle.operation(), "update");
+        assert_eq!(lifecycle.public_surface(), "create().update");
+        assert_eq!(lifecycle.source_execution_record_id(), route.record_id());
+        assert_eq!(lifecycle.source_execution_status(), route.status());
+        assert_eq!(
+            lifecycle.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+        );
+        assert_eq!(lifecycle.root_child_count(), 1);
+        assert_eq!(lifecycle.previous_root_child_count(), 1);
+        assert_eq!(lifecycle.host_component_count(), 1);
+        assert_eq!(lifecycle.host_text_count(), 2);
+        assert_eq!(
+            lifecycle.host_update_apply_count(),
+            output.host_parent_placement_apply_count()
+        );
+        assert_eq!(lifecycle.snapshot(), output.snapshot());
+        assert_eq!(
+            lifecycle.previous_snapshot(),
+            Some(output.previous_snapshot())
+        );
+        let TestNodeSnapshot::Element(element) = &output.snapshot().children()[0] else {
+            panic!("expected multi-child host component");
+        };
+        assert_eq!(child_texts(element), vec!["hello", "inserted"]);
+        assert_private_root_lifecycle_execution_blocks_public_surfaces(&lifecycle);
+
+        assert_eq!(
+            row.id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            row.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+        );
+        assert_eq!(row.previous_root_child_count(), 1);
+        assert_eq!(row.current_root_child_count(), 1);
+        assert_eq!(row.previous_host_text_count(), 1);
+        assert_eq!(row.current_host_text_count(), 2);
+        assert_eq!(row.current_root_text_count(), 0);
+        assert_eq!(row.current_max_host_component_depth(), 1);
+        assert!(row.public_blockers().all_blocked());
+
+        assert_eq!(
+            identity.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_DIAGNOSTIC_NAME
+        );
+        assert_eq!(identity.root(), root.root_id());
+        assert_eq!(identity.renderer_id(), root.renderer.renderer_id);
+        assert_eq!(
+            identity.public_surface(),
+            "create().update -> create().toJSON"
+        );
+        assert_eq!(identity.source_execution_record_id(), route.record_id());
+        assert_eq!(
+            identity.source_lifecycle_diagnostic_name(),
+            lifecycle.diagnostic_name()
+        );
+        assert_eq!(
+            identity.worker_895_report_row_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            identity.child_fiber_tag_order(),
+            ["HostComponent", "HostText", "HostText"]
+        );
+        assert_eq!(identity.root_child_count(), 1);
+        assert_eq!(identity.source_node_count(), 3);
+        assert_eq!(identity.route_render_current(), identity.render_current());
+        assert_eq!(
+            identity.route_render_finished_work(),
+            identity.render_finished_work()
+        );
+        assert_eq!(
+            identity.route_commit_previous_current(),
+            identity.commit_previous_current()
+        );
+        assert_eq!(identity.route_commit_current(), identity.commit_current());
+        assert_eq!(identity.render_finished_work(), identity.commit_current());
+        assert_eq!(identity.report_finished_work(), identity.commit_current());
+        assert_eq!(
+            identity.route_render_lanes_bits(),
+            identity.render_lanes_bits()
+        );
+        assert_eq!(
+            identity.route_commit_finished_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert_eq!(
+            identity.render_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert_eq!(
+            identity.report_finished_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert_eq!(identity.commit_remaining_lanes_bits(), 0);
+        assert_eq!(identity.commit_pending_lanes_bits(), 0);
+        assert!(identity.route_handles_match_committed_update());
+        assert!(identity.route_lanes_match_committed_update());
+        assert!(identity.lifecycle_matches_committed_update());
+        assert!(identity.commit_current_matches_render_finished_work());
+        assert!(identity.commit_previous_current_matches_render_current());
+        assert!(identity.report_finished_work_matches_commit_current());
+        assert!(identity.report_lanes_match_commit_lanes());
+        assert!(identity.host_output_snapshot_current());
+        assert!(identity.report_host_output_row_matches_output());
+        assert!(identity.child_order_matches_current_snapshot());
+        assert_eq!(
+            identity.host_parent_placement_apply_count(),
+            output.host_parent_placement_apply_count()
+        );
+        assert!(identity.real_multi_child_handoff_available());
+        assert!(identity.consumes_update_route_admission());
+        assert!(identity.consumes_root_lifecycle_execution());
+        assert!(identity.consumes_multi_child_host_output());
+        assert!(identity.consumes_committed_host_root_finished_work_identity());
+        assert!(identity.consumes_committed_host_root_finished_work_lanes());
+        assert!(identity.identity_admission_available());
+        assert!(!identity.broad_multichild_identity_available());
+        assert!(identity.public_native_package_js_surfaces_blocked());
+    }
+
+    #[test]
     fn root_private_root_lifecycle_execution_rejects_stale_or_cross_surface_rows() {
         let (mut root, created, create_handoff) = create_lifecycle_handoff_for_root();
         root.update_host_component_with_text_for_canary("span", "later")
@@ -23023,6 +24924,42 @@ mod tests {
         (root, output, route, report, identity)
     }
 
+    fn multi_child_host_text_identity_inputs_for_canary() -> (
+        TestRendererRoot,
+        TestRendererHostParentPlacedHostOutput,
+        TestRendererPrivateUpdateRouteAdmissionRecord,
+        TestRendererPrivateRootLifecycleExecutionEvidence,
+        TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate,
+    ) {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let output = root
+            .render_and_commit_host_parent_text_placement_for_canary("inserted")
+            .unwrap();
+        let route = root
+            .describe_private_multi_child_host_text_update_route_admission_for_canary(&output)
+            .unwrap();
+        let lifecycle = root
+            .describe_private_root_multi_child_host_text_update_lifecycle_execution_for_canary(
+                &output, route,
+            )
+            .unwrap();
+        let identity = root
+            .describe_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(
+                &output, route, &lifecycle,
+            )
+            .unwrap();
+
+        (root, output, route, lifecycle, identity)
+    }
+
     fn assert_sibling_text_identity_error_reason(
         error: TestRendererRootError,
         expected_reason: &'static str,
@@ -23047,6 +24984,33 @@ mod tests {
                 reason,
             } => assert_eq!(*reason, expected_reason),
             other => panic!("unexpected sibling-text identity error: {other:?}"),
+        }
+    }
+
+    fn assert_multi_child_host_text_identity_error_reason(
+        error: TestRendererRootError,
+        expected_reason: &'static str,
+    ) {
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected multi-child HostText private finished-work identity error");
+        };
+        match error.as_ref() {
+            TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::NonCommittedFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                reason,
+            } => assert_eq!(*reason, expected_reason),
+            other => panic!("unexpected multi-child HostText identity error: {other:?}"),
         }
     }
 
@@ -23139,6 +25103,7 @@ mod tests {
             status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
             public_surface: "create().update",
             root: root.root_id(),
+            renderer_id: root.renderer.renderer_id,
             scheduled_update_sequence: output.scheduled_update_sequence(),
             request_api: "TestRendererRoot::update",
             source_diagnostic_name: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME,
@@ -25817,6 +27782,279 @@ mod tests {
         assert_eq!(inner.element_type().as_str(), "span");
         assert_eq!(inner.children().unwrap()[0].as_text(), Some("stable"));
         assert_eq!(inner.children().unwrap()[1].as_text(), Some("inserted"));
+    }
+
+    #[test]
+    fn root_private_multi_child_host_text_native_execution_consumes_lifecycle_and_identity() {
+        let (root, output, route, lifecycle, identity) =
+            multi_child_host_text_identity_inputs_for_canary();
+
+        let json_evidence = root
+            .describe_private_to_json_after_multi_child_host_text_update_native_execution_for_canary(
+                &output,
+                route,
+                &lifecycle,
+                Some(identity),
+            )
+            .unwrap();
+
+        assert_eq!(json_evidence.operation(), "update");
+        assert_eq!(
+            json_evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            json_evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+        );
+        assert_eq!(
+            json_evidence.host_output_row().unwrap().id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(json_evidence.source_node_count(), 3);
+        assert_eq!(json_evidence.root_child_count(), 1);
+        assert_eq!(
+            json_evidence.source_finished_work_identity_diagnostic_name(),
+            Some(TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_DIAGNOSTIC_NAME)
+        );
+        assert_eq!(
+            json_evidence.source_lifecycle_execution_diagnostic_name(),
+            Some(TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_DIAGNOSTIC_NAME)
+        );
+        assert_eq!(
+            json_evidence.source_lifecycle_execution_status(),
+            Some(TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_STATUS)
+        );
+        assert!(json_evidence.consumes_accepted_native_update_execution_record());
+        assert!(json_evidence.consumes_accepted_host_output_row());
+        assert!(json_evidence.consumes_private_root_lifecycle_execution());
+        assert!(json_evidence.consumes_private_to_json_evidence());
+        assert!(!json_evidence.consumes_private_sibling_text_finished_work_identity_gate());
+        assert!(!json_evidence.minimal_tree_shape());
+        assert!(!json_evidence.public_to_json_available());
+        assert!(!json_evidence.public_serialization_available());
+        assert!(!json_evidence.native_bridge_available());
+        assert!(!json_evidence.native_execution_available());
+        assert!(!json_evidence.compatibility_claimed());
+
+        let rendered = json_evidence.rendered_root().as_host_component().unwrap();
+        assert_eq!(rendered.element_type().as_str(), "span");
+        assert_eq!(rendered.child_count(), 2);
+        assert_eq!(rendered.children().unwrap()[0].as_text(), Some("hello"));
+        assert_eq!(rendered.children().unwrap()[1].as_text(), Some("inserted"));
+
+        let tree_evidence = root
+            .describe_private_to_tree_after_multi_child_host_text_update_native_execution_for_canary(
+                &output,
+                route,
+                &lifecycle,
+                Some(identity),
+            )
+            .unwrap();
+
+        assert_eq!(tree_evidence.operation(), "update");
+        assert_eq!(
+            tree_evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+        );
+        assert_eq!(
+            tree_evidence.host_output_row().unwrap().id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            tree_evidence.source_fiber_count(),
+            TEST_RENDERER_PRIVATE_TREE_COMPOSITE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE.len()
+        );
+        assert_eq!(tree_evidence.root_child_count(), 1);
+        assert_eq!(
+            tree_evidence.source_finished_work_identity_diagnostic_name(),
+            Some(TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_DIAGNOSTIC_NAME)
+        );
+        assert_eq!(
+            tree_evidence.source_lifecycle_execution_diagnostic_name(),
+            Some(TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_DIAGNOSTIC_NAME)
+        );
+        assert!(tree_evidence.consumes_accepted_native_update_execution_record());
+        assert!(tree_evidence.consumes_accepted_host_output_row());
+        assert!(tree_evidence.consumes_private_root_lifecycle_execution());
+        assert!(tree_evidence.consumes_private_to_tree_evidence());
+        assert!(tree_evidence.function_component_above_host_output_shape());
+        assert!(!tree_evidence.public_to_tree_available());
+        assert!(!tree_evidence.public_serialization_available());
+        assert!(!tree_evidence.native_bridge_available());
+        assert!(!tree_evidence.native_execution_available());
+        assert!(!tree_evidence.compatibility_claimed());
+
+        let component = tree_evidence
+            .rendered_root()
+            .as_function_component()
+            .unwrap();
+        assert_eq!(
+            component.component_type(),
+            TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE
+        );
+        assert!(component.wraps_committed_host_output());
+        let rendered_host = component.rendered().as_host_component().unwrap();
+        assert_eq!(rendered_host.rendered_child_count(), 2);
+        assert_eq!(rendered_host.rendered()[0].as_text(), Some("hello"));
+        assert_eq!(rendered_host.rendered()[1].as_text(), Some("inserted"));
+    }
+
+    #[test]
+    fn root_private_multi_child_host_text_native_execution_rejects_tampered_stale_and_public_claims()
+     {
+        let (root, output, route, lifecycle, identity) =
+            multi_child_host_text_identity_inputs_for_canary();
+
+        let error = root
+            .describe_private_to_json_after_multi_child_host_text_update_native_execution_for_canary(
+                &output,
+                route,
+                &lifecycle,
+                None,
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "update",
+            "finished-work-identity-missing",
+        );
+
+        let mut stale_output = output.clone();
+        stale_output.snapshot.children.clear();
+        let error = root
+            .describe_private_to_json_multi_child_host_text_output_row_for_canary(&stale_output)
+            .unwrap_err();
+        assert_multi_child_host_text_identity_error_reason(
+            error,
+            "multi-child-host-text-snapshot-stale",
+        );
+        let error = root
+            .describe_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(
+                &stale_output,
+                route,
+                &lifecycle,
+            )
+            .unwrap_err();
+        assert_multi_child_host_text_identity_error_reason(
+            error,
+            "multi-child-host-text-lifecycle-snapshot-stale",
+        );
+
+        let mut foreign_route = route;
+        foreign_route.renderer_id = TestRendererId(foreign_route.renderer_id.0 + 1);
+        let error = root
+            .describe_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(
+                &output,
+                foreign_route,
+                &lifecycle,
+            )
+            .unwrap_err();
+        assert_multi_child_host_text_identity_error_reason(
+            error,
+            "multi-child-host-text-route-metadata-stale",
+        );
+
+        let mut replayed_route = route;
+        replayed_route.scheduled_update_sequence += 1;
+        let error = root
+            .describe_private_to_json_after_multi_child_host_text_update_native_execution_for_canary(
+                &output,
+                replayed_route,
+                &lifecycle,
+                Some(identity),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "update",
+            "update-admission-handoff-mismatch",
+        );
+
+        let mut unmount_route = route;
+        unmount_route.host_output_update_kind = TestRendererRootUpdateKind::Unmount;
+        let error = root
+            .describe_private_to_json_after_multi_child_host_text_update_native_execution_for_canary(
+                &output,
+                unmount_route,
+                &lifecycle,
+                Some(identity),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(error, "update", "route-metadata-stale");
+
+        let mut caller_built_lifecycle = lifecycle.clone();
+        caller_built_lifecycle.source_execution_status = "caller-built-lifecycle-row";
+        let error = root
+            .describe_private_to_json_after_multi_child_host_text_update_native_execution_for_canary(
+                &output,
+                route,
+                &caller_built_lifecycle,
+                Some(identity),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "update",
+            "multi-child-host-text-lifecycle-evidence-mismatch",
+        );
+
+        let mut native_lifecycle = lifecycle.clone();
+        native_lifecycle.native_execution_available = true;
+        let error = root
+            .describe_private_to_json_after_multi_child_host_text_update_native_execution_for_canary(
+                &output,
+                route,
+                &native_lifecycle,
+                Some(identity),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "update",
+            "public-or-native-package-js-compatibility-claim",
+        );
+
+        let mut stale_identity = identity;
+        stale_identity.commit_current.slot += 1;
+        let error = root
+            .describe_private_to_json_after_multi_child_host_text_update_native_execution_for_canary(
+                &output,
+                route,
+                &lifecycle,
+                Some(stale_identity),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "update",
+            "multi-child-host-text-route-finished-work-identity-mismatch",
+        );
+
+        let mut lane_identity = identity;
+        lane_identity.route_render_lanes_bits += 1;
+        let error = root
+            .describe_private_to_tree_after_multi_child_host_text_update_native_execution_for_canary(
+                &output,
+                route,
+                &lifecycle,
+                Some(lane_identity),
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "update",
+            "multi-child-host-text-finished-work-identity-lane-mismatch",
+        );
+
+        let mut package_identity = identity;
+        package_identity.package_compatibility_claimed = true;
+        let reason =
+            TestRendererRoot::validate_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(
+                package_identity,
+            )
+            .unwrap_err();
+        assert_eq!(reason, "public-or-native-package-js-compatibility-claim");
     }
 
     #[test]
