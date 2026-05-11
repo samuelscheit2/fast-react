@@ -47,29 +47,29 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Accepted/merged baseline for this branch includes
 Workers 803-837, 842-846, 848-852, 855-860, 862-874, 878-883, 885-893,
-895-896, 898-902, 904, 906-909, and 912-921. Current baseline is
-`da842580` (`Merge worker 920 host node store update payload currentness`).
-Worker 853's competing test-renderer branch was rejected as redundant after
-Worker 844 was accepted; do not use it as accepted input.
+895-896, 898-902, 904, 906-909, 912-930, and docs refresh Worker 922.
+Current baseline is `9af7741e`
+(`Merge worker 930 react dom test utils act blocked currentness`). Worker
+853's competing test-renderer branch was rejected as redundant after Worker
+844 was accepted; do not use it as accepted input.
 
 Current active queue:
 
 - Worker 910: fixing after DO NOT MERGE for hydration recoverable-error
   boundary admission; do not treat it as accepted input.
-- Worker 923: active native cleanup currentness admission ledger worker.
-- Worker 924: active N-API worker-thread cleanup currentness worker.
-- Worker 925: active concurrent update drain currentness worker.
-- Worker 926: active core hook staging failure preservation worker.
-- Worker 927: active root listener dispatch currentness worker.
-- Worker 922: docs-only refresh for the `da842580` baseline.
+- Worker 931: docs-only refresh for the `9af7741e` baseline.
+- Worker 932: active test-renderer CJS `act` lifecycle parity worker.
+- Worker 933: active public `flushSync` blocked-currentness worker.
+- Worker 934: active transition queue-lane scheduler continuation worker.
 
-If Workers 910 or 923-927 merge after this branch point, update this section
+If Workers 910 or 932-934 merge after this branch point, update this section
 and move their accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private evidence through `da842580` still keeps public
-root/render/unmount, `act`, `flushSync`, Scheduler timing, hydration,
-resources/forms, serialization, native/reconciler execution, package
-compatibility, and broad renderer compatibility blocked.
+Accepted private evidence through `9af7741e` still keeps public
+root/render/unmount, `act`, `react-dom/test-utils.act`, `flushSync`, Scheduler
+timing, hydration, resources/forms, serialization, native/reconciler execution,
+unsupported hook behavior, event dispatch, package compatibility, and broad
+renderer compatibility blocked.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -77,11 +77,12 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat the accepted branch baseline through `da842580` as private evidence
+1. Treat the accepted branch baseline through `9af7741e` as private evidence
    only. Public package, root, native, React DOM, test-renderer, Scheduler,
-   `act`, hydration, resource/form, serialization, and `flushSync`
+   `act`, `react-dom/test-utils.act`, hydration, resource/form,
+   serialization, unsupported hook, event dispatch, and `flushSync`
    compatibility still require fail-closed gates and dual-run oracle evidence.
-2. Review Workers 910 and 923-927 against the accepted source-owned lifecycle,
+2. Review Workers 910 and 932-934 against the accepted source-owned lifecycle,
    hydration, `act`, deletion, sync-flush, HostRoot lane handoff, scheduler
    continuation/currentness, reconciler/test-renderer direct multi-child fiber
    inspection, native-generation/cleanup, worker-thread cleanup, concurrent
@@ -103,8 +104,10 @@ canonical evidence requirements.
   continuation, FunctionComponent deletion/render-phase update/bailout blocker
   coverage, HostRoot update-queue lane handoff, finished-work commit queue-lane
   consumer, direct committed-fiber inspection, terminal host descendant
-  collection, scheduler-owned continuation/currentness, and HostNodeStore
-  update payload currentness shapes only as private test-host canaries with
+  collection, scheduler-owned continuation/currentness, HostNodeStore update
+  payload currentness, Worker 925 concurrent update drain currentness, Worker
+  926 hook staging failure preservation, and Worker 928 HostRoot container
+  descendant currentness shapes only as private test-host canaries with
   source-owned commit, host-node, root/lane, scheduler, queue/handoff,
   store-backed row lane metadata, topology, replay, ref/passive, and cleanup
   validation. Public React DOM/test-renderer roots and public `flushSync`
@@ -127,9 +130,10 @@ canonical evidence requirements.
   execution consumer, Worker 883 resource/form lifecycle boundary hardening,
   Worker 891 source-owned root unmount lifecycle request-boundary consumer, and
   Worker 901 source-owned render/update/nested lifecycle boundary consumer,
-  plus Worker 912 root-listener currentness and Worker 915 symbol-only client
-  facade gates, as diagnostic input. Worker 920's HostNodeStore payload
-  currentness can inform fake/native host update handoffs only when scoped
+  plus Worker 912 root-listener currentness, Worker 927 root-listener dispatch
+  currentness, and Worker 915 symbol-only client facade gates, as diagnostic
+  input. Worker 920's HostNodeStore payload currentness can inform fake/native
+  host update handoffs only when scoped
   root/fiber/token/phase/target identity is preserved. Any real native/Rust
   execution or public facade work still must prove scheduling, commit, cleanup,
   DOM output, listener/event/ref behavior, hydration boundaries,
@@ -145,17 +149,28 @@ canonical evidence requirements.
   frozen, nested source-owned scheduler-driven passive diagnostics, Worker
   885's source-owned root lifecycle boundary gate, Worker 902's private
   test-renderer act/update lifecycle boundary, and Worker 913's public
-  React.act blocked-currentness gate. Public `act`, public root work, passive
-  effect execution, Scheduler timing, warnings, thenable behavior, renderer
-  behavior, and package compatibility remain blocked.
+  React.act blocked-currentness gate, plus Worker 930's public
+  `react-dom/test-utils.act` blocked-currentness gate. Public `act`, public
+  test-utils act callback/thenable/warning behavior, public root work, passive
+  effect execution, Scheduler timing, renderer behavior, and package
+  compatibility remain blocked.
 - Native lifecycle work can consume accepted Worker 858's Rust JSON lifecycle
   mirror, Worker 870's in-process JSON batch lifecycle executor, Worker 873's
   private generation/replay no-stale guard, and Worker 882's native JS
   generation admission ledger, plus Worker 892's private cleanup-generation
-  consumer and Worker 908's cleanup-generation currentness gate. Executable
-  native addon loading, cleanup hooks, scheduling, renderer/reconciler output,
-  worker-thread teardown, public no-stale-value behavior, public native
-  compatibility, and package exports remain blocked.
+  consumer, Worker 908's cleanup-generation currentness gate, Worker 923's
+  cleanup currentness admission ledger, and Worker 924's worker-thread/
+  environment cleanup currentness. Executable native addon loading, cleanup
+  hooks, scheduling, renderer/reconciler output, worker-thread teardown, public
+  no-stale-value behavior, public native compatibility, and package exports
+  remain blocked.
+- React hook facade work can consume accepted Worker 916 transition blocker
+  currentness, Worker 918 render-phase update ownership evidence, Worker 926
+  hook staging failure-preservation currentness, and Worker 929 unsupported
+  placeholder hook blocker currentness. Public dispatcher routing, unsupported
+  hook execution, external-store subscription, callback invocation, ID
+  generation, root scheduling, renderer behavior, `act`, Scheduler timing, and
+  package compatibility remain blocked.
 - Scheduler variant and root-scheduler continuation work can consume accepted
   Worker 886 as the variant boundary, Worker 909's live source-currentness seal,
   and Worker 914's public root-entry currentness gate for root, native, mock,
@@ -189,5 +204,6 @@ canonical evidence requirements.
   native bridge execution.
 
 Premature until later gates are green: public React DOM root render/unmount,
-public `act`, public `flushSync`, public Scheduler timing, public hydration,
-resources, forms, and controlled inputs.
+public `act`, public `react-dom/test-utils.act`, public `flushSync`, public
+Scheduler timing, public hydration, resources, forms, controlled inputs,
+unsupported hooks, and event dispatch.

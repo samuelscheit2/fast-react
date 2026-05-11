@@ -29,6 +29,65 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 923-930
+
+- Worker 923 admitted Worker 908 cleanup-generation currentness into the
+  private-admission 821 native cleanup stale ledger, binding Rust test-only
+  source identity, render/cleanup generation currentness, root/value cleanup
+  handoff rows, and stale/replay/forged/caller-built/public-claim rejection.
+  Native addon loading, N-API cleanup hook execution, worker-thread teardown,
+  renderer/reconciler execution, package exports, and public native
+  compatibility remain blocked.
+- Worker 924 extended the private Rust cleanup-generation currentness canary
+  with cleanup-hook source worker-thread and environment identity, rejecting
+  cross-worker-thread and cross-environment cleanup handoff reuse against the
+  canonical cleanup-hook preflight. It remains inert test-only evidence; real
+  cleanup hooks, native addon loading, Node worker-thread teardown, package
+  exports, and public native compatibility remain blocked.
+- Worker 925 hardened reconciler concurrent update draining with pre-drain
+  validation and private currentness rows for staged HostRoot update tuples,
+  source lanes, duplicate/stale/replayed/pre-linked updates, invalid queues,
+  lane mismatches, cross-root queue reuse, and stale HostRoot-current evidence.
+  Public root scheduling, rendering, and package compatibility remain blocked.
+- Worker 926 hardened core hook update staging so `finish_queueing` preflights
+  existing pending rings before linking updates or clearing staging, rejects a
+  declared tail not reachable from `tail.next`, and preserves staging on
+  duplicate/stale/corrupt/already-linked failures. Public hook dispatchers,
+  root scheduling, renderer behavior, `act`, and package compatibility remain
+  blocked.
+- Worker 927 required WeakMap-backed root listener currentness records before
+  private click/focus dispatch can invoke root listener shells, validates the
+  same active registration, recomputes listener state before dispatch, and
+  rejects missing, cloned, foreign, stale, public, synthetic, or browser event
+  claims. Public DOM event compatibility and package-surface expansion remain
+  blocked.
+- Worker 928 added a private/test-only HostRoot
+  `appendAllChildrenToContainer`-style descendant currentness canary that
+  collects terminal HostComponent/HostText descendants through
+  FunctionComponent and Fragment wrappers with React 19.2.6 source anchors plus
+  root/current/work-in-progress identity. Container child sets, host mutation,
+  public DOM/test-renderer/root behavior, renderer compatibility, and package
+  compatibility remain blocked.
+- Worker 929 added package-private unsupported placeholder hook blocker
+  currentness for `useActionState`, `useOptimistic`, `useSyncExternalStore`,
+  `useEffectEvent`, `useId`, and `useDebugValue`, preserving placeholder public
+  exports and rejecting dispatcher/root/scheduler prerequisites,
+  external-store invocation, callback invocation, ID generation, and public
+  compatibility claims.
+- Worker 930 added source-owned blocked-currentness evidence for public
+  `react-dom/test-utils.act`, probing rootless sync, async, error, and thenable
+  shapes while the public placeholder still throws before callback invocation,
+  returns no thenable, emits no warning output, and claims no package
+  compatibility. The gate consumes Worker 913 as background currentness and
+  explicitly excludes Worker 910. Public React act readiness, test-utils act,
+  Scheduler/root/passive drains, renderer execution, warnings, and package
+  compatibility remain blocked.
+- The accepted state for this batch is current main `9af7741e`
+  (`Merge worker 930 react dom test utils act blocked currentness`) after the
+  focused native, reconciler, core hook, React DOM event/test-utils, hook
+  dispatcher, package-surface, import-smoke, formatting, and `git diff --check`
+  verification recorded in worker reports and git history.
+
 ### Workers 917 and 920
 
 - Worker 917 added reconciler-owned private direct committed-fiber inspection
@@ -53,7 +112,7 @@ sequencing belong in `MASTER_PLAN.md`.
   compatibility claims are rejected. Public DOM/test-renderer/native execution,
   renderer compatibility, root public behavior, and package compatibility
   remain blocked.
-- The accepted state for this batch is current main `da842580`
+- The accepted state for this batch was recorded at main commit `da842580`
   (`Merge worker 920 host node store update payload currentness`) after the
   focused reconciler/host-node/host-work checks, formatting, and
   `git diff --check` verification recorded in worker reports and git history.
@@ -153,7 +212,7 @@ sequencing belong in `MASTER_PLAN.md`.
   Public serialization, `ReactTestInstance`, native/package behavior, `act`,
   Scheduler, React DOM/native execution, and broad renderer compatibility
   remain blocked.
-- The latest accepted state was recorded in current main
+- The accepted state for that batch was recorded at main commit
   `cc34b057ec8a3652f03c1769a6a7405e37273e8c` after the Worker 904, Worker
   901, and Worker 899 merge batch, with focused Rust/JS checks, package-surface
   and import-smoke checks where applicable, formatting, and `git diff --check`
