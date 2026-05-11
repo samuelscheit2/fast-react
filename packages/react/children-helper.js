@@ -307,6 +307,180 @@ const childrenTraversalLazyEvidence = freezeRecord({
   compatibilityClaimed: false
 });
 
+const childrenTraversalLazyRendererBlockerSourceRowFieldNames = freezeArray([
+  'id',
+  'sourceFiles',
+  'symbols',
+  'role',
+  'compatibilityScope',
+  'sourceOwned',
+  'current',
+  'compatibilityClaimed'
+]);
+
+const childrenTraversalLazyRendererBlockerSourceRows = freezeRecordArray([
+  {
+    id: 'react-children-direct-lazy-traversal',
+    sourceFiles: freezeArray(['packages/react/src/ReactChildren.js']),
+    symbols: freezeArray(['mapIntoArray', 'REACT_LAZY_TYPE']),
+    role: 'direct Children helper lazy wrapper traversal evidence',
+    compatibilityScope: 'direct-children-helper-only',
+    sourceOwned: true,
+    current: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'react-reconciler-lazy-component-resolution',
+    sourceFiles: freezeArray([
+      'packages/react-reconciler/src/ReactFiberBeginWork.js',
+      'packages/react-reconciler/src/ReactFiberThenable.js'
+    ]),
+    symbols: freezeArray(['mountLazyComponent', 'resolveLazy']),
+    role: 'renderer lazy component resolution and component tag selection',
+    compatibilityScope: 'renderer-owned',
+    sourceOwned: true,
+    current: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'react-reconciler-suspense-wakeup',
+    sourceFiles: freezeArray([
+      'packages/react-reconciler/src/ReactFiberBeginWork.js',
+      'packages/react-reconciler/src/ReactFiberThrow.js',
+      'packages/react-reconciler/src/ReactFiberWorkLoop.js'
+    ]),
+    symbols: freezeArray([
+      'updateSuspenseComponent',
+      'throwException',
+      'markSuspenseBoundaryShouldCapture',
+      'attachPingListener'
+    ]),
+    role: 'Suspense capture, retry queue, and wakeup scheduling behavior',
+    compatibilityScope: 'renderer-owned',
+    sourceOwned: true,
+    current: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'react-dom-root-lazy-render-entry',
+    sourceFiles: freezeArray([
+      'packages/react-dom/src/client/ReactDOMRoot.js',
+      'packages/react-reconciler/src/ReactFiberRoot.js',
+      'packages/react-reconciler/src/ReactFiberBeginWork.js'
+    ]),
+    symbols: freezeArray([
+      'createRoot',
+      'ReactDOMRoot.render',
+      'createFiberRoot',
+      'updateHostRoot'
+    ]),
+    role: 'root creation, root render entry, and HostRoot begin-work behavior',
+    compatibilityScope: 'root-and-renderer-owned',
+    sourceOwned: true,
+    current: true,
+    compatibilityClaimed: false
+  }
+]);
+
+const childrenTraversalLazyRendererBlockerRowFieldNames = freezeArray([
+  'id',
+  'sourceRowId',
+  'directTraversalInput',
+  'blockedSurfaces',
+  'requiredRendererOwnedEvidence',
+  'callerShapedEvidenceAccepted',
+  'blocked',
+  'compatibilityClaimed'
+]);
+
+const childrenTraversalLazyRendererBlockerRows = freezeRecordArray([
+  {
+    id: 'direct-lazy-traversal-not-renderer-lazy-component',
+    sourceRowId: 'react-reconciler-lazy-component-resolution',
+    directTraversalInput: 'direct-react-lazy-child-traversal',
+    blockedSurfaces: freezeArray([
+      'renderer-lazy-component-execution',
+      'component-tag-selection',
+      'owner-stack',
+      'ref-lifecycle'
+    ]),
+    requiredRendererOwnedEvidence:
+      'renderer begin-work evidence for mountLazyComponent and resolveLazy',
+    callerShapedEvidenceAccepted: false,
+    blocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'direct-lazy-traversal-not-suspense-wakeup',
+    sourceRowId: 'react-reconciler-suspense-wakeup',
+    directTraversalInput: 'direct-react-lazy-child-traversal',
+    blockedSurfaces: freezeArray([
+      'Suspense-fallback-capture',
+      'Suspense-retry-queue',
+      'ping-listener',
+      'offscreen-state'
+    ]),
+    requiredRendererOwnedEvidence:
+      'renderer Suspense evidence for throwException capture and retry wakeups',
+    callerShapedEvidenceAccepted: false,
+    blocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'direct-lazy-traversal-not-root-lazy-render',
+    sourceRowId: 'react-dom-root-lazy-render-entry',
+    directTraversalInput: 'direct-react-lazy-child-traversal',
+    blockedSurfaces: freezeArray([
+      'createRoot',
+      'root.render',
+      'HostRoot-update-queue',
+      'root-scheduling',
+      'DOM-or-native-commit'
+    ]),
+    requiredRendererOwnedEvidence:
+      'root/render evidence for createRoot, root.render, HostRoot work, and commit',
+    callerShapedEvidenceAccepted: false,
+    blocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'direct-lazy-traversal-not-portal-ref-prerequisites',
+    sourceRowId: 'react-children-direct-lazy-traversal',
+    directTraversalInput: 'direct-react-lazy-child-traversal',
+    blockedSurfaces: freezeArray([
+      'real-portal-creation',
+      'ref-attach-detach-lifecycle',
+      'owner-stack-rendering'
+    ]),
+    requiredRendererOwnedEvidence:
+      'renderer-owned portal, ref, and owner evidence before public promotion',
+    callerShapedEvidenceAccepted: false,
+    blocked: true,
+    compatibilityClaimed: false
+  }
+]);
+
+const childrenTraversalLazyRendererBlockerEvidence = freezeRecord({
+  id: 'direct-lazy-children-traversal-renderer-suspense-root-blockers',
+  reactSourceTag: 'v19.2.6',
+  reactSourceCommit: 'eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401',
+  directTraversalOracleScenario: 'children-lazy-values',
+  acceptedInputEvidence: 'direct-react-lazy-child-traversal',
+  blockerSource:
+    'source-owned React 19.2.6 renderer, Suspense, and root anchors',
+  rendererOwnedEvidenceRequired: true,
+  directLazyTraversalImpliesRendererCompatibility: false,
+  callerShapedRendererEvidenceAccepted: false,
+  callerShapedSuspenseEvidenceAccepted: false,
+  callerShapedRootEvidenceAccepted: false,
+  rendererLazyCompatibilityClaimed: false,
+  suspenseWakeupCompatibilityClaimed: false,
+  rootLazyRenderingCompatibilityClaimed: false,
+  portalOrRefPrerequisiteClaimed: false,
+  publicCompatibilityClaimed: false,
+  compatibilityClaimed: false
+});
+
 const childrenTraversalBehaviorCurrentnessFieldNames = freezeArray([
   'nullishTopLevelCurrent',
   'booleanChildrenCoerceToNull',
@@ -331,6 +505,11 @@ const childrenTraversalBehaviorCurrentnessFieldNames = freezeArray([
   'lazyTraversalSupported',
   'lazyTraversalBlocked',
   'rendererTraversalBlocked',
+  'lazyRendererSuspenseRootBlockerCurrent',
+  'lazyRendererCompatibilityBlocked',
+  'lazySuspenseCompatibilityBlocked',
+  'lazyRootCompatibilityBlocked',
+  'callerShapedLazyRendererEvidenceBlocked',
   'ownerDispatcherRootPrerequisitesBlocked',
   'compatibilityClaimed'
 ]);
@@ -341,7 +520,10 @@ const childrenTraversalPublicCompatibilityFalseFlags = freezeArray([
   'packageCompatibilityClaimed',
   'fullReactChildrenParityClaimed',
   'fastReactBehaviorCompatible',
-  'publicPackageCompatibilityClaimed'
+  'publicPackageCompatibilityClaimed',
+  'publicLazyRendererCompatibilityClaimed',
+  'publicLazySuspenseCompatibilityClaimed',
+  'publicLazyRootCompatibilityClaimed'
 ]);
 
 const childrenTraversalPrerequisiteFalseFlags = freezeArray([
@@ -350,6 +532,11 @@ const childrenTraversalPrerequisiteFalseFlags = freezeArray([
   'rootPrerequisitesReady',
   'reactDomRootPrerequisitesReady',
   'schedulerPrerequisitesReady',
+  'lazyRendererPrerequisitesReady',
+  'lazySuspensePrerequisitesReady',
+  'lazyRootPrerequisitesReady',
+  'portalPrerequisitesReady',
+  'refPrerequisitesReady',
   'publicRootCompatibilityClaimed',
   'publicRendererCompatibilityClaimed'
 ]);
@@ -359,6 +546,9 @@ const childrenTraversalUnsupportedClaimFalseFlags = freezeArray([
   'fragmentRenderTraversalClaimed',
   'portalCreationClaimed',
   'lazyTraversalClaimed',
+  'lazyRendererCompatibilityClaimed',
+  'lazySuspenseWakeupClaimed',
+  'lazyRootRenderingClaimed',
   'ownerTraversalClaimed',
   'refLifecycleClaimed'
 ]);
@@ -376,6 +566,9 @@ const childrenTraversalCurrentnessReportFieldNames = freezeArray([
   'thrownErrorRows',
   'unsupportedEdgeCaseRows',
   'lazyEvidence',
+  'lazyRendererBlockerSourceRows',
+  'lazyRendererBlockerRows',
+  'lazyRendererBlockerEvidence',
   'behaviorCurrentness',
   ...childrenTraversalPublicCompatibilityFalseFlags,
   ...childrenTraversalPrerequisiteFalseFlags,
@@ -397,6 +590,13 @@ const privateChildrenTraversalCurrentnessMetadata = freezeRecord({
   thrownErrorRows: childrenTraversalThrownErrorRows,
   unsupportedEdgeCaseRows: childrenTraversalUnsupportedEdgeCaseRows,
   lazyEvidence: childrenTraversalLazyEvidence,
+  lazyRendererBlockerSourceRowFieldNames:
+    childrenTraversalLazyRendererBlockerSourceRowFieldNames,
+  lazyRendererBlockerSourceRows: childrenTraversalLazyRendererBlockerSourceRows,
+  lazyRendererBlockerRowFieldNames:
+    childrenTraversalLazyRendererBlockerRowFieldNames,
+  lazyRendererBlockerRows: childrenTraversalLazyRendererBlockerRows,
+  lazyRendererBlockerEvidence: childrenTraversalLazyRendererBlockerEvidence,
   behaviorCurrentnessFieldNames: childrenTraversalBehaviorCurrentnessFieldNames,
   publicCompatibilityFalseFlags: childrenTraversalPublicCompatibilityFalseFlags,
   prerequisiteFalseFlags: childrenTraversalPrerequisiteFalseFlags,
@@ -793,6 +993,10 @@ function createChildrenTraversalCurrentnessReport(overrides = {}) {
     thrownErrorRows: childrenTraversalThrownErrorRows,
     unsupportedEdgeCaseRows: childrenTraversalUnsupportedEdgeCaseRows,
     lazyEvidence: childrenTraversalLazyEvidence,
+    lazyRendererBlockerSourceRows:
+      childrenTraversalLazyRendererBlockerSourceRows,
+    lazyRendererBlockerRows: childrenTraversalLazyRendererBlockerRows,
+    lazyRendererBlockerEvidence: childrenTraversalLazyRendererBlockerEvidence,
     behaviorCurrentness: createChildrenTraversalBehaviorCurrentness()
   };
 
@@ -852,15 +1056,24 @@ function consumeChildrenTraversalCurrentnessReport(report) {
       'iterable-handling',
       'thrown-error-shapes',
       'lazy-child-traversal',
+      'lazy-renderer-suspense-root-blockers',
       'unsupported-edge-blockers'
     ]),
     sourceReport: report.sourceReport,
     lazyEvidence: report.lazyEvidence,
+    lazyRendererBlockerSourceRows: report.lazyRendererBlockerSourceRows,
+    lazyRendererBlockerRows: report.lazyRendererBlockerRows,
+    lazyRendererBlockerEvidence: report.lazyRendererBlockerEvidence,
     behaviorCurrentness: report.behaviorCurrentness,
     lazyTraversalSupported: true,
     directLazyTraversalSupported: true,
     lazyTraversalBlocked: false,
     rendererTraversalBlocked: true,
+    lazyRendererSuspenseRootBlocked: true,
+    lazyRendererCompatibilityClaimed: false,
+    suspenseWakeupCompatibilityClaimed: false,
+    rootLazyRenderingCompatibilityClaimed: false,
+    callerShapedLazyRendererEvidenceAccepted: false,
     ownerDispatcherRootPrerequisitesBlocked: true,
     publicCompatibilityClaimed: false,
     packageCompatibilityClaimed: false,
@@ -932,6 +1145,26 @@ function validateChildrenTraversalCurrentnessReport(report) {
 
   if (report.lazyEvidence !== childrenTraversalLazyEvidence) {
     return 'children-traversal-currentness-lazy-evidence';
+  }
+
+  if (
+    report.lazyRendererBlockerSourceRows !==
+    childrenTraversalLazyRendererBlockerSourceRows
+  ) {
+    return 'children-traversal-currentness-lazy-renderer-source-rows';
+  }
+
+  if (
+    report.lazyRendererBlockerRows !== childrenTraversalLazyRendererBlockerRows
+  ) {
+    return 'children-traversal-currentness-lazy-renderer-blocker-rows';
+  }
+
+  if (
+    report.lazyRendererBlockerEvidence !==
+    childrenTraversalLazyRendererBlockerEvidence
+  ) {
+    return 'children-traversal-currentness-lazy-renderer-evidence';
   }
 
   if (
@@ -1278,6 +1511,11 @@ function createChildrenTraversalBehaviorCurrentness() {
       lazyTraversalSupported: true,
       lazyTraversalBlocked: false,
       rendererTraversalBlocked: true,
+      lazyRendererSuspenseRootBlockerCurrent: true,
+      lazyRendererCompatibilityBlocked: true,
+      lazySuspenseCompatibilityBlocked: true,
+      lazyRootCompatibilityBlocked: true,
+      callerShapedLazyRendererEvidenceBlocked: true,
       ownerDispatcherRootPrerequisitesBlocked: true,
       compatibilityClaimed: false
     });
@@ -1299,8 +1537,16 @@ function createChildrenTraversalCurrentnessGateError(reason) {
   error.fullReactChildrenParityClaimed = false;
   error.rendererTraversalClaimed = false;
   error.lazyTraversalClaimed = false;
+  error.lazyRendererCompatibilityClaimed = false;
+  error.lazySuspenseWakeupClaimed = false;
+  error.lazyRootRenderingClaimed = false;
   error.dispatcherPrerequisitesReady = false;
   error.rootPrerequisitesReady = false;
+  error.lazyRendererPrerequisitesReady = false;
+  error.lazySuspensePrerequisitesReady = false;
+  error.lazyRootPrerequisitesReady = false;
+  error.portalPrerequisitesReady = false;
+  error.refPrerequisitesReady = false;
   return error;
 }
 
