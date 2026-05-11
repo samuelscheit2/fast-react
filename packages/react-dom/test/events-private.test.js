@@ -331,6 +331,423 @@ test('private click event delegation accepted order targets root-render fake DOM
   }
 });
 
+test('private nested click event delegation accepted order is deterministic across parent and child', () => {
+  const fixture = createPrivateNestedRootRenderClickDelegationFixture(
+    'nested-click-order'
+  );
+  const calls = [];
+  const parentCaptureRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.parentNode,
+      'click',
+      true,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          phase: 'parent-capture',
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      },
+      {
+        listenerType: 'accepted-private-nested-click-parent-capture-test'
+      }
+    );
+  const childCaptureRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      true,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          phase: 'child-capture',
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      },
+      {
+        listenerType: 'accepted-private-nested-click-child-capture-test'
+      }
+    );
+  const childBubbleRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          phase: 'child-bubble',
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      },
+      {
+        listenerType: 'accepted-private-nested-click-child-bubble-test'
+      }
+    );
+  const parentBubbleRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.parentNode,
+      'click',
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          phase: 'parent-bubble',
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      },
+      {
+        listenerType: 'accepted-private-nested-click-parent-bubble-test'
+      }
+    );
+  const targetRecord =
+    componentTree.createPrivateRootHostOutputEventTargetRecord(
+      fixture.hostOutputPayload,
+      {
+        targetNode: fixture.targetNode
+      }
+    );
+  const captureDispatchRecord = createPrivateClickDispatchRecord(
+    fixture,
+    'capture'
+  );
+  const bubbleDispatchRecord = createPrivateClickDispatchRecord(
+    fixture,
+    'bubble'
+  );
+  const acceptedInputOrder = [
+    parentBubbleRecord,
+    childCaptureRecord,
+    childBubbleRecord,
+    parentCaptureRecord
+  ];
+
+  try {
+    const orderRecord =
+      pluginEventSystem.invokePrivateClickEventDelegationAcceptedListenerOrder(
+        [captureDispatchRecord, bubbleDispatchRecord],
+        acceptedInputOrder,
+        {
+          requireRootRenderMetadata: true,
+          rootHostOutputEventTargetRecord: targetRecord
+        }
+      );
+    const payload =
+      pluginEventSystem
+        .getPrivateClickEventDelegationAcceptedListenerOrderPayload(
+          orderRecord
+        );
+    const targetPayload =
+      componentTree.getPrivateRootHostOutputEventTargetRecordPayload(
+        targetRecord
+      );
+
+    assert.equal(orderRecord.acceptedListenerCount, 4);
+    assert.equal(orderRecord.listenerInvocationCount, 4);
+    assert.equal(orderRecord.dispatchRecordCount, 2);
+    assert.equal(orderRecord.targetDispatchPathLength, 2);
+    assert.equal(orderRecord.nestedDispatchPath, true);
+    assert.equal(orderRecord.targetInst, fixture.childToken);
+    assert.deepEqual(orderRecord.phases, [
+      'capture',
+      'capture',
+      'bubble',
+      'bubble'
+    ]);
+    assert.deepEqual(orderRecord.registrationNames, [
+      'onClickCapture',
+      'onClickCapture',
+      'onClick',
+      'onClick'
+    ]);
+    assert.equal(orderRecord.ownerRootRequired, true);
+    assert.equal(orderRecord.ownerRootPreserved, true);
+    assert.equal(
+      orderRecord.ownerRootStatus,
+      'validated-private-click-owner-root'
+    );
+    assert.equal(orderRecord.dispatchRecordOwnerRootMatchCount, 2);
+    assert.equal(orderRecord.dispatchRecordOwnerRootMismatchCount, 0);
+    assert.equal(orderRecord.acceptedListenerOwnerRootMatchCount, 4);
+    assert.equal(orderRecord.acceptedListenerOwnerRootMismatchCount, 0);
+    assert.equal(orderRecord.targetRootOwnerMatchCount, 2);
+    assert.equal(orderRecord.targetRootOwnerMismatchCount, 0);
+    assert.equal(orderRecord.targetDispatchPathOwnerRootPreserved, true);
+    assert.equal(orderRecord.rootRenderMetadataAvailable, true);
+    assert.equal(orderRecord.rootRenderHostOutputActive, true);
+    assert.equal(orderRecord.publicDispatchEnabled, false);
+    assert.equal(orderRecord.publicDispatchBlocked, true);
+    assert.equal(orderRecord.browserDomEventCompatibilityClaimed, false);
+    assert.equal(orderRecord.compatibilityClaimed, false);
+    assert.equal(orderRecord.syntheticEventCount, 0);
+    assert.equal(orderRecord.eventDispatch, false);
+    assert.equal(orderRecord.willDispatchPublicEvent, false);
+    assert.deepEqual(
+      orderRecord.acceptedListenerOrder.map(entry => [
+        entry.phase,
+        entry.registrationName,
+        entry.currentTarget,
+        entry.dispatchPathIndex,
+        entry.targetInst,
+        entry.listenerQueueIndex
+      ]),
+      [
+        [
+          'capture',
+          'onClickCapture',
+          fixture.parentNode,
+          1,
+          fixture.parentToken,
+          parentCaptureRecord.listenerQueueIndex
+        ],
+        [
+          'capture',
+          'onClickCapture',
+          fixture.targetNode,
+          0,
+          fixture.childToken,
+          childCaptureRecord.listenerQueueIndex
+        ],
+        [
+          'bubble',
+          'onClick',
+          fixture.targetNode,
+          0,
+          fixture.childToken,
+          childBubbleRecord.listenerQueueIndex
+        ],
+        [
+          'bubble',
+          'onClick',
+          fixture.parentNode,
+          1,
+          fixture.parentToken,
+          parentBubbleRecord.listenerQueueIndex
+        ]
+      ]
+    );
+    assert.deepEqual(calls, [
+      {
+        currentTarget: fixture.parentNode,
+        phase: 'parent-capture',
+        registrationName: 'onClickCapture',
+        target: fixture.targetNode,
+        targetInst: fixture.parentToken,
+        type: 'click'
+      },
+      {
+        currentTarget: fixture.targetNode,
+        phase: 'child-capture',
+        registrationName: 'onClickCapture',
+        target: fixture.targetNode,
+        targetInst: fixture.childToken,
+        type: 'click'
+      },
+      {
+        currentTarget: fixture.targetNode,
+        phase: 'child-bubble',
+        registrationName: 'onClick',
+        target: fixture.targetNode,
+        targetInst: fixture.childToken,
+        type: 'click'
+      },
+      {
+        currentTarget: fixture.parentNode,
+        phase: 'parent-bubble',
+        registrationName: 'onClick',
+        target: fixture.targetNode,
+        targetInst: fixture.parentToken,
+        type: 'click'
+      }
+    ]);
+    assert.deepEqual(payload.dispatchRecords, [
+      captureDispatchRecord,
+      bubbleDispatchRecord
+    ]);
+    assert.deepEqual(
+      payload.acceptedListenerQueueEntryRecords,
+      acceptedInputOrder
+    );
+    assert.deepEqual(
+      payload.selections.map(selection => [
+        selection.dispatchRecordIndex,
+        selection.listenerIndex
+      ]),
+      [
+        [0, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1]
+      ]
+    );
+    assert.equal(payload.ownerRootMetadata.ownerRootPreserved, true);
+    assert.equal(payload.targetRecord, targetRecord);
+    assert.equal(targetRecord.isSourceHostNode, false);
+    assert.equal(targetPayload.hostOutputPayload, fixture.hostOutputPayload);
+    assert.equal(targetPayload.targetNode, fixture.targetNode);
+    assert.equal(fixture.parentNode.__registrations.length, 0);
+    assert.equal(fixture.targetNode.__registrations.length, 0);
+    assert.equal(fixture.container.__registrations.length, 138);
+    assert.equal(fixture.document.__registrations.length, 1);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      parentCaptureRecord
+    );
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      childCaptureRecord
+    );
+    listenerRegistry.removePrivateEventListenerQueueEntry(childBubbleRecord);
+    listenerRegistry.removePrivateEventListenerQueueEntry(parentBubbleRecord);
+    cleanupPrivateRootRenderClickDelegationFixture(fixture);
+  }
+});
+
+test('private nested click event delegation accepted order rejects stale listener records before invoking', () => {
+  const fixture = createPrivateNestedRootRenderClickDelegationFixture(
+    'nested-click-order-stale'
+  );
+  const calls = [];
+  const staleRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.parentNode,
+      'click',
+      true,
+      () => {
+        calls.push('stale-parent-capture-invoked');
+      }
+    );
+  const childBubbleRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      false,
+      () => {
+        calls.push('child-bubble-invoked');
+      }
+    );
+  const captureDispatchRecord = createPrivateClickDispatchRecord(
+    fixture,
+    'capture'
+  );
+  const bubbleDispatchRecord = createPrivateClickDispatchRecord(
+    fixture,
+    'bubble'
+  );
+
+  try {
+    listenerRegistry.removePrivateEventListenerQueueEntry(staleRecord);
+
+    assert.throws(
+      () =>
+        pluginEventSystem
+          .invokePrivateClickEventDelegationAcceptedListenerOrder(
+            [captureDispatchRecord, bubbleDispatchRecord],
+            [staleRecord, childBubbleRecord]
+          ),
+      {
+        code:
+          pluginEventSystem
+            .INVALID_PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_CODE,
+        reason: 'stale-listener-record'
+      }
+    );
+    assert.deepEqual(calls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(staleRecord);
+    listenerRegistry.removePrivateEventListenerQueueEntry(childBubbleRecord);
+    cleanupPrivateRootRenderClickDelegationFixture(fixture);
+  }
+});
+
+test('private nested click event delegation accepted order rejects foreign owner records before invoking', () => {
+  const source = createPrivateNestedRootRenderClickDelegationFixture(
+    'nested-click-order-source'
+  );
+  const foreign = createPrivateNestedRootRenderClickDelegationFixture(
+    'nested-click-order-foreign'
+  );
+  const calls = [];
+  const sourceBubbleRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      source.targetNode,
+      'click',
+      false,
+      () => {
+        calls.push('source-child-bubble-invoked');
+      }
+    );
+  const foreignCaptureRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      foreign.parentNode,
+      'click',
+      true,
+      () => {
+        calls.push('foreign-parent-capture-invoked');
+      }
+    );
+  const sourceCaptureDispatchRecord = createPrivateClickDispatchRecord(
+    source,
+    'capture'
+  );
+  const sourceBubbleDispatchRecord = createPrivateClickDispatchRecord(
+    source,
+    'bubble'
+  );
+  const targetRecord =
+    componentTree.createPrivateRootHostOutputEventTargetRecord(
+      source.hostOutputPayload,
+      {
+        targetNode: source.targetNode
+      }
+    );
+
+  try {
+    assert.throws(
+      () =>
+        pluginEventSystem
+          .invokePrivateClickEventDelegationAcceptedListenerOrder(
+            [sourceCaptureDispatchRecord, sourceBubbleDispatchRecord],
+            [sourceBubbleRecord, foreignCaptureRecord],
+            {
+              rootHostOutputEventTargetRecord: targetRecord
+            }
+          ),
+      {
+        code:
+          pluginEventSystem
+            .INVALID_PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_CODE,
+        reason: 'foreign-owner-root'
+      }
+    );
+    assert.deepEqual(calls, []);
+    assert.equal(source.parentNode.__registrations.length, 0);
+    assert.equal(source.targetNode.__registrations.length, 0);
+    assert.equal(foreign.parentNode.__registrations.length, 0);
+    assert.equal(foreign.targetNode.__registrations.length, 0);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      sourceBubbleRecord
+    );
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      foreignCaptureRecord
+    );
+    cleanupPrivateRootRenderClickDelegationFixture(source);
+    cleanupPrivateRootRenderClickDelegationFixture(foreign);
+  }
+});
+
 test('private click event delegation dispatch gate rejects stale listener records before invoking', () => {
   const fixture = createPrivateClickDelegationFixture('click-gate-stale');
   const calls = [];
@@ -1787,6 +2204,66 @@ function createPrivateRootRenderClickDelegationFixture(label) {
     sideEffects,
     targetNode: hostOutputPayload.hostNode,
     token: hostOutputPayload.hostToken
+  };
+}
+
+function createPrivateNestedRootRenderClickDelegationFixture(label) {
+  const document = createDocument();
+  const container = createNode('DIV', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: `${label}:admission`,
+    initialHostOutputIdPrefix: `${label}:output`,
+    requestIdPrefix: `${label}:request`,
+    rootIdPrefix: `${label}:root`,
+    sideEffectIdPrefix: `${label}:side-effect`,
+    updateIdPrefix: `${label}:update`
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const childElement = {
+    props: {
+      children: `${label} nested target`,
+      id: `${label}-child`,
+      title: 'Private nested delegated click target'
+    },
+    type: 'span'
+  };
+  const element = {
+    props: {
+      children: childElement,
+      id: `${label}-parent`,
+      title: 'Private nested delegated click parent'
+    },
+    type: 'section'
+  };
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+
+  return {
+    bridge,
+    childElement,
+    childToken: hostOutputPayload.childHostToken,
+    container,
+    create,
+    document,
+    element,
+    handoff,
+    hostOutputPayload,
+    parentNode: hostOutputPayload.hostNode,
+    parentToken: hostOutputPayload.hostToken,
+    render,
+    rootOwner: hostOutputPayload.rootOwner,
+    sideEffects,
+    targetNode: hostOutputPayload.childHostNode,
+    textNode: hostOutputPayload.textNode,
+    token: hostOutputPayload.childHostToken
   };
 }
 
