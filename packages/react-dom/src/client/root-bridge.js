@@ -273,6 +273,8 @@ const privateRootRenderHostOutputFinishedWorkRecordType =
   'fast.react_dom.private_root_render_host_output_finished_work_record';
 const privateRootPublicFacadeHostOutputUpdateRecordType =
   'fast.react_dom.private_root_public_facade_host_output_update_record';
+const privateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecordType =
+  'fast.react_dom.private_root_public_facade_root_commit_host_component_update_execution_record';
 const privateRootPublicFacadeNestedHostOutputUpdateRecordType =
   'fast.react_dom.private_root_public_facade_nested_host_output_update_record';
 const privateRootPublicFacadeHostOutputUnmountCleanupRecordType =
@@ -395,6 +397,8 @@ const ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_FINISHED_WORK_ACCEPTED =
   'accepted-private-root-render-host-output-finished-work';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-public-facade-host-output-update-diagnostic';
+const ROOT_BRIDGE_PUBLIC_FACADE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_EXECUTION_ACCEPTED =
+  'accepted-private-root-public-facade-root-commit-host-component-update-execution';
 const ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-public-facade-nested-host-output-update-diagnostic';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED =
@@ -2500,6 +2504,13 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES =
         'The update request is applied through the accepted fake-DOM host-output update handoff.'
     })
   ]);
+const ROOT_BRIDGE_PUBLIC_FACADE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_EXECUTION_ACCEPTED_CAPABILITY =
+  freezeRecord({
+    id: 'source-owned-root-commit-host-component-update-execution',
+    accepted: true,
+    reason:
+      'Source-owned HostComponent and HostText update execution rows were consumed before fake-DOM mutation or native handoff metadata.'
+  });
 const ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES =
   freezeArray([
     freezeRecord({
@@ -2962,6 +2973,11 @@ const rootPublicFacadeRootWorkLoopFinishedWorkPayloads = new WeakMap();
 const rootRenderHostOutputPayloads = new WeakMap();
 const rootRenderHostOutputFinishedWorkPayloads = new WeakMap();
 const rootPublicFacadeHostOutputUpdatePayloads = new WeakMap();
+const rootPublicFacadeRootCommitHostComponentUpdateExecutionPayloads =
+  new WeakMap();
+const rootPublicFacadeRootCommitHostUpdateSourceRowPayloads =
+  new WeakMap();
+const rootPublicFacadeRootCommitHostUpdateConsumedRows = new WeakMap();
 const rootPublicFacadeNestedHostOutputUpdatePayloads = new WeakMap();
 const rootPublicFacadeHostOutputUnmountCleanupPayloads = new WeakMap();
 const rootPublicFacadeLifecycleContainerSnapshotPayloads = new WeakMap();
@@ -6286,27 +6302,27 @@ function createPrivateRootPublicFacadeRoot(
     render: {
       enumerable: true,
       value: function render(element) {
-        const callback =
-          arguments.length > 1 ? arguments[1] : undefined;
+        const options =
+          normalizePrivateRootPublicFacadeRootRenderOptions(arguments);
         const handleState = getPrivateRootHandleState(payload.rootHandle);
         if (handleState.lifecycleStatus === ROOT_LIFECYCLE_UNMOUNTED) {
           return appendPrivateRootPublicFacadeRenderRecord(
             payload,
             element,
-            callback
+            options.callback
           );
         }
         if (hasActivePrivateRootPublicFacadeHostOutputRender(payload)) {
           return updatePrivateRootPublicFacadeHostOutputFromPayload(
             payload,
             element,
-            {callback}
+            options.value
           );
         }
         return renderPrivateRootPublicFacadeHostOutputFromPayload(
           payload,
           element,
-          {callback}
+          options.value
         );
       }
     },
@@ -6364,6 +6380,59 @@ function appendPrivateRootPublicFacadeRenderRecord(
   payload.requestRecords.push(record);
   payload.renderRecords.push(record);
   return record;
+}
+
+function normalizePrivateRootPublicFacadeRootRenderOptions(args) {
+  const second = args.length > 1 ? args[1] : undefined;
+  const third = args.length > 2 ? args[2] : undefined;
+  if (isObjectOrFunction(third)) {
+    const value = Object.create(null);
+    for (const key of Object.keys(third)) {
+      value[key] = third[key];
+    }
+    value.callback = second;
+    return {
+      callback: second,
+      value
+    };
+  }
+  if (isPrivateRootPublicFacadeRootRenderOptionsObject(second)) {
+    return {
+      callback: getPublicFacadeHostOutputUpdateCallback(second),
+      value: second
+    };
+  }
+  return {
+    callback: second,
+    value: {
+      callback: second
+    }
+  };
+}
+
+function isPrivateRootPublicFacadeRootRenderOptionsObject(value) {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    Array.isArray(value)
+  ) {
+    return false;
+  }
+  return (
+    Object.prototype.hasOwnProperty.call(value, 'callback') ||
+    Object.prototype.hasOwnProperty.call(
+      value,
+      'rootCommitHostComponentUpdateExecutionFactory'
+    ) ||
+    Object.prototype.hasOwnProperty.call(
+      value,
+      'rootCommitHostComponentUpdateExecutionRecord'
+    ) ||
+    Object.prototype.hasOwnProperty.call(
+      value,
+      'rootCommitHostComponentUpdateMetadataFactory'
+    )
+  );
 }
 
 function createPrivateRootPublicFacadePreflightRoot(
@@ -7789,6 +7858,17 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     sourceContainerSnapshotBefore
   );
   const callback = getPublicFacadeHostOutputUpdateCallback(options);
+  const rootCommitUpdateExecution =
+    resolvePrivateRootPublicFacadeRootCommitHostComponentUpdateExecution({
+      activeRender,
+      callback,
+      createPayload,
+      createRecord,
+      element,
+      normalized,
+      options,
+      payload
+    });
   const updateRecord = appendPrivateRootPublicFacadeRenderRecord(
     payload,
     element,
@@ -7801,17 +7881,53 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     updateRecord,
     lifecycleRequestBoundary
   );
-  const hostOutputUpdateHandoff = payload.bridge.applyHostOutputUpdate(
-    updateRecord,
-    {
-      hostInstanceToken: activeRender.hostOutputPayload.hostToken,
-      nextProps: normalized.nextProps,
-      tag: normalized.type,
-      textUpdate: normalized.textUpdate
-    }
-  );
-  const hostOutputUpdatePayload =
-    rootHostOutputUpdateHandoffPayloads.get(hostOutputUpdateHandoff);
+  let hostOutputUpdateHandoff;
+  let hostOutputUpdatePayload;
+  let rootCommitHostComponentUpdateHandoff = null;
+  let rootCommitHostComponentUpdatePayload = null;
+  if (rootCommitUpdateExecution === null) {
+    hostOutputUpdateHandoff = payload.bridge.applyHostOutputUpdate(
+      updateRecord,
+      {
+        hostInstanceToken: activeRender.hostOutputPayload.hostToken,
+        nextProps: normalized.nextProps,
+        tag: normalized.type,
+        textUpdate: normalized.textUpdate
+      }
+    );
+    hostOutputUpdatePayload =
+      rootHostOutputUpdateHandoffPayloads.get(hostOutputUpdateHandoff);
+  } else {
+    assertPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionMatchesRecord(
+      rootCommitUpdateExecution,
+      updateRecord
+    );
+    rootCommitHostComponentUpdateHandoff =
+      payload.bridge.applyRootCommitHostComponentUpdate(
+        updateRecord,
+        rootCommitUpdateExecution.payload.rootCommitMetadata,
+        rootCommitUpdateExecution.payload.updateOptions
+      );
+    rootCommitHostComponentUpdatePayload =
+      rootCommitHostComponentUpdateHandoffPayloads.get(
+        rootCommitHostComponentUpdateHandoff
+      );
+    validatePrivateRootPublicFacadeRootCommitHostComponentUpdateHandoff(
+      rootCommitUpdateExecution,
+      rootCommitHostComponentUpdateHandoff,
+      rootCommitHostComponentUpdatePayload,
+      updateRecord
+    );
+    consumePrivateRootPublicFacadeRootCommitHostComponentUpdateExecution(
+      rootCommitUpdateExecution,
+      rootCommitHostComponentUpdateHandoff,
+      rootCommitHostComponentUpdatePayload
+    );
+    hostOutputUpdateHandoff =
+      rootCommitHostComponentUpdatePayload.hostOutputHandoff;
+    hostOutputUpdatePayload =
+      rootCommitHostComponentUpdatePayload.hostOutputPayload;
+  }
   if (hostOutputUpdatePayload === undefined) {
     throwInvalidRootPublicFacadeHostOutputUpdate(
       'Public-facade host-output update requires an applied host-output update handoff.'
@@ -7841,7 +7957,10 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     `${rootBridgeState.publicFacadeHostOutputUpdateIdPrefix}:${sequence}`;
   const acceptedCapabilities =
     createPublicFacadeHostOutputUpdateAcceptedCapabilities(
-      hostOutputUpdateHandoff
+      rootCommitHostComponentUpdateHandoff || hostOutputUpdateHandoff,
+      rootCommitUpdateExecution === null
+        ? null
+        : rootCommitUpdateExecution.record
     );
   const diagnosticRecord = freezeRecord({
     $$typeof: privateRootPublicFacadeHostOutputUpdateRecordType,
@@ -7876,6 +7995,51 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     hostOutputUpdateHandoffSequence:
       hostOutputUpdateHandoff.handoffSequence,
     hostOutputUpdateStatus: hostOutputUpdateHandoff.updateStatus,
+    rootCommitHostComponentUpdateExecutionRecord:
+      rootCommitUpdateExecution === null
+        ? null
+        : rootCommitUpdateExecution.record,
+    rootCommitHostComponentUpdateExecutionStatus:
+      rootCommitUpdateExecution === null
+        ? null
+        : rootCommitUpdateExecution.record.executionStatus,
+    rootCommitHostComponentUpdateExecutionConsumed:
+      rootCommitUpdateExecution !== null,
+    rootCommitHostComponentUpdateHandoffId:
+      rootCommitHostComponentUpdateHandoff === null
+        ? null
+        : rootCommitHostComponentUpdateHandoff.handoffId,
+    rootCommitHostComponentUpdateStatus:
+      rootCommitHostComponentUpdateHandoff === null
+        ? null
+        : rootCommitHostComponentUpdateHandoff.updateStatus,
+    rootCommitMetadataSource:
+      rootCommitHostComponentUpdateHandoff === null
+        ? null
+        : rootCommitHostComponentUpdateHandoff.rootCommitMetadataSource,
+    rootCommitMetadataRecordCount:
+      rootCommitHostComponentUpdateHandoff === null
+        ? 0
+        : rootCommitHostComponentUpdateHandoff.rootCommitMetadataRecordCount,
+    rootCommitHostComponentUpdateRecordCount:
+      rootCommitHostComponentUpdateHandoff === null
+        ? 0
+        : rootCommitHostComponentUpdateHandoff
+            .rootCommitHostComponentUpdateRecordCount,
+    rootCommitHostComponentUpdate:
+      rootCommitHostComponentUpdateHandoff === null
+        ? null
+        : rootCommitHostComponentUpdateHandoff
+            .rootCommitHostComponentUpdate,
+    rootCommitHostTextUpdateRecordCount:
+      rootCommitHostComponentUpdateHandoff === null
+        ? null
+        : rootCommitHostComponentUpdateHandoff
+            .rootCommitHostTextUpdateRecordCount,
+    rootCommitHostTextUpdate:
+      rootCommitHostComponentUpdateHandoff === null
+        ? null
+        : rootCommitHostComponentUpdateHandoff.rootCommitHostTextUpdate,
     nativeHandoffId: nativeHandoffRecord.handoffId,
     nativeHandoffStatus: nativeHandoffRecord.handoffStatus,
     nativeRequestKind: nativeHandoffRecord.nativeRequestRecord.kind,
@@ -7905,6 +8069,10 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     blockedCapabilities:
       ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES,
     privateFacadeRoot: true,
+    rustRootCommitUpdateExecutionMetadataAccepted:
+      rootCommitUpdateExecution !== null,
+    rootCommitUpdateExecutionBeforeNativeHandoff:
+      rootCommitUpdateExecution !== null,
     publicCreateRootEnabled: false,
     publicHydrateRootEnabled: false,
     publicRootCreated: false,
@@ -7943,6 +8111,16 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     nativeHandoffRecord,
     normalizedUpdate: normalized,
     renderRecord: activeRender.renderPayload.renderRecord,
+    rootCommitHostComponentUpdateExecutionPayload:
+      rootCommitUpdateExecution === null
+        ? null
+        : rootCommitUpdateExecution.payload,
+    rootCommitHostComponentUpdateExecutionRecord:
+      rootCommitUpdateExecution === null
+        ? null
+        : rootCommitUpdateExecution.record,
+    rootCommitHostComponentUpdateHandoff,
+    rootCommitHostComponentUpdatePayload,
     root: payload.root,
     rootHandle: payload.rootHandle,
     sourceContainerSnapshot,
@@ -7954,6 +8132,651 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
   });
   payload.hostOutputUpdateRecords.push(diagnosticRecord);
   return diagnosticRecord;
+}
+
+function resolvePrivateRootPublicFacadeRootCommitHostComponentUpdateExecution({
+  activeRender,
+  callback,
+  createPayload,
+  createRecord,
+  element,
+  normalized,
+  options,
+  payload
+}) {
+  const option =
+    getPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionOption(
+      options
+    );
+  if (option.kind === 'none') {
+    return null;
+  }
+
+  const updateOptions = freezeRecord({
+    hostInstanceToken: activeRender.hostOutputPayload.hostToken,
+    nextProps: normalized.nextProps,
+    recordIndex: null,
+    stateNodeRaw: null,
+    tag: normalized.type,
+    textUpdate: normalized.textUpdate
+  });
+  const expectedSource =
+    createPrivateRootPublicFacadeRootRenderUpdateExpectedSource({
+      callback,
+      createPayload,
+      createRecord,
+      element,
+      payload
+    });
+  const context =
+    createPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionFactoryContext(
+      {
+        activeRender,
+        createPayload,
+        createRecord,
+        element,
+        expectedSource,
+        normalized,
+        payload,
+        updateOptions
+      }
+    );
+  let executionRecord;
+  if (option.kind === 'record') {
+    executionRecord = option.record;
+  } else if (option.kind === 'metadataFactory') {
+    const metadata = option.factory(context);
+    executionRecord =
+      context.createRootCommitHostComponentUpdateExecutionRecord(
+        metadata
+      );
+  } else {
+    executionRecord = option.factory(context);
+  }
+
+  return assertPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecord(
+    {
+      createRecord,
+      element,
+      expectedSource,
+      normalized,
+      payload,
+      record: executionRecord,
+      updateOptions
+    }
+  );
+}
+
+function getPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionOption(
+  options
+) {
+  if (!isObjectOrFunction(options)) {
+    return {
+      kind: 'none'
+    };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rootCommitHostComponentUpdateExecutionRecord'
+    )
+  ) {
+    return {
+      kind: 'record',
+      record: options.rootCommitHostComponentUpdateExecutionRecord
+    };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rootCommitHostComponentUpdateExecutionFactory'
+    )
+  ) {
+    if (
+      typeof options.rootCommitHostComponentUpdateExecutionFactory !==
+      'function'
+    ) {
+      throwInvalidRootPublicFacadeHostOutputUpdate(
+        'Public-facade root.render update execution factories must be functions.'
+      );
+    }
+    return {
+      factory: options.rootCommitHostComponentUpdateExecutionFactory,
+      kind: 'factory'
+    };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rootCommitHostComponentUpdateMetadataFactory'
+    )
+  ) {
+    if (
+      typeof options.rootCommitHostComponentUpdateMetadataFactory !==
+      'function'
+    ) {
+      throwInvalidRootPublicFacadeHostOutputUpdate(
+        'Public-facade root.render update metadata factories must be functions.'
+      );
+    }
+    return {
+      factory: options.rootCommitHostComponentUpdateMetadataFactory,
+      kind: 'metadataFactory'
+    };
+  }
+  return {
+    kind: 'none'
+  };
+}
+
+function createPrivateRootPublicFacadeRootRenderUpdateExpectedSource({
+  callback,
+  createPayload,
+  createRecord,
+  element,
+  payload
+}) {
+  const handleState = getPrivateRootHandleState(payload.rootHandle);
+  const bridgeState = handleState.bridgeState;
+  const requestSequence = bridgeState.nextRequestSequence;
+  const updateSequence = bridgeState.nextUpdateSequence;
+  return freezeRecord({
+    operation: 'render',
+    requestId: `${bridgeState.requestIdPrefix}:${requestSequence}`,
+    requestSequence,
+    requestType: 'root.render',
+    sequence: updateSequence,
+    updateId: `${bridgeState.updateIdPrefix}:${updateSequence}`,
+    rootId: createRecord.rootId,
+    rootKind: createRecord.rootKind,
+    rootTag: createRecord.rootTag,
+    lifecycleStatusBefore: handleState.lifecycleStatus,
+    lifecycleStatusAfter: ROOT_LIFECYCLE_RENDERED,
+    renderCount: handleState.renderCount + 1,
+    elementInfo: describeBridgeValue(element),
+    callbackInfo: describeBridgeValue(callback),
+    containerInfo: freezeRecord(describeContainer(createPayload.container))
+  });
+}
+
+function createPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionFactoryContext({
+  activeRender,
+  createPayload,
+  createRecord,
+  element,
+  expectedSource,
+  normalized,
+  payload,
+  updateOptions
+}) {
+  return freezeRecord({
+    createRecord,
+    element,
+    expectedSourceRecord: expectedSource,
+    hostInstanceToken: updateOptions.hostInstanceToken,
+    rootHandle: payload.rootHandle,
+    textInstance:
+      normalized.textUpdate === null
+        ? null
+        : normalized.textUpdate.textInstance,
+    updateOptions,
+    createRootCommitHostComponentUpdateRow(row) {
+      return createPrivateRootPublicFacadeRootCommitHostUpdateSourceRow({
+        expectedSource,
+        row,
+        tag: 'HostComponent'
+      });
+    },
+    createRootCommitHostTextUpdateRow(row) {
+      return createPrivateRootPublicFacadeRootCommitHostUpdateSourceRow({
+        expectedSource,
+        row,
+        tag: 'HostText'
+      });
+    },
+    createRootCommitHostComponentUpdateExecutionRecord(metadata) {
+      return createPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecord(
+        {
+          activeRender,
+          createPayload,
+          createRecord,
+          element,
+          expectedSource,
+          metadata,
+          normalized,
+          payload,
+          updateOptions
+        }
+      );
+    }
+  });
+}
+
+function createPrivateRootPublicFacadeRootCommitHostUpdateSourceRow({
+  expectedSource,
+  row,
+  tag
+}) {
+  if (!isObjectOrFunction(row)) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root update execution rows must be objects.'
+    );
+  }
+  const ownedRow = freezeRecord({...row});
+  const snapshot =
+    tag === 'HostText'
+      ? createRootCommitHostTextUpdateSnapshot(
+          ownedRow,
+          0,
+          'source-owned-public-facade-root-render-update'
+        )
+      : createRootCommitHostComponentUpdateSnapshot(
+          ownedRow,
+          0,
+          'source-owned-public-facade-root-render-update'
+        );
+  if (snapshot === null) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      `Public-facade root update execution requires a ${tag} update row.`
+    );
+  }
+  rootPublicFacadeRootCommitHostUpdateSourceRowPayloads.set(
+    ownedRow,
+    freezeRecord({
+      expectedSource,
+      sourceRow: row,
+      stateNodeRaw: snapshot.stateNodeRaw,
+      tag
+    })
+  );
+  return ownedRow;
+}
+
+function createPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecord({
+  activeRender,
+  createPayload,
+  createRecord,
+  element,
+  expectedSource,
+  metadata,
+  normalized,
+  payload,
+  updateOptions
+}) {
+  assertPrivateRootPublicFacadeRootCommitHostComponentUpdateExpectedSourceCurrent(
+    payload,
+    expectedSource
+  );
+  const normalizedMetadata = normalizeRootCommitHostComponentUpdateMetadata(
+    metadata,
+    updateOptions
+  );
+  assertPrivateRootPublicFacadeRootCommitHostComponentUpdateMetadataRowsSourceOwned(
+    metadata,
+    expectedSource
+  );
+  const sourceRows =
+    getPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionSourceRows(
+      normalizedMetadata
+    );
+  assertPrivateRootPublicFacadeRootCommitHostComponentUpdateRowsFresh(
+    sourceRows
+  );
+
+  const executionId =
+    `${expectedSource.updateId}:root-commit-host-component-update-execution`;
+  const record = freezeRecord({
+    $$typeof:
+      privateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecordType,
+    kind:
+      'FastReactDomPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecord',
+    operation:
+      'public-facade-root-commit-host-component-update-execution',
+    executionId,
+    executionStatus:
+      ROOT_BRIDGE_PUBLIC_FACADE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_EXECUTION_ACCEPTED,
+    sourceOwned: true,
+    sourceRequestId: expectedSource.requestId,
+    sourceRequestSequence: expectedSource.requestSequence,
+    sourceRequestType: expectedSource.requestType,
+    sourceUpdateId: expectedSource.updateId,
+    sourceLifecycleStatusBefore: expectedSource.lifecycleStatusBefore,
+    sourceLifecycleStatusAfter: expectedSource.lifecycleStatusAfter,
+    sourceRenderCount: expectedSource.renderCount,
+    rootId: expectedSource.rootId,
+    rootKind: expectedSource.rootKind,
+    rootTag: expectedSource.rootTag,
+    hostTag: normalized.type,
+    rootCommitMetadataSource: normalizedMetadata.source,
+    rootCommitMetadataRecordCount: normalizedMetadata.recordCount,
+    rootCommitHostComponentUpdateRecordCount:
+      normalizedMetadata.hostComponentUpdateRecordCount,
+    rootCommitHostComponentUpdate:
+      normalizedMetadata.selected.publicRecord,
+    rootCommitHostTextUpdateRecordCount:
+      normalizedMetadata.hostTextUpdateRecordCount,
+    rootCommitHostTextUpdate:
+      normalizedMetadata.selectedHostTextUpdate === null
+        ? null
+        : normalizedMetadata.selectedHostTextUpdate.publicRecord,
+    hostOutputHandoffId:
+      activeRender.renderPayload.hostOutputHandoff.handoffId,
+    initialRenderRequestId: activeRender.renderPayload.renderRecord.requestId,
+    initialRenderUpdateId: activeRender.renderPayload.renderRecord.updateId,
+    containerChildCountBefore: getChildNodeCount(createPayload.container),
+    textUpdateRequested: normalized.textUpdate !== null,
+    consumed: false,
+    replayRejected: true,
+    fakeDomMutation: false,
+    domMutation: false,
+    browserDomMutation: false,
+    publicRootExecution: false,
+    publicRootCompatibilitySurface: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false
+  });
+
+  rootPublicFacadeRootCommitHostComponentUpdateExecutionPayloads.set(
+    record,
+    {
+      activeRender,
+      createPayload,
+      createRecord,
+      consumed: false,
+      element,
+      expectedSource,
+      metadataRows: sourceRows,
+      normalized,
+      normalizedMetadata,
+      payload,
+      rootCommitMetadata: metadata,
+      rootCommitMetadataSelection: normalizedMetadata.selected,
+      rootCommitTextMetadataSelection:
+        normalizedMetadata.selectedHostTextUpdate,
+      rootHandle: payload.rootHandle,
+      updateOptions
+    }
+  );
+  return record;
+}
+
+function assertPrivateRootPublicFacadeRootCommitHostComponentUpdateMetadataRowsSourceOwned(
+  metadata,
+  expectedSource
+) {
+  const entries = getRootCommitMetadataRecordEntries(metadata);
+  for (const entry of entries.records) {
+    const componentSnapshot = createRootCommitHostComponentUpdateSnapshot(
+      entry.record,
+      entry.index,
+      entries.source
+    );
+    if (componentSnapshot !== null) {
+      assertPrivateRootPublicFacadeRootCommitHostUpdateSourceRow(
+        entry.record,
+        expectedSource,
+        'HostComponent'
+      );
+      continue;
+    }
+    const textSnapshot = createRootCommitHostTextUpdateSnapshot(
+      entry.record,
+      entry.index,
+      entries.source
+    );
+    if (textSnapshot !== null) {
+      assertPrivateRootPublicFacadeRootCommitHostUpdateSourceRow(
+        entry.record,
+        expectedSource,
+        'HostText'
+      );
+    }
+  }
+}
+
+function assertPrivateRootPublicFacadeRootCommitHostUpdateSourceRow(
+  row,
+  expectedSource,
+  tag
+) {
+  const rowPayload =
+    rootPublicFacadeRootCommitHostUpdateSourceRowPayloads.get(row);
+  if (
+    rowPayload === undefined ||
+    rowPayload.tag !== tag ||
+    !privateRootPublicFacadeRootCommitHostUpdateExpectedSourceMatches(
+      rowPayload.expectedSource,
+      expectedSource
+    )
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root update execution rejected a stale, cloned, cross-root, or caller-built HostComponent/HostText update row.'
+    );
+  }
+}
+
+function getPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionSourceRows(
+  normalizedMetadata
+) {
+  const rows = [normalizedMetadata.selected.record];
+  if (normalizedMetadata.selectedHostTextUpdate !== null) {
+    rows.push(normalizedMetadata.selectedHostTextUpdate.record);
+  }
+  return freezeArray(rows);
+}
+
+function assertPrivateRootPublicFacadeRootCommitHostComponentUpdateRowsFresh(
+  rows
+) {
+  for (const row of rows) {
+    if (rootPublicFacadeRootCommitHostUpdateConsumedRows.has(row)) {
+      throwInvalidRootPublicFacadeHostOutputUpdate(
+        'Public-facade root update execution rejected replayed HostComponent/HostText update rows.'
+      );
+    }
+  }
+}
+
+function assertPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecord({
+  createRecord,
+  element,
+  expectedSource,
+  normalized,
+  payload,
+  record,
+  updateOptions
+}) {
+  if (!isWeakMapKey(record)) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update requires a source-owned root HostComponent update execution record.'
+    );
+  }
+  const executionPayload =
+    rootPublicFacadeRootCommitHostComponentUpdateExecutionPayloads.get(
+      record
+    );
+  if (
+    executionPayload === undefined ||
+    record.$$typeof !==
+      privateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecordType ||
+    record.executionStatus !==
+      ROOT_BRIDGE_PUBLIC_FACADE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_EXECUTION_ACCEPTED ||
+    record.sourceOwned !== true ||
+    record.fakeDomMutation !== false ||
+    record.nativeExecution !== false ||
+    record.reconcilerExecution !== false ||
+    record.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update requires an intact source-owned root HostComponent update execution record.'
+    );
+  }
+  if (executionPayload.consumed) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update rejected a replayed root HostComponent update execution record.'
+    );
+  }
+  if (
+    executionPayload.payload !== payload ||
+    executionPayload.createRecord !== createRecord ||
+    executionPayload.element !== element ||
+    executionPayload.normalized.type !== normalized.type ||
+    executionPayload.normalized.nextProps !== normalized.nextProps ||
+    executionPayload.updateOptions.hostInstanceToken !==
+      updateOptions.hostInstanceToken ||
+    executionPayload.updateOptions.nextProps !== updateOptions.nextProps ||
+    !privateRootPublicFacadeRootCommitHostUpdateExpectedSourceMatches(
+      executionPayload.expectedSource,
+      expectedSource
+    )
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update rejected stale, cross-root, cloned, or caller-built update execution metadata.'
+    );
+  }
+  assertPrivateRootPublicFacadeRootCommitHostComponentUpdateExpectedSourceCurrent(
+    payload,
+    expectedSource
+  );
+  assertPrivateRootPublicFacadeRootCommitHostComponentUpdateRowsFresh(
+    executionPayload.metadataRows
+  );
+  return {
+    payload: executionPayload,
+    record
+  };
+}
+
+function assertPrivateRootPublicFacadeRootCommitHostComponentUpdateExpectedSourceCurrent(
+  payload,
+  expectedSource
+) {
+  const handleState = getPrivateRootHandleState(payload.rootHandle);
+  const bridgeState = handleState.bridgeState;
+  if (
+    handleState.lifecycleStatus !== expectedSource.lifecycleStatusBefore ||
+    handleState.renderCount + 1 !== expectedSource.renderCount ||
+    bridgeState.nextRequestSequence !== expectedSource.requestSequence ||
+    bridgeState.nextUpdateSequence !== expectedSource.sequence
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update execution metadata is stale for the current root lifecycle request boundary.'
+    );
+  }
+}
+
+function privateRootPublicFacadeRootCommitHostUpdateExpectedSourceMatches(
+  left,
+  right
+) {
+  return (
+    left !== null &&
+    right !== null &&
+    left.rootId === right.rootId &&
+    left.rootKind === right.rootKind &&
+    left.rootTag === right.rootTag &&
+    left.requestId === right.requestId &&
+    left.requestSequence === right.requestSequence &&
+    left.requestType === right.requestType &&
+    left.sequence === right.sequence &&
+    left.updateId === right.updateId &&
+    left.lifecycleStatusBefore === right.lifecycleStatusBefore &&
+    left.lifecycleStatusAfter === right.lifecycleStatusAfter &&
+    left.renderCount === right.renderCount
+  );
+}
+
+function assertPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionMatchesRecord(
+  execution,
+  updateRecord
+) {
+  const expectedSource = execution.payload.expectedSource;
+  if (
+    updateRecord.requestId !== expectedSource.requestId ||
+    updateRecord.requestSequence !== expectedSource.requestSequence ||
+    updateRecord.requestType !== expectedSource.requestType ||
+    updateRecord.sequence !== expectedSource.sequence ||
+    updateRecord.updateId !== expectedSource.updateId ||
+    updateRecord.rootId !== expectedSource.rootId ||
+    updateRecord.rootKind !== expectedSource.rootKind ||
+    updateRecord.rootTag !== expectedSource.rootTag ||
+    updateRecord.lifecycleStatusBefore !==
+      expectedSource.lifecycleStatusBefore ||
+    updateRecord.lifecycleStatusAfter !==
+      expectedSource.lifecycleStatusAfter ||
+    updateRecord.renderCount !== expectedSource.renderCount
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update execution metadata did not match the active root.render request record.'
+    );
+  }
+}
+
+function validatePrivateRootPublicFacadeRootCommitHostComponentUpdateHandoff(
+  execution,
+  handoff,
+  handoffPayload,
+  updateRecord
+) {
+  if (
+    handoffPayload === undefined ||
+    handoff.$$typeof !==
+      privateRootCommitHostComponentUpdateHandoffRecordType ||
+    handoff.updateStatus !==
+      ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_APPLIED ||
+    handoff.sourceRequestId !== updateRecord.requestId ||
+    handoff.sourceUpdateId !== updateRecord.updateId ||
+    handoff.fakeDomMutation !== true ||
+    handoff.nativeExecution !== false ||
+    handoff.reconcilerExecution !== false ||
+    handoff.compatibilityClaimed !== false ||
+    handoffPayload.sourceRecord !== updateRecord ||
+    handoffPayload.rootHandle !== execution.payload.rootHandle ||
+    handoffPayload.hostInstanceToken !==
+      execution.payload.updateOptions.hostInstanceToken ||
+    handoffPayload.nextProps !== execution.payload.updateOptions.nextProps ||
+    handoffPayload.rootCommitMetadata !==
+      execution.payload.rootCommitMetadata ||
+    handoffPayload.selectedRootCommitRecord !==
+      execution.payload.rootCommitMetadataSelection.record ||
+    handoffPayload.selectedRootCommitTextRecord !==
+      (execution.payload.rootCommitTextMetadataSelection === null
+        ? null
+        : execution.payload.rootCommitTextMetadataSelection.record) ||
+    rootNativeHandoffRecords.get(updateRecord) !== undefined
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update requires current root commit HostComponent update execution before native handoff metadata.'
+    );
+  }
+}
+
+function consumePrivateRootPublicFacadeRootCommitHostComponentUpdateExecution(
+  execution,
+  handoff,
+  handoffPayload
+) {
+  assertPrivateRootPublicFacadeRootCommitHostComponentUpdateRowsFresh(
+    execution.payload.metadataRows
+  );
+  execution.payload.consumed = true;
+  for (const row of execution.payload.metadataRows) {
+    rootPublicFacadeRootCommitHostUpdateConsumedRows.set(
+      row,
+      freezeRecord({
+        executionRecord: execution.record,
+        handoff,
+        handoffPayload
+      })
+    );
+  }
 }
 
 function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
@@ -12141,6 +12964,24 @@ function getPrivateRootCommitHostComponentUpdateHandoffPayload(record) {
 
 function isPrivateRootCommitHostComponentUpdateHandoffRecord(value) {
   return rootCommitHostComponentUpdateHandoffPayloads.has(value);
+}
+
+function getPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionPayload(
+  record
+) {
+  return (
+    rootPublicFacadeRootCommitHostComponentUpdateExecutionPayloads.get(
+      record
+    ) || null
+  );
+}
+
+function isPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecord(
+  value
+) {
+  return rootPublicFacadeRootCommitHostComponentUpdateExecutionPayloads.has(
+    value
+  );
 }
 
 function getPrivateRootDangerousHtmlTextResetCommitMetadataPayload(record) {
@@ -23388,11 +24229,28 @@ function createRootRenderHostOutputAcceptedCapabilities(
   return freezeArray(capabilities);
 }
 
-function createPublicFacadeHostOutputUpdateAcceptedCapabilities(handoff) {
-  return freezeArray([
+function createPublicFacadeHostOutputUpdateAcceptedCapabilities(
+  handoff,
+  executionRecord
+) {
+  const capabilities = [
     ...ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
     ...handoff.acceptedCapabilities
-  ]);
+  ];
+  if (
+    executionRecord !== null &&
+    executionRecord !== undefined &&
+    isPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecord(
+      executionRecord
+    )
+  ) {
+    capabilities.splice(
+      ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES.length,
+      0,
+      ROOT_BRIDGE_PUBLIC_FACADE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_EXECUTION_ACCEPTED_CAPABILITY
+    );
+  }
+  return freezeArray(capabilities);
 }
 
 function createPublicFacadeNestedHostOutputUpdateAcceptedCapabilities(
@@ -24606,6 +25464,7 @@ module.exports = {
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_PUBLIC_FACADE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_EXECUTION_ACCEPTED,
   ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_ACCEPTED_CAPABILITIES,
@@ -24714,6 +25573,7 @@ module.exports = {
   getPrivateRootRenderNativeHandoffPayload,
   getPrivateRootCreateRenderAdmissionPayload,
   getPrivateRootCommitHostComponentUpdateHandoffPayload,
+  getPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionPayload,
   getPrivateRootDangerousHtmlTextResetCommitHandoffPayload,
   getPrivateRootDangerousHtmlTextResetCommitMetadataPayload,
   getPrivateRootHostOutputUpdateHandoffPayload,
@@ -24769,6 +25629,7 @@ module.exports = {
   isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission,
   isPrivateRootLifecycleRequestBoundaryRecord,
   isPrivateRootCommitHostComponentUpdateHandoffRecord,
+  isPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecord,
   isPrivateRootDangerousHtmlTextResetCommitHandoffRecord,
   isPrivateRootDangerousHtmlTextResetCommitMetadataRecord,
   isPrivateRootHostOutputUpdateHandoffRecord,
@@ -24844,6 +25705,7 @@ module.exports = {
   privateRootRenderHostOutputRecordType,
   privateRootRenderHostOutputFinishedWorkRecordType,
   privateRootPublicFacadeHostOutputUpdateRecordType,
+  privateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecordType,
   privateRootPublicFacadeLifecycleContainerSnapshotRecordType,
   privateRootPublicFacadeNestedHostOutputUpdateRecordType,
   privateRootPublicFacadeHostOutputUnmountCleanupRecordType,
