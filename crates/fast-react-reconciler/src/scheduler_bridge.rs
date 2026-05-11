@@ -553,11 +553,13 @@ impl SchedulerBridge {
     }
 
     #[must_use]
+    #[cfg(test)]
     pub(crate) const fn act_queue_consumed_request_count(&self) -> usize {
         self.act_queue_consumed_request_count
     }
 
     #[must_use]
+    #[cfg(test)]
     pub(crate) fn pending_act_queue_request_count(&self) -> usize {
         self.act_queue_requests
             .len()

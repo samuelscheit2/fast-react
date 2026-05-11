@@ -2406,6 +2406,7 @@ impl SchedulerBridgeActQueueRequestExecutionRecord {
         })
     }
 
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn accepted_root_scheduler_execution_evidence_for_canary(&self) -> bool {
         self.render_callback.as_ref().is_some_and(|record| {
@@ -2508,6 +2509,7 @@ impl SchedulerBridgeActQueueExecutionResult {
             })
     }
 
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn did_execute_accepted_render_callbacks(&self) -> bool {
         self.executed_render_callback_count() > 0
@@ -2537,6 +2539,7 @@ impl SchedulerBridgeActQueueExecutionResult {
                 .all(|records| records[0].queue_order() <= records[1].queue_order())
     }
 
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn routed_private_act_queue_requests_and_continuations_for_canary(&self) -> bool {
         self.did_consume_queued_act_requests()

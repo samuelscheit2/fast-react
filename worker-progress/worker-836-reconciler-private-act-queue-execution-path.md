@@ -80,3 +80,20 @@
   can be proven together.
 - Keep using source-owned request/continuation evidence for future facade
   consumers instead of accepting cloned or fabricated diagnostic records.
+
+## Audit Fix
+
+- Fixed the non-test build blocker found after commit `779afbf` by gating the
+  new canary-only act queue evidence methods behind `#[cfg(test)]`.
+- Also gated test-only act queue consumed-count accessors so
+  `cargo check -p fast-react-reconciler --all-features` is clean.
+- Preserved the private act queue execution tests, existing execution structs,
+  source-owned request consumption, and public compatibility blockers.
+
+Additional verification after the audit fix:
+
+- `cargo check -p fast-react-reconciler --all-features`: passed.
+- `cargo test -p fast-react-reconciler act_queue --all-targets --all-features -- --nocapture`: passed, 9 tests.
+- `cargo test -p fast-react-reconciler root_scheduler --all-targets --all-features -- --nocapture`: passed, 78 tests.
+- `cargo test -p fast-react-reconciler sync_flush --all-targets --all-features -- --nocapture`: passed, 56 tests.
+- `cargo fmt --all --check`: passed.
