@@ -10,7 +10,7 @@
 
 - `packages/react-dom/test/react-dom-test-utils-act-gate.test.js`
 - `tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs`
-- `worker-progress/worker-846.md`
+- `worker-progress/worker-846-test-utils-gate-first-source-proof-route.md`
 
 ## Verification
 
