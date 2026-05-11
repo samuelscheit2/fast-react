@@ -7359,6 +7359,7 @@ const rootRequestTestInstanceQueryDiagnostics = new WeakMap();
 const rootRequestCreateRouteAdmissions = new WeakMap();
 const rootRequestUpdateRouteAdmissions = new WeakMap();
 const rootRequestUpdateNativeBridgeAdmissions = new WeakMap();
+const rootExecutionResults = new WeakSet();
 
 function createTestRendererRootRequestBridge(options) {
   const bridgeState = {
@@ -9969,7 +9970,7 @@ function consumeRootExecutionResult(record, result, handoff) {
   const executionHandoff =
     handoff === undefined ? createRootExecutionHandoff(record) : handoff;
 
-  return freezeRecord({
+  const executionResult = freezeRecord({
     kind: 'FastReactTestRendererPrivateRootExecutionResult',
     status: 'accepted-private-test-renderer-root-execution-result',
     executionStatus: rootRequestExecutionStatus,
@@ -10022,6 +10023,8 @@ function consumeRootExecutionResult(record, result, handoff) {
     publicCreateUpdateUnmountBehaviorAvailable: false,
     compatibilityClaimed: false
   });
+  rootExecutionResults.add(executionResult);
+  return executionResult;
 }
 
 function readDiagnosticField(record, names) {
@@ -14176,13 +14179,80 @@ function validatePrivateSerializationFinishedWorkIdentitySourceReport(
     'hostOutputRow',
     'host_output_row'
   ) ?? readPrivateToJSONField(report, 'privateHostOutputRow');
-  const hostOutputRowId =
+  const directHostOutputRowId =
     readPrivateToJSONField(report, 'hostOutputRowId', 'host_output_row_id') ??
-    readPrivateToJSONField(report, 'privateRowId', 'private_row_id') ??
-    readPrivateToJSONField(hostOutputRow, 'id');
-  const hostOutputShape =
+    readPrivateToJSONField(report, 'privateRowId', 'private_row_id');
+  const requiresHostOutputRow =
+    identity.hostOutputUpdateKind === 'Update' ||
+    identity.hostOutputUpdateKind === 'Unmount';
+  if (
+    requiresHostOutputRow &&
+    (hostOutputRow === undefined ||
+      hostOutputRow === null ||
+      typeof hostOutputRow !== 'object')
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected private serialization source report hostOutputRow.'
+    );
+  }
+  const embeddedHostOutputRowId = readPrivateToJSONField(hostOutputRow, 'id');
+  if (requiresHostOutputRow && embeddedHostOutputRowId === undefined) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected private serialization source report hostOutputRow.id.'
+    );
+  }
+  if (
+    directHostOutputRowId !== undefined &&
+    embeddedHostOutputRowId !== undefined &&
+    directHostOutputRowId !== embeddedHostOutputRowId
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected private serialization source report hostOutputRowId to match hostOutputRow.id.'
+    );
+  }
+  const hostOutputRowId =
+    embeddedHostOutputRowId ?? directHostOutputRowId;
+  const directHostOutputShape =
     readPrivateToJSONField(report, 'hostOutputShape', 'host_output_shape') ??
     readPrivateToJSONField(hostOutputRow, 'hostOutputShape', 'host_output_shape');
+  if (hostOutputRow !== undefined && hostOutputRow !== null) {
+    const rowHostOutputKind = readPrivateToJSONField(
+      hostOutputRow,
+      'hostOutputUpdateKind',
+      'host_output_update_kind'
+    );
+    if (rowHostOutputKind === undefined) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Expected private serialization source report hostOutputRow.hostOutputUpdateKind.'
+      );
+    }
+    if (
+      rowHostOutputKind !== undefined &&
+      rowHostOutputKind !== identity.hostOutputUpdateKind
+    ) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Private serialization source report row update kind does not match identity evidence.'
+      );
+    }
+    if (
+      readPrivateToJSONField(
+        hostOutputRow,
+        'hostOutputShape',
+        'host_output_shape'
+      ) === undefined
+    ) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Expected private serialization source report hostOutputRow.hostOutputShape.'
+      );
+    }
+  }
+  const hostOutputShape = directHostOutputShape;
   if (
     hostOutputShape === 'SiblingText' ||
     hostOutputRowId === privateToJSONSiblingTextHostOutputRowId
@@ -14504,20 +14574,21 @@ function consumeAcceptedToJSONNativeExecutionRecordImpl(
       'Expected an accepted private native root execution result.'
     );
   }
-  if (
-    executionRecord.kind !== undefined &&
-    executionRecord.kind !== privateToJSONNativeExecutionRecordKind
-  ) {
+  if (executionRecord.kind !== privateToJSONNativeExecutionRecordKind) {
     throwPrivateToJSONSerializationError(
       'Expected a FastReactTestRendererPrivateRootExecutionResult record.'
     );
   }
   if (
-    executionRecord.status !== undefined &&
     executionRecord.status !== 'accepted-private-test-renderer-root-execution-result'
   ) {
     throwPrivateToJSONSerializationError(
       'Expected an accepted private root execution result status.'
+    );
+  }
+  if (!rootExecutionResults.has(executionRecord)) {
+    throwPrivateToJSONSerializationError(
+      'Expected a source-owned private native root execution result.'
     );
   }
 
@@ -15597,10 +15668,30 @@ function validatePrivateToJSONUpdateUnmountRowMetadata(
       `Expected private JSON ${hostOutputUpdateKind} row id to be one of ${expectedRowIds.join(', ')}.`
     );
   }
-  const hostOutputShape = normalizePrivateToJSONHostOutputShape(
-    readPrivateToJSONField(row, 'hostOutputShape', 'host_output_shape') ??
-      expectedPrivateToJSONHostOutputShapeForRowId(rowId)
+  if (directRowId !== undefined && directRowId !== rowId) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON ${hostOutputUpdateKind} hostOutputRowId to match hostOutputRow.id.`
+    );
+  }
+  const explicitHostOutputShape = readPrivateToJSONField(
+    row,
+    'hostOutputShape',
+    'host_output_shape'
   );
+  if (explicitHostOutputShape === undefined) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON ${hostOutputUpdateKind} row hostOutputShape.`
+    );
+  }
+  const hostOutputShape = normalizePrivateToJSONHostOutputShape(
+    explicitHostOutputShape
+  );
+  const expectedShape = expectedPrivateToJSONHostOutputShapeForRowId(rowId);
+  if (hostOutputShape !== expectedShape) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON ${rowId} row shape to be ${expectedShape}.`
+    );
+  }
   assertPrivateToJSONStringField(
     row,
     'status',
