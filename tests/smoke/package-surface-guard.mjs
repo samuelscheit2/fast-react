@@ -708,6 +708,8 @@ function assertNativePackageDiagnosticSurface(nativeRuntime) {
     requestShape.transportWorkerThreadTeardownGate;
   const workerThreadExecutablePreflight =
     requestShape.workerThreadTeardownExecutablePreflight;
+  const workerThreadCleanupHookPreflight =
+    requestShape.workerThreadCleanupHookPreflight;
 
   assert.equal(
     batchMetadata.batchGateStatus,
@@ -1067,6 +1069,139 @@ function assertNativePackageDiagnosticSurface(nativeRuntime) {
   );
   assert.equal(
     workerThreadExecutablePreflight.publicNativeCompatibility,
+    false
+  );
+
+  assert.equal(
+    workerThreadCleanupHookPreflight.preflightStatus,
+    'preflighted-native-root-bridge-worker-thread-cleanup-hook-order',
+    'native cleanup-hook preflight status'
+  );
+  assert.equal(
+    workerThreadCleanupHookPreflight.executionScope,
+    'rust-only-cleanup-hook-order-preflight-no-node-worker-thread-no-napi-cleanup-hook-execution',
+    'native cleanup-hook preflight scope'
+  );
+  assert.equal(
+    workerThreadCleanupHookPreflight.sourceExecutablePreflightStatus,
+    workerThreadExecutablePreflight.preflightStatus,
+    'native cleanup-hook executable preflight source'
+  );
+  assert.equal(
+    workerThreadCleanupHookPreflight.canonicalExecutableEvidenceRequired,
+    true,
+    'native cleanup-hook canonical source required'
+  );
+  assert.equal(
+    workerThreadCleanupHookPreflight.canonicalExecutableEvidenceAccepted,
+    true,
+    'native cleanup-hook canonical source accepted'
+  );
+  assert.equal(
+    workerThreadCleanupHookPreflight.cleanupHookExecutionOrder,
+    'reverse-registration-order',
+    'native cleanup-hook reverse order'
+  );
+  assert.equal(
+    workerThreadCleanupHookPreflight.cleanupHookRegistrationCount,
+    2,
+    'native cleanup-hook registration count'
+  );
+  assert.deepEqual(
+    workerThreadCleanupHookPreflight.rows.map((row) => row.id),
+    [
+      'cleanup-hook-worker-root-before-value-release',
+      'cleanup-hook-worker-value-after-root-release',
+      'cleanup-hook-stale-worker-transport-evidence-rejected',
+      'cleanup-hook-forged-peer-active-evidence-rejected'
+    ],
+    'native cleanup-hook row ids'
+  );
+  assert.deepEqual(
+    workerThreadCleanupHookPreflight.rows.map((row) => row.registrationOrder),
+    [2, 1, 2, 1],
+    'native cleanup-hook registration order'
+  );
+  assert.deepEqual(
+    workerThreadCleanupHookPreflight.rows.map(
+      (row) => row.expectedExecutionOrder
+    ),
+    [1, 2, 1, 2],
+    'native cleanup-hook expected execution order'
+  );
+  assert.deepEqual(
+    workerThreadCleanupHookPreflight.rows.map(
+      (row) => row.observedExecutionOrder
+    ),
+    [1, 2, null, null],
+    'native cleanup-hook observed execution order'
+  );
+  assert.deepEqual(
+    workerThreadCleanupHookPreflight.rows.map((row) => row.status),
+    ['accepted', 'accepted', 'rejected', 'rejected'],
+    'native cleanup-hook row statuses'
+  );
+  assert.deepEqual(
+    workerThreadCleanupHookPreflight.rows.map((row) => row.code),
+    [
+      null,
+      null,
+      'FAST_REACT_NAPI_CLEANUP_HOOK_STALE_EXECUTABLE_PREFLIGHT',
+      'FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE'
+    ],
+    'native cleanup-hook rejection codes'
+  );
+  assert.deepEqual(
+    workerThreadCleanupHookPreflight.rows.map(
+      (row) => row.canonicalExecutableEvidence
+    ),
+    [true, true, false, false],
+    'native cleanup-hook canonical evidence'
+  );
+  assert.deepEqual(
+    workerThreadCleanupHookPreflight.rows.map(
+      (row) => row.staleOrForgedCleanupEvidenceRejected
+    ),
+    [false, false, true, true],
+    'native cleanup-hook stale or forged rejections'
+  );
+  for (const row of workerThreadCleanupHookPreflight.rows) {
+    assert.deepEqual(
+      Object.keys(row),
+      workerThreadCleanupHookPreflight.cleanupHookPreflightRowFields,
+      `native cleanup-hook row fields ${row.id}`
+    );
+    assert.equal(
+      row.nodeWorkerThreadsExecution,
+      false,
+      `native cleanup-hook worker execution ${row.id}`
+    );
+    assert.equal(
+      row.napiCleanupHookExecution,
+      false,
+      `native cleanup-hook execution ${row.id}`
+    );
+    assertNativeNoExecutionFlags(row, `native cleanup-hook ${row.id}`);
+    assert.equal(
+      row.publicNativeCompatibility,
+      false,
+      `native cleanup-hook compatibility ${row.id}`
+    );
+  }
+  assert.equal(
+    workerThreadCleanupHookPreflight.nodeWorkerThreadsExecution,
+    false
+  );
+  assert.equal(
+    workerThreadCleanupHookPreflight.napiCleanupHookExecution,
+    false
+  );
+  assertNativeNoExecutionFlags(
+    workerThreadCleanupHookPreflight,
+    'native cleanup-hook preflight'
+  );
+  assert.equal(
+    workerThreadCleanupHookPreflight.publicNativeCompatibility,
     false
   );
 }
