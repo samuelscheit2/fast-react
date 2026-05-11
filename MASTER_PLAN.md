@@ -45,45 +45,26 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Workers 786-795 have been accepted and cleaned up
-after the latest merge batch; Worker 796 and Worker 801 are awaiting read-only
-acceptance audit. Accepted private evidence still keeps public root, act,
+Top-level cap: 30 workers. Workers 785-802 have been accepted, verified,
+merged, and cleaned up. No implementation worker is currently active after the
+latest merge batch. Accepted private evidence still keeps public root, act,
 Scheduler timing, hydration, serialization, native execution, package
 compatibility, and broad renderer compatibility blocked.
 
-Active workers are running in isolated worktrees:
-
-- Worker 785: restarted Rust reconciler managed child placement/delete private
-  handoff from the interrupted partial worktree.
-- Worker 796: private-admission ledger for Workers 778-779, follow-up complete
-  and under re-audit.
-- Worker 797: hydrateRoot preflight conformance matrix.
-- Worker 798: Scheduler private diagnostics integrity matrix.
-- Worker 799: test-renderer sibling-text private-admission ledger.
-- Worker 800: form rejected-error blocker hardening.
-- Worker 801: native no-load transitive matrix, complete and under audit.
-- Worker 802: resource root-map negative matrix.
-
-These workers intentionally have some historical overlap with accepted areas
-when that improves throughput. Resolve merge conflicts by preserving accepted
-private blockers and canonical evidence requirements.
+Future workers may intentionally overlap with accepted areas when that improves
+throughput. Resolve merge conflicts by preserving accepted private blockers and
+canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Audit and merge Workers 796 and 801 if their re-audits stay clean, then
-   clean their worktrees and branches.
-2. Audit and merge Workers 785 and 797-802 as they complete. Expect overlap in
-   Rust root-commit/host-work, React DOM hydration/resource/form tests,
-   Scheduler private diagnostics tests, and react-test-renderer
-   serialization/create-routing tests.
-3. Launch additional workers from accepted private evidence when a task has a
+1. Launch the next parallel batch from accepted private evidence when a task has a
    narrow proof boundary: delayed Scheduler/React act diagnostics, hydrateRoot
    marker/listener/target/recoverable-error rows, resource/form fake metadata,
-   and sibling-text serialization/native evidence.
-4. Prefer parallelizable independent proofs even when they may conflict in test
+   sibling-text serialization/native evidence, and managed child host traversal.
+2. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
-5. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates

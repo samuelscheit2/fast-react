@@ -29,30 +29,42 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-### Workers 786-795
+### Workers 785-802
 
+- Worker 785 added the Rust managed HostComponent child placement/delete
+  private handoff canary across complete-work, root-commit, and host-work. The
+  accepted follow-up requires placement candidates to be the parent’s sole
+  finished child and covers the prior final-child multi-child rejection gap.
 - Workers 786 and 794 advanced React DOM private coverage. Worker 786 added
   hydrateRoot event-replay preflight evidence with explicit scheduling
   blockers; Worker 794 added resource root-map conformance for canonical
   stylesheet/script rows, skipped preload props, stale source rejection, and
   public resource/head/package blockers.
-- Workers 787, 791, 792, and 793 advanced test-renderer and Scheduler private
+- Workers 787, 791, 792, 793, 798, and 799 advanced test-renderer and Scheduler private
   handoffs. Worker 787 added CJS `toJSON` sibling-text admission with own
   `rootFinishedLanesHandoff` rejection coverage; Worker 791 moved Scheduler
   mock source proof into frozen private diagnostics; Worker 792 let React
   preflight renderer-root delayed reports only as private nested-expired
-  evidence; Worker 793 added delayed renderer-root negative coverage.
-- Workers 788, 789, and 790 hardened native private boundaries: ESM/CJS
+  evidence; Worker 793 added delayed renderer-root negative coverage; Worker
+  798 hardened Scheduler private diagnostics integrity; Worker 799 added a
+  static sibling-text JS/CJS admission ledger.
+- Workers 788, 789, 790, and 801 hardened native private boundaries: ESM/CJS
   `worker_threads` no-load guarding, private subpath blocklist refresh, and
-  cleanup-hook identity tamper coverage. Worker 795 hardened form async failure
-  gates while public form submission, reset, action invocation, and error
-  routing remain blocked.
+  cleanup-hook identity tamper coverage, plus a transitive CJS/ESM no-load
+  matrix for worker-thread and `.node` imports.
+- Workers 795, 796, 800, and 802 hardened resource/form gates and ledgers.
+  Worker 796 added a static private-admission ledger for accepted resource
+  root-map and form rejected-error preflights; Worker 800 hardened rejected-error
+  blocker shapes and stale async execution rejection; Worker 802 added resource
+  root-map negative coverage for mutation/lifecycle/package claims and tampered
+  source rows. Public resources/forms, reset/action invocation, DOM/head
+  mutation, and package compatibility remain blocked.
 - The batch was accepted after focused React act/Scheduler, React DOM
   hydration/root/resource/form, react-test-renderer serialization/create-routing,
-  native no-load/workspace, package-surface, import-smoke, conflict-resolution,
-  and `git diff --check` verification. A merge fix kept package-root
-  sibling-text assertions on the existing package-root path while scoping new
-  CJS committed-fiber/root-handoff assertions to CJS entries.
+  native no-load/workspace, Rust reconciler, package-surface, import-smoke,
+  conflict-resolution, and `git diff --check` verification. A merge fix kept
+  package-root sibling-text assertions on the existing package-root path while
+  scoping new CJS committed-fiber/root-handoff assertions to CJS entries.
 
 ### Workers 767-784
 
