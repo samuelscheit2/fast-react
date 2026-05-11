@@ -140,10 +140,29 @@ test(
       bridgeExecution.acceptedCapabilities.map((capability) => capability.id),
       [
         'hydrate-root-execution-preflight-required',
+        'hydrate-root-lifecycle-request-boundary-required',
         'hydrate-root-text-node-claim-patch-execution-record',
         'hydrate-root-text-node-claim-patch-options-owned',
         'hydrate-root-text-node-claim-patch-state-unchanged'
       ]
+    );
+    assert.equal(bridgeExecution.lifecycleRequestBoundaryAccepted, true);
+    assert.equal(
+      bridgeExecution.lifecycleRequestBoundarySourceOwned,
+      true
+    );
+    assert.equal(bridgeExecution.lifecycleContainerSnapshotOwned, true);
+    assert.equal(
+      rootBridge
+        .isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(
+          bridgeExecution.lifecycleRequestBoundary
+        ),
+      true
+    );
+    assert.equal(
+      bridgeExecution.lifecycleRequestBoundaryStatus,
+      rootBridge
+        .ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_LIFECYCLE_BOUNDARY_ACCEPTED
     );
 
     assert.equal(
@@ -182,6 +201,20 @@ test(
       bridgePayload.textNodeClaimPatchExecutionPayload,
       textPatchPayload
     );
+    assert.equal(
+      bridgePayload.lifecycleRequestBoundary,
+      bridgeExecution.lifecycleRequestBoundary
+    );
+    const lifecyclePayload =
+      rootBridge
+        .getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload(
+          bridgeExecution.lifecycleRequestBoundary
+        );
+    assert.equal(lifecyclePayload.requestRecord, bridgePayload.requestRecord);
+    assert.equal(
+      lifecyclePayload.requestAdmission,
+      hydrateRecord.requestAdmission
+    );
     assert.deepEqual(
       preflight.getHydrateRootTextNodeClaimPatchExecutionRecords(),
       [bridgeExecution]
@@ -190,6 +223,11 @@ test(
       preflightPayload.textNodeClaimPatchExecutionRecords,
       [bridgeExecution]
     );
+    assert.deepEqual(
+      preflightPayload.lifecycleRequestBoundaryRecords,
+      [bridgeExecution.lifecycleRequestBoundary]
+    );
+    assert.equal(preflightPayload.lifecycleRequestBoundaryRecordCount, 1);
     assert.equal(preflightPayload.textNodeClaimPatchExecutionRecordCount, 1);
     assert.equal(textNode.nodeValue, 'client text');
     assert.equal(recoverableErrorCalls, 0);
@@ -300,14 +338,15 @@ test(
       hydrateRecord,
       hydrationOptions,
       preflight,
-      targetClaimRecord
+      targetClaimRecord,
+      textNode
     } = createHydrateRootTextClaimPatchBridgeScenario(
       'hydrate-text-claim-patch-bridge-negative'
     );
 
     assert.throws(
       () => preflight.postPreflightExecution(eventReplayRecord),
-    {
+      {
         code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
       }
     );
@@ -316,7 +355,7 @@ test(
         preflight.postPreflightExecution(
           Object.freeze({...executionPreflightRecord})
         ),
-    {
+      {
         code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
       }
     );
@@ -328,7 +367,7 @@ test(
             publicHydrateRootSupported: true
           })
         ),
-    {
+      {
         code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
       }
     );
@@ -337,7 +376,52 @@ test(
         preflight.postPreflightExecution(executionPreflightRecord, {
           hydrationOptions: {}
         }),
-    {
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
+      }
+    );
+    const executionPayload =
+      rootBridge.getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(
+        executionPreflightRecord
+      );
+    const lifecycleRequestBoundary =
+      executionPayload.lifecycleRequestBoundary;
+    const mismatchRow = hydrateRecord.textMismatchDiagnostics.mismatchRows[0];
+    assert.throws(
+      () =>
+        preflight.postPreflightExecution(executionPreflightRecord, {
+          hydrationOptions,
+          lifecycleRequestBoundary: Object.freeze({
+            ...lifecycleRequestBoundary
+          }),
+          mismatchRow
+        }),
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
+      }
+    );
+    assert.throws(
+      () =>
+        preflight.postPreflightExecution(executionPreflightRecord, {
+          hydrationOptions,
+          lifecycleContainerSnapshot: Object.freeze({
+            ...lifecycleRequestBoundary.lifecycleContainerSnapshot
+          }),
+          mismatchRow
+        }),
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
+      }
+    );
+    assert.throws(
+      () =>
+        preflight.postPreflightExecution(executionPreflightRecord, {
+          hydrationOptions,
+          lifecycleRequestBoundary:
+            'hydrate-root-lifecycle-request-boundary-required',
+          mismatchRow
+        }),
+      {
         code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
       }
     );
@@ -351,7 +435,23 @@ test(
         preflight.postPreflightExecution(
           foreign.executionPreflightRecord
         ),
-    {
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
+      }
+    );
+    const foreignExecutionPayload =
+      rootBridge.getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(
+        foreign.executionPreflightRecord
+      );
+    assert.throws(
+      () =>
+        preflight.postPreflightExecution(executionPreflightRecord, {
+          hydrationOptions,
+          lifecycleRequestBoundary:
+            foreignExecutionPayload.lifecycleRequestBoundary,
+          mismatchRow
+        }),
+      {
         code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
       }
     );
@@ -365,13 +465,13 @@ test(
       staleStateBridge.applyCreateRootSideEffects(staleStateCreateRecord);
     assert.throws(
       () => preflight.postPreflightExecution(executionPreflightRecord),
-    {
+      {
         code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
       }
     );
     staleStateBridge.revertCreateRootSideEffects(staleStateSideEffects);
+    assert.equal(textNode.nodeValue, 'server text');
 
-    const mismatchRow = hydrateRecord.textMismatchDiagnostics.mismatchRows[0];
     const bridgeExecution = preflight.postPreflightExecution(
       executionPreflightRecord,
       {

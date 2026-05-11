@@ -965,6 +965,7 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
     record.acceptedCapabilities.map((capability) => capability.id),
     [
       "private-hydrate-root-bridge-request-admission",
+      "hydrate-root-lifecycle-request-boundary",
       "unsupported-hydration-boundary-diagnostics",
       "hydrate-root-marker-listener-preflight-diagnostics",
       "hydrate-root-recoverable-error-preflight-diagnostics"
@@ -1038,6 +1039,7 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
     ),
     [
       "hydrate-root-marker-guard-snapshot",
+      "hydrate-root-lifecycle-request-boundary-required",
       "hydrate-root-listener-guard-snapshot",
       "hydrate-root-marker-listener-state-unchanged"
     ]
@@ -1348,6 +1350,7 @@ test("React DOM client private hydrateRoot target-claiming preflight remains pri
     targetClaimRecord.acceptedCapabilities.map((capability) => capability.id),
     [
       "hydrate-root-marker-listener-preflight-required",
+      "hydrate-root-lifecycle-request-boundary-required",
       "hydrate-root-target-dispatch-link-diagnostic",
       "hydrate-root-target-claiming-canonical-evidence",
       "hydrate-root-target-claiming-state-unchanged"
@@ -1535,6 +1538,7 @@ test("React DOM client private hydrateRoot event replay preflight validates bloc
     eventReplayRecord.acceptedCapabilities.map((capability) => capability.id),
     [
       "hydrate-root-marker-listener-preflight-required",
+      "hydrate-root-lifecycle-request-boundary-required",
       "hydrate-root-target-claiming-preflight-required",
       "hydrate-root-replay-target-dispatch-execution-metadata",
       "hydrate-root-event-replay-state-unchanged"
@@ -1670,6 +1674,7 @@ test("React DOM client private hydrateRoot execution preflight consumes blocked 
     executionRecord.acceptedCapabilities.map((capability) => capability.id),
     [
       "hydrate-root-event-replay-preflight-required",
+      "hydrate-root-lifecycle-request-boundary-required",
       "hydrate-root-replay-execution-boundary-canonical",
       "hydrate-root-target-claiming-boundary-retained",
       "hydrate-root-recoverable-error-preflight-retained",
@@ -1804,6 +1809,7 @@ test("React DOM client private hydrateRoot post-preflight execution applies fake
     bridgeExecution.acceptedCapabilities.map((capability) => capability.id),
     [
       "hydrate-root-execution-preflight-required",
+      "hydrate-root-lifecycle-request-boundary-required",
       "hydrate-root-text-node-claim-patch-execution-record",
       "hydrate-root-text-node-claim-patch-options-owned",
       "hydrate-root-text-node-claim-patch-state-unchanged"
@@ -1913,7 +1919,8 @@ test("React DOM client private hydrateRoot post-preflight execution rejects nonc
     hydrationOptions,
     preflight,
     rootBridge,
-    targetClaimRecord
+    targetClaimRecord,
+    textNode
   } = createHydrateRootExecutionPreflightScenario(
     "public-facade-hydrate-text-claim-patch-negative",
     {
@@ -1960,6 +1967,51 @@ test("React DOM client private hydrateRoot post-preflight execution rejects nonc
       code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
     }
   );
+  const executionPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(
+      executionPreflightRecord
+    );
+  const lifecycleRequestBoundary =
+    executionPayload.lifecycleRequestBoundary;
+  const mismatchRow = hydrateRecord.textMismatchDiagnostics.mismatchRows[0];
+  assert.throws(
+    () =>
+      preflight.postPreflightExecution(executionPreflightRecord, {
+        hydrationOptions,
+        lifecycleRequestBoundary: Object.freeze({
+          ...lifecycleRequestBoundary
+        }),
+        mismatchRow
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
+  assert.throws(
+    () =>
+      preflight.postPreflightExecution(executionPreflightRecord, {
+        hydrationOptions,
+        lifecycleContainerSnapshot: Object.freeze({
+          ...lifecycleRequestBoundary.lifecycleContainerSnapshot
+        }),
+        mismatchRow
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
+  assert.throws(
+    () =>
+      preflight.postPreflightExecution(executionPreflightRecord, {
+        hydrationOptions,
+        lifecycleRequestBoundary:
+          "hydrate-root-lifecycle-request-boundary-required",
+        mismatchRow
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
   assert.throws(
     () => preflight.postPreflightExecution(targetClaimRecord),
     {
@@ -1983,12 +2035,29 @@ test("React DOM client private hydrateRoot post-preflight execution rejects nonc
       code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
     }
   );
+  const foreignExecutionPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(
+      foreignExecutionRecord
+    );
+  assert.throws(
+    () =>
+      preflight.postPreflightExecution(executionPreflightRecord, {
+        hydrationOptions,
+        lifecycleRequestBoundary:
+          foreignExecutionPayload.lifecycleRequestBoundary,
+        mismatchRow
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
+  assert.equal(textNode.textContent, "server text");
 
   const bridgeExecution = preflight.postPreflightExecution(
     executionPreflightRecord,
     {
       hydrationOptions,
-      mismatchRow: hydrateRecord.textMismatchDiagnostics.mismatchRows[0]
+      mismatchRow
     }
   );
   assert.equal(bridgeExecution.textPatchApplied, true);
@@ -2123,7 +2192,7 @@ test("React DOM client private hydrateRoot execution preflight rejects stale for
     () => preflight.preflightExecution(eventReplayRecord),
     {
       code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT",
-      message: /current marker\/listener state/
+      message: /lifecycle container snapshot|current marker\/listener state/
     }
   );
   staleStateBridge.revertCreateRootSideEffects(staleStateSideEffects);
