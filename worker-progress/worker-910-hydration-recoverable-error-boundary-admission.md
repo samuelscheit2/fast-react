@@ -14,6 +14,10 @@
   `hydration-boundary-gate.js` and proves tailored cloned source-ledger rows
   still resolve to `null` and cannot create an accepted recoverable-error
   boundary admission record.
+- Follow-up smoke investigation proved
+  `tests/smoke/react-dom-private-root-bridge-shell.mjs` has the same unmount
+  host-output cleanup failure on current `main` without the Worker 910
+  export-lock commit, so that failure is not caused by this branch.
 
 ## Changed Files
 
@@ -57,6 +61,11 @@
 - `node tests/smoke/react-dom-private-root-bridge-shell.mjs` failed with
   `FAST_REACT_DOM_INVALID_UNMOUNT_HOST_OUTPUT_CLEANUP_RECORD` at the existing
   unmount host-output cleanup path.
+- On current `main` at `e62d3c816bdd6b11a60b8ac369200232e0d23462`,
+  `node tests/smoke/react-dom-private-root-bridge-shell.mjs` failed with the
+  same `FAST_REACT_DOM_INVALID_UNMOUNT_HOST_OUTPUT_CLEANUP_RECORD` at
+  `tests/smoke/react-dom-private-root-bridge-shell.mjs:386`.
+- `git diff --check`
 
 ## Evidence Gathered
 
@@ -69,13 +78,17 @@
   hydration-marker oracle tests pass.
 - Package surface and import smoke checks pass.
 - Workspace React DOM check passes.
+- Branch ancestry confirms `main` does not contain Worker 910 commit
+  `aa5a97e4b61c252c47bb9a8893cf5d1e053a3948`; the smoke failure reproduces
+  on `main` at `e62d3c816bdd6b11a60b8ac369200232e0d23462` with the same error
+  code, message, and smoke callsite.
 
 ## Risks Or Blockers
 
-- The optional `tests/smoke/react-dom-private-root-bridge-shell.mjs` smoke still
-  fails on an unmount host-output cleanup mismatch unrelated to the source-ledger
-  cache export repair. The focused `react-dom-private-root-bridge-shell.test.js`
-  suite passes.
+- `tests/smoke/react-dom-private-root-bridge-shell.mjs` still fails on an
+  unmount host-output cleanup mismatch, but the exact same failure exists on
+  current `main` without this branch. The focused
+  `react-dom-private-root-bridge-shell.test.js` suite passes.
 - This remains private diagnostic evidence only; no public `hydrateRoot`, real
   hydration/replay, root scheduling, callback routing, native execution,
   reconciler execution, or DOM mutation compatibility is opened.
@@ -85,8 +98,9 @@
 
 ## Recommended Next Tasks
 
-- Decide whether to refresh or retire
+- Assign a separate root-bridge smoke refresh for
   `tests/smoke/react-dom-private-root-bridge-shell.mjs`; its unmount cleanup
-  expectation no longer matches the passing focused root-bridge test suite.
+  scenario fails on current `main` and no longer matches the passing focused
+  root-bridge test suite.
 - If later work changes hydrateRoot lifecycle/source-ledger field names, rerun
   the Worker 910 admission tests and align the ledger assertions.
