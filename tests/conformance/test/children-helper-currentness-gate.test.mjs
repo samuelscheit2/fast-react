@@ -308,6 +308,285 @@ test("private Children traversal currentness report records source-owned anchors
     publicCompatibilityClaimed: false,
     compatibilityClaimed: false
   });
+  assert.deepEqual(metadata.portalRefOwnerBlockerSourceRowFieldNames, [
+    "id",
+    "sourceFiles",
+    "symbols",
+    "role",
+    "requiredEvidenceOwner",
+    "directChildrenScope",
+    "sourceOwned",
+    "current",
+    "compatibilityClaimed"
+  ]);
+  assert.deepEqual(
+    metadata.portalRefOwnerBlockerSourceRows.map((row) => [
+      row.id,
+      row.sourceFiles,
+      row.symbols,
+      row.requiredEvidenceOwner,
+      row.directChildrenScope
+    ]),
+    [
+      [
+        "react-children-portal-leaf-traversal-only",
+        ["packages/react/src/ReactChildren.js", "packages/shared/ReactSymbols.js"],
+        ["mapIntoArray", "REACT_PORTAL_TYPE"],
+        "react-children-helper-source",
+        true
+      ],
+      [
+        "react-dom-create-portal-entry",
+        [
+          "packages/react-dom/src/shared/ReactDOM.js",
+          "packages/react-dom/src/client/ReactDOMClientFB.js",
+          "packages/react-reconciler/src/ReactPortal.js"
+        ],
+        ["createPortal", "createPortalImpl", "REACT_PORTAL_TYPE"],
+        "react-dom-and-reconciler",
+        false
+      ],
+      [
+        "react-reconciler-host-portal-fiber",
+        [
+          "packages/react-reconciler/src/ReactChildFiber.js",
+          "packages/react-reconciler/src/ReactFiber.js",
+          "packages/react-reconciler/src/ReactWorkTags.js"
+        ],
+        [
+          "updatePortal",
+          "reconcileSinglePortal",
+          "createFiberFromPortal",
+          "HostPortal"
+        ],
+        "react-reconciler-renderer",
+        false
+      ],
+      [
+        "react-reconciler-ref-lifecycle",
+        [
+          "packages/react-reconciler/src/ReactFiberBeginWork.js",
+          "packages/react-reconciler/src/ReactFiberCommitEffects.js",
+          "packages/react-reconciler/src/ReactFiberCommitWork.js",
+          "packages/react-reconciler/src/ReactFiberFlags.js"
+        ],
+        [
+          "markRef",
+          "Ref",
+          "RefStatic",
+          "commitAttachRef",
+          "safelyAttachRef",
+          "safelyDetachRef"
+        ],
+        "react-reconciler-commit",
+        false
+      ],
+      [
+        "react-owner-stack-integration",
+        [
+          "packages/react/src/jsx/ReactJSXElement.js",
+          "packages/react/src/ReactOwnerStack.js",
+          "packages/react-reconciler/src/ReactCurrentFiber.js",
+          "packages/shared/ReactComponentInfoStack.js"
+        ],
+        [
+          "getOwner",
+          "captureOwnerStack",
+          "runWithFiberInDEV",
+          "getOwnerStackByComponentInfoInDev"
+        ],
+        "react-and-reconciler-dev-owner-stack",
+        false
+      ],
+      [
+        "renderer-root-dispatcher-prerequisites",
+        [
+          "packages/react-dom/src/client/ReactDOMRoot.js",
+          "packages/react-reconciler/src/ReactFiberReconciler.js",
+          "packages/react-reconciler/src/ReactFiberRoot.js",
+          "packages/react-reconciler/src/ReactFiberWorkLoop.js",
+          "packages/react-reconciler/src/ReactFiberBeginWork.js"
+        ],
+        [
+          "createRoot",
+          "ReactDOMRoot.render",
+          "updateContainer",
+          "createFiberRoot",
+          "requestUpdateLane",
+          "scheduleUpdateOnFiber",
+          "updateHostRoot"
+        ],
+        "root-scheduler-and-renderer",
+        false
+      ],
+      [
+        "suspense-lazy-renderer-separation",
+        [
+          "packages/react-reconciler/src/ReactFiberBeginWork.js",
+          "packages/react-reconciler/src/ReactFiberThenable.js",
+          "packages/react-reconciler/src/ReactFiberThrow.js",
+          "packages/react-reconciler/src/ReactFiberWorkLoop.js"
+        ],
+        [
+          "mountLazyComponent",
+          "resolveLazy",
+          "updateSuspenseComponent",
+          "throwException",
+          "attachPingListener"
+        ],
+        "react-reconciler-suspense-renderer",
+        false
+      ]
+    ]
+  );
+  assert.deepEqual(metadata.portalRefOwnerBlockerRowFieldNames, [
+    "id",
+    "sourceRowId",
+    "acceptedDirectChildrenInput",
+    "blockedSurfaces",
+    "requiredSourceOwnedEvidence",
+    "rejectedEvidence",
+    "callerShapedEvidenceAccepted",
+    "blocked",
+    "compatibilityClaimed"
+  ]);
+  assert.deepEqual(
+    metadata.portalRefOwnerBlockerRows.map((row) => [
+      row.id,
+      row.sourceRowId,
+      row.blockedSurfaces,
+      row.rejectedEvidence
+    ]),
+    [
+      [
+        "portal-leaf-not-portal-renderer-traversal",
+        "react-reconciler-host-portal-fiber",
+        [
+          "ReactDOM.createPortal",
+          "HostPortal-fiber",
+          "portal-containerInfo",
+          "portal-implementation",
+          "DOM-or-native-portal-commit"
+        ],
+        [
+          "caller-shaped-portal-object",
+          "direct-Children-portal-leaf-only",
+          "portal-compatible-public-flag"
+        ]
+      ],
+      [
+        "portal-leaf-not-root-renderer-prerequisite",
+        "renderer-root-dispatcher-prerequisites",
+        [
+          "root.createRoot",
+          "root.render",
+          "updateContainer",
+          "requestUpdateLane",
+          "scheduleUpdateOnFiber"
+        ],
+        [
+          "root-prerequisite-smuggling",
+          "dispatcher-prerequisite-smuggling",
+          "scheduler-only-evidence"
+        ]
+      ],
+      [
+        "element-ref-prop-not-ref-lifecycle",
+        "react-reconciler-ref-lifecycle",
+        [
+          "markRef",
+          "Ref-flags",
+          "commitAttachRef",
+          "safelyDetachRef",
+          "ref-cleanup"
+        ],
+        [
+          "element-ref-descriptor-only",
+          "caller-shaped-ref-lifecycle",
+          "useRef-currentness-alias"
+        ]
+      ],
+      [
+        "element-debug-owner-not-owner-stack",
+        "react-owner-stack-integration",
+        [
+          "current-owner-dispatcher",
+          "debugOwner-propagation",
+          "captureOwnerStack",
+          "runWithFiberInDEV"
+        ],
+        [
+          "element-debug-field-only",
+          "caller-shaped-owner-stack",
+          "dispatcher-alias"
+        ]
+      ],
+      [
+        "direct-lazy-traversal-not-suspense-renderer-behavior",
+        "suspense-lazy-renderer-separation",
+        [
+          "mountLazyComponent",
+          "resolveLazy",
+          "updateSuspenseComponent",
+          "throwException",
+          "attachPingListener"
+        ],
+        [
+          "direct-lazy-children-oracle-only",
+          "caller-shaped-suspense-renderer",
+          "public-suspense-compatibility-flag"
+        ]
+      ],
+      [
+        "children-currentness-not-renderer-root-currentness",
+        "renderer-root-dispatcher-prerequisites",
+        [
+          "renderer-root-lifecycle",
+          "dispatcher-currentness",
+          "root-update-queue",
+          "commit-phase-output"
+        ],
+        [
+          "cloned-report",
+          "stale-progress-report",
+          "proxy-hidden-alias",
+          "root-dispatcher-smuggling"
+        ]
+      ]
+    ]
+  );
+  assert.deepEqual(metadata.portalRefOwnerBlockerEvidence, {
+    id: "children-helper-portal-ref-owner-renderer-blockers",
+    reactSourceTag: "v19.2.6",
+    reactSourceCommit: "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401",
+    acceptedTraversalEvidence: [
+      "element-fragment-and-portal-leaves",
+      "direct-react-lazy-child-traversal",
+      "children-helper-traversal-currentness"
+    ],
+    blockerSource:
+      "source-owned React 19.2.6 portal, ref, owner, root, and Suspense renderer anchors",
+    sourceOwnedRowsRequired: true,
+    acceptedDirectPortalLeafTraversal: true,
+    directPortalLeafImpliesPortalRendererCompatibility: false,
+    directElementRefObservationImpliesRefLifecycleCompatibility: false,
+    directOwnerDebugObservationImpliesOwnerStackCompatibility: false,
+    directLazyTraversalImpliesSuspenseRendererCompatibility: false,
+    rendererRootPrerequisitesRequired: true,
+    callerShapedRendererEvidenceAccepted: false,
+    callerShapedPortalEvidenceAccepted: false,
+    callerShapedRefEvidenceAccepted: false,
+    callerShapedOwnerEvidenceAccepted: false,
+    clonedOrStaleReportEvidenceAccepted: false,
+    hiddenOrProxyAliasEvidenceAccepted: false,
+    rootDispatcherPrerequisiteSmugglingAccepted: false,
+    portalRendererCompatibilityClaimed: false,
+    refOwnerIntegrationCompatibilityClaimed: false,
+    ownerStackCompatibilityClaimed: false,
+    suspenseLazyRendererCompatibilityClaimed: false,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
   assert.deepEqual(metadata.publicCompatibilityFalseFlags, [
     "compatibilityClaimed",
     "publicCompatibilityClaimed",
@@ -317,7 +596,11 @@ test("private Children traversal currentness report records source-owned anchors
     "publicPackageCompatibilityClaimed",
     "publicLazyRendererCompatibilityClaimed",
     "publicLazySuspenseCompatibilityClaimed",
-    "publicLazyRootCompatibilityClaimed"
+    "publicLazyRootCompatibilityClaimed",
+    "publicPortalRendererCompatibilityClaimed",
+    "publicRefOwnerCompatibilityClaimed",
+    "publicOwnerStackCompatibilityClaimed",
+    "publicSuspenseRendererCompatibilityClaimed"
   ]);
   assert.deepEqual(metadata.prerequisiteFalseFlags, [
     "ownerStackCompatibilityClaimed",
@@ -330,6 +613,11 @@ test("private Children traversal currentness report records source-owned anchors
     "lazyRootPrerequisitesReady",
     "portalPrerequisitesReady",
     "refPrerequisitesReady",
+    "rendererRootPrerequisitesReady",
+    "portalRootPrerequisitesReady",
+    "refOwnerPrerequisitesReady",
+    "suspenseRendererPrerequisitesReady",
+    "ownerDispatcherPrerequisitesReady",
     "publicRootCompatibilityClaimed",
     "publicRendererCompatibilityClaimed"
   ]);
@@ -342,7 +630,12 @@ test("private Children traversal currentness report records source-owned anchors
     "lazySuspenseWakeupClaimed",
     "lazyRootRenderingClaimed",
     "ownerTraversalClaimed",
-    "refLifecycleClaimed"
+    "refLifecycleClaimed",
+    "portalRendererTraversalClaimed",
+    "portalRootRenderingClaimed",
+    "refOwnerIntegrationClaimed",
+    "rendererRootCompatibilityClaimed",
+    "suspenseLazyRendererBehaviorClaimed"
   ]);
   assertDeepFrozen(metadata);
 });
@@ -367,6 +660,9 @@ test("private Children traversal currentness is accepted only from the helper so
   assert.equal(report.lazyRendererBlockerSourceRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.lazyRendererBlockerSourceRows);
   assert.equal(report.lazyRendererBlockerRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.lazyRendererBlockerRows);
   assert.equal(report.lazyRendererBlockerEvidence, childrenHelper.privateChildrenTraversalCurrentnessMetadata.lazyRendererBlockerEvidence);
+  assert.equal(report.portalRefOwnerBlockerSourceRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.portalRefOwnerBlockerSourceRows);
+  assert.equal(report.portalRefOwnerBlockerRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.portalRefOwnerBlockerRows);
+  assert.equal(report.portalRefOwnerBlockerEvidence, childrenHelper.privateChildrenTraversalCurrentnessMetadata.portalRefOwnerBlockerEvidence);
   assert.deepEqual(report.behaviorCurrentness, {
     nullishTopLevelCurrent: true,
     booleanChildrenCoerceToNull: true,
@@ -396,6 +692,12 @@ test("private Children traversal currentness is accepted only from the helper so
     lazySuspenseCompatibilityBlocked: true,
     lazyRootCompatibilityBlocked: true,
     callerShapedLazyRendererEvidenceBlocked: true,
+    portalRefOwnerRendererBlockerCurrent: true,
+    portalRendererCompatibilityBlocked: true,
+    refOwnerIntegrationCompatibilityBlocked: true,
+    rootRendererPrerequisitesBlocked: true,
+    suspenseLazyRendererBehaviorBlocked: true,
+    callerShapedPortalRefOwnerEvidenceBlocked: true,
     ownerDispatcherRootPrerequisitesBlocked: true,
     compatibilityClaimed: false
   });
@@ -405,6 +707,10 @@ test("private Children traversal currentness is accepted only from the helper so
   assert.equal(report.lazyRendererCompatibilityClaimed, false);
   assert.equal(report.lazySuspenseWakeupClaimed, false);
   assert.equal(report.lazyRootRenderingClaimed, false);
+  assert.equal(report.portalRendererTraversalClaimed, false);
+  assert.equal(report.refOwnerIntegrationClaimed, false);
+  assert.equal(report.rendererRootCompatibilityClaimed, false);
+  assert.equal(report.suspenseLazyRendererBehaviorClaimed, false);
   assert.equal(report.dispatcherPrerequisitesReady, false);
   assert.equal(report.rootPrerequisitesReady, false);
   assert.equal(report.lazyRendererPrerequisitesReady, false);
@@ -412,6 +718,8 @@ test("private Children traversal currentness is accepted only from the helper so
   assert.equal(report.lazyRootPrerequisitesReady, false);
   assert.equal(report.portalPrerequisitesReady, false);
   assert.equal(report.refPrerequisitesReady, false);
+  assert.equal(report.rendererRootPrerequisitesReady, false);
+  assert.equal(report.ownerDispatcherPrerequisitesReady, false);
   assert.equal(Object.isFrozen(report), true);
   assert.equal(Object.isFrozen(report.behaviorCurrentness), true);
   assert.equal(
@@ -434,6 +742,7 @@ test("private Children traversal currentness is accepted only from the helper so
     "thrown-error-shapes",
     "lazy-child-traversal",
     "lazy-renderer-suspense-root-blockers",
+    "portal-ref-owner-renderer-blockers",
     "unsupported-edge-blockers"
   ]);
   assert.equal(consumption.sourceReport, report.sourceReport);
@@ -447,17 +756,36 @@ test("private Children traversal currentness is accepted only from the helper so
     consumption.lazyRendererBlockerEvidence,
     report.lazyRendererBlockerEvidence
   );
+  assert.equal(
+    consumption.portalRefOwnerBlockerSourceRows,
+    report.portalRefOwnerBlockerSourceRows
+  );
+  assert.equal(
+    consumption.portalRefOwnerBlockerRows,
+    report.portalRefOwnerBlockerRows
+  );
+  assert.equal(
+    consumption.portalRefOwnerBlockerEvidence,
+    report.portalRefOwnerBlockerEvidence
+  );
   assert.equal(consumption.behaviorCurrentness, report.behaviorCurrentness);
   assert.equal(consumption.lazyTraversalSupported, true);
   assert.equal(consumption.directLazyTraversalSupported, true);
   assert.equal(consumption.lazyTraversalBlocked, false);
   assert.equal(consumption.rendererTraversalBlocked, true);
   assert.equal(consumption.lazyRendererSuspenseRootBlocked, true);
+  assert.equal(consumption.portalRefOwnerRendererBlocked, true);
   assert.equal(consumption.lazyRendererCompatibilityClaimed, false);
   assert.equal(consumption.suspenseWakeupCompatibilityClaimed, false);
   assert.equal(consumption.rootLazyRenderingCompatibilityClaimed, false);
+  assert.equal(consumption.portalRendererCompatibilityClaimed, false);
+  assert.equal(consumption.refOwnerIntegrationCompatibilityClaimed, false);
+  assert.equal(consumption.ownerStackCompatibilityClaimed, false);
+  assert.equal(consumption.suspenseLazyRendererCompatibilityClaimed, false);
   assert.equal(consumption.callerShapedLazyRendererEvidenceAccepted, false);
+  assert.equal(consumption.callerShapedPortalRefOwnerEvidenceAccepted, false);
   assert.equal(consumption.ownerDispatcherRootPrerequisitesBlocked, true);
+  assert.equal(consumption.rootRendererPrerequisitesBlocked, true);
   assert.equal(consumption.publicCompatibilityClaimed, false);
   assert.equal(consumption.packageCompatibilityClaimed, false);
   assert.equal(consumption.compatibilityClaimed, false);
@@ -639,6 +967,107 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   );
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRefOwnerBlockerSourceRows: report.portalRefOwnerBlockerSourceRows.map(
+        (row) => ({
+          ...row,
+          current: false
+        })
+      )
+    }),
+    "children-traversal-currentness-portal-ref-owner-source-rows"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRefOwnerBlockerSourceRows: report.portalRefOwnerBlockerSourceRows.map(
+        (row) =>
+          row.id === "react-reconciler-host-portal-fiber"
+            ? {
+                ...row,
+                sourceFiles: [
+                  "packages/react-reconciler/src/ReactChildFiber.js",
+                  "packages/react-reconciler/src/ReactFiber.js"
+                ]
+              }
+            : row
+      )
+    }),
+    "children-traversal-currentness-portal-ref-owner-source-rows"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRefOwnerBlockerRows: report.portalRefOwnerBlockerRows.map((row) => ({
+        ...row,
+        blocked: false
+      }))
+    }),
+    "children-traversal-currentness-portal-ref-owner-blocker-rows"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRefOwnerBlockerEvidence: {
+        ...report.portalRefOwnerBlockerEvidence,
+        reactSourceCommit: "stale",
+        clonedOrStaleReportEvidenceAccepted: true
+      }
+    }),
+    "children-traversal-currentness-portal-ref-owner-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRefOwnerBlockerEvidence: {
+        ...report.portalRefOwnerBlockerEvidence,
+        callerShapedRendererEvidenceAccepted: true
+      }
+    }),
+    "children-traversal-currentness-portal-ref-owner-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRefOwnerBlockerEvidence: {
+        ...report.portalRefOwnerBlockerEvidence,
+        callerShapedPortalEvidenceAccepted: true
+      }
+    }),
+    "children-traversal-currentness-portal-ref-owner-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRefOwnerBlockerEvidence: {
+        ...report.portalRefOwnerBlockerEvidence,
+        callerShapedRefEvidenceAccepted: true
+      }
+    }),
+    "children-traversal-currentness-portal-ref-owner-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRefOwnerBlockerEvidence: {
+        ...report.portalRefOwnerBlockerEvidence,
+        callerShapedOwnerEvidenceAccepted: true
+      }
+    }),
+    "children-traversal-currentness-portal-ref-owner-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRefOwnerBlockerEvidence: {
+        ...report.portalRefOwnerBlockerEvidence,
+        hiddenOrProxyAliasEvidenceAccepted: true
+      }
+    }),
+    "children-traversal-currentness-portal-ref-owner-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRefOwnerBlockerEvidence: {
+        ...report.portalRefOwnerBlockerEvidence,
+        rootDispatcherPrerequisiteSmugglingAccepted: true
+      }
+    }),
+    "children-traversal-currentness-portal-ref-owner-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
       behaviorCurrentness: {
         keyPathEscapingCurrent: false
       }
@@ -671,6 +1100,22 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   );
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
+      behaviorCurrentness: {
+        portalRendererCompatibilityBlocked: false
+      }
+    }),
+    "children-traversal-currentness-behavior-probes"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      behaviorCurrentness: {
+        [Symbol.for("fast-react.hidden-portal-ref-owner-alias")]: true
+      }
+    }),
+    "children-traversal-currentness-behavior-probes"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
       fullReactChildrenParityClaimed: true
     }),
     "children-traversal-currentness-public-compatibility-claim"
@@ -678,6 +1123,12 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
       publicLazyRendererCompatibilityClaimed: true
+    }),
+    "children-traversal-currentness-public-compatibility-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      publicPortalRendererCompatibilityClaimed: true
     }),
     "children-traversal-currentness-public-compatibility-claim"
   );
@@ -691,6 +1142,34 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
     childrenHelper.createChildrenTraversalCurrentnessReport({
       portalCompatibilityClaimed: true
     }),
+    "children-traversal-currentness-report-shape"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      [Symbol.for("fast-react.public-portal-compatibility-alias")]: true
+    }),
+    "children-traversal-currentness-report-shape"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport(
+      new Proxy(
+        {},
+        {
+          ownKeys() {
+            return [Symbol.for("fast-react.proxy-renderer-alias")];
+          },
+          getOwnPropertyDescriptor() {
+            return {
+              configurable: true,
+              enumerable: true
+            };
+          },
+          get() {
+            return true;
+          }
+        }
+      )
+    ),
     "children-traversal-currentness-report-shape"
   );
   assertCurrentnessRejected(
@@ -737,6 +1216,18 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   );
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
+      rendererRootPrerequisitesReady: true
+    }),
+    "children-traversal-currentness-prerequisite-smuggling"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      ownerDispatcherPrerequisitesReady: true
+    }),
+    "children-traversal-currentness-prerequisite-smuggling"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
       lazyTraversalClaimed: true
     }),
     "children-traversal-currentness-unsupported-edge-claim"
@@ -774,6 +1265,30 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
       refLifecycleClaimed: true
+    }),
+    "children-traversal-currentness-unsupported-edge-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalRendererTraversalClaimed: true
+    }),
+    "children-traversal-currentness-unsupported-edge-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      refOwnerIntegrationClaimed: true
+    }),
+    "children-traversal-currentness-unsupported-edge-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      rendererRootCompatibilityClaimed: true
+    }),
+    "children-traversal-currentness-unsupported-edge-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      suspenseLazyRendererBehaviorClaimed: true
     }),
     "children-traversal-currentness-unsupported-edge-claim"
   );
@@ -843,6 +1358,15 @@ function assertCurrentnessRejected(report, reason) {
       assert.equal(error.lazyRendererCompatibilityClaimed, false);
       assert.equal(error.lazySuspenseWakeupClaimed, false);
       assert.equal(error.lazyRootRenderingClaimed, false);
+      assert.equal(error.portalRendererTraversalClaimed, false);
+      assert.equal(error.portalRootRenderingClaimed, false);
+      assert.equal(error.refOwnerIntegrationClaimed, false);
+      assert.equal(error.rendererRootCompatibilityClaimed, false);
+      assert.equal(error.suspenseLazyRendererBehaviorClaimed, false);
+      assert.equal(error.publicPortalRendererCompatibilityClaimed, false);
+      assert.equal(error.publicRefOwnerCompatibilityClaimed, false);
+      assert.equal(error.publicOwnerStackCompatibilityClaimed, false);
+      assert.equal(error.publicSuspenseRendererCompatibilityClaimed, false);
       assert.equal(error.dispatcherPrerequisitesReady, false);
       assert.equal(error.rootPrerequisitesReady, false);
       assert.equal(error.lazyRendererPrerequisitesReady, false);
@@ -850,6 +1374,11 @@ function assertCurrentnessRejected(report, reason) {
       assert.equal(error.lazyRootPrerequisitesReady, false);
       assert.equal(error.portalPrerequisitesReady, false);
       assert.equal(error.refPrerequisitesReady, false);
+      assert.equal(error.rendererRootPrerequisitesReady, false);
+      assert.equal(error.portalRootPrerequisitesReady, false);
+      assert.equal(error.refOwnerPrerequisitesReady, false);
+      assert.equal(error.suspenseRendererPrerequisitesReady, false);
+      assert.equal(error.ownerDispatcherPrerequisitesReady, false);
       return true;
     },
     reason
