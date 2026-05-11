@@ -44,3 +44,26 @@
 
 - Add a later private handoff from deterministic fake root-map snapshots to any future real root resource storage implementation.
 - Keep preload-props storage separate until a dedicated private preload map execution gate exists.
+
+## Follow-Up Audit Fix
+
+- Added root-map storage execution admission rejection for the 808-ledger public/package compatibility aliases:
+  `publicResourceRootMapStorageCompatibilityClaimed`,
+  `publicResourceMapCommitCompatibilityClaimed`,
+  `publicResourceDispatchCompatibilityClaimed`,
+  `publicPackageCompatibilityClaimed`, and
+  `publicPackageExportsCompatibilityClaimed`.
+- Covered the aliases in the focused private root-map storage execution package test.
+
+## Follow-Up Verification
+
+- `node --check packages/react-dom/src/resource-form-internals-gate.js`
+- `node --check packages/react-dom/src/resource-form-gates.js`
+- `node --check packages/react-dom/test/resource-form-unsupported-gates.test.js`
+- `node --test --test-name-pattern "private resource root-map storage execution" packages/react-dom/test/resource-form-unsupported-gates.test.js`
+- `node --test --test-name-pattern "root-map storage" tests/conformance/test/react-dom-resource-hints-oracle.test.mjs`
+- `node --test packages/react-dom/test/resource-form-unsupported-gates.test.js`
+- `npm run check:package-surface`
+- `node tests/smoke/import-entrypoints.mjs`
+- `git diff --check`
+- `git diff --cached --check`

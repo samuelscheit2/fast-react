@@ -15461,6 +15461,21 @@ test('private resource root-map storage execution mutates deterministic fake map
       scriptExecutionStarted: true
     }
   );
+  for (const field of [
+    'publicResourceRootMapStorageCompatibilityClaimed',
+    'publicResourceMapCommitCompatibilityClaimed',
+    'publicResourceDispatchCompatibilityClaimed',
+    'publicPackageCompatibilityClaimed',
+    'publicPackageExportsCompatibilityClaimed'
+  ]) {
+    assertRootMapStorageExecutionAdmissionRejects(
+      preflight,
+      {
+        explicitRootMapStorageExecution: true,
+        [field]: true
+      }
+    );
+  }
   assert.throws(
     () =>
       resourceFormGate

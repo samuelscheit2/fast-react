@@ -10225,6 +10225,11 @@ function assertNoRootMapStorageExecutionClaims(admission) {
   assertNoRootMapStorageExecutionClaimFields(
     admission,
     [
+      'publicResourceRootMapStorageCompatibilityClaimed',
+      'publicResourceMapCommitCompatibilityClaimed',
+      'publicResourceDispatchCompatibilityClaimed',
+      'publicPackageCompatibilityClaimed',
+      'publicPackageExportsCompatibilityClaimed',
       'packageCompatibilityClaimed',
       'packageExportCompatibilityClaimed',
       'packageExportsMutated',
