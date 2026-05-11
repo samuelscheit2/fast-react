@@ -536,6 +536,7 @@ const hydrationTextMismatchRecoverableErrorRoutingExecutionPayloads =
 const hydrationRecoverableErrorBoundaryAdmissionPayloads = new WeakMap();
 const hydrationTextNodeClaimPatchExecutionPayloads = new WeakMap();
 let hydrateRootSourceLedgerRootBridgeModule = null;
+let hydrateRootSourceLedgerRootBridgeRegistrationCandidate = null;
 const hydrateRootSourceLedgerRootBridgeModules = new WeakSet();
 const hydrateRootSourceLedgerRootBridgeAuthorityTokens = new WeakMap();
 const defaultHydrationBoundaryGate = createHydrationBoundaryGate();
@@ -1908,6 +1909,9 @@ function createHydrationRecoverableErrorBoundaryAdmissionRecord(
     targetClaimAccepted: true,
     targetClaimExecuted: false,
     replayExecutionAccepted: true,
+    replayBlockerCurrentnessAccepted: true,
+    replayBlockerReportAccepted: true,
+    replayBlockerReportCurrent: true,
     replayTargetDispatchExecutionBlocked: true,
     replayQueueDrained: false,
     eventsReplayed: false,
@@ -2004,6 +2008,25 @@ function createHydrationRecoverableErrorBoundaryAdmissionRecord(
       validation.sourceLedger.eventReplayPreflightRecord.kind,
     sourceEventReplayPreflightStatus:
       validation.sourceLedger.eventReplayPreflightRecord.preflightStatus,
+    sourceReplayBlockerCurrentnessKind:
+      validation.sourceLedger.replayBlockerCurrentnessRecord.kind,
+    sourceReplayBlockerCurrentnessStatus:
+      validation.sourceLedger.replayBlockerCurrentnessRecord
+        .currentnessStatus,
+    sourceReplayBlockerCurrentnessId:
+      validation.sourceLedger.replayBlockerCurrentnessRecord
+        .replayBlockerCurrentnessId,
+    replayBlockerCurrentness:
+      validation.sourceLedger.replayBlockerCurrentnessRecord,
+    replayBlockerCurrentnessAccepted: true,
+    replayBlockerReport:
+      validation.sourceLedger.replayBlockerCurrentnessRecord
+        .eventReplayBlockers,
+    replayBlockerReportAccepted: true,
+    replayBlockerReportCurrent: true,
+    replayBlockerReportSourceOwned: true,
+    rootListenerReplayAliasRejected: true,
+    rootListenerStateDoesNotProveReplay: true,
     sourceExecutionPreflightKind:
       validation.sourceLedger.executionPreflightRecord.kind,
     sourceExecutionPreflightStatus:
@@ -4127,6 +4150,10 @@ function normalizeHydrationRecoverableErrorBoundaryAdmissionOptions(
   const aliasKey = findHydrationRecoverableErrorBoundaryAdmissionAliasKey(
     normalizedOptions
   );
+  const publicClaimAliasKey =
+    findHydrationRecoverableErrorBoundaryAdmissionPublicClaimAliasKey(
+      normalizedOptions
+    );
 
   return freezeRecord({
     aliasKey,
@@ -4142,6 +4169,7 @@ function normalizeHydrationRecoverableErrorBoundaryAdmissionOptions(
     hydrateRootPreflightRecord:
       normalizedOptions.hydrateRootPreflightRecord,
     lifecycleRequestBoundary: normalizedOptions.lifecycleRequestBoundary,
+    publicClaimAliasKey,
     rawOptions: options,
     source:
       typeof normalizedOptions.source === 'string'
@@ -4155,15 +4183,93 @@ function findHydrationRecoverableErrorBoundaryAdmissionAliasKey(options) {
     'callback',
     'error',
     'errorInfo',
+    'hydrateRootSourceLedgerContext',
     'onRecoverableError',
     'recoverableError',
     'recoverableErrorCallback',
-    'rootOptions'
+    'rootOptions',
+    'sourceLedger',
+    'sourceLedgerPayload',
+    'sourceLedgerReader'
   ]) {
     if (Object.prototype.hasOwnProperty.call(options, key)) {
       return key;
     }
   }
+  return null;
+}
+
+function findHydrationRecoverableErrorBoundaryAdmissionPublicClaimAliasKey(
+  options
+) {
+  if (!options || (typeof options !== 'object' && typeof options !== 'function')) {
+    return null;
+  }
+
+  let ownKeys;
+  try {
+    ownKeys = Reflect.ownKeys(options);
+  } catch (error) {
+    return 'proxy-own-keys';
+  }
+
+  const blockedOwnKeys = new Set([
+    'browserDomEventCompatibilityClaimed',
+    'browserDomMutation',
+    'compatibilityClaimed',
+    'domMutated',
+    'domMutation',
+    'eventDispatch',
+    'eventReplayInstalled',
+    'eventReplaySupported',
+    'eventsReplayed',
+    'hydration',
+    'hydrationCompatibilityClaimed',
+    'hydrationReplaySupported',
+    'nativeExecution',
+    'packageCompatibility',
+    'publicHydrateRootSupported',
+    'publicHydrationCompatibilityClaimed',
+    'publicHydrationReplayCompatibilityClaimed',
+    'publicPackageCompatibilityClaimed',
+    'publicRootCompatibilitySurface',
+    'publicRootCreated',
+    'publicRootExecution',
+    'publicRootObjectExposed',
+    'reconcilerExecution',
+    'replayBlocker',
+    'replayBlockerReport',
+    'replayQueuesDrained',
+    'rootListenerCurrentness',
+    'rootListenerDispatchCurrentness',
+    'rootListenerReplayAlias',
+    'rootListenerReplayCurrentness',
+    'rootScheduled',
+    'rustExecution',
+    'suspenseHydrationScheduled'
+  ]);
+
+  for (const key of ownKeys) {
+    if (typeof key === 'symbol') {
+      return key.description || String(key);
+    }
+    if (blockedOwnKeys.has(key)) {
+      return key;
+    }
+  }
+
+  for (const key of blockedOwnKeys) {
+    let value;
+    try {
+      value = options[key];
+    } catch (error) {
+      return key;
+    }
+    if (value === true || (typeof value === 'number' && value > 0)) {
+      return key;
+    }
+  }
+
   return null;
 }
 
@@ -4187,6 +4293,11 @@ function validateHydrationRecoverableErrorBoundaryAdmission(
   if (admissionOptions.aliasKey !== null) {
     throwInvalidHydrationRecoverableErrorBoundaryAdmission(
       'Hydration recoverable-error boundary admission rejects callback or value alias options.'
+    );
+  }
+  if (admissionOptions.publicClaimAliasKey !== null) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission rejects source-ledger, root-listener, public hydration, browser, native, package, or replay compatibility aliases.'
     );
   }
   if (
@@ -4640,6 +4751,11 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
     admissionOptions.executionPreflightRecord;
   const lifecycleRequestBoundary =
     admissionOptions.lifecycleRequestBoundary;
+  const replayBlockerCurrentnessRecord =
+    eventReplayPreflightRecord &&
+    typeof eventReplayPreflightRecord === 'object'
+      ? eventReplayPreflightRecord.replayBlockerCurrentness
+      : null;
   const hydrateRootSourceLedgerPayload =
     getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
       hydrationBoundaryRecord,
@@ -4676,6 +4792,15 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
       replayExecutionPayload,
       replayExecutionRecord
     );
+  const replayBlockerSourceLedgerPayload =
+    getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+      hydrationBoundaryRecord,
+      replayBlockerCurrentnessRecord,
+      'hydrate-root-public-facade-replay-blocker-currentness-record',
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
+    );
 
   if (
     !isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
@@ -4698,6 +4823,11 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
       lifecycleRequestBoundary,
       'hydrate-root-public-facade-lifecycle-request-boundary'
     ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+      replayBlockerSourceLedgerPayload,
+      replayBlockerCurrentnessRecord,
+      'hydrate-root-public-facade-replay-blocker-currentness-record'
+    ) ||
     !isHydrationRecoverableErrorBoundaryAdmissionHydrateRootPreflight(
       hydrateRootPreflightRecord
     ) ||
@@ -4710,15 +4840,22 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
     !isHydrationRecoverableErrorBoundaryAdmissionLifecycleBoundary(
       lifecycleRequestBoundary
     ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionReplayBlockerCurrentness(
+      replayBlockerCurrentnessRecord
+    ) ||
     hydrateRootPreflightRecord.hydrationBoundaryRecord !==
       hydrationBoundaryRecord ||
     hydrateRootSourceLedgerPayload.hydrationBoundaryRecord !==
       hydrationBoundaryRecord ||
+    hydrateRootSourceLedgerPayload.eventReplayBlockers !==
+      hydrationBoundaryRecord.eventReplayBlockers ||
     eventReplaySourceLedgerPayload.hydrationBoundaryRecord !==
       hydrationBoundaryRecord ||
     executionSourceLedgerPayload.hydrationBoundaryRecord !==
       hydrationBoundaryRecord ||
     lifecycleSourceLedgerPayload.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    replayBlockerSourceLedgerPayload.hydrationBoundaryRecord !==
       hydrationBoundaryRecord ||
     hydrateRootSourceLedgerPayload.preflight !==
       eventReplaySourceLedgerPayload.preflight ||
@@ -4726,18 +4863,24 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
       executionSourceLedgerPayload.preflight ||
     hydrateRootSourceLedgerPayload.preflight !==
       lifecycleSourceLedgerPayload.preflight ||
+    hydrateRootSourceLedgerPayload.preflight !==
+      replayBlockerSourceLedgerPayload.preflight ||
     hydrateRootSourceLedgerPayload.bridge !==
       eventReplaySourceLedgerPayload.bridge ||
     hydrateRootSourceLedgerPayload.bridge !==
       executionSourceLedgerPayload.bridge ||
     hydrateRootSourceLedgerPayload.bridge !==
       lifecycleSourceLedgerPayload.bridge ||
+    hydrateRootSourceLedgerPayload.bridge !==
+      replayBlockerSourceLedgerPayload.bridge ||
     hydrateRootSourceLedgerPayload.requestRecord !==
       eventReplaySourceLedgerPayload.requestRecord ||
     hydrateRootSourceLedgerPayload.requestRecord !==
       executionSourceLedgerPayload.requestRecord ||
     hydrateRootSourceLedgerPayload.requestRecord !==
       lifecycleSourceLedgerPayload.requestRecord ||
+    hydrateRootSourceLedgerPayload.requestRecord !==
+      replayBlockerSourceLedgerPayload.requestRecord ||
     hydrateRootSourceLedgerPayload.requestAdmission !==
       lifecycleSourceLedgerPayload.requestAdmission ||
     hydrateRootPreflightRecord.recoverableErrorPreflight !==
@@ -4767,6 +4910,12 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
       replayExecutionRecord ||
     eventReplaySourceLedgerPayload.replayExecutionRecord !==
       replayExecutionRecord ||
+    eventReplayPreflightRecord.replayBlockerCurrentness !==
+      replayBlockerCurrentnessRecord ||
+    eventReplayPreflightRecord.replayBlockerCurrentnessAccepted !== true ||
+    eventReplayPreflightRecord.replayBlockerReportAccepted !== true ||
+    eventReplaySourceLedgerPayload.replayBlockerCurrentness !==
+      replayBlockerCurrentnessRecord ||
     executionPreflightRecord.lifecycleRequestBoundary !==
       lifecycleRequestBoundary ||
     executionSourceLedgerPayload.lifecycleRequestBoundary !==
@@ -4779,8 +4928,36 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
       replayExecutionRecord ||
     executionSourceLedgerPayload.replayExecutionRecord !==
       replayExecutionRecord ||
+    executionPreflightRecord.replayBlockerCurrentness !==
+      replayBlockerCurrentnessRecord ||
+    executionPreflightRecord.replayBlockerCurrentnessAccepted !== true ||
+    executionPreflightRecord.replayBlockerReportAccepted !== true ||
+    executionSourceLedgerPayload.replayBlockerCurrentness !==
+      replayBlockerCurrentnessRecord ||
     executionPreflightRecord.recoverableErrorMetadata !==
       hydrationBoundaryRecord.recoverableErrorMetadata ||
+    replayBlockerCurrentnessRecord.eventReplayBlockers !==
+      hydrationBoundaryRecord.eventReplayBlockers ||
+    replayBlockerCurrentnessRecord.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
+    replayBlockerCurrentnessRecord.replayExecutionRecord !==
+      replayExecutionRecord ||
+    replayBlockerCurrentnessRecord.targetClaimingDiagnostic !==
+      targetClaimingDiagnostic ||
+    replayBlockerCurrentnessRecord.targetDispatchLinkDiagnostic !==
+      targetClaimingPayload.targetDispatchLinkDiagnostic ||
+    replayBlockerSourceLedgerPayload.eventReplayBlockers !==
+      hydrationBoundaryRecord.eventReplayBlockers ||
+    replayBlockerSourceLedgerPayload.eventReplayPreflightRecord !==
+      eventReplayPreflightRecord ||
+    replayBlockerSourceLedgerPayload.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
+    replayBlockerSourceLedgerPayload.replayExecutionRecord !==
+      replayExecutionRecord ||
+    replayBlockerSourceLedgerPayload.targetClaimingDiagnostic !==
+      targetClaimingDiagnostic ||
+    replayBlockerSourceLedgerPayload.targetDispatchLinkDiagnostic !==
+      targetClaimingPayload.targetDispatchLinkDiagnostic ||
     lifecycleRequestBoundary.hydrationBoundaryRecord !==
       hydrationBoundaryRecord ||
     lifecycleRequestBoundary.acceptedPrivateMetadataDiagnostics !==
@@ -4821,6 +4998,8 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
     lifecycleContainerSnapshotCurrent: true,
     lifecycleRequestBoundary,
     lifecycleSourceLedgerPayload,
+    replayBlockerCurrentnessRecord,
+    replayBlockerSourceLedgerPayload,
     sourceOwnedLedgerPayloads: true
   });
 }
@@ -4890,6 +5069,19 @@ function getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
       ledgerKind
     );
   }
+  if (
+    ledgerKind ===
+    'hydrate-root-public-facade-replay-blocker-currentness-record'
+  ) {
+    return createHydrateRootReplayBlockerCurrentnessSourceLedgerPayload(
+      hydrationBoundaryRecord,
+      record,
+      ledgerKind,
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
+    );
+  }
 
   return null;
 }
@@ -4916,6 +5108,7 @@ function createHydrateRootPreflightSourceLedgerPayload(
 
   return freezeRecord({
     bridge: sourceLedgerPayload.bridge,
+    eventReplayBlockers: sourceLedgerPayload.eventReplayBlockers,
     hydrationBoundaryRecord: sourceLedgerPayload.hydrationBoundaryRecord,
     ledgerKind,
     lifecycleRequestBoundary: record.lifecycleRequestBoundary,
@@ -4925,6 +5118,67 @@ function createHydrateRootPreflightSourceLedgerPayload(
     recoverableErrorPreflight: record.recoverableErrorPreflight,
     requestAdmission: sourceLedgerPayload.requestAdmission,
     requestRecord: sourceLedgerPayload.requestRecord,
+    record
+  });
+}
+
+function createHydrateRootReplayBlockerCurrentnessSourceLedgerPayload(
+  hydrationBoundaryRecord,
+  record,
+  ledgerKind,
+  targetClaimingPayload,
+  replayExecutionPayload,
+  replayExecutionRecord
+) {
+  const sourceLedgerPayload =
+    readPrivateHydrateRootSourceLedgerPayload(
+      hydrationBoundaryRecord,
+      record,
+      ledgerKind
+    );
+  if (
+    sourceLedgerPayload === null ||
+    record.lifecycleRequestBoundary !==
+      sourceLedgerPayload.lifecycleRequestBoundary ||
+    record.eventReplayBlockers !==
+      sourceLedgerPayload.eventReplayBlockers ||
+    record.replayExecutionRecord !== replayExecutionRecord ||
+    record.targetClaimingDiagnostic !==
+      replayExecutionPayload.targetClaimingDiagnostic ||
+    sourceLedgerPayload.replayExecutionRecord !== replayExecutionRecord ||
+    sourceLedgerPayload.targetClaimingDiagnostic !==
+      replayExecutionPayload.targetClaimingDiagnostic ||
+    sourceLedgerPayload.targetDispatchLinkDiagnostic !==
+      targetClaimingPayload.targetDispatchLinkDiagnostic
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: sourceLedgerPayload.bridge,
+    eventReplayBlockers: sourceLedgerPayload.eventReplayBlockers,
+    eventReplayPreflightRecord:
+      sourceLedgerPayload.eventReplayPreflightRecord,
+    hydrationBoundaryRecord: sourceLedgerPayload.hydrationBoundaryRecord,
+    ledgerKind,
+    lifecycleRequestBoundary: sourceLedgerPayload.lifecycleRequestBoundary,
+    preflight: sourceLedgerPayload.preflight,
+    replayBlockerCurrentness: record,
+    replayExecutionPayload,
+    replayExecutionRecord: sourceLedgerPayload.replayExecutionRecord,
+    requestRecord: sourceLedgerPayload.requestRecord,
+    targetClaimingDiagnostic:
+      sourceLedgerPayload.targetClaimingDiagnostic,
+    targetClaimingPayload: freezeRecord({
+      ...targetClaimingPayload,
+      targetClaimingDiagnostic:
+        replayExecutionPayload.targetClaimingDiagnostic,
+      targetDispatchLinkDiagnostic:
+        sourceLedgerPayload.targetDispatchLinkDiagnostic
+    }),
+    targetClaimingPreflight: sourceLedgerPayload.targetClaimingPreflight,
+    targetDispatchLinkDiagnostic:
+      sourceLedgerPayload.targetDispatchLinkDiagnostic,
     record
   });
 }
@@ -4960,6 +5214,7 @@ function createHydrateRootEventReplaySourceLedgerPayload(
     ledgerKind,
     lifecycleRequestBoundary: record.lifecycleRequestBoundary,
     preflight: sourceLedgerPayload.preflight,
+    replayBlockerCurrentness: sourceLedgerPayload.replayBlockerCurrentness,
     replayExecutionPayload,
     replayExecutionRecord: record.replayExecutionRecord,
     requestRecord: sourceLedgerPayload.requestRecord,
@@ -5001,6 +5256,7 @@ function createHydrateRootExecutionSourceLedgerPayload(
     ledgerKind,
     lifecycleRequestBoundary: record.lifecycleRequestBoundary,
     preflight: sourceLedgerPayload.preflight,
+    replayBlockerCurrentness: sourceLedgerPayload.replayBlockerCurrentness,
     replayExecutionPayload,
     replayExecutionRecord: record.replayExecutionRecord,
     requestRecord: sourceLedgerPayload.requestRecord,
@@ -5105,6 +5361,9 @@ function rememberPrivateHydrateRootSourceLedgerRootBridgeModule() {
     isTrustedPrivateHydrateRootSourceLedgerRootBridgeModule(
       cacheEntry.exports
     ) &&
+    isCanonicalPrivateHydrateRootSourceLedgerRootBridgeModule(
+      cacheEntry.exports
+    ) &&
     isPrivateHydrateRootSourceLedgerRootBridgeCacheEntry(
       rootBridgePath,
       cacheEntry.exports
@@ -5114,13 +5373,29 @@ function rememberPrivateHydrateRootSourceLedgerRootBridgeModule() {
     return hydrateRootSourceLedgerRootBridgeModule;
   }
 
-  delete require.cache[rootBridgePath];
+  if (
+    cacheEntry &&
+    !isCanonicalPrivateHydrateRootSourceLedgerRootBridgeModule(
+      cacheEntry.exports
+    )
+  ) {
+    delete require.cache[rootBridgePath];
+  }
   const rootBridge = require(rootBridgePath);
-  requestPrivateHydrateRootSourceLedgerRootBridgeModuleRegistration(
-    rootBridge
-  );
+  const previousRegistrationCandidate =
+    hydrateRootSourceLedgerRootBridgeRegistrationCandidate;
+  hydrateRootSourceLedgerRootBridgeRegistrationCandidate = rootBridge;
+  try {
+    requestPrivateHydrateRootSourceLedgerRootBridgeModuleRegistration(
+      rootBridge
+    );
+  } finally {
+    hydrateRootSourceLedgerRootBridgeRegistrationCandidate =
+      previousRegistrationCandidate;
+  }
   if (
     !isTrustedPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) ||
+    !isCanonicalPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) ||
     !isPrivateHydrateRootSourceLedgerRootBridgeCacheEntry(
       rootBridgePath,
       rootBridge
@@ -5131,6 +5406,50 @@ function rememberPrivateHydrateRootSourceLedgerRootBridgeModule() {
   }
   hydrateRootSourceLedgerRootBridgeModule = rootBridge;
   return hydrateRootSourceLedgerRootBridgeModule;
+}
+
+function isCanonicalPrivateHydrateRootSourceLedgerRootBridgeModule(
+  rootBridge
+) {
+  return (
+    isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) &&
+    rootBridge.CLIENT_ROOT_KIND === 'client' &&
+    rootBridge.CONCURRENT_ROOT_TAG === 'ConcurrentRoot' &&
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED ===
+      'admitted-private-root-bridge-request-record' &&
+    rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED ===
+      'blocked-private-root-bridge-execution' &&
+    rootBridge.ROOT_BRIDGE_COMPATIBILITY_BLOCKED ===
+      'blocked-private-root-bridge-compatibility' &&
+    rootBridge.privateRootAdmissionRecordType ===
+      'fast.react_dom.private_root_admission_record' &&
+    rootBridge.privateRootHydrateRecordType ===
+      'fast.react_dom.private_root_hydrate_record' &&
+    rootBridge.privateHydrateRootPublicFacadePreflightRecordType ===
+      'fast.react_dom.private_hydrate_root_public_facade_preflight_record' &&
+    rootBridge.privateHydrateRootPublicFacadeEventReplayPreflightRecordType ===
+      'fast.react_dom.private_hydrate_root_public_facade_event_replay_preflight_record' &&
+    rootBridge.privateHydrateRootPublicFacadeReplayBlockerCurrentnessRecordType ===
+      'fast.react_dom.private_hydrate_root_public_facade_replay_blocker_currentness_record' &&
+    rootBridge.privateHydrateRootPublicFacadeExecutionPreflightRecordType ===
+      'fast.react_dom.private_hydrate_root_public_facade_execution_preflight_record' &&
+    typeof rootBridge.admitPrivateCreateRenderPath === 'function' &&
+    typeof rootBridge.admitRootBridgeRequestRecord === 'function' &&
+    typeof rootBridge.createHydrateRootRecord === 'function' &&
+    typeof rootBridge.createPrivateRootPublicFacadePreflight === 'function' &&
+    typeof rootBridge.getPrivateRootRecordPayload === 'function' &&
+    typeof rootBridge.isPrivateRootBridgeAdmissionRecord === 'function' &&
+    typeof rootBridge.renderPrivateRootHostOutput === 'function'
+  );
+}
+
+function isCanonicalPrivateHydrateRootSourceLedgerRootBridgeRegistrationCandidate(
+  rootBridge
+) {
+  if (hydrateRootSourceLedgerRootBridgeModule !== null) {
+    return rootBridge === hydrateRootSourceLedgerRootBridgeModule;
+  }
+  return rootBridge === hydrateRootSourceLedgerRootBridgeRegistrationCandidate;
 }
 
 function isPrivateHydrateRootSourceLedgerRootBridgeCacheEntry(
@@ -5184,6 +5503,12 @@ function isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) {
       .getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload ===
       'function' &&
     typeof rootBridge
+      .isPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessRecord ===
+      'function' &&
+    typeof rootBridge
+      .getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload ===
+      'function' &&
+    typeof rootBridge
       .isPrivateHydrateRootPublicFacadeExecutionPreflightRecord ===
       'function' &&
     typeof rootBridge
@@ -5210,7 +5535,9 @@ function registerPrivateHydrateRootSourceLedgerRootBridgeModule(
     !authorityToken ||
     (typeof authorityToken !== 'object' &&
       typeof authorityToken !== 'function') ||
-    !isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
+    !isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) ||
+    (rootBridge !== hydrateRootSourceLedgerRootBridgeModule &&
+      rootBridge !== hydrateRootSourceLedgerRootBridgeRegistrationCandidate)
   ) {
     return false;
   }
@@ -5218,6 +5545,7 @@ function registerPrivateHydrateRootSourceLedgerRootBridgeModule(
     rootBridge,
     authorityToken
   );
+  hydrateRootSourceLedgerRootBridgeModule = rootBridge;
   return true;
 }
 
@@ -5225,18 +5553,28 @@ function requestPrivateHydrateRootSourceLedgerRootBridgeModuleRegistration(
   rootBridge
 ) {
   if (
-    !isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) ||
+    !isCanonicalPrivateHydrateRootSourceLedgerRootBridgeRegistrationCandidate(
+      rootBridge
+    ) ||
     typeof rootBridge
       .registerPrivateHydrateRootSourceLedgerRootBridgeModule !== 'function'
   ) {
     return false;
   }
-  return (
-    rootBridge.registerPrivateHydrateRootSourceLedgerRootBridgeModule(
-      registerPrivateHydrateRootSourceLedgerRootBridgeModule
-    ) === true &&
-    isTrustedPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
-  );
+  const previousRegistrationCandidate =
+    hydrateRootSourceLedgerRootBridgeRegistrationCandidate;
+  hydrateRootSourceLedgerRootBridgeRegistrationCandidate = rootBridge;
+  try {
+    return (
+      rootBridge.registerPrivateHydrateRootSourceLedgerRootBridgeModule(
+        registerPrivateHydrateRootSourceLedgerRootBridgeModule
+      ) === true &&
+      isTrustedPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
+    );
+  } finally {
+    hydrateRootSourceLedgerRootBridgeRegistrationCandidate =
+      previousRegistrationCandidate;
+  }
 }
 
 function trustPrivateHydrateRootSourceLedgerRootBridgeModule(
@@ -5249,7 +5587,7 @@ function trustPrivateHydrateRootSourceLedgerRootBridgeModule(
     authorityToken &&
     (typeof authorityToken === 'object' ||
       typeof authorityToken === 'function') &&
-    isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
+    isCanonicalPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
   ) {
     hydrateRootSourceLedgerRootBridgeModules.add(rootBridge);
     hydrateRootSourceLedgerRootBridgeAuthorityTokens.set(
@@ -5266,7 +5604,7 @@ function isTrustedPrivateHydrateRootSourceLedgerRootBridgeModule(
     rootBridge &&
     (typeof rootBridge === 'object' || typeof rootBridge === 'function') &&
     hydrateRootSourceLedgerRootBridgeModules.has(rootBridge) &&
-    isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
+    isCanonicalPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
   );
 }
 
@@ -5367,6 +5705,10 @@ function isHydrationRecoverableErrorBoundaryAdmissionEventReplayPreflight(
     record.preconditions.accepted === true &&
     record.preconditions.stateUnchanged === true &&
     record.replayExecutionPayloadAccepted === true &&
+    record.replayBlockerCurrentnessAccepted === true &&
+    record.replayBlockerReportAccepted === true &&
+    record.replayBlockerReportCurrent === true &&
+    record.rootListenerReplayAliasRejected === true &&
     record.lifecycleRequestBoundaryAccepted === true &&
     record.lifecycleRequestBoundarySourceOwned === true &&
     record.lifecycleContainerSnapshotOwned === true &&
@@ -5379,6 +5721,15 @@ function isHydrationRecoverableErrorBoundaryAdmissionEventReplayPreflight(
     record.replayQueuesDrained === false &&
     record.eventsReplayed === false &&
     record.eventDispatch === false &&
+    record.publicRootCreated === false &&
+    record.publicRootExecution === false &&
+    record.nativeExecution === false &&
+    record.reconcilerExecution === false &&
+    record.domMutation === false &&
+    record.rootScheduled === false &&
+    record.browserDomEventCompatibilityClaimed === false &&
+    record.publicHydrationCompatibilityClaimed === false &&
+    record.publicHydrationReplayCompatibilityClaimed === false &&
     record.compatibilityClaimed === false
   );
 }
@@ -5403,6 +5754,10 @@ function isHydrationRecoverableErrorBoundaryAdmissionExecutionPreflight(
     record.eventReplayPreconditionsAccepted === true &&
     record.eventReplayStateUnchanged === true &&
     record.replayExecutionPayloadAccepted === true &&
+    record.replayBlockerCurrentnessAccepted === true &&
+    record.replayBlockerReportAccepted === true &&
+    record.replayBlockerReportCurrent === true &&
+    record.rootListenerReplayAliasRejected === true &&
     record.lifecycleRequestBoundaryAccepted === true &&
     record.lifecycleRequestBoundarySourceOwned === true &&
     record.lifecycleContainerSnapshotOwned === true &&
@@ -5423,6 +5778,10 @@ function isHydrationRecoverableErrorBoundaryAdmissionExecutionPreflight(
     record.nativeExecution === false &&
     record.reconcilerExecution === false &&
     record.domMutation === false &&
+    record.rootScheduled === false &&
+    record.browserDomEventCompatibilityClaimed === false &&
+    record.publicHydrationCompatibilityClaimed === false &&
+    record.publicHydrationReplayCompatibilityClaimed === false &&
     record.hydration === false &&
     record.compatibilityClaimed === false
   );
@@ -5467,6 +5826,109 @@ function isHydrationRecoverableErrorBoundaryAdmissionLifecycleBoundary(
     record.publicHydrationReplayCompatibilityClaimed === false &&
     record.lifecycleContainerSnapshot &&
     typeof record.lifecycleContainerSnapshot === 'object'
+  );
+}
+
+function isHydrationRecoverableErrorBoundaryAdmissionReplayBlockerCurrentness(
+  record
+) {
+  return (
+    record &&
+    typeof record === 'object' &&
+    Object.isFrozen(record) &&
+    record.kind ===
+      'FastReactDomPrivateHydrateRootReplayBlockerCurrentnessRecord' &&
+    record.facadeCall === 'hydrateRoot' &&
+    record.requestType === 'hydrateRoot' &&
+    record.status ===
+      'accepted-private-hydrate-root-replay-blocker-currentness' &&
+    record.currentnessStatus ===
+      'accepted-private-hydrate-root-replay-blocker-currentness' &&
+    record.sourceOwned === true &&
+    record.diagnosticOnly === true &&
+    record.readOnly === true &&
+    record.replayBlockerReportAccepted === true &&
+    record.replayBlockerReportSourceOwned === true &&
+    record.replayBlockerReportCurrent === true &&
+    record.lifecycleRequestBoundaryAccepted === true &&
+    record.lifecycleRequestBoundarySourceOwned === true &&
+    record.lifecycleContainerSnapshotOwned === true &&
+    record.lifecycleContainerSnapshotCurrent === true &&
+    record.markerListenerStateCurrent === true &&
+    record.rootListenerReplayAliasRejected === true &&
+    record.rootListenerStateDoesNotProveReplay === true &&
+    record.rootListenerDispatchAliasAccepted === false &&
+    record.sourceLedgerRequired === true &&
+    record.hydrateRootPreflightSourceLedgerRequired === true &&
+    record.eventReplayPreflightSourceLedgerRequired === true &&
+    record.executionPreflightSourceLedgerRequired === true &&
+    record.lifecycleSourceLedgerRequired === true &&
+    record.replayBlockerSourceLedgerRequired === true &&
+    record.targetClaimAccepted === true &&
+    record.targetClaimExecuted === false &&
+    record.replayExecutionAccepted === true &&
+    record.replayTargetDispatchExecutionBlocked === true &&
+    record.eventReplayBlockers &&
+    typeof record.eventReplayBlockers === 'object' &&
+    Object.isFrozen(record.eventReplayBlockers) &&
+    record.eventReplayBlockers.kind ===
+      'FastReactDomHydrationEventReplayBlockers' &&
+    record.eventReplayBlockers.status ===
+      'blocked-after-private-root-and-event-gates' &&
+    record.eventReplayBlockers.compatibilityClaimed === false &&
+    record.eventReplayBlockers.browserDomEventCompatibilityClaimed === false &&
+    record.eventReplayBlockers.publicHydrationCompatibilityClaimed === false &&
+    record.eventReplayBlockers
+      .publicHydrationReplayCompatibilityClaimed === false &&
+    record.eventReplayBlockers.publicHydrateRootSupported === false &&
+    record.eventReplayBlockers.publicRootExecution === false &&
+    record.eventReplayBlockers.publicRootCreated === false &&
+    record.eventReplayBlockers.publicRootObjectExposed === false &&
+    record.eventReplayBlockers.publicPackageCompatibilityClaimed === false &&
+    record.eventReplayBlockers.packageCompatibility === false &&
+    record.eventReplayBlockers.nativeExecution === false &&
+    record.eventReplayBlockers.rustExecution === false &&
+    record.eventReplayBlockers.reconcilerExecution === false &&
+    record.eventReplayBlockers.rootScheduled === false &&
+    record.eventReplayBlockers.hydration === false &&
+    record.eventReplayBlockers.domMutation === false &&
+    record.eventReplayBlockers.domMutated === false &&
+    record.eventReplayBlockers.browserDomMutation === false &&
+    record.eventReplayBlockers.eventDispatch === false &&
+    record.eventReplayBlockers.eventReplayInstalled === false &&
+    record.eventReplayBlockers.eventReplaySupported === false &&
+    record.eventReplayBlockers.hydrationReplaySupported === false &&
+    record.eventReplayBlockers.eventsReplayed === false &&
+    record.eventReplayBlockers.replayQueuesDrained === false &&
+    record.eventReplayBlockers.rootListenerReplayAliasAccepted === false &&
+    record.compatibilityClaimed === false &&
+    record.browserDomEventCompatibilityClaimed === false &&
+    record.publicHydrationCompatibilityClaimed === false &&
+    record.publicHydrationReplayCompatibilityClaimed === false &&
+    record.publicHydrateRootSupported === false &&
+    record.publicRootExecution === false &&
+    record.publicRootObjectExposed === false &&
+    record.publicRootCreated === false &&
+    record.publicPackageCompatibilityClaimed === false &&
+    record.packageCompatibility === false &&
+    record.nativeExecution === false &&
+    record.rustExecution === false &&
+    record.reconcilerExecution === false &&
+    record.rootScheduled === false &&
+    record.hydration === false &&
+    record.canHydrate === false &&
+    record.domMutation === false &&
+    record.domMutated === false &&
+    record.browserDomMutation === false &&
+    record.eventDispatch === false &&
+    record.eventReplayInstalled === false &&
+    record.eventReplaySupported === false &&
+    record.hydrationReplaySupported === false &&
+    record.eventsReplayed === false &&
+    record.replayQueuesDrained === false &&
+    record.recoverableErrorsQueued === false &&
+    record.onRecoverableErrorInvoked === false &&
+    record.publicOnRecoverableErrorInvoked === false
   );
 }
 
@@ -6284,11 +6746,45 @@ function createHydrationEventReplayBlockers({
     diagnosticOnly: true,
     readOnly: true,
     compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicHydrationReplayCompatibilityClaimed: false,
+    publicHydrateRootSupported: false,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    publicRootCreated: false,
+    publicRootCompatibilitySurface: false,
+    publicPackageCompatibilityClaimed: false,
+    packageCompatibility: false,
+    nativeExecution: false,
+    rustExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    suspenseHydrationScheduled: false,
+    hydration: false,
+    canHydrate: false,
+    domMutation: false,
+    domMutated: false,
+    browserDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    listenersAttached: false,
+    eventDispatch: false,
+    eventReplayInstalled: false,
+    eventReplaySupported: false,
     hydrationReplaySupported: false,
     eventsReplayed: false,
+    replayQueueDrained: false,
+    replayQueuesDrained: false,
+    queueMutationAllowed: false,
     explicitHydrationTargetsQueued: false,
     continuousEventReplayQueued: false,
     formReplayQueued: false,
+    recoverableErrorsQueued: false,
+    onRecoverableErrorInvoked: false,
+    publicOnRecoverableErrorInvoked: false,
+    rootListenerReplayAliasAccepted: false,
+    rootListenerStateDoesNotProveReplay: true,
     rootListenerGateAccepted: true,
     rootListenerInstallationDeferred: true,
     eventDispatchGateAccepted: true,
