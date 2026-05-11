@@ -519,6 +519,28 @@ function isFlushAllOrExpiredHelper(key) {
   );
 }
 
+function hasPublicPackageOrFlushHelperCompatibilityClaim(value) {
+  return (
+    isObjectLike(value) &&
+    (value.packageCompatibilityClaimed === true ||
+      value.publicPackageCompatibilityClaimed === true ||
+      value.publicSchedulerFlushHelperCompatibilityClaimed === true ||
+      value.schedulerTimingAdmissionClaimed === true ||
+      value.schedulerDelayedActRootAdmissionClaimed === true ||
+      value.schedulerDelayedRendererRootAdmissionClaimed === true)
+  );
+}
+
+function hasPublicSchedulerFlushExecutionClaim(value) {
+  return (
+    isObjectLike(value) &&
+    (value.invokesPublicSchedulerFlushHelper === true ||
+      value.publicSchedulerFlushBehaviorExecuted === true ||
+      value.publicSchedulerFlushExecutionAvailable === true ||
+      value.routesAcceptedMockSchedulerFlushHelperMetadata === true)
+  );
+}
+
 function recordScheduledTask(shadowState, task) {
   if (!isObjectLike(task)) {
     return;
@@ -888,7 +910,10 @@ function validateExpiredLanePriorityRootSchedulerMetadata(
     lanePriorityRootSchedulerMetadata.publicReactActCompatibilityClaimed !==
       false ||
     lanePriorityRootSchedulerMetadata.publicRootSchedulerCompatibilityClaimed !==
-      false
+      false ||
+    hasPublicPackageOrFlushHelperCompatibilityClaim(
+      lanePriorityRootSchedulerMetadata
+    )
   ) {
     return invalid('metadata-public-claim');
   }
@@ -897,7 +922,8 @@ function validateExpiredLanePriorityRootSchedulerMetadata(
     lanePriorityRootSchedulerMetadata.drainsPublicReactActQueue !== false ||
     lanePriorityRootSchedulerMetadata.executesQueuedWork !== false ||
     lanePriorityRootSchedulerMetadata.executesEffects !== false ||
-    lanePriorityRootSchedulerMetadata.executesRendererWork !== false
+    lanePriorityRootSchedulerMetadata.executesRendererWork !== false ||
+    hasPublicSchedulerFlushExecutionClaim(lanePriorityRootSchedulerMetadata)
   ) {
     return invalid('metadata-execution-claim');
   }
@@ -2628,7 +2654,8 @@ function hasDelayedActRootWorkProducerPublicClaim(options) {
     options.publicReactActCompatibilityClaimed === true ||
     options.publicRootSchedulerCompatibilityClaimed === true ||
     options.publicRendererCompatibilityClaimed === true ||
-    options.compatibilityClaimed === true
+    options.compatibilityClaimed === true ||
+    hasPublicPackageOrFlushHelperCompatibilityClaim(options)
   );
 }
 
@@ -2639,7 +2666,8 @@ function hasDelayedActRootWorkProducerExecutionClaim(options) {
     options.executesQueuedWork === true ||
     options.executesEffects === true ||
     options.executesRendererWork === true ||
-    options.executesRendererRoots === true
+    options.executesRendererRoots === true ||
+    hasPublicSchedulerFlushExecutionClaim(options)
   );
 }
 
@@ -2897,7 +2925,10 @@ function validateDelayedActRootWorkMetadata(
     delayedActRootWorkMetadata.publicReactActCompatibilityClaimed !== false ||
     delayedActRootWorkMetadata.publicRootSchedulerCompatibilityClaimed !==
       false ||
-    delayedActRootWorkMetadata.publicRendererCompatibilityClaimed !== false
+    delayedActRootWorkMetadata.publicRendererCompatibilityClaimed !== false ||
+    hasPublicPackageOrFlushHelperCompatibilityClaim(
+      delayedActRootWorkMetadata
+    )
   ) {
     return invalid('metadata-public-claim');
   }
@@ -2907,7 +2938,8 @@ function validateDelayedActRootWorkMetadata(
     delayedActRootWorkMetadata.executesQueuedWork !== false ||
     delayedActRootWorkMetadata.executesEffects !== false ||
     delayedActRootWorkMetadata.executesRendererWork !== false ||
-    delayedActRootWorkMetadata.executesRendererRoots !== false
+    delayedActRootWorkMetadata.executesRendererRoots !== false ||
+    hasPublicSchedulerFlushExecutionClaim(delayedActRootWorkMetadata)
   ) {
     return invalid('metadata-execution-claim');
   }
@@ -3850,7 +3882,10 @@ function validateExpiredActRootWorkMetadata(
     expiredActRootWorkMetadata.publicReactActCompatibilityClaimed !== false ||
     expiredActRootWorkMetadata.publicRootSchedulerCompatibilityClaimed !==
       false ||
-    expiredActRootWorkMetadata.publicRendererCompatibilityClaimed !== false
+    expiredActRootWorkMetadata.publicRendererCompatibilityClaimed !== false ||
+    hasPublicPackageOrFlushHelperCompatibilityClaim(
+      expiredActRootWorkMetadata
+    )
   ) {
     return invalid('metadata-public-claim');
   }
@@ -3860,7 +3895,8 @@ function validateExpiredActRootWorkMetadata(
     expiredActRootWorkMetadata.executesQueuedWork !== false ||
     expiredActRootWorkMetadata.executesEffects !== false ||
     expiredActRootWorkMetadata.executesRendererWork !== false ||
-    expiredActRootWorkMetadata.executesRendererRoots !== false
+    expiredActRootWorkMetadata.executesRendererRoots !== false ||
+    hasPublicSchedulerFlushExecutionClaim(expiredActRootWorkMetadata)
   ) {
     return invalid('metadata-execution-claim');
   }
@@ -4075,7 +4111,8 @@ function validateExpiredActRootWorkActQueue(queue) {
   if (
     queue.publicCompatibilityClaimed !== false ||
     queue.publicSchedulerTimingCompatibilityClaimed !== false ||
-    queue.publicReactActCompatibilityClaimed !== false
+    queue.publicReactActCompatibilityClaimed !== false ||
+    hasPublicPackageOrFlushHelperCompatibilityClaim(queue)
   ) {
     return invalid('act-queue-public-claim');
   }
@@ -4088,7 +4125,11 @@ function validateExpiredActRootWorkActQueue(queue) {
   ) {
     return invalid('act-queue-drain-policy');
   }
-  if (queue.executesQueuedWork !== false || queue.executesEffects !== false) {
+  if (
+    queue.executesQueuedWork !== false ||
+    queue.executesEffects !== false ||
+    hasPublicSchedulerFlushExecutionClaim(queue)
+  ) {
     return invalid('act-queue-execution-claim');
   }
   if (!Array.isArray(queue.records)) {
@@ -4173,11 +4214,16 @@ function getRejectedExpiredActRootWorkActTaskReason(task, index) {
   if (
     task.publicCompatibilityClaimed !== false ||
     task.publicSchedulerTimingCompatibilityClaimed !== false ||
-    task.publicReactActCompatibilityClaimed !== false
+    task.publicReactActCompatibilityClaimed !== false ||
+    hasPublicPackageOrFlushHelperCompatibilityClaim(task)
   ) {
     return 'act-record-' + index + '-public-claim';
   }
-  if (task.executesQueuedWork !== false || task.executesEffects !== false) {
+  if (
+    task.executesQueuedWork !== false ||
+    task.executesEffects !== false ||
+    hasPublicSchedulerFlushExecutionClaim(task)
+  ) {
     return 'act-record-' + index + '-execution-claim';
   }
   return null;
@@ -4208,13 +4254,15 @@ function getRejectedExpiredActRootWorkCallbackReason(callback, role) {
   if (
     callback.publicCompatibilityClaimed !== false ||
     callback.publicSchedulerTimingCompatibilityClaimed !== false ||
-    callback.publicReactActCompatibilityClaimed !== false
+    callback.publicReactActCompatibilityClaimed !== false ||
+    hasPublicPackageOrFlushHelperCompatibilityClaim(callback)
   ) {
     return role + '-public-claim';
   }
   if (
     callback.executesQueuedWork !== false ||
-    callback.executesEffects !== false
+    callback.executesEffects !== false ||
+    hasPublicSchedulerFlushExecutionClaim(callback)
   ) {
     return role + '-execution-claim';
   }
@@ -4270,7 +4318,8 @@ function getRejectedExpiredActRootWorkRecordReason(record, index) {
     record.publicSchedulerTimingCompatibilityClaimed !== false ||
     record.publicReactActCompatibilityClaimed !== false ||
     record.publicRootSchedulerCompatibilityClaimed !== false ||
-    record.publicRendererCompatibilityClaimed !== false
+    record.publicRendererCompatibilityClaimed !== false ||
+    hasPublicPackageOrFlushHelperCompatibilityClaim(record)
   ) {
     return 'root-work-record-' + index + '-public-claim';
   }
@@ -4280,7 +4329,8 @@ function getRejectedExpiredActRootWorkRecordReason(record, index) {
     record.executesQueuedWork !== false ||
     record.executesEffects !== false ||
     record.executesRendererWork !== false ||
-    record.executesRendererRoots !== false
+    record.executesRendererRoots !== false ||
+    hasPublicSchedulerFlushExecutionClaim(record)
   ) {
     return 'root-work-record-' + index + '-execution-claim';
   }

@@ -94,6 +94,13 @@ test('scheduler mock records expired lane metadata while keeping renderer work b
     assert.equal(report[expiredLaneFlushDiagnosticsBrand], true, nodeEnv);
     assert.equal(report.kind, expiredLaneFlushDiagnosticsKind, nodeEnv);
     assert.equal(
+      diagnostics.schedulerMockExpiredActRootWorkSourceValidator.isSchedulerMockExpiredActRootWorkSource(
+        report
+      ),
+      false,
+      nodeEnv
+    );
+    assert.equal(
       report.status,
       'drained-expired-mock-scheduler-work-with-lane-metadata-for-diagnostics',
       nodeEnv
@@ -215,6 +222,79 @@ test('scheduler mock rejects unsupported priority levels and stale callback hand
       nodeEnv
     );
     assert.deepEqual(events, [], nodeEnv);
+
+    Scheduler.reset();
+  }
+});
+
+test('scheduler mock rejects expired lane public timing and helper/package claims', () => {
+  const reactGate = loadFreshReactActDispatcherGate();
+
+  for (const nodeEnv of ['development', 'production']) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const diagnostics = readPrivateFlushDiagnostics(Scheduler);
+
+    for (const { label, overrides, reason } of [
+      {
+        label: 'public-scheduler-timing-claim',
+        overrides: { publicSchedulerTimingCompatibilityClaimed: true },
+        reason: 'metadata-public-claim'
+      },
+      {
+        label: 'public-scheduler-flush-helper-claim',
+        overrides: { publicSchedulerFlushHelperCompatibilityClaimed: true },
+        reason: 'metadata-public-claim'
+      },
+      {
+        label: 'package-compatibility-claim',
+        overrides: { packageCompatibilityClaimed: true },
+        reason: 'metadata-public-claim'
+      },
+      {
+        label: 'invokes-public-scheduler-flush-helper',
+        overrides: { invokesPublicSchedulerFlushHelper: true },
+        reason: 'metadata-execution-claim'
+      },
+      {
+        label: 'public-scheduler-flush-executed',
+        overrides: { publicSchedulerFlushBehaviorExecuted: true },
+        reason: 'metadata-execution-claim'
+      }
+    ]) {
+      Scheduler.reset();
+      let callbackRan = false;
+      const handle = Scheduler.unstable_scheduleCallback(
+        Scheduler.unstable_UserBlockingPriority,
+        reactGate.createInternalActQueueTestCallback(
+          () => {
+            callbackRan = true;
+            Scheduler.log(label);
+          },
+          { label }
+        )
+      );
+      Scheduler.unstable_advanceTime(251);
+
+      const metadata = createExpiredLaneMetadata(Scheduler, handle, overrides);
+      const described =
+        diagnostics.describeExpiredLanePriorityRootSchedulerMetadataForDiagnostics(
+          metadata
+        );
+      assert.equal(described.accepted, false, `${nodeEnv}:${label}`);
+      assert.equal(
+        described.rejectionReason,
+        reason,
+        `${nodeEnv}:${label}`
+      );
+      assertExpiredLaneFlushRejection(
+        () => diagnostics.drainExpiredMockSchedulerWork(metadata),
+        reason,
+        `${nodeEnv}:${label}`
+      );
+      assert.equal(callbackRan, false, `${nodeEnv}:${label}`);
+      assert.deepEqual(Scheduler.unstable_clearLog(), [], `${nodeEnv}:${label}`);
+      assert.equal(typeof handle.callback, 'function', `${nodeEnv}:${label}`);
+    }
 
     Scheduler.reset();
   }

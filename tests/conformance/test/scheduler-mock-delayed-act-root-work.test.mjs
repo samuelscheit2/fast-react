@@ -35,6 +35,9 @@ const expiredActRootWorkDiagnosticsKind =
 const expiredActRootWorkDiagnosticsBrand = Symbol.for(
   expiredActRootWorkDiagnosticsKind
 );
+const expiredActRootWorkSourceProof = Symbol.for(
+  'fast-react.scheduler.mock-expired-act-root-work-source-proof'
+);
 
 test('scheduler mock promotes delayed act/root metadata through the expired route', () => {
   const reactGate = loadFreshReactActDispatcherGate();
@@ -255,6 +258,12 @@ test('scheduler mock promotes delayed act/root metadata through the expired rout
     assert.equal(report.executesEffects, false, nodeEnv);
     assert.equal(report.executesRendererWork, false, nodeEnv);
     assert.equal(report.executesRendererRoots, false, nodeEnv);
+    assertSchedulerMockSourceValidatorRejectsForgedSources(
+      readSchedulerMockExpiredActRootWorkSourceValidator(Scheduler),
+      Scheduler.unstable_flushExpired,
+      report,
+      nodeEnv
+    );
     assert.deepEqual(
       events,
       [
@@ -505,6 +514,12 @@ test('scheduler mock promotes delayed renderer-root metadata through private act
     assert.equal(report.executesEffects, false, nodeEnv);
     assert.equal(report.executesRendererWork, false, nodeEnv);
     assert.equal(report.executesRendererRoots, false, nodeEnv);
+    assertSchedulerMockSourceValidatorRejectsForgedSources(
+      readSchedulerMockExpiredActRootWorkSourceValidator(Scheduler),
+      Scheduler.unstable_flushExpired,
+      report,
+      nodeEnv
+    );
     assert.deepEqual(
       events,
       [
@@ -560,8 +575,38 @@ test('scheduler mock rejects unsafe delayed renderer-root producer metadata', ()
 
     const rendererRootClaimCases = [
       {
+        label: 'renderer-root-public-compatibility-claim',
+        overrides: { publicCompatibilityClaimed: true },
+        reason: 'renderer-root-metadata-public-claim'
+      },
+      {
+        label: 'renderer-root-public-scheduler-timing-claim',
+        overrides: { publicSchedulerTimingCompatibilityClaimed: true },
+        reason: 'renderer-root-metadata-public-claim'
+      },
+      {
+        label: 'renderer-root-public-react-act-claim',
+        overrides: { publicReactActCompatibilityClaimed: true },
+        reason: 'renderer-root-metadata-public-claim'
+      },
+      {
+        label: 'renderer-root-public-root-scheduler-claim',
+        overrides: { publicRootSchedulerCompatibilityClaimed: true },
+        reason: 'renderer-root-metadata-public-claim'
+      },
+      {
         label: 'renderer-root-public-renderer-claim',
         overrides: { publicRendererCompatibilityClaimed: true },
+        reason: 'renderer-root-metadata-public-claim'
+      },
+      {
+        label: 'renderer-root-public-flush-helper-claim',
+        overrides: { publicSchedulerFlushHelperCompatibilityClaimed: true },
+        reason: 'renderer-root-metadata-public-claim'
+      },
+      {
+        label: 'renderer-root-package-claim',
+        overrides: { packageCompatibilityClaimed: true },
         reason: 'renderer-root-metadata-public-claim'
       },
       {
@@ -572,6 +617,16 @@ test('scheduler mock rejects unsafe delayed renderer-root producer metadata', ()
       {
         label: 'renderer-root-public-scheduler-flush-claim',
         overrides: { drainsPublicSchedulerTaskQueue: true },
+        reason: 'renderer-root-metadata-execution-claim'
+      },
+      {
+        label: 'renderer-root-public-flush-helper-execution',
+        overrides: { invokesPublicSchedulerFlushHelper: true },
+        reason: 'renderer-root-metadata-execution-claim'
+      },
+      {
+        label: 'renderer-root-public-scheduler-flush-executed',
+        overrides: { publicSchedulerFlushBehaviorExecuted: true },
         reason: 'renderer-root-metadata-execution-claim'
       },
       {
@@ -1479,6 +1534,61 @@ test('scheduler mock rejects unsupported delayed act/root metadata', () => {
       'metadata-public-claim',
       nodeEnv
     );
+    for (const { label, overrides, reason } of [
+      {
+        label: 'delayed-public-scheduler-timing-claim',
+        overrides: { publicSchedulerTimingCompatibilityClaimed: true },
+        reason: 'metadata-public-claim'
+      },
+      {
+        label: 'delayed-public-flush-helper-claim',
+        overrides: { publicSchedulerFlushHelperCompatibilityClaimed: true },
+        reason: 'metadata-public-claim'
+      },
+      {
+        label: 'delayed-package-claim',
+        overrides: { packageCompatibilityClaimed: true },
+        reason: 'metadata-public-claim'
+      },
+      {
+        label: 'delayed-public-flush-helper-execution',
+        overrides: { invokesPublicSchedulerFlushHelper: true },
+        reason: 'metadata-execution-claim'
+      },
+      {
+        label: 'delayed-public-scheduler-flush-executed',
+        overrides: { publicSchedulerFlushBehaviorExecuted: true },
+        reason: 'metadata-execution-claim'
+      }
+    ]) {
+      const metadata = createDelayedActRootWorkMetadata(
+        Scheduler,
+        publicClaimHandle,
+        createExpiredActRootWorkMetadata(
+          Scheduler,
+          publicClaimHandle,
+          createAcceptedActRootWorkQueue(reactGate)
+        ),
+        {
+          scheduledVirtualTime: 0,
+          delayMs: 10,
+          ...overrides
+        }
+      );
+      assertDelayedDescriptionRejection(
+        diagnostics,
+        metadata,
+        reason,
+        `${nodeEnv}:${label}`
+      );
+      assertDelayedActRootWorkRejection(
+        () => diagnostics.drainDelayedMockSchedulerWorkWithActRootMetadataForDiagnostics(
+          metadata
+        ),
+        reason,
+        `${nodeEnv}:${label}`
+      );
+    }
     assertDelayedDescriptionRejection(
       diagnostics,
       createDelayedActRootWorkMetadata(
@@ -1536,6 +1646,43 @@ test('scheduler mock rejects unsupported delayed act/root metadata', () => {
       'producer-public-claim',
       nodeEnv
     );
+    for (const { label, options, reason } of [
+      {
+        label: 'producer-public-scheduler-timing-claim',
+        options: { publicSchedulerTimingCompatibilityClaimed: true },
+        reason: 'producer-public-claim'
+      },
+      {
+        label: 'producer-public-flush-helper-claim',
+        options: { publicSchedulerFlushHelperCompatibilityClaimed: true },
+        reason: 'producer-public-claim'
+      },
+      {
+        label: 'producer-package-claim',
+        options: { packageCompatibilityClaimed: true },
+        reason: 'producer-public-claim'
+      },
+      {
+        label: 'producer-public-flush-helper-execution',
+        options: { invokesPublicSchedulerFlushHelper: true },
+        reason: 'producer-execution-claim'
+      },
+      {
+        label: 'producer-public-scheduler-flush-executed',
+        options: { publicSchedulerFlushBehaviorExecuted: true },
+        reason: 'producer-execution-claim'
+      }
+    ]) {
+      assertDelayedActRootWorkRejection(
+        () =>
+          diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+            producerExpiredMetadata,
+            options
+          ),
+        reason,
+        `${nodeEnv}:${label}`
+      );
+    }
     const producedMetadata =
       diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
         producerExpiredMetadata,
@@ -2011,6 +2158,14 @@ function readSchedulerMockExpiredActRootWorkSourceValidator(Scheduler) {
     .filter((key) => typeof key === 'symbol')
     .map((key) => key.description);
   assert.deepEqual(privateSymbolDescriptions, []);
+  assert.equal(
+    Object.hasOwn(flushExpired, 'schedulerMockExpiredActRootWorkSourceValidator'),
+    false
+  );
+  assert.equal(
+    Object.hasOwn(flushExpired, 'isSchedulerMockExpiredActRootWorkSource'),
+    false
+  );
 
   const diagnostics = readPrivateFlushDiagnostics(Scheduler);
   assert.equal(
@@ -2031,6 +2186,85 @@ function readSchedulerMockExpiredActRootWorkSourceValidator(Scheduler) {
   );
   assert.equal(value.isSchedulerMockExpiredActRootWorkSource(diagnostics), true);
   return value;
+}
+
+function assertSchedulerMockSourceValidatorRejectsForgedSources(
+  sourceValidator,
+  flushHelper,
+  acceptedSource,
+  label
+) {
+  assert.equal(
+    sourceValidator.isSchedulerMockExpiredActRootWorkSource(acceptedSource),
+    true,
+    label
+  );
+  assert.equal(
+    sourceValidator.isSchedulerMockExpiredActRootWorkSource(
+      Object.freeze({ ...acceptedSource })
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    sourceValidator.isSchedulerMockExpiredActRootWorkSource(
+      createOldGlobalSchedulerMockExpiredActRootWorkSourceClone(acceptedSource)
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    sourceValidator.isSchedulerMockExpiredActRootWorkSource(
+      Object.freeze({
+        ...acceptedSource,
+        schedulerMockExpiredActRootWorkSourceValidator:
+          createFakeSchedulerMockExpiredActRootWorkSourceValidator()
+      })
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    Reflect.defineProperty(
+      flushHelper,
+      Symbol(
+        'fast-react.scheduler.mock-expired-act-root-work-source-validator'
+      ),
+      {
+        configurable: false,
+        enumerable: false,
+        value: sourceValidator,
+        writable: false
+      }
+    ),
+    false,
+    label
+  );
+}
+
+function createFakeSchedulerMockExpiredActRootWorkSourceValidator() {
+  return Object.freeze({
+    status: 'fast-react.scheduler.mock-expired-act-root-work-source-validator',
+    isSchedulerMockExpiredActRootWorkSource() {
+      return true;
+    }
+  });
+}
+
+function createOldGlobalSchedulerMockExpiredActRootWorkSourceClone(value) {
+  const clone = { ...value };
+  Object.defineProperty(clone, expiredActRootWorkSourceProof, {
+    configurable: false,
+    enumerable: false,
+    value: Object.freeze({
+      kind: 'fast-react.scheduler.mock-expired-act-root-work-source-token',
+      version: 1,
+      compatibilityTarget: 'scheduler@0.27.0',
+      reactCompatibilityTarget: 'react@19.2.6'
+    }),
+    writable: false
+  });
+  return Object.freeze(clone);
 }
 
 function getSchedulerPriorityName(Scheduler, priorityLevel) {
