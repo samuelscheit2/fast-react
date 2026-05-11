@@ -50,9 +50,17 @@ Top-level cap: 30 workers. Accepted/merged baseline includes Workers 803-837,
 rejected as redundant after Worker 844 was accepted; do not use it as accepted
 input.
 
-Implementation/audit queue: none. Local cleanup state shows no active
-top-level worker worktrees beyond `main` and this docs-update worktree, and
-`git branch --list "worker/*"` shows only this docs branch.
+Current active queue:
+
+- Worker 862: root unmount container execution.
+- Worker 863: root host update mutation execution.
+- Worker 864: sync-flush update/unmount host execution.
+- Worker 865: function component mount host execution.
+- Worker 866: function component update host execution.
+- Worker 867: deleted subtree teardown execution.
+- Worker 868: Rust test-renderer root lifecycle execution consumer.
+- Worker 869: React DOM private facade fake-DOM lifecycle consumer.
+- Worker 870: native JSON batch lifecycle executor.
 
 Accepted private evidence still keeps public root/render, `act`, `flushSync`,
 Scheduler timing, hydration, resources/forms, serialization, native execution,
@@ -64,8 +72,8 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Spawn from independent private proofs; no current audit queue blocks new
-   assignments.
+1. Let Workers 862-870 run as the current active queue; do not treat their
+   outputs as accepted inputs until reviewed and merged.
 2. Use accepted Workers 855 and 860 as private Rust execution inputs for narrow
    root/sync-flush host mutation follow-ups only when source-owned finished
    work, detached-host, lane/root, and sibling evidence is preserved.

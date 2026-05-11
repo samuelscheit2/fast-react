@@ -6,8 +6,9 @@ Date: 2026-05-11
 
 - Updated `MASTER_PLAN.md` after the accepted merge batch so the stale
   Workers 844/848/853 audit queue is gone.
-- Recorded that no implementation/audit queue is active after cleanup, with
-  local branch/worktree state showing only `main` plus this docs worker branch.
+- Initial commit recorded no implementation/audit queue after cleanup, then a
+  follow-up refresh replaced that stale state with active Workers 862-870 after
+  the orchestrator spawned the next worker batch.
 - Updated near-term candidate guidance to consume accepted Workers 844, 848,
   and 855-860 only through private, fail-closed gates while keeping public
   compatibility claims blocked.
@@ -50,6 +51,10 @@ git status --short --branch
 git add MASTER_PLAN.md MASTER_PROGRESS.md worker-progress/worker-861-master-docs-post-844-860.md
 git diff --cached --check
 git diff --cached --stat
+git worktree list
+git branch --list "worker/*"
+rg -n "Implementation/audit queue: none|queue: none|no active top-level worker worktrees|shows only this docs branch" MASTER_PLAN.md
+rg -n "Worker 862|Worker 863|Worker 864|Worker 865|Worker 866|Worker 867|Worker 868|Worker 869|Worker 870" MASTER_PLAN.md
 ```
 
 ## Verification Results
@@ -67,6 +72,20 @@ git diff --cached --stat
 - `git diff --cached --stat` showed only the two master docs and the Worker 861
   progress report.
 
+## Follow-up - Active Queue Refresh
+
+- After the orchestrator spawned Workers 862-870, updated `MASTER_PLAN.md` to
+  replace the stale no-active-queue language with the current active worker
+  queue.
+- Updated the near-term sequencing note so Workers 862-870 are active but not
+  accepted inputs until reviewed and merged.
+- Added follow-up verification commands for stale queue-none language and
+  active worker representation.
+- Follow-up `git diff --check` and `git diff --cached --check` passed.
+- Focused stale queue-none grep against `MASTER_PLAN.md` returned no matches,
+  and focused active-worker grep showed Workers 862-870 in the active queue.
+- Follow-up staged stat showed only `MASTER_PLAN.md` and this Worker 861 report.
+
 ## Evidence
 
 - `git worktree list` showed only `/Users/user/Developer/Developer/fast-react`
@@ -77,6 +96,9 @@ git diff --cached --stat
   856, 857, 858, 859, and 860.
 - Worker reports for all accepted workers in the batch were present and used as
   the detailed archive for the concise master progress summary.
+- Follow-up `git worktree list` and `git branch --list "worker/*"` showed
+  active worker branches/worktrees for Workers 862, 863, 864, 865, 866, 867,
+  868, 869, and 870.
 
 ## Risks Or Blockers
 
