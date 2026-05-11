@@ -5991,6 +5991,173 @@ pub(crate) fn delete_test_host_work_root_child_for_canary(
     Ok(())
 }
 
+#[cfg(test)]
+pub(crate) fn update_test_host_root_sibling_text_child_work_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+    source: &TestHostTree,
+    updated_current: FiberId,
+    next_element: RootElementHandle,
+) -> Result<FiberId, HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let current_children = validated_multi_child_host_work_current_children(
+        store,
+        render.root(),
+        render.current(),
+        host_work,
+    )?;
+    let source_node = source
+        .root(next_element)
+        .ok_or(HostWorkError::MissingTestRootElement {
+            handle: next_element,
+        })?;
+    let TestHostNode::Text(text) = source_node else {
+        return Err(HostWorkError::ExpectedFiberTag {
+            fiber: updated_current,
+            expected: FiberTag::HostText,
+            actual: FiberTag::HostComponent,
+        });
+    };
+
+    let mut completed_children = Vec::with_capacity(current_children.len());
+    let mut updated_work = None;
+    for current in current_children {
+        if current == updated_current {
+            let diff = update_test_host_text_work(
+                store,
+                render.root(),
+                current,
+                text,
+                render.render_lanes(),
+                host_work.detached_hosts_mut(),
+            )?;
+            updated_work = Some(diff.work_in_progress());
+            completed_children.push(diff.work_in_progress());
+        } else {
+            completed_children.push(stable_root_text_sibling_work_for_canary(store, current)?);
+        }
+    }
+
+    let updated_work = updated_work.ok_or(HostWorkError::MissingCurrentRootChild {
+        root: render.root(),
+        current: render.current(),
+    })?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &completed_children)?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, completed_children);
+    Ok(updated_work)
+}
+
+#[cfg(test)]
+pub(crate) fn delete_test_host_root_sibling_child_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+    deleted_current: FiberId,
+) -> Result<Vec<FiberId>, HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let current_children = validated_multi_child_host_work_current_children(
+        store,
+        render.root(),
+        render.current(),
+        host_work,
+    )?;
+    if !current_children.contains(&deleted_current) {
+        return Err(HostWorkError::MissingCurrentRootChild {
+            root: render.root(),
+            current: render.current(),
+        });
+    }
+
+    let mut remaining_children = Vec::with_capacity(current_children.len().saturating_sub(1));
+    for current in current_children {
+        if current == deleted_current {
+            continue;
+        }
+        remaining_children.push(stable_root_text_sibling_work_for_canary(store, current)?);
+    }
+
+    store
+        .fiber_arena_mut()
+        .mark_child_for_deletion(render.work_in_progress(), deleted_current)?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &remaining_children)?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, remaining_children.clone());
+    Ok(remaining_children)
+}
+
+#[cfg(test)]
+fn validated_multi_child_host_work_current_children(
+    store: &FiberRootStore<RecordingHost>,
+    root: FiberRootId,
+    current: FiberId,
+    host_work: &HostWorkResult,
+) -> Result<Vec<FiberId>, HostWorkError> {
+    if host_work.root() != root || host_work.work_in_progress() != current {
+        return Err(HostWorkError::CommitCurrentMismatch {
+            root,
+            expected: current,
+            actual: host_work.work_in_progress(),
+        });
+    }
+
+    let current_children = store.fiber_arena().child_ids(current)?;
+    if current_children.len() < 2 {
+        return Err(HostWorkError::ExpectedMultipleRootChildren {
+            count: current_children.len(),
+        });
+    }
+    if current_children.as_slice() != host_work.root_children() {
+        let Some(&sibling) = host_work.root_children().first() else {
+            return Err(HostWorkError::ExpectedMultipleRootChildren {
+                count: host_work.root_children().len(),
+            });
+        };
+        return Err(HostWorkError::UnexpectedCurrentRootChildSibling {
+            root,
+            current,
+            child: *current_children.first().expect("length checked above"),
+            sibling,
+        });
+    }
+
+    Ok(current_children)
+}
+
+#[cfg(test)]
+fn stable_root_text_sibling_work_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    current: FiberId,
+) -> Result<FiberId, HostWorkError> {
+    expect_tag(store, current, FiberTag::HostText)?;
+    let current_node = store.fiber_arena().get(current)?;
+    let props = current_node.memoized_props();
+    let state_node = current_node.state_node();
+    let work = store
+        .fiber_arena_mut()
+        .create_work_in_progress(current, props)?;
+    {
+        let node = store.fiber_arena_mut().get_mut(work)?;
+        node.set_state_node(state_node);
+        node.set_memoized_props(props);
+        node.set_lanes(Lanes::NO);
+        node.set_flags(FiberFlags::NO);
+    }
+    complete_fiber_common(
+        store,
+        work,
+        props,
+        state_node,
+        InitialChildrenFinalization::NoCommitMount,
+    )?;
+    Ok(work)
+}
+
 pub(crate) fn mount_test_host_sibling_work(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
