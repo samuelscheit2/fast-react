@@ -303,6 +303,123 @@ test("Fast React test-utils act keeps the oracle-shaped package surface but fail
   assertFastReactDomActBlocked(testUtils.act);
 });
 
+test("Fast React test-utils act currentness stays blocked like public React.act", () => {
+  const gateModule = loadFreshCjs(fastReactDomTestUtilsActGatePath);
+  const report =
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport();
+  const consumption =
+    gateModule.consumePublicReactDomTestUtilsActBlockedCurrentnessReport(
+      report
+    );
+
+  assert.equal(
+    gateModule.isAcceptedPublicReactDomTestUtilsActBlockedCurrentnessReport(
+      report
+    ),
+    true
+  );
+  assert.equal(
+    consumption.status,
+    "accepted-blocked-public-react-dom-test-utils-act-currentness"
+  );
+  assert.equal(
+    report.publicReactActBlockedCurrentnessConsumption.status,
+    "accepted-blocked-public-react-act-currentness"
+  );
+  assert.deepEqual(report.publicTestUtilsActExport, {
+    hasOwn: true,
+    exportKeysInclude: true,
+    value: {
+      type: "function",
+      name: "",
+      length: 1,
+      thenable: false
+    }
+  });
+  assert.deepEqual(consumption.scenarioIds, [
+    "rootless-sync-callback",
+    "rootless-async-callback",
+    "rootless-error-callback",
+    "rootless-thenable-callback"
+  ]);
+  assert.deepEqual(consumption.acceptedWorkerIds, [
+    "worker-913-react-act-public-blocked-currentness-gate",
+    "worker-857-react-dom-act-passive-consumer",
+    "worker-885-react-act-lifecycle-boundary-gate"
+  ]);
+  assert.deepEqual(consumption.excludedWorkerIds, [
+    "worker-910-hydration-recoverable-error-boundary-admission"
+  ]);
+  assert.equal(consumption.publicTestUtilsActUnsupportedPlaceholder, true);
+  assert.equal(consumption.callbackInvocationBlocked, true);
+  assert.equal(consumption.thenableReturnBlocked, true);
+  assert.equal(consumption.publicWarningCompatibilityClaimed, false);
+  assert.equal(consumption.publicReactActReady, false);
+  assert.equal(consumption.publicTestUtilsActReady, false);
+  assert.equal(consumption.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(consumption.drainsPublicReactActQueue, false);
+  assert.equal(consumption.publicActPassiveDrain, false);
+  assert.equal(consumption.publicEffectExecution, false);
+  assert.equal(consumption.publicRootExecution, false);
+  assert.equal(consumption.packageCompatibilityClaimed, false);
+  assert.equal(consumption.packageSurfaceChanged, false);
+
+  for (const scenario of report.scenarios) {
+    assert.equal(scenario.callbackInvoked, false, scenario.scenarioId);
+    assert.equal(scenario.returnedThenable, false, scenario.scenarioId);
+    assert.equal(scenario.consoleCalls.length, 0, scenario.scenarioId);
+    assert.equal(scenario.callAttempt.status, "throws", scenario.scenarioId);
+    assert.equal(
+      scenario.callAttempt.error.name,
+      "FastReactDomUnimplementedError",
+      scenario.scenarioId
+    );
+    assert.equal(
+      scenario.callAttempt.error.entrypoint,
+      "react-dom/test-utils",
+      scenario.scenarioId
+    );
+  }
+
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule,
+    Object.freeze({
+      ...report
+    }),
+    "public-react-dom-test-utils-act-currentness-source-proof",
+    "source-clone"
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule,
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      packageCompatibilityClaimed: true
+    }),
+    "public-react-dom-test-utils-act-currentness-package-compatibility-claim",
+    "package-claim"
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule,
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      publicRootExecution: true,
+      publicActPassiveDrain: true,
+      drainsPublicSchedulerTaskQueue: true
+    }),
+    "public-react-dom-test-utils-act-currentness-prerequisite-smuggling",
+    "scheduler-root-passive-smuggling"
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule,
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      privatePrerequisites: {
+        ...report.privatePrerequisites,
+        consumesWorker910Evidence: true
+      }
+    }),
+    "public-react-dom-test-utils-act-currentness-private-prerequisite-boundary",
+    "worker-910-excluded"
+  );
+});
+
 test("Fast React test-utils act private routing gate records accepted prerequisites without opening public act", () => {
   const gateModule = loadFreshCjs(fastReactDomTestUtilsActGatePath);
   const gate = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate();
@@ -607,6 +724,28 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   assert.equal(
     gate.deprecationWarningBehavior,
     "preserved-no-warning-while-public-test-utils-act-is-placeholder"
+  );
+  assert.equal(
+    gate.publicTestUtilsActBlockedCurrentness.status,
+    "blocked-public-react-dom-test-utils-act-unsupported-placeholder-currentness"
+  );
+  assert.equal(
+    gate.publicTestUtilsActBlockedCurrentness
+      .consumesPublicReactActBlockedCurrentnessReport,
+    true
+  );
+  assert.equal(
+    gate.publicTestUtilsActBlockedCurrentness
+      .excludesUnacceptedPrivateRootPrerequisites,
+    true
+  );
+  assert.equal(
+    gate.publicTestUtilsActBlockedCurrentness.acceptsFutureWorkerEvidence,
+    false
+  );
+  assert.equal(
+    gate.publicTestUtilsActBlockedCurrentness.packageCompatibilityClaimed,
+    false
   );
 
   assert.deepEqual(gate.reactActPrivateDispatcher, {
@@ -3530,6 +3669,57 @@ function cloneFrozenObject(value, overrides = {}) {
     ...value,
     ...overrides
   });
+}
+
+function assertReactDomTestUtilsCurrentnessRejected(
+  gateModule,
+  report,
+  reason,
+  label
+) {
+  assert.equal(
+    gateModule.isAcceptedPublicReactDomTestUtilsActBlockedCurrentnessReport(
+      report
+    ),
+    false,
+    label
+  );
+  assert.throws(
+    () =>
+      gateModule.consumePublicReactDomTestUtilsActBlockedCurrentnessReport(
+        report
+      ),
+    (error) => {
+      assert.equal(error.name, "FastReactDomUnimplementedError", label);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", label);
+      assert.equal(error.entrypoint, "react-dom/test-utils", label);
+      assert.equal(
+        error.exportName,
+        `${gateModule.privateTestUtilsActGateExport}.consumePublicReactDomTestUtilsActBlockedCurrentnessReport`,
+        label
+      );
+      assert.equal(error.compatibilityTarget, "react-dom@19.2.6", label);
+      assert.equal(error.reason, reason, label);
+      assert.equal(error.publicCompatibilityClaimed, false, label);
+      assert.equal(error.publicReactActCompatibilityClaimed, false, label);
+      assert.equal(error.publicTestUtilsActCompatibilityClaimed, false, label);
+      assert.equal(error.publicWarningCompatibilityClaimed, false, label);
+      assert.equal(error.publicPackageCompatibilityClaimed, false, label);
+      assert.equal(error.packageCompatibilityClaimed, false, label);
+      assert.equal(error.packageSurfaceChanged, false, label);
+      assert.equal(error.drainsPublicSchedulerTaskQueue, false, label);
+      assert.equal(error.drainsPublicReactActQueue, false, label);
+      assert.equal(error.publicActPassiveDrain, false, label);
+      assert.equal(error.publicEffectExecution, false, label);
+      assert.equal(error.publicRootExecution, false, label);
+      assert.equal(error.invokesCallback, false, label);
+      assert.equal(error.returnsThenable, false, label);
+      assert.equal(error.executesPassiveEffects, false, label);
+      assert.equal(error.executesRendererRoots, false, label);
+      return true;
+    },
+    label
+  );
 }
 
 function assertReactDomExpiredSchedulerDiagnosticsRejected(
