@@ -20,6 +20,8 @@ const rootCommitPath = "crates/fast-react-reconciler/src/root_commit.rs";
 const hostWorkPath = "crates/fast-react-reconciler/src/host_work.rs";
 const packageSurfaceGuardPath = "tests/smoke/package-surface-guard.mjs";
 const importSmokePath = "tests/smoke/import-entrypoints.mjs";
+const rustSourceEvidenceType = "source-owned-rust-implementation-slice";
+const jsSourceEvidenceType = "source-owned-js-package-guard-slice";
 
 export const PRIVATE_ADMISSION_804_WORKERS = freezeArray([worker785]);
 
@@ -208,7 +210,7 @@ const privateAdmission804Rows = freezeArray([
         sliceStart:
           "enum TestHostRootManagedChildExecutionBlockerForCanary {",
         sliceEnd:
-          "#[derive(Debug, Clone, PartialEq, Eq)]\nenum TestHostRootManagedChildExecutionErrorForCanary",
+          "#[derive(Debug, Clone, PartialEq, Eq)]\npub(crate) enum TestHostRootManagedChildExecutionErrorForCanary",
         tokens: [
           "enum TestHostRootManagedChildExecutionBlockerForCanary",
           "PublicRootRendering",
@@ -227,7 +229,6 @@ const privateAdmission804Rows = freezeArray([
           "private_test_host_mutation_executed(&self) -> bool",
           "TestHostRootMutationHostCall::AppendChild",
           "TestHostRootMutationHostCall::RemoveChild",
-          "TestHostRootDeletionCleanupAction::DetachDeletedInstance",
           "public_root_rendering_blocked(&self) -> bool",
           "public_renderer_mutation_blocked(&self) -> bool",
           "react_dom_compatibility_claimed(&self) -> bool",
@@ -257,8 +258,11 @@ const privateAdmission804Rows = freezeArray([
           "let apply = apply_test_host_root_commit_mutations(",
           "if apply.records().len() != 1",
           "let (cleanup_status, deletion_cleanup_apply_count) = match handoff.kind()",
-          "apply_test_host_root_deletion_cleanup(",
-          "TestHostRootDeletionCleanupAction::DetachDeletedInstance",
+          "let cleanup_apply = apply_test_host_root_deletion_cleanup(",
+          "let cleanup_status = cleanup_apply",
+          "if !managed_child_deletion_cleanup_status_matches_tag(",
+          "(Some(cleanup_status), cleanup_apply.applied_record_count())",
+          "Ok(TestHostRootManagedChildExecutionDiagnosticForCanary",
           "blockers: TEST_HOST_ROOT_MANAGED_CHILD_EXECUTION_BLOCKERS"
         ]
       }),
@@ -303,6 +307,7 @@ const privateAdmission804Rows = freezeArray([
       evidenceData({
         role: "package-surface-private-export-guard",
         path: packageSurfaceGuardPath,
+        sourceEvidenceType: jsSourceEvidenceType,
         tokens: [
           "const privateDiagnosticPublicFileGuards = {",
           "const exactPrivatePublicFileGuards = {",
@@ -316,6 +321,7 @@ const privateAdmission804Rows = freezeArray([
       evidenceData({
         role: "import-smoke-private-export-guard",
         path: importSmokePath,
+        sourceEvidenceType: jsSourceEvidenceType,
         tokens: [
           "reactTestRendererPackageRoot",
           "nativePackageRoot",
@@ -334,6 +340,15 @@ export const PRIVATE_ADMISSION_804_ROWS = freezeArray(
   privateAdmission804Rows
 );
 
+export const PRIVATE_ADMISSION_804_REQUIRED_EVIDENCE_CONTEXTS = freezeRecord(
+  Object.fromEntries(
+    PRIVATE_ADMISSION_804_ROWS.map((sourceRow) => [
+      sourceRow.workerId,
+      evidenceContextsForRow(sourceRow)
+    ])
+  )
+);
+
 export function evaluatePrivateAdmission804Gate({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT,
   rowOverrides = {}
@@ -342,8 +357,13 @@ export function evaluatePrivateAdmission804Gate({
   const rows = PRIVATE_ADMISSION_804_ROWS.map((baseRow) =>
     mergeRowOverride(baseRow, rowOverrides[baseRow.workerId] ?? {})
   );
-  const evaluatedRows = rows.map((baseRow) =>
-    evaluatePrivateAdmissionRow({ fileCache, row: baseRow, workspaceRoot })
+  const evaluatedRows = rows.map((baseRow, index) =>
+    evaluatePrivateAdmissionRow({
+      fileCache,
+      row: baseRow,
+      sourceRow: PRIVATE_ADMISSION_804_ROWS[index],
+      workspaceRoot
+    })
   );
   const manifestWorkerIds = rows.map((row) => row.workerId);
   const manifest = freezeRecord({
@@ -373,6 +393,11 @@ export function evaluatePrivateAdmission804Gate({
           workerId: row.workerId,
           role: evidenceRow.role,
           path: evidenceRow.path,
+          evidenceContextRecognized: evidenceRow.evidenceContextRecognized,
+          evidenceTokenContractRecognized:
+            evidenceRow.evidenceTokenContractRecognized,
+          expectedEvidenceContext: evidenceRow.expectedEvidenceContext,
+          actualEvidenceContext: evidenceRow.actualEvidenceContext,
           missingTokens: evidenceRow.missingTokens,
           orderedTokenViolations: evidenceRow.orderedTokenViolations,
           forbiddenTokensPresent: evidenceRow.forbiddenTokensPresent,
@@ -395,6 +420,9 @@ export function evaluatePrivateAdmission804Gate({
     expectedKey: "expectedAcceptedStatusIdentifiers",
     actualKeyForViolation: "actualAcceptedStatusIdentifiers"
   });
+  const evidenceContextMismatches = evaluatedRows.flatMap(
+    (row) => row.evidenceContextMismatches
+  );
   const publicBlockerKeyMismatches = evaluatedRows.flatMap((row) => {
     const actualKeys = Object.keys(row.publicBlockerClaims ?? {});
     if (sameStringSet(PRIVATE_ADMISSION_804_PUBLIC_BLOCKER_FIELDS, actualKeys)) {
@@ -503,6 +531,11 @@ export function evaluatePrivateAdmission804Gate({
   );
   pushRowsViolation(
     violations,
+    "private-managed-child-evidence-context-mismatch",
+    evidenceContextMismatches
+  );
+  pushRowsViolation(
+    violations,
     "private-managed-child-public-blocker-field-mismatch",
     publicBlockerKeyMismatches
   );
@@ -533,6 +566,7 @@ export function evaluatePrivateAdmission804Gate({
   );
 
   const evidenceRecognized = evidenceMismatches.length === 0;
+  const evidenceContextsRecognized = evidenceContextMismatches.length === 0;
   const capabilitiesRecognized = capabilityMismatches.length === 0;
   const statusIdentifiersRecognized = statusIdentifierMismatches.length === 0;
   const blockedPublicClaimsRecognized =
@@ -551,6 +585,7 @@ export function evaluatePrivateAdmission804Gate({
     manifest.unexpectedWorkerIds.length === 0 &&
     manifest.duplicateWorkerIds.length === 0 &&
     evidenceRecognized &&
+    evidenceContextsRecognized &&
     capabilitiesRecognized &&
     statusIdentifiersRecognized &&
     blockedPublicClaimsRecognized &&
@@ -565,6 +600,7 @@ export function evaluatePrivateAdmission804Gate({
       : PRIVATE_ADMISSION_804_VIOLATION_STATUS,
     privateDiagnosticsRecognized,
     evidenceRecognized,
+    evidenceContextsRecognized,
     capabilitiesRecognized,
     statusIdentifiersRecognized,
     blockedPublicClaimsRecognized,
@@ -631,12 +667,14 @@ function evidenceData({
   tokens,
   orderedTokens = [],
   forbiddenTokens = [],
+  sourceEvidenceType = rustSourceEvidenceType,
   sliceStart = null,
   sliceEnd = null
 }) {
   return freezeRecord({
     role,
     path,
+    sourceEvidenceType,
     tokens: freezeArray(tokens),
     orderedTokens: freezeArray(orderedTokens),
     forbiddenTokens: freezeArray(forbiddenTokens),
@@ -670,25 +708,52 @@ function mergeRowOverride(row, override) {
   return freezeRecord(merged);
 }
 
-function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
-  const evidence = row.evidence.map((evidenceRow) =>
+function evaluatePrivateAdmissionRow({ fileCache, row, sourceRow, workspaceRoot }) {
+  const evidence = row.evidence.map((evidenceRow, index) =>
     evaluateEvidenceRow({
       evidenceRow,
+      expectedEvidenceRow: sourceRow?.evidence[index] ?? null,
       fileCache,
       workspaceRoot
     })
   );
+  const evidenceContextMismatches = createEvidenceContextMismatches(row);
 
   return freezeRecord({
     ...row,
     evidence: freezeArray(evidence),
+    evidenceContextsRecognized: evidenceContextMismatches.length === 0,
+    evidenceContextMismatches: freezeArray(evidenceContextMismatches),
     evidenceRecognized: evidence.every(
       (evidenceRow) => evidenceRow.recognized === true
     )
   });
 }
 
-function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
+function evaluateEvidenceRow({
+  evidenceRow,
+  expectedEvidenceRow,
+  fileCache,
+  workspaceRoot
+}) {
+  const expectedEvidenceContext = expectedEvidenceRow
+    ? evidenceContextForEvidenceRow(expectedEvidenceRow)
+    : null;
+  const actualEvidenceContext = evidenceContextForEvidenceRow(evidenceRow);
+  const evidenceContextRecognized = sameEvidenceContext(
+    actualEvidenceContext,
+    expectedEvidenceContext
+  );
+  const expectedTokens = expectedEvidenceRow?.tokens ?? freezeArray([]);
+  const expectedOrderedTokens =
+    expectedEvidenceRow?.orderedTokens ?? freezeArray([]);
+  const expectedForbiddenTokens =
+    expectedEvidenceRow?.forbiddenTokens ?? freezeArray([]);
+  const evidenceTokenContractRecognized =
+    expectedEvidenceRow != null &&
+    sameStringArray(evidenceRow.tokens, expectedTokens) &&
+    sameStringArray(evidenceRow.orderedTokens, expectedOrderedTokens) &&
+    sameStringArray(evidenceRow.forbiddenTokens, expectedForbiddenTokens);
   const readResult = readEvidenceFile({
     fileCache,
     path: evidenceRow.path,
@@ -709,28 +774,102 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
 
   const canCheckText = readResult.readError === null && sliceError === null;
   const missingTokens = canCheckText
-    ? evidenceRow.tokens.filter((token) => !text.includes(token))
-    : [...evidenceRow.tokens];
+    ? expectedTokens.filter((token) => !text.includes(token))
+    : [...expectedTokens];
   const orderedTokenViolations = canCheckText
-    ? orderedTokenMismatches(text, evidenceRow.orderedTokens)
-    : [...evidenceRow.orderedTokens];
+    ? orderedTokenMismatches(text, expectedOrderedTokens)
+    : [...expectedOrderedTokens];
   const forbiddenTokensPresent = canCheckText
-    ? evidenceRow.forbiddenTokens.filter((token) => text.includes(token))
+    ? expectedForbiddenTokens.filter((token) => text.includes(token))
     : [];
 
   return freezeRecord({
     ...evidenceRow,
     recognized:
+      evidenceContextRecognized &&
+      evidenceTokenContractRecognized &&
       canCheckText &&
       missingTokens.length === 0 &&
       orderedTokenViolations.length === 0 &&
       forbiddenTokensPresent.length === 0,
+    evidenceContextRecognized,
+    evidenceTokenContractRecognized,
+    expectedEvidenceContext,
+    actualEvidenceContext,
     missingTokens: freezeArray(missingTokens),
     orderedTokenViolations: freezeArray(orderedTokenViolations),
     forbiddenTokensPresent: freezeArray(forbiddenTokensPresent),
     readError: readResult.readError,
     sliceError
   });
+}
+
+function evidenceContextsForRow(row) {
+  return freezeRecord(
+    Object.fromEntries(
+      row.evidence.map((evidenceRow) => [
+        evidenceRow.role,
+        evidenceContextForEvidenceRow(evidenceRow)
+      ])
+    )
+  );
+}
+
+function evidenceContextForEvidenceRow(evidenceRow) {
+  return freezeRecord({
+    role: evidenceRow.role,
+    path: evidenceRow.path,
+    sliceStart: evidenceRow.sliceStart,
+    sliceEnd: evidenceRow.sliceEnd,
+    sourceEvidenceType: evidenceRow.sourceEvidenceType,
+    tokens: freezeArray(evidenceRow.tokens),
+    orderedTokens: freezeArray(evidenceRow.orderedTokens),
+    forbiddenTokens: freezeArray(evidenceRow.forbiddenTokens)
+  });
+}
+
+function createEvidenceContextMismatches(row) {
+  const expected =
+    PRIVATE_ADMISSION_804_REQUIRED_EVIDENCE_CONTEXTS[row.workerId] ??
+    freezeRecord({});
+  const actual = evidenceContextsForRow(row);
+  const expectedRoles = Object.keys(expected);
+  const actualRoles = row.evidence.map((evidenceRow) => evidenceRow.role);
+  const rolesMatch = sameStringArray(expectedRoles, actualRoles);
+  const contextsMatch =
+    rolesMatch &&
+    expectedRoles.every((role) =>
+      sameEvidenceContext(actual[role], expected[role])
+    );
+
+  if (contextsMatch) {
+    return [];
+  }
+
+  return [
+    freezeRecord({
+      workerId: row.workerId,
+      expectedEvidenceRoles: freezeArray(expectedRoles),
+      actualEvidenceRoles: freezeArray(actualRoles),
+      expectedEvidenceContexts: expected,
+      actualEvidenceContexts: actual
+    })
+  ];
+}
+
+function sameEvidenceContext(actual, expected) {
+  return (
+    actual != null &&
+    expected != null &&
+    actual.role === expected.role &&
+    actual.path === expected.path &&
+    actual.sliceStart === expected.sliceStart &&
+    actual.sliceEnd === expected.sliceEnd &&
+    actual.sourceEvidenceType === expected.sourceEvidenceType &&
+    sameStringArray(actual.tokens, expected.tokens) &&
+    sameStringArray(actual.orderedTokens, expected.orderedTokens) &&
+    sameStringArray(actual.forbiddenTokens, expected.forbiddenTokens)
+  );
 }
 
 function orderedTokenMismatches(text, tokens) {
@@ -851,6 +990,13 @@ function sameStringSet(expected, actual) {
     return false;
   }
   return expected.every((value) => actualSet.has(value));
+}
+
+function sameStringArray(expected, actual) {
+  return (
+    expected.length === actual.length &&
+    expected.every((value, index) => actual[index] === value)
+  );
 }
 
 function freezeArray(values) {
