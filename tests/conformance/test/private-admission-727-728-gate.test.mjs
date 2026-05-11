@@ -1,15 +1,30 @@
 import assert from "node:assert/strict";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import test from "node:test";
 
 import {
   PRIVATE_ADMISSION_727_728_BLOCKED_SURFACES,
+  PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_DIAGNOSTICS,
+  PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_EVIDENCE,
+  PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_WORKERS,
   PRIVATE_ADMISSION_727_728_GATE_STATUS,
   PRIVATE_ADMISSION_727_728_PUBLIC_COMPATIBILITY_CLAIMS,
   PRIVATE_ADMISSION_727_728_REQUIRED_ACCEPTED_DIAGNOSTICS,
   PRIVATE_ADMISSION_727_728_REQUIRED_BLOCKER_CONTEXT,
   PRIVATE_ADMISSION_727_728_REQUIRED_BLOCKER_CONTEXT_DIAGNOSTICS,
+  PRIVATE_ADMISSION_727_728_REQUIRED_CURRENT_UNMOUNT_IDENTITY_EVIDENCE_ROLES,
   PRIVATE_ADMISSION_727_728_REQUIRED_DEPENDENCIES,
   PRIVATE_ADMISSION_727_728_REQUIRED_DEPENDENCY_DIAGNOSTICS,
+  PRIVATE_ADMISSION_727_728_REQUIRED_EVIDENCE_ROLES,
   PRIVATE_ADMISSION_727_728_ROWS,
   PRIVATE_ADMISSION_727_728_SKIPPED_ROWS,
   PRIVATE_ADMISSION_727_728_SKIPPED_WORKERS,
@@ -25,6 +40,85 @@ const expected727728Workers = [
 const expected727728SkippedWorkers = [
   "worker-727-package-private-admission-audit-724-726"
 ];
+const worker728 =
+  "worker-728-test-renderer-unmount-native-identity-argument-guard";
+const skippedWorker727 = "worker-727-package-private-admission-audit-724-726";
+
+const expectedAcceptedDiagnosticIds = [
+  "test-renderer-unmount-native-identity-argument-guard",
+  "private-unmount-native-serialization-rejects-finished-work-identity-evidence"
+];
+
+const expectedDependencyWorkerIds = [
+  "worker-612-test-renderer-unmount-native-bridge-admission",
+  "worker-638-test-renderer-unmount-native-execution",
+  "worker-639-test-renderer-tojson-after-native-execution",
+  "worker-667-test-renderer-totree-native-execution"
+];
+
+const expectedDependencyDiagnosticIds = [
+  "react-test-renderer-unmount-native-bridge-admission-private-diagnostic",
+  "react-test-renderer-unmount-native-bridge-cleanup-handoff-private-diagnostic",
+  "test-renderer-tojson-native-execution-evidence",
+  "test-renderer-totree-native-execution"
+];
+
+const expectedBlockerContextWorkerIds = [
+  "worker-725-test-renderer-update-serialization-finished-work-identity",
+  "worker-726-test-renderer-update-native-serialization-identity-admission"
+];
+
+const expectedBlockerContextDiagnosticIds = [
+  "test-renderer-update-serialization-finished-work-identity",
+  "test-renderer-update-native-serialization-identity-admission"
+];
+
+const expectedEvidenceRoles = [
+  "worker-612-unmount-route-admission-dependency",
+  "worker-638-unmount-cleanup-handoff-dependency",
+  "worker-639-tojson-unmount-empty-host-output-dependency",
+  "worker-667-totree-unmount-native-output-dependency",
+  "worker-725-update-identity-blocker-context",
+  "worker-726-update-native-identity-blocker-context",
+  "worker-728-unmount-identity-argument-guard-report"
+];
+
+const expectedCurrentUnmountIdentityWorkers = [
+  "worker-730-test-renderer-unmount-native-cleanup-evidence",
+  "worker-733-test-renderer-unmount-finished-work-identity",
+  "worker-754-js-cjs-unmount-finished-work-identity",
+  "worker-757-react-test-renderer-index-unmount-identity"
+];
+
+const expectedCurrentUnmountIdentityDiagnostics = [
+  "test-renderer-unmount-native-ref-passive-cleanup-evidence",
+  "test-renderer-unmount-finished-work-identity-admission",
+  "private-unmount-tojson-native-finished-work-identity-validation",
+  "private-unmount-totree-native-finished-work-identity-validation",
+  "test-renderer-cjs-unmount-finished-work-identity",
+  "test-renderer-package-root-unmount-finished-work-identity"
+];
+
+const expectedCurrentUnmountIdentityEvidenceRoles = [
+  "current-worker-730-unmount-ref-passive-cleanup-dependency",
+  "current-worker-733-unmount-finished-work-identity-report",
+  "current-worker-733-unmount-finished-work-identity-rust-proof",
+  "current-worker-754-cjs-unmount-finished-work-identity-report",
+  "current-worker-754-cjs-development-tojson-unmount-identity-source",
+  "current-worker-754-cjs-development-totree-unmount-identity-source",
+  "current-worker-754-cjs-production-tojson-unmount-identity-source",
+  "current-worker-754-cjs-production-totree-unmount-identity-source",
+  "current-worker-757-package-root-unmount-identity-report",
+  "current-worker-757-package-root-tojson-unmount-identity-source",
+  "current-worker-757-package-root-totree-unmount-identity-source",
+  "current-unmount-native-strict-identity-conformance"
+];
+
+const packageRootSource = "packages/react-test-renderer/index.js";
+const cjsDevelopmentSource =
+  "packages/react-test-renderer/cjs/react-test-renderer.development.js";
+const cjsProductionSource =
+  "packages/react-test-renderer/cjs/react-test-renderer.production.js";
 
 const expectedPublicCompatibilityClaims = [
   "publicTestRendererCompatibilityClaimed",
@@ -112,6 +206,24 @@ test("private admission 727-728 manifest records one skipped meta row and one ac
     PRIVATE_ADMISSION_727_728_BLOCKED_SURFACES,
     expectedBlockedSurfaces
   );
+  assert.deepEqual(
+    PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_WORKERS,
+    expectedCurrentUnmountIdentityWorkers
+  );
+  assert.deepEqual(
+    PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_DIAGNOSTICS,
+    expectedCurrentUnmountIdentityDiagnostics
+  );
+  assert.deepEqual(
+    PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_EVIDENCE.map(
+      (evidenceRow) => evidenceRow.role
+    ),
+    expectedCurrentUnmountIdentityEvidenceRoles
+  );
+  assert.deepEqual(
+    PRIVATE_ADMISSION_727_728_REQUIRED_CURRENT_UNMOUNT_IDENTITY_EVIDENCE_ROLES,
+    expectedCurrentUnmountIdentityEvidenceRoles
+  );
   assert.equal(PRIVATE_ADMISSION_727_728_ROWS.length, 1);
   assert.equal(PRIVATE_ADMISSION_727_728_SKIPPED_ROWS.length, 1);
   assert.equal(new Set(PRIVATE_ADMISSION_727_728_WORKERS).size, 1);
@@ -124,7 +236,7 @@ test("private admission 727-728 manifest records one skipped meta row and one ac
   );
 });
 
-test("private admission 727-728 gate recognizes the unmount identity argument guard without public compatibility", () => {
+test("private admission 727-728 gate recognizes strict unmount finished-work identity without public compatibility", () => {
   const gate = evaluatePrivateAdmission727728Gate();
 
   assert.equal(gate.status, PRIVATE_ADMISSION_727_728_GATE_STATUS);
@@ -133,6 +245,9 @@ test("private admission 727-728 gate recognizes the unmount identity argument gu
   assert.equal(gate.acceptedDiagnosticsRecognized, true);
   assert.equal(gate.dependenciesRecognized, true);
   assert.equal(gate.blockerContextRecognized, true);
+  assert.equal(gate.evidenceContractRecognized, true);
+  assert.equal(gate.currentUnmountIdentityEvidenceRecognized, true);
+  assert.equal(gate.currentUnmountIdentityEvidenceContractRecognized, true);
   assert.equal(gate.blockedPublicSurfacesRecognized, true);
   assert.equal(gate.blockedPublicClaimsRecognized, true);
   assert.equal(gate.compatibilityClaimed, false);
@@ -140,6 +255,14 @@ test("private admission 727-728 gate recognizes the unmount identity argument gu
   assert.deepEqual(gate.violations, []);
   assert.deepEqual(gate.queueWorkers, PRIVATE_ADMISSION_727_728_WORKERS);
   assert.deepEqual(gate.skippedWorkers, PRIVATE_ADMISSION_727_728_SKIPPED_WORKERS);
+  assert.deepEqual(
+    gate.currentUnmountIdentityWorkers,
+    PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_WORKERS
+  );
+  assert.deepEqual(
+    gate.currentUnmountIdentityDiagnostics,
+    PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_DIAGNOSTICS
+  );
   assert.deepEqual(gate.recognizedWorkerIds, PRIVATE_ADMISSION_727_728_WORKERS);
   assert.deepEqual(
     gate.recognizedSkippedWorkerIds,
@@ -157,10 +280,7 @@ test("private admission 727-728 gate recognizes the unmount identity argument gu
     PRIVATE_ADMISSION_727_728_SKIPPED_WORKERS
   );
 
-  const row =
-    gate.rowsByWorker[
-      "worker-728-test-renderer-unmount-native-identity-argument-guard"
-    ];
+  const row = gate.rowsByWorker[worker728];
   assert.equal(row.privateAdmission, "accepted-private-diagnostic");
   assert.equal(row.sourceQueue, "727-728");
   assert.equal(
@@ -173,60 +293,32 @@ test("private admission 727-728 gate recognizes the unmount identity argument gu
   assert.equal(row.compatibilityClaimed, false);
   assert.equal(row.promotion, "rejected");
   assert.equal(row.privateEvidenceOnly, true);
-  assert.deepEqual(row.acceptedDiagnosticIds, [
-    "test-renderer-unmount-native-identity-argument-guard",
-    "private-unmount-native-serialization-rejects-finished-work-identity-evidence"
-  ]);
+  assert.deepEqual(row.acceptedDiagnosticIds, expectedAcceptedDiagnosticIds);
   assert.deepEqual(row.acceptedDiagnosticIds, [
     ...PRIVATE_ADMISSION_727_728_REQUIRED_ACCEPTED_DIAGNOSTICS[row.workerId]
   ]);
   assert.equal(
     row.acceptedDiagnosticIds.includes(
-      "test-renderer-unmount-identity-admission"
+      "private-unmount-native-serialization-rejects-finished-work-identity-evidence"
     ),
-    false
+    true
   );
-  assert.deepEqual(row.dependencyWorkerIds, [
-    "worker-612-test-renderer-unmount-native-bridge-admission",
-    "worker-638-test-renderer-unmount-native-execution",
-    "worker-639-test-renderer-tojson-after-native-execution",
-    "worker-667-test-renderer-totree-native-execution"
-  ]);
+  assert.deepEqual(row.dependencyWorkerIds, expectedDependencyWorkerIds);
   assert.deepEqual(row.dependencyWorkerIds, [
     ...PRIVATE_ADMISSION_727_728_REQUIRED_DEPENDENCIES[row.workerId]
   ]);
-  assert.equal(
-    row.dependencyWorkerIds.includes(
-      "worker-725-test-renderer-update-serialization-finished-work-identity"
-    ),
-    false
-  );
-  assert.equal(
-    row.dependencyWorkerIds.includes(
-      "worker-726-test-renderer-update-native-serialization-identity-admission"
-    ),
-    false
-  );
-  assert.deepEqual(row.dependencyDiagnosticIds, [
-    "react-test-renderer-unmount-native-bridge-admission-private-diagnostic",
-    "react-test-renderer-unmount-native-bridge-cleanup-handoff-private-diagnostic",
-    "test-renderer-tojson-native-execution-evidence",
-    "test-renderer-totree-native-execution"
-  ]);
+  assert.deepEqual(row.dependencyDiagnosticIds, expectedDependencyDiagnosticIds);
   assert.deepEqual(row.dependencyDiagnosticIds, [
     ...PRIVATE_ADMISSION_727_728_REQUIRED_DEPENDENCY_DIAGNOSTICS[row.workerId]
   ]);
-  assert.deepEqual(row.blockerContextWorkerIds, [
-    "worker-725-test-renderer-update-serialization-finished-work-identity",
-    "worker-726-test-renderer-update-native-serialization-identity-admission"
-  ]);
+  assert.deepEqual(row.blockerContextWorkerIds, expectedBlockerContextWorkerIds);
   assert.deepEqual(row.blockerContextWorkerIds, [
     ...PRIVATE_ADMISSION_727_728_REQUIRED_BLOCKER_CONTEXT[row.workerId]
   ]);
-  assert.deepEqual(row.blockerContextDiagnosticIds, [
-    "test-renderer-update-serialization-finished-work-identity",
-    "test-renderer-update-native-serialization-identity-admission"
-  ]);
+  assert.deepEqual(
+    row.blockerContextDiagnosticIds,
+    expectedBlockerContextDiagnosticIds
+  );
   assert.deepEqual(row.blockerContextDiagnosticIds, [
     ...PRIVATE_ADMISSION_727_728_REQUIRED_BLOCKER_CONTEXT_DIAGNOSTICS[
       row.workerId
@@ -234,16 +326,11 @@ test("private admission 727-728 gate recognizes the unmount identity argument gu
   ]);
   assert.deepEqual(
     row.evidence.map((evidenceRow) => evidenceRow.role),
-    [
-      "worker-612-unmount-route-admission-dependency",
-      "worker-638-unmount-cleanup-handoff-dependency",
-      "worker-639-tojson-unmount-empty-host-output-dependency",
-      "worker-667-totree-unmount-native-output-dependency",
-      "worker-725-update-identity-blocker-context",
-      "worker-726-update-native-identity-blocker-context",
-      "worker-728-unmount-identity-argument-guard-report",
-      "worker-728-unmount-identity-argument-guard-conformance"
-    ]
+    expectedEvidenceRoles
+  );
+  assert.deepEqual(
+    row.evidence.map((evidenceRow) => evidenceRow.role),
+    [...PRIVATE_ADMISSION_727_728_REQUIRED_EVIDENCE_ROLES[row.workerId]]
   );
 
   for (const evaluatedRow of gate.rows) {
@@ -276,7 +363,20 @@ test("private admission 727-728 gate recognizes the unmount identity argument gu
     for (const evidenceRow of evaluatedRow.evidence) {
       assert.equal(evidenceRow.recognized, true, evidenceRow.role);
       assert.deepEqual(evidenceRow.missingTokens, [], evidenceRow.path);
+      assert.deepEqual(evidenceRow.forbiddenTokensPresent, [], evidenceRow.path);
     }
+  }
+
+  assert.deepEqual(
+    gate.currentUnmountIdentityEvidence.map((evidenceRow) => evidenceRow.role),
+    expectedCurrentUnmountIdentityEvidenceRoles
+  );
+
+  for (const evidenceRow of gate.currentUnmountIdentityEvidence) {
+    assert.equal(evidenceRow.recognized, true, evidenceRow.role);
+    assert.deepEqual(evidenceRow.missingTokens, [], evidenceRow.path);
+    assert.deepEqual(evidenceRow.forbiddenTokensPresent, [], evidenceRow.path);
+    assert.deepEqual(evidenceRow.failedSourceAssertions, [], evidenceRow.path);
   }
 });
 
@@ -334,12 +434,8 @@ test("private admission 727-728 gate rejects missing accepted diagnostics", () =
       id: "accepted-private-diagnostic-id-mismatch",
       rows: [
         {
-          workerId:
-            "worker-728-test-renderer-unmount-native-identity-argument-guard",
-          expectedAcceptedDiagnosticIds: [
-            "test-renderer-unmount-native-identity-argument-guard",
-            "private-unmount-native-serialization-rejects-finished-work-identity-evidence"
-          ],
+          workerId: worker728,
+          expectedAcceptedDiagnosticIds,
           actualAcceptedDiagnosticIds: []
         }
       ]
@@ -430,14 +526,8 @@ test("private admission 727-728 gate rejects missing dependency metadata", () =>
       id: "accepted-private-diagnostic-dependency-mismatch",
       rows: [
         {
-          workerId:
-            "worker-728-test-renderer-unmount-native-identity-argument-guard",
-          expectedDependencyWorkerIds: [
-            "worker-612-test-renderer-unmount-native-bridge-admission",
-            "worker-638-test-renderer-unmount-native-execution",
-            "worker-639-test-renderer-tojson-after-native-execution",
-            "worker-667-test-renderer-totree-native-execution"
-          ],
+          workerId: worker728,
+          expectedDependencyWorkerIds,
           actualDependencyWorkerIds: []
         }
       ]
@@ -462,14 +552,8 @@ test("private admission 727-728 gate rejects missing dependency diagnostic metad
       id: "accepted-private-diagnostic-dependency-diagnostic-mismatch",
       rows: [
         {
-          workerId:
-            "worker-728-test-renderer-unmount-native-identity-argument-guard",
-          expectedDependencyDiagnosticIds: [
-            "react-test-renderer-unmount-native-bridge-admission-private-diagnostic",
-            "react-test-renderer-unmount-native-bridge-cleanup-handoff-private-diagnostic",
-            "test-renderer-tojson-native-execution-evidence",
-            "test-renderer-totree-native-execution"
-          ],
+          workerId: worker728,
+          expectedDependencyDiagnosticIds,
           actualDependencyDiagnosticIds: []
         }
       ]
@@ -535,6 +619,472 @@ test("private admission 727-728 gate rejects missing blocker context diagnostic 
       ]
     }
   ]);
+});
+
+test("private admission 727-728 gate rejects replacing Worker 728 guard evidence with later identity evidence", () => {
+  const gate = evaluatePrivateAdmission727728Gate({
+    rowOverrides: {
+      [worker728]: {
+        evidence: PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_EVIDENCE
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_727_728_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.acceptedDiagnosticsRecognized, true);
+  assert.equal(gate.dependenciesRecognized, true);
+  assert.equal(gate.evidenceContractRecognized, false);
+  assertViolationIds(gate, [
+    "accepted-private-diagnostic-evidence-contract-mismatch"
+  ]);
+
+  const row = gate.rowsByWorker[worker728];
+  assert.equal(row.evidenceRecognized, true);
+  assert.equal(
+    row.evidence.some(
+      (evidenceRow) =>
+        evidenceRow.role === "worker-728-unmount-identity-argument-guard-report"
+    ),
+    false
+  );
+  assert.equal(
+    gate.violations[0].rows[0].missingEvidenceRoles.includes(
+      "worker-728-unmount-identity-argument-guard-report"
+    ),
+    true
+  );
+});
+
+test("private admission 727-728 gate rejects prose-only and test-title evidence replacements", () => {
+  const replacements = [
+    {
+      label: "prose-only",
+      evidence: [
+        {
+          role: expectedEvidenceRoles[0],
+          path: "worker-progress/worker-754-js-cjs-unmount-finished-work-identity.md",
+          tokens: [
+            "strict private admission for Worker 733 toJSON/toTree evidence"
+          ],
+          forbiddenTokens: [],
+          sliceStart: null,
+          sliceEnd: null
+        }
+      ]
+    },
+    {
+      label: "test-title-only",
+      evidence: [
+        {
+          role: "current-unmount-native-strict-identity-conformance",
+          path: "tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs",
+          tokens: [
+            "react-test-renderer JS private native unmount serialization accepts strict finished-work identity evidence"
+          ],
+          forbiddenTokens: [],
+          sliceStart: null,
+          sliceEnd: null
+        }
+      ]
+    }
+  ];
+
+  for (const replacement of replacements) {
+    const gate = evaluatePrivateAdmission727728Gate({
+      rowOverrides: {
+        [worker728]: {
+          evidence: replacement.evidence
+        }
+      }
+    });
+
+    assert.equal(
+      gate.status,
+      PRIVATE_ADMISSION_727_728_VIOLATION_STATUS,
+      replacement.label
+    );
+    assert.equal(gate.privateDiagnosticsRecognized, false, replacement.label);
+    assert.equal(gate.evidenceContractRecognized, false, replacement.label);
+    assertViolationIds(
+      gate,
+      ["accepted-private-diagnostic-evidence-contract-mismatch"],
+      replacement.label
+    );
+  }
+});
+
+test("private admission 727-728 gate rejects row override spoofing over current source identity drift", () => {
+  const workspace = createWorkspaceWithMutatedEvidenceFile({
+    evidencePath: packageRootSource,
+    sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+    find: "unmountNativeExecutionRequiresFinishedWorkIdentity: true",
+    replace: "unmountNativeExecutionRequiresFinishedWorkIdentity: false"
+  });
+
+  try {
+    const gate = evaluatePrivateAdmission727728Gate({
+      workspaceRoot: workspace.root,
+      rowOverrides: {
+        [worker728]: {
+          recognized: true
+        }
+      }
+    });
+
+    assert.equal(gate.status, PRIVATE_ADMISSION_727_728_VIOLATION_STATUS);
+    assert.equal(gate.privateDiagnosticsRecognized, false);
+    assert.equal(gate.currentUnmountIdentityEvidenceRecognized, false);
+    assertViolationIds(gate, [
+      "current-unmount-identity-evidence-not-recognized"
+    ]);
+    assert.equal(gate.rowsByWorker[worker728].recognized, true);
+
+    const sourceEvidence =
+      gate.currentUnmountIdentityEvidenceByRole[
+        "current-worker-757-package-root-tojson-unmount-identity-source"
+      ];
+    assert.notEqual(sourceEvidence, undefined);
+    assert.equal(sourceEvidence.recognized, false);
+    assert.deepEqual(sourceEvidence.missingTokens, []);
+    assertSourceAssertionFailure(sourceEvidence, {
+      property: "unmountNativeExecutionRequiresFinishedWorkIdentity",
+      actualSource: "false",
+      actualValue: false
+    });
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("private admission 727-728 gate rejects comment and string spoofed current source identity", () => {
+  const workspace = createWorkspaceWithMutatedEvidenceFile({
+    evidencePath: packageRootSource,
+    sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+    find: "unmountNativeExecutionRequiresFinishedWorkIdentity: true",
+    replace:
+      "unmountNativeExecutionRequiresFinishedWorkIdentity: false /* unmountNativeExecutionRequiresFinishedWorkIdentity: true */,\n  stringSpoofedUnmountIdentitySource: 'unmountNativeExecutionRequiresFinishedWorkIdentity: true'"
+  });
+
+  try {
+    const gate = evaluatePrivateAdmission727728Gate({
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(gate.status, PRIVATE_ADMISSION_727_728_VIOLATION_STATUS);
+    assert.equal(gate.privateDiagnosticsRecognized, false);
+    assert.equal(gate.currentUnmountIdentityEvidenceRecognized, false);
+    assertViolationIds(gate, [
+      "current-unmount-identity-evidence-not-recognized"
+    ]);
+
+    const sourceEvidence =
+      gate.currentUnmountIdentityEvidenceByRole[
+        "current-worker-757-package-root-tojson-unmount-identity-source"
+      ];
+    assert.equal(sourceEvidence.recognized, false);
+    assertSourceAssertionFailure(sourceEvidence, {
+      property: "unmountNativeExecutionRequiresFinishedWorkIdentity",
+      actualSource:
+        "false /* unmountNativeExecutionRequiresFinishedWorkIdentity: true */",
+      actualValue: null
+    });
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("private admission 727-728 gate rejects forged package-root gate anchors inside block comments", () => {
+  const workspace = createWorkspaceWithMutatedEvidenceFile({
+    evidencePath: packageRootSource,
+    mutate(text) {
+      const anchor = "const toJSONPrivateSerializationFacadeGate = Object.freeze({";
+      const forgedGate = `/*
+${anchor}
+  privateUnmountFinishedWorkIdentityGateAvailable: true,
+  unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:
+    'worker-733-test-renderer-unmount-finished-work-identity',
+  acceptedUnmountFinishedWorkIdentityWorker:
+    'worker-733-test-renderer-unmount-finished-work-identity',
+  unmountNativeExecutionRequiresFinishedWorkIdentity: true,
+  rejectsStaleUnmountFinishedWorkIdentity: true,
+  requiresUnmountDeletionCleanupHandoffEvidence: true,
+  validatesUnmountRootRequestIdentity: true,
+  validatesUnmountDeletionAndCleanupHandoffIdentity: true,
+  consumesCommittedHostRootFinishedWorkIdentity: true,
+  consumesCommittedHostRootFinishedWorkLanes: true,
+  publicSerializationAvailable: false,
+  publicRouteAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
+*/
+`;
+      assert.equal(text.includes(anchor), true, anchor);
+      return text.replace(
+        anchor,
+        `${forgedGate}const toJSONPrivateSerializationFacadeGate = forgedObjectFreeze({`
+      );
+    }
+  });
+
+  try {
+    const gate = evaluatePrivateAdmission727728Gate({
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(gate.status, PRIVATE_ADMISSION_727_728_VIOLATION_STATUS);
+    assert.equal(gate.privateDiagnosticsRecognized, false);
+    assert.equal(gate.currentUnmountIdentityEvidenceRecognized, false);
+    assertViolationIds(gate, [
+      "current-unmount-identity-evidence-not-recognized"
+    ]);
+
+    const sourceEvidence =
+      gate.currentUnmountIdentityEvidenceByRole[
+        "current-worker-757-package-root-tojson-unmount-identity-source"
+      ];
+    assert.equal(sourceEvidence.recognized, false);
+    assert.match(
+      sourceEvidence.sliceError,
+      /^slice-start-not-found: const toJSONPrivateSerializationFacadeGate = Object\.freeze/
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("private admission 727-728 gate rejects CJS development and production false-to-true source drift", () => {
+  const cases = [
+    {
+      label: "development",
+      evidencePath: cjsDevelopmentSource,
+      toJSONRole:
+        "current-worker-754-cjs-development-tojson-unmount-identity-source",
+      toTreeRole:
+        "current-worker-754-cjs-development-totree-unmount-identity-source"
+    },
+    {
+      label: "production",
+      evidencePath: cjsProductionSource,
+      toJSONRole:
+        "current-worker-754-cjs-production-tojson-unmount-identity-source",
+      toTreeRole:
+        "current-worker-754-cjs-production-totree-unmount-identity-source"
+    }
+  ];
+
+  for (const testCase of cases) {
+    const workspace = createWorkspaceWithMutatedEvidenceFile({
+      evidencePath: testCase.evidencePath,
+      mutate(text) {
+        let mutated = replaceInEvidenceSlice(text, {
+          sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+          find: "publicSerializationAvailable: false",
+          replace: "publicSerializationAvailable: true"
+        });
+        mutated = replaceInEvidenceSlice(mutated, {
+          sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+          find: "nativeExecution: false",
+          replace: "nativeExecution: true"
+        });
+        mutated = replaceInEvidenceSlice(mutated, {
+          sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+          find: "compatibilityClaimed: false",
+          replace: "compatibilityClaimed: true"
+        });
+        mutated = replaceInEvidenceSlice(mutated, {
+          sliceStart: "const toTreePrivateFacadeGate = Object.freeze({",
+          find: "publicTreeAvailable: false",
+          replace: "publicTreeAvailable: true"
+        });
+        mutated = replaceInEvidenceSlice(mutated, {
+          sliceStart: "const toTreePrivateFacadeGate = Object.freeze({",
+          find: "nativeExecution: false",
+          replace: "nativeExecution: true"
+        });
+        return replaceInEvidenceSlice(mutated, {
+          sliceStart: "const toTreePrivateFacadeGate = Object.freeze({",
+          find: "compatibilityClaimed: false",
+          replace: "compatibilityClaimed: true"
+        });
+      }
+    });
+
+    try {
+      const gate = evaluatePrivateAdmission727728Gate({
+        workspaceRoot: workspace.root
+      });
+
+      assert.equal(
+        gate.status,
+        PRIVATE_ADMISSION_727_728_VIOLATION_STATUS,
+        testCase.label
+      );
+      assert.equal(gate.privateDiagnosticsRecognized, false, testCase.label);
+      assert.equal(
+        gate.currentUnmountIdentityEvidenceRecognized,
+        false,
+        testCase.label
+      );
+      assertViolationIds(
+        gate,
+        ["current-unmount-identity-evidence-not-recognized"],
+        testCase.label
+      );
+
+      const toJSONEvidence =
+        gate.currentUnmountIdentityEvidenceByRole[testCase.toJSONRole];
+      const toTreeEvidence =
+        gate.currentUnmountIdentityEvidenceByRole[testCase.toTreeRole];
+      assertSourceAssertionFailure(toJSONEvidence, {
+        property: "publicSerializationAvailable",
+        actualSource: "true",
+        actualValue: true
+      });
+      assertSourceAssertionFailure(toJSONEvidence, {
+        property: "nativeExecution",
+        actualSource: "true",
+        actualValue: true
+      });
+      assertSourceAssertionFailure(toJSONEvidence, {
+        property: "compatibilityClaimed",
+        actualSource: "true",
+        actualValue: true
+      });
+      assertSourceAssertionFailure(toTreeEvidence, {
+        property: "publicTreeAvailable",
+        actualSource: "true",
+        actualValue: true
+      });
+      assertSourceAssertionFailure(toTreeEvidence, {
+        property: "nativeExecution",
+        actualSource: "true",
+        actualValue: true
+      });
+      assertSourceAssertionFailure(toTreeEvidence, {
+        property: "compatibilityClaimed",
+        actualSource: "true",
+        actualValue: true
+      });
+    } finally {
+      workspace.cleanup();
+    }
+  }
+});
+
+test("private admission 727-728 gate rejects public and native blocker false-to-true source drift", () => {
+  const workspace = createWorkspaceWithMutatedEvidenceFile({
+    evidencePath: packageRootSource,
+    mutate(text) {
+      let mutated = replaceInEvidenceSlice(text, {
+        sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+        find: "publicSerializationAvailable: false",
+        replace: "publicSerializationAvailable: true"
+      });
+      mutated = replaceInEvidenceSlice(mutated, {
+        sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+        find: "nativeExecution: false",
+        replace: "nativeExecution: true"
+      });
+      mutated = replaceInEvidenceSlice(mutated, {
+        sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+        find: "compatibilityClaimed: false",
+        replace: "compatibilityClaimed: true"
+      });
+      return replaceInEvidenceSlice(mutated, {
+        sliceStart: "const toTreePrivateFacadeGate = Object.freeze({",
+        find: "publicTreeAvailable: false",
+        replace: "publicTreeAvailable: true"
+      });
+    }
+  });
+
+  try {
+    const gate = evaluatePrivateAdmission727728Gate({
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(gate.status, PRIVATE_ADMISSION_727_728_VIOLATION_STATUS);
+    assert.equal(gate.privateDiagnosticsRecognized, false);
+    assert.equal(gate.currentUnmountIdentityEvidenceRecognized, false);
+    assertViolationIds(gate, [
+      "current-unmount-identity-evidence-not-recognized"
+    ]);
+
+    const toJSONEvidence =
+      gate.currentUnmountIdentityEvidenceByRole[
+        "current-worker-757-package-root-tojson-unmount-identity-source"
+      ];
+    const toTreeEvidence =
+      gate.currentUnmountIdentityEvidenceByRole[
+        "current-worker-757-package-root-totree-unmount-identity-source"
+      ];
+    assertSourceAssertionFailure(toJSONEvidence, {
+      property: "publicSerializationAvailable",
+      actualSource: "true",
+      actualValue: true
+    });
+    assertSourceAssertionFailure(toJSONEvidence, {
+      property: "nativeExecution",
+      actualSource: "true",
+      actualValue: true
+    });
+    assertSourceAssertionFailure(toJSONEvidence, {
+      property: "compatibilityClaimed",
+      actualSource: "true",
+      actualValue: true
+    });
+    assertSourceAssertionFailure(toTreeEvidence, {
+      property: "publicTreeAvailable",
+      actualSource: "true",
+      actualValue: true
+    });
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("private admission 727-728 gate rejects toTree-only current source identity drift", () => {
+  const workspace = createWorkspaceWithMutatedEvidenceFile({
+    evidencePath: packageRootSource,
+    sliceStart: "const toTreePrivateFacadeGate = Object.freeze({",
+    find: "unmountNativeExecutionRequiresFinishedWorkIdentity: true",
+    replace: "unmountNativeExecutionRequiresFinishedWorkIdentity: false"
+  });
+
+  try {
+    const gate = evaluatePrivateAdmission727728Gate({
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(gate.status, PRIVATE_ADMISSION_727_728_VIOLATION_STATUS);
+    assert.equal(gate.privateDiagnosticsRecognized, false);
+    assert.equal(gate.currentUnmountIdentityEvidenceRecognized, false);
+    assertViolationIds(gate, [
+      "current-unmount-identity-evidence-not-recognized"
+    ]);
+    assert.equal(
+      gate.currentUnmountIdentityEvidenceByRole[
+        "current-worker-757-package-root-tojson-unmount-identity-source"
+      ].recognized,
+      true
+    );
+
+    const toTreeEvidence =
+      gate.currentUnmountIdentityEvidenceByRole[
+        "current-worker-757-package-root-totree-unmount-identity-source"
+      ];
+    assert.equal(toTreeEvidence.recognized, false);
+    assertSourceAssertionFailure(toTreeEvidence, {
+      property: "unmountNativeExecutionRequiresFinishedWorkIdentity",
+      actualSource: "false",
+      actualValue: false
+    });
+  } finally {
+    workspace.cleanup();
+  }
 });
 
 test("private admission 727-728 gate rejects row compatibility claims", () => {
@@ -674,3 +1224,111 @@ test("private admission 727-728 gate rejects public surface promotion leaks", ()
     ]);
   }
 });
+
+function assertViolationIds(gate, expectedViolationIds, message) {
+  assert.deepEqual(
+    gate.violations.map((violation) => violation.id),
+    expectedViolationIds,
+    message
+  );
+}
+
+function assertSourceAssertionFailure(
+  evidenceRow,
+  { property, actualSource, actualValue }
+) {
+  const failure = evidenceRow.failedSourceAssertions.find(
+    (sourceAssertion) => sourceAssertion.property === property
+  );
+  assert.notEqual(failure, undefined, property);
+  assert.equal(failure.actualSource, actualSource, property);
+  assert.equal(failure.actualValue, actualValue, property);
+  assert.equal(failure.passed, false, property);
+}
+
+function createWorkspaceWithMutatedEvidenceFile({
+  evidencePath,
+  find,
+  replace,
+  sliceStart,
+  sliceEnd,
+  mutate
+}) {
+  const root = mkdtempSync(join(tmpdir(), "private-admission-727-728-"));
+  const workspaceRoot = findWorkspaceRoot();
+  const evidencePaths = new Set([
+    ...PRIVATE_ADMISSION_727_728_ROWS.flatMap((row) =>
+      row.evidence.map((evidenceRow) => evidenceRow.path)
+    ),
+    ...PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_EVIDENCE.map(
+      (evidenceRow) => evidenceRow.path
+    ),
+    ...PRIVATE_ADMISSION_727_728_SKIPPED_ROWS.flatMap((row) =>
+      row.evidence.map((evidenceRow) => evidenceRow.path)
+    )
+  ]);
+
+  for (const path of evidencePaths) {
+    const sourcePath = join(workspaceRoot, path);
+    const targetPath = join(root, path);
+    mkdirSync(dirname(targetPath), { recursive: true });
+    let text = readFileSync(sourcePath, "utf8");
+
+    if (path === evidencePath) {
+      if (mutate !== undefined) {
+        text = mutate(text);
+      } else if (sliceStart !== undefined) {
+        text = replaceInEvidenceSlice(text, {
+          sliceStart,
+          sliceEnd,
+          find,
+          replace
+        });
+      } else {
+        assert.equal(text.includes(find), true, find);
+        text = text.replace(find, replace);
+      }
+    }
+
+    writeFileSync(targetPath, text);
+  }
+
+  return {
+    root,
+    cleanup() {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+}
+
+function replaceInEvidenceSlice(text, { sliceStart, sliceEnd, find, replace }) {
+  const startIndex = text.indexOf(sliceStart);
+  assert.notEqual(startIndex, -1, sliceStart);
+  const endIndex =
+    sliceEnd === undefined
+      ? text.length
+      : text.indexOf(sliceEnd, startIndex + sliceStart.length);
+  assert.notEqual(endIndex, -1, sliceEnd);
+
+  const slice = text.slice(startIndex, endIndex);
+  assert.equal(slice.includes(find), true, find);
+  const updatedSlice = slice.replace(find, replace);
+  return `${text.slice(0, startIndex)}${updatedSlice}${text.slice(endIndex)}`;
+}
+
+function findWorkspaceRoot() {
+  let current = process.cwd();
+
+  while (current !== dirname(current)) {
+    if (
+      existsSync(join(current, "package.json")) &&
+      existsSync(join(current, "tests/conformance"))
+    ) {
+      return current;
+    }
+
+    current = dirname(current);
+  }
+
+  throw new Error("Unable to locate workspace root");
+}

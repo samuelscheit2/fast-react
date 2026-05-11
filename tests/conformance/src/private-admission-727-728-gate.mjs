@@ -129,6 +129,53 @@ export const PRIVATE_ADMISSION_727_728_REQUIRED_BLOCKER_CONTEXT_DIAGNOSTICS =
       ])
   });
 
+export const PRIVATE_ADMISSION_727_728_REQUIRED_EVIDENCE_ROLES = freezeRecord({
+  "worker-728-test-renderer-unmount-native-identity-argument-guard":
+    freezeArray([
+      "worker-612-unmount-route-admission-dependency",
+      "worker-638-unmount-cleanup-handoff-dependency",
+      "worker-639-tojson-unmount-empty-host-output-dependency",
+      "worker-667-totree-unmount-native-output-dependency",
+      "worker-725-update-identity-blocker-context",
+      "worker-726-update-native-identity-blocker-context",
+      "worker-728-unmount-identity-argument-guard-report"
+    ])
+});
+
+export const PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_WORKERS =
+  freezeArray([
+    "worker-730-test-renderer-unmount-native-cleanup-evidence",
+    "worker-733-test-renderer-unmount-finished-work-identity",
+    "worker-754-js-cjs-unmount-finished-work-identity",
+    "worker-757-react-test-renderer-index-unmount-identity"
+  ]);
+
+export const PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_DIAGNOSTICS =
+  freezeArray([
+    "test-renderer-unmount-native-ref-passive-cleanup-evidence",
+    "test-renderer-unmount-finished-work-identity-admission",
+    "private-unmount-tojson-native-finished-work-identity-validation",
+    "private-unmount-totree-native-finished-work-identity-validation",
+    "test-renderer-cjs-unmount-finished-work-identity",
+    "test-renderer-package-root-unmount-finished-work-identity"
+  ]);
+
+export const PRIVATE_ADMISSION_727_728_REQUIRED_CURRENT_UNMOUNT_IDENTITY_EVIDENCE_ROLES =
+  freezeArray([
+    "current-worker-730-unmount-ref-passive-cleanup-dependency",
+    "current-worker-733-unmount-finished-work-identity-report",
+    "current-worker-733-unmount-finished-work-identity-rust-proof",
+    "current-worker-754-cjs-unmount-finished-work-identity-report",
+    "current-worker-754-cjs-development-tojson-unmount-identity-source",
+    "current-worker-754-cjs-development-totree-unmount-identity-source",
+    "current-worker-754-cjs-production-tojson-unmount-identity-source",
+    "current-worker-754-cjs-production-totree-unmount-identity-source",
+    "current-worker-757-package-root-unmount-identity-report",
+    "current-worker-757-package-root-tojson-unmount-identity-source",
+    "current-worker-757-package-root-totree-unmount-identity-source",
+    "current-unmount-native-strict-identity-conformance"
+  ]);
+
 const privateAdmission727728SkippedRowData = Object.freeze([
   skippedRowData({
     workerId: "worker-727-package-private-admission-audit-724-726",
@@ -148,10 +195,69 @@ const privateAdmission727728SkippedRowData = Object.freeze([
   })
 ]);
 
+const unmountIdentitySourceAssertions = freezeArray([
+  jsBooleanPropertyAssertion(
+    "privateUnmountFinishedWorkIdentityGateAvailable",
+    true
+  ),
+  jsStringPropertyAssertion(
+    "unmountNativeExecutionFinishedWorkIdentityAdmissionWorker",
+    "worker-733-test-renderer-unmount-finished-work-identity"
+  ),
+  jsBooleanPropertyAssertion(
+    "unmountNativeExecutionRequiresFinishedWorkIdentity",
+    true
+  ),
+  jsBooleanPropertyAssertion("rejectsStaleUnmountFinishedWorkIdentity", true),
+  jsBooleanPropertyAssertion("requiresUnmountDeletionCleanupHandoffEvidence", true),
+  jsBooleanPropertyAssertion(
+    "consumesCommittedHostRootFinishedWorkIdentity",
+    true
+  ),
+  jsBooleanPropertyAssertion("consumesCommittedHostRootFinishedWorkLanes", true),
+  jsBooleanPropertyAssertion("publicRouteAvailable", false),
+  jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+  jsBooleanPropertyAssertion("nativeExecution", false),
+  jsBooleanPropertyAssertion("compatibilityClaimed", false)
+]);
+
+const packageRootUnmountIdentitySourceAssertions = freezeArray([
+  ...unmountIdentitySourceAssertions,
+  jsStringPropertyAssertion(
+    "acceptedUnmountFinishedWorkIdentityWorker",
+    "worker-733-test-renderer-unmount-finished-work-identity"
+  ),
+  jsBooleanPropertyAssertion("validatesUnmountRootRequestIdentity", true),
+  jsBooleanPropertyAssertion(
+    "validatesUnmountDeletionAndCleanupHandoffIdentity",
+    true
+  )
+]);
+
+const toJSONUnmountIdentitySourceAssertions = freezeArray([
+  ...unmountIdentitySourceAssertions,
+  jsBooleanPropertyAssertion("publicSerializationAvailable", false)
+]);
+
+const toTreeUnmountIdentitySourceAssertions = freezeArray([
+  ...unmountIdentitySourceAssertions,
+  jsBooleanPropertyAssertion("publicTreeAvailable", false)
+]);
+
+const packageRootToJSONUnmountIdentitySourceAssertions = freezeArray([
+  ...packageRootUnmountIdentitySourceAssertions,
+  jsBooleanPropertyAssertion("publicSerializationAvailable", false)
+]);
+
+const packageRootToTreeUnmountIdentitySourceAssertions = freezeArray([
+  ...packageRootUnmountIdentitySourceAssertions,
+  jsBooleanPropertyAssertion("publicTreeAvailable", false)
+]);
+
 const privateAdmission727728RowData = Object.freeze([
   rowData({
     workerId: "worker-728-test-renderer-unmount-native-identity-argument-guard",
-    area: "react-test-renderer unmount native serialization identity argument guard diagnostics",
+    area: "react-test-renderer historical unmount native identity argument guard diagnostics",
     primaryCompatibilityArea:
       "test-renderer-unmount-native-identity-argument-guard",
     acceptedDiagnosticIds: [
@@ -246,22 +352,162 @@ const privateAdmission727728RowData = Object.freeze([
           "consumesAcceptedFinishedWorkIdentityGate: false",
           "Did not add a Rust unmount identity adapter."
         ]
-      }),
-      evidenceData({
-        role: "worker-728-unmount-identity-argument-guard-conformance",
-        path: "tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs",
-        tokens: [
-          'test("react-test-renderer JS private native unmount serialization rejects finished-work identity evidence"',
-          "createAcceptedEmptyRootHostOutputDiagnostic({",
-          'hostOutputUpdateKind: "Unmount"',
-          "createAcceptedUnmountTreeMetadataDiagnostic()",
-          "assert.equal(jsonUnmountResult.finishedWorkIdentity, null);",
-          "assert.equal(treeUnmountResult.finishedWorkIdentity, null);"
-        ]
       })
     ]
   })
 ]);
+
+const privateAdmission727728CurrentUnmountIdentityEvidenceData = Object.freeze([
+  evidenceData({
+    role: "current-worker-730-unmount-ref-passive-cleanup-dependency",
+    path: "worker-progress/worker-730-test-renderer-unmount-native-cleanup-evidence.md",
+    tokens: [
+      "# Worker 730 - Test Renderer Unmount Native Cleanup Evidence",
+      "unmount native cleanup evidence with nonzero deleted ref cleanup and deleted",
+      "`ref_cleanup_return_count == 1`, `passive_destroy_count == 1`,",
+      "finished-work identity for unmount. This worker did not add or consume that"
+    ]
+  }),
+  evidenceData({
+    role: "current-worker-733-unmount-finished-work-identity-report",
+    path: "worker-progress/worker-733-test-renderer-unmount-finished-work-identity.md",
+    tokens: [
+      "# Worker 733 Progress",
+      "Added dedicated unmount finished-work identity gates for private `toJSON` and `toTree` diagnostics",
+      "deletion/cleanup handoff validation",
+      "reject stale `cleanup_handoff_id` values",
+      "Public, native, JS, and package compatibility remain blocked by diagnostics flags"
+    ]
+  }),
+  evidenceData({
+    role: "current-worker-733-unmount-finished-work-identity-rust-proof",
+    path: "crates/fast-react-test-renderer/src/lib.rs",
+    sliceStart:
+      "fn root_private_to_json_unmount_native_execution_requires_finished_work_identity_gate()",
+    sliceEnd:
+      "fn root_private_to_json_nested_host_output_update_row_records_nested_text_rows()",
+    tokens: [
+      "fn root_private_to_json_unmount_native_execution_requires_finished_work_identity_gate()",
+      "fn root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate()",
+      "reason: \"finished-work-identity-missing\"",
+      "reason: \"unmount-admission-finished-work-identity-mismatch\"",
+      "reason: \"finished-work-identity-source-report-mismatch\"",
+      "reason: \"public-or-native-compatibility-claim\""
+    ]
+  }),
+  evidenceData({
+    role: "current-worker-754-cjs-unmount-finished-work-identity-report",
+    path: "worker-progress/worker-754-js-cjs-unmount-finished-work-identity.md",
+    tokens: [
+      "# Worker 754 - JS/CJS unmount finished-work identity",
+      "Replaced the old JS/CJS hidden-facade behavior that rejected unmount finished-work identity evidence with strict private admission",
+      "unmount without identity fails, strict identity succeeds",
+      "public/native compatibility claims remain rejected"
+    ]
+  }),
+  evidenceData({
+    role: "current-worker-754-cjs-development-tojson-unmount-identity-source",
+    path: "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+    sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+    sliceEnd: "const privateGetInstanceDiagnosticsSymbol = Symbol.for(",
+    tokens: [
+      "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+      "unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:\n    'worker-733-test-renderer-unmount-finished-work-identity'"
+    ],
+    sourceAssertions: toJSONUnmountIdentitySourceAssertions
+  }),
+  evidenceData({
+    role: "current-worker-754-cjs-development-totree-unmount-identity-source",
+    path: "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+    sliceStart: "const toTreePrivateFacadeGate = Object.freeze({",
+    sliceEnd: "const privateTestInstanceWrapperRecordSymbol = Symbol.for(",
+    tokens: [
+      "const toTreePrivateFacadeGate = Object.freeze({",
+      "unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:\n    'worker-733-test-renderer-unmount-finished-work-identity'"
+    ],
+    sourceAssertions: toTreeUnmountIdentitySourceAssertions
+  }),
+  evidenceData({
+    role: "current-worker-754-cjs-production-tojson-unmount-identity-source",
+    path: "packages/react-test-renderer/cjs/react-test-renderer.production.js",
+    sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+    sliceEnd: "const privateGetInstanceDiagnosticsSymbol = Symbol.for(",
+    tokens: [
+      "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+      "unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:\n    'worker-733-test-renderer-unmount-finished-work-identity'"
+    ],
+    sourceAssertions: toJSONUnmountIdentitySourceAssertions
+  }),
+  evidenceData({
+    role: "current-worker-754-cjs-production-totree-unmount-identity-source",
+    path: "packages/react-test-renderer/cjs/react-test-renderer.production.js",
+    sliceStart: "const toTreePrivateFacadeGate = Object.freeze({",
+    sliceEnd: "const privateTestInstanceWrapperRecordSymbol = Symbol.for(",
+    tokens: [
+      "const toTreePrivateFacadeGate = Object.freeze({",
+      "unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:\n    'worker-733-test-renderer-unmount-finished-work-identity'"
+    ],
+    sourceAssertions: toTreeUnmountIdentitySourceAssertions
+  }),
+  evidenceData({
+    role: "current-worker-757-package-root-unmount-identity-report",
+    path: "worker-progress/worker-757-react-test-renderer-index-unmount-identity.md",
+    tokens: [
+      "# Worker 757 Progress",
+      "Added package-root private unmount finished-work identity admission",
+      "rejects omitted deletion/cleanup handoff\n  evidence",
+      "Public serialization and tree availability remain false"
+    ]
+  }),
+  evidenceData({
+    role: "current-worker-757-package-root-tojson-unmount-identity-source",
+    path: "packages/react-test-renderer/index.js",
+    sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+    sliceEnd: "const privateToTreeHostOutputMetadataSymbol = Symbol.for(",
+    tokens: [
+      "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+      "acceptedUnmountFinishedWorkIdentityWorker:\n    'worker-733-test-renderer-unmount-finished-work-identity'"
+    ],
+    sourceAssertions: packageRootToJSONUnmountIdentitySourceAssertions
+  }),
+  evidenceData({
+    role: "current-worker-757-package-root-totree-unmount-identity-source",
+    path: "packages/react-test-renderer/index.js",
+    sliceStart: "const toTreePrivateFacadeGate = Object.freeze({",
+    sliceEnd: "const privateTestInstanceWrapperRecordSymbol = Symbol.for(",
+    tokens: [
+      "const toTreePrivateFacadeGate = Object.freeze({",
+      "acceptedUnmountFinishedWorkIdentityWorker:\n    'worker-733-test-renderer-unmount-finished-work-identity'"
+    ],
+    sourceAssertions: packageRootToTreeUnmountIdentitySourceAssertions
+  }),
+  evidenceData({
+    role: "current-unmount-native-strict-identity-conformance",
+    path: "tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs",
+    tokens: [
+      'test("react-test-renderer JS private native unmount serialization accepts strict finished-work identity evidence"',
+      "createAcceptedEmptyRootHostOutputDiagnostic({",
+      'hostOutputUpdateKind: "Unmount"',
+      "jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        jsonUnmountReport\n      ),\n      false",
+      "jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        jsonUnmountReport,\n        jsonUnmountIdentityEvidence\n      ),\n      true",
+      "treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        treeUnmountReport\n      ),\n      false",
+      "treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        treeUnmountReport,\n        treeUnmountIdentityEvidence\n      ),\n      true",
+      "createAcceptedUnmountTreeMetadataDiagnostic()",
+      "jsonUnmountResult.consumesAcceptedFinishedWorkIdentityGate",
+      "jsonUnmountResult.finishedWorkIdentity.rootRequestOperation",
+      "treeUnmountResult.consumesAcceptedFinishedWorkIdentityGate",
+      "treeUnmountResult.finishedWorkIdentity.rootRequestOperation"
+    ],
+    forbiddenTokens: [
+      'test("react-test-renderer JS private native unmount serialization rejects finished-work identity evidence"',
+      "assert.equal(jsonUnmountResult.finishedWorkIdentity, null);",
+      "assert.equal(treeUnmountResult.finishedWorkIdentity, null);"
+    ]
+  })
+]);
+
+export const PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_EVIDENCE =
+  freezeArray(privateAdmission727728CurrentUnmountIdentityEvidenceData);
 
 function rowData(data) {
   return freezeRecord({
@@ -284,11 +530,39 @@ function skippedRowData(data) {
   });
 }
 
-function evidenceData({ role, path, tokens }) {
+function evidenceData({
+  role,
+  path,
+  tokens,
+  forbiddenTokens = [],
+  sliceStart = null,
+  sliceEnd = null,
+  sourceAssertions = []
+}) {
   return freezeRecord({
     role,
     path,
-    tokens: freezeArray(tokens)
+    tokens: freezeArray(tokens),
+    forbiddenTokens: freezeArray(forbiddenTokens),
+    sliceStart,
+    sliceEnd,
+    sourceAssertions: freezeArray(sourceAssertions)
+  });
+}
+
+function jsBooleanPropertyAssertion(property, value) {
+  return freezeRecord({
+    kind: "js-boolean-property",
+    property,
+    value
+  });
+}
+
+function jsStringPropertyAssertion(property, value) {
+  return freezeRecord({
+    kind: "js-string-property",
+    property,
+    value
   });
 }
 
@@ -424,6 +698,15 @@ export function evaluatePrivateAdmission727728Gate({
   const evaluatedSkippedRows = skippedRows.map((baseRow) =>
     evaluatePrivateAdmissionRow({ fileCache, row: baseRow, workspaceRoot })
   );
+  const evaluatedCurrentUnmountIdentityEvidence =
+    PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_EVIDENCE.map(
+      (evidenceRow) =>
+        evaluateEvidenceRow({
+          evidenceRow,
+          fileCache,
+          workspaceRoot
+        })
+    );
   const manifestWorkerIds = rows.map((baseRow) => baseRow.workerId);
   const skippedManifestWorkerIds = skippedRows.map(
     (baseRow) => baseRow.workerId
@@ -453,6 +736,12 @@ export function evaluatePrivateAdmission727728Gate({
   const unrecognizedSkippedWorkerIds = evaluatedSkippedRows
     .filter((evaluatedRow) => evaluatedRow.recognized !== true)
     .map((evaluatedRow) => evaluatedRow.workerId);
+  const unrecognizedCurrentUnmountIdentityEvidenceRoles =
+    evaluatedCurrentUnmountIdentityEvidence
+      .filter((evidenceRow) => evidenceRow.recognized !== true)
+      .map((evidenceRow) => evidenceRow.role);
+  const currentUnmountIdentityEvidenceRecognized =
+    unrecognizedCurrentUnmountIdentityEvidenceRoles.length === 0;
   const evaluatedAllRows = [...evaluatedRows, ...evaluatedSkippedRows];
   const compatibilityClaimWorkerIds = evaluatedAllRows
     .filter((evaluatedRow) => evaluatedRow.compatibilityClaimed !== false)
@@ -694,6 +983,137 @@ export function evaluatePrivateAdmission727728Gate({
       ];
     }
   );
+  const evidenceContractMismatches = evaluatedRows.flatMap((evaluatedRow) => {
+    if (
+      !Object.hasOwn(
+        PRIVATE_ADMISSION_727_728_REQUIRED_EVIDENCE_ROLES,
+        evaluatedRow.workerId
+      )
+    ) {
+      return [];
+    }
+
+    const expectedEvidenceRoles =
+      PRIVATE_ADMISSION_727_728_REQUIRED_EVIDENCE_ROLES[evaluatedRow.workerId];
+    const actualEvidenceRoles = evaluatedRow.evidence.map(
+      (evidenceRow) => evidenceRow.role
+    );
+    const missingEvidenceRoles = expectedEvidenceRoles.filter(
+      (role) => !actualEvidenceRoles.includes(role)
+    );
+    const unexpectedEvidenceRoles = actualEvidenceRoles.filter(
+      (role) => !expectedEvidenceRoles.includes(role)
+    );
+    const duplicateEvidenceRoles = actualEvidenceRoles.filter(
+      (role, index) => actualEvidenceRoles.indexOf(role) !== index
+    );
+    const canonicalRow = PRIVATE_ADMISSION_727_728_ROWS.find(
+      (row) => row.workerId === evaluatedRow.workerId
+    );
+    const canonicalEvidenceByRole = new Map(
+      (canonicalRow?.evidence ?? []).map((evidenceRow) => [
+        evidenceRow.role,
+        evidenceRow
+      ])
+    );
+    const evidenceLocationMismatches = evaluatedRow.evidence.flatMap(
+      (evidenceRow) => {
+        const expectedEvidence = canonicalEvidenceByRole.get(evidenceRow.role);
+
+        if (expectedEvidence === undefined) {
+          return [];
+        }
+
+        if (evidenceRowsMatchContract(evidenceRow, expectedEvidence)) {
+          return [];
+        }
+
+        return [
+          createEvidenceLocationMismatch(evidenceRow, expectedEvidence)
+        ];
+      }
+    );
+
+    if (
+      missingEvidenceRoles.length === 0 &&
+      unexpectedEvidenceRoles.length === 0 &&
+      duplicateEvidenceRoles.length === 0 &&
+      evidenceLocationMismatches.length === 0
+    ) {
+      return [];
+    }
+
+    return [
+      freezeRecord({
+        workerId: evaluatedRow.workerId,
+        expectedEvidenceRoles,
+        actualEvidenceRoles: freezeArray(actualEvidenceRoles),
+        missingEvidenceRoles: freezeArray(missingEvidenceRoles),
+        unexpectedEvidenceRoles: freezeArray(unexpectedEvidenceRoles),
+        duplicateEvidenceRoles: freezeArray(duplicateEvidenceRoles),
+        evidenceLocationMismatches: freezeArray(evidenceLocationMismatches)
+      })
+    ];
+  });
+  const currentUnmountIdentityEvidenceContractMismatches = (() => {
+    const expectedEvidenceRoles =
+      PRIVATE_ADMISSION_727_728_REQUIRED_CURRENT_UNMOUNT_IDENTITY_EVIDENCE_ROLES;
+    const actualEvidenceRoles = evaluatedCurrentUnmountIdentityEvidence.map(
+      (evidenceRow) => evidenceRow.role
+    );
+    const missingEvidenceRoles = expectedEvidenceRoles.filter(
+      (role) => !actualEvidenceRoles.includes(role)
+    );
+    const unexpectedEvidenceRoles = actualEvidenceRoles.filter(
+      (role) => !expectedEvidenceRoles.includes(role)
+    );
+    const duplicateEvidenceRoles = actualEvidenceRoles.filter(
+      (role, index) => actualEvidenceRoles.indexOf(role) !== index
+    );
+    const canonicalEvidenceByRole = new Map(
+      PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_EVIDENCE.map(
+        (evidenceRow) => [evidenceRow.role, evidenceRow]
+      )
+    );
+    const evidenceLocationMismatches =
+      evaluatedCurrentUnmountIdentityEvidence.flatMap((evidenceRow) => {
+        const expectedEvidence = canonicalEvidenceByRole.get(evidenceRow.role);
+
+        if (expectedEvidence === undefined) {
+          return [];
+        }
+
+        if (evidenceRowsMatchContract(evidenceRow, expectedEvidence)) {
+          return [];
+        }
+
+        return [
+          createEvidenceLocationMismatch(evidenceRow, expectedEvidence)
+        ];
+      });
+
+    if (
+      missingEvidenceRoles.length === 0 &&
+      unexpectedEvidenceRoles.length === 0 &&
+      duplicateEvidenceRoles.length === 0 &&
+      evidenceLocationMismatches.length === 0
+    ) {
+      return [];
+    }
+
+    return [
+      freezeRecord({
+        expectedEvidenceRoles,
+        actualEvidenceRoles: freezeArray(actualEvidenceRoles),
+        missingEvidenceRoles: freezeArray(missingEvidenceRoles),
+        unexpectedEvidenceRoles: freezeArray(unexpectedEvidenceRoles),
+        duplicateEvidenceRoles: freezeArray(duplicateEvidenceRoles),
+        evidenceLocationMismatches: freezeArray(evidenceLocationMismatches)
+      })
+    ];
+  })();
+  const currentUnmountIdentityEvidenceContractRecognized =
+    currentUnmountIdentityEvidenceContractMismatches.length === 0;
   const violations = [];
 
   if (
@@ -794,6 +1214,30 @@ export function evaluatePrivateAdmission727728Gate({
     );
   }
 
+  if (evidenceContractMismatches.length > 0) {
+    violations.push(
+      createViolation("accepted-private-diagnostic-evidence-contract-mismatch", {
+        rows: freezeArray(evidenceContractMismatches)
+      })
+    );
+  }
+
+  if (unrecognizedCurrentUnmountIdentityEvidenceRoles.length > 0) {
+    violations.push(
+      createViolation("current-unmount-identity-evidence-not-recognized", {
+        roles: freezeArray(unrecognizedCurrentUnmountIdentityEvidenceRoles)
+      })
+    );
+  }
+
+  if (currentUnmountIdentityEvidenceContractMismatches.length > 0) {
+    violations.push(
+      createViolation("current-unmount-identity-evidence-contract-mismatch", {
+        evidence: freezeArray(currentUnmountIdentityEvidenceContractMismatches)
+      })
+    );
+  }
+
   if (compatibilityClaimWorkerIds.length > 0) {
     violations.push(
       createViolation("private-diagnostic-claimed-compatibility", {
@@ -834,8 +1278,15 @@ export function evaluatePrivateAdmission727728Gate({
         : PRIVATE_ADMISSION_727_728_VIOLATION_STATUS,
     queueWorkers: PRIVATE_ADMISSION_727_728_WORKERS,
     skippedWorkers: PRIVATE_ADMISSION_727_728_SKIPPED_WORKERS,
+    currentUnmountIdentityWorkers:
+      PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_WORKERS,
+    currentUnmountIdentityDiagnostics:
+      PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_DIAGNOSTICS,
     rows: freezeArray(evaluatedRows),
     skippedRows: freezeArray(evaluatedSkippedRows),
+    currentUnmountIdentityEvidence: freezeArray(
+      evaluatedCurrentUnmountIdentityEvidence
+    ),
     rowsByWorker: freezeRecord(
       Object.fromEntries(
         evaluatedRows.map((evaluatedRow) => [
@@ -849,6 +1300,14 @@ export function evaluatePrivateAdmission727728Gate({
         evaluatedSkippedRows.map((evaluatedRow) => [
           evaluatedRow.workerId,
           evaluatedRow
+        ])
+      )
+    ),
+    currentUnmountIdentityEvidenceByRole: freezeRecord(
+      Object.fromEntries(
+        evaluatedCurrentUnmountIdentityEvidence.map((evidenceRow) => [
+          evidenceRow.role,
+          evidenceRow
         ])
       )
     ),
@@ -872,6 +1331,9 @@ export function evaluatePrivateAdmission727728Gate({
       dependencyDiagnosticMismatches.length === 0 &&
       blockerContextMismatches.length === 0 &&
       blockerContextDiagnosticMismatches.length === 0 &&
+      evidenceContractMismatches.length === 0 &&
+      currentUnmountIdentityEvidenceRecognized === true &&
+      currentUnmountIdentityEvidenceContractRecognized === true &&
       blockedSurfaceMismatches.length === 0 &&
       blockedPublicClaimMismatches.length === 0,
     skipMetaRecognized:
@@ -887,6 +1349,9 @@ export function evaluatePrivateAdmission727728Gate({
     blockerContextRecognized:
       blockerContextMismatches.length === 0 &&
       blockerContextDiagnosticMismatches.length === 0,
+    evidenceContractRecognized: evidenceContractMismatches.length === 0,
+    currentUnmountIdentityEvidenceRecognized,
+    currentUnmountIdentityEvidenceContractRecognized,
     blockedPublicSurfacesRecognized: blockedSurfaceMismatches.length === 0,
     blockedPublicClaimsRecognized: blockedPublicClaimMismatches.length === 0,
     compatibilityClaimed:
@@ -943,8 +1408,7 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
     ...row,
     evidence: freezeArray(evaluatedEvidence),
     evidenceRecognized,
-    recognized:
-      typeof row.recognized === "boolean" ? row.recognized : evidenceRecognized,
+    recognized: evidenceRecognized === true && row.recognized !== false,
     publicCompatibilityViolations: freezeArray(publicCompatibilityViolations)
   });
 }
@@ -955,23 +1419,614 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
     workspaceRoot,
     path: evidenceRow.path
   });
+  const slicedSource =
+    source.ok === true
+      ? extractEvidenceSourceSlice({
+          path: evidenceRow.path,
+          text: source.text,
+          sliceStart: evidenceRow.sliceStart,
+          sliceEnd: evidenceRow.sliceEnd
+        })
+      : source;
   const tokenResults = evidenceRow.tokens.map((token) =>
     freezeRecord({
       token,
-      present: source.text.includes(token)
+      present: slicedSource.text.includes(token)
     })
   );
   const missingTokens = tokenResults
     .filter((tokenResult) => tokenResult.present !== true)
     .map((tokenResult) => tokenResult.token);
+  const forbiddenTokens = evidenceRow.forbiddenTokens ?? [];
+  const forbiddenTokensPresent =
+    slicedSource.ok === true
+      ? forbiddenTokens.filter((token) => slicedSource.text.includes(token))
+      : [];
+  const sourceAssertionEvaluation =
+    slicedSource.ok === true
+      ? evaluateSourceAssertions({
+          text: slicedSource.text,
+          sourceAssertions: evidenceRow.sourceAssertions ?? []
+        })
+      : evaluateSourceAssertionsForUnavailableSource(
+          evidenceRow.sourceAssertions ?? []
+        );
 
   return freezeRecord({
     ...evidenceRow,
     tokenResults: freezeArray(tokenResults),
     missingTokens: freezeArray(missingTokens),
-    recognized: source.ok === true && missingTokens.length === 0,
-    readError: source.error
+    forbiddenTokensPresent: freezeArray(forbiddenTokensPresent),
+    sourceAssertionResults: freezeArray(sourceAssertionEvaluation.results),
+    failedSourceAssertions: freezeArray(sourceAssertionEvaluation.failed),
+    sourceAssertionError: sourceAssertionEvaluation.error,
+    recognized:
+      slicedSource.ok === true &&
+      missingTokens.length === 0 &&
+      forbiddenTokensPresent.length === 0 &&
+      sourceAssertionEvaluation.failed.length === 0,
+    readError: source.error,
+    sliceError: slicedSource.ok === true ? null : slicedSource.error
   });
+}
+
+function evidenceRowsMatchContract(evidenceRow, expectedEvidence) {
+  return (
+    evidenceRow.path === expectedEvidence.path &&
+    (evidenceRow.sliceStart ?? null) === (expectedEvidence.sliceStart ?? null) &&
+    (evidenceRow.sliceEnd ?? null) === (expectedEvidence.sliceEnd ?? null) &&
+    sameStringSet(evidenceRow.tokens ?? [], expectedEvidence.tokens) === true &&
+    sameStringSet(
+      evidenceRow.forbiddenTokens ?? [],
+      expectedEvidence.forbiddenTokens ?? []
+    ) === true &&
+    sameSourceAssertionSet(
+      evidenceRow.sourceAssertions ?? [],
+      expectedEvidence.sourceAssertions ?? []
+    ) === true
+  );
+}
+
+function createEvidenceLocationMismatch(evidenceRow, expectedEvidence) {
+  return freezeRecord({
+    role: evidenceRow.role,
+    expectedPath: expectedEvidence.path,
+    actualPath: evidenceRow.path,
+    expectedSliceStart: expectedEvidence.sliceStart ?? null,
+    actualSliceStart: evidenceRow.sliceStart ?? null,
+    expectedSliceEnd: expectedEvidence.sliceEnd ?? null,
+    actualSliceEnd: evidenceRow.sliceEnd ?? null,
+    expectedTokens: expectedEvidence.tokens,
+    actualTokens: freezeArray(evidenceRow.tokens ?? []),
+    expectedForbiddenTokens: expectedEvidence.forbiddenTokens ?? [],
+    actualForbiddenTokens: freezeArray(evidenceRow.forbiddenTokens ?? []),
+    expectedSourceAssertions: expectedEvidence.sourceAssertions ?? [],
+    actualSourceAssertions: freezeArray(evidenceRow.sourceAssertions ?? [])
+  });
+}
+
+function evaluateSourceAssertions({ text, sourceAssertions }) {
+  if (sourceAssertions.length === 0) {
+    return freezeRecord({
+      results: freezeArray([]),
+      failed: freezeArray([]),
+      error: null
+    });
+  }
+
+  const extractedProperties = extractTopLevelJsObjectProperties(text);
+  if (extractedProperties.ok !== true) {
+    const results = sourceAssertions.map((assertion) =>
+      freezeRecord({
+        ...assertion,
+        expectedValue: assertion.value,
+        actualSource: null,
+        actualValue: null,
+        passed: false,
+        error: extractedProperties.error
+      })
+    );
+
+    return freezeRecord({
+      results: freezeArray(results),
+      failed: freezeArray(results),
+      error: extractedProperties.error
+    });
+  }
+
+  const results = sourceAssertions.map((assertion) =>
+    evaluateSourceAssertion({
+      assertion,
+      properties: extractedProperties.properties
+    })
+  );
+
+  return freezeRecord({
+    results: freezeArray(results),
+    failed: freezeArray(
+      results.filter((sourceAssertionResult) => {
+        return sourceAssertionResult.passed !== true;
+      })
+    ),
+    error: null
+  });
+}
+
+function evaluateSourceAssertionsForUnavailableSource(sourceAssertions) {
+  const results = sourceAssertions.map((assertion) =>
+    freezeRecord({
+      ...assertion,
+      expectedValue: assertion.value,
+      actualSource: null,
+      actualValue: null,
+      passed: false,
+      error: "source-unavailable"
+    })
+  );
+
+  return freezeRecord({
+    results: freezeArray(results),
+    failed: freezeArray(results),
+    error: sourceAssertions.length === 0 ? null : "source-unavailable"
+  });
+}
+
+function evaluateSourceAssertion({ assertion, properties }) {
+  const actualSource = properties.get(assertion.property);
+  if (actualSource === undefined) {
+    return freezeRecord({
+      ...assertion,
+      expectedValue: assertion.value,
+      actualSource: null,
+      actualValue: null,
+      passed: false,
+      error: "property-missing"
+    });
+  }
+
+  if (assertion.kind === "js-boolean-property") {
+    const actualValue =
+      actualSource === "true" ? true : actualSource === "false" ? false : null;
+    return freezeRecord({
+      ...assertion,
+      expectedValue: assertion.value,
+      actualSource,
+      actualValue,
+      passed: actualSource === String(assertion.value),
+      error: actualValue === null ? "not-boolean-literal" : null
+    });
+  }
+
+  if (assertion.kind === "js-string-property") {
+    const actualValue = parseSimpleQuotedJsString(actualSource);
+    return freezeRecord({
+      ...assertion,
+      expectedValue: assertion.value,
+      actualSource,
+      actualValue: actualValue.ok === true ? actualValue.value : null,
+      passed:
+        actualValue.ok === true && actualValue.value === assertion.value,
+      error: actualValue.ok === true ? null : actualValue.error
+    });
+  }
+
+  return freezeRecord({
+    ...assertion,
+    expectedValue: assertion.value,
+    actualSource,
+    actualValue: null,
+    passed: false,
+    error: `unknown-source-assertion-kind: ${assertion.kind}`
+  });
+}
+
+function extractTopLevelJsObjectProperties(text) {
+  const freezeIndex = findJsSourceOutsideCommentsAndStrings(
+    text,
+    "Object.freeze"
+  );
+  const openIndex = findNextJsPunctuator(
+    text,
+    freezeIndex < 0 ? 0 : freezeIndex,
+    "{"
+  );
+
+  if (openIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-freeze-literal-not-found"
+    });
+  }
+
+  const closeIndex = findMatchingJsBrace(text, openIndex);
+  if (closeIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-freeze-literal-not-closed"
+    });
+  }
+
+  const properties = new Map();
+  let index = openIndex + 1;
+  while (index < closeIndex) {
+    index = skipJsTrivia(text, index, closeIndex);
+
+    while (text[index] === "," && index < closeIndex) {
+      index = skipJsTrivia(text, index + 1, closeIndex);
+    }
+
+    if (index >= closeIndex) {
+      break;
+    }
+
+    const propertyKey = readJsObjectPropertyKey(text, index, closeIndex);
+    if (propertyKey.ok !== true) {
+      const nextIndex = findNextTopLevelPropertySeparator(
+        text,
+        index,
+        closeIndex
+      );
+      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+      continue;
+    }
+
+    index = skipJsTrivia(text, propertyKey.end, closeIndex);
+    if (text[index] !== ":") {
+      const nextIndex = findNextTopLevelPropertySeparator(
+        text,
+        index,
+        closeIndex
+      );
+      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+      continue;
+    }
+
+    const valueStart = skipJsTrivia(text, index + 1, closeIndex);
+    const valueEnd = findNextTopLevelPropertySeparator(
+      text,
+      valueStart,
+      closeIndex
+    );
+    properties.set(propertyKey.key, text.slice(valueStart, valueEnd).trim());
+    index = valueEnd < closeIndex ? valueEnd + 1 : closeIndex;
+  }
+
+  return freezeRecord({
+    ok: true,
+    properties,
+    error: null
+  });
+}
+
+function findNextJsPunctuator(text, startIndex, punctuator) {
+  let index = startIndex;
+
+  while (index < text.length) {
+    const nextIndex = skipJsCommentOrString(text, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (text[index] === punctuator) {
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return -1;
+}
+
+function findJsSourceOutsideCommentsAndStrings(text, needle, fromIndex = 0) {
+  let index = fromIndex;
+
+  while (index < text.length) {
+    const nextIndex = skipJsCommentOrString(text, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (text.startsWith(needle, index)) {
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return -1;
+}
+
+function findMatchingJsBrace(text, openIndex) {
+  let depth = 0;
+  let index = openIndex;
+
+  while (index < text.length) {
+    const nextIndex = skipJsCommentOrString(text, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (text[index] === "{") {
+      depth += 1;
+    } else if (text[index] === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return index;
+      }
+    }
+
+    index += 1;
+  }
+
+  return -1;
+}
+
+function findNextTopLevelPropertySeparator(text, startIndex, endIndex) {
+  let index = startIndex;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+
+  while (index < endIndex) {
+    const nextIndex = skipJsCommentOrString(text, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const character = text[index];
+    if (character === "{" && bracketDepth === 0 && parenDepth === 0) {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[" && braceDepth === 0 && parenDepth === 0) {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (character === "(" && braceDepth === 0 && bracketDepth === 0) {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    } else if (
+      character === "," &&
+      braceDepth === 0 &&
+      bracketDepth === 0 &&
+      parenDepth === 0
+    ) {
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return endIndex;
+}
+
+function skipJsTrivia(text, startIndex, endIndex) {
+  let index = startIndex;
+
+  while (index < endIndex) {
+    const character = text[index];
+    if (/\s/.test(character)) {
+      index += 1;
+      continue;
+    }
+
+    if (text.startsWith("//", index)) {
+      const lineEnd = text.indexOf("\n", index + 2);
+      index = lineEnd < 0 ? endIndex : lineEnd + 1;
+      continue;
+    }
+
+    if (text.startsWith("/*", index)) {
+      const blockEnd = text.indexOf("*/", index + 2);
+      index = blockEnd < 0 ? endIndex : blockEnd + 2;
+      continue;
+    }
+
+    break;
+  }
+
+  return index;
+}
+
+function skipJsCommentOrString(text, index) {
+  if (text.startsWith("//", index)) {
+    const lineEnd = text.indexOf("\n", index + 2);
+    return lineEnd < 0 ? text.length : lineEnd + 1;
+  }
+
+  if (text.startsWith("/*", index)) {
+    const blockEnd = text.indexOf("*/", index + 2);
+    return blockEnd < 0 ? text.length : blockEnd + 2;
+  }
+
+  const character = text[index];
+  if (character === "'" || character === '"' || character === "`") {
+    return skipQuotedJsLiteral(text, index);
+  }
+
+  return index;
+}
+
+function readJsObjectPropertyKey(text, startIndex, endIndex) {
+  const character = text[startIndex];
+  if (character === "'" || character === '"') {
+    const parsed = readQuotedJsLiteral(text, startIndex, endIndex);
+    return freezeRecord({
+      ok: parsed.ok,
+      key: parsed.ok === true ? parsed.value : null,
+      end: parsed.end,
+      error: parsed.error
+    });
+  }
+
+  if (!/[A-Za-z_$]/.test(character)) {
+    return freezeRecord({
+      ok: false,
+      key: null,
+      end: startIndex,
+      error: "property-key-not-supported"
+    });
+  }
+
+  let index = startIndex + 1;
+  while (index < endIndex && /[A-Za-z0-9_$]/.test(text[index])) {
+    index += 1;
+  }
+
+  return freezeRecord({
+    ok: true,
+    key: text.slice(startIndex, index),
+    end: index,
+    error: null
+  });
+}
+
+function parseSimpleQuotedJsString(source) {
+  const trimmed = source.trim();
+  const parsed = readQuotedJsLiteral(trimmed, 0, trimmed.length);
+
+  if (parsed.ok !== true) {
+    return parsed;
+  }
+
+  if (parsed.end !== trimmed.length) {
+    return freezeRecord({
+      ok: false,
+      value: null,
+      end: parsed.end,
+      error: "string-literal-has-trailing-source"
+    });
+  }
+
+  return parsed;
+}
+
+function readQuotedJsLiteral(text, startIndex, endIndex) {
+  const quote = text[startIndex];
+  if (quote !== "'" && quote !== '"' && quote !== "`") {
+    return freezeRecord({
+      ok: false,
+      value: null,
+      end: startIndex,
+      error: "not-quoted-string-literal"
+    });
+  }
+
+  let value = "";
+  let index = startIndex + 1;
+  while (index < endIndex) {
+    const character = text[index];
+
+    if (character === "\\") {
+      if (index + 1 >= endIndex) {
+        return freezeRecord({
+          ok: false,
+          value: null,
+          end: index,
+          error: "unterminated-string-escape"
+        });
+      }
+
+      value += text[index + 1];
+      index += 2;
+      continue;
+    }
+
+    if (character === quote) {
+      return freezeRecord({
+        ok: true,
+        value,
+        end: index + 1,
+        error: null
+      });
+    }
+
+    value += character;
+    index += 1;
+  }
+
+  return freezeRecord({
+    ok: false,
+    value: null,
+    end: index,
+    error: "unterminated-string-literal"
+  });
+}
+
+function skipQuotedJsLiteral(text, startIndex) {
+  const quote = text[startIndex];
+  let index = startIndex + 1;
+
+  while (index < text.length) {
+    if (text[index] === "\\") {
+      index += 2;
+      continue;
+    }
+
+    if (text[index] === quote) {
+      return index + 1;
+    }
+
+    index += 1;
+  }
+
+  return text.length;
+}
+
+function extractEvidenceSourceSlice({ path, text, sliceStart, sliceEnd }) {
+  if (sliceStart == null && sliceEnd == null) {
+    return freezeRecord({ ok: true, text, error: null });
+  }
+
+  const findMarker = isJavaScriptSourcePath(path)
+    ? findJsSourceOutsideCommentsAndStrings
+    : findRawSource;
+  const startIndex =
+    sliceStart == null
+      ? 0
+      : findMarker(text, sliceStart);
+  if (startIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      text: "",
+      error: `slice-start-not-found: ${sliceStart}`
+    });
+  }
+
+  const endSearchIndex =
+    sliceStart == null ? startIndex : startIndex + sliceStart.length;
+  const endIndex =
+    sliceEnd == null
+      ? text.length
+      : findMarker(text, sliceEnd, endSearchIndex);
+  if (endIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      text: "",
+      error: `slice-end-not-found: ${sliceEnd}`
+    });
+  }
+
+  return freezeRecord({
+    ok: true,
+    text: text.slice(startIndex, endIndex),
+    error: null
+  });
+}
+
+function isJavaScriptSourcePath(path) {
+  return path.endsWith(".js") || path.endsWith(".mjs");
+}
+
+function findRawSource(text, needle, fromIndex = 0) {
+  return text.indexOf(needle, fromIndex);
 }
 
 function readWorkspaceFile({ fileCache, workspaceRoot, path }) {
@@ -1002,8 +2057,25 @@ function sameStringSet(left, right) {
     return false;
   }
 
+  const leftSet = new Set(left);
   const rightSet = new Set(right);
-  return left.every((value) => rightSet.has(value));
+  return (
+    left.every((value) => rightSet.has(value)) &&
+    right.every((value) => leftSet.has(value))
+  );
+}
+
+function sameSourceAssertionSet(left, right) {
+  return sameStringSet(
+    left.map((assertion) => sourceAssertionKey(assertion)),
+    right.map((assertion) => sourceAssertionKey(assertion))
+  );
+}
+
+function sourceAssertionKey(assertion) {
+  return `${assertion.kind}:${assertion.property}:${JSON.stringify(
+    assertion.value
+  )}`;
 }
 
 function createViolation(id, fields) {
