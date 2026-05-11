@@ -2,6 +2,44 @@
 
 let transitionDepth = 0;
 
+const startTransitionRootlessCurrentnessFieldNames = Object.freeze([
+  'apiName',
+  'compatibilityTarget',
+  'currentPublicExport',
+  'rootlessFacade',
+  'transitionScopeExecution',
+  'errorChannel',
+  'restoresPreviousDepth',
+  'restoresPreviousDepthAfterThrow',
+  'schedulerIntegration',
+  'rootLaneIntegration',
+  'rootScheduling',
+  'rootExecution',
+  'dispatcherRouting',
+  'schedulerCallbackExecution',
+  'compatibilityClaimed',
+  'blocker'
+]);
+const startTransitionRootlessCurrentness = Object.freeze({
+  apiName: 'startTransition',
+  compatibilityTarget: 'react@19.2.6',
+  currentPublicExport: 'react.startTransition facade',
+  rootlessFacade: true,
+  transitionScopeExecution: 'synchronous',
+  errorChannel: 'global-report-error',
+  restoresPreviousDepth: true,
+  restoresPreviousDepthAfterThrow: true,
+  schedulerIntegration: false,
+  rootLaneIntegration: false,
+  rootScheduling: false,
+  rootExecution: false,
+  dispatcherRouting: false,
+  schedulerCallbackExecution: false,
+  compatibilityClaimed: false,
+  blocker:
+    'startTransition remains a rootless facade until scheduler and root-lane integration are admitted'
+});
+
 function reportGlobalError(error) {
   if (typeof reportError === 'function') {
     reportError(error);
@@ -63,5 +101,7 @@ Object.defineProperty(startTransition, 'name', {
 
 module.exports = {
   isTransitionBatchActive,
-  startTransition
+  startTransition,
+  startTransitionRootlessCurrentness,
+  startTransitionRootlessCurrentnessFieldNames
 };
