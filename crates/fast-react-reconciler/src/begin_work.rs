@@ -17,19 +17,19 @@ use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
     ContextFrameId, ContextHandle, ContextStackError, ContextStackSnapshot, ContextValueHandle,
-    FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError, Lane, Lanes, PropsHandle,
-    ReactKey, StateHandle, StateNodeHandle, UpdateQueueHandle,
+    DependenciesHandle, FiberArena, FiberFlags, FiberId, FiberMode, FiberTag, FiberTopologyError,
+    Lane, Lanes, PropsHandle, ReactKey, StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
 
 use crate::{
     RootElementHandle,
     function_component::{
         FunctionComponentContextConsumerInvoker, FunctionComponentContextDependencyHandle,
-        FunctionComponentContextReadRecord, FunctionComponentContextRenderState,
-        FunctionComponentContextRenderStore, FunctionComponentHookRenderResult,
-        FunctionComponentHookRenderStore, FunctionComponentInvoker, FunctionComponentOutputHandle,
-        FunctionComponentRenderError, FunctionComponentRenderRecord,
-        FunctionComponentSingleChildOutputResolver,
+        FunctionComponentContextDependencyRecord, FunctionComponentContextReadRecord,
+        FunctionComponentContextRenderState, FunctionComponentContextRenderStore,
+        FunctionComponentHookRenderResult, FunctionComponentHookRenderStore,
+        FunctionComponentInvoker, FunctionComponentOutputHandle, FunctionComponentRenderError,
+        FunctionComponentRenderRecord, FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError,
         FunctionComponentSingleChildReconciliationRecord, FunctionComponentStateActionHandle,
         FunctionComponentUseContextRenderRecord, FunctionComponentUseStateHookRenderRecord,
@@ -945,6 +945,160 @@ impl FunctionComponentBeginWorkRecord {
     #[must_use]
     pub const fn context_read_count(self) -> usize {
         self.render.context_read_count()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentBeginWorkBailoutBlockerRecord {
+    current: FiberId,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    pending_props: PropsHandle,
+    memoized_props: PropsHandle,
+    current_lanes_before: Lanes,
+    current_lanes_after: Lanes,
+    skipped_lanes: Lanes,
+    child: Option<FiberId>,
+    child_lanes: Lanes,
+    child_to_visit: Option<FiberId>,
+    context_dependency_count: usize,
+    context_dependency_lanes: Lanes,
+    work_in_progress_update_queue_before: UpdateQueueHandle,
+    work_in_progress_update_queue_after: UpdateQueueHandle,
+    work_in_progress_dependencies_before: DependenciesHandle,
+    work_in_progress_dependencies_after: DependenciesHandle,
+    reused_update_queue: UpdateQueueHandle,
+    reused_dependencies: DependenciesHandle,
+    work_in_progress_flags_before: FiberFlags,
+    work_in_progress_flags_after: FiberFlags,
+    removed_hook_effect_flags: FiberFlags,
+    child_traversal_blocked: bool,
+}
+
+impl FunctionComponentBeginWorkBailoutBlockerRecord {
+    #[must_use]
+    pub const fn current(self) -> FiberId {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.work_in_progress
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn pending_props(self) -> PropsHandle {
+        self.pending_props
+    }
+
+    #[must_use]
+    pub const fn memoized_props(self) -> PropsHandle {
+        self.memoized_props
+    }
+
+    #[must_use]
+    pub const fn current_lanes_before(self) -> Lanes {
+        self.current_lanes_before
+    }
+
+    #[must_use]
+    pub const fn current_lanes_after(self) -> Lanes {
+        self.current_lanes_after
+    }
+
+    #[must_use]
+    pub const fn skipped_lanes(self) -> Lanes {
+        self.skipped_lanes
+    }
+
+    #[must_use]
+    pub const fn child(self) -> Option<FiberId> {
+        self.child
+    }
+
+    #[must_use]
+    pub const fn child_lanes(self) -> Lanes {
+        self.child_lanes
+    }
+
+    #[must_use]
+    pub const fn child_to_visit(self) -> Option<FiberId> {
+        self.child_to_visit
+    }
+
+    #[must_use]
+    pub const fn context_dependency_count(self) -> usize {
+        self.context_dependency_count
+    }
+
+    #[must_use]
+    pub const fn context_dependency_lanes(self) -> Lanes {
+        self.context_dependency_lanes
+    }
+
+    #[must_use]
+    pub const fn work_in_progress_update_queue_before(self) -> UpdateQueueHandle {
+        self.work_in_progress_update_queue_before
+    }
+
+    #[must_use]
+    pub const fn work_in_progress_update_queue_after(self) -> UpdateQueueHandle {
+        self.work_in_progress_update_queue_after
+    }
+
+    #[must_use]
+    pub const fn work_in_progress_dependencies_before(self) -> DependenciesHandle {
+        self.work_in_progress_dependencies_before
+    }
+
+    #[must_use]
+    pub const fn work_in_progress_dependencies_after(self) -> DependenciesHandle {
+        self.work_in_progress_dependencies_after
+    }
+
+    #[must_use]
+    pub const fn reused_update_queue(self) -> UpdateQueueHandle {
+        self.reused_update_queue
+    }
+
+    #[must_use]
+    pub const fn reused_dependencies(self) -> DependenciesHandle {
+        self.reused_dependencies
+    }
+
+    #[must_use]
+    pub const fn work_in_progress_flags_before(self) -> FiberFlags {
+        self.work_in_progress_flags_before
+    }
+
+    #[must_use]
+    pub const fn work_in_progress_flags_after(self) -> FiberFlags {
+        self.work_in_progress_flags_after
+    }
+
+    #[must_use]
+    pub const fn removed_hook_effect_flags(self) -> FiberFlags {
+        self.removed_hook_effect_flags
+    }
+
+    #[must_use]
+    pub const fn child_traversal_blocked(self) -> bool {
+        self.child_traversal_blocked
+    }
+
+    #[must_use]
+    pub fn reused_hook_update_queue(self) -> bool {
+        self.work_in_progress_update_queue_after == self.reused_update_queue
+    }
+
+    #[must_use]
+    pub fn reused_current_dependencies(self) -> bool {
+        self.work_in_progress_dependencies_after == self.reused_dependencies
     }
 }
 
@@ -3419,6 +3573,133 @@ impl From<FiberTopologyError> for SiblingContextProviderBeginWorkError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FunctionComponentBeginWorkBailoutBlockerError {
+    FiberTopology(FiberTopologyError),
+    UnexpectedFiberTag {
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    MissingCurrent {
+        work_in_progress: FiberId,
+    },
+    PropsChanged {
+        current: FiberId,
+        work_in_progress: FiberId,
+        memoized_props: PropsHandle,
+        pending_props: PropsHandle,
+    },
+    ScheduledUpdate {
+        current: FiberId,
+        render_lanes: Lanes,
+        current_lanes: Lanes,
+    },
+    ContextChanged {
+        current: FiberId,
+        work_in_progress: FiberId,
+        render_lanes: Lanes,
+        context_dependency_count: usize,
+        context_dependency_lanes: Lanes,
+    },
+    ChildLanesIntersectRenderLanes {
+        work_in_progress: FiberId,
+        render_lanes: Lanes,
+        child_lanes: Lanes,
+        child: Option<FiberId>,
+    },
+}
+
+impl Display for FunctionComponentBeginWorkBailoutBlockerError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::UnexpectedFiberTag { fiber, tag } => write!(
+                formatter,
+                "fiber {} has tag {:?}; function component bailout blocker admits FunctionComponent only",
+                fiber.slot().get(),
+                tag
+            ),
+            Self::MissingCurrent { work_in_progress } => write!(
+                formatter,
+                "function component fiber {} has no current alternate; mount path cannot bail out",
+                work_in_progress.slot().get()
+            ),
+            Self::PropsChanged {
+                current,
+                work_in_progress,
+                memoized_props,
+                pending_props,
+            } => write!(
+                formatter,
+                "function component bailout blocked because current {} memoized props {:?} differ from work-in-progress {} pending props {:?}",
+                current.slot().get(),
+                memoized_props,
+                work_in_progress.slot().get(),
+                pending_props
+            ),
+            Self::ScheduledUpdate {
+                current,
+                render_lanes,
+                current_lanes,
+            } => write!(
+                formatter,
+                "function component bailout blocked because current {} lanes {:?} intersect render lanes {:?}",
+                current.slot().get(),
+                current_lanes,
+                render_lanes
+            ),
+            Self::ContextChanged {
+                current,
+                work_in_progress,
+                render_lanes,
+                context_dependency_count,
+                context_dependency_lanes,
+            } => write!(
+                formatter,
+                "function component bailout blocked because {} private context dependencies for current {} / work-in-progress {} carry lanes {:?} intersecting render lanes {:?}",
+                context_dependency_count,
+                current.slot().get(),
+                work_in_progress.slot().get(),
+                context_dependency_lanes,
+                render_lanes
+            ),
+            Self::ChildLanesIntersectRenderLanes {
+                work_in_progress,
+                render_lanes,
+                child_lanes,
+                child,
+            } => write!(
+                formatter,
+                "function component bailout cannot block child traversal for {} because child lanes {:?} intersect render lanes {:?}; child {:?} must remain reachable",
+                work_in_progress.slot().get(),
+                child_lanes,
+                render_lanes,
+                child.map(|fiber| fiber.slot().get())
+            ),
+        }
+    }
+}
+
+impl Error for FunctionComponentBeginWorkBailoutBlockerError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberTopology(error) => Some(error),
+            Self::UnexpectedFiberTag { .. }
+            | Self::MissingCurrent { .. }
+            | Self::PropsChanged { .. }
+            | Self::ScheduledUpdate { .. }
+            | Self::ContextChanged { .. }
+            | Self::ChildLanesIntersectRenderLanes { .. } => None,
+        }
+    }
+}
+
+impl From<FiberTopologyError> for FunctionComponentBeginWorkBailoutBlockerError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BeginWorkError {
     FiberTopology(FiberTopologyError),
     FunctionComponent(FunctionComponentRenderError),
@@ -4274,6 +4555,196 @@ fn unsupported_begin_work_error(
         ))),
         _ => Ok(BeginWorkError::UnsupportedFiberTag { fiber, tag }),
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FunctionComponentBailoutContextDependencySummary {
+    dependency_count: usize,
+    dependency_lanes: Lanes,
+}
+
+fn function_component_bailout_context_dependency_summary(
+    dependencies: &[FunctionComponentContextDependencyRecord],
+    current: FiberId,
+    work_in_progress: FiberId,
+) -> FunctionComponentBailoutContextDependencySummary {
+    dependencies
+        .iter()
+        .filter(|dependency| {
+            let fiber = dependency.fiber();
+            fiber == current || fiber == work_in_progress
+        })
+        .fold(
+            FunctionComponentBailoutContextDependencySummary {
+                dependency_count: 0,
+                dependency_lanes: Lanes::NO,
+            },
+            |summary, dependency| FunctionComponentBailoutContextDependencySummary {
+                dependency_count: summary.dependency_count + 1,
+                dependency_lanes: summary
+                    .dependency_lanes
+                    .merge(dependency.dependency_lanes()),
+            },
+        )
+}
+
+fn function_component_bailout_hook_effect_flags(mode: FiberMode) -> FiberFlags {
+    let mut flags = FiberFlags::PASSIVE | FiberFlags::UPDATE;
+    if mode.contains_any(FiberMode::STRICT_EFFECTS) {
+        flags |= FiberFlags::MOUNT_PASSIVE_DEV | FiberFlags::MOUNT_LAYOUT_DEV;
+    }
+    flags
+}
+
+fn begin_work_function_component_bailout_blocker(
+    arena: &mut FiberArena,
+    request: BeginWorkRequest,
+    context_dependencies: &[FunctionComponentContextDependencyRecord],
+) -> Result<
+    FunctionComponentBeginWorkBailoutBlockerRecord,
+    FunctionComponentBeginWorkBailoutBlockerError,
+> {
+    let work_in_progress = request.work_in_progress();
+    let render_lanes = request.render_lanes();
+    let (
+        tag,
+        current,
+        pending_props,
+        work_in_progress_lanes,
+        child,
+        child_lanes,
+        work_in_progress_update_queue_before,
+        work_in_progress_dependencies_before,
+        work_in_progress_flags_before,
+        mode,
+    ) = {
+        let node = arena.get(work_in_progress)?;
+        (
+            node.tag(),
+            node.alternate(),
+            node.pending_props(),
+            node.lanes(),
+            node.child(),
+            node.child_lanes(),
+            node.update_queue(),
+            node.dependencies(),
+            node.flags(),
+            node.mode(),
+        )
+    };
+
+    if tag != FiberTag::FunctionComponent {
+        return Err(
+            FunctionComponentBeginWorkBailoutBlockerError::UnexpectedFiberTag {
+                fiber: work_in_progress,
+                tag,
+            },
+        );
+    }
+
+    let Some(current) = current else {
+        return Err(
+            FunctionComponentBeginWorkBailoutBlockerError::MissingCurrent { work_in_progress },
+        );
+    };
+
+    let (memoized_props, current_lanes_before, reused_update_queue, reused_dependencies) = {
+        let current_node = arena.get(current)?;
+        (
+            current_node.memoized_props(),
+            current_node.lanes(),
+            current_node.update_queue(),
+            current_node.dependencies(),
+        )
+    };
+
+    if memoized_props != pending_props {
+        return Err(
+            FunctionComponentBeginWorkBailoutBlockerError::PropsChanged {
+                current,
+                work_in_progress,
+                memoized_props,
+                pending_props,
+            },
+        );
+    }
+
+    let context_summary = function_component_bailout_context_dependency_summary(
+        context_dependencies,
+        current,
+        work_in_progress,
+    );
+    if context_summary.dependency_lanes.contains_any(render_lanes) {
+        return Err(
+            FunctionComponentBeginWorkBailoutBlockerError::ContextChanged {
+                current,
+                work_in_progress,
+                render_lanes,
+                context_dependency_count: context_summary.dependency_count,
+                context_dependency_lanes: context_summary.dependency_lanes,
+            },
+        );
+    }
+
+    if current_lanes_before.contains_any(render_lanes) {
+        return Err(
+            FunctionComponentBeginWorkBailoutBlockerError::ScheduledUpdate {
+                current,
+                render_lanes,
+                current_lanes: current_lanes_before,
+            },
+        );
+    }
+
+    if child_lanes.contains_any(render_lanes) {
+        return Err(
+            FunctionComponentBeginWorkBailoutBlockerError::ChildLanesIntersectRenderLanes {
+                work_in_progress,
+                render_lanes,
+                child_lanes,
+                child,
+            },
+        );
+    }
+
+    let current_lanes_after = current_lanes_before.remove(render_lanes);
+    let hook_effect_flags = function_component_bailout_hook_effect_flags(mode);
+    let work_in_progress_flags_after = work_in_progress_flags_before.remove(hook_effect_flags);
+    let removed_hook_effect_flags = work_in_progress_flags_before.intersect(hook_effect_flags);
+
+    arena.get_mut(current)?.set_lanes(current_lanes_after);
+    {
+        let node = arena.get_mut(work_in_progress)?;
+        node.set_update_queue(reused_update_queue);
+        node.set_dependencies(reused_dependencies);
+        node.set_flags(work_in_progress_flags_after);
+    }
+
+    Ok(FunctionComponentBeginWorkBailoutBlockerRecord {
+        current,
+        work_in_progress,
+        render_lanes,
+        pending_props,
+        memoized_props,
+        current_lanes_before,
+        current_lanes_after,
+        skipped_lanes: work_in_progress_lanes,
+        child,
+        child_lanes,
+        child_to_visit: None,
+        context_dependency_count: context_summary.dependency_count,
+        context_dependency_lanes: context_summary.dependency_lanes,
+        work_in_progress_update_queue_before,
+        work_in_progress_update_queue_after: reused_update_queue,
+        work_in_progress_dependencies_before,
+        work_in_progress_dependencies_after: reused_dependencies,
+        reused_update_queue,
+        reused_dependencies,
+        work_in_progress_flags_before,
+        work_in_progress_flags_after,
+        removed_hook_effect_flags,
+        child_traversal_blocked: true,
+    })
 }
 
 pub(crate) fn begin_work(
@@ -6090,18 +6561,21 @@ pub(crate) fn begin_work_reconcile_function_component_single_child(
 mod tests {
     use super::*;
     use crate::function_component::{
-        FunctionComponentContextReadRecord, FunctionComponentContextRenderReader,
-        FunctionComponentInvocationError, FunctionComponentInvocationRequest,
-        FunctionComponentSingleChildOutput, FunctionComponentSingleChildOutputResolver,
+        FunctionComponentContextChangePropagationRequest, FunctionComponentContextReadRecord,
+        FunctionComponentContextRenderReader, FunctionComponentInvocationError,
+        FunctionComponentInvocationRequest, FunctionComponentSingleChildOutput,
+        FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError, FunctionComponentStateDispatchRequest,
         FunctionComponentStateUpdateRenderLanes,
+        propagate_context_change_to_function_component_dependencies,
     };
     use crate::test_support::{FakeContainer, RecordingHost};
-    use crate::{FiberRootStore, RootElementHandle, RootOptions};
+    use crate::{FiberRootId, FiberRootStore, RootElementHandle, RootOptions};
     use fast_react_core::{
-        ContextHandle, ContextStackSnapshot, ContextValueHandle, ElementTypeHandle, FiberFlags,
-        FiberMode, FiberTypeHandle, HookUpdateLane, Lane, PropsHandle, ReactKey, StateHandle,
-        StateNodeHandle, UpdateQueueHandle,
+        ContextHandle, ContextStackSnapshot, ContextValueChange, ContextValueHandle,
+        DependenciesHandle, ElementTypeHandle, FiberFlags, FiberMode, FiberTypeHandle,
+        HookUpdateLane, Lane, PropsHandle, ReactKey, StateHandle, StateNodeHandle,
+        UpdateQueueHandle,
     };
 
     #[derive(Debug, Clone)]
@@ -6306,6 +6780,56 @@ mod tests {
             .unwrap();
 
         (arena, current, work_in_progress, component)
+    }
+
+    fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId) {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let root_id = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        (store, root_id)
+    }
+
+    fn attached_function_component_pair(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+    ) -> (FiberId, FiberId, FiberTypeHandle) {
+        let host_root = store.root(root_id).unwrap().current();
+        let current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(1),
+            FiberMode::NO,
+        );
+        let component = FiberTypeHandle::from_raw(200);
+        store
+            .fiber_arena_mut()
+            .get_mut(current)
+            .unwrap()
+            .set_fiber_type(component);
+        let work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current, PropsHandle::from_raw(2))
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[work_in_progress])
+            .unwrap();
+
+        (current, work_in_progress, component)
+    }
+
+    fn mark_same_props_for_bailout(
+        arena: &mut FiberArena,
+        current: FiberId,
+        work_in_progress: FiberId,
+        props: PropsHandle,
+    ) {
+        arena.get_mut(current).unwrap().set_memoized_props(props);
+        arena
+            .get_mut(work_in_progress)
+            .unwrap()
+            .set_memoized_props(props);
     }
 
     fn fragment_with_host_child(
@@ -8648,6 +9172,291 @@ mod tests {
             arena.get(existing_child).unwrap().return_fiber(),
             Some(work_in_progress)
         );
+    }
+
+    #[test]
+    fn begin_work_function_component_bailout_blocker_records_child_block() {
+        let (mut arena, current, work_in_progress, _component) = function_component_pair();
+        let props = PropsHandle::from_raw(2);
+        mark_same_props_for_bailout(&mut arena, current, work_in_progress, props);
+        let child = arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(900),
+            FiberMode::NO,
+        );
+        arena.set_children(work_in_progress, &[child]).unwrap();
+
+        let current_lanes = Lanes::from(Lane::TRANSITION_1);
+        let skipped_lanes = Lanes::from(Lane::TRANSITION_2);
+        let child_lanes = Lanes::from(Lane::TRANSITION_3);
+        let current_update_queue = UpdateQueueHandle::from_raw(501);
+        let current_dependencies = DependenciesHandle::from_raw(601);
+        let stale_update_queue = UpdateQueueHandle::from_raw(502);
+        let stale_dependencies = DependenciesHandle::from_raw(602);
+        let flags_before = FiberFlags::PASSIVE
+            | FiberFlags::UPDATE
+            | FiberFlags::PLACEMENT
+            | FiberFlags::PASSIVE_STATIC;
+        {
+            let current_node = arena.get_mut(current).unwrap();
+            current_node.set_lanes(current_lanes);
+            current_node.set_update_queue(current_update_queue);
+            current_node.set_dependencies(current_dependencies);
+        }
+        {
+            let work_node = arena.get_mut(work_in_progress).unwrap();
+            work_node.set_lanes(skipped_lanes);
+            work_node.set_child_lanes(child_lanes);
+            work_node.set_update_queue(stale_update_queue);
+            work_node.set_dependencies(stale_dependencies);
+            work_node.set_flags(flags_before);
+        }
+
+        let record = begin_work_function_component_bailout_blocker(
+            &mut arena,
+            BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(record.current(), current);
+        assert_eq!(record.work_in_progress(), work_in_progress);
+        assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.pending_props(), props);
+        assert_eq!(record.memoized_props(), props);
+        assert_eq!(record.current_lanes_before(), current_lanes);
+        assert_eq!(record.current_lanes_after(), current_lanes);
+        assert_eq!(record.skipped_lanes(), skipped_lanes);
+        assert_eq!(record.child(), Some(child));
+        assert_eq!(record.child_lanes(), child_lanes);
+        assert_eq!(record.child_to_visit(), None);
+        assert!(record.child_traversal_blocked());
+        assert_eq!(record.context_dependency_count(), 0);
+        assert_eq!(record.context_dependency_lanes(), Lanes::NO);
+        assert_eq!(
+            record.work_in_progress_update_queue_before(),
+            stale_update_queue
+        );
+        assert_eq!(
+            record.work_in_progress_update_queue_after(),
+            current_update_queue
+        );
+        assert_eq!(
+            record.work_in_progress_dependencies_before(),
+            stale_dependencies
+        );
+        assert_eq!(
+            record.work_in_progress_dependencies_after(),
+            current_dependencies
+        );
+        assert_eq!(record.reused_update_queue(), current_update_queue);
+        assert_eq!(record.reused_dependencies(), current_dependencies);
+        assert!(record.reused_hook_update_queue());
+        assert!(record.reused_current_dependencies());
+        assert_eq!(record.work_in_progress_flags_before(), flags_before);
+        assert_eq!(
+            record.removed_hook_effect_flags(),
+            FiberFlags::PASSIVE | FiberFlags::UPDATE
+        );
+        assert_eq!(
+            record.work_in_progress_flags_after(),
+            FiberFlags::PLACEMENT | FiberFlags::PASSIVE_STATIC
+        );
+
+        let current_node = arena.get(current).unwrap();
+        assert_eq!(current_node.lanes(), current_lanes);
+        assert_eq!(current_node.update_queue(), current_update_queue);
+        assert_eq!(current_node.dependencies(), current_dependencies);
+
+        let work_node = arena.get(work_in_progress).unwrap();
+        assert_eq!(work_node.update_queue(), current_update_queue);
+        assert_eq!(work_node.dependencies(), current_dependencies);
+        assert_eq!(
+            work_node.flags(),
+            FiberFlags::PLACEMENT | FiberFlags::PASSIVE_STATIC
+        );
+        assert_eq!(work_node.child(), Some(child));
+        assert_eq!(work_node.child_lanes(), child_lanes);
+    }
+
+    #[test]
+    fn begin_work_function_component_bailout_blocker_rejects_props_lanes_and_child_lanes() {
+        let (mut props_arena, props_current, props_work_in_progress, _component) =
+            function_component_pair();
+        props_arena
+            .get_mut(props_current)
+            .unwrap()
+            .set_memoized_props(PropsHandle::from_raw(1));
+        assert_eq!(
+            begin_work_function_component_bailout_blocker(
+                &mut props_arena,
+                BeginWorkRequest::new(props_work_in_progress, Lanes::DEFAULT),
+                &[],
+            ),
+            Err(
+                FunctionComponentBeginWorkBailoutBlockerError::PropsChanged {
+                    current: props_current,
+                    work_in_progress: props_work_in_progress,
+                    memoized_props: PropsHandle::from_raw(1),
+                    pending_props: PropsHandle::from_raw(2),
+                },
+            )
+        );
+
+        let (mut lane_arena, lane_current, lane_work_in_progress, _component) =
+            function_component_pair();
+        mark_same_props_for_bailout(
+            &mut lane_arena,
+            lane_current,
+            lane_work_in_progress,
+            PropsHandle::from_raw(2),
+        );
+        lane_arena
+            .get_mut(lane_current)
+            .unwrap()
+            .set_lanes(Lanes::DEFAULT.merge_lane(Lane::TRANSITION_1));
+        assert_eq!(
+            begin_work_function_component_bailout_blocker(
+                &mut lane_arena,
+                BeginWorkRequest::new(lane_work_in_progress, Lanes::DEFAULT),
+                &[],
+            ),
+            Err(
+                FunctionComponentBeginWorkBailoutBlockerError::ScheduledUpdate {
+                    current: lane_current,
+                    render_lanes: Lanes::DEFAULT,
+                    current_lanes: Lanes::DEFAULT.merge_lane(Lane::TRANSITION_1),
+                },
+            )
+        );
+
+        let (mut child_arena, child_current, child_work_in_progress, _component) =
+            function_component_pair();
+        mark_same_props_for_bailout(
+            &mut child_arena,
+            child_current,
+            child_work_in_progress,
+            PropsHandle::from_raw(2),
+        );
+        let child = child_arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(903),
+            FiberMode::NO,
+        );
+        child_arena
+            .set_children(child_work_in_progress, &[child])
+            .unwrap();
+        child_arena
+            .get_mut(child_work_in_progress)
+            .unwrap()
+            .set_child_lanes(Lanes::DEFAULT);
+        assert_eq!(
+            begin_work_function_component_bailout_blocker(
+                &mut child_arena,
+                BeginWorkRequest::new(child_work_in_progress, Lanes::DEFAULT),
+                &[],
+            ),
+            Err(
+                FunctionComponentBeginWorkBailoutBlockerError::ChildLanesIntersectRenderLanes {
+                    work_in_progress: child_work_in_progress,
+                    render_lanes: Lanes::DEFAULT,
+                    child_lanes: Lanes::DEFAULT,
+                    child: Some(child),
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn begin_work_function_component_bailout_blocker_rejects_context_dependency_lanes() {
+        let (mut store, root_id) = root_store();
+        let (current, work_in_progress, component) =
+            attached_function_component_pair(&mut store, root_id);
+        mark_same_props_for_bailout(
+            store.fiber_arena_mut(),
+            current,
+            work_in_progress,
+            PropsHandle::from_raw(2),
+        );
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(930);
+        let previous_value = context_value(931);
+        let next_value = context_value(932);
+        let context = context_store.create_context(default_value);
+        let provider_snapshot = context_store
+            .push_provider(context, previous_value)
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+
+        let render = begin_work_function_component_use_context(
+            store.fiber_arena_mut(),
+            BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap()
+        .render();
+        context_store.restore_snapshot(provider_snapshot).unwrap();
+        assert_eq!(registry.calls().len(), 1);
+        let propagation = propagate_context_change_to_function_component_dependencies(
+            &mut store,
+            &mut context_store,
+            render,
+            FunctionComponentContextChangePropagationRequest::new(
+                ContextValueChange::new(context, previous_value, next_value),
+                Lanes::DEFAULT,
+            ),
+        )
+        .unwrap();
+        assert_eq!(propagation.marked_dependency_count(), 1);
+        assert_eq!(
+            context_store.context_dependencies()[0].dependency_lanes(),
+            Lanes::DEFAULT
+        );
+
+        assert_eq!(
+            begin_work_function_component_bailout_blocker(
+                store.fiber_arena_mut(),
+                BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+                context_store.context_dependencies(),
+            ),
+            Err(
+                FunctionComponentBeginWorkBailoutBlockerError::ContextChanged {
+                    current,
+                    work_in_progress,
+                    render_lanes: Lanes::DEFAULT,
+                    context_dependency_count: 1,
+                    context_dependency_lanes: Lanes::DEFAULT,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn begin_work_function_component_bailout_blocker_keeps_memo_tags_unsupported() {
+        for tag in [FiberTag::MemoComponent, FiberTag::SimpleMemoComponent] {
+            let mut arena = FiberArena::new();
+            let fiber = arena.create_fiber(tag, None, PropsHandle::from_raw(940), FiberMode::NO);
+
+            assert_eq!(
+                begin_work_function_component_bailout_blocker(
+                    &mut arena,
+                    BeginWorkRequest::new(fiber, Lanes::DEFAULT),
+                    &[],
+                ),
+                Err(
+                    FunctionComponentBeginWorkBailoutBlockerError::UnexpectedFiberTag {
+                        fiber,
+                        tag,
+                    },
+                )
+            );
+        }
     }
 
     #[test]
