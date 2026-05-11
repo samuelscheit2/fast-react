@@ -17799,6 +17799,15 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
     summary.privateFormActionRejectedErrorPreflightBoundary,
     formActions.describePrivateFormActionRejectedErrorPreflightGate()
   );
+  assert.deepEqual(
+    summary.privateResourceFormRootExecutionConsumerBoundary,
+    resourceFormGate.describePrivateResourceFormRootExecutionConsumerBoundary()
+  );
+  assert.equal(
+    summary.privateResourceFormRootExecutionConsumerBoundary.ledgerBoundary
+      .ledgerId,
+    resourceFormGate.privateResourceFormExecutionAdmissionLedgerId
+  );
 
   assert.deepEqual(summary.publicRootBoundary, {
     gateId: rootFacadeGate.REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_GATE_ID,
@@ -19072,6 +19081,435 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
   );
 });
 
+test('private resource/form root execution consumer links accepted fake evidence to root boundary only', async () => {
+  const { admission, container, document } = createPrivateRootBridgeAdmission();
+  const resourceExecution = createRootMapStorageExecutionForRoot(
+    'root-execution-consumer',
+    admission.rootId
+  );
+  const { fulfilledResetExecution } =
+    await createPrivateFulfilledResetExecutionRecord(
+      'root-execution-consumer-form'
+    );
+  const gate = resourceFormGate.createResourceFormRootExecutionConsumerGate({
+    requestIdPrefix: 'root-execution-consumer-gate'
+  });
+  const consumer = gate.recordRootExecutionConsumer(
+    admission,
+    resourceExecution,
+    fulfilledResetExecution,
+    {
+      explicitResourceFormRootExecutionConsumer: true
+    }
+  );
+  const summary =
+    resourceFormGate.describePrivateResourceFormRootExecutionConsumerBoundary();
+
+  assert.equal(Object.isFrozen(consumer), true);
+  assert.equal(
+    resourceFormGate.isResourceFormRootExecutionConsumerRecord(consumer),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getResourceFormRootExecutionConsumerRecordPayload(
+      consumer
+    ),
+    consumer
+  );
+  assert.equal(
+    consumer.$$typeof,
+    resourceFormGate.resourceFormRootExecutionConsumerRecordType
+  );
+  assert.equal(
+    consumer.gateId,
+    resourceFormGate.privateResourceFormRootExecutionConsumerGateId
+  );
+  assert.equal(
+    consumer.status,
+    resourceFormGate.privateResourceFormRootExecutionConsumerStatus
+  );
+  assert.equal(
+    consumer.compatibilityStatus,
+    resourceFormGate
+      .privateResourceFormRootExecutionConsumerCompatibilityBlockedStatus
+  );
+  assert.equal(consumer.consumerId, 'root-execution-consumer-gate:1');
+  assert.equal(consumer.rootId, admission.rootId);
+  assert.equal(
+    consumer.sourceRootBridgeAdmissionId,
+    admission.requestId
+  );
+  assert.equal(consumer.rootBridgeBoundary.admittedRootRequest, true);
+  assert.equal(
+    consumer.rootBridgeBoundary.executionStatus,
+    rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED
+  );
+  assert.deepEqual(consumer.publicRootBoundary, {
+    gateId: resourceFormGate.publicRootFacadeBlockedGateId,
+    gateStatus: resourceFormGate.publicRootFacadeBlockedStatus,
+    rootObjectCreated: false,
+    renderReachable: false,
+    unmountReachable: false,
+    compatibilityClaimed: false
+  });
+  assert.deepEqual(
+    consumer.ledgerBoundary,
+    summary.ledgerBoundary
+  );
+  assert.equal(consumer.ledgerBoundary.runtimeRecordsRequired, true);
+  assert.equal(
+    consumer.ledgerBoundary.callerSuppliedDiagnosticStringsAccepted,
+    false
+  );
+  assert.deepEqual(consumer.ledgerBoundary.workerIds, [
+    'worker-829-resource-root-map-storage-private-execution',
+    'worker-830-form-action-fulfilled-reset-fake-commit',
+    'worker-850-resource-form-execution-admission-ledger'
+  ]);
+
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.rootMapStorageExecutionId,
+    resourceExecution.rootMapStorageExecutionId
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.rootId,
+    admission.rootId
+  );
+  assert.equal(consumer.resourceRootMapStorageBoundary.rowCount, 3);
+  assert.deepEqual(
+    consumer.resourceRootMapStorageBoundary.sourceOwnedTokens,
+    [
+      resourceFormGate.privateResourceHintRootMapStorageGateId,
+      resourceFormGate.privateResourceHintRootMapStorageRecordType,
+      resourceFormGate.privateResourceHintRootMapStorageStatus,
+      resourceFormGate.privateResourceHintRootMapStorageExecutionStatus,
+      resourceFormGate
+        .privateResourceHintRootMapStorageCompatibilityBlockedStatus,
+      'deterministic-private-root-map-storage-execution',
+      'react-19.2.6-resource-root-map-storage-private-execution',
+      'react-19.2.6-resource-root-map-storage-private-execution-snapshot',
+      'validated-private-resource-root-map-storage-execution'
+    ]
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary
+      .deterministicFakeRootMapStorageConsumed,
+    true
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.realResourceMapsMutated,
+    false
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.preloadPropsMapMutated,
+    false
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.publicResourceMapCommitBehavior,
+    false
+  );
+
+  assert.equal(
+    consumer.formFulfilledResetBoundary.executionId,
+    fulfilledResetExecution.executionId
+  );
+  assert.equal(
+    consumer.formFulfilledResetBoundary.queueExecutionId,
+    fulfilledResetExecution.fakeResetStateQueueExecution.queueExecutionId
+  );
+  assert.equal(
+    consumer.formFulfilledResetBoundary.commitExecutionId,
+    fulfilledResetExecution.fakeResetCommitExecution.commitExecutionId
+  );
+  assert.deepEqual(
+    consumer.formFulfilledResetBoundary.sourceOwnedTokens,
+    [
+      formActions.privateFormActionFulfilledResetExecutionGateId,
+      formActions.privateFormActionFulfilledResetExecutionRecordType,
+      formActions.privateFormActionFulfilledResetExecutionRecordedStatus,
+      'form-action-fulfilled-reset-execution.fake-commit',
+      'form-action-fulfilled-reset-fake-commit',
+      formActions.formActionFulfilledResetExecutionDiagnosticKind,
+      formActions.formActionFulfilledResetExecutionQueueExecutionKind,
+      'after-mutation-form-reset-order',
+      'executed-private-form-action-fulfilled-reset-state-queue-fake',
+      'executed-private-form-action-fulfilled-reset-commit-fake'
+    ]
+  );
+  assert.deepEqual(
+    consumer.formFulfilledResetBoundary.queueSourceFunctionNames,
+    [
+      'requestFormReset',
+      'ensureFormComponentIsStateful',
+      'dispatchSetStateInternal',
+      'requestUpdateLane'
+    ]
+  );
+  assert.equal(
+    consumer.formFulfilledResetBoundary
+      .deterministicFakeResetStateQueueConsumed,
+    true
+  );
+  assert.equal(
+    consumer.formFulfilledResetBoundary.deterministicFakeResetCommitConsumed,
+    true
+  );
+  assert.equal(consumer.formFulfilledResetBoundary.reactUpdateQueued, false);
+  assert.equal(consumer.formFulfilledResetBoundary.realFormReset, false);
+  assert.equal(consumer.formFulfilledResetBoundary.domMutation, false);
+
+  assert.deepEqual(
+    consumer.sideEffects,
+    resourceFormGate.rootExecutionConsumerSideEffects
+  );
+  assert.equal(consumer.sideEffects.rootExecutionConsumerInvoked, true);
+  assert.equal(consumer.sideEffects.publicRootTouched, false);
+  assert.equal(consumer.sideEffects.domMutation, false);
+  assert.equal(consumer.publicResourceBoundary.publicResourcesClaimed, false);
+  assert.equal(consumer.publicFormBoundary.publicFormsClaimed, false);
+  assert.equal(consumer.nativeExecution, false);
+  assert.equal(consumer.reconcilerExecution, false);
+  assert.equal(consumer.publicRootExecution, false);
+  assert.equal(consumer.compatibilityClaimed, false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        admission,
+        resourceExecution,
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'resource root-map storage execution was already consumed by a root boundary consumer'
+    }
+  );
+});
+
+test('private resource/form root execution consumer rejects stale cross-root missing and public aliases', async () => {
+  const { admission } = createPrivateRootBridgeAdmission();
+  const resourceExecution = createRootMapStorageExecutionForRoot(
+    'root-execution-consumer-negative',
+    admission.rootId
+  );
+  const foreignResourceExecution = createRootMapStorageExecutionForRoot(
+    'root-execution-consumer-foreign',
+    'foreign-root-execution-consumer-root'
+  );
+  const { fulfilledResetExecution } =
+    await createPrivateFulfilledResetExecutionRecord(
+      'root-execution-consumer-negative-form'
+    );
+  const gate = resourceFormGate.createResourceFormRootExecutionConsumerGate({
+    requestIdPrefix: 'root-execution-consumer-negative-gate'
+  });
+
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        admission,
+        foreignResourceExecution,
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'resource root-map storage execution rootId must match root bridge admission'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        admission,
+        {
+          ...resourceExecution,
+          rootMapStorageExecutionRows:
+            resourceExecution.rootMapStorageExecutionRows.slice(1)
+        },
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'resource root-map storage execution record must be source-owned'
+    }
+  );
+  for (const alias of [
+    {
+      title:
+        'private resource root-map storage execution mutates deterministic fake maps only'
+    },
+    {
+      errorMessage:
+        'Invalid private React DOM resource root-map storage execution record'
+    },
+    {
+      sourceSyntax:
+        'recordRootMapStorageExecution(rootMapStoragePreflight, admission)'
+    }
+  ]) {
+    assert.throws(
+      () =>
+        gate.recordRootExecutionConsumer(
+          admission,
+          alias,
+          fulfilledResetExecution,
+          {
+            explicitResourceFormRootExecutionConsumer: true
+          }
+        ),
+      {
+        code:
+          resourceFormGate
+            .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+        compatibilityTarget,
+        reason:
+          'resource root-map storage execution record must be source-owned'
+      }
+    );
+  }
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        admission,
+        resourceExecution,
+        {
+          ...fulfilledResetExecution,
+          fakeResetStateQueueExecution: undefined
+        },
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'form fulfilled reset execution record must be source-owned'
+    }
+  );
+  for (const alias of [
+    {
+      title:
+        'private fulfilled form action reset execution records deterministic fake queue and commit evidence'
+    },
+    {
+      errorMessage:
+        'Invalid private React DOM form action fulfilled reset execution record'
+    },
+    {
+      sourceSyntax:
+        'recordFulfilledResetExecution(asyncExecution, submitReset, admission)'
+    }
+  ]) {
+    assert.throws(
+      () =>
+        gate.recordRootExecutionConsumer(
+          admission,
+          resourceExecution,
+          alias,
+          {
+            explicitResourceFormRootExecutionConsumer: true
+          }
+        ),
+      {
+        code:
+          resourceFormGate
+            .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+        compatibilityTarget,
+        reason:
+          'form fulfilled reset execution record must be source-owned'
+      }
+    );
+  }
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        admission,
+        resourceExecution,
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true,
+          publicPackageCompatibilityClaimed: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'publicPackageCompatibilityClaimed must remain blocked in the root execution consumer gate'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        admission,
+        resourceExecution,
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true,
+          sourceResourceRootMapStorageExecutionId:
+            resourceExecution.rootMapStorageExecutionId
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'source-owned root execution tokens must come from private records'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        admission,
+        resourceExecution,
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true,
+          ledgerId: resourceFormGate.privateResourceFormExecutionAdmissionLedgerId
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'source-owned root execution tokens must come from private records'
+    }
+  );
+});
+
 test('resource hint entrypoints keep accepted public shape but never dispatch resource work', () => {
   for (const entrypoint of [
     {
@@ -19593,6 +20031,74 @@ function createPrivateFormActionCallbackPreflightScenario(prefix) {
     resetIntent,
     resetQueueCommit,
     submitIntent
+  };
+}
+
+function createRootMapStorageExecutionForRoot(prefix, rootId) {
+  const scenario = createRootMapStoragePreflightScenario(prefix);
+  const preflight = scenario.storageGate.recordRootMapStoragePreflight(
+    scenario.commit,
+    {
+      explicitRootMapStoragePreflight: true,
+      preflightId: `${prefix}-preflight`,
+      rootId,
+      expectedSourceResourceMapCommitRowIds: [
+        'resource-map-commit-1',
+        'resource-map-commit-3',
+        'resource-map-commit-4'
+      ]
+    }
+  );
+
+  return resourceFormGate
+    .createResourceHintRootMapStorageGate({
+      requestIdPrefix: `${prefix}-execution`
+    })
+    .recordRootMapStorageExecution(preflight, {
+      explicitRootMapStorageExecution: true,
+      executionId: `${prefix}-root-map-storage-execution`,
+      rootId,
+      expectedRootMapStorageRowIds: [
+        'root-map-storage-preflight-0',
+        'root-map-storage-preflight-1',
+        'root-map-storage-preflight-2'
+      ]
+    });
+}
+
+async function createPrivateFulfilledResetExecutionRecord(prefix) {
+  const scenario = createPrivateFormActionCallbackPreflightScenario(prefix);
+  const asyncExecution = await formActions
+    .createFormActionAsyncCallbackExecutionDiagnosticGate({
+      requestIdPrefix: `${prefix}-async`
+    })
+    .recordAsyncCallbackExecution(scenario.preflight, {
+      explicitFormActionAsyncCallbackExecution: true,
+      async asyncActionCallback(payload) {
+        assert.equal(Object.isFrozen(payload), true);
+        assert.equal(payload.formDataConstructed, false);
+        await Promise.resolve();
+        return { ok: true };
+      }
+    });
+  const fulfilledResetExecution = formActions
+    .createFormActionFulfilledResetExecutionDiagnosticGate({
+      requestIdPrefix: `${prefix}-fulfilled-reset`
+    })
+    .recordFulfilledResetExecution(
+      asyncExecution,
+      scenario.execution,
+      {
+        explicitFormActionFulfilledResetExecution: true,
+        sourceAsyncCallbackExecutionId: asyncExecution.executionId,
+        sourceSubmitResetExecutionId: scenario.execution.executionId
+      }
+    );
+
+  return {
+    ...scenario,
+    asyncExecution,
+    fulfilledResetExecution
   };
 }
 
