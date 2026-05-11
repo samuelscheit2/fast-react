@@ -28234,7 +28234,7 @@ function isWeakMapKey(value) {
   );
 }
 
-module.exports = {
+module.exports = Object.freeze({
   CLIENT_ROOT_KIND,
   CONCURRENT_ROOT_TAG,
   ROOT_BRIDGE_BLOCKED_CAPABILITIES,
@@ -28613,4 +28613,4 @@ module.exports = {
   updatePrivateRootPublicFacadeNestedHostOutput,
   unmountPrivateRootPublicFacadeHostOutput,
   revertPrivateCreateRootSideEffects
-};
+});

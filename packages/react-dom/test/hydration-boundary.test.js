@@ -2083,6 +2083,56 @@ test('private hydration recoverable error boundary admission rejects stale clone
     eventReplayPreflight: clonedEventReplayPreflightRecord,
     lifecycleRequestBoundary: clonedLifecycleRequestBoundary
   });
+  const sourceLedgerGetterNames = [
+    'getPrivateHydrateRootPublicFacadePreflightRecordPayload',
+    'getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload',
+    'getPrivateHydrateRootPublicFacadeExecutionPreflightPayload',
+    'getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload'
+  ];
+  const sourceLedgerFakePayloads = new Map([
+    [
+      'getPrivateHydrateRootPublicFacadePreflightRecordPayload',
+      rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
+        scenario.hydrateRecord
+      )
+    ],
+    [
+      'getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload',
+      rootBridge.getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(
+        scenario.eventReplayPreflightRecord
+      )
+    ],
+    [
+      'getPrivateHydrateRootPublicFacadeExecutionPreflightPayload',
+      rootBridge.getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(
+        scenario.executionPreflightRecord
+      )
+    ],
+    [
+      'getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload',
+      rootBridge
+        .getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload(
+          scenario.lifecycleRequestBoundary
+        )
+    ]
+  ]);
+  for (const getterName of sourceLedgerGetterNames) {
+    const descriptor = Object.getOwnPropertyDescriptor(rootBridge, getterName);
+    const fakePayloadGetter = () => sourceLedgerFakePayloads.get(getterName);
+    assert.equal(typeof rootBridge[getterName], 'function');
+    assert.equal(descriptor.configurable, false);
+    assert.equal(descriptor.writable, false);
+    assert.throws(() => {
+      rootBridge[getterName] = fakePayloadGetter;
+    }, TypeError);
+    assert.throws(
+      () =>
+        Object.defineProperty(rootBridge, getterName, {
+          value: fakePayloadGetter
+        }),
+      TypeError
+    );
+  }
   for (const clonedSourceLedgerRecord of [
     clonedHydrateRootPreflightRecord,
     clonedEventReplayPreflightRecord,

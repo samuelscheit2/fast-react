@@ -8,6 +8,7 @@
 - The admission also requires hydrateRoot public-facade source-ledger evidence: current hydrateRoot preflight, event replay preflight, execution preflight, and source-owned active lifecycle request boundary derived from root-bridge WeakMap payload ownership.
 - Rechecks marker and target currentness at admission time so replay is rejected after marker or target state changes.
 - Rejects cloned/caller-built rows, cloned or rewired source-ledger records, cross-root source ledgers, missing lifecycle/source ledger evidence, stale marker/target evidence, and recoverable-error callback/value alias options.
+- Freezes the root-bridge export object so the hydrateRoot source-ledger getter capabilities are non-writable/non-configurable before source-ledger lookup can use them.
 
 ## Changed Files
 
@@ -45,18 +46,19 @@
 - `node tests/smoke/import-entrypoints.mjs`
 - `git diff --check`
 
-All commands passed.
+All commands passed after the root-bridge export freeze and monkeypatch regression rerun.
 
 ## Evidence Gathered
 
 - Positive hydration boundary test proves a current hydrateRoot lifecycle/replay/recoverable-error source chain admits exactly one private recoverable-error boundary row without invoking callbacks or mutating DOM/listeners.
 - Negative hydration boundary test proves cloned preflight/claim/replay records, cloned/rewired source-ledger rows, caller registrar import abuse, one-at-a-time mixed source-ledger swaps, missing lifecycle ledger, cross-root source ledger, callback/root-options aliases, stale marker rows, and stale target rows fail closed.
+- Negative hydration boundary test also proves direct assignment and `Object.defineProperty` monkeypatch attempts against the four hydrateRoot source-ledger getter exports throw and cloned source-ledger rows still resolve to `null`.
 - Adjacent private hydration/root-bridge tests pass with the added accepted metadata row.
 
 ## Risks Or Blockers
 
 - This remains diagnostic/private evidence only; no public `hydrateRoot`, real replay, real hydration, root scheduling, or DOM mutation behavior is opened.
-- Source-ledger validation uses shared `hydrate-root-source-ledger.js` readers over root-bridge WeakMap payloads. The module exports no write/registration capability, so caller-shaped clones cannot become source-owned by importing it.
+- Source-ledger validation uses shared `hydrate-root-source-ledger.js` readers over root-bridge WeakMap payloads. The source-ledger module exports no write/registration capability, and the root-bridge getter capabilities it reads are frozen/non-writable/non-configurable, so caller-shaped clones cannot become source-owned by importing or monkeypatching the bridge modules.
 - Worker 901 is concurrently changing React DOM root bridge lifecycle evidence. If its lifecycle record field names/status strings change, this admission canary may need a small alignment patch.
 
 ## Recommended Next Tasks
