@@ -99,7 +99,8 @@ use crate::{
         FunctionComponentContextChangePropagationError,
         FunctionComponentContextChangePropagationRecord,
         FunctionComponentContextChangePropagationRequest, FunctionComponentHookRenderStore,
-        FunctionComponentReducerDispatchRequest, FunctionComponentReducerHandle,
+        FunctionComponentReducerDispatchRequest,
+        FunctionComponentReducerDispatchRootRescheduleRecord, FunctionComponentReducerHandle,
         FunctionComponentRenderError, FunctionComponentSingleChildOutput,
         FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError,
@@ -107,16 +108,24 @@ use crate::{
         FunctionComponentSingleChildUpdateReconciliationError,
         FunctionComponentSingleChildUpdateReconciliationRecord, FunctionComponentStateActionHandle,
         FunctionComponentStateReducerId, FunctionComponentStateUpdateRenderLanes,
+        FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary,
+        FunctionComponentUseReducerAcceptedUpdateEvidenceForCanary,
         FunctionComponentUseReducerRenderRecord, FunctionComponentUseReducerRenderRequest,
         FunctionComponentUseStateRenderRequest,
+        function_component_use_reducer_accepted_update_evidence_for_canary,
         propagate_context_change_to_function_component_dependencies,
         reconcile_function_component_single_child_output,
         reconcile_function_component_single_child_update_output,
         render_function_component_with_use_reducer,
     },
     host_work::{
-        HostWorkError, HostWorkResult, mount_test_function_component_single_host_child_work,
-        mount_test_host_sibling_work, mount_test_host_work,
+        DetachedHostRecords, HostWorkError, HostWorkResult,
+        TestHostRootHostUpdateExecutionDiagnosticForCanary,
+        TestHostRootHostUpdateExecutionErrorForCanary,
+        apply_single_test_host_update_with_finished_work_handoff_for_canary,
+        complete_test_function_component_single_host_update_work_for_canary,
+        mount_test_function_component_single_host_child_work, mount_test_host_sibling_work,
+        mount_test_host_work,
     },
     root_commit::{
         HostRootContextProviderUpdateCommitHandoffErrorForCanary,
@@ -2209,11 +2218,14 @@ struct HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffRecord {
     host_root_work_in_progress: FiberId,
     original_root_element: RootElementHandle,
     function_component: FiberId,
+    hook_evidence: FunctionComponentUseReducerAcceptedUpdateEvidenceForCanary,
     use_reducer_render: FunctionComponentUseReducerRenderRecord,
     single_child_update: FunctionComponentSingleChildUpdateReconciliationRecord,
+    complete_work: HostRootCompleteWorkHandoffRecord,
     pending_host_update: HostRootSingleHostUpdateApplyRecordForCanary,
     finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
     committed_host_update: HostRootSingleHostUpdateApplyRecordForCanary,
+    host_execution: TestHostRootHostUpdateExecutionDiagnosticForCanary,
 }
 
 #[cfg(test)]
@@ -2239,6 +2251,11 @@ impl HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffRecord {
     }
 
     #[must_use]
+    const fn hook_evidence(&self) -> FunctionComponentUseReducerAcceptedUpdateEvidenceForCanary {
+        self.hook_evidence
+    }
+
+    #[must_use]
     const fn use_reducer_render(&self) -> FunctionComponentUseReducerRenderRecord {
         self.use_reducer_render
     }
@@ -2246,6 +2263,11 @@ impl HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffRecord {
     #[must_use]
     const fn single_child_update(&self) -> FunctionComponentSingleChildUpdateReconciliationRecord {
         self.single_child_update
+    }
+
+    #[must_use]
+    const fn complete_work(&self) -> HostRootCompleteWorkHandoffRecord {
+        self.complete_work
     }
 
     #[must_use]
@@ -2269,12 +2291,22 @@ impl HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffRecord {
     }
 
     #[must_use]
+    const fn host_execution(&self) -> &TestHostRootHostUpdateExecutionDiagnosticForCanary {
+        &self.host_execution
+    }
+
+    #[must_use]
     const fn public_render_blocked(&self) -> bool {
         self.finished_work_handoff.public_root_rendering_blocked()
             && self.pending_host_update.public_root_rendering_blocked()
             && !self
                 .pending_host_update
                 .public_renderer_package_behavior_exposed()
+            && self.host_execution.public_root_rendering_blocked()
+            && !self
+                .host_execution
+                .public_renderer_package_behavior_exposed()
+            && !self.hook_evidence.public_hook_compatibility_claimed()
     }
 }
 
@@ -2667,7 +2699,10 @@ enum HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError {
     CompleteWork(HostRootCompleteWorkHandoffError),
     FunctionComponentRender(FunctionComponentRenderError),
     FunctionComponentSingleChildUpdate(FunctionComponentSingleChildUpdateReconciliationError),
+    HookEvidence(FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary),
+    HostWork(HostWorkError),
     SingleHostUpdateApply(HostRootSingleHostUpdateApplyRecordErrorForCanary),
+    HostUpdateExecution(TestHostRootHostUpdateExecutionErrorForCanary),
     FinishedWorkCommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
     CommittedHostUpdateMismatch {
         expected: Box<HostRootSingleHostUpdateApplyRecordForCanary>,
@@ -2698,7 +2733,10 @@ impl Display for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandof
             Self::CompleteWork(error) => Display::fmt(error, formatter),
             Self::FunctionComponentRender(error) => Display::fmt(error, formatter),
             Self::FunctionComponentSingleChildUpdate(error) => Display::fmt(error, formatter),
+            Self::HookEvidence(error) => Display::fmt(error, formatter),
+            Self::HostWork(error) => Display::fmt(error, formatter),
             Self::SingleHostUpdateApply(error) => Display::fmt(error, formatter),
+            Self::HostUpdateExecution(error) => Display::fmt(error, formatter),
             Self::FinishedWorkCommitHandoff(error) => Display::fmt(error, formatter),
             Self::CommittedHostUpdateMismatch { expected, actual } => write!(
                 formatter,
@@ -2754,7 +2792,10 @@ impl Error for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffE
             Self::CompleteWork(error) => Some(error),
             Self::FunctionComponentRender(error) => Some(error),
             Self::FunctionComponentSingleChildUpdate(error) => Some(error),
+            Self::HookEvidence(error) => Some(error),
+            Self::HostWork(error) => Some(error),
             Self::SingleHostUpdateApply(error) => Some(error),
+            Self::HostUpdateExecution(error) => Some(error),
             Self::FinishedWorkCommitHandoff(error) => Some(error.as_ref()),
             Self::CommittedHostUpdateMismatch { .. }
             | Self::MissingFunctionComponentChild { .. }
@@ -2792,11 +2833,36 @@ impl From<FunctionComponentSingleChildUpdateReconciliationError>
 }
 
 #[cfg(test)]
+impl From<FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary>
+    for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError
+{
+    fn from(error: FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary) -> Self {
+        Self::HookEvidence(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostWorkError> for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError {
+    fn from(error: HostWorkError) -> Self {
+        Self::HostWork(error)
+    }
+}
+
+#[cfg(test)]
 impl From<HostRootSingleHostUpdateApplyRecordErrorForCanary>
     for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError
 {
     fn from(error: HostRootSingleHostUpdateApplyRecordErrorForCanary) -> Self {
         Self::SingleHostUpdateApply(error)
+    }
+}
+
+#[cfg(test)]
+impl From<TestHostRootHostUpdateExecutionErrorForCanary>
+    for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError
+{
+    fn from(error: TestHostRootHostUpdateExecutionErrorForCanary) -> Self {
+        Self::HostUpdateExecution(error)
     }
 }
 
@@ -3179,7 +3245,11 @@ fn handoff_completed_function_component_use_reducer_single_child_to_test_complet
 #[cfg(test)]
 fn handoff_completed_function_component_use_reducer_single_host_update_to_commit(
     store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
     render: HostRootRenderPhaseRecord,
+    source: &TestHostTree,
+    detached_hosts: DetachedHostRecords,
+    reducer_dispatch: FunctionComponentReducerDispatchRootRescheduleRecord,
     hook_store: &mut FunctionComponentHookRenderStore,
     reducer_request: FunctionComponentUseReducerRenderRequest,
     invoker: &mut impl FunctionComponentInvoker,
@@ -3249,20 +3319,51 @@ fn handoff_completed_function_component_use_reducer_single_host_update_to_commit
         use_reducer_render.render(),
         resolver,
     )?;
-    bubble_function_component_single_host_update_to_host_root(
+    let hook_evidence = function_component_use_reducer_accepted_update_evidence_for_canary(
+        &reducer_dispatch,
+        use_reducer_render,
+    )?;
+    let mut host_work = complete_test_function_component_single_host_update_work_for_canary(
         store,
-        render.work_in_progress(),
-        function_component,
+        render,
+        single_child_update,
+        source,
+        detached_hosts,
+    )?;
+    let complete_work = host_root_complete_work_handoff_record_from_host_work(
+        store,
+        render,
+        single_child_update.child_element(),
+        &host_work,
     )?;
 
     let pending_host_update = record_host_root_single_host_update_apply_for_canary(store, render)?;
-    let finished_work_handoff =
-        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
-            store, render, 1, 2,
-        )?;
-    let committed_host_update = finished_work_handoff
-        .commit()
-        .single_host_update_apply_record_for_canary()?;
+    {
+        let root = store
+            .root_mut(render.root())
+            .map_err(HostRootCompleteWorkHandoffError::from)?;
+        root.record_finished_work_for_canary(render.finished_work(), render.render_lanes());
+    }
+    let pending_commit =
+        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
+    let host_execution = apply_single_test_host_update_with_finished_work_handoff_for_canary(
+        store,
+        host,
+        render,
+        Some(pending_commit),
+        2,
+        &mut host_work,
+    )?;
+    if host_execution.pending_update() != pending_host_update {
+        return Err(
+            HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError::CommittedHostUpdateMismatch {
+                expected: Box::new(pending_host_update),
+                actual: Box::new(host_execution.pending_update()),
+            },
+        );
+    }
+    let finished_work_handoff = host_execution.finished_work_handoff().clone();
+    let committed_host_update = host_execution.committed_update();
     if committed_host_update != pending_host_update {
         return Err(
             HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError::CommittedHostUpdateMismatch {
@@ -3278,35 +3379,16 @@ fn handoff_completed_function_component_use_reducer_single_host_update_to_commit
             host_root_work_in_progress: render.work_in_progress(),
             original_root_element: render.resulting_element(),
             function_component,
+            hook_evidence,
             use_reducer_render,
             single_child_update,
+            complete_work,
             pending_host_update,
             finished_work_handoff,
             committed_host_update,
+            host_execution: host_execution.diagnostic().clone(),
         },
     )
-}
-
-#[cfg(test)]
-fn bubble_function_component_single_host_update_to_host_root(
-    store: &mut FiberRootStore<RecordingHost>,
-    host_root_work_in_progress: FiberId,
-    function_component: FiberId,
-) -> Result<(), HostRootCompleteWorkHandoffError> {
-    let function_bubbled = bubble_properties(store.fiber_arena(), function_component)?;
-    {
-        let function_node = store.fiber_arena_mut().get_mut(function_component)?;
-        function_node.set_child_lanes(function_bubbled.child_lanes());
-        function_node.set_subtree_flags(function_bubbled.subtree_flags());
-    }
-
-    let root_bubbled = bubble_properties(store.fiber_arena(), host_root_work_in_progress)?;
-    let root_node = store
-        .fiber_arena_mut()
-        .get_mut(host_root_work_in_progress)?;
-    root_node.set_child_lanes(root_bubbled.child_lanes());
-    root_node.set_subtree_flags(root_bubbled.subtree_flags());
-    Ok(())
 }
 
 #[cfg(test)]
@@ -17200,17 +17282,16 @@ mod tests {
     }
 
     #[test]
-    fn root_work_loop_use_reducer_render_commits_single_host_update_handoff() {
+    fn root_work_loop_use_reducer_single_host_update_executes_host_work() {
         let mut source = TestHostTree::new();
         let updated_text = source.insert_text("reducer text update");
         let updated_component =
             source.insert_host_element_with_text("section", "reducer component update");
 
-        for (child_element, previous_props, state_node, initial_state, action_handle, reducer_id) in [
+        for (child_element, previous_props, initial_state, action_handle, reducer_id) in [
             (
                 updated_text,
                 PropsHandle::from_raw(9_001),
-                StateNodeHandle::from_raw(9_101),
                 StateHandle::from_raw(1_000),
                 action(11),
                 reducer(1_101),
@@ -17218,7 +17299,6 @@ mod tests {
             (
                 updated_component,
                 PropsHandle::from_raw(9_002),
-                StateNodeHandle::from_raw(9_102),
                 StateHandle::from_raw(2_000),
                 action(12),
                 reducer(1_102),
@@ -17239,7 +17319,7 @@ mod tests {
                         HostRootMutationApplyRecordKind::CommitHostComponentUpdate,
                     ),
                 };
-            let (mut store, root_id, _host) = root_store();
+            let (mut store, root_id, mut host) = root_store();
             let root_current = store.root(root_id).unwrap().current();
             let (function_current, function_work_in_progress, component) =
                 attach_function_component_current_child_with_work_pair(&mut store, root_id);
@@ -17249,8 +17329,36 @@ mod tests {
                 expected_tag,
                 previous_props,
                 element_type,
-                state_node,
+                StateNodeHandle::NONE,
             );
+            let mut detached_hosts = DetachedHostRecords::new_for_canary();
+            let state_node = match source.root(child_element).unwrap() {
+                TestHostNode::Text(_) => {
+                    create_detached_test_host_text_for_existing_fiber_for_canary(
+                        &mut store,
+                        &mut host,
+                        &mut detached_hosts,
+                        root_id,
+                        current_child,
+                        "previous reducer text update",
+                        previous_props,
+                    )
+                    .unwrap()
+                }
+                TestHostNode::Element(element) => {
+                    create_detached_test_host_component_for_existing_fiber_for_canary(
+                        &mut store,
+                        &mut host,
+                        &mut detached_hosts,
+                        root_id,
+                        current_child,
+                        element.ty(),
+                        previous_props,
+                        &[],
+                    )
+                    .unwrap()
+                }
+            };
             let mut hook_store = FunctionComponentHookRenderStore::new();
             let current_reducer = hook_store
                 .create_current_reducer_hook(function_current, reducer_id, initial_state)
@@ -17260,7 +17368,7 @@ mod tests {
             registry.register(component, Ok(output));
             let resolver = TestHostTreeFunctionOutputResolver::new(&source);
             let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
-            hook_store
+            let rescheduled = hook_store
                 .dispatch_reducer_update_and_reschedule_root(
                     &mut store,
                     FunctionComponentReducerDispatchRequest::new(
@@ -17290,7 +17398,11 @@ mod tests {
             let record =
                 handoff_completed_function_component_use_reducer_single_host_update_to_commit(
                     &mut store,
+                    &mut host,
                     render,
+                    &source,
+                    detached_hosts,
+                    rescheduled,
                     &mut hook_store,
                     FunctionComponentUseReducerRenderRequest::new(
                         reducer_id,
@@ -17321,6 +17433,22 @@ mod tests {
                 Some(function_current)
             );
             assert_eq!(record.use_reducer_render().output(), output);
+            assert_eq!(record.hook_evidence().root(), root_id);
+            assert_eq!(record.hook_evidence().current(), function_current);
+            assert_eq!(
+                record.hook_evidence().work_in_progress(),
+                function_work_in_progress
+            );
+            assert_eq!(record.hook_evidence().queue(), current_reducer.queue());
+            assert_eq!(
+                record.hook_evidence().dispatch(),
+                current_reducer.dispatch()
+            );
+            assert_eq!(record.hook_evidence().dispatch_lane(), lane);
+            assert_eq!(record.hook_evidence().render_lanes(), Lanes::DEFAULT);
+            assert_eq!(record.hook_evidence().applied_update_count(), 1);
+            assert_eq!(record.hook_evidence().skipped_update_count(), 0);
+            assert!(!record.hook_evidence().public_hook_compatibility_claimed());
             let reducer_update = record
                 .use_reducer_render()
                 .reducer_hook()
@@ -17375,6 +17503,30 @@ mod tests {
                     .subtree_flags()
                     .contains_all(FiberFlags::UPDATE)
             );
+            assert_eq!(
+                record.complete_work().root_child_tag(),
+                Some(FiberTag::FunctionComponent)
+            );
+            assert_eq!(
+                record.complete_work().completed_child(),
+                Some(updated_child)
+            );
+            assert_eq!(
+                record.complete_work().completed_child_tag(),
+                Some(expected_tag)
+            );
+            assert_eq!(record.complete_work().completed_child_count(), 1);
+            match expected_tag {
+                FiberTag::HostText => {
+                    assert_eq!(record.complete_work().detached_text_count(), 1);
+                    assert_eq!(record.complete_work().detached_instance_count(), 0);
+                }
+                FiberTag::HostComponent => {
+                    assert_eq!(record.complete_work().detached_instance_count(), 1);
+                    assert_eq!(record.complete_work().detached_text_count(), 0);
+                }
+                _ => unreachable!("test only covers HostText and HostComponent"),
+            }
 
             let pending_update = record.pending_host_update();
             assert_eq!(pending_update.root(), root_id);
@@ -17397,6 +17549,63 @@ mod tests {
                 _ => unreachable!("test only covers HostText and HostComponent"),
             }
             assert_eq!(record.committed_host_update(), pending_update);
+            assert_eq!(record.host_execution().root(), root_id);
+            assert_eq!(
+                record.host_execution().finished_work(),
+                render.finished_work()
+            );
+            assert_eq!(record.host_execution().source_handoff_order(), 1);
+            assert_eq!(record.host_execution().commit_order(), 2);
+            assert_eq!(
+                record.host_execution().mutation(),
+                pending_update.mutation()
+            );
+            assert_eq!(record.host_execution().payload().current(), current_child);
+            assert_eq!(
+                record.host_execution().payload().work_in_progress(),
+                updated_child
+            );
+            assert_eq!(record.host_execution().payload().state_node(), state_node);
+            assert_eq!(record.host_execution().applied_host_call_count(), 1);
+            assert_eq!(record.host_execution().private_host_store_update_count(), 0);
+            assert!(record.host_execution().test_host_commit_executed());
+            assert!(!record.host_execution().react_dom_compatibility_claimed());
+            assert!(
+                !record
+                    .host_execution()
+                    .test_renderer_compatibility_claimed()
+            );
+            match expected_tag {
+                FiberTag::HostText => {
+                    assert!(
+                        record
+                            .host_execution()
+                            .payload()
+                            .is_host_text_content_update()
+                    );
+                    assert_eq!(
+                        record.host_execution().payload().host_text_old_text(),
+                        Some("previous reducer text update")
+                    );
+                    assert_eq!(
+                        record.host_execution().payload().host_text_new_text(),
+                        Some("reducer text update")
+                    );
+                }
+                FiberTag::HostComponent => {
+                    assert!(
+                        record
+                            .host_execution()
+                            .payload()
+                            .is_host_component_props_update()
+                    );
+                    assert_eq!(
+                        record.host_execution().payload().host_component_prop_name(),
+                        Some("testHostProperty")
+                    );
+                }
+                _ => unreachable!("test only covers HostText and HostComponent"),
+            }
             assert_eq!(record.commit().mutation_log().len(), 1);
             assert_eq!(record.commit().mutation_apply_log().len(), 1);
             assert_eq!(
@@ -17425,6 +17634,203 @@ mod tests {
                 Lanes::NO
             );
         }
+    }
+
+    #[test]
+    fn root_work_loop_use_reducer_single_host_update_rejects_stale_hook_render_evidence() {
+        let mut source = TestHostTree::new();
+        let child_element = source.insert_text("stale reducer text update");
+        let (mut store, root_id, mut host) = root_store();
+        let root_current = store.root(root_id).unwrap().current();
+        let (function_current, function_work_in_progress, component) =
+            attach_function_component_current_child_with_work_pair(&mut store, root_id);
+        let previous_props = PropsHandle::from_raw(9_201);
+        let current_child = attach_current_single_host_child(
+            &mut store,
+            function_current,
+            FiberTag::HostText,
+            previous_props,
+            ElementTypeHandle::NONE,
+            StateNodeHandle::NONE,
+        );
+        let mut detached_hosts = DetachedHostRecords::new_for_canary();
+        create_detached_test_host_text_for_existing_fiber_for_canary(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            current_child,
+            "previous stale reducer text update",
+            previous_props,
+        )
+        .unwrap();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = reducer(1_201);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(function_current, reducer_id, StateHandle::from_raw(2_100))
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(child_element.raw());
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let resolver = TestHostTreeFunctionOutputResolver::new(&source);
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let rescheduled = hook_store
+            .dispatch_reducer_update_and_reschedule_root(
+                &mut store,
+                FunctionComponentReducerDispatchRequest::new(
+                    current_reducer.dispatch(),
+                    action(13),
+                    lane,
+                ),
+            )
+            .unwrap();
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let callback = processed.records()[0].scheduled_callback().unwrap();
+        let render = render_host_root_via_scheduler_callback(
+            &mut store,
+            root_id,
+            callback.node(),
+            Lanes::DEFAULT,
+        )
+        .unwrap()
+        .render_phase()
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(render.work_in_progress(), &[function_work_in_progress])
+            .unwrap();
+        let operations_before = host.operations();
+
+        let error = handoff_completed_function_component_use_reducer_single_host_update_to_commit(
+            &mut store,
+            &mut host,
+            render,
+            &source,
+            detached_hosts,
+            rescheduled,
+            &mut hook_store,
+            FunctionComponentUseReducerRenderRequest::new(
+                reducer_id,
+                StateHandle::from_raw(999),
+                FunctionComponentStateUpdateRenderLanes::new(Lanes::SYNC, Lanes::SYNC),
+            ),
+            &mut registry,
+            &resolver,
+            |_, _| panic!("stale hook render evidence should skip the reducer update"),
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError::HookEvidence(
+                FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary::StaleHookQueueRenderEvidence {
+                    root,
+                    queue,
+                    render_lanes,
+                    dispatch_lanes,
+                    ..
+                }
+            ) if root == root_id
+                && queue == current_reducer.queue()
+                && render_lanes == Lanes::DEFAULT
+                && dispatch_lanes == Lanes::DEFAULT
+        ));
+        assert_eq!(store.root(root_id).unwrap().current(), root_current);
+        assert_eq!(host.operations(), operations_before);
+    }
+
+    #[test]
+    fn root_work_loop_use_reducer_single_host_update_rejects_missing_detached_host_payload() {
+        let mut source = TestHostTree::new();
+        let child_element = source.insert_text("missing payload reducer text update");
+        let (mut store, root_id, mut host) = root_store();
+        let root_current = store.root(root_id).unwrap().current();
+        let (function_current, function_work_in_progress, component) =
+            attach_function_component_current_child_with_work_pair(&mut store, root_id);
+        let previous_props = PropsHandle::from_raw(9_301);
+        let current_child = attach_current_single_host_child(
+            &mut store,
+            function_current,
+            FiberTag::HostText,
+            previous_props,
+            ElementTypeHandle::NONE,
+            StateNodeHandle::NONE,
+        );
+        let mut source_detached_hosts = DetachedHostRecords::new_for_canary();
+        let state_node = create_detached_test_host_text_for_existing_fiber_for_canary(
+            &mut store,
+            &mut host,
+            &mut source_detached_hosts,
+            root_id,
+            current_child,
+            "previous missing payload reducer text update",
+            previous_props,
+        )
+        .unwrap();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = reducer(1_301);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(function_current, reducer_id, StateHandle::from_raw(3_100))
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(child_element.raw());
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let resolver = TestHostTreeFunctionOutputResolver::new(&source);
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let rescheduled = hook_store
+            .dispatch_reducer_update_and_reschedule_root(
+                &mut store,
+                FunctionComponentReducerDispatchRequest::new(
+                    current_reducer.dispatch(),
+                    action(14),
+                    lane,
+                ),
+            )
+            .unwrap();
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let callback = processed.records()[0].scheduled_callback().unwrap();
+        let render = render_host_root_via_scheduler_callback(
+            &mut store,
+            root_id,
+            callback.node(),
+            Lanes::DEFAULT,
+        )
+        .unwrap()
+        .render_phase()
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(render.work_in_progress(), &[function_work_in_progress])
+            .unwrap();
+        let operations_before = host.operations();
+
+        let error = handoff_completed_function_component_use_reducer_single_host_update_to_commit(
+            &mut store,
+            &mut host,
+            render,
+            &source,
+            DetachedHostRecords::new_for_canary(),
+            rescheduled,
+            &mut hook_store,
+            FunctionComponentUseReducerRenderRequest::new(
+                reducer_id,
+                StateHandle::from_raw(999),
+                FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT),
+            ),
+            &mut registry,
+            &resolver,
+            |state, action| StateHandle::from_raw(state.raw() + action.raw()),
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError::HostWork(
+                HostWorkError::InvalidDetachedText { handle }
+            ) if handle == state_node
+        ));
+        assert_eq!(store.root(root_id).unwrap().current(), root_current);
+        assert_eq!(host.operations(), operations_before);
     }
 
     #[test]

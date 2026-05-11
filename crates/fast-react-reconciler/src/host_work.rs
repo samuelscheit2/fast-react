@@ -27,6 +27,8 @@ use crate::complete_work::{
     host_component_managed_child_complete_work_record_for_canary,
     host_component_managed_child_sibling_order_complete_work_record_for_canary,
 };
+#[cfg(test)]
+use crate::function_component::FunctionComponentSingleChildUpdateReconciliationRecord;
 use crate::host_nodes::{
     HostNodeAppliedTextUpdate, HostNodeMetadata, HostNodePropertyUpdate,
     HostNodePropertyUpdateExecution, HostNodeScope, HostNodeStore, HostNodeTextUpdate,
@@ -40,6 +42,7 @@ use crate::root_commit::{
     HostRootDeletionCleanupRecord, HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary,
     HostRootDeletionSubtreeHostDetachmentPlanForCanary,
     HostRootFinishedWorkCommitHandoffErrorForCanary,
+    HostRootFinishedWorkCommitHandoffRecordForCanary,
     HostRootFinishedWorkPendingCommitRecordForCanary,
     HostRootManagedChildCommitHandoffRecordForCanary,
     HostRootManagedChildSiblingOrderCommitHandoffRecordForCanary, HostRootMutationApplyRecord,
@@ -990,7 +993,7 @@ const TEST_HOST_TEXT_CONTENT_PROP_NAME: &str = "children";
 const TEST_HOST_TEXT_CONTENT_PROPERTY_NAME: &str = "textContent";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TestHostComponentPropertyPayloadKind {
+pub(crate) enum TestHostComponentPropertyPayloadKind {
     SafeTestProperty,
     Style,
     DangerousHtml,
@@ -1704,7 +1707,7 @@ impl From<HostWorkError> for SyncFlushHostMutationExecutionErrorForCanary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum TestHostRootHostUpdatePayloadForCanary {
+pub(crate) enum TestHostRootHostUpdatePayloadForCanary {
     HostComponent {
         current: FiberId,
         work_in_progress: FiberId,
@@ -1753,14 +1756,14 @@ impl TestHostRootHostUpdatePayloadForCanary {
     }
 
     #[must_use]
-    const fn current(&self) -> FiberId {
+    pub(crate) const fn current(&self) -> FiberId {
         match self {
             Self::HostComponent { current, .. } | Self::HostText { current, .. } => *current,
         }
     }
 
     #[must_use]
-    const fn work_in_progress(&self) -> FiberId {
+    pub(crate) const fn work_in_progress(&self) -> FiberId {
         match self {
             Self::HostComponent {
                 work_in_progress, ..
@@ -1772,7 +1775,7 @@ impl TestHostRootHostUpdatePayloadForCanary {
     }
 
     #[must_use]
-    const fn state_node(&self) -> StateNodeHandle {
+    pub(crate) const fn state_node(&self) -> StateNodeHandle {
         match self {
             Self::HostComponent { state_node, .. } | Self::HostText { state_node, .. } => {
                 *state_node
@@ -1781,17 +1784,17 @@ impl TestHostRootHostUpdatePayloadForCanary {
     }
 
     #[must_use]
-    const fn is_host_component_props_update(&self) -> bool {
+    pub(crate) const fn is_host_component_props_update(&self) -> bool {
         matches!(self, Self::HostComponent { .. })
     }
 
     #[must_use]
-    const fn is_host_text_content_update(&self) -> bool {
+    pub(crate) const fn is_host_text_content_update(&self) -> bool {
         matches!(self, Self::HostText { .. })
     }
 
     #[must_use]
-    fn host_text_old_text(&self) -> Option<&str> {
+    pub(crate) fn host_text_old_text(&self) -> Option<&str> {
         match self {
             Self::HostText { old_text, .. } => Some(old_text),
             Self::HostComponent { .. } => None,
@@ -1799,7 +1802,7 @@ impl TestHostRootHostUpdatePayloadForCanary {
     }
 
     #[must_use]
-    fn host_text_new_text(&self) -> Option<&str> {
+    pub(crate) fn host_text_new_text(&self) -> Option<&str> {
         match self {
             Self::HostText { new_text, .. } => Some(new_text),
             Self::HostComponent { .. } => None,
@@ -1807,7 +1810,7 @@ impl TestHostRootHostUpdatePayloadForCanary {
     }
 
     #[must_use]
-    const fn host_component_property_payload_kind(
+    pub(crate) const fn host_component_property_payload_kind(
         &self,
     ) -> Option<TestHostComponentPropertyPayloadKind> {
         match self {
@@ -1820,7 +1823,7 @@ impl TestHostRootHostUpdatePayloadForCanary {
     }
 
     #[must_use]
-    const fn host_component_prop_name(&self) -> Option<&'static str> {
+    pub(crate) const fn host_component_prop_name(&self) -> Option<&'static str> {
         match self {
             Self::HostComponent { prop_name, .. } => Some(*prop_name),
             Self::HostText { .. } => None,
@@ -1828,7 +1831,7 @@ impl TestHostRootHostUpdatePayloadForCanary {
     }
 
     #[must_use]
-    const fn host_component_property_name(&self) -> Option<&'static str> {
+    pub(crate) const fn host_component_property_name(&self) -> Option<&'static str> {
         match self {
             Self::HostComponent { property_name, .. } => Some(*property_name),
             Self::HostText { .. } => None,
@@ -1853,7 +1856,7 @@ const TEST_HOST_ROOT_HOST_UPDATE_EXECUTION_BLOCKERS:
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct TestHostRootHostUpdateExecutionDiagnosticForCanary {
+pub(crate) struct TestHostRootHostUpdateExecutionDiagnosticForCanary {
     root: FiberRootId,
     finished_work: FiberId,
     source_handoff_order: usize,
@@ -1868,52 +1871,52 @@ struct TestHostRootHostUpdateExecutionDiagnosticForCanary {
 
 impl TestHostRootHostUpdateExecutionDiagnosticForCanary {
     #[must_use]
-    const fn root(&self) -> FiberRootId {
+    pub(crate) const fn root(&self) -> FiberRootId {
         self.root
     }
 
     #[must_use]
-    const fn finished_work(&self) -> FiberId {
+    pub(crate) const fn finished_work(&self) -> FiberId {
         self.finished_work
     }
 
     #[must_use]
-    const fn source_handoff_order(&self) -> usize {
+    pub(crate) const fn source_handoff_order(&self) -> usize {
         self.source_handoff_order
     }
 
     #[must_use]
-    const fn commit_order(&self) -> usize {
+    pub(crate) const fn commit_order(&self) -> usize {
         self.commit_order
     }
 
     #[must_use]
-    const fn mutation(&self) -> HostRootMutationApplyRecord {
+    pub(crate) const fn mutation(&self) -> HostRootMutationApplyRecord {
         self.mutation
     }
 
     #[must_use]
-    const fn payload(&self) -> &TestHostRootHostUpdatePayloadForCanary {
+    pub(crate) const fn payload(&self) -> &TestHostRootHostUpdatePayloadForCanary {
         &self.payload
     }
 
     #[must_use]
-    const fn status(&self) -> TestHostRootMutationApplyStatus {
+    pub(crate) const fn status(&self) -> TestHostRootMutationApplyStatus {
         self.status
     }
 
     #[must_use]
-    const fn applied_host_call_count(&self) -> usize {
+    pub(crate) const fn applied_host_call_count(&self) -> usize {
         self.applied_host_call_count
     }
 
     #[must_use]
-    const fn private_host_store_update_count(&self) -> usize {
+    pub(crate) const fn private_host_store_update_count(&self) -> usize {
         self.private_host_store_update_count
     }
 
     #[must_use]
-    fn test_host_commit_executed(&self) -> bool {
+    pub(crate) fn test_host_commit_executed(&self) -> bool {
         matches!(
             self.status,
             TestHostRootMutationApplyStatus::Applied(
@@ -1925,7 +1928,7 @@ impl TestHostRootHostUpdateExecutionDiagnosticForCanary {
     }
 
     #[must_use]
-    fn private_host_store_only_commit_executed(&self) -> bool {
+    pub(crate) fn private_host_store_only_commit_executed(&self) -> bool {
         matches!(
             self.status,
             TestHostRootMutationApplyStatus::PrivateHostStoreOnly(
@@ -1940,28 +1943,64 @@ impl TestHostRootHostUpdateExecutionDiagnosticForCanary {
     }
 
     #[must_use]
-    const fn public_root_rendering_blocked(&self) -> bool {
+    pub(crate) const fn public_root_rendering_blocked(&self) -> bool {
         true
     }
 
     #[must_use]
-    const fn public_renderer_package_behavior_exposed(&self) -> bool {
+    pub(crate) const fn public_renderer_package_behavior_exposed(&self) -> bool {
         false
     }
 
     #[must_use]
-    const fn react_dom_compatibility_claimed(&self) -> bool {
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
         false
     }
 
     #[must_use]
-    const fn test_renderer_compatibility_claimed(&self) -> bool {
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
         false
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum TestHostRootHostUpdateExecutionErrorForCanary {
+pub(crate) struct TestHostRootHostUpdateFinishedWorkExecutionForCanary {
+    pending_update: crate::root_commit::HostRootSingleHostUpdateApplyRecordForCanary,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+    committed_update: crate::root_commit::HostRootSingleHostUpdateApplyRecordForCanary,
+    diagnostic: TestHostRootHostUpdateExecutionDiagnosticForCanary,
+}
+
+impl TestHostRootHostUpdateFinishedWorkExecutionForCanary {
+    #[must_use]
+    pub(crate) const fn pending_update(
+        &self,
+    ) -> crate::root_commit::HostRootSingleHostUpdateApplyRecordForCanary {
+        self.pending_update
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_handoff(
+        &self,
+    ) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        &self.finished_work_handoff
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_update(
+        &self,
+    ) -> crate::root_commit::HostRootSingleHostUpdateApplyRecordForCanary {
+        self.committed_update
+    }
+
+    #[must_use]
+    pub(crate) const fn diagnostic(&self) -> &TestHostRootHostUpdateExecutionDiagnosticForCanary {
+        &self.diagnostic
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum TestHostRootHostUpdateExecutionErrorForCanary {
     FinishedWorkHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
     HostUpdateRecord(HostRootSingleHostUpdateApplyRecordErrorForCanary),
     UnsupportedPayload {
@@ -2714,6 +2753,198 @@ pub(crate) fn apply_test_host_root_commit_mutations_for_canary(
     host_work: &mut HostWorkResult,
 ) -> Result<TestHostRootMutationApplyResult, HostWorkError> {
     apply_test_host_root_commit_mutations(store, host, commit, host_work.detached_hosts_mut())
+}
+
+#[cfg(test)]
+pub(crate) fn complete_test_function_component_single_host_update_work_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    render: HostRootRenderPhaseRecord,
+    update: FunctionComponentSingleChildUpdateReconciliationRecord,
+    source: &TestHostTree,
+    mut detached_hosts: DetachedHostRecords,
+) -> Result<HostWorkResult, HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    expect_tag(
+        store,
+        update.function_component(),
+        FiberTag::FunctionComponent,
+    )?;
+    let function_node = store.fiber_arena().get(update.function_component())?;
+    let root_child = store.fiber_arena().get(render.work_in_progress())?.child();
+    if root_child != Some(update.function_component())
+        || function_node.return_fiber() != Some(render.work_in_progress())
+        || function_node.sibling().is_some()
+        || function_node.alternate() != Some(update.current())
+    {
+        return Err(HostWorkError::FunctionComponentParentTopologyMismatch(
+            Box::new(FunctionComponentParentTopologyMismatchRecord {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                function_component: update.function_component(),
+                actual_root_child: root_child,
+                actual_parent: function_node.return_fiber(),
+                actual_sibling: function_node.sibling(),
+            }),
+        ));
+    }
+
+    let source_node =
+        source
+            .root(update.child_element())
+            .ok_or(HostWorkError::MissingTestRootElement {
+                handle: update.child_element(),
+            })?;
+    match source_node {
+        TestHostNode::Element(element) => {
+            if update.child_tag() != FiberTag::HostComponent {
+                return Err(HostWorkError::ExpectedFiberTag {
+                    fiber: update.work_in_progress_child(),
+                    expected: update.child_tag(),
+                    actual: FiberTag::HostComponent,
+                });
+            }
+            complete_host_component_update(
+                store,
+                render.root(),
+                update.current_child(),
+                update.work_in_progress_child(),
+                element,
+                update.previous_child_props(),
+                &mut detached_hosts,
+            )?;
+        }
+        TestHostNode::Text(text) => {
+            if update.child_tag() != FiberTag::HostText {
+                return Err(HostWorkError::ExpectedFiberTag {
+                    fiber: update.work_in_progress_child(),
+                    expected: update.child_tag(),
+                    actual: FiberTag::HostText,
+                });
+            }
+            complete_host_text_update(
+                store,
+                render.root(),
+                update.current_child(),
+                update.work_in_progress_child(),
+                text,
+                &mut detached_hosts,
+            )?;
+        }
+    }
+
+    complete_function_component_parent(store, update.function_component())?;
+    complete_host_root(store, render.work_in_progress())?;
+
+    Ok(HostWorkResult {
+        root: render.root(),
+        work_in_progress: render.work_in_progress(),
+        root_child,
+        root_children: root_child.into_iter().collect(),
+        completed_child: Some(update.work_in_progress_child()),
+        completed_children: vec![update.work_in_progress_child()],
+        detached_hosts,
+    })
+}
+
+#[cfg(test)]
+pub(crate) fn apply_single_test_host_update_with_finished_work_handoff_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    pending: Option<HostRootFinishedWorkPendingCommitRecordForCanary>,
+    commit_order: usize,
+    host_work: &mut HostWorkResult,
+) -> Result<
+    TestHostRootHostUpdateFinishedWorkExecutionForCanary,
+    TestHostRootHostUpdateExecutionErrorForCanary,
+> {
+    let pending_update = record_host_root_single_host_update_apply_for_canary(store, render)?;
+    let mutation = pending_update.mutation();
+    let Some(payload) =
+        accepted_test_host_update_payload_for_canary(host_work.detached_hosts(), mutation)
+    else {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::UnsupportedPayload {
+                root: pending_update.root(),
+                finished_work: pending_update.finished_work(),
+                fiber: pending_update.fiber(),
+                kind: pending_update.kind(),
+            },
+        );
+    };
+
+    let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        pending,
+        commit_order,
+    )?;
+    let committed_update = handoff
+        .commit()
+        .single_host_update_apply_record_for_canary()?;
+    if committed_update.mutation() != mutation {
+        return Err(
+            HostRootSingleHostUpdateApplyRecordErrorForCanary::ExpectedSingleHostUpdateRecord {
+                root: handoff.commit().root(),
+                finished_work: handoff.commit().finished_work(),
+                mutation_record_count: handoff.commit().mutation_apply_log().len(),
+                host_update_record_count: 0,
+            }
+            .into(),
+        );
+    }
+
+    let apply = apply_test_host_root_commit_mutations(
+        store,
+        host,
+        handoff.commit(),
+        host_work.detached_hosts_mut(),
+    )?;
+    let applied_status = apply
+        .records()
+        .iter()
+        .find(|record| record.mutation() == mutation)
+        .map(|record| record.status());
+    let Some(status) = applied_status else {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::HostUpdateNotApplied {
+                root: handoff.commit().root(),
+                finished_work: handoff.commit().finished_work(),
+                fiber: mutation.fiber(),
+                status: None,
+            },
+        );
+    };
+    if !host_update_apply_status_matches_mutation_kind(status, mutation.kind()) {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::HostUpdateNotApplied {
+                root: handoff.commit().root(),
+                finished_work: handoff.commit().finished_work(),
+                fiber: mutation.fiber(),
+                status: Some(status),
+            },
+        );
+    }
+
+    let diagnostic = TestHostRootHostUpdateExecutionDiagnosticForCanary {
+        root: handoff.commit().root(),
+        finished_work: handoff.commit().finished_work(),
+        source_handoff_order: handoff.pending().handoff_order(),
+        commit_order: handoff.commit_order(),
+        mutation,
+        payload,
+        status,
+        applied_host_call_count: apply.applied_host_call_count(),
+        private_host_store_update_count: apply.private_host_store_update_count(),
+        blockers: TEST_HOST_ROOT_HOST_UPDATE_EXECUTION_BLOCKERS,
+    };
+
+    Ok(TestHostRootHostUpdateFinishedWorkExecutionForCanary {
+        pending_update,
+        finished_work_handoff: handoff,
+        committed_update,
+        diagnostic,
+    })
 }
 
 pub(crate) fn sync_flush_host_mutation_execution_request_for_canary(
