@@ -31,6 +31,11 @@
   - Added canonical row coverage, skipped preload-props coverage, public blocker
     assertions, stale/duplicate/foreign rejection coverage, raw target
     rejection, invalid record checks, and updated exact boundary snapshots.
+  - Follow-up audit coverage added direct public-claim rejection cases for all
+    root-map preflight public dispatch/compatibility claim fields, every raw
+    target field blocked by the admission validator, malformed
+    `expectedSourceResourceMapCommitRowIds`, and assertions that fake head state
+    and package exports remain unchanged after rejection.
 - `worker-progress/worker-778-resource-root-map-storage-preflight.md`
   - Recorded this handoff.
 
@@ -67,11 +72,11 @@ Passed:
 - `node --check packages/react-dom/test/resource-form-unsupported-gates.test.js`
 - `node --check tests/conformance/test/react-dom-resource-hints-oracle.test.mjs`
 - `node --test packages/react-dom/test/resource-form-unsupported-gates.test.js`
-  - 52 tests passed.
+  - 53 tests passed.
 - `node --test tests/conformance/test/react-dom-resource-hints-oracle.test.mjs`
   - 18 tests passed.
 - `npm run check --workspace @fast-react/react-dom`
-  - 166 package tests plus import smoke passed.
+  - 167 package tests plus import smoke passed.
 - `node tests/smoke/package-surface-guard.mjs`
 - `node tests/smoke/import-entrypoints.mjs`
 - `git diff --check`
@@ -95,5 +100,6 @@ results.
 - Keep public resource compatibility blocked until root-owned storage,
   stylesheet/script lifecycle work, public dispatcher behavior, and real DOM
   mutations are admitted together with end-to-end evidence.
-- Preserve the stale, duplicate, foreign, raw-target, and public-claim rejection
-  tests as invariants for any future implementation-backed root resource path.
+- Preserve the stale, duplicate, foreign, raw-target, malformed-admission, and
+  public-claim rejection tests as invariants for any future
+  implementation-backed root resource path.

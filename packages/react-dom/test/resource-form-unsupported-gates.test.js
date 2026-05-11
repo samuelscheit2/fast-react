@@ -13706,6 +13706,185 @@ test('private resource root-map storage preflight rejects stale duplicate and fo
   );
 });
 
+test('private resource root-map storage preflight rejects public claims raw targets and malformed admissions', () => {
+  const scenario = createRootMapStoragePreflightScenario(
+    'root-map-storage-public-claims'
+  );
+  const headChildCount = scenario.fakeDom.head.childNodes.length;
+  const expectedReactDomPackageExportKeys = [
+    '.',
+    './client',
+    './server',
+    './server.browser',
+    './server.bun',
+    './server.edge',
+    './server.node',
+    './static',
+    './static.browser',
+    './static.edge',
+    './static.node',
+    './profiling',
+    './test-utils',
+    './package.json'
+  ];
+  const publicClaimFields = [
+    'publicResourceHintDomInsertion',
+    'publicResourceMapCommitBehavior',
+    'publicStylesheetResourceBehavior',
+    'publicStylesheetLoadStateDispatch',
+    'publicStylesheetPrecedenceBehavior',
+    'publicScriptModuleResourceDispatch',
+    'publicResourceApisReachable',
+    'compatibilityClaimed'
+  ];
+  const blockedTargetFields = [
+    'root',
+    'document',
+    'fakeDocument',
+    'head',
+    'fakeHead',
+    'resourceRoot',
+    'rootResources',
+    'resourceMap',
+    'realResourceMap',
+    'fakeResourceMap',
+    'hoistableStyles',
+    'hoistableScripts',
+    'stylesheetMap',
+    'scriptMap',
+    'preloadMap',
+    'preloadPropsMap',
+    'instance',
+    'node',
+    'element'
+  ];
+  const malformedAdmissionCases = [
+    [
+      null,
+      'root-map storage preflight admission metadata must be an object'
+    ],
+    [
+      {},
+      'explicitRootMapStoragePreflight must be true'
+    ],
+    [
+      {
+        explicitRootMapStoragePreflight: true,
+        preflightKind: 'public-root-map-storage'
+      },
+      'preflightKind must be deterministic-private-root-map-storage-preflight'
+    ],
+    [
+      {
+        explicitRootMapStoragePreflight: true,
+        targetKind: 'document-body'
+      },
+      'targetKind must be document-head'
+    ],
+    [
+      {
+        explicitRootMapStoragePreflight: true,
+        hostTag: 'body'
+      },
+      'hostTag must be head'
+    ],
+    [
+      {
+        explicitRootMapStoragePreflight: true,
+        rootKind: 'live-document'
+      },
+      'rootKind must be document-or-shadow-root'
+    ],
+    [
+      {
+        explicitRootMapStoragePreflight: true,
+        expectedSourceResourceMapCommitRowIds: 'resource-map-commit-1'
+      },
+      'expectedSourceResourceMapCommitRowIds must be an array when provided'
+    ],
+    [
+      {
+        explicitRootMapStoragePreflight: true,
+        expectedSourceResourceMapCommitRowIds: [
+          'resource-map-commit-1',
+          ''
+        ]
+      },
+      'expectedSourceResourceMapCommitRowIds must contain non-empty strings'
+    ],
+    [
+      {
+        explicitRootMapStoragePreflight: true,
+        expectedSourceResourceMapCommitRowIds: [
+          'resource-map-commit-1',
+          1
+        ]
+      },
+      'expectedSourceResourceMapCommitRowIds must contain non-empty strings'
+    ],
+    [
+      {
+        explicitRootMapStoragePreflight: true,
+        expectedSourceResourceMapCommitRowIds: [
+          'resource-map-commit-1',
+          'resource-map-commit-1'
+        ]
+      },
+      'duplicate expected root-map storage source row resource-map-commit-1'
+    ]
+  ];
+
+  for (const field of publicClaimFields) {
+    assertRootMapStoragePreflightAdmissionRejects(
+      scenario.commit,
+      {
+        explicitRootMapStoragePreflight: true,
+        [field]: true
+      },
+      `${field} must not claim public resource dispatch in ` +
+        'the root-map storage preflight gate'
+    );
+  }
+
+  for (const field of blockedTargetFields) {
+    assertRootMapStoragePreflightAdmissionRejects(
+      scenario.commit,
+      {
+        explicitRootMapStoragePreflight: true,
+        [field]: throwingProxy(`root-map ${field}`)
+      },
+      `${field} must not be passed to the root-map storage preflight gate`
+    );
+  }
+
+  for (const [admission, reason] of malformedAdmissionCases) {
+    assertRootMapStoragePreflightAdmissionRejects(
+      scenario.commit,
+      admission,
+      reason
+    );
+  }
+
+  const summary =
+    resourceFormGate.describePrivateResourceHintRootMapStoragePreflightGate();
+  const packageJson = require(path.join(packageRoot, 'package.json'));
+  assert.equal(scenario.fakeDom.head.childNodes.length, headChildCount);
+  assert.equal(summary.publicResourceHintDomInsertion, false);
+  assert.equal(summary.publicResourceMapCommitBehavior, false);
+  assert.equal(summary.publicScriptModuleResourceDispatch, false);
+  assert.equal(summary.publicStylesheetLoadStateDispatch, false);
+  assert.equal(summary.sideEffects.rootResourceStorageMutated, false);
+  assert.equal(summary.sideEffects.realResourceMapsMutated, false);
+  assert.equal(summary.sideEffects.fakeResourceMapsMutated, false);
+  assert.equal(summary.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(summary.sideEffects.publicResourceMapCommitBehavior, false);
+  assert.equal(summary.sideEffects.compatibilityClaimed, false);
+  assert.deepEqual(
+    Object.keys(packageJson.exports),
+    expectedReactDomPackageExportKeys
+  );
+});
+
 test('private resource-map commit executes deduped preload/preinit/script fake-head order', () => {
   const scenario = createResourceMapCommitScenario(
     'resource-map-fake-head-load-order',
@@ -17608,6 +17787,26 @@ function createResourceMapCommitScenario(
     order,
     stylesheet
   };
+}
+
+function assertRootMapStoragePreflightAdmissionRejects(
+  resourceMapCommit,
+  admission,
+  reason
+) {
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintRootMapStoragePreflightGate()
+        .recordRootMapStoragePreflight(resourceMapCommit, admission),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintRootMapStoragePreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason
+    }
+  );
 }
 
 function createRootMapStoragePreflightScenario(prefix) {
