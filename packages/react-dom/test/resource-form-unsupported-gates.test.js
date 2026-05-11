@@ -3205,6 +3205,10 @@ test('private form action rejected-error preflight records rejected async action
     false
   );
   assert.equal(
+    record.resetActionPublicBlockers.publicSubmitDispatchReachable,
+    false
+  );
+  assert.equal(
     record.resetActionPublicBlockers.publicRequestFormResetReachable,
     false
   );
@@ -3227,6 +3231,10 @@ test('private form action rejected-error preflight records rejected async action
   assert.equal(record.resetActionPublicBlockers.realFormReset, false);
   assert.equal(
     record.publicFormActionBoundary.publicFormSubmissionReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicSubmitDispatchReachable,
     false
   );
   assert.equal(
@@ -3385,6 +3393,22 @@ test('private form action rejected-error preflight records rejected async action
         .createFormActionRejectedErrorPreflightDiagnosticGate()
         .recordRejectedErrorPreflight(rejectedExecution, {
           explicitFormActionRejectedErrorPreflight: true,
+          publicDispatchRequested: true
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'public submit dispatch must remain blocked'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
           publicErrorRoutingRequested: true
         }),
     {
@@ -3438,6 +3462,56 @@ test('private form action rejected-error preflight records rejected async action
   );
 });
 
+test('private form action rejected-error preflight blocks public submit dispatch directly', async () => {
+  const scenario = createPrivateFormActionCallbackPreflightScenario(
+    'rejected-error-submit-dispatch-blocker'
+  );
+  const rejectedExecution =
+    await formActions
+      .createFormActionAsyncCallbackExecutionDiagnosticGate({
+        requestIdPrefix: 'rejected-error-submit-dispatch-async-execution'
+      })
+      .recordAsyncCallbackExecution(scenario.preflight, {
+        explicitFormActionAsyncCallbackExecution: true,
+        async asyncActionCallback() {
+          throw new Error('public submit dispatch blocked');
+        }
+      });
+  const record =
+    formActions
+      .createFormActionRejectedErrorPreflightDiagnosticGate({
+        requestIdPrefix: 'rejected-error-submit-dispatch-preflight'
+      })
+      .recordRejectedErrorPreflight(rejectedExecution, {
+        explicitFormActionRejectedErrorPreflight: true,
+        sourceAsyncCallbackExecutionId: rejectedExecution.executionId
+      });
+
+  assert.equal(
+    record.resetActionPublicBlockers.publicSubmitDispatchReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicSubmitDispatchReachable,
+    false
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          publicDispatchRequested: true
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'public submit dispatch must remain blocked'
+    }
+  );
+});
 
 test('private controlled input value-tracker gate records deterministic metadata only', () => {
   const first = createPrivateControlledValueTrackerScenario();

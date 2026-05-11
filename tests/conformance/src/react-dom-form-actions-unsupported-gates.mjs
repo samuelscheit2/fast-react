@@ -1440,6 +1440,14 @@ export async function assertPrivateFormActionRejectedErrorPreflightGate() {
     false
   );
   assert.equal(
+    record.resetActionPublicBlockers.publicFormSubmissionReachable,
+    false
+  );
+  assert.equal(
+    record.resetActionPublicBlockers.publicSubmitDispatchReachable,
+    false
+  );
+  assert.equal(
     record.resetActionPublicBlockers.publicRequestFormResetReachable,
     false
   );
@@ -1454,6 +1462,14 @@ export async function assertPrivateFormActionRejectedErrorPreflightGate() {
   assert.equal(record.resetActionPublicBlockers.actionInvoked, false);
   assert.equal(record.resetActionPublicBlockers.reactUpdateQueued, false);
   assert.equal(record.resetActionPublicBlockers.realFormReset, false);
+  assert.equal(
+    record.publicFormActionBoundary.publicFormSubmissionReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicSubmitDispatchReachable,
+    false
+  );
   assert.equal(record.publicFormActionBoundary.actionInvoked, false);
   assert.equal(record.publicFormActionBoundary.realFormReset, false);
   assert.deepEqual(
@@ -1533,6 +1549,22 @@ export async function assertPrivateFormActionRejectedErrorPreflightGate() {
       compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
       reason:
         "sourceAsyncCallbackExecutionId must match the rejected async callback execution record"
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          publicDispatchRequested: true
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason: "public submit dispatch must remain blocked"
     }
   );
   assert.throws(
