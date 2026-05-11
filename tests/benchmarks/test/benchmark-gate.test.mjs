@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
 import test from "node:test";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -511,6 +518,26 @@ test("benchmark result gate rejects public diagnostic timing proof", () => {
   );
 });
 
+test("benchmark result gate rechecks manifest command provenance", () => {
+  const manifest = clone(privateDiagnosticManifest);
+  manifest.conformanceGates[0].acceptedGate.command =
+    "Worker 994 says this stale command passed";
+  const result = buildResultForManifest(manifest, {
+    implementation: "fast-react-private-diagnostic",
+    lane: "default-node-development-private-diagnostic"
+  });
+
+  const errors = validateBenchmarkResult(result, {
+    manifestById: new Map([[manifest.manifestId, manifest]]),
+    repoRoot
+  });
+
+  assert.match(
+    errors.join("\n"),
+    /command segment "Worker 994 says this stale command passed" must be an npm run, node --test, or cargo test command/
+  );
+});
+
 test("benchmark accepted gates reject decorative non-runnable commands", () => {
   const cases = [
     {
@@ -524,14 +551,52 @@ test("benchmark accepted gates reject decorative non-runnable commands", () => {
         /command segment "npm run Worker 957 says this benchmark passed" must be `npm run <script>` optionally followed by `--workspace <workspace>`/
     },
     {
+      command: "npm test --workspace @fast-react/conformance",
+      pattern:
+        /command segment "npm test --workspace @fast-react\/conformance" must be an npm run, node --test, or cargo test command/
+    },
+    {
+      command: "npm run test:conformance --workspace @fast-react/conformance",
+      pattern: /is not an accepted benchmark gate npm command/
+    },
+    {
+      command:
+        "npm run root-render-e2e:conformance --workspace @fast-react/conformance -- --format=json",
+      pattern:
+        /must be `npm run <script>` optionally followed by `--workspace <workspace>`/
+    },
+    {
+      command:
+        "NODE_OPTIONS=--test-reporter=spec node --test tests/conformance/test/react-act-oracle.test.mjs",
+      pattern:
+        /must be an npm run, node --test, or cargo test command/
+    },
+    {
       command: "node --test this benchmark passed",
       pattern:
         /command segment "node --test this benchmark passed" test target "this" must be a repo \.js or \.mjs test path/
     },
     {
+      command:
+        "node --test tests/conformance/test/react-act-oracle.test.mjs --test-name-pattern never",
+      pattern:
+        /test target "--test-name-pattern" must be a repo \.js or \.mjs test path/
+    },
+    {
+      command: "node --test packages/react-dom/src/client/root-bridge.js",
+      pattern:
+        /test target "packages\/react-dom\/src\/client\/root-bridge\.js" is not an accepted benchmark gate test target/
+    },
+    {
       command: "cargo test it passed",
       pattern:
         /command segment "cargo test it passed" must include `-p <crate>`/
+    },
+    {
+      command:
+        "cargo t -p fast-react-reconciler --all-features root_commit_finished_work",
+      pattern:
+        /must be an npm run, node --test, or cargo test command/
     },
     {
       command: "node --test tests/benchmarks/src/benchmark-gate.mjs",
@@ -567,6 +632,350 @@ test("benchmark accepted gates reject decorative non-runnable commands", () => {
   }
 });
 
+test("benchmark accepted gates reject caller-shaped cwd and env evidence", () => {
+  const manifest = clone(privateDiagnosticManifest);
+  manifest.conformanceGates[0].acceptedGate.cwd = "tests/conformance";
+  manifest.conformanceGates[0].acceptedGate.env = {
+    NODE_ENV: "test"
+  };
+
+  const errors = validateBenchmarkManifest(manifest, { repoRoot });
+  const joined = errors.join("\n");
+
+  assert.match(joined, /unsupported property cwd/);
+  assert.match(joined, /unsupported property env/);
+});
+
+test("benchmark accepted gates reject stale package command provenance", () => {
+  const fakeRepoRoot = makeFakeCommandRepoRoot({
+    conformanceScript: "echo caller-shaped benchmark pass"
+  });
+
+  try {
+    const manifest = clone(privateDiagnosticManifest);
+    manifest.conformanceGates[0].acceptedGate.command =
+      "npm run root-render-e2e:conformance --workspace @fast-react/conformance";
+
+    const errors = validateBenchmarkManifest(manifest, {
+      repoRoot: fakeRepoRoot
+    });
+    const joined = errors.join("\n");
+
+    assert.match(
+      joined,
+      /command provenance must be validated from the current benchmark gate repo root/
+    );
+    assert.match(
+      joined,
+      /script root-render-e2e:conformance is stale; expected "node scripts\/check-react-dom-root-render-e2e-conformance\.mjs"/
+    );
+  } finally {
+    rmSync(fakeRepoRoot, { recursive: true, force: true });
+  }
+});
+
+test("benchmark accepted gates reject inert node:test import spoofs", () => {
+  const cases = [
+    {
+      name: "comment and string",
+      nodeTestSource:
+        '// import test from "node:test";\nconst inert = "require(\\"node:test\\")";\n'
+    },
+    {
+      name: "regular expression",
+      nodeTestSource: '/import test from "node:test"/;\n'
+    },
+    {
+      name: "arrow function regular expression",
+      nodeTestSource:
+        'const inert = () => /import test from "node:test"/;\n'
+    },
+    {
+      name: "member require call",
+      nodeTestSource:
+        'const obj = { require(value) { return value; } };\nobj.require("node:test");\n'
+    }
+  ];
+
+  for (const { name, nodeTestSource } of cases) {
+    const fakeRepoRoot = makeFakeCommandRepoRoot({ nodeTestSource });
+    const manifest = clone(privateDiagnosticManifest);
+    manifest.conformanceGates[0].acceptedGate.command =
+      "node --test tests/conformance/test/react-act-oracle.test.mjs";
+
+    try {
+      const errors = validateBenchmarkManifest(manifest, {
+        repoRoot: fakeRepoRoot
+      });
+
+      assert.match(
+        errors.join("\n"),
+        /test target "tests\/conformance\/test\/react-act-oracle\.test\.mjs" does not import node:test/,
+        name
+      );
+    } finally {
+      rmSync(fakeRepoRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test("benchmark accepted gates reject node:test targets with no current test registrations", () => {
+  const cases = [
+    {
+      name: "empty import",
+      nodeTestSource: 'import test from "node:test";\n'
+    },
+    {
+      name: "require without tests",
+      nodeTestSource: 'const test = require("node:test");\n'
+    },
+    {
+      name: "hook without tests",
+      nodeTestSource:
+        'import test from "node:test";\ntest.afterEach(() => {});\n'
+    },
+    {
+      name: "non-top-level registration",
+      nodeTestSource:
+        'import test from "node:test";\nfunction registerLater() { test("root_commit_finished_work", () => {}); }\n'
+    },
+    {
+      name: "nested require binding with top-level call",
+      nodeTestSource:
+        'import "node:test";\nfunction install() { const { test } = require("node:test"); }\ntest("root_commit_finished_work", () => {});\n'
+    }
+  ];
+
+  for (const { name, nodeTestSource } of cases) {
+    const fakeRepoRoot = makeFakeCommandRepoRoot({ nodeTestSource });
+    const manifest = clone(privateDiagnosticManifest);
+    manifest.conformanceGates[0].acceptedGate.command =
+      "node --test tests/conformance/test/react-act-oracle.test.mjs";
+
+    try {
+      const errors = validateBenchmarkManifest(manifest, {
+        repoRoot: fakeRepoRoot
+      });
+
+      assert.match(
+        errors.join("\n"),
+        /test target "tests\/conformance\/test\/react-act-oracle\.test\.mjs" does not register a current node:test test name/,
+        name
+      );
+    } finally {
+      rmSync(fakeRepoRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test("benchmark accepted gates reject accepted cargo filters that select no current tests", () => {
+  const cases = [
+    {
+      name: "comment and string",
+      cargoTestSource:
+        "// #[test]\n// fn root_commit_finished_work_commented_out() {}\nconst INERT: &str = r#\"#[test] fn root_commit_finished_work_string() {}\"#;\n"
+    },
+    {
+      name: "disabled cfg",
+      cargoTestSource:
+        "#[cfg(FALSE)]\n#[test]\nfn root_commit_finished_work_cfg_disabled() {}\n"
+    },
+    {
+      name: "disabled target cfg",
+      cargoTestSource:
+        '#[cfg(target_os = "definitely_not_this_os")]\n#[test]\nfn root_commit_finished_work_disabled_by_target() {}\n'
+    },
+    {
+      name: "unknown cfg",
+      cargoTestSource:
+        "#[cfg(root_commit_finished_work_unknown_cfg_probe)]\n#[test]\nfn root_commit_finished_work_disabled_by_unknown_cfg() {}\n"
+    },
+    {
+      name: "disabled cfg module",
+      cargoTestSource:
+        "#[cfg(FALSE)]\nmod disabled {\n  #[test]\n  fn root_commit_finished_work_disabled_module() {}\n}\n"
+    },
+    {
+      name: "disabled cfg external module",
+      cargoTestSource: "#[cfg(FALSE)]\nmod disabled;\n",
+      cargoExtraFiles: {
+        "crates/fast-react-reconciler/src/disabled.rs":
+          "#[test]\nfn root_commit_finished_work_disabled_external_module() {}\n"
+      }
+    },
+    {
+      name: "disabled cfg nested external module",
+      cargoTestSource: "#[cfg(FALSE)]\nmod disabled {\n  mod nested;\n}\n",
+      cargoExtraFiles: {
+        "crates/fast-react-reconciler/src/disabled/nested.rs":
+          "#[test]\nfn root_commit_finished_work_disabled_nested_external_module() {}\n"
+      }
+    },
+    {
+      name: "macro template",
+      cargoTestSource:
+        "macro_rules! inert_test_template { () => { #[test] fn root_commit_finished_work_macro_template() {} }; }\n"
+    },
+    {
+      name: "inner function test",
+      cargoTestSource:
+        "fn inert() { #[test] fn root_commit_finished_work_inner_only() {} }\n"
+    }
+  ];
+
+  for (const { name, cargoTestSource, cargoExtraFiles } of cases) {
+    const fakeRepoRoot = makeFakeCommandRepoRoot({
+      cargoExtraFiles,
+      cargoTestSource
+    });
+    const manifest = clone(privateDiagnosticManifest);
+    manifest.conformanceGates[0].acceptedGate.command =
+      "cargo test -p fast-react-reconciler --all-features root_commit_finished_work";
+
+    try {
+      const errors = validateBenchmarkManifest(manifest, {
+        repoRoot: fakeRepoRoot
+      });
+
+      assert.match(
+        errors.join("\n"),
+        /test filter "root_commit_finished_work" selects no current tests for fast-react-reconciler/,
+        name
+      );
+    } finally {
+      rmSync(fakeRepoRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test("benchmark accepted cargo filters discover nested inline external modules", () => {
+  const cases = [
+    {
+      name: "nested module file",
+      cargoExtraFiles: {
+        "crates/fast-react-reconciler/src/outer/inner.rs":
+          "#[test]\nfn root_commit_finished_work_nested_inline_external_module() {}\n"
+      }
+    },
+    {
+      name: "nested module mod file",
+      cargoExtraFiles: {
+        "crates/fast-react-reconciler/src/outer/inner/mod.rs":
+          "#[test]\nfn root_commit_finished_work_nested_inline_external_mod_file() {}\n"
+      }
+    }
+  ];
+
+  for (const { name, cargoExtraFiles } of cases) {
+    const fakeRepoRoot = makeFakeCommandRepoRoot({
+      cargoExtraFiles,
+      cargoTestSource: "mod outer {\n  mod inner;\n}\n"
+    });
+    const manifest = clone(privateDiagnosticManifest);
+    manifest.conformanceGates[0].acceptedGate.command =
+      "cargo test -p fast-react-reconciler --all-features root_commit_finished_work";
+
+    try {
+      const errors = validateBenchmarkManifest(manifest, {
+        repoRoot: fakeRepoRoot
+      });
+
+      assert.doesNotMatch(
+        errors.join("\n"),
+        /test filter "root_commit_finished_work" selects no current tests for fast-react-reconciler/,
+        name
+      );
+    } finally {
+      rmSync(fakeRepoRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test("benchmark accepted cargo filters discover host-true cfg nested external modules", () => {
+  const fakeRepoRoot = makeFakeCommandRepoRoot({
+    cargoExtraFiles: {
+      "crates/fast-react-reconciler/src/outer/inner.rs":
+        "#[test]\nfn root_commit_finished_work_host_true_cfg_nested_external_module() {}\n"
+    },
+    cargoTestSource: `#[cfg(target_os = "${rustHostTargetOsForTest()}")]
+mod outer {
+  mod inner;
+}
+`
+  });
+  const manifest = clone(privateDiagnosticManifest);
+  manifest.conformanceGates[0].acceptedGate.command =
+    "cargo test -p fast-react-reconciler --all-features root_commit_finished_work";
+
+  try {
+    const errors = validateBenchmarkManifest(manifest, {
+      repoRoot: fakeRepoRoot
+    });
+
+    assert.doesNotMatch(
+      errors.join("\n"),
+      /test filter "root_commit_finished_work" selects no current tests for fast-react-reconciler/
+    );
+  } finally {
+    rmSync(fakeRepoRoot, { recursive: true, force: true });
+  }
+});
+
+test("benchmark accepted cargo filters keep rejecting inner-function Rust test spoofs", () => {
+  const fakeRepoRoot = makeFakeCommandRepoRoot({
+    cargoTestSource: `
+      mod outer {
+        fn register_later() {
+          #[test]
+          fn root_commit_finished_work_inner_spoof() {}
+        }
+      }
+    `
+  });
+  const manifest = clone(privateDiagnosticManifest);
+  manifest.conformanceGates[0].acceptedGate.command =
+    "cargo test -p fast-react-reconciler --all-features root_commit_finished_work";
+
+  try {
+    const errors = validateBenchmarkManifest(manifest, {
+      repoRoot: fakeRepoRoot
+    });
+
+    assert.match(
+      errors.join("\n"),
+      /test filter "root_commit_finished_work" selects no current tests for fast-react-reconciler/
+    );
+  } finally {
+    rmSync(fakeRepoRoot, { recursive: true, force: true });
+  }
+});
+
+test("benchmark accepted cargo filters ignore undeclared orphan Rust source files", () => {
+  const fakeRepoRoot = makeFakeCommandRepoRoot({
+    cargoExtraFiles: {
+      "crates/fast-react-reconciler/src/orphan.rs":
+        "#[test]\nfn root_commit_finished_work_orphan_probe() {}\n"
+    },
+    cargoTestSource: ""
+  });
+  const manifest = clone(privateDiagnosticManifest);
+  manifest.conformanceGates[0].acceptedGate.command =
+    "cargo test -p fast-react-reconciler --all-features root_commit_finished_work";
+
+  try {
+    const errors = validateBenchmarkManifest(manifest, {
+      repoRoot: fakeRepoRoot
+    });
+
+    assert.match(
+      errors.join("\n"),
+      /test filter "root_commit_finished_work" selects no current tests for fast-react-reconciler/
+    );
+  } finally {
+    rmSync(fakeRepoRoot, { recursive: true, force: true });
+  }
+});
+
 function readManifest(fileName) {
   return JSON.parse(
     readFileSync(path.join(benchmarkRoot, "manifests", fileName), "utf8")
@@ -595,4 +1004,94 @@ function buildResultForManifest(manifest, options = {}) {
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function rustHostTargetOsForTest() {
+  const values = {
+    aix: "aix",
+    android: "android",
+    darwin: "macos",
+    freebsd: "freebsd",
+    linux: "linux",
+    openbsd: "openbsd",
+    sunos: "solaris",
+    win32: "windows"
+  };
+  return values[process.platform];
+}
+
+function makeFakeCommandRepoRoot({
+  conformanceScript =
+    "node scripts/check-react-dom-root-render-e2e-conformance.mjs",
+  nodeTestSource = 'import test from "node:test";\n',
+  cargoExtraFiles = {},
+  cargoTestSource = `
+    #[cfg(test)]
+    mod tests {
+      #[test]
+      fn root_commit_finished_work_current_fake_test() {}
+    }
+  `
+} = {}) {
+  const fakeRepoRoot = mkdtempSync(
+    path.join(tmpdir(), "fast-react-benchmark-command-")
+  );
+
+  writeJson(path.join(fakeRepoRoot, "package.json"), {
+    workspaces: ["tests/*", "packages/*", "bindings/*"]
+  });
+
+  mkdirSync(path.join(fakeRepoRoot, "tests/conformance/scripts"), {
+    recursive: true
+  });
+  writeJson(path.join(fakeRepoRoot, "tests/conformance/package.json"), {
+    name: "@fast-react/conformance",
+    scripts: {
+      "root-render-e2e:conformance": conformanceScript
+    }
+  });
+  writeFileSync(
+    path.join(
+      fakeRepoRoot,
+      "tests/conformance/scripts/check-react-dom-root-render-e2e-conformance.mjs"
+    ),
+    "process.exit(0);\n"
+  );
+  mkdirSync(path.join(fakeRepoRoot, "tests/conformance/test"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(fakeRepoRoot, "tests/conformance/test/react-act-oracle.test.mjs"),
+    nodeTestSource
+  );
+
+  mkdirSync(path.join(fakeRepoRoot, "crates/fast-react-reconciler/src"), {
+    recursive: true
+  });
+  writeFileSync(
+    path.join(fakeRepoRoot, "crates/fast-react-reconciler/Cargo.toml"),
+    [
+      "[package]",
+      'name = "fast-react-reconciler"',
+      'version = "0.0.0"',
+      'edition = "2021"',
+      ""
+    ].join("\n")
+  );
+  writeFileSync(
+    path.join(fakeRepoRoot, "crates/fast-react-reconciler/src/lib.rs"),
+    cargoTestSource
+  );
+  for (const [relativePath, source] of Object.entries(cargoExtraFiles)) {
+    const filePath = path.join(fakeRepoRoot, relativePath);
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFileSync(filePath, source);
+  }
+
+  return fakeRepoRoot;
+}
+
+function writeJson(filePath, value) {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
