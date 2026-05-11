@@ -2992,6 +2992,8 @@ const rootHydratePublicFacadeTextNodeClaimPatchExecutionPayloads =
   new WeakMap();
 const rootHydratePublicFacadeLifecycleRequestBoundaryPayloads =
   new WeakMap();
+const rootHydratePublicFacadeLatestLifecycleRequestBoundaryByContainer =
+  new WeakMap();
 const rootLiveContainerPreflightPayloads = new WeakMap();
 const rootPublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootPublicFacadeHostOutputRenderPayloads = new WeakMap();
@@ -3514,6 +3516,7 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
     eventReplayPreflightRecords: [],
     executionPreflightRecords: [],
     lifecycleRequestBoundaryRecords: [],
+    lifecycleRequestBoundaryRecordsByContainer: new WeakMap(),
     lifecycleRequestBoundaryRecordsByRequest: new WeakMap(),
     markerListenerPreflightRecords: [],
     nextEventReplayPreflightSequence: 1,
@@ -3815,6 +3818,11 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
   );
   preflightState.lifecycleRequestBoundaryRecordsByRequest.set(
     requestRecord,
+    lifecycleRequestBoundary
+  );
+  recordHydrateRootLifecycleRequestBoundaryContainerCurrentness(
+    preflightState,
+    requestPayload.container,
     lifecycleRequestBoundary
   );
   const markerListenerPreflight =
@@ -5963,6 +5971,50 @@ function assertHydrateRootTargetClaimingMarkerListenerPreflight(
   return payload;
 }
 
+function recordHydrateRootLifecycleRequestBoundaryContainerCurrentness(
+  preflightState,
+  container,
+  lifecycleRequestBoundary
+) {
+  if (!isObjectOrFunction(container)) {
+    return;
+  }
+  preflightState.lifecycleRequestBoundaryRecordsByContainer.set(
+    container,
+    lifecycleRequestBoundary
+  );
+  rootHydratePublicFacadeLatestLifecycleRequestBoundaryByContainer.set(
+    container,
+    lifecycleRequestBoundary
+  );
+}
+
+function hydrateRootLifecycleRequestBoundaryMatchesCurrentContainerRequest(
+  lifecycleRequestBoundary,
+  preflightState,
+  requestRecord,
+  requestPayload
+) {
+  const container = requestPayload.container;
+  if (!isObjectOrFunction(container)) {
+    return true;
+  }
+  const currentPreflightBoundary =
+    preflightState.lifecycleRequestBoundaryRecordsByContainer.get(container);
+  const currentContainerBoundary =
+    rootHydratePublicFacadeLatestLifecycleRequestBoundaryByContainer.get(
+      container
+    );
+  return (
+    currentPreflightBoundary === lifecycleRequestBoundary &&
+    currentContainerBoundary === lifecycleRequestBoundary &&
+    lifecycleRequestBoundary.requestId === requestRecord.requestId &&
+    lifecycleRequestBoundary.requestSequence ===
+      requestRecord.requestSequence &&
+    lifecycleRequestBoundary.hydrateId === requestRecord.hydrateId
+  );
+}
+
 function assertHydrateRootLifecycleRequestBoundaryForPreflight(
   lifecycleRequestBoundary,
   preflightState,
@@ -6030,6 +6082,18 @@ function assertHydrateRootLifecycleRequestBoundaryForPreflight(
       `hydrateRoot ${phase} requires source-owned active lifecycle request-boundary evidence for the same hydrateRoot request.`
     );
   }
+  const containerRequestCurrent =
+    hydrateRootLifecycleRequestBoundaryMatchesCurrentContainerRequest(
+      lifecycleRequestBoundary,
+      preflightState,
+      requestRecord,
+      requestPayload
+    );
+  if (!containerRequestCurrent) {
+    throwInvalidRootPublicFacadePreflight(
+      `hydrateRoot ${phase} rejected stale same-container lifecycle request-boundary evidence.`
+    );
+  }
 
   const snapshotPayload =
     rootPublicFacadeLifecycleContainerSnapshotCaptures.get(
@@ -6059,6 +6123,7 @@ function assertHydrateRootLifecycleRequestBoundaryForPreflight(
   return freezeRecord({
     ...payload,
     containerSnapshotCurrent,
+    containerRequestCurrent,
     currentState
   });
 }

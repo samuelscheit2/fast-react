@@ -504,10 +504,52 @@ test(
     assert.deepEqual(foreign.document.__mutationLog, []);
     assert.throws(
       () => preflight.postPreflightExecution(targetClaimRecord),
-    {
+      {
         code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
       }
     );
+  }
+);
+
+test(
+  'private hydrateRoot post-preflight execution rejects older same-container lifecycle evidence',
+  () => {
+    const {
+      container,
+      executionPreflightRecord,
+      hydrateRecord,
+      hydrationOptions,
+      initialChildren,
+      preflight,
+      textNode
+    } = createHydrateRootTextClaimPatchBridgeScenario(
+      'hydrate-text-claim-patch-bridge-same-container-stale'
+    );
+    const mismatchRow = hydrateRecord.textMismatchDiagnostics.mismatchRows[0];
+
+    const newerHydrateRecord = preflight.hydrateRoot(
+      container,
+      initialChildren,
+      hydrationOptions
+    );
+
+    assert.equal(
+      newerHydrateRecord.requestSequence > hydrateRecord.requestSequence,
+      true
+    );
+    assert.throws(
+      () =>
+        preflight.postPreflightExecution(executionPreflightRecord, {
+          hydrationOptions,
+          mismatchRow
+        }),
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT',
+        message: /stale same-container lifecycle request-boundary/
+      }
+    );
+    assert.equal(textNode.nodeValue, 'server text');
+    assert.equal(preflight.getHydrateRootPreflightRecords().length, 2);
   }
 );
 
@@ -576,6 +618,7 @@ function createHydrateRootTextClaimPatchBridgeScenario(label, options) {
     executionPreflightRecord,
     hydrateRecord,
     hydrationOptions,
+    initialChildren,
     preflight,
     targetClaimRecord,
     textNode

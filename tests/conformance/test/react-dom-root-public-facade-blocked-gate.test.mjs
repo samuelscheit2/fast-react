@@ -2074,6 +2074,50 @@ test("React DOM client private hydrateRoot post-preflight execution rejects nonc
   );
 });
 
+test("React DOM client private hydrateRoot post-preflight execution rejects older same-container lifecycle evidence", () => {
+  const {
+    container,
+    eventReplayRecord,
+    hydrateRecord,
+    hydrationOptions,
+    initialChildren,
+    preflight,
+    textNode
+  } = createHydrateRootExecutionPreflightScenario(
+    "public-facade-hydrate-text-claim-patch-same-container-stale",
+    {
+      textMismatch: true
+    }
+  );
+  const executionPreflightRecord = preflight.preflightExecution(
+    eventReplayRecord
+  );
+  const mismatchRow = hydrateRecord.textMismatchDiagnostics.mismatchRows[0];
+  const newerHydrateRecord = preflight.hydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+
+  assert.equal(
+    newerHydrateRecord.requestSequence > hydrateRecord.requestSequence,
+    true
+  );
+  assert.throws(
+    () =>
+      preflight.postPreflightExecution(executionPreflightRecord, {
+        hydrationOptions,
+        mismatchRow
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT",
+      message: /stale same-container lifecycle request-boundary/
+    }
+  );
+  assert.equal(textNode.textContent, "server text");
+  assert.equal(preflight.getHydrateRootPreflightRecords().length, 2);
+});
+
 test("React DOM client private hydrateRoot execution preflight rejects stale foreign or public execution claims", () => {
   const {
     container,
@@ -4570,19 +4614,20 @@ function createHydrateRootExecutionPreflightScenario(label, options = {}) {
       publicFacadeHydratePreflightIdPrefix: `${label}-preflight`,
       requestIdPrefix: `${label}-request`
     });
+  const initialChildren = {
+    props: {
+      children:
+        options.textMismatchRows === true
+          ? ["client text one", "client text two"]
+          : options.textMismatch === true
+          ? "client text"
+          : `${label} child`
+    },
+    type: "App"
+  };
   const hydrateRecord = preflight.hydrateRoot(
     container,
-    {
-      props: {
-        children:
-          options.textMismatchRows === true
-            ? ["client text one", "client text two"]
-            : options.textMismatch === true
-            ? "client text"
-            : `${label} child`
-      },
-      type: "App"
-    },
+    initialChildren,
     hydrationOptions
   );
   const wrapper =
@@ -4620,6 +4665,7 @@ function createHydrateRootExecutionPreflightScenario(label, options = {}) {
     eventReplayRecord,
     hydrateRecord,
     hydrationOptions,
+    initialChildren,
     preflight,
     rootBridge,
     target,
