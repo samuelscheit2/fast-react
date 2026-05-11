@@ -46,21 +46,19 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Accepted/merged baseline includes Workers 803-837,
-842-846, 848-852, and 855-860. Worker 853's competing test-renderer branch was
-rejected as redundant after Worker 844 was accepted; do not use it as accepted
-input.
+842-846, 848-852, 855-860, 864, and 870. Worker 853's competing test-renderer
+branch was rejected as redundant after Worker 844 was accepted; do not use it
+as accepted input.
 
 Current active queue:
 
 - Worker 862: root unmount container execution.
 - Worker 863: root host update mutation execution.
-- Worker 864: sync-flush update/unmount host execution.
 - Worker 865: function component mount host execution.
 - Worker 866: function component update host execution.
 - Worker 867: deleted subtree teardown execution.
 - Worker 868: Rust test-renderer root lifecycle execution consumer.
 - Worker 869: React DOM private facade fake-DOM lifecycle consumer.
-- Worker 870: native JSON batch lifecycle executor.
 
 Accepted private evidence still keeps public root/render, `act`, `flushSync`,
 Scheduler timing, hydration, resources/forms, serialization, native execution,
@@ -72,11 +70,11 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Let Workers 862-870 run as the current active queue; do not treat their
-   outputs as accepted inputs until reviewed and merged.
-2. Use accepted Workers 855 and 860 as private Rust execution inputs for narrow
-   root/sync-flush host mutation follow-ups only when source-owned finished
-   work, detached-host, lane/root, and sibling evidence is preserved.
+1. Let Workers 862-863 and 865-869 run as the current active queue; do not
+   treat their outputs as accepted inputs until reviewed and merged.
+2. Use accepted Workers 855, 860, and 864 as private Rust execution inputs for
+   narrow root/sync-flush host mutation follow-ups only when source-owned
+   finished work, detached-host, lane/root, and sibling evidence is preserved.
 3. Consume accepted Workers 844, 848, 856, 857, 858, and 859 only through
    fail-closed package/private gates. Public compatibility still needs dual-run
    oracle evidence and broad package validation.
@@ -88,8 +86,8 @@ canonical evidence requirements.
 
 ## Next Queue Candidates
 
-- Rust root/sync-flush execution can extend accepted Workers 855 and 860 toward
-  managed-child, HostText, update, and deletion shapes only as private
+- Rust root/sync-flush execution can extend accepted Workers 855, 860, and 864
+  toward managed-child, HostText, update, and deletion shapes only as private
   test-host canaries with source-owned commit, host-node, root, and lane
   validation. Public React DOM/test-renderer roots and public `flushSync` remain
   blocked.
@@ -114,9 +112,10 @@ canonical evidence requirements.
   thenable behavior, renderer behavior, and package compatibility remain
   blocked.
 - Native lifecycle work can consume accepted Worker 858's Rust JSON lifecycle
-  mirror. Executable native addon loading, cleanup hooks, scheduling,
-  renderer/reconciler output, worker-thread teardown, no-stale-value behavior,
-  public native compatibility, and package exports remain blocked.
+  mirror and Worker 870's in-process JSON batch lifecycle executor. Executable
+  native addon loading, cleanup hooks, scheduling, renderer/reconciler output,
+  worker-thread teardown, no-stale-value behavior, public native compatibility,
+  and package exports remain blocked.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, and the text-patch admission ledger. Future

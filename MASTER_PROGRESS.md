@@ -29,7 +29,7 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-### Workers 844, 848, and 855-860
+### Workers 844, 848, 855-860, 864, and 870
 
 - Worker 844 added package-root private `react-test-renderer` native execution
   parity for committed `toJSON`/`toTree` single-host and unmount rows, with
@@ -49,6 +49,11 @@ sequencing belong in `MASTER_PLAN.md`.
   before host calls while keeping default sync flush inert. Public React DOM,
   test-renderer, `flushSync`, hydration, native/package behavior, refs/effects,
   and broad renderer compatibility remain blocked.
+- Worker 864 extended the opt-in sync-flush private host mutation executor to
+  HostText update, HostComponent update, and root unmount/delete shapes. The
+  default sync flush path remains inert; deletion cleanup only runs through the
+  explicit private canary executor, and public `flushSync`/renderer behavior
+  remains blocked.
 - Worker 856 added the private resource/form root execution consumer, binding
   accepted resource root-map storage and fulfilled-reset fake queue/commit
   evidence to private root admission plus Worker 850 ledger/source-token
@@ -65,16 +70,23 @@ sequencing belong in `MASTER_PLAN.md`.
   and cleanup-hook preflight provenance without package exports. Native addon
   loading/execution, cleanup hooks, worker threads, renderer/reconciler output,
   public native compatibility, and React behavior remain blocked.
+- Worker 870 added the private in-process Rust state-machine executor for
+  decoded native JSON create/render/unmount lifecycle rows, binding executor
+  rows to handle-table transitions, environment/root identity, generations, and
+  inert execution flags. Native addon loading, renderer/reconciler execution,
+  cleanup hooks, public native compatibility, and package exports remain
+  blocked.
 - Worker 859 hardened the Rust test-renderer private unmount/nested native
   consumer with source-owned renderer IDs, `toJSON`/`toTree` identity surfaces,
   durable row IDs, cleanup counts, and update sequences. Public serialization,
   JS/CJS/package compatibility, native bridge loading/public execution,
   root/act/Scheduler compatibility, and broad multichild identity remain
   blocked.
-- The batch was accepted after focused Rust, React DOM, React act/test-utils,
-  resource/form, native lifecycle, test-renderer package/CJS, package-surface,
-  import-smoke, formatting, and `git diff --check` verification recorded in
-  git history and the worker reports.
+- The batch was accepted after focused Rust, sync-flush host mutation,
+  React DOM, React act/test-utils, resource/form, native lifecycle,
+  test-renderer package/CJS, package-surface, import-smoke, formatting, and
+  `git diff --check` verification recorded in git history and the worker
+  reports.
 
 ### Workers 826-837, 842-843, 845-846, 849-852
 
