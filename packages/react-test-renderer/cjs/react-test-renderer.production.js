@@ -2425,6 +2425,10 @@ const privateRootFinishedLanesHandoffStatus =
   'private-root-finished-work-lanes-handoff-public-serialization-native-blocked';
 const privateToJSONNativeExecutionRecordKind =
   'FastReactTestRendererPrivateRootExecutionResult';
+const privateRootLifecycleExecutionDiagnosticName =
+  'fast-react-test-renderer.root.private-lifecycle-execution-evidence';
+const privateRootLifecycleExecutionStatus =
+  'private-root-lifecycle-host-execution-records-consumed-public-root-native-js-act-scheduler-blocked';
 const privateToJSONNativeExecutionAcceptedOperations = Object.freeze([
   'create',
   'update',
@@ -7556,6 +7560,17 @@ function createTestRendererRootRequestBridge(options) {
     consumeRootExecutionResult(record, result) {
       return consumeRootExecutionResult(record, result);
     },
+    canConsumePrivateRootLifecycleExecutionEvidence(records) {
+      try {
+        consumePrivateRootLifecycleExecutionEvidence(records);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    consumePrivateRootLifecycleExecutionEvidence(records) {
+      return consumePrivateRootLifecycleExecutionEvidence(records);
+    },
     executeRootRequest(record, executor) {
       return executeRootRequestWithBridge(record, executor);
     },
@@ -10025,6 +10040,297 @@ function consumeRootExecutionResult(record, result, handoff) {
   });
   rootExecutionResults.add(executionResult);
   return executionResult;
+}
+
+function consumePrivateRootLifecycleExecutionEvidence(records) {
+  const createResult = readLifecycleExecutionResult(records, 'create');
+  const updateResult = readLifecycleExecutionResult(records, 'update');
+  const unmountResult = readLifecycleExecutionResult(records, 'unmount');
+
+  assertSourceOwnedRootLifecycleExecutionResult(createResult, 'create');
+  assertSourceOwnedRootLifecycleExecutionResult(updateResult, 'update');
+  assertSourceOwnedRootLifecycleExecutionResult(unmountResult, 'unmount');
+  assertRootLifecycleExecutionRowsShareOwner(
+    createResult,
+    updateResult,
+    unmountResult
+  );
+  assertRootLifecycleExecutionRowsAreCurrent(
+    createResult,
+    updateResult,
+    unmountResult
+  );
+
+  const operationEvidence = freezeArray([
+    createPrivateRootLifecycleExecutionOperationEvidence(createResult),
+    createPrivateRootLifecycleExecutionOperationEvidence(updateResult),
+    createPrivateRootLifecycleExecutionOperationEvidence(unmountResult)
+  ]);
+
+  return freezeRecord({
+    id: privateRootLifecycleExecutionDiagnosticName,
+    kind: 'FastReactTestRendererPrivateRootLifecycleExecutionEvidence',
+    diagnosticName: privateRootLifecycleExecutionDiagnosticName,
+    status: privateRootLifecycleExecutionStatus,
+    entrypoint,
+    compatibilityTarget,
+    publicSurface: 'create() -> create().update -> create().unmount',
+    rootId: createResult.rootId,
+    rootSequence: createResult.request.rootSequence,
+    create: operationEvidence[0],
+    update: operationEvidence[1],
+    unmount: operationEvidence[2],
+    operationEvidence,
+    operations: freezeArray(['create', 'update', 'unmount']),
+    sourceExecutionRecordIds: freezeArray(
+      operationEvidence.map((evidence) => evidence.sourceExecutionRecordId)
+    ),
+    sourceExecutionStatuses: freezeArray(
+      operationEvidence.map((evidence) => evidence.sourceExecutionStatus)
+    ),
+    requestSequences: freezeRecord({
+      create: createResult.requestSequence,
+      update: updateResult.requestSequence,
+      unmount: unmountResult.requestSequence
+    }),
+    sourceRendererOwnerAccepted: true,
+    sourceLifecycleRowsAccepted: true,
+    sourceReconcilerHostExecutionConsumed: true,
+    sourceOwnedExecutionAccepted: true,
+    createUpdateUnmountEvidenceConsumed: true,
+    snapshotProducedFromExecutedState: true,
+    hostOutputSnapshotCurrent: true,
+    staleRootLifecycleRejection: true,
+    clonedExecutionRejection: true,
+    crossSurfaceExecutionRejection: true,
+    callerBuiltExecutionRejection: true,
+    publicRootAvailable: false,
+    publicSerializationAvailable: false,
+    publicTestInstanceAvailable: false,
+    publicActAvailable: false,
+    publicSchedulerAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecutionAvailable: false,
+    jsPackageCompatibilityAvailable: false,
+    compatibilityClaimed: false
+  });
+}
+
+function readLifecycleExecutionResult(records, operation) {
+  if (Array.isArray(records)) {
+    return records.find((record) => record && record.operation === operation);
+  }
+  if (records !== null && typeof records === 'object') {
+    return records[operation];
+  }
+  return undefined;
+}
+
+function assertSourceOwnedRootLifecycleExecutionResult(result, operation) {
+  if (result === null || typeof result !== 'object') {
+    throwInvalidRootRequest(
+      `Expected source-owned ${operation} private root lifecycle execution result.`
+    );
+  }
+  if (
+    result.kind !== privateToJSONNativeExecutionRecordKind ||
+    result.status !== 'accepted-private-test-renderer-root-execution-result'
+  ) {
+    throwInvalidRootRequest(
+      'Expected a FastReactTestRendererPrivateRootExecutionResult lifecycle row.'
+    );
+  }
+  if (!rootExecutionResults.has(result)) {
+    throwInvalidRootRequest(
+      'Expected source-owned private root lifecycle execution row.'
+    );
+  }
+  if (!isRootRequestRecord(result.request)) {
+    throwInvalidRootRequest(
+      'Expected lifecycle execution row to carry a private root request.'
+    );
+  }
+  if (result.operation !== operation || result.request.operation !== operation) {
+    throwInvalidRootRequest(
+      `Expected ${operation} lifecycle execution row, found ${String(result.operation)}.`
+    );
+  }
+  if (
+    result.handoff === undefined ||
+    result.handoff.requestId !== result.requestId ||
+    result.handoff.requestSequence !== result.requestSequence ||
+    result.handoff.rootId !== result.rootId
+  ) {
+    throwInvalidRootRequest(
+      'Expected lifecycle execution handoff to belong to the execution request.'
+    );
+  }
+  if (
+    result.requestId !== result.request.requestId ||
+    result.requestSequence !== result.request.requestSequence ||
+    result.rootId !== result.request.rootId ||
+    result.updateKind !== result.request.updateKind ||
+    result.rustOutcome !== result.request.rustOutcome ||
+    result.scheduled !== true ||
+    result.privateRootRequestExecution !== true ||
+    result.rustRootExecutionBridgeStatus !==
+      'admitted-private-test-renderer-native-root-execution-bridge' ||
+    result.rustRootExecutionBoundaryCalled !== true ||
+    result.rustExecution !== true ||
+    result.reconcilerExecution !== true
+  ) {
+    throwInvalidRootRequest(
+      'Expected accepted private root lifecycle execution evidence.'
+    );
+  }
+  if (
+    result.serializationAvailable !== false ||
+    result.publicRouteAvailable !== false ||
+    result.publicCreateUpdateUnmountBehaviorAvailable !== false ||
+    result.nativeAddonLoaded === true ||
+    result.nativeBridgeAvailable === true ||
+    result.nativeExecution === true ||
+    result.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootRequest(
+      'Private root lifecycle execution evidence cannot claim public or native compatibility.'
+    );
+  }
+}
+
+function assertRootLifecycleExecutionRowsShareOwner(
+  createResult,
+  updateResult,
+  unmountResult
+) {
+  const rootHandle = createResult.request.rootHandle;
+  if (
+    updateResult.request.rootHandle !== rootHandle ||
+    unmountResult.request.rootHandle !== rootHandle ||
+    updateResult.rootId !== createResult.rootId ||
+    unmountResult.rootId !== createResult.rootId ||
+    updateResult.entrypoint !== createResult.entrypoint ||
+    unmountResult.entrypoint !== createResult.entrypoint
+  ) {
+    throwInvalidRootRequest(
+      'Private root lifecycle execution rows must belong to the same renderer root.'
+    );
+  }
+  if (
+    !(
+      createResult.requestSequence < updateResult.requestSequence &&
+      updateResult.requestSequence < unmountResult.requestSequence
+    )
+  ) {
+    throwInvalidRootRequest(
+      'Private root lifecycle execution row sequence is stale.'
+    );
+  }
+}
+
+function assertRootLifecycleExecutionRowsAreCurrent(
+  createResult,
+  updateResult,
+  unmountResult
+) {
+  const handleState = assertPrivateRootHandle(createResult.request.rootHandle);
+  const requests = handleState.requests;
+  const createIndex = requests.indexOf(createResult.request);
+  const updateIndex = requests.indexOf(updateResult.request);
+  const unmountIndex = requests.indexOf(unmountResult.request);
+  if (
+    createIndex === -1 ||
+    updateIndex === -1 ||
+    unmountIndex === -1 ||
+    requests[0] !== createResult.request ||
+    requests[requests.length - 1] !== unmountResult.request ||
+    !(createIndex < updateIndex && updateIndex < unmountIndex)
+  ) {
+    throwInvalidRootRequest(
+      'Private root lifecycle execution rows are stale for the current renderer root.'
+    );
+  }
+}
+
+function createPrivateRootLifecycleExecutionOperationEvidence(result) {
+  const lifecycle = result.rustLifecycleDiagnostic;
+  return freezeRecord({
+    diagnosticName: privateRootLifecycleExecutionDiagnosticName,
+    status: privateRootLifecycleExecutionStatus,
+    operation: result.operation,
+    publicSurface: publicSurfaceForRootLifecycleOperation(result.operation),
+    sourceExecutionRecordId: sourceExecutionRecordIdForRootLifecycleResult(
+      result
+    ),
+    sourceExecutionStatus: sourceExecutionStatusForRootLifecycleResult(result),
+    requestId: result.requestId,
+    requestSequence: result.requestSequence,
+    rootId: result.rootId,
+    rootSequence: result.request.rootSequence,
+    lifecycle,
+    lifecycleStatusBefore: lifecycle.lifecycleStatusBefore,
+    lifecycleStatusAfter: lifecycle.lifecycleStatusAfter,
+    scheduledUpdateKind: result.updateKind,
+    hostOutputUpdateKind: result.updateKind,
+    scheduledUpdateSequence: result.requestSequence,
+    updateOutcome: result.rustOutcome,
+    scheduled: result.scheduled,
+    sourceRendererOwnerAccepted: true,
+    sourceLifecycleRowAccepted: true,
+    sourceReconcilerHostExecutionConsumed: true,
+    snapshotProducedFromExecutedState: true,
+    hostOutputSnapshotCurrent: true,
+    sourceOwnedExecutionAccepted: true,
+    publicRootAvailable: false,
+    publicSerializationAvailable: false,
+    publicTestInstanceAvailable: false,
+    publicActAvailable: false,
+    publicSchedulerAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecutionAvailable: false,
+    jsPackageCompatibilityAvailable: false,
+    compatibilityClaimed: false
+  });
+}
+
+function publicSurfaceForRootLifecycleOperation(operation) {
+  switch (operation) {
+    case 'create':
+      return 'create()';
+    case 'update':
+      return 'create().update';
+    case 'unmount':
+      return 'create().unmount';
+  }
+  throwInvalidRootRequest(
+    `Unsupported private root lifecycle operation: ${String(operation)}.`
+  );
+}
+
+function sourceExecutionRecordIdForRootLifecycleResult(result) {
+  if (result.privateCreateNativeBridgeHostOutputHandoff != null) {
+    return result.privateCreateNativeBridgeHostOutputHandoff.id;
+  }
+  if (result.privateUpdateNativeBridgeAdmission != null) {
+    return result.privateUpdateNativeBridgeAdmission.id;
+  }
+  if (result.privateUnmountNativeBridgeAdmission != null) {
+    return result.privateUnmountNativeBridgeAdmission.id;
+  }
+  return result.requestId;
+}
+
+function sourceExecutionStatusForRootLifecycleResult(result) {
+  if (result.privateCreateNativeBridgeHostOutputHandoff != null) {
+    return result.privateCreateNativeBridgeHostOutputHandoff.status;
+  }
+  if (result.privateUpdateNativeBridgeAdmission != null) {
+    return result.privateUpdateNativeBridgeAdmission.status;
+  }
+  if (result.privateUnmountNativeBridgeAdmission != null) {
+    return result.privateUnmountNativeBridgeAdmission.status;
+  }
+  return result.status;
 }
 
 function readDiagnosticField(record, names) {

@@ -294,6 +294,10 @@ const privateRootCompatibilityStatus =
   "blocked-private-test-renderer-root-bridge-compatibility";
 const lifecycleDiagnosticGateStatus =
   "accepted-private-update-unmount-lifecycle-diagnostics-public-root-blocked";
+const privateRootLifecycleExecutionDiagnosticName =
+  "fast-react-test-renderer.root.private-lifecycle-execution-evidence";
+const privateRootLifecycleExecutionStatus =
+  "private-root-lifecycle-host-execution-records-consumed-public-root-native-js-act-scheduler-blocked";
 const privateUpdateRouteRootWorkLoopDiagnosticName =
   "fast-react-test-renderer.update-route.private-root-work-loop";
 const privateUpdateRouteRootWorkLoopStatus =
@@ -4746,6 +4750,110 @@ test("react-test-renderer private root request bridge consumes accepted Rust lif
   }
 });
 
+test("react-test-renderer package root and CJS consume source-owned root lifecycle execution rows only", () => {
+  for (const entry of entrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const { createResult, updateResult, unmountResult, renderer } =
+      createPrivateRootLifecycleExecutionRows(moduleExports, bridge);
+
+    const rows = {
+      create: createResult,
+      update: updateResult,
+      unmount: unmountResult
+    };
+    assert.equal(
+      bridge.canConsumePrivateRootLifecycleExecutionEvidence(rows),
+      true,
+      entry.entrypoint
+    );
+    const evidence =
+      bridge.consumePrivateRootLifecycleExecutionEvidence(rows);
+    assertPrivateRootLifecycleExecutionEvidence(evidence, {
+      createResult,
+      entrypoint: entry.entrypoint,
+      updateResult,
+      unmountResult
+    });
+
+    const publicJsonError = captureThrown(() => renderer.toJSON());
+    assertReactTestRendererUnimplemented(
+      publicJsonError,
+      entry.entrypoint,
+      "create().toJSON"
+    );
+    assert.equal(publicJsonError.routingGate.nativeExecution, false);
+    assert.equal(publicJsonError.routingGate.compatibilityClaimed, false);
+
+    const clonedRows = {
+      create: createResult,
+      update: { ...updateResult },
+      unmount: unmountResult
+    };
+    assert.equal(
+      bridge.canConsumePrivateRootLifecycleExecutionEvidence(clonedRows),
+      false,
+      entry.entrypoint
+    );
+    const clonedError = captureThrown(() =>
+      bridge.consumePrivateRootLifecycleExecutionEvidence(clonedRows)
+    );
+    assert.equal(
+      clonedError.name,
+      "FastReactTestRendererPrivateRootRequestError"
+    );
+    assert.match(clonedError.message, /source-owned private root lifecycle/u);
+
+    const callerBuiltRows = {
+      create: createResult,
+      update: {
+        ...updateResult,
+        nativeBridgeAvailable: true,
+        nativeExecution: true,
+        compatibilityClaimed: true
+      },
+      unmount: unmountResult
+    };
+    const callerBuiltError = captureThrown(() =>
+      bridge.consumePrivateRootLifecycleExecutionEvidence(callerBuiltRows)
+    );
+    assert.match(
+      callerBuiltError.message,
+      /source-owned private root lifecycle/u
+    );
+    assert.doesNotMatch(callerBuiltError.message, /compatibility/u);
+
+    const crossSurfaceRows = {
+      create: updateResult,
+      update: updateResult,
+      unmount: unmountResult
+    };
+    const crossSurfaceError = captureThrown(() =>
+      bridge.consumePrivateRootLifecycleExecutionEvidence(crossSurfaceRows)
+    );
+    assert.match(crossSurfaceError.message, /Expected create lifecycle/u);
+
+    const staleUnmountError = captureThrown(() => renderer.unmount());
+    assertReactTestRendererUnimplemented(
+      staleUnmountError,
+      entry.entrypoint,
+      "create().unmount"
+    );
+    assert.equal(
+      bridge.canConsumePrivateRootLifecycleExecutionEvidence(rows),
+      false,
+      entry.entrypoint
+    );
+    const staleError = captureThrown(() =>
+      bridge.consumePrivateRootLifecycleExecutionEvidence(rows)
+    );
+    assert.match(staleError.message, /stale for the current renderer root/u);
+  }
+});
+
 test("react-test-renderer create routing gate feeds only private error diagnostic rows", () => {
   const gate = evaluateReactTestRendererErrorSurfaceLocalGate({
     oracle: readCheckedReactTestRendererErrorSurfaceOracle()
@@ -5892,6 +6000,120 @@ function privateNativeExecutionRecord(bridge, rootRequest) {
   });
 }
 
+function createPrivateRootLifecycleExecutionRows(moduleExports, bridge) {
+  const renderer = moduleExports.create(
+    {
+      props: { children: "hello" },
+      type: "span"
+    },
+    {}
+  );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const createAdmission =
+    typeof bridge.getRootCreateRouteAdmission === "function"
+      ? bridge.getRootCreateRouteAdmission(createRequest)
+      : null;
+
+  const updateError = captureThrown(() =>
+    renderer.update({
+      props: { children: "goodbye" },
+      type: "span"
+    })
+  );
+  assertReactTestRendererUnimplemented(
+    updateError,
+    moduleExports.__FAST_REACT_ENTRYPOINT__,
+    "create().update"
+  );
+
+  const unmountError = captureThrown(() => renderer.unmount());
+  assertReactTestRendererUnimplemented(
+    unmountError,
+    moduleExports.__FAST_REACT_ENTRYPOINT__,
+    "create().unmount"
+  );
+
+  const requestsBySequence = new Map(
+    [createRequest, updateError.rootRequest, unmountError.rootRequest].map(
+      (request) => [request.requestSequence, request]
+    )
+  );
+  const executor = (handoff) => {
+    const request = requestsBySequence.get(handoff.requestSequence);
+    if (request.operation === "update") {
+      return typeof bridge.canConsumePrivateUpdateNativeBridgeAdmission ===
+        "function"
+        ? createRustUpdateNativeBridgeAdmissionEvidence(request)
+        : {
+            rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(request),
+            nativeAddonLoaded: false,
+            nativeBridgeAvailable: false,
+            nativeExecution: false,
+            rustExecution: true
+          };
+    }
+    if (request.operation === "unmount") {
+      return typeof bridge.canConsumePrivateUnmountNativeBridgeAdmission ===
+        "function"
+        ? {
+            ...createRustUnmountNativeBridgeAdmissionEvidence(request),
+            nativeAddonLoaded: false,
+            nativeBridgeAvailable: false,
+            nativeExecution: false,
+            rustExecution: true
+          }
+        : {
+            rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(request),
+            nativeAddonLoaded: false,
+            nativeBridgeAvailable: false,
+            nativeExecution: false,
+            rustExecution: true
+          };
+    }
+
+    const result = {
+      rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(request),
+      nativeAddonLoaded: false,
+      nativeBridgeAvailable: false,
+      nativeExecution: false,
+      rustExecution: true
+    };
+    if (
+      createAdmission !== null &&
+      typeof bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff ===
+        "function"
+    ) {
+      result.privateCreateNativeBridgeHostOutputHandoff =
+        createRustCreateNativeBridgeHostOutputHandoffSource(
+          request,
+          createAdmission
+        );
+    }
+    return result;
+  };
+
+  const createResult = bridge.executeRootRequest(createRequest, executor);
+  const updateResult = bridge.executeRootRequest(
+    updateError.rootRequest,
+    executor
+  );
+  const unmountResult = bridge.executeRootRequest(
+    unmountError.rootRequest,
+    executor
+  );
+
+  assertRootExecutionResult(createResult, createRequest);
+  assertRootExecutionResult(updateResult, updateError.rootRequest);
+  assertRootExecutionResult(unmountResult, unmountError.rootRequest);
+
+  return {
+    createResult,
+    renderer,
+    updateResult,
+    unmountResult
+  };
+}
+
 function privateRootFinishedLanesHandoffEvidence(rootRequest, evidence) {
   return {
     diagnosticName: privateRootFinishedLanesHandoffDiagnosticName,
@@ -6824,6 +7046,14 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
   assert.equal(typeof bridge.createRootExecutionHandoff, "function");
   assert.equal(typeof bridge.canConsumeRootExecutionResult, "function");
   assert.equal(typeof bridge.consumeRootExecutionResult, "function");
+  assert.equal(
+    typeof bridge.canConsumePrivateRootLifecycleExecutionEvidence,
+    "function"
+  );
+  assert.equal(
+    typeof bridge.consumePrivateRootLifecycleExecutionEvidence,
+    "function"
+  );
   assert.equal(typeof bridge.executeRootRequest, "function");
   assert.equal(bridge.getRustCanaryMetadata(), bridge.rustCanaryMetadata);
 
@@ -7149,6 +7379,121 @@ function assertRootExecutionResult(result, request) {
     false
   );
   assert.equal(result.compatibilityClaimed, false);
+}
+
+function assertPrivateRootLifecycleExecutionEvidence(evidence, expected) {
+  assert.equal(Object.isFrozen(evidence), true, expected.entrypoint);
+  assert.equal(
+    evidence.kind,
+    "FastReactTestRendererPrivateRootLifecycleExecutionEvidence"
+  );
+  assert.equal(evidence.id, privateRootLifecycleExecutionDiagnosticName);
+  assert.equal(
+    evidence.diagnosticName,
+    privateRootLifecycleExecutionDiagnosticName
+  );
+  assert.equal(evidence.status, privateRootLifecycleExecutionStatus);
+  assert.equal(evidence.entrypoint, expected.entrypoint);
+  assert.equal(evidence.compatibilityTarget, compatibilityTarget);
+  assert.equal(evidence.rootId, expected.createResult.rootId);
+  assert.equal(evidence.rootSequence, expected.createResult.request.rootSequence);
+  assert.deepEqual(evidence.operations, ["create", "update", "unmount"]);
+  assert.deepEqual(evidence.requestSequences, {
+    create: expected.createResult.requestSequence,
+    update: expected.updateResult.requestSequence,
+    unmount: expected.unmountResult.requestSequence
+  });
+  assert.equal(evidence.operationEvidence.length, 3);
+  assertPrivateRootLifecycleOperationEvidence(
+    evidence.create,
+    expected.createResult,
+    "create",
+    "create()"
+  );
+  assertPrivateRootLifecycleOperationEvidence(
+    evidence.update,
+    expected.updateResult,
+    "update",
+    "create().update"
+  );
+  assertPrivateRootLifecycleOperationEvidence(
+    evidence.unmount,
+    expected.unmountResult,
+    "unmount",
+    "create().unmount"
+  );
+  assert.equal(evidence.operationEvidence[0], evidence.create);
+  assert.equal(evidence.operationEvidence[1], evidence.update);
+  assert.equal(evidence.operationEvidence[2], evidence.unmount);
+  assert.deepEqual(
+    evidence.sourceExecutionRecordIds,
+    evidence.operationEvidence.map((row) => row.sourceExecutionRecordId)
+  );
+  assert.deepEqual(
+    evidence.sourceExecutionStatuses,
+    evidence.operationEvidence.map((row) => row.sourceExecutionStatus)
+  );
+  assert.equal(evidence.sourceRendererOwnerAccepted, true);
+  assert.equal(evidence.sourceLifecycleRowsAccepted, true);
+  assert.equal(evidence.sourceReconcilerHostExecutionConsumed, true);
+  assert.equal(evidence.sourceOwnedExecutionAccepted, true);
+  assert.equal(evidence.createUpdateUnmountEvidenceConsumed, true);
+  assert.equal(evidence.snapshotProducedFromExecutedState, true);
+  assert.equal(evidence.hostOutputSnapshotCurrent, true);
+  assert.equal(evidence.staleRootLifecycleRejection, true);
+  assert.equal(evidence.clonedExecutionRejection, true);
+  assert.equal(evidence.crossSurfaceExecutionRejection, true);
+  assert.equal(evidence.callerBuiltExecutionRejection, true);
+  assertPrivateRootLifecycleCompatibilityBlockers(evidence);
+}
+
+function assertPrivateRootLifecycleOperationEvidence(
+  row,
+  result,
+  operation,
+  publicSurface
+) {
+  assert.equal(Object.isFrozen(row), true, result.entrypoint);
+  assert.equal(row.diagnosticName, privateRootLifecycleExecutionDiagnosticName);
+  assert.equal(row.status, privateRootLifecycleExecutionStatus);
+  assert.equal(row.operation, operation);
+  assert.equal(row.publicSurface, publicSurface);
+  assert.equal(row.requestId, result.requestId);
+  assert.equal(row.requestSequence, result.requestSequence);
+  assert.equal(row.rootId, result.rootId);
+  assert.equal(row.rootSequence, result.request.rootSequence);
+  assert.equal(row.lifecycle, result.rustLifecycleDiagnostic);
+  assert.equal(
+    row.lifecycleStatusBefore,
+    result.rustLifecycleDiagnostic.lifecycleStatusBefore
+  );
+  assert.equal(
+    row.lifecycleStatusAfter,
+    result.rustLifecycleDiagnostic.lifecycleStatusAfter
+  );
+  assert.equal(row.scheduledUpdateKind, result.updateKind);
+  assert.equal(row.hostOutputUpdateKind, result.updateKind);
+  assert.equal(row.updateOutcome, result.rustOutcome);
+  assert.equal(row.scheduled, true);
+  assert.equal(row.sourceRendererOwnerAccepted, true);
+  assert.equal(row.sourceLifecycleRowAccepted, true);
+  assert.equal(row.sourceReconcilerHostExecutionConsumed, true);
+  assert.equal(row.snapshotProducedFromExecutedState, true);
+  assert.equal(row.hostOutputSnapshotCurrent, true);
+  assert.equal(row.sourceOwnedExecutionAccepted, true);
+  assertPrivateRootLifecycleCompatibilityBlockers(row);
+}
+
+function assertPrivateRootLifecycleCompatibilityBlockers(record) {
+  assert.equal(record.publicRootAvailable, false);
+  assert.equal(record.publicSerializationAvailable, false);
+  assert.equal(record.publicTestInstanceAvailable, false);
+  assert.equal(record.publicActAvailable, false);
+  assert.equal(record.publicSchedulerAvailable, false);
+  assert.equal(record.nativeBridgeAvailable, false);
+  assert.equal(record.nativeExecutionAvailable, false);
+  assert.equal(record.jsPackageCompatibilityAvailable, false);
+  assert.equal(record.compatibilityClaimed, false);
 }
 
 function assertPrivateRootCreatePreflight(preflight, request, expected) {
