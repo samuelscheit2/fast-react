@@ -77,6 +77,125 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
       }
     }
   ]);
+  assert.deepEqual(
+    report.sourceRows.map((row) => ({
+      rowId: row.rowId,
+      entrypoint: row.entrypoint,
+      packageSource: row.packageSource,
+      guardSource: row.guardSource,
+      placeholderFactorySource: row.placeholderFactorySource,
+      placeholderFactory: row.placeholderFactory,
+      exportName: row.exportName,
+      sourceOwned: row.sourceOwned,
+      sourceCurrent: row.sourceCurrent
+    })),
+    [
+      {
+        rowId: 'react-dom-public-flush-sync-placeholder-source',
+        entrypoint: 'react-dom',
+        packageSource: 'packages/react-dom/index.js',
+        guardSource: 'packages/react-dom/src/shared/flush-sync-guard.js',
+        placeholderFactorySource: 'packages/react-dom/placeholder-utils.js',
+        placeholderFactory: 'createUnsupportedFunction',
+        exportName: 'flushSync',
+        sourceOwned: true,
+        sourceCurrent: true
+      },
+      {
+        rowId: 'react-dom-profiling-public-flush-sync-placeholder-source',
+        entrypoint: 'react-dom/profiling',
+        packageSource: 'packages/react-dom/profiling.js',
+        guardSource: 'packages/react-dom/src/shared/flush-sync-guard.js',
+        placeholderFactorySource: 'packages/react-dom/placeholder-utils.js',
+        placeholderFactory: 'createUnsupportedFunction',
+        exportName: 'flushSync',
+        sourceOwned: true,
+        sourceCurrent: true
+      }
+    ]
+  );
+  assert.deepEqual(consumption.sourceRows, report.sourceRows);
+  for (const row of report.sourceRows) {
+    assert.equal(Object.isFrozen(row), true, row.rowId);
+    assert.equal(row.descriptorSnapshotReadable, true, row.rowId);
+    assert.equal(row.descriptorOwn, true, row.rowId);
+    assert.equal(row.descriptorData, true, row.rowId);
+    assert.equal(row.descriptorEnumerable, true, row.rowId);
+    assert.equal(row.descriptorConfigurable, true, row.rowId);
+    assert.equal(row.descriptorWritable, true, row.rowId);
+    assert.equal(row.exportKeysInclude, true, row.rowId);
+    assert.equal(row.reflectOwnKeysInclude, true, row.rowId);
+    assert.equal(row.functionType, 'function', row.rowId);
+    assert.equal(row.functionName, '', row.rowId);
+    assert.equal(row.functionLength, 1, row.rowId);
+    assert.equal(row.functionThenable, false, row.rowId);
+    assert.equal(row.placeholderMetadataOwn, true, row.rowId);
+    assert.equal(row.placeholderMetadataEnumerable, false, row.rowId);
+    assert.equal(row.placeholderMetadataValue, true, row.rowId);
+    assert.equal(row.entrypointMetadataOwn, true, row.rowId);
+    assert.equal(row.entrypointMetadataEnumerable, false, row.rowId);
+    assert.equal(row.entrypointMetadataValue, row.entrypoint, row.rowId);
+    assert.equal(row.compatibilityTargetMetadataOwn, true, row.rowId);
+    assert.equal(row.compatibilityTargetMetadataEnumerable, false, row.rowId);
+    assert.equal(
+      row.compatibilityTargetMetadataValue,
+      'react-dom@19.2.6',
+      row.rowId
+    );
+    assert.deepEqual(
+      row.acceptedPrivateBlockerWorkerIds,
+      report.acceptedWorkerIds,
+      row.rowId
+    );
+    assert.deepEqual(
+      row.acceptedPrivateBlockerPrerequisiteIds,
+      guard.privateSyncFlushRootHandoffPrerequisiteIds,
+      row.rowId
+    );
+    assert.equal(
+      row.publicRootBlockedLifecycleWorkerId,
+      'worker-901-react-dom-render-lifecycle-boundary-consumer',
+      row.rowId
+    );
+    assert.equal(
+      row.publicRootBlockedLifecycleProgressPath,
+      'worker-progress/worker-901-react-dom-render-lifecycle-boundary-consumer.md',
+      row.rowId
+    );
+    assert.deepEqual(
+      row.excludedPrivateBlockerWorkerIds,
+      report.excludedWorkerIds,
+      row.rowId
+    );
+    assert.deepEqual(row.ownPublicCompatibilityClaimKeys, [], row.rowId);
+    assert.deepEqual(row.hiddenPublicCompatibilityAliasKeys, [], row.rowId);
+    assert.deepEqual(row.symbolPublicCompatibilityClaimKeys, [], row.rowId);
+    assert.deepEqual(
+      row.nonEnumerablePublicCompatibilityClaimKeys,
+      [],
+      row.rowId
+    );
+    assert.deepEqual(row.accessorPublicCompatibilityClaimKeys, [], row.rowId);
+    assert.deepEqual(row.inheritedPublicCompatibilityClaimKeys, [], row.rowId);
+    assert.deepEqual(row.functionPublicCompatibilityClaimKeys, [], row.rowId);
+    assert.equal(row.publicFlushSyncCompatibilityClaimed, false, row.rowId);
+    assert.equal(
+      row.publicSchedulerTimingCompatibilityClaimed,
+      false,
+      row.rowId
+    );
+    assert.equal(row.publicActTimingCompatibilityClaimed, false, row.rowId);
+    assert.equal(row.publicRootCompatibilityClaimed, false, row.rowId);
+    assert.equal(row.publicPackageCompatibilityClaimed, false, row.rowId);
+    assert.equal(row.packageCompatibilityClaimed, false, row.rowId);
+    assert.equal(row.profilingCompatibilityClaimed, false, row.rowId);
+    assert.equal(row.drainsPublicSchedulerTaskQueue, false, row.rowId);
+    assert.equal(row.drainsPublicReactActQueue, false, row.rowId);
+    assert.equal(row.publicRootExecution, false, row.rowId);
+    assert.equal(row.executesPublicFlushSync, false, row.rowId);
+    assert.equal(row.executesPublicDomMutation, false, row.rowId);
+    assert.equal(row.compatibilityClaimed, false, row.rowId);
+  }
 
   assert.equal(consumption.publicReactDomFlushSyncUnsupportedPlaceholder, true);
   assert.equal(consumption.publicProfilingFlushSyncUnsupportedPlaceholder, true);
@@ -188,6 +307,45 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
     }),
     'public-react-dom-flush-sync-currentness-caller-overrides'
   );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      sourceRows: report.sourceRows.map((row) => ({ ...row }))
+    }),
+    'public-react-dom-flush-sync-currentness-source-rows-source-proof'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      sourceRowOverrides: {
+        [report.sourceRows[0].rowId]: {
+          packageSource: 'packages/react-dom/stale-index.js'
+        }
+      }
+    }),
+    'public-react-dom-flush-sync-currentness-source-rows'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      sourceRowOverrides: {
+        [report.sourceRows[1].rowId]: {
+          acceptedPrivateBlockerWorkerIds: [
+            ...report.acceptedWorkerIds,
+            'worker-981-resource-form-root-execution-currentness'
+          ]
+        }
+      }
+    }),
+    'public-react-dom-flush-sync-currentness-source-rows'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      sourceRowOverrides: {
+        [report.sourceRows[0].rowId]: {
+          hiddenPublicCompatibilityAliasKeys: ['Symbol(flushSync)']
+        }
+      }
+    }),
+    'public-react-dom-flush-sync-currentness-source-rows'
+  );
   const nonEnumerableScenarioOverride = {};
   Object.defineProperty(nonEnumerableScenarioOverride, 'scenarios', {
     configurable: true,
@@ -238,6 +396,26 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
   assertFlushSyncCurrentnessRejected(
     guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(
       proxyScenarioOverride
+    ),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
+  const proxyNativeClaimOverride = new Proxy(
+    {},
+    {
+      ownKeys() {
+        return [];
+      },
+      getOwnPropertyDescriptor() {
+        return undefined;
+      },
+      get(_target, key) {
+        return key === 'nativeExecution' ? true : undefined;
+      }
+    }
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(
+      proxyNativeClaimOverride
     ),
     'public-react-dom-flush-sync-currentness-caller-overrides'
   );
@@ -429,6 +607,178 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
   );
 });
 
+test('public React DOM flushSync source rows reject hidden entrypoint claims', () => {
+  withTemporaryOwnProperty(
+    ReactDOM,
+    '__FAST_REACT_TEST_FLUSH_SYNC_ALIAS__',
+    {
+      configurable: true,
+      enumerable: false,
+      value: ReactDOM.flushSync
+    },
+    () => {
+      assertFlushSyncCurrentnessRejected(
+        guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(),
+        'public-react-dom-flush-sync-currentness-source-rows'
+      );
+    }
+  );
+
+  withTemporaryOwnProperty(
+    ReactDOMProfiling,
+    Symbol.for('publicFlushSyncCompatibilityClaimed'),
+    {
+      configurable: true,
+      enumerable: false,
+      value: true
+    },
+    () => {
+      assertFlushSyncCurrentnessRejected(
+        guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(),
+        'public-react-dom-flush-sync-currentness-source-rows'
+      );
+    }
+  );
+
+  withTemporaryOwnProperty(
+    ReactDOM,
+    'publicNativeCompatibilityClaimed',
+    {
+      configurable: true,
+      enumerable: true,
+      value: true
+    },
+    () => {
+      assertFlushSyncCurrentnessRejected(
+        guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(),
+        'public-react-dom-flush-sync-currentness-source-rows'
+      );
+    }
+  );
+
+  withTemporaryOwnProperty(
+    ReactDOMProfiling,
+    'nativeExecution',
+    {
+      configurable: true,
+      enumerable: false,
+      value: true
+    },
+    () => {
+      assertFlushSyncCurrentnessRejected(
+        guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(),
+        'public-react-dom-flush-sync-currentness-source-rows'
+      );
+    }
+  );
+
+  withTemporaryOwnProperty(
+    ReactDOM,
+    Symbol.for('rustExecutionClaimed'),
+    {
+      configurable: true,
+      enumerable: false,
+      value: true
+    },
+    () => {
+      assertFlushSyncCurrentnessRejected(
+        guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(),
+        'public-react-dom-flush-sync-currentness-source-rows'
+      );
+    }
+  );
+
+  let accessorRead = false;
+  withTemporaryOwnProperty(
+    ReactDOM,
+    'publicRootExecution',
+    {
+      configurable: true,
+      enumerable: false,
+      get() {
+        accessorRead = true;
+        return true;
+      }
+    },
+    () => {
+      assertFlushSyncCurrentnessRejected(
+        guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(),
+        'public-react-dom-flush-sync-currentness-source-rows'
+      );
+    }
+  );
+  assert.equal(accessorRead, false);
+
+  let nativeAccessorRead = false;
+  withTemporaryOwnProperty(
+    ReactDOMProfiling,
+    'nativeRuntimeExecutionClaimed',
+    {
+      configurable: true,
+      enumerable: false,
+      get() {
+        nativeAccessorRead = true;
+        return true;
+      }
+    },
+    () => {
+      assertFlushSyncCurrentnessRejected(
+        guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(),
+        'public-react-dom-flush-sync-currentness-source-rows'
+      );
+    }
+  );
+  assert.equal(nativeAccessorRead, false);
+
+  withTemporaryOwnProperty(
+    ReactDOM.flushSync,
+    'rustExecutionClaimed',
+    {
+      configurable: true,
+      enumerable: false,
+      value: true
+    },
+    () => {
+      assertFlushSyncCurrentnessRejected(
+        guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(),
+        'public-react-dom-flush-sync-currentness-source-rows'
+      );
+    }
+  );
+
+  const inheritedClaims = Object.create(Object.getPrototypeOf(ReactDOMProfiling));
+  Object.defineProperty(
+    inheritedClaims,
+    'drainsPublicSchedulerTaskQueue',
+    {
+      configurable: true,
+      value: true
+    }
+  );
+  withTemporaryPrototype(ReactDOMProfiling, inheritedClaims, () => {
+    assertFlushSyncCurrentnessRejected(
+      guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(),
+      'public-react-dom-flush-sync-currentness-source-rows'
+    );
+  });
+
+  const inheritedNativeClaims = Object.create(Object.getPrototypeOf(ReactDOM));
+  Object.defineProperty(
+    inheritedNativeClaims,
+    'nativeBridgeAvailable',
+    {
+      configurable: true,
+      value: true
+    }
+  );
+  withTemporaryPrototype(ReactDOM, inheritedNativeClaims, () => {
+    assertFlushSyncCurrentnessRejected(
+      guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(),
+      'public-react-dom-flush-sync-currentness-source-rows'
+    );
+  });
+});
+
 function assertPublicFlushSyncPlaceholder(ReactDOM, entrypoint) {
   const descriptor = Object.getOwnPropertyDescriptor(ReactDOM, 'flushSync');
 
@@ -513,4 +863,31 @@ function replacePrivatePrerequisiteRow(report, index, overrides) {
           }
         : row
   );
+}
+
+function withTemporaryOwnProperty(target, key, descriptor, callback) {
+  const hadOwn = Object.prototype.hasOwnProperty.call(target, key);
+  const previousDescriptor = Object.getOwnPropertyDescriptor(target, key);
+
+  Object.defineProperty(target, key, descriptor);
+  try {
+    callback();
+  } finally {
+    if (hadOwn) {
+      Object.defineProperty(target, key, previousDescriptor);
+    } else {
+      delete target[key];
+    }
+  }
+}
+
+function withTemporaryPrototype(target, prototype, callback) {
+  const previousPrototype = Object.getPrototypeOf(target);
+
+  Object.setPrototypeOf(target, prototype);
+  try {
+    callback();
+  } finally {
+    Object.setPrototypeOf(target, previousPrototype);
+  }
 }
