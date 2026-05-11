@@ -74,6 +74,9 @@ const privateHydrationTextNodeClaimPatchExecutionStatus =
 const privateHydrationTextNodeClaimPatchMetadataId =
   'hydration-text-node-claim-patch';
 let hydrationBoundaryGateModule = null;
+const rootBridgeHydrateRootSourceLedgerAuthorityToken = Object.freeze({
+  source: 'root-bridge-hydrate-root-source-ledger-authority'
+});
 const {
   hasListeningMarker,
   inspectListeningMarker,
@@ -164,8 +167,33 @@ const testUtilsActGate = require('../test-utils-act-gate.js');
 function getHydrationBoundaryGateModule() {
   if (hydrationBoundaryGateModule === null) {
     hydrationBoundaryGateModule = require('./hydration-boundary-gate.js');
+    registerHydrateRootSourceLedgerRootBridgeModule();
   }
   return hydrationBoundaryGateModule;
+}
+
+function registerHydrateRootSourceLedgerRootBridgeModule() {
+  const requestRootBridgeModuleRegistration =
+    hydrationBoundaryGateModule &&
+    hydrationBoundaryGateModule
+      .requestPrivateHydrateRootSourceLedgerRootBridgeModuleRegistration;
+  if (typeof requestRootBridgeModuleRegistration === 'function') {
+    requestRootBridgeModuleRegistration(rootBridgeExports);
+  }
+}
+
+function registerPrivateHydrateRootSourceLedgerRootBridgeModule(
+  registerRootBridgeModule
+) {
+  if (typeof registerRootBridgeModule !== 'function') {
+    return false;
+  }
+  return (
+    registerRootBridgeModule(
+      rootBridgeExports,
+      rootBridgeHydrateRootSourceLedgerAuthorityToken
+    ) === true
+  );
 }
 
 function getAcceptedHydrationBoundaryMetadataContracts() {
@@ -3112,6 +3140,9 @@ const rootHydratePublicFacadePreflightRecordPayloads = new WeakMap();
 const rootHydratePublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootHydratePublicFacadeTargetClaimingPreflightPayloads =
   new WeakMap();
+const rootHydratePublicFacadeSourceLedgerPayloads = new WeakMap();
+const rootHydratePublicFacadeSourceLedgerStatesByBridge =
+  new WeakMap();
 const rootHydratePublicFacadeEventReplayPreflightPayloads =
   new WeakMap();
 const rootHydratePublicFacadeExecutionPreflightPayloads =
@@ -3426,6 +3457,80 @@ function getDefaultBridgeShell() {
     defaultBridgeShell = createPrivateRootBridgeShell();
   }
   return defaultBridgeShell;
+}
+
+function createHydrateRootPublicFacadeSourceLedgerState() {
+  const sourceLedgerPayloads = new WeakMap();
+  return freezeRecord({
+    read(record, ledgerKind) {
+      const payload = sourceLedgerPayloads.get(record) || null;
+      if (
+        payload === null ||
+        typeof ledgerKind !== 'string' ||
+        payload.ledgerKind !== ledgerKind
+      ) {
+        return null;
+      }
+      return payload;
+    },
+    record(record, payload) {
+      if (
+        !isWeakMapKey(record) ||
+        !payload ||
+        typeof payload !== 'object' ||
+        payload.record !== record ||
+        typeof payload.ledgerKind !== 'string'
+      ) {
+        return false;
+      }
+      sourceLedgerPayloads.set(
+        record,
+        freezeRecord({
+          ...payload,
+          record
+        })
+      );
+      return true;
+    }
+  });
+}
+
+function recordHydrateRootPublicFacadeSourceLedgerPayload(
+  bridgeState,
+  record,
+  payload
+) {
+  const sourceLedgerState =
+    rootHydratePublicFacadeSourceLedgerStatesByBridge.get(bridgeState);
+  if (sourceLedgerState === undefined) {
+    return false;
+  }
+  const sourceLedgerPayload = freezeRecord({
+    ...payload,
+    record,
+    sourceLedgerAuthorityToken:
+      rootBridgeHydrateRootSourceLedgerAuthorityToken
+  });
+  const recorded = sourceLedgerState.record(record, sourceLedgerPayload);
+  if (recorded) {
+    rootHydratePublicFacadeSourceLedgerPayloads.set(record, sourceLedgerPayload);
+  }
+  return recorded;
+}
+
+function readPrivateHydrateRootPublicFacadeSourceLedgerPayload(
+  record,
+  ledgerKind
+) {
+  const payload = rootHydratePublicFacadeSourceLedgerPayloads.get(record);
+  if (
+    payload === undefined ||
+    typeof ledgerKind !== 'string' ||
+    payload.ledgerKind !== ledgerKind
+  ) {
+    return null;
+  }
+  return payload;
 }
 
 function createPrivateRootPublicFacadeAdapter(options) {
@@ -3942,6 +4047,22 @@ function createPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(
     record,
     lifecycleRequestBoundaryPayload
   );
+  recordHydrateRootPublicFacadeSourceLedgerPayload(
+    requestPayload.bridgeState,
+    record,
+    {
+      bridge: preflightState.bridge,
+      container,
+      hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+      ledgerKind: 'hydrate-root-public-facade-lifecycle-request-boundary',
+      lifecycleContainerSnapshot,
+      preflight: preflightState.preflight,
+      requestAdmission,
+      requestPayload,
+      requestRecord,
+      record
+    }
+  );
   return record;
 }
 
@@ -4138,6 +4259,23 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
   rootHydratePublicFacadePreflightRecordPayloads.set(
     record,
     preflightRecordPayload
+  );
+  recordHydrateRootPublicFacadeSourceLedgerPayload(
+    requestPayload.bridgeState,
+    record,
+    {
+      bridge: preflightState.bridge,
+      hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+      ledgerKind: 'hydrate-root-public-facade-preflight-record',
+      lifecycleRequestBoundary,
+      markerListenerPreflight,
+      nativeHandoffRecord: null,
+      preflight: preflightState.preflight,
+      recoverableErrorPreflight,
+      requestAdmission,
+      requestRecord,
+      record
+    }
   );
   return record;
 }
@@ -5148,6 +5286,25 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     record,
     eventReplayPreflightPayload
   );
+  recordHydrateRootPublicFacadeSourceLedgerPayload(
+    requestPayload.bridgeState,
+    record,
+    {
+      bridge: preflightState.bridge,
+      hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+      ledgerKind:
+        'hydrate-root-public-facade-event-replay-preflight-record',
+      lifecycleRequestBoundary:
+        eventReplayPreflightPayload.lifecycleRequestBoundary,
+      preflight: preflightState.preflight,
+      replayExecutionPayload,
+      replayExecutionRecord,
+      requestRecord,
+      targetClaimingPayload,
+      targetClaimingPreflight: targetClaimingPreflightRecord,
+      record
+    }
+  );
   return record;
 }
 
@@ -5590,6 +5747,23 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
   rootHydratePublicFacadeExecutionPreflightPayloads.set(
     record,
     executionPreflightPayload
+  );
+  recordHydrateRootPublicFacadeSourceLedgerPayload(
+    requestPayload.bridgeState,
+    record,
+    {
+      bridge: preflightState.bridge,
+      eventReplayPreflight: eventReplayPreflightRecord,
+      hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+      ledgerKind: 'hydrate-root-public-facade-execution-preflight-record',
+      lifecycleRequestBoundary:
+        executionPreflightPayload.lifecycleRequestBoundary,
+      preflight: preflightState.preflight,
+      replayExecutionPayload,
+      replayExecutionRecord,
+      requestRecord,
+      record
+    }
   );
   return record;
 }
@@ -20065,6 +20239,8 @@ function getIdPrefix(value, fallback) {
 }
 
 function createBridgeState(options) {
+  const hydrateRootSourceLedgerState =
+    createHydrateRootPublicFacadeSourceLedgerState();
   const hydrationBoundaryOptions = {
     markerOptions: options && options.markerOptions,
     recordIdPrefix: getIdPrefix(
@@ -20083,7 +20259,7 @@ function createBridgeState(options) {
     hydrationBoundaryOptions
   );
 
-  return {
+  const bridgeState = {
     hydrateIdPrefix: getIdPrefix(options && options.hydrateIdPrefix, 'hydrate'),
     hydrationBoundaryGate,
     markerOptions: options && options.markerOptions,
@@ -20231,6 +20407,11 @@ function createBridgeState(options) {
     nextUpdateSequence: 1,
     validationOptions: options && options.validationOptions
   };
+  rootHydratePublicFacadeSourceLedgerStatesByBridge.set(
+    bridgeState,
+    hydrateRootSourceLedgerState
+  );
+  return bridgeState;
 }
 
 function getRootKind(options) {
@@ -28576,6 +28757,7 @@ const rootBridgeExports = Object.freeze({
   getPrivateHydrateRootPublicFacadePreflightPayload,
   getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload,
   getPrivateHydrateRootPublicFacadeExecutionPreflightPayload,
+  readPrivateHydrateRootPublicFacadeSourceLedgerPayload,
   getPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionPayload,
   getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload,
   getPrivateHydrateRootPublicFacadeTargetClaimingPreflightPayload,
@@ -28723,6 +28905,7 @@ const rootBridgeExports = Object.freeze({
   privateRootOwnerType,
   privateRootUpdateRecordType,
   preflightPrivateRootPublicFacadeMarkerListenerSetup,
+  registerPrivateHydrateRootSourceLedgerRootBridgeModule,
   renderPrivateRootHostOutput,
   renderPrivateRootPublicFacadeHostOutput,
   renderPrivateRootPublicFacadeNativeHandoff,

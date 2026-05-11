@@ -2345,11 +2345,377 @@ test('private hydration recoverable error boundary admission rejects stale clone
   assert.deepEqual(other.document.__registrations, []);
 });
 
+test('hydrateRoot source ledger rejects caller-owned boundary reader', () => {
+  const script = `
+'use strict';
+
+const assert = require('node:assert/strict');
+const path = require('node:path');
+
+const packageRoot = ${JSON.stringify(packageRoot)};
+const hydrationGate = require(path.join(
+  packageRoot,
+  'src/client/hydration-boundary-gate.js'
+));
+const rootBridge = require(path.join(
+  packageRoot,
+  'src/client/root-bridge.js'
+));
+const domContainer = require(path.join(
+  packageRoot,
+  'src/client/dom-container.js'
+));
+const eventListener = require(path.join(
+  packageRoot,
+  'src/events/react-dom-event-listener.js'
+));
+const eventSystemFlags = require(path.join(
+  packageRoot,
+  'src/events/event-system-flags.js'
+));
+const pluginEventSystem = require(path.join(
+  packageRoot,
+  'src/events/plugin-event-system.js'
+));
+
+const scenario = createScenario('caller-owned-source-ledger-reader');
+const callerPayloads = new WeakMap();
+function callerSourceLedgerReader(record, ledgerKind) {
+  const payload = callerPayloads.get(record) || null;
+  return payload !== null && payload.ledgerKind === ledgerKind ? payload : null;
+}
+
+const callerGate = hydrationGate.createHydrationBoundaryGate({
+  recordIdPrefix: 'caller-owned-source-ledger-reader-boundary'
+});
+const callerBoundaryRecord = callerGate.recordUnsupportedHydrateRoot(
+  scenario.container,
+  scenario.initialChildren,
+  scenario.hydrationOptions,
+  callerSourceLedgerReader
+);
+const callerRecoverableErrorPreflight =
+  hydrationGate.createHydrationTextMismatchRecoverableErrorPreflightRecord(
+    callerBoundaryRecord,
+    callerBoundaryRecord.acceptedPrivateMetadataDiagnostics,
+    callerBoundaryRecord.recoverableErrorMetadata,
+    {
+      enableRecoverableErrorPreflight: true,
+      hydrationOptions: scenario.hydrationOptions,
+      source: 'caller-owned-source-ledger-reader-preflight'
+    }
+  );
+const callerOwnershipDiagnostics =
+  hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+    callerBoundaryRecord,
+    scenario.dispatchRecord,
+    {
+      source: 'caller-owned-source-ledger-reader-ownership'
+    }
+  );
+const callerTargetDispatchLinkDiagnostic =
+  hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+    callerBoundaryRecord,
+    scenario.dispatchRecord,
+    {
+      source: 'caller-owned-source-ledger-reader-dispatch-link'
+    }
+  );
+const callerTargetClaimingDiagnostic =
+  hydrationGate.createHydrationTargetClaimingDiagnostic(
+    callerBoundaryRecord,
+    callerOwnershipDiagnostics,
+    callerTargetDispatchLinkDiagnostic,
+    {
+      source: 'caller-owned-source-ledger-reader-target-claim'
+    }
+  );
+const callerReplayExecutionRecord =
+  hydrationGate.createHydrationClaimedReplayTargetDispatchExecutionRecord(
+    callerTargetClaimingDiagnostic,
+    callerTargetDispatchLinkDiagnostic,
+    {
+      source: 'caller-owned-source-ledger-reader-replay-execution'
+    }
+  );
+
+const callerLifecycleRequestBoundary = Object.freeze({
+  ...scenario.lifecycleRequestBoundary,
+  acceptedPrivateMetadataDiagnostics:
+    callerBoundaryRecord.acceptedPrivateMetadataDiagnostics,
+  containerInfo: callerBoundaryRecord.containerInfo,
+  hydrationBoundaryRecord: callerBoundaryRecord,
+  listenerGuard: callerBoundaryRecord.listenerGuard,
+  markerGuard: callerBoundaryRecord.markerGuard,
+  rootRecordId: callerBoundaryRecord.recordId
+});
+const callerHydrateRootPreflightRecord = Object.freeze({
+  ...scenario.hydrateRecord,
+  acceptedPrivateMetadataDiagnostics:
+    callerBoundaryRecord.acceptedPrivateMetadataDiagnostics,
+  acceptedPrivateMetadataGateIds:
+    callerBoundaryRecord.acceptedPrivateMetadataGateIds,
+  acceptedPrivateMetadataIds:
+    callerBoundaryRecord.acceptedPrivateMetadataIds,
+  eventReplayBlockers: callerBoundaryRecord.eventReplayBlockers,
+  hydrationBoundaryRecord: callerBoundaryRecord,
+  lifecycleRequestBoundary: callerLifecycleRequestBoundary,
+  listenerGuard: callerBoundaryRecord.listenerGuard,
+  markerEvidence: callerBoundaryRecord.markerEvidence,
+  markerGuard: callerBoundaryRecord.markerGuard,
+  markerParserEvidence: callerBoundaryRecord.markerParserEvidence,
+  recoverableErrorMetadata: callerBoundaryRecord.recoverableErrorMetadata,
+  recoverableErrorPreflight: callerRecoverableErrorPreflight,
+  replayQueueDiagnostics: callerBoundaryRecord.replayQueueDiagnostics,
+  targetResolutionDiagnostics:
+    callerBoundaryRecord.targetResolutionDiagnostics,
+  textMismatchDiagnostics: callerBoundaryRecord.textMismatchDiagnostics
+});
+const callerEventReplayPreflightRecord = Object.freeze({
+  ...scenario.eventReplayPreflightRecord,
+  lifecycleRequestBoundary: callerLifecycleRequestBoundary,
+  replayExecutionRecord: callerReplayExecutionRecord,
+  targetClaimingDiagnostic: callerTargetClaimingDiagnostic
+});
+const callerExecutionPreflightRecord = Object.freeze({
+  ...scenario.executionPreflightRecord,
+  eventReplayPreflight: callerEventReplayPreflightRecord,
+  lifecycleRequestBoundary: callerLifecycleRequestBoundary,
+  recoverableErrorMetadata: callerBoundaryRecord.recoverableErrorMetadata,
+  replayExecutionRecord: callerReplayExecutionRecord
+});
+
+callerPayloads.set(
+  callerHydrateRootPreflightRecord,
+  Object.freeze({
+    ...rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
+      scenario.hydrateRecord
+    ),
+    hydrationBoundaryRecord: callerBoundaryRecord,
+    lifecycleRequestBoundary: callerLifecycleRequestBoundary,
+    recoverableErrorPreflight: callerRecoverableErrorPreflight,
+    requestRecord: callerHydrateRootPreflightRecord,
+    ledgerKind: 'hydrate-root-public-facade-preflight-record',
+    record: callerHydrateRootPreflightRecord
+  })
+);
+callerPayloads.set(
+  callerEventReplayPreflightRecord,
+  Object.freeze({
+    ...rootBridge
+      .getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(
+        scenario.eventReplayPreflightRecord
+      ),
+    hydrationBoundaryRecord: callerBoundaryRecord,
+    lifecycleRequestBoundary: callerLifecycleRequestBoundary,
+    replayExecutionRecord: callerReplayExecutionRecord,
+    requestRecord: callerHydrateRootPreflightRecord,
+    targetClaimingPayload: hydrationGate
+      .getPrivateHydrationTargetClaimingDiagnosticPayload(
+        callerTargetClaimingDiagnostic
+      ),
+    targetClaimingPreflight: callerEventReplayPreflightRecord
+      .targetClaimingPreflight,
+    ledgerKind:
+      'hydrate-root-public-facade-event-replay-preflight-record',
+    record: callerEventReplayPreflightRecord
+  })
+);
+callerPayloads.set(
+  callerExecutionPreflightRecord,
+  Object.freeze({
+    ...rootBridge
+      .getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(
+        scenario.executionPreflightRecord
+      ),
+    eventReplayPreflight: callerEventReplayPreflightRecord,
+    hydrationBoundaryRecord: callerBoundaryRecord,
+    lifecycleRequestBoundary: callerLifecycleRequestBoundary,
+    recoverableErrorMetadata: callerBoundaryRecord.recoverableErrorMetadata,
+    replayExecutionRecord: callerReplayExecutionRecord,
+    requestRecord: callerHydrateRootPreflightRecord,
+    ledgerKind: 'hydrate-root-public-facade-execution-preflight-record',
+    record: callerExecutionPreflightRecord
+  })
+);
+callerPayloads.set(
+  callerLifecycleRequestBoundary,
+  Object.freeze({
+    ...rootBridge
+      .getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload(
+        scenario.lifecycleRequestBoundary
+      ),
+    hydrationBoundaryRecord: callerBoundaryRecord,
+    requestRecord: callerHydrateRootPreflightRecord,
+    ledgerKind: 'hydrate-root-public-facade-lifecycle-request-boundary',
+    record: callerLifecycleRequestBoundary
+  })
+);
+
+assert.throws(
+  () =>
+    hydrationGate.createHydrationRecoverableErrorBoundaryAdmissionRecord(
+      callerBoundaryRecord,
+      callerBoundaryRecord.acceptedPrivateMetadataDiagnostics,
+      callerRecoverableErrorPreflight,
+      callerTargetClaimingDiagnostic,
+      callerReplayExecutionRecord,
+      {
+        enableRecoverableErrorBoundaryAdmission: true,
+        eventReplayPreflightRecord: callerEventReplayPreflightRecord,
+        executionPreflightRecord: callerExecutionPreflightRecord,
+        hydrateRootPreflightRecord: callerHydrateRootPreflightRecord,
+        hydrationOptions: scenario.hydrationOptions,
+        lifecycleRequestBoundary: callerLifecycleRequestBoundary
+      }
+    ),
+  {
+    code:
+      hydrationGate
+        .INVALID_HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_CODE
+  }
+);
+
+function createScenario(label) {
+  const document = createDocument(label);
+  const container = createElement('DIV', document);
+  const boundaryTarget = createElement('BUTTON', document);
+  boundaryTarget.parentNode = container;
+  container.childNodes = [
+    createComment('$'),
+    boundaryTarget,
+    createComment('/$'),
+    createText('server text')
+  ];
+  const preflight =
+    rootBridge.createPrivateHydrateRootPublicFacadePreflight({
+      hydrateIdPrefix: label + '-hydrate',
+      hydrationRecordIdPrefix: label + '-boundary',
+      publicFacadeHydratePreflightIdPrefix: label + '-preflight',
+      requestIdPrefix: label + '-request'
+    });
+  const hydrationOptions = {
+    identifierPrefix: label + '-',
+    onRecoverableError() {}
+  };
+  const initialChildren = {
+    props: {
+      children: 'client text'
+    },
+    type: 'App'
+  };
+  const hydrateRecord = preflight.hydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        'click',
+        eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      {
+        target: boundaryTarget,
+        type: 'click'
+      }
+    );
+  const targetClaimingPreflightRecord = preflight.preflightTargetClaiming(
+    hydrateRecord,
+    dispatchRecord,
+    {
+      source: label + '-target-claiming-preflight'
+    }
+  );
+  const eventReplayPreflightRecord = preflight.preflightEventReplay(
+    targetClaimingPreflightRecord,
+    {
+      source: label + '-event-replay-preflight'
+    }
+  );
+  const executionPreflightRecord = preflight.preflightExecution(
+    eventReplayPreflightRecord,
+    {
+      source: label + '-execution-preflight'
+    }
+  );
+
+  return {
+    dispatchRecord,
+    eventReplayPreflightRecord,
+    executionPreflightRecord,
+    hydrateRecord,
+    hydrationOptions,
+    initialChildren,
+    container,
+    lifecycleRequestBoundary: hydrateRecord.lifecycleRequestBoundary
+  };
+}
+
+function createComment(data) {
+  return {
+    data,
+    nodeType: domContainer.COMMENT_NODE
+  };
+}
+
+function createText(nodeValue) {
+  return {
+    nodeType: domContainer.TEXT_NODE,
+    nodeValue
+  };
+}
+
+function createDocument(label) {
+  const document = createEventTarget({
+    label,
+    nodeName: '#document',
+    nodeType: domContainer.DOCUMENT_NODE
+  });
+  document.defaultView = createEventTarget({
+    label: label + '-window'
+  });
+  document.ownerDocument = document;
+  return document;
+}
+
+function createElement(nodeName, ownerDocument) {
+  return createEventTarget({
+    childNodes: [],
+    nodeName,
+    nodeType: domContainer.ELEMENT_NODE,
+    ownerDocument
+  });
+}
+
+function createEventTarget(fields) {
+  return {
+    ...fields,
+    __registrations: [],
+    addEventListener(type, listener, options) {
+      this.__registrations.push({
+        listener,
+        options,
+        type
+      });
+    }
+  };
+}
+`;
+
+  childProcess.execFileSync(process.execPath, ['-e', script], {
+    cwd: packageRoot,
+    stdio: 'pipe'
+  });
+});
+
 test('hydrateRoot source ledger rejects forged context and cache poisoning', () => {
   const script = `
 'use strict';
 
 const assert = require('node:assert/strict');
+const Module = require('node:module');
 const path = require('node:path');
 const vm = require('node:vm');
 
@@ -2363,6 +2729,16 @@ const sourceLedgerPath = path.join(
 const sourceLedgerCacheKey = require.resolve(sourceLedgerPath);
 const sourceLedgerFakePayloads = new WeakMap();
 const fakeRootBridgeCacheExports = Object.freeze({
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES:
+    Object.freeze([]),
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES:
+    Object.freeze([]),
+  createPrivateHydrateRootPublicFacadePreflight() {
+    return Object.freeze({source: 'fake-hydrate-root-preflight'});
+  },
+  createPrivateRootBridgeShell() {
+    return Object.freeze({source: 'fake-root-bridge-shell'});
+  },
   getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
     return sourceLedgerFakePayloads.get(record) || null;
   },
@@ -2386,6 +2762,22 @@ const fakeRootBridgeCacheExports = Object.freeze({
   },
   isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(record) {
     return sourceLedgerFakePayloads.has(record);
+  },
+  readPrivateHydrateRootPublicFacadeSourceLedgerPayload(record, ledgerKind) {
+    const payload = sourceLedgerFakePayloads.get(record) || null;
+    return payload !== null && payload.ledgerKind === ledgerKind
+      ? payload
+      : null;
+  },
+  registerPrivateHydrateRootSourceLedgerRootBridgeModule(
+    registerRootBridgeModule
+  ) {
+    return typeof registerRootBridgeModule === 'function'
+      ? registerRootBridgeModule(
+          fakeRootBridgeCacheExports,
+          Object.freeze({source: 'fake-root-bridge-token'})
+        )
+      : false;
   }
 });
 const fakeHydrateRootSourceLedgerExports = Object.freeze({
@@ -2409,18 +2801,17 @@ const fakeHydrateRootSourceLedgerExports = Object.freeze({
   }
 });
 
-const fakeRootBridgeCacheEntry = {
-  id: rootBridgeCacheKey,
-  filename: rootBridgeCacheKey,
-  loaded: true
-};
-Object.defineProperty(fakeRootBridgeCacheEntry, 'exports', {
-  configurable: false,
-  enumerable: true,
-  value: fakeRootBridgeCacheExports,
-  writable: false
-});
-require.cache[rootBridgeCacheKey] = fakeRootBridgeCacheEntry;
+require.cache[rootBridgeCacheKey] =
+  createModuleLikeFakeRootBridgeCacheEntry(fakeRootBridgeCacheExports);
+assert.equal(
+  require.cache[rootBridgeCacheKey].children.every(
+    (childModule) =>
+      childModule &&
+      childModule.loaded === true &&
+      require.cache[childModule.filename] === childModule
+  ),
+  true
+);
 require.cache[sourceLedgerCacheKey] = {
   id: sourceLedgerCacheKey,
   filename: sourceLedgerCacheKey,
@@ -2634,6 +3025,16 @@ sourceLedgerFakePayloads.set(
   })
 );
 const postLoadFakeRootBridgeCacheExports = Object.freeze({
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES:
+    Object.freeze([]),
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES:
+    Object.freeze([]),
+  createPrivateHydrateRootPublicFacadePreflight() {
+    return Object.freeze({source: 'post-load-fake-hydrate-preflight'});
+  },
+  createPrivateRootBridgeShell() {
+    return Object.freeze({source: 'post-load-fake-root-bridge-shell'});
+  },
   getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
     return sourceLedgerFakePayloads.get(record) || null;
   },
@@ -2657,15 +3058,29 @@ const postLoadFakeRootBridgeCacheExports = Object.freeze({
   },
   isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(record) {
     return sourceLedgerFakePayloads.has(record);
+  },
+  readPrivateHydrateRootPublicFacadeSourceLedgerPayload(record, ledgerKind) {
+    const payload = sourceLedgerFakePayloads.get(record) || null;
+    return payload !== null && payload.ledgerKind === ledgerKind
+      ? payload
+      : null;
+  },
+  registerPrivateHydrateRootSourceLedgerRootBridgeModule(
+    registerRootBridgeModule
+  ) {
+    return typeof registerRootBridgeModule === 'function'
+      ? registerRootBridgeModule(
+          postLoadFakeRootBridgeCacheExports,
+          Object.freeze({source: 'post-load-fake-root-bridge-token'})
+        )
+      : false;
   }
 });
 delete require.cache[rootBridgeCacheKey];
-require.cache[rootBridgeCacheKey] = {
-  id: rootBridgeCacheKey,
-  filename: rootBridgeCacheKey,
-  loaded: true,
-  exports: postLoadFakeRootBridgeCacheExports
-};
+require.cache[rootBridgeCacheKey] =
+  createObjectLiteralFakeRootBridgeCacheEntry(
+    postLoadFakeRootBridgeCacheExports
+  );
 assert.equal(require(rootBridgePath), postLoadFakeRootBridgeCacheExports);
 
 const forgedPreflightState = {
@@ -2795,6 +3210,30 @@ assert.throws(
         .INVALID_HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_CODE
   }
 );
+delete require.cache[rootBridgeCacheKey];
+require.cache[rootBridgeCacheKey] =
+  createModuleLikeFakeRootBridgeCacheEntry(
+    postLoadFakeRootBridgeCacheExports
+  );
+assert.equal(require(rootBridgePath), postLoadFakeRootBridgeCacheExports);
+assert.equal(
+  createAdmission(scenario).status,
+  hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionStatus
+);
+assert.throws(
+  () =>
+    createAdmission(scenario, {
+      eventReplayPreflightRecord: clonedEventReplayPreflightRecord,
+      executionPreflightRecord: clonedExecutionPreflightRecord,
+      hydrateRootPreflightRecord: clonedHydrateRootPreflightRecord,
+      lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+    }),
+  {
+    code:
+      hydrationGate
+        .INVALID_HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_CODE
+  }
+);
 
 function createScenario(label) {
   const document = createDocument(label);
@@ -2894,6 +3333,62 @@ function createAdmission(scenario, options) {
       ...(options || {})
     }
   );
+}
+
+function createModuleLikeFakeRootBridgeCacheEntry(exportsValue) {
+  const fakeModule = new Module(rootBridgeCacheKey, module.parent);
+  fakeModule.filename = rootBridgeCacheKey;
+  fakeModule.path = path.dirname(rootBridgeCacheKey);
+  fakeModule.loaded = true;
+  fakeModule.children = getExpectedRootBridgeChildCacheEntries();
+  fakeModule[Symbol('kFormat')] = 'commonjs';
+  fakeModule[Symbol('kIsExecuting')] = false;
+  Object.defineProperty(fakeModule, 'exports', {
+    configurable: false,
+    enumerable: true,
+    value: exportsValue,
+    writable: false
+  });
+  return fakeModule;
+}
+
+function getExpectedRootBridgeChildCacheEntries() {
+  const rootBridgeDirectory = path.dirname(rootBridgeCacheKey);
+  return [
+    './dom-container.js',
+    './component-tree.js',
+    './root-markers.js',
+    '../events/listener-registry.js',
+    './ref-callback-gate.js',
+    '../events/root-listeners.js',
+    '../events/plugin-event-system.js',
+    '../dom-host/mutation.js',
+    '../dom-host/property-payload.js',
+    '../shared/create-portal.js',
+    './dom-property-operations.js',
+    '../test-utils-act-gate.js'
+  ].map((childPath) => {
+    const resolvedChildPath = require.resolve(
+      path.join(rootBridgeDirectory, childPath)
+    );
+    require(resolvedChildPath);
+    return require.cache[resolvedChildPath];
+  });
+}
+
+function createObjectLiteralFakeRootBridgeCacheEntry(exportsValue) {
+  const fakeCacheEntry = {
+    id: rootBridgeCacheKey,
+    filename: rootBridgeCacheKey,
+    loaded: true
+  };
+  Object.defineProperty(fakeCacheEntry, 'exports', {
+    configurable: false,
+    enumerable: true,
+    value: exportsValue,
+    writable: false
+  });
+  return fakeCacheEntry;
 }
 
 function createComment(data) {
