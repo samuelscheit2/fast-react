@@ -15,6 +15,7 @@ const sourceTokenPolicy =
   "source-owned-identifiers-statuses-functions-fields-and-constants";
 const worker829 = "worker-829-resource-root-map-storage-private-execution";
 const worker830 = "worker-830-form-action-fulfilled-reset-fake-commit";
+const worker942 = "worker-942-resource-form-reset-currentness";
 
 const resourceInternalsPath =
   "packages/react-dom/src/resource-form-internals-gate.js";
@@ -33,6 +34,15 @@ export const PRIVATE_ADMISSION_850_WORKERS = freezeArray([
   worker829,
   worker830
 ]);
+
+export const PRIVATE_ADMISSION_850_CURRENTNESS_WORKERS = freezeArray([
+  worker942
+]);
+
+export const PRIVATE_ADMISSION_850_REQUIRED_CURRENTNESS_EVIDENCE_IDS =
+  freezeRecord({
+    [worker942]: freezeArray(["worker-942-fulfilled-reset-currentness-source"])
+  });
 
 export const PRIVATE_ADMISSION_850_REQUIRED_ACCEPTED_IDS = freezeRecord({
   [worker829]: freezeArray([
@@ -598,6 +608,25 @@ export const PRIVATE_ADMISSION_850_ROWS = freezeArray(
   )
 );
 
+export const PRIVATE_ADMISSION_850_REQUIRED_IMPLEMENTATION_PATHS =
+  freezeRecord(
+    Object.fromEntries(
+      PRIVATE_ADMISSION_850_ROWS.map((sourceRow) => [
+        sourceRow.workerId,
+        freezeArray(sourceRow.implementationPaths)
+      ])
+    )
+  );
+
+export const PRIVATE_ADMISSION_850_REQUIRED_EVIDENCE_CONTEXTS = freezeRecord(
+  Object.fromEntries(
+    PRIVATE_ADMISSION_850_ROWS.map((sourceRow) => [
+      sourceRow.workerId,
+      evidenceContextsForRow(sourceRow)
+    ])
+  )
+);
+
 export function evaluatePrivateAdmission850ResourceFormExecutionLedger({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT,
   rows = PRIVATE_ADMISSION_850_ROWS,
@@ -635,6 +664,37 @@ export function evaluatePrivateAdmission850ResourceFormExecutionLedger({
       )
     )
   });
+  const currentnessWorkerEvidenceIds = evaluatedRows.flatMap((row) =>
+    row.evidence
+      .map((evidenceRow) => evidenceRow.evidenceId)
+      .filter((evidenceId) =>
+        Object.values(PRIVATE_ADMISSION_850_REQUIRED_CURRENTNESS_EVIDENCE_IDS)
+          .flat()
+          .includes(evidenceId)
+      )
+  );
+  const currentnessWorkerIds = PRIVATE_ADMISSION_850_CURRENTNESS_WORKERS.filter(
+    (workerId) =>
+      PRIVATE_ADMISSION_850_REQUIRED_CURRENTNESS_EVIDENCE_IDS[workerId].every(
+        (evidenceId) => currentnessWorkerEvidenceIds.includes(evidenceId)
+      )
+  );
+  const currentnessManifest = freezeRecord({
+    expectedWorkerIds: PRIVATE_ADMISSION_850_CURRENTNESS_WORKERS,
+    actualWorkerIds: freezeArray(currentnessWorkerIds),
+    missingWorkerIds: freezeArray(
+      PRIVATE_ADMISSION_850_CURRENTNESS_WORKERS.filter(
+        (workerId) => !currentnessWorkerIds.includes(workerId)
+      )
+    ),
+    unexpectedWorkerIds: freezeArray(
+      currentnessWorkerIds.filter(
+        (workerId) =>
+          !PRIVATE_ADMISSION_850_CURRENTNESS_WORKERS.includes(workerId)
+      )
+    ),
+    evidenceIds: freezeArray(currentnessWorkerEvidenceIds)
+  });
 
   const evidenceRoleMismatches = evaluatedRows.flatMap((row) =>
     row.evidenceIdsRecognized === true
@@ -664,6 +724,16 @@ export function evaluatePrivateAdmission850ResourceFormExecutionLedger({
           readError: evidenceRow.readError
         })
       )
+  );
+  const implementationPathMismatches = compareRequiredArrayByWorker({
+    rows: evaluatedRows,
+    requiredByWorker: PRIVATE_ADMISSION_850_REQUIRED_IMPLEMENTATION_PATHS,
+    actualKey: "implementationPaths",
+    expectedKey: "expectedImplementationPaths",
+    actualKeyForViolation: "actualImplementationPaths"
+  });
+  const evidenceContextMismatches = evaluatedRows.flatMap(
+    (row) => row.evidenceContextMismatches
   );
   const acceptedIdMismatches = compareRequiredArrayByWorker({
     rows: evaluatedRows,
@@ -868,10 +938,35 @@ export function evaluatePrivateAdmission850ResourceFormExecutionLedger({
     "private-admission-850-required-evidence-mismatch",
     evidenceRoleMismatches
   );
+  if (
+    currentnessManifest.missingWorkerIds.length > 0 ||
+    currentnessManifest.unexpectedWorkerIds.length > 0
+  ) {
+    violations.push(
+      createViolation(
+        "private-admission-850-currentness-worker-manifest-mismatch",
+        {
+          missingWorkerIds: currentnessManifest.missingWorkerIds,
+          unexpectedWorkerIds: currentnessManifest.unexpectedWorkerIds,
+          evidenceIds: currentnessManifest.evidenceIds
+        }
+      )
+    );
+  }
   pushRowsViolation(
     violations,
     "private-admission-850-evidence-token-missing-or-unstable",
     evidenceMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "private-admission-850-implementation-path-mismatch",
+    implementationPathMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "private-admission-850-evidence-context-mismatch",
+    evidenceContextMismatches
   );
   pushRowsViolation(
     violations,
@@ -943,9 +1038,15 @@ export function evaluatePrivateAdmission850ResourceFormExecutionLedger({
     manifest.missingWorkerIds.length === 0 &&
     manifest.unexpectedWorkerIds.length === 0 &&
     manifest.duplicateWorkerIds.length === 0;
+  const currentnessWorkerManifestRecognized =
+    currentnessManifest.missingWorkerIds.length === 0 &&
+    currentnessManifest.unexpectedWorkerIds.length === 0;
   const priorLedgerRecognized = priorLedgerViolations.length === 0;
   const evidenceRolesRecognized = evidenceRoleMismatches.length === 0;
   const evidenceRecognized = evidenceMismatches.length === 0;
+  const implementationPathsRecognized =
+    implementationPathMismatches.length === 0;
+  const evidenceContextsRecognized = evidenceContextMismatches.length === 0;
   const acceptedIdsRecognized = acceptedIdMismatches.length === 0;
   const statusesRecognized = statusMismatches.length === 0;
   const fieldNamesRecognized = fieldNameMismatches.length === 0;
@@ -959,9 +1060,12 @@ export function evaluatePrivateAdmission850ResourceFormExecutionLedger({
   const staticReadOnlyRecognized = staticReadOnlyViolationIds.length === 0;
   const privateExecutionEvidenceRecognized =
     manifestRecognized &&
+    currentnessWorkerManifestRecognized &&
     priorLedgerRecognized &&
     evidenceRolesRecognized &&
     evidenceRecognized &&
+    implementationPathsRecognized &&
+    evidenceContextsRecognized &&
     acceptedIdsRecognized &&
     statusesRecognized &&
     fieldNamesRecognized &&
@@ -978,9 +1082,12 @@ export function evaluatePrivateAdmission850ResourceFormExecutionLedger({
       : PRIVATE_ADMISSION_850_LEDGER_VIOLATION_STATUS,
     privateExecutionEvidenceRecognized,
     manifestRecognized,
+    currentnessWorkerManifestRecognized,
     priorLedgerRecognized,
     evidenceRolesRecognized,
     evidenceRecognized,
+    implementationPathsRecognized,
+    evidenceContextsRecognized,
     acceptedIdsRecognized,
     statusesRecognized,
     fieldNamesRecognized,
@@ -993,11 +1100,13 @@ export function evaluatePrivateAdmission850ResourceFormExecutionLedger({
     compatibilityClaimed: publicClaimViolationIds.length > 0,
     publicCompatibilityClaimed: publicCompatibilityLeakClaimIds.length > 0,
     queueWorkers: PRIVATE_ADMISSION_850_WORKERS,
+    currentnessWorkers: PRIVATE_ADMISSION_850_CURRENTNESS_WORKERS,
     recognizedWorkerIds: freezeArray(
       evaluatedRows
         .filter((row) => row.recognized === true)
         .map((row) => row.workerId)
     ),
+    recognizedCurrentnessWorkerIds: freezeArray(currentnessWorkerIds),
     priorLedger: freezeRecord({
       gateId: prior808.gateId,
       status: prior808.status,
@@ -1013,6 +1122,7 @@ export function evaluatePrivateAdmission850ResourceFormExecutionLedger({
     publicClaimViolationIds: freezeArray(publicClaimViolationIds),
     staticReadOnlyViolationIds: freezeArray(staticReadOnlyViolationIds),
     manifest,
+    currentnessManifest,
     rows: freezeArray(evaluatedRows),
     rowsByWorker: freezeRecord(
       Object.fromEntries(evaluatedRows.map((row) => [row.workerId, row]))
@@ -1031,6 +1141,49 @@ function rowData(data) {
     sourceOwnedEvidenceValues: freezeRecord(data.sourceOwnedEvidenceValues),
     evidence: freezeArray(data.evidence)
   });
+}
+
+function evidenceContextsForRow(row) {
+  return freezeRecord(
+    Object.fromEntries(
+      row.evidence.map((evidenceRow) => [
+        evidenceRow.evidenceId,
+        freezeRecord({
+          path: evidenceRow.path,
+          tokenPolicy: evidenceRow.tokenPolicy
+        })
+      ])
+    )
+  );
+}
+
+function createEvidenceContextMismatches(row) {
+  const expected =
+    PRIVATE_ADMISSION_850_REQUIRED_EVIDENCE_CONTEXTS[row.workerId] ??
+    freezeRecord({});
+  const actual = evidenceContextsForRow(row);
+  const expectedIds = Object.keys(expected);
+  const actualIds = Object.keys(actual);
+  const idsMatch = sameStringSet(expectedIds, actualIds);
+  const contextsMatch =
+    idsMatch &&
+    expectedIds.every(
+      (evidenceId) =>
+        actual[evidenceId]?.path === expected[evidenceId].path &&
+        actual[evidenceId]?.tokenPolicy === expected[evidenceId].tokenPolicy
+    );
+
+  if (contextsMatch) {
+    return [];
+  }
+
+  return [
+    freezeRecord({
+      workerId: row.workerId,
+      expectedEvidenceContexts: expected,
+      actualEvidenceContexts: actual
+    })
+  ];
 }
 
 function evidenceData({ evidenceId, path, tokens, forbiddenTokens = [] }) {
@@ -1114,6 +1267,8 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
   const evidenceRecognized = evaluatedEvidence.every(
     (evidenceRow) => evidenceRow.recognized === true
   );
+  const evidenceContextMismatches = createEvidenceContextMismatches(row);
+  const evidenceContextsRecognized = evidenceContextMismatches.length === 0;
   const acceptedIdsRecognized = sameStringSet(
     PRIVATE_ADMISSION_850_REQUIRED_ACCEPTED_IDS[row.workerId] ?? [],
     row.acceptedPrivateEvidenceIds
@@ -1165,6 +1320,8 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
     evidence: freezeArray(evaluatedEvidence),
     evidenceIdsRecognized,
     evidenceRecognized,
+    evidenceContextsRecognized,
+    evidenceContextMismatches: freezeArray(evidenceContextMismatches),
     acceptedIdsRecognized,
     statusesRecognized,
     fieldNamesRecognized,
@@ -1177,6 +1334,7 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
     recognized:
       evidenceIdsRecognized === true &&
       evidenceRecognized === true &&
+      evidenceContextsRecognized === true &&
       acceptedIdsRecognized === true &&
       statusesRecognized === true &&
       fieldNamesRecognized === true &&

@@ -159,6 +159,7 @@ const publicFlushSyncBlockedCurrentnessAcceptedPrivateRows = freezeRecords([
   }
 ]);
 const publicFlushSyncBlockedCurrentnessReports = new WeakSet();
+const publicFlushSyncBlockedCurrentnessReportOverrideKeys = new WeakMap();
 
 function isDevelopmentMode(options) {
   if (options && typeof options.development === 'boolean') {
@@ -352,6 +353,10 @@ function createPublicReactDomFlushSyncBlockedCurrentnessReport(
   });
 
   publicFlushSyncBlockedCurrentnessReports.add(report);
+  publicFlushSyncBlockedCurrentnessReportOverrideKeys.set(
+    report,
+    freezeArray(Object.keys(normalizedOptions))
+  );
   return report;
 }
 
@@ -524,7 +529,20 @@ function validatePublicReactDomFlushSyncBlockedCurrentnessReport(report) {
     return 'public-react-dom-flush-sync-currentness-private-prerequisite-boundary';
   }
 
-  return validatePublicFlushSyncBlockedCurrentnessScenarios(report.scenarios);
+  const scenarioRejection =
+    validatePublicFlushSyncBlockedCurrentnessScenarios(report.scenarios);
+  if (scenarioRejection !== null) {
+    return scenarioRejection;
+  }
+
+  const overrideKeys =
+    publicFlushSyncBlockedCurrentnessReportOverrideKeys.get(report) ||
+    freezeArray([]);
+  if (overrideKeys.length > 0) {
+    return 'public-react-dom-flush-sync-currentness-caller-overrides';
+  }
+
+  return null;
 }
 
 function createPublicFlushSyncBlockedCurrentnessPrivatePrerequisites(

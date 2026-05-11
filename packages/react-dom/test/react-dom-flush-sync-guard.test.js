@@ -184,6 +184,12 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
   );
   assertFlushSyncCurrentnessRejected(
     guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      scenarios: report.scenarios
+    }),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
       publicFlushSyncCompatibilityClaimed: true
     }),
     'public-react-dom-flush-sync-currentness-public-claim'

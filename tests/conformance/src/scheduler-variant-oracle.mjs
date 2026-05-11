@@ -21,6 +21,7 @@ export const SCHEDULER_VARIANT_CURRENTNESS_REPORT_KIND =
   "scheduler-variant-source-currentness-report";
 export const SCHEDULER_VARIANT_CURRENTNESS_REPORT_ID =
   "scheduler-variant-source-currentness-report-937-1";
+const schedulerVariantSourceCurrentnessReports = new WeakSet();
 
 export const SCHEDULER_VARIANT_CURRENTNESS_BLOCKED_PUBLIC_CLAIMS =
   freezeArray([
@@ -156,9 +157,16 @@ export function findSchedulerVariantDeepCjsProbe(oracle, modeId, specifier) {
   return probe;
 }
 
-export function createSchedulerVariantSourceCurrentnessReport({
-  privateVariantBoundaryGate = evaluatePrivateAdmission886Gate()
-} = {}) {
+export function createSchedulerVariantSourceCurrentnessReport(options = {}) {
+  const normalizedOptions = options ?? {};
+  const callerProvidedPrivateVariantBoundaryGate =
+    Object.prototype.hasOwnProperty.call(
+      normalizedOptions,
+      "privateVariantBoundaryGate"
+    );
+  const privateVariantBoundaryGate = callerProvidedPrivateVariantBoundaryGate
+    ? normalizedOptions.privateVariantBoundaryGate
+    : evaluatePrivateAdmission886Gate();
   const rows = freezeArray(
     Object.values(privateVariantBoundaryGate?.rowsByVariant ?? {}).map((row) =>
       createSchedulerVariantCurrentnessRow(
@@ -168,10 +176,11 @@ export function createSchedulerVariantSourceCurrentnessReport({
     )
   );
 
-  return freezeRecord({
+  const report = freezeRecord({
     schemaVersion: 1,
     reportKind: SCHEDULER_VARIANT_CURRENTNESS_REPORT_KIND,
     reportId: SCHEDULER_VARIANT_CURRENTNESS_REPORT_ID,
+    callerProvidedPrivateVariantBoundaryGate,
     sourceGateId: privateVariantBoundaryGate?.gateId ?? null,
     sourceGateStatus: privateVariantBoundaryGate?.status ?? null,
     sourceGateAcceptedAsPrivateContextOnly:
@@ -187,6 +196,8 @@ export function createSchedulerVariantSourceCurrentnessReport({
     ),
     compatibilityClaimed: false
   });
+  schedulerVariantSourceCurrentnessReports.add(report);
+  return report;
 }
 
 export function evaluateSchedulerVariantCurrentnessGate({
@@ -198,12 +209,13 @@ export function evaluateSchedulerVariantCurrentnessGate({
     privateVariantBoundaryGate ?? evaluatePrivateAdmission886Gate();
   const effectiveReport =
     sourceCurrentnessReport ??
-    createSchedulerVariantSourceCurrentnessReport({
-      privateVariantBoundaryGate: effectivePrivateVariantBoundaryGate
-    });
+    createSchedulerVariantSourceCurrentnessReport();
   const sourceRows = freezeArray(effectiveReport?.rows ?? []);
   const rowsByVariant = indexRowsByVariant(sourceRows);
   const violations = [];
+  const sourceReportSourceProofRecognized =
+    schedulerVariantSourceCurrentnessReports.has(effectiveReport) &&
+    effectiveReport?.callerProvidedPrivateVariantBoundaryGate === false;
 
   if (!schedulerVariantOracleSchemaIsCurrent(oracle)) {
     violations.push(
@@ -227,6 +239,17 @@ export function evaluateSchedulerVariantCurrentnessGate({
         actualReportKind: effectiveReport?.reportKind ?? null,
         expectedReportId: SCHEDULER_VARIANT_CURRENTNESS_REPORT_ID,
         actualReportId: effectiveReport?.reportId ?? null
+      })
+    );
+  }
+  if (!sourceReportSourceProofRecognized) {
+    violations.push(
+      violation("scheduler-variant-currentness-source-report-caller-shaped", {
+        sourceCurrentnessReportProvided: sourceCurrentnessReport !== null,
+        reportKnownToFactory:
+          schedulerVariantSourceCurrentnessReports.has(effectiveReport),
+        callerProvidedPrivateVariantBoundaryGate:
+          effectiveReport?.callerProvidedPrivateVariantBoundaryGate ?? null
       })
     );
   }
@@ -490,6 +513,7 @@ export function evaluateSchedulerVariantCurrentnessGate({
     mockPostTaskAliasesRejected &&
     blockedPublicClaimsRecognized &&
     cjsDiagnosticCoverageRecognized &&
+    sourceReportSourceProofRecognized &&
     privateVariantBoundaryContext.acceptedAsPrivateContextOnly &&
     compatibilityClaimed === false;
 
@@ -514,6 +538,7 @@ export function evaluateSchedulerVariantCurrentnessGate({
     variantEvidenceRejectedForRootBehavior,
     mockPostTaskAliasesRejected,
     cjsDiagnosticCoverageRecognized,
+    sourceReportSourceProofRecognized,
     compatibilityClaimed,
     publicCompatibilityClaimIds: freezeArray(publicCompatibilityClaimIds),
     diagnosticCjsCoverageVariantIds: freezeArray(
@@ -674,6 +699,7 @@ function schedulerVariantSourceReportSchemaIsCurrent(report) {
     report?.schemaVersion === 1 &&
     report?.reportKind === SCHEDULER_VARIANT_CURRENTNESS_REPORT_KIND &&
     report?.reportId === SCHEDULER_VARIANT_CURRENTNESS_REPORT_ID &&
+    report?.callerProvidedPrivateVariantBoundaryGate === false &&
     report?.source ===
       "tests/conformance/src/private-admission-886-scheduler-variant-boundary-ledger.mjs" &&
     report?.compatibilityClaimed === false

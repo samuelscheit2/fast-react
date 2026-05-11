@@ -1038,6 +1038,12 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
   );
   assertUnsupportedCurrentnessRejected(
     hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      publicExportsPlaceholderBlocked: true
+    }),
+    "unsupported-placeholder-hook-currentness-caller-overrides"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
       publicShapeBlockers: [
         {
           ...expectedUnsupportedPublicShapeBlockers[0],

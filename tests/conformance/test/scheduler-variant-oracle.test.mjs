@@ -25,6 +25,9 @@ import {
   SCHEDULER_VARIANT_SCENARIOS,
   SCHEDULER_VARIANT_TARGET
 } from "../src/scheduler-variant-targets.mjs";
+import {
+  evaluatePrivateAdmission886Gate
+} from "../src/private-admission-886-scheduler-variant-boundary-ledger.mjs";
 
 const require = createRequire(import.meta.url);
 const oracle = readCheckedSchedulerVariantOracle();
@@ -198,6 +201,7 @@ test("scheduler variant currentness gate binds source-owned variant boundaries w
   assert.equal(gate.variantEvidenceRejectedForRootBehavior, true);
   assert.equal(gate.mockPostTaskAliasesRejected, true);
   assert.equal(gate.cjsDiagnosticCoverageRecognized, true);
+  assert.equal(gate.sourceReportSourceProofRecognized, true);
   assert.equal(gate.compatibilityClaimed, false);
   assert.deepEqual(gate.violations, []);
   assert.deepEqual(
@@ -353,6 +357,39 @@ test("scheduler variant currentness gate rejects wrong mode bindings", () => {
       (candidate) => candidate.variantId
     ),
     ["scheduler-cjs-unstable-mock-production"]
+  );
+});
+
+test("scheduler variant currentness gate rejects cloned source-currentness reports", () => {
+  const report = cloneJson(baselineVariantCurrentnessGate().sourceCurrentnessReport);
+  const gate = evaluateSchedulerVariantCurrentnessGate({
+    oracle,
+    sourceCurrentnessReport: report
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.rowCurrentnessRecognized, true);
+  assert.equal(gate.sourceReportSourceProofRecognized, false);
+  assertViolation(
+    gate,
+    "scheduler-variant-currentness-source-report-caller-shaped"
+  );
+});
+
+test("scheduler variant currentness gate rejects reports minted from caller-provided private gates", () => {
+  const report = createSchedulerVariantSourceCurrentnessReport({
+    privateVariantBoundaryGate: evaluatePrivateAdmission886Gate()
+  });
+  const gate = evaluateSchedulerVariantCurrentnessGate({
+    oracle,
+    sourceCurrentnessReport: report
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.sourceReportSourceProofRecognized, false);
+  assertViolation(
+    gate,
+    "scheduler-variant-currentness-source-report-caller-shaped"
   );
 });
 

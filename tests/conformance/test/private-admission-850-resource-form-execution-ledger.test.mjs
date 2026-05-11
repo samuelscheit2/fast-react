@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   PRIVATE_ADMISSION_850_BLOCKED_PUBLIC_CLAIMS,
+  PRIVATE_ADMISSION_850_CURRENTNESS_WORKERS,
   PRIVATE_ADMISSION_850_LEDGER_STATUS,
   PRIVATE_ADMISSION_850_LEDGER_VIOLATION_STATUS,
   PRIVATE_ADMISSION_850_REQUIRED_ACCEPTED_IDS,
@@ -19,18 +20,25 @@ import {
 
 const worker829 = "worker-829-resource-root-map-storage-private-execution";
 const worker830 = "worker-830-form-action-fulfilled-reset-fake-commit";
+const worker942 = "worker-942-resource-form-reset-currentness";
 const expectedWorkers = [worker829, worker830];
+const expectedCurrentnessWorkers = [worker942];
 const sourceTokenPolicy =
   "source-owned-identifiers-statuses-functions-fields-and-constants";
 
-test("private admission 850 manifest pins Worker 829 and Worker 830 execution rows", () => {
+test("private admission 850 manifest pins execution rows and Worker 942 currentness", () => {
   assert.deepEqual(PRIVATE_ADMISSION_850_WORKERS, expectedWorkers);
+  assert.deepEqual(
+    PRIVATE_ADMISSION_850_CURRENTNESS_WORKERS,
+    expectedCurrentnessWorkers
+  );
   assert.deepEqual(
     PRIVATE_ADMISSION_850_ROWS.map((row) => row.workerId),
     expectedWorkers
   );
   assert.equal(PRIVATE_ADMISSION_850_ROWS.length, 2);
   assert.equal(new Set(PRIVATE_ADMISSION_850_WORKERS).size, 2);
+  assert.equal(new Set(PRIVATE_ADMISSION_850_CURRENTNESS_WORKERS).size, 1);
   assertSubset(
     [
       "publicResourceRootMapStorageCompatibilityClaimed",
@@ -93,9 +101,12 @@ test("private admission 850 recognizes accepted private execution evidence witho
   assert.equal(ledger.status, PRIVATE_ADMISSION_850_LEDGER_STATUS);
   assert.equal(ledger.privateExecutionEvidenceRecognized, true);
   assert.equal(ledger.manifestRecognized, true);
+  assert.equal(ledger.currentnessWorkerManifestRecognized, true);
   assert.equal(ledger.priorLedgerRecognized, true);
   assert.equal(ledger.evidenceRolesRecognized, true);
   assert.equal(ledger.evidenceRecognized, true);
+  assert.equal(ledger.implementationPathsRecognized, true);
+  assert.equal(ledger.evidenceContextsRecognized, true);
   assert.equal(ledger.acceptedIdsRecognized, true);
   assert.equal(ledger.statusesRecognized, true);
   assert.equal(ledger.fieldNamesRecognized, true);
@@ -107,7 +118,15 @@ test("private admission 850 recognizes accepted private execution evidence witho
   assert.equal(ledger.compatibilityClaimed, false);
   assert.equal(ledger.publicCompatibilityClaimed, false);
   assert.deepEqual(ledger.queueWorkers, expectedWorkers);
+  assert.deepEqual(
+    ledger.currentnessWorkers,
+    expectedCurrentnessWorkers
+  );
   assert.deepEqual(ledger.recognizedWorkerIds, expectedWorkers);
+  assert.deepEqual(
+    ledger.recognizedCurrentnessWorkerIds,
+    expectedCurrentnessWorkers
+  );
   assert.deepEqual(ledger.violations, []);
   assert.deepEqual(ledger.resourceLeakClaimIds, []);
   assert.deepEqual(ledger.formLeakClaimIds, []);
@@ -231,6 +250,7 @@ test("private admission 850 rejects missing stale cloned tampered and caller-sup
   assert.equal(stale.evidenceLineageRecognized, false);
   assertViolationIds(stale, [
     "private-admission-850-required-evidence-mismatch",
+    "private-admission-850-evidence-context-mismatch",
     "private-admission-850-accepted-id-mismatch",
     "private-admission-850-status-mismatch",
     "private-admission-850-field-name-mismatch",
@@ -268,6 +288,82 @@ test("private admission 850 rejects missing stale cloned tampered and caller-sup
     ),
     true
   );
+});
+
+test("private admission 850 rejects missing Worker 942 currentness manifest evidence", () => {
+  const sourceRow = PRIVATE_ADMISSION_850_ROWS.find(
+    (row) => row.workerId === worker830
+  );
+  const ledger = evaluatePrivateAdmission850ResourceFormExecutionLedger({
+    rowOverrides: {
+      [worker830]: {
+        evidence: sourceRow.evidence.filter(
+          (evidenceRow) =>
+            evidenceRow.evidenceId !==
+            "worker-942-fulfilled-reset-currentness-source"
+        )
+      }
+    }
+  });
+
+  assert.equal(ledger.status, PRIVATE_ADMISSION_850_LEDGER_VIOLATION_STATUS);
+  assert.equal(ledger.currentnessWorkerManifestRecognized, false);
+  assert.equal(ledger.evidenceRolesRecognized, false);
+  assert.equal(ledger.evidenceContextsRecognized, false);
+  assert.deepEqual(ledger.recognizedCurrentnessWorkerIds, []);
+  assertViolationIds(ledger, [
+    "private-admission-850-required-evidence-mismatch",
+    "private-admission-850-currentness-worker-manifest-mismatch",
+    "private-admission-850-evidence-context-mismatch"
+  ]);
+});
+
+test("private admission 850 rejects implementation path and evidence context replacement", () => {
+  const sourceRow = PRIVATE_ADMISSION_850_ROWS.find(
+    (row) => row.workerId === worker830
+  );
+  const emptyPathLedger = evaluatePrivateAdmission850ResourceFormExecutionLedger({
+    rowOverrides: {
+      [worker830]: {
+        implementationPaths: []
+      }
+    }
+  });
+
+  assert.equal(
+    emptyPathLedger.status,
+    PRIVATE_ADMISSION_850_LEDGER_VIOLATION_STATUS
+  );
+  assert.equal(emptyPathLedger.implementationPathsRecognized, false);
+  assertViolationIds(emptyPathLedger, [
+    "private-admission-850-implementation-path-mismatch"
+  ]);
+
+  const contextLedger = evaluatePrivateAdmission850ResourceFormExecutionLedger({
+    rowOverrides: {
+      [worker830]: {
+        evidence: sourceRow.evidence.map((evidenceRow) =>
+          evidenceRow.evidenceId ===
+          "worker-942-fulfilled-reset-currentness-source"
+            ? {
+                ...evidenceRow,
+                path: "packages/react-dom/package.json"
+              }
+            : evidenceRow
+        )
+      }
+    }
+  });
+
+  assert.equal(
+    contextLedger.status,
+    PRIVATE_ADMISSION_850_LEDGER_VIOLATION_STATUS
+  );
+  assert.equal(contextLedger.evidenceContextsRecognized, false);
+  assertViolationIds(contextLedger, [
+    "private-admission-850-evidence-token-missing-or-unstable",
+    "private-admission-850-evidence-context-mismatch"
+  ]);
 });
 
 test("private admission 850 rejects public resource form update DOM reset package and export claims", () => {
@@ -386,7 +482,9 @@ test("private admission 850 rejects progress prose test-title error-message and 
   assert.equal(ledger.evidenceRecognized, false);
   assertViolationIds(ledger, [
     "private-admission-850-required-evidence-mismatch",
-    "private-admission-850-evidence-token-missing-or-unstable"
+    "private-admission-850-currentness-worker-manifest-mismatch",
+    "private-admission-850-evidence-token-missing-or-unstable",
+    "private-admission-850-evidence-context-mismatch"
   ]);
 
   const evidenceViolation = ledger.violations.find(

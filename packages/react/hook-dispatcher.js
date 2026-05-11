@@ -30,6 +30,7 @@ const privateTransitionHookDispatchers = new WeakSet();
 const privateTransitionHookDispatcherMetadataByDispatcher = new WeakMap();
 const unsupportedPlaceholderHookCurrentnessReports = new WeakSet();
 const unsupportedPlaceholderHookSurfaceCurrentnessRowsByReport = new WeakMap();
+const unsupportedPlaceholderHookCurrentnessReportOverrideKeys = new WeakMap();
 
 const effectRegistrationFieldNames = Object.freeze([
   'hook',
@@ -2081,6 +2082,10 @@ function createUnsupportedPlaceholderHookCurrentnessReport(overrides = {}) {
   }
 
   unsupportedPlaceholderHookCurrentnessReports.add(report);
+  unsupportedPlaceholderHookCurrentnessReportOverrideKeys.set(
+    report,
+    freezeArray(Object.keys(normalized))
+  );
   return report;
 }
 
@@ -2545,6 +2550,13 @@ function validateUnsupportedPlaceholderHookCurrentnessReport(report) {
 
   if (!hasBlockedUnsupportedPlaceholderHookIdGeneration(report)) {
     return 'unsupported-placeholder-hook-currentness-id-generation-claim';
+  }
+
+  const overrideKeys =
+    unsupportedPlaceholderHookCurrentnessReportOverrideKeys.get(report) ||
+    freezeArray([]);
+  if (overrideKeys.length > 0) {
+    return 'unsupported-placeholder-hook-currentness-caller-overrides';
   }
 
   return null;
