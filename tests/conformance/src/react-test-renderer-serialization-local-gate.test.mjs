@@ -1286,7 +1286,10 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
       "root_private_tree_metadata_canary_describes_function_component_above_host_output"
     ];
-    if (entry.entrypoint.endsWith(".development")) {
+    if (
+      entry.entrypoint === packageRootEntrypoint ||
+      entry.entrypoint.endsWith(".development")
+    ) {
       expectedMetadataRustWorkers.push(
         "worker-516-test-renderer-committed-fiber-tree-inspection"
       );
@@ -1418,7 +1421,7 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       true
     );
     assert.equal(facadeGate.consumesCommittedHostRootFinishedWorkLanes, true);
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasSiblingTextPrivateAdmission(entry)) {
       assert.equal(
         facadeGate.privateSiblingTextFinishedWorkIdentityGateAvailable,
         true
@@ -1447,6 +1450,12 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
         facadeGate.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
         true
       );
+      if (entry.entrypoint === packageRootEntrypoint) {
+        assert.equal(
+          facadeGate.siblingTextJSAdmissionConsumesCommittedFiberInspection,
+          true
+        );
+      }
       assert.equal(facadeGate.rejectsGenericSiblingTextFinishedWorkIdentity, true);
       assert.equal(facadeGate.rejectsBroadMultichildFinishedWorkIdentity, true);
       assert.equal(
@@ -1505,12 +1514,12 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
             "TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary",
             "TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary",
             "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary",
-            ...(entry.entrypoint.includes("/cjs/")
-              ? [
-                  "TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary",
-                  "TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary"
-                ]
-              : [])
+          ]
+        : []),
+      ...(hasSiblingTextPrivateAdmission(entry)
+        ? [
+            "TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary",
+            "TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary"
           ]
         : []),
       "TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary",
@@ -1542,13 +1551,13 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
                   "root_private_to_tree_native_execution_evidence_records_composite_host_shape"
                 ]
               : []),
-            ...(entry.entrypoint.includes("/cjs/")
-              ? [
-                  "root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate",
-                  "root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity",
-                  "root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate"
-                ]
-              : [])
+          ]
+        : []),
+      ...(hasSiblingTextPrivateAdmission(entry)
+        ? [
+            "root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate",
+            "root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity",
+            "root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate"
           ]
         : []),
       "root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff",
@@ -1581,7 +1590,10 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
         "worker-698-test-renderer-totree-composite-native-execution"
       );
     }
-    if (entry.entrypoint.endsWith(".development")) {
+    if (
+      entry.entrypoint === packageRootEntrypoint ||
+      entry.entrypoint.endsWith(".development")
+    ) {
       assert.equal(facadeGate.privateMultiChildTreeMetadataSerializable, true);
       assert.equal(
         facadeGate.multiChildAcceptedWorker,
@@ -1635,7 +1647,10 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     assert.equal(privateMetadata.rootRequest, error.rootRequest);
     assert.equal(privateMetadata.privateHostOutputTreeMetadataAvailable, true);
     assert.equal(privateMetadata.privateCompositeFunctionMetadataAvailable, true);
-    if (entry.entrypoint.endsWith(".development")) {
+    if (
+      entry.entrypoint === packageRootEntrypoint ||
+      entry.entrypoint.endsWith(".development")
+    ) {
       assert.equal(
         privateMetadata.privateMultiChildHostOutputTreeMetadataAvailable,
         true
@@ -1820,7 +1835,10 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       true
     );
     assert.equal(privateFacade.consumesCommittedHostRootFinishedWorkLanes, true);
-    if (entry.entrypoint.endsWith(".development")) {
+    if (
+      entry.entrypoint === packageRootEntrypoint ||
+      entry.entrypoint.endsWith(".development")
+    ) {
       assert.equal(privateFacade.privateMultiChildTreeMetadataSerializable, true);
     }
     if (
@@ -1856,7 +1874,7 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       typeof privateFacade.canValidateAcceptedFinishedWorkIdentity,
       "function"
     );
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasSiblingTextPrivateAdmission(entry)) {
       assert.equal(
         typeof privateFacade.createAcceptedSiblingTextDiagnosticResult,
         "function"
@@ -1907,7 +1925,10 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
         rendered: ["goodbye"]
       }
     });
-    if (entry.entrypoint.endsWith(".development")) {
+    if (
+      entry.entrypoint === packageRootEntrypoint ||
+      entry.entrypoint.endsWith(".development")
+    ) {
       const multiChildShape = privateMetadata.describeAcceptedHostOutputDiagnostic(
         createAcceptedMultiChildTreeMetadataDiagnostic()
       );
@@ -2817,7 +2838,7 @@ test("react-test-renderer JS private serialization finished-work identity valida
     assert.equal(treeUpdateIdentity.rootRequestOperation, "update");
     assert.equal(treeUpdateIdentity.hostOutputUpdateKind, "Update");
 
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasSiblingTextPrivateAdmission(entry)) {
       const siblingTreeReport = createAcceptedMultiChildTreeMetadataDiagnostic({
         composite: true,
         hostOutputUpdateKind: "Update"
@@ -3462,19 +3483,20 @@ test("react-test-renderer CJS dev/prod private toJSON sibling text admission req
   }
 });
 
-test("react-test-renderer CJS dev/prod private toTree sibling text admission requires committed fiber inspection", () => {
-  const cjsEntries = jsEntrypoints.filter((entry) =>
-    entry.entrypoint.includes("/cjs/")
+test("react-test-renderer package-root and CJS private toTree sibling text admission requires committed fiber inspection", () => {
+  const siblingAdmissionEntries = jsEntrypoints.filter(
+    hasSiblingTextPrivateAdmission
   );
   assert.deepEqual(
-    cjsEntries.map((entry) => entry.entrypoint),
+    siblingAdmissionEntries.map((entry) => entry.entrypoint),
     [
+      "react-test-renderer",
       "react-test-renderer/cjs/react-test-renderer.development",
       "react-test-renderer/cjs/react-test-renderer.production"
     ]
   );
 
-  for (const entry of cjsEntries) {
+  for (const entry of siblingAdmissionEntries) {
     const moduleExports = loadFresh(entry.specifier);
     const renderer = moduleExports.create({
       type: "span",
@@ -3576,10 +3598,10 @@ test("react-test-renderer sibling-text private admissions reject stale identity 
     });
   }
 
-  const cjsEntries = jsEntrypoints.filter((entry) =>
-    entry.entrypoint.includes("/cjs/")
+  const siblingAdmissionEntries = jsEntrypoints.filter(
+    hasSiblingTextPrivateAdmission
   );
-  for (const entry of cjsEntries) {
+  for (const entry of siblingAdmissionEntries) {
     const { jsonFacade, treeFacade, updateRootRequest } =
       createSiblingTextAdmissionRuntime(entry);
     const siblingTextReport = createAcceptedSiblingTextHostOutputDiagnostic();
@@ -3615,19 +3637,21 @@ test("react-test-renderer sibling-text private admissions reject stale identity 
         );
       }
     });
-    assertSiblingTextCommittedFiberInspectionRejections({
-      report: siblingTextReport,
-      evidence: siblingTextIdentity,
-      reject(report, evidence, messagePattern) {
-        return assertSiblingTextAdmissionRejection(
-          jsonFacade,
-          report,
-          evidence,
-          updateRootRequest,
-          messagePattern
-        );
-      }
-    });
+    if (entry.entrypoint.includes("/cjs/")) {
+      assertSiblingTextCommittedFiberInspectionRejections({
+        report: siblingTextReport,
+        evidence: siblingTextIdentity,
+        reject(report, evidence, messagePattern) {
+          return assertSiblingTextAdmissionRejection(
+            jsonFacade,
+            report,
+            evidence,
+            updateRootRequest,
+            messagePattern
+          );
+        }
+      });
+    }
 
     const siblingTreeReport = createAcceptedMultiChildTreeMetadataDiagnostic({
       composite: true,
