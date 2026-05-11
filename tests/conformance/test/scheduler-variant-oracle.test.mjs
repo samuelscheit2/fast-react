@@ -4,6 +4,11 @@ import { createRequire } from "node:module";
 import test from "node:test";
 
 import {
+  SCHEDULER_VARIANT_CURRENTNESS_GATE_STATUS,
+  SCHEDULER_VARIANT_CURRENTNESS_REQUIRED_ROWS,
+  SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS,
+  createSchedulerVariantSourceCurrentnessReport,
+  evaluateSchedulerVariantCurrentnessGate,
   findSchedulerVariantDeepCjsProbe,
   findSchedulerVariantResolution,
   readCheckedSchedulerVariantOracle,
@@ -97,6 +102,8 @@ const EXPECTED_TARBALL_FILES = [
   "unstable_post_task.js"
 ];
 
+let cachedVariantCurrentnessGate = null;
+
 test("checked scheduler variant oracle artifact has the expected schema and target", () => {
   assert.equal(
     SCHEDULER_VARIANT_ORACLE_ARTIFACT_PATH,
@@ -175,6 +182,333 @@ test("scheduler variant oracle keeps Fast React compatibility claims false", () 
   assert.deepEqual(
     oracle.compatibilityGateRecommendations,
     SCHEDULER_VARIANT_GATE_DECISIONS
+  );
+});
+
+test("scheduler variant currentness gate binds source-owned variant boundaries without public compatibility claims", () => {
+  const gate = baselineVariantCurrentnessGate();
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_GATE_STATUS);
+  assert.equal(gate.oracleArtifactPath, SCHEDULER_VARIANT_ORACLE_ARTIFACT_PATH);
+  assert.equal(gate.blockedPublicClaimsRecognized, true);
+  assert.equal(gate.rowCurrentnessRecognized, true);
+  assert.equal(gate.sourceDiagnosticBindingsRecognized, true);
+  assert.equal(gate.packageDeepCjsBoundariesRecognized, true);
+  assert.equal(gate.rootEvidenceRejectedForVariants, true);
+  assert.equal(gate.variantEvidenceRejectedForRootBehavior, true);
+  assert.equal(gate.mockPostTaskAliasesRejected, true);
+  assert.equal(gate.cjsDiagnosticCoverageRecognized, true);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.deepEqual(gate.violations, []);
+  assert.deepEqual(
+    createSchedulerVariantSourceCurrentnessReport().rows,
+    gate.sourceRows
+  );
+  assert.deepEqual(gate.sourceRows, SCHEDULER_VARIANT_CURRENTNESS_REQUIRED_ROWS);
+  assert.deepEqual(gate.sourceClassifications, [
+    "root",
+    "mock",
+    "post_task",
+    "native"
+  ]);
+  assert.deepEqual(gate.diagnosticCjsCoverageVariantIds, [
+    "scheduler-cjs-unstable-mock-development",
+    "scheduler-cjs-unstable-mock-production",
+    "scheduler-cjs-unstable-post-task-development",
+    "scheduler-cjs-unstable-post-task-production"
+  ]);
+
+  assert.equal(
+    gate.privateVariantBoundaryContext.role,
+    "private-scheduler-variant-boundary-currentness-context-only"
+  );
+  assert.equal(
+    gate.privateVariantBoundaryContext.acceptedAsPrivateContextOnly,
+    true
+  );
+  assert.equal(gate.privateVariantBoundaryContext.behaviorEvidenceUsed, false);
+  assert.equal(
+    gate.privateVariantBoundaryContext.rootBehaviorEvidenceAllowed,
+    false
+  );
+
+  assertVariantCurrentnessRow(
+    gate.rowsByVariant["scheduler-index-wrapper"],
+    {
+      classification: "root",
+      modeId: "node-env-wrapper",
+      entrypoint: "scheduler",
+      packagePath: "scheduler",
+      deepCjsPath: null,
+      directDeepCjsImport: false,
+      sourceDiagnosticIds: []
+    }
+  );
+  assertVariantCurrentnessRow(
+    gate.rowsByVariant["scheduler-cjs-unstable-mock-development"],
+    {
+      classification: "mock",
+      modeId: "node-development",
+      entrypoint: "scheduler/cjs/scheduler-unstable_mock.development.js",
+      packagePath: "scheduler/cjs/scheduler-unstable_mock.development.js",
+      deepCjsPath: "scheduler/cjs/scheduler-unstable_mock.development.js",
+      directDeepCjsImport: true,
+      sourceDiagnosticIds: [
+        "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+      ]
+    }
+  );
+  assertVariantCurrentnessRow(
+    gate.rowsByVariant["scheduler-cjs-unstable-mock-production"],
+    {
+      classification: "mock",
+      modeId: "node-production",
+      entrypoint: "scheduler/cjs/scheduler-unstable_mock.production.js",
+      packagePath: "scheduler/cjs/scheduler-unstable_mock.production.js",
+      deepCjsPath: "scheduler/cjs/scheduler-unstable_mock.production.js",
+      directDeepCjsImport: true,
+      sourceDiagnosticIds: [
+        "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+      ]
+    }
+  );
+  assertVariantCurrentnessRow(
+    gate.rowsByVariant["scheduler-cjs-unstable-post-task-development"],
+    {
+      classification: "post_task",
+      modeId: "node-development",
+      entrypoint: "scheduler/unstable_post_task",
+      packagePath:
+        "scheduler/cjs/scheduler-unstable_post_task.development.js",
+      deepCjsPath:
+        "scheduler/cjs/scheduler-unstable_post_task.development.js",
+      directDeepCjsImport: true,
+      sourceDiagnosticIds: [
+        "__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__",
+        "fast-react.scheduler.post_task.private-act-root-work-handoff",
+        "fast-react.scheduler.unstable_post_task.priority-diagnostics"
+      ]
+    }
+  );
+  assertVariantCurrentnessRow(
+    gate.rowsByVariant["scheduler-cjs-unstable-post-task-production"],
+    {
+      classification: "post_task",
+      modeId: "node-production",
+      entrypoint: "scheduler/unstable_post_task",
+      packagePath:
+        "scheduler/cjs/scheduler-unstable_post_task.production.js",
+      deepCjsPath:
+        "scheduler/cjs/scheduler-unstable_post_task.production.js",
+      directDeepCjsImport: true,
+      sourceDiagnosticIds: [
+        "__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__",
+        "fast-react.scheduler.post_task.private-act-root-work-handoff",
+        "fast-react.scheduler.unstable_post_task.priority-diagnostics"
+      ]
+    }
+  );
+  assertVariantCurrentnessRow(
+    gate.rowsByVariant["scheduler-native-wrapper"],
+    {
+      classification: "native",
+      modeId: "node-env-wrapper",
+      entrypoint: "scheduler/index.native.js",
+      packagePath: "scheduler/index.native.js",
+      deepCjsPath: null,
+      directDeepCjsImport: false,
+      sourceDiagnosticIds: []
+    }
+  );
+});
+
+test("scheduler variant currentness gate fails closed for stale oracle schema", () => {
+  const staleOracle = cloneJson(oracle);
+  staleOracle.schemaVersion = 0;
+
+  const gate = evaluateVariantCurrentnessWithBaselineReport({
+    oracle: staleOracle
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assertViolation(gate, "scheduler-variant-currentness-stale-oracle-schema");
+});
+
+test("scheduler variant currentness gate rejects wrong mode bindings", () => {
+  const report = cloneJson(baselineVariantCurrentnessGate().sourceCurrentnessReport);
+  const row = report.rows.find(
+    (candidate) =>
+      candidate.variantId === "scheduler-cjs-unstable-mock-production"
+  );
+  row.modeId = "node-development";
+  row.nodeEnv = "development";
+
+  const gate = evaluateVariantCurrentnessWithBaselineReport({
+    sourceCurrentnessReport: report
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assert.deepEqual(
+    violationById(gate, "scheduler-variant-currentness-wrong-mode").rows.map(
+      (candidate) => candidate.variantId
+    ),
+    ["scheduler-cjs-unstable-mock-production"]
+  );
+});
+
+test("scheduler variant currentness gate rejects root evidence used as variant evidence", () => {
+  const report = cloneJson(baselineVariantCurrentnessGate().sourceCurrentnessReport);
+  const row = report.rows.find(
+    (candidate) =>
+      candidate.variantId === "scheduler-cjs-unstable-post-task-development"
+  );
+  row.entrypoint = "scheduler";
+  row.packagePath = "scheduler";
+  row.evidenceScope.rootEntryEvidenceAcceptedForVariant = true;
+
+  const gate = evaluateVariantCurrentnessWithBaselineReport({
+    sourceCurrentnessReport: report
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-variant-currentness-root-evidence-used-as-variant"
+    ).rows.map((candidate) => candidate.variantId),
+    ["scheduler-cjs-unstable-post-task-development"]
+  );
+});
+
+test("scheduler variant currentness gate rejects variant evidence used as root behavior", () => {
+  const report = cloneJson(baselineVariantCurrentnessGate().sourceCurrentnessReport);
+  const row = report.rows.find(
+    (candidate) => candidate.variantId === "scheduler-index-wrapper"
+  );
+  row.evidenceScope.variantEvidenceAcceptedForRootBehavior = true;
+  row.evidenceScope.rootBehaviorEvidenceClaimed = true;
+
+  const gate = evaluateVariantCurrentnessWithBaselineReport({
+    sourceCurrentnessReport: report
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-variant-currentness-variant-evidence-used-as-root"
+    ).rows.map((candidate) => candidate.variantId),
+    ["scheduler-index-wrapper"]
+  );
+});
+
+test("scheduler variant currentness gate rejects forged diagnostic symbols and ids", () => {
+  const report = cloneJson(baselineVariantCurrentnessGate().sourceCurrentnessReport);
+  const row = report.rows.find(
+    (candidate) =>
+      candidate.variantId === "scheduler-cjs-unstable-mock-development"
+  );
+  row.sourceDiagnosticIds.push(
+    "fast-react.scheduler.unstable_post_task.priority-diagnostics"
+  );
+  row.diagnosticSymbolOrSourceIds.push(
+    "fast-react.scheduler.unstable_post_task.priority-diagnostics"
+  );
+
+  const gate = evaluateVariantCurrentnessWithBaselineReport({
+    sourceCurrentnessReport: report
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-variant-currentness-forged-diagnostic-symbol"
+    ).rows.map((candidate) => candidate.variantId),
+    ["scheduler-cjs-unstable-mock-development"]
+  );
+});
+
+test("scheduler variant currentness gate rejects package and deep-CJS alias smuggling", () => {
+  const report = cloneJson(baselineVariantCurrentnessGate().sourceCurrentnessReport);
+  const row = report.rows.find(
+    (candidate) =>
+      candidate.variantId === "scheduler-cjs-unstable-mock-development"
+  );
+  row.packagePath = "scheduler/unstable_mock";
+  row.deepCjsPath = null;
+  row.directDeepCjsImport = false;
+  row.boundaryKind = "package-entrypoint";
+
+  const gate = evaluateVariantCurrentnessWithBaselineReport({
+    sourceCurrentnessReport: report
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-variant-currentness-package-deep-cjs-alias"
+    ).rows.map((candidate) => candidate.variantId),
+    ["scheduler-cjs-unstable-mock-development"]
+  );
+});
+
+test("scheduler variant currentness gate rejects mock and postTask cross-variant aliases", () => {
+  const report = cloneJson(baselineVariantCurrentnessGate().sourceCurrentnessReport);
+  const row = report.rows.find(
+    (candidate) =>
+      candidate.variantId === "scheduler-cjs-unstable-post-task-production"
+  );
+  row.classification = "mock";
+  row.rootNativeMockPostTaskClassification = "mock";
+  row.sourceDiagnosticIds.push(
+    "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+  );
+  row.diagnosticExportNames.push(
+    "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+  );
+
+  const gate = evaluateVariantCurrentnessWithBaselineReport({
+    sourceCurrentnessReport: report
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-variant-currentness-mock-post-task-cross-alias"
+    ).rows.map((candidate) => candidate.variantId),
+    ["scheduler-cjs-unstable-post-task-production"]
+  );
+});
+
+test("scheduler variant currentness gate keeps public timing, root, act, and package compatibility blocked", () => {
+  const report = cloneJson(baselineVariantCurrentnessGate().sourceCurrentnessReport);
+  report.compatibilityClaimed = true;
+  report.blockedPublicClaims.publicSchedulerTimingCompatibilityClaimed = true;
+  report.blockedPublicClaims.publicRootSchedulerCompatibilityClaimed = true;
+  report.blockedPublicClaims.publicReactActCompatibilityClaimed = true;
+  report.blockedPublicClaims.publicPackageCompatibilityClaimed = true;
+
+  const gate = evaluateVariantCurrentnessWithBaselineReport({
+    sourceCurrentnessReport: report
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assertSubset(
+    [
+      "sourceCurrentnessReport.compatibilityClaimed",
+      "sourceCurrentnessReport.blockedPublicClaims.publicSchedulerTimingCompatibilityClaimed",
+      "sourceCurrentnessReport.blockedPublicClaims.publicRootSchedulerCompatibilityClaimed",
+      "sourceCurrentnessReport.blockedPublicClaims.publicReactActCompatibilityClaimed",
+      "sourceCurrentnessReport.blockedPublicClaims.publicPackageCompatibilityClaimed"
+    ],
+    gate.publicCompatibilityClaimIds
+  );
+  assertViolation(
+    gate,
+    "scheduler-variant-currentness-public-compatibility-claim-detected"
   );
 });
 
@@ -523,4 +857,84 @@ function assertNativeThrowers(throwers) {
       message: "Not implemented."
     });
   }
+}
+
+function baselineVariantCurrentnessGate() {
+  cachedVariantCurrentnessGate ??= evaluateSchedulerVariantCurrentnessGate({
+    oracle
+  });
+  return cachedVariantCurrentnessGate;
+}
+
+function evaluateVariantCurrentnessWithBaselineReport({
+  sourceCurrentnessReport = cloneJson(
+    baselineVariantCurrentnessGate().sourceCurrentnessReport
+  ),
+  oracle: effectiveOracle = oracle
+} = {}) {
+  return evaluateSchedulerVariantCurrentnessGate({
+    oracle: effectiveOracle,
+    sourceCurrentnessReport
+  });
+}
+
+function assertVariantCurrentnessRow(
+  row,
+  {
+    classification,
+    modeId,
+    entrypoint,
+    packagePath,
+    deepCjsPath,
+    directDeepCjsImport,
+    sourceDiagnosticIds
+  }
+) {
+  assert.equal(row.classification, classification, row.variantId);
+  assert.equal(
+    row.rootNativeMockPostTaskClassification,
+    classification,
+    row.variantId
+  );
+  assert.equal(row.modeId, modeId, row.variantId);
+  assert.equal(row.entrypoint, entrypoint, row.variantId);
+  assert.equal(row.packagePath, packagePath, row.variantId);
+  assert.equal(row.deepCjsPath, deepCjsPath, row.variantId);
+  assert.equal(row.directDeepCjsImport, directDeepCjsImport, row.variantId);
+  assert.deepEqual(
+    row.sourceDiagnosticIds,
+    sourceDiagnosticIds,
+    row.variantId
+  );
+  assert.equal(row.evidenceScope.sourceOwnedCurrentnessReport, true);
+  assert.equal(row.evidenceScope.rootEntryEvidenceAcceptedForVariant, false);
+  assert.equal(row.evidenceScope.variantEvidenceAcceptedForRootBehavior, false);
+  assert.equal(row.evidenceScope.behaviorEvidenceClaimed, false);
+  assert.equal(row.evidenceScope.rootBehaviorEvidenceClaimed, false);
+  assert.equal(row.evidenceScope.variantBehaviorEvidenceClaimed, false);
+  assert.equal(row.evidenceScope.directDeepCjsBehaviorEvidenceClaimed, false);
+  assert.equal(row.compatibilityClaimed, false);
+}
+
+function assertViolation(gate, id) {
+  assert.ok(
+    gate.violations.some((violation) => violation.id === id),
+    `missing violation ${id}`
+  );
+}
+
+function violationById(gate, id) {
+  const violation = gate.violations.find((candidate) => candidate.id === id);
+  assert.ok(violation, `missing violation ${id}`);
+  return violation;
+}
+
+function assertSubset(expectedSubset, actualSuperset) {
+  for (const value of expectedSubset) {
+    assert.equal(actualSuperset.includes(value), true, value);
+  }
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
 }
