@@ -2971,6 +2971,12 @@ const getInstancePrivateClassRootGate = Object.freeze({
 const privateTestInstanceWrapperRecordSymbol = Symbol.for(
   'fast.react_test_renderer.private_test_instance_wrapper_record'
 );
+const privateTestInstanceLifecycleGateDiagnosticName =
+  'fast-react-test-renderer.testinstance.private-root-lifecycle-gate';
+const privateTestInstanceLifecycleGateRequiredStatus =
+  'private-test-instance-root-lifecycle-evidence-required-public-test-instance-blocked';
+const privateTestInstanceLifecycleGateAcceptedStatus =
+  'private-test-instance-root-lifecycle-evidence-accepted-public-test-instance-blocked';
 const privateTestInstanceEmptyProps = Object.freeze({});
 const privateTestInstanceHostRootProps = null;
 const privateTestInstanceRootTextChildRecord = Object.freeze({
@@ -3500,6 +3506,48 @@ const privateTestInstanceRootQueryRecord = Object.freeze({
   publicAccessAvailable: false,
   result: privateTestInstanceRootRecord
 });
+const privateTestInstanceRootLifecycleGate = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-root-lifecycle-gate',
+  diagnosticName: privateTestInstanceLifecycleGateDiagnosticName,
+  status: privateTestInstanceLifecycleGateRequiredStatus,
+  acceptedStatus: privateTestInstanceLifecycleGateAcceptedStatus,
+  publicSurface: 'create().root/ReactTestInstance.find*',
+  acceptedWorker: 'worker-888-test-renderer-instance-lifecycle-gate',
+  acceptedDependencyWorkers: Object.freeze([
+    'worker-844-test-renderer-package-root-native-execution-parity',
+    'worker-859-test-renderer-private-lifecycle-native-consumer-hardening',
+    'worker-868-test-renderer-private-lifecycle-native-consumer-hardening',
+    'worker-872-test-renderer-package-root-cjs-lifecycle-execution-evidence'
+  ]),
+  sourceLifecycleDiagnosticName: privateRootLifecycleExecutionDiagnosticName,
+  sourceLifecycleStatus: privateRootLifecycleExecutionStatus,
+  sourceLifecycleEvidenceKind:
+    'FastReactTestRendererPrivateRootLifecycleExecutionEvidence',
+  requiresSourceOwnedCreateUpdateUnmountEvidence: true,
+  requiresCurrentRootRequest: true,
+  validatesEntrypointIdentity: true,
+  validatesRootHandleIdentity: true,
+  validatesRootRequestCurrentness: true,
+  validatesFinishedWorkAndHostOutputSourceRecords: true,
+  rejectsReplayLifecycleEvidence: true,
+  rejectsStaleUpdateLifecycleEvidence: true,
+  rejectsStaleAfterUnmountLifecycleEvidence: true,
+  rejectsCrossSurfaceLifecycleEvidence: true,
+  rejectsClonedLifecycleRows: true,
+  rejectsCallerBuiltLifecycleRows: true,
+  rejectsCallerShapedQueryRows: true,
+  publicRootAvailable: false,
+  publicQueryMethodsAvailable: false,
+  publicTestInstanceObjectAvailable: false,
+  publicSerializationAvailable: false,
+  publicActAvailable: false,
+  publicSchedulerAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  jsPackageCompatibilityAvailable: false,
+  compatibilityClaimed: false
+});
 const privateTestInstanceWrapperSkeleton = Object.freeze({
   id: 'react-test-renderer-private-test-instance-wrapper-skeleton',
   status: 'private-record-ready-public-test-instance-blocked',
@@ -3509,6 +3557,11 @@ const privateTestInstanceWrapperSkeleton = Object.freeze({
   publicRootAvailable: false,
   publicQueryMethodsAvailable: false,
   publicTestInstanceObjectAvailable: false,
+  privateRootLifecycleGate: privateTestInstanceRootLifecycleGate,
+  privateRootLifecycleEvidenceRequired: true,
+  privateRootLifecycleEvidenceAccepted: false,
+  privateRootLifecycleExecutionDiagnosticName,
+  privateRootLifecycleExecutionStatus,
   nativeBridgeAvailable: false,
   nativeExecution: false,
   compatibilityClaimed: false,
@@ -4301,8 +4354,13 @@ function createUnsupportedError(
         rootRequest.operation === 'update'
           ? getUpdateRouteAdmissionForRootRequest(rootRequest)
           : null;
-      error.privateTestInstanceWrapperRecord =
+      error.privateTestInstanceLifecycleGate =
         getTestInstanceQueryDiagnosticsForRootRequest(rootRequest);
+      error.privateTestInstanceWrapperRecord =
+        error.privateTestInstanceLifecycleGate.kind ===
+        'FastReactTestRendererPrivateTestInstanceRootLifecycleGate'
+          ? null
+          : error.privateTestInstanceLifecycleGate;
     }
   }
 
@@ -7363,6 +7421,7 @@ const rootRequestTestInstanceQueryDiagnostics = new WeakMap();
 const rootRequestCreateRouteAdmissions = new WeakMap();
 const rootRequestUpdateRouteAdmissions = new WeakMap();
 const rootRequestUpdateNativeBridgeAdmissions = new WeakMap();
+const rootHandleTestInstanceLifecycleEvidence = new WeakMap();
 const rootExecutionResults = new WeakSet();
 
 function createTestRendererRootRequestBridge(options) {
@@ -7463,20 +7522,20 @@ function createTestRendererRootRequestBridge(options) {
       return getTestInstanceQueryDiagnosticsForRootRequest(record);
     },
     getRootTestInstanceQueryDiagnostics(rootHandle) {
-      const requests = getRootRequestsForHandle(rootHandle);
-      return requests.length === 0
+      const request = getCurrentRootRequestForHandle(rootHandle);
+      return request === null
         ? null
-        : getTestInstanceQueryDiagnosticsForRootRequest(requests[0]);
+        : getTestInstanceQueryDiagnosticsForRootRequest(request);
     },
     getRendererTestInstanceQueryDiagnostics(renderer) {
       const rootHandle = rendererRootHandles.get(renderer);
       if (rootHandle === undefined) {
         return null;
       }
-      const requests = getRootRequestsForHandle(rootHandle);
-      return requests.length === 0
+      const request = getCurrentRootRequestForHandle(rootHandle);
+      return request === null
         ? null
-        : getTestInstanceQueryDiagnosticsForRootRequest(requests[0]);
+        : getTestInstanceQueryDiagnosticsForRootRequest(request);
     },
     canConsumeAcceptedRustLifecycleDiagnostic(record, diagnostic) {
       try {
@@ -7562,7 +7621,9 @@ function createTestRendererRootRequestBridge(options) {
     },
     canConsumePrivateRootLifecycleExecutionEvidence(records) {
       try {
-        consumePrivateRootLifecycleExecutionEvidence(records);
+        consumePrivateRootLifecycleExecutionEvidence(records, {
+          recordAcceptance: false
+        });
         return true;
       } catch (_error) {
         return false;
@@ -10042,7 +10103,7 @@ function consumeRootExecutionResult(record, result, handoff) {
   return executionResult;
 }
 
-function consumePrivateRootLifecycleExecutionEvidence(records) {
+function consumePrivateRootLifecycleExecutionEvidence(records, options) {
   const createResult = readLifecycleExecutionResult(records, 'create');
   const updateResult = readLifecycleExecutionResult(records, 'update');
   const unmountResult = readLifecycleExecutionResult(records, 'unmount');
@@ -10060,6 +10121,12 @@ function consumePrivateRootLifecycleExecutionEvidence(records) {
     updateResult,
     unmountResult
   );
+  assertRootLifecycleExecutionRowsHaveSourceRecords(
+    createResult,
+    updateResult,
+    unmountResult
+  );
+  assertRootLifecycleExecutionEvidenceNotReplayed(createResult);
 
   const operationEvidence = freezeArray([
     createPrivateRootLifecycleExecutionOperationEvidence(createResult),
@@ -10067,7 +10134,7 @@ function consumePrivateRootLifecycleExecutionEvidence(records) {
     createPrivateRootLifecycleExecutionOperationEvidence(unmountResult)
   ]);
 
-  return freezeRecord({
+  const evidence = freezeRecord({
     id: privateRootLifecycleExecutionDiagnosticName,
     kind: 'FastReactTestRendererPrivateRootLifecycleExecutionEvidence',
     diagnosticName: privateRootLifecycleExecutionDiagnosticName,
@@ -10114,6 +10181,15 @@ function consumePrivateRootLifecycleExecutionEvidence(records) {
     jsPackageCompatibilityAvailable: false,
     compatibilityClaimed: false
   });
+
+  if (!(options && options.recordAcceptance === false)) {
+    rootHandleTestInstanceLifecycleEvidence.set(
+      createResult.request.rootHandle,
+      evidence
+    );
+  }
+
+  return evidence;
 }
 
 function readLifecycleExecutionResult(records, operation) {
@@ -10151,9 +10227,19 @@ function assertSourceOwnedRootLifecycleExecutionResult(result, operation) {
       'Expected source-owned private root lifecycle execution row.'
     );
   }
+  if (!Object.isFrozen(result)) {
+    throwInvalidRootRequest(
+      'Expected frozen source-owned private root lifecycle execution row.'
+    );
+  }
   if (!isRootRequestRecord(result.request)) {
     throwInvalidRootRequest(
       'Expected lifecycle execution row to carry a private root request.'
+    );
+  }
+  if (result.entrypoint !== entrypoint || result.request.entrypoint !== entrypoint) {
+    throwInvalidRootRequest(
+      'Expected lifecycle execution row to belong to the current react-test-renderer entrypoint.'
     );
   }
   if (result.operation !== operation || result.request.operation !== operation) {
@@ -10261,6 +10347,38 @@ function assertRootLifecycleExecutionRowsAreCurrent(
   ) {
     throwInvalidRootRequest(
       'Private root lifecycle execution rows are stale for the current renderer root.'
+    );
+  }
+}
+
+function assertRootLifecycleExecutionRowsHaveSourceRecords(
+  createResult,
+  updateResult,
+  unmountResult
+) {
+  for (const result of [createResult, updateResult, unmountResult]) {
+    const sourceRecordId = sourceExecutionRecordIdForRootLifecycleResult(result);
+    const sourceStatus = sourceExecutionStatusForRootLifecycleResult(result);
+    if (
+      typeof sourceRecordId !== 'string' ||
+      sourceRecordId.length === 0 ||
+      typeof sourceStatus !== 'string' ||
+      sourceStatus.length === 0
+    ) {
+      throwInvalidRootRequest(
+        'Private root lifecycle execution evidence must carry finished work or current host output source records.'
+      );
+    }
+  }
+}
+
+function assertRootLifecycleExecutionEvidenceNotReplayed(createResult) {
+  const existing = rootHandleTestInstanceLifecycleEvidence.get(
+    createResult.request.rootHandle
+  );
+  if (existing !== undefined) {
+    throwInvalidRootRequest(
+      'Private root lifecycle execution evidence has already been accepted for this renderer root.'
     );
   }
 }
@@ -10566,6 +10684,12 @@ function getRootRequestsForHandle(rootHandle) {
   return freezeArray(handleState.requests.slice());
 }
 
+function getCurrentRootRequestForHandle(rootHandle) {
+  const handleState = assertPrivateRootHandle(rootHandle);
+  const {requests} = handleState;
+  return requests.length === 0 ? null : requests[requests.length - 1];
+}
+
 function isRootRequestRecord(record) {
   return (
     record !== null &&
@@ -10616,16 +10740,172 @@ function getTestInstanceQueryDiagnosticsForRootRequest(record) {
       'Expected a private react-test-renderer root request record.'
     );
   }
+  const lifecycleEvidence =
+    getAcceptedTestInstanceLifecycleEvidenceForRootRequest(record);
+  if (lifecycleEvidence === null) {
+    return createPrivateTestInstanceLifecycleGateRecord(record);
+  }
 
   let diagnostics = rootRequestTestInstanceQueryDiagnostics.get(record);
   if (diagnostics === undefined) {
-    diagnostics = createPrivateTestInstanceWrapperRecordForRootRequest(record);
+    diagnostics = createPrivateTestInstanceWrapperRecordForRootRequest(
+      record,
+      lifecycleEvidence
+    );
     rootRequestTestInstanceQueryDiagnostics.set(record, diagnostics);
   }
   return diagnostics;
 }
 
-function createPrivateTestInstanceWrapperRecordForRootRequest(rootRequest) {
+function getAcceptedTestInstanceLifecycleEvidenceForRootRequest(rootRequest) {
+  if (!isRootRequestRecord(rootRequest)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+  const evidence = rootHandleTestInstanceLifecycleEvidence.get(
+    rootRequest.rootHandle
+  );
+  if (evidence === undefined) {
+    return null;
+  }
+  if (!isAcceptedTestInstanceLifecycleEvidenceForRootRequest(rootRequest, evidence)) {
+    return null;
+  }
+  return evidence;
+}
+
+function assertAcceptedTestInstanceLifecycleEvidenceForRootRequest(
+  rootRequest,
+  lifecycleEvidence
+) {
+  const evidence =
+    lifecycleEvidence ??
+    getAcceptedTestInstanceLifecycleEvidenceForRootRequest(rootRequest);
+  if (evidence === null) {
+    throwInvalidRootRequest(
+      'Private TestInstance query diagnostics require accepted current root lifecycle execution evidence.'
+    );
+  }
+  return evidence;
+}
+
+function isAcceptedTestInstanceLifecycleEvidenceForRootRequest(
+  rootRequest,
+  evidence
+) {
+  if (
+    evidence === null ||
+    typeof evidence !== 'object' ||
+    !Object.isFrozen(evidence) ||
+    evidence.kind !== 'FastReactTestRendererPrivateRootLifecycleExecutionEvidence' ||
+    evidence.diagnosticName !== privateRootLifecycleExecutionDiagnosticName ||
+    evidence.status !== privateRootLifecycleExecutionStatus ||
+    evidence.entrypoint !== entrypoint ||
+    evidence.compatibilityClaimed !== false
+  ) {
+    return false;
+  }
+  const currentRequest = getCurrentRootRequestForHandle(rootRequest.rootHandle);
+  return (
+    currentRequest === rootRequest &&
+    evidence.rootId === rootRequest.rootId &&
+    evidence.rootSequence === rootRequest.rootSequence &&
+    evidence.unmount.requestSequence === rootRequest.requestSequence &&
+    evidence.sourceOwnedExecutionAccepted === true &&
+    evidence.createUpdateUnmountEvidenceConsumed === true &&
+    evidence.publicRootAvailable === false &&
+    evidence.publicTestInstanceAvailable === false &&
+    evidence.nativeBridgeAvailable === false &&
+    evidence.nativeExecutionAvailable === false &&
+    evidence.jsPackageCompatibilityAvailable === false
+  );
+}
+
+function createPrivateTestInstanceLifecycleGateRecord(rootRequest) {
+  const currentRequest = getCurrentRootRequestForHandle(rootRequest.rootHandle);
+  const acceptedEvidence = rootHandleTestInstanceLifecycleEvidence.get(
+    rootRequest.rootHandle
+  );
+  const acceptedEvidenceCurrent =
+    acceptedEvidence !== undefined &&
+    isAcceptedTestInstanceLifecycleEvidenceForRootRequest(
+      currentRequest ?? rootRequest,
+      acceptedEvidence
+    );
+  const exposesPrivateQueryDiagnostics =
+    acceptedEvidenceCurrent && currentRequest === rootRequest;
+
+  return freezeRecord({
+    id: 'react-test-renderer-private-test-instance-root-lifecycle-gate-record',
+    kind: 'FastReactTestRendererPrivateTestInstanceRootLifecycleGate',
+    diagnosticName: privateTestInstanceLifecycleGateDiagnosticName,
+    status: exposesPrivateQueryDiagnostics
+      ? privateTestInstanceLifecycleGateAcceptedStatus
+      : privateTestInstanceLifecycleGateRequiredStatus,
+    gate: privateTestInstanceRootLifecycleGate,
+    entrypoint,
+    compatibilityTarget,
+    publicSurface: 'create().root/ReactTestInstance.find*',
+    symbol: privateTestInstanceWrapperRecordSymbol.description,
+    rootRequest,
+    currentRootRequest: currentRequest,
+    rootHandle: rootRequest.rootHandle,
+    rootId: rootRequest.rootId,
+    rootSequence: rootRequest.rootSequence,
+    requestedRootRequestId: rootRequest.requestId,
+    requestedRootRequestSequence: rootRequest.requestSequence,
+    currentRootRequestId: currentRequest === null ? null : currentRequest.requestId,
+    currentRootRequestSequence:
+      currentRequest === null ? null : currentRequest.requestSequence,
+    sourceLifecycleDiagnosticName: privateRootLifecycleExecutionDiagnosticName,
+    sourceLifecycleStatus: privateRootLifecycleExecutionStatus,
+    acceptedLifecycleEvidenceAvailable: acceptedEvidenceCurrent,
+    acceptedLifecycleEvidence: acceptedEvidenceCurrent ? acceptedEvidence : null,
+    requiresSourceOwnedCreateUpdateUnmountEvidence: true,
+    requiresCurrentRootRequest: true,
+    exposesPrivateQueryDiagnostics,
+    publicRootAvailable: false,
+    publicQueryMethodsAvailable: false,
+    publicTestInstanceObjectAvailable: false,
+    publicSerializationAvailable: false,
+    publicActAvailable: false,
+    publicSchedulerAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    jsPackageCompatibilityAvailable: false,
+    compatibilityClaimed: false,
+    canAcceptPrivateRootLifecycleExecutionEvidence(records) {
+      try {
+        consumePrivateRootLifecycleExecutionEvidence(records, {
+          recordAcceptance: false
+        });
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    acceptPrivateRootLifecycleExecutionEvidence(records) {
+      return consumePrivateRootLifecycleExecutionEvidence(records);
+    },
+    getAcceptedPrivateTestInstanceQueryDiagnostics() {
+      const request = getCurrentRootRequestForHandle(rootRequest.rootHandle);
+      return request === null
+        ? createPrivateTestInstanceLifecycleGateRecord(rootRequest)
+        : getTestInstanceQueryDiagnosticsForRootRequest(request);
+    }
+  });
+}
+
+function createPrivateTestInstanceWrapperRecordForRootRequest(
+  rootRequest,
+  lifecycleEvidence
+) {
+  const acceptedLifecycleEvidence =
+    assertAcceptedTestInstanceLifecycleEvidenceForRootRequest(
+      rootRequest,
+      lifecycleEvidence
+    );
   const rootBridgeMetadata = freezeRecord({
     id: 'react-test-renderer-private-test-instance-root-bridge-metadata',
     bridgeKind: 'FastReactTestRendererPrivateRootRequestBridge',
@@ -10646,6 +10926,14 @@ function createPrivateTestInstanceWrapperRecordForRootRequest(rootRequest) {
     createRequestCompatibilityStatus: rootRequest.compatibilityStatus,
     rustCanaryMetadata: rootRequest.rustCanaryMetadata,
     testInstanceQueryMetadata: rootRequest.rustCanaryMetadata.testInstanceQuery,
+    privateRootLifecycleGate: privateTestInstanceRootLifecycleGate,
+    privateRootLifecycleExecutionEvidence: acceptedLifecycleEvidence,
+    privateRootLifecycleEvidenceAccepted: true,
+    sourceLifecycleDiagnosticName:
+      acceptedLifecycleEvidence.diagnosticName,
+    sourceLifecycleStatus: acceptedLifecycleEvidence.status,
+    sourceLifecycleRequestSequences:
+      acceptedLifecycleEvidence.requestSequences,
     recordOnlyPrivateBridge: rootRequest.rustCanaryMetadata.recordOnlyPrivateBridge,
     nativeBridgeAvailable: false,
     nativeExecution: false,
@@ -10659,6 +10947,15 @@ function createPrivateTestInstanceWrapperRecordForRootRequest(rootRequest) {
     ...privateTestInstanceWrapperSkeleton,
     status:
       'private-bridge-query-metadata-ready-public-test-instance-blocked',
+    privateRootLifecycleGate: privateTestInstanceRootLifecycleGate,
+    privateRootLifecycleExecutionEvidence: acceptedLifecycleEvidence,
+    privateRootLifecycleEvidenceRequired: true,
+    privateRootLifecycleEvidenceAccepted: true,
+    sourceLifecycleDiagnosticName:
+      acceptedLifecycleEvidence.diagnosticName,
+    sourceLifecycleStatus: acceptedLifecycleEvidence.status,
+    sourceLifecycleRequestSequences:
+      acceptedLifecycleEvidence.requestSequences,
     bridgeRouted: true,
     bridgeMetadataSource:
       rootRequest.rustCanaryMetadata.testInstanceQuery.bridgeMetadataSource,
@@ -10676,6 +10973,7 @@ function createPrivateTestInstanceWrapperRecordForRootRequest(rootRequest) {
     rootRequestRustCanaryMetadata: rootRequest.rustCanaryMetadata,
     rootRequestTestInstanceQueryMetadata:
       rootRequest.rustCanaryMetadata.testInstanceQuery,
+    consumesPrivateRootLifecycleExecutionEvidence: true,
     consumesRootBridgeMetadata: true,
     standaloneWrapperMetadata: false,
     nativeBridgeAvailable: false,
@@ -16651,6 +16949,9 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
     configurable: true,
     enumerable: true,
     get() {
+      const currentRootRequest =
+        getCurrentRootRequestForHandle(createRequest.rootHandle) ??
+        createRequest;
       throw createUnsupportedError(
         'create().root',
         'was accessed',
@@ -16658,14 +16959,14 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
         routingGate,
         undefined,
         undefined,
-        createRequest
+        currentRootRequest
       );
     }
   });
   Object.defineProperty(renderer, privateTestInstanceWrapperRecordSymbol, {
     configurable: false,
     enumerable: false,
-    value: getTestInstanceQueryDiagnosticsForRootRequest(createRequest),
+    value: createPrivateTestInstanceLifecycleGateRecord(createRequest),
     writable: false
   });
 
