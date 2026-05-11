@@ -17,6 +17,10 @@
 - Audit follow-up added explicit top-level alias blockers for public/root/act/
   Scheduler/package/native compatibility and runtime claim fields so rows cannot
   bypass the gate by setting claim aliases outside `publicBlockerClaims`.
+- Re-audit follow-up imported adjacent established blocker aliases from the 804
+  managed-child ledger and 805 Scheduler diagnostics ledger, including
+  managed-child DOM/hydration/native bridge aliases plus Scheduler admission,
+  helper-routing, helper-invocation, readiness, and execution-shaped fields.
 
 ## Changed Files
 
@@ -57,6 +61,11 @@
   - `node --check tests/conformance/test/private-admission-820-reconciler-ledger.test.mjs`
   - `node --test tests/conformance/test/private-admission-820-reconciler-ledger.test.mjs`
   - `git diff --check`
+  - `git diff --check`
+- Re-audit follow-up rerun:
+  - `node --check tests/conformance/src/private-admission-820-reconciler-ledger.mjs`
+  - `node --check tests/conformance/test/private-admission-820-reconciler-ledger.test.mjs`
+  - `node --test tests/conformance/test/private-admission-820-reconciler-ledger.test.mjs`
 
 ## Verification Result
 
@@ -66,6 +75,9 @@
 - Audit follow-up syntax checks passed.
 - Audit follow-up focused Node test passed: 7 tests, 7 pass.
 - Audit follow-up `git diff --check` passed.
+- Re-audit follow-up syntax checks passed.
+- Re-audit follow-up focused Node test passed: 7 tests, 7 pass.
+- Re-audit follow-up `git diff --check` passed.
 
 ## Risks Or Blockers
 
@@ -76,6 +88,8 @@
   public Scheduler compatibility.
 - Top-level compatibility/runtime claim aliases now fail closed; future aliases
   should be added to the exported top-level public or runtime claim field lists.
+- The top-level alias blocker lists now include the adjacent 804 managed-child
+  and 805 Scheduler diagnostics claim vocabulary.
 - Future refactors that rename the source-owned canary identifiers will need to
   update this ledger.
 
