@@ -3021,6 +3021,127 @@ test("React DOM client private facade host-output update routes through private 
   assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
 });
 
+test("React DOM client private facade lifecycle boundary rejects stale source records", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const symbol = rootBridge.privateRootPublicFacadeAdapterSymbol;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    symbol
+  );
+  const document = createPrivateGateDocument(
+    "public-facade-lifecycle-boundary",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const crossDocument = createPrivateGateDocument(
+    "public-facade-lifecycle-boundary-cross",
+    domContainer
+  );
+  const crossContainer = createPrivateGateElement(
+    "DIV",
+    crossDocument,
+    domContainer
+  );
+  const initialElement = {
+    props: {
+      children: "boundary initial",
+      id: "facade-boundary-host"
+    },
+    type: "section"
+  };
+  const nextElement = {
+    props: {
+      children: "boundary updated",
+      id: "facade-boundary-host"
+    },
+    type: "section"
+  };
+  const adapter = descriptor.value({
+    requestIdPrefix: "facade-boundary-request",
+    rootIdPrefix: "facade-boundary-root",
+    updateIdPrefix: "facade-boundary-update"
+  });
+  const root = adapter.createRoot(container);
+  const initial = root.render(initialElement);
+  const hidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(initial);
+  const crossRoot = adapter.createRoot(crossContainer);
+  const crossInitial = adapter.renderHostOutput(crossRoot, initialElement);
+  const crossHidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(crossInitial);
+  const clonedSnapshot = Object.freeze({
+    ...initial.sourceContainerSnapshot
+  });
+
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(root, nextElement, {
+        sourceUpdateRecord: hidden.renderRecord
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE",
+      message: /stale source record snapshot/
+    }
+  );
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(root, nextElement, {
+        sourceUpdateRecord: crossHidden.renderRecord
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE",
+      message: /cloned or caller-built source record/
+    }
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord(
+      clonedSnapshot
+    ),
+    false
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
+      clonedSnapshot
+    ),
+    null
+  );
+  assert.deepEqual(
+    adapter.getRootRequestRecords(root).map((record) => record.requestType),
+    ["createRoot", "root.render"]
+  );
+  assert.deepEqual(adapter.getRootHostOutputUpdateDiagnostics(root), []);
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.textContent, "boundary initial");
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+
+  hidden.bridge.cleanupInitialRenderHostOutput(hidden.hostOutputHandoff);
+  crossHidden.bridge.cleanupInitialRenderHostOutput(
+    crossHidden.hostOutputHandoff
+  );
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(crossContainer.childNodes.length, 0);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.createRoot.status, "throws");
+  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+});
+
 test("React DOM client private facade nested host-output update stays diagnostic-only", () => {
   const reactDomClient = require(
     path.join(repoRoot, "packages/react-dom/client.js")

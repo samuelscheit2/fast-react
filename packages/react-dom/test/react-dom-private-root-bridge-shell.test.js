@@ -11967,6 +11967,38 @@ test('private react-dom/client facade lifecycle source records fail closed', () 
       message: /cloned or caller-built createRoot source record/
     }
   );
+  let renderMetadataGetterCalled = false;
+  assert.throws(
+    () =>
+      adapter.renderHostOutput(renderRoot, initialElement, {
+        get rootWorkLoopFinishedWorkMetadata() {
+          renderMetadataGetterCalled = true;
+          return {};
+        },
+        sourceCreateRecord: clonedCreateRecord
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER',
+      message: /cloned or caller-built createRoot source record/
+    }
+  );
+  assert.equal(renderMetadataGetterCalled, false);
+  const crossCreateDocument = createDocument(
+    'private-client-facade-source-render-cross-create'
+  );
+  const crossCreateContainer = createElement('DIV', crossCreateDocument);
+  const crossCreateRoot = adapter.createRoot(crossCreateContainer);
+  const crossCreateRecord = adapter.getRootCreateRecord(crossCreateRoot);
+  assert.throws(
+    () =>
+      adapter.renderHostOutput(renderRoot, initialElement, {
+        sourceCreateRecord: crossCreateRecord
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER',
+      message: /cloned or caller-built createRoot source record/
+    }
+  );
   const callerBuiltRenderRecord = Object.freeze({
     $$typeof: rootBridge.privateRootUpdateRecordType,
     operation: 'render',
@@ -12004,11 +12036,44 @@ test('private react-dom/client facade lifecycle source records fail closed', () 
     rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
       initialDiagnostic
     );
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(updateRoot, nextElement, {
+        sourceUpdateRecord: initialPayload.renderRecord
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE',
+      message: /stale source record snapshot/
+    }
+  );
   const clonedRenderRecord = Object.freeze({...initialPayload.renderRecord});
   assert.throws(
     () =>
       adapter.updateHostOutput(updateRoot, nextElement, {
         sourceUpdateRecord: clonedRenderRecord
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE',
+      message: /cloned or caller-built source record/
+    }
+  );
+  const crossUpdateDocument = createDocument(
+    'private-client-facade-source-update-cross-render'
+  );
+  const crossUpdateContainer = createElement('DIV', crossUpdateDocument);
+  const crossUpdateRoot = adapter.createRoot(crossUpdateContainer);
+  const crossUpdateDiagnostic = adapter.renderHostOutput(
+    crossUpdateRoot,
+    initialElement
+  );
+  const crossUpdatePayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      crossUpdateDiagnostic
+    );
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(updateRoot, nextElement, {
+        sourceUpdateRecord: crossUpdatePayload.renderRecord
       }),
     {
       code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE',
@@ -12057,6 +12122,22 @@ test('private react-dom/client facade lifecycle source records fail closed', () 
       message: /cloned or caller-built source record/
     }
   );
+  const crossUnmountDocument = createDocument(
+    'private-client-facade-source-unmount-cross-record'
+  );
+  const crossUnmountContainer = createElement('DIV', crossUnmountDocument);
+  const crossUnmountRoot = adapter.createRoot(crossUnmountContainer);
+  const crossUnmountRecord = crossUnmountRoot.unmount();
+  assert.throws(
+    () =>
+      adapter.unmountHostOutput(unmountRoot, initialElement, {
+        sourceUnmountRecord: crossUnmountRecord
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT',
+      message: /cloned or caller-built source record/
+    }
+  );
   assertBridgeDidNotTouchContainer(unmountContainer, unmountDocument);
   assert.deepEqual(
     adapter.getRootHostOutputUnmountCleanupDiagnostics(unmountRoot),
@@ -12064,6 +12145,9 @@ test('private react-dom/client facade lifecycle source records fail closed', () 
   );
   assert.equal(adapter.getRootRequestRecords(unmountRoot).length, 1);
 
+  crossUpdatePayload.bridge.cleanupInitialRenderHostOutput(
+    crossUpdatePayload.hostOutputHandoff
+  );
   initialPayload.bridge.cleanupInitialRenderHostOutput(
     initialPayload.hostOutputHandoff
   );
