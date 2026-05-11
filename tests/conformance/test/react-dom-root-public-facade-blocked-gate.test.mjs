@@ -3021,6 +3021,222 @@ test("React DOM client private facade host-output update routes through private 
   assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
 });
 
+test("React DOM client private facade root.render update consumes source-owned HostComponent and HostText execution metadata only", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const symbol = rootBridge.privateRootPublicFacadeAdapterSymbol;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    symbol
+  );
+  const document = createPrivateGateDocument(
+    "public-facade-root-render-update-execution",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const initialElement = {
+    props: {
+      children: "initial execution output",
+      className: "execution initial",
+      id: "execution-host"
+    },
+    type: "main"
+  };
+  const nextElement = {
+    props: {
+      children: "updated execution output",
+      className: "execution updated",
+      id: "execution-host",
+      title: "Updated execution host"
+    },
+    type: "main"
+  };
+  const adapter = descriptor.value({
+    hostOutputUpdateIdPrefix: "facade-conformance-exec-handoff",
+    nativeEnvironmentId: 880,
+    nativeHandoffIdPrefix: "facade-conformance-exec-native",
+    publicFacadeHostOutputRenderIdPrefix: "facade-conformance-exec-render",
+    publicFacadeHostOutputUpdateIdPrefix: "facade-conformance-exec-update",
+    requestIdPrefix: "facade-conformance-exec-request",
+    rootCommitHostComponentUpdateIdPrefix:
+      "facade-conformance-exec-root-commit",
+    rootIdPrefix: "facade-conformance-exec-root",
+    updateIdPrefix: "facade-conformance-exec-update-id"
+  });
+  const root = adapter.createRoot(container);
+  const initial = root.render(initialElement);
+  const initialHidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(initial);
+  const update = root.render(nextElement, {
+    rootCommitHostComponentUpdateExecutionFactory(context) {
+      return context.createRootCommitHostComponentUpdateExecutionRecord({
+        mutationApplyRecords: [
+          context.createRootCommitHostComponentUpdateRow(
+            createRootCommitHostComponentUpdateRecordForConformance({
+              recordIndex: 0,
+              stateNodeRaw: 901
+            })
+          ),
+          context.createRootCommitHostTextUpdateRow(
+            createRootCommitHostTextUpdateRecordForConformance({
+              recordIndex: 1,
+              stateNodeRaw: 902
+            })
+          )
+        ]
+      });
+    }
+  });
+  const hidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputUpdatePayload(update);
+  const executionRecord =
+    update.rootCommitHostComponentUpdateExecutionRecord;
+  const executionPayload =
+    rootBridge.getPrivateRootPublicFacadeRootCommitHostComponentUpdateExecutionPayload(
+      executionRecord
+    );
+
+  assert.equal(
+    update.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(
+    executionRecord.$$typeof,
+    rootBridge
+      .privateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecordType
+  );
+  assert.equal(
+    executionRecord.executionStatus,
+    rootBridge
+      .ROOT_BRIDGE_PUBLIC_FACADE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_EXECUTION_ACCEPTED
+  );
+  assert.equal(executionRecord.sourceUpdateId, hidden.updateRecord.updateId);
+  assert.equal(executionRecord.sourceOwned, true);
+  assert.equal(executionRecord.rootCommitMetadataRecordCount, 2);
+  assert.equal(executionRecord.rootCommitHostComponentUpdateRecordCount, 1);
+  assert.equal(executionRecord.rootCommitHostTextUpdateRecordCount, 1);
+  assert.equal(executionRecord.fakeDomMutation, false);
+  assert.equal(executionRecord.nativeExecution, false);
+  assert.equal(executionRecord.reconcilerExecution, false);
+  assert.equal(executionRecord.compatibilityClaimed, false);
+  assert.equal(
+    update.rootCommitHostComponentUpdateExecutionConsumed,
+    true
+  );
+  assert.equal(
+    update.rootCommitHostComponentUpdateHandoffId,
+    "facade-conformance-exec-root-commit:1"
+  );
+  assert.equal(
+    update.rootCommitHostComponentUpdateStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_APPLIED
+  );
+  assert.equal(update.rootCommitHostTextUpdate.tag, "HostText");
+  assert.equal(
+    update.nativeHandoffId,
+    "facade-conformance-exec-native:3"
+  );
+  assert.equal(update.nativeUpdateRequestMirrored, true);
+  assert.equal(update.rootCommitUpdateExecutionBeforeNativeHandoff, true);
+  assert.equal(
+    update.rustRootCommitUpdateExecutionMetadataAccepted,
+    true
+  );
+  assert.equal(update.publicRootExecution, false);
+  assert.equal(update.publicRootCompatibilitySurface, false);
+  assert.equal(update.nativeExecution, false);
+  assert.equal(update.reconcilerExecution, false);
+  assert.equal(update.browserDomMutation, false);
+  assert.equal(update.compatibilityClaimed, false);
+  assert.deepEqual(
+    update.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "public-facade-create-root-record",
+      "public-facade-initial-host-output-render",
+      "public-facade-root-render-update-record",
+      "private-native-update-request-handoff",
+      "host-output-update-handoff",
+      "source-owned-root-commit-host-component-update-execution",
+      "root-commit-host-component-update-metadata",
+      "root-commit-host-text-update-metadata",
+      "fake-dom-property-update",
+      "property-payload-evidence",
+      "fake-dom-text-update",
+      "latest-props-after-mutation",
+      "attribute-payload-rows"
+    ]
+  );
+  assert.equal(executionPayload.consumed, true);
+  assert.equal(
+    hidden.rootCommitHostComponentUpdatePayload.sourceRecord,
+    hidden.updateRecord
+  );
+  assert.equal(
+    hidden.rootCommitHostComponentUpdatePayload.selectedRootCommitRecord,
+    executionPayload.rootCommitMetadataSelection.record
+  );
+  assert.equal(
+    hidden.nativeHandoffPayload.sourceRecord,
+    hidden.updateRecord
+  );
+  assert.equal(hidden.nativeHandoffPayload.value, nextElement);
+  assert.equal(container.textContent, "updated execution output");
+  assert.deepEqual(attributeEntries(container.firstChild), [
+    ["class", "execution updated"],
+    ["id", "execution-host"],
+    ["title", "Updated execution host"]
+  ]);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+
+  assert.throws(
+    () =>
+      root.render(
+        {
+          props: {
+            children: "replayed execution output",
+            id: "execution-host"
+          },
+          type: "main"
+        },
+        {
+          rootCommitHostComponentUpdateExecutionRecord: executionRecord
+        }
+      ),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE",
+      message: /replayed root HostComponent update execution record/
+    }
+  );
+  assert.deepEqual(adapter.getRootHostOutputUpdateDiagnostics(root), [
+    update
+  ]);
+  assert.equal(container.textContent, "updated execution output");
+
+  hidden.bridge.cleanupInitialRenderHostOutput(
+    initialHidden.hostOutputHandoff
+  );
+  assert.equal(container.childNodes.length, 0);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.createRoot.status, "throws");
+  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+});
+
 test("React DOM client private facade lifecycle boundary rejects stale source records", () => {
   const reactDomClient = require(
     path.join(repoRoot, "packages/react-dom/client.js")
@@ -4994,6 +5210,66 @@ function createPrivateGateRootWorkLoopFinishedWorkMetadata(
       applyKind: "append-placement-to-container",
       siblingStatus: "append"
     }
+  };
+}
+
+function createRootCommitHostComponentUpdateRecordForConformance(options) {
+  return {
+    kind: "commit-host-component-update",
+    tag: "HostComponent",
+    source: {
+      kind: "Update"
+    },
+    root: {
+      slot: 3
+    },
+    hostRoot: {
+      slot: 4
+    },
+    parent: {
+      slot: 4
+    },
+    parentTag: "HostRoot",
+    fiber: {
+      slot: 12 + (options.recordIndex || 0)
+    },
+    alternateFiber: {
+      slot: 8 + (options.recordIndex || 0)
+    },
+    stateNodeRaw: options.stateNodeRaw,
+    pendingPropsRaw: 3003,
+    memoizedPropsRaw: 3003,
+    alternateMemoizedPropsRaw: 3001
+  };
+}
+
+function createRootCommitHostTextUpdateRecordForConformance(options) {
+  return {
+    kind: "commit-host-text-update",
+    tag: "HostText",
+    source: {
+      kind: "Update"
+    },
+    root: {
+      slot: 3
+    },
+    hostRoot: {
+      slot: 4
+    },
+    parent: {
+      slot: 12
+    },
+    parentTag: "HostComponent",
+    fiber: {
+      slot: 40 + (options.recordIndex || 0)
+    },
+    alternateFiber: {
+      slot: 36 + (options.recordIndex || 0)
+    },
+    stateNodeRaw: options.stateNodeRaw,
+    pendingPropsRaw: 4003,
+    memoizedPropsRaw: 4003,
+    alternateMemoizedPropsRaw: 4001
   };
 }
 
