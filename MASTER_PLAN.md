@@ -45,30 +45,30 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current accepted docs baseline is main `5793ba3f`
-(`Merge worker 1001 docs refresh accepted batch`), with cleanup accepted
-through `337c8b76` (`Merge worker 1008 root scheduler test extraction`);
-this docs refresh makes no runtime or public compatibility claim. Accepted
-implementation history still includes the post-Worker-997 batch: Workers 986,
-987, 992, 1000, 998, 978, 999, 990, 967, 996, 994, and 989. Accepted cleanup
-history now also includes Workers 1002-1008, which only moved inline Rust
-`#[cfg(test)] mod tests` blocks into sibling `tests.rs` files. Worker 853's
-competing test-renderer branch was rejected as redundant after Worker 844 was
-accepted; do not use it as accepted input.
+Top-level cap: 30 workers. Current accepted branch baseline before this docs
+refresh is main `878a842c` (`Merge worker 1015 function component source
+split`).
+Accepted implementation history still includes the post-Worker-997 batch:
+Workers 986, 987, 992, 1000, 998, 978, 999, 990, 967, 996, 994, and 989.
+Accepted organization-only cleanup history now includes Workers 1002-1015:
+Rust test-module extractions, the test-renderer facade split, the N-API root
+bridge request split, the root work-loop test split, the `root_commit` error
+module split, root-commit/host-work test splits, and the function-component
+handles/errors split. These cleanups make no runtime or public compatibility
+claim. Worker 853's competing test-renderer branch was rejected as redundant
+after Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- No active implementation or audit workers are recorded in this plan after the
-  `337c8b76` cleanup baseline. Start new work from the queue candidates below,
-  explicit orchestrator assignment, or narrow behavior-preserving module/facade
-  splits that reduce large-file pressure without changing runtime behavior,
-  package exports, public API shape, or compatibility claims.
+- Worker 1016: `root_commit` effects split.
+- Worker 1017: `root_commit` deletions split.
 
 Do not consume future active worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair or audit lane lands, move
 the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private evidence through `8a3b4042`, plus audit policy through
+Accepted private compatibility evidence through `8a3b4042`, accepted
+organization-only cleanup through `878a842c`, plus audit policy through
 `732a6b21`, still keeps public root/render/unmount, `act`,
 `react-dom/test-utils.act`, `flushSync`, Scheduler timing, hydration,
 resources/forms, public input/change or controlled-input behavior,
@@ -82,12 +82,13 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat the accepted branch baseline through `8a3b4042` as private evidence
-   only. Public package, root, native, React DOM, test-renderer, Scheduler,
-   `act`, `react-dom/test-utils.act`, hydration, resource/form,
-   public controlled-input, serialization, React Children lazy/full traversal,
-   unsupported hook, event dispatch, and `flushSync` compatibility still
-   require fail-closed gates and dual-run oracle evidence.
+1. Treat accepted compatibility evidence through `8a3b4042`, plus the
+   organization-only cleanup history through `878a842c`, as private evidence
+   or file-organization evidence only. Public package, root, native, React DOM,
+   test-renderer, Scheduler, `act`, `react-dom/test-utils.act`, hydration,
+   resource/form, public controlled-input, serialization, React Children
+   lazy/full traversal, unsupported hook, event dispatch, and `flushSync`
+   compatibility still require fail-closed gates and dual-run oracle evidence.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct
