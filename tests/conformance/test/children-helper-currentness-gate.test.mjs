@@ -164,13 +164,160 @@ test("private Children traversal currentness report records source-owned anchors
     rendererOrSuspenseCompatibilityClaimed: false,
     compatibilityClaimed: false
   });
+  assert.deepEqual(metadata.lazyRendererBlockerSourceRowFieldNames, [
+    "id",
+    "sourceFiles",
+    "symbols",
+    "role",
+    "compatibilityScope",
+    "sourceOwned",
+    "current",
+    "compatibilityClaimed"
+  ]);
+  assert.deepEqual(
+    metadata.lazyRendererBlockerSourceRows.map((row) => [
+      row.id,
+      row.sourceFiles,
+      row.symbols,
+      row.compatibilityScope
+    ]),
+    [
+      [
+        "react-children-direct-lazy-traversal",
+        ["packages/react/src/ReactChildren.js"],
+        ["mapIntoArray", "REACT_LAZY_TYPE"],
+        "direct-children-helper-only"
+      ],
+      [
+        "react-reconciler-lazy-component-resolution",
+        [
+          "packages/react-reconciler/src/ReactFiberBeginWork.js",
+          "packages/react-reconciler/src/ReactFiberThenable.js"
+        ],
+        ["mountLazyComponent", "resolveLazy"],
+        "renderer-owned"
+      ],
+      [
+        "react-reconciler-suspense-wakeup",
+        [
+          "packages/react-reconciler/src/ReactFiberBeginWork.js",
+          "packages/react-reconciler/src/ReactFiberThrow.js",
+          "packages/react-reconciler/src/ReactFiberWorkLoop.js"
+        ],
+        [
+          "updateSuspenseComponent",
+          "throwException",
+          "markSuspenseBoundaryShouldCapture",
+          "attachPingListener"
+        ],
+        "renderer-owned"
+      ],
+      [
+        "react-dom-root-lazy-render-entry",
+        [
+          "packages/react-dom/src/client/ReactDOMRoot.js",
+          "packages/react-reconciler/src/ReactFiberRoot.js",
+          "packages/react-reconciler/src/ReactFiberBeginWork.js"
+        ],
+        [
+          "createRoot",
+          "ReactDOMRoot.render",
+          "createFiberRoot",
+          "updateHostRoot"
+        ],
+        "root-and-renderer-owned"
+      ]
+    ]
+  );
+  assert.deepEqual(metadata.lazyRendererBlockerRowFieldNames, [
+    "id",
+    "sourceRowId",
+    "directTraversalInput",
+    "blockedSurfaces",
+    "requiredRendererOwnedEvidence",
+    "callerShapedEvidenceAccepted",
+    "blocked",
+    "compatibilityClaimed"
+  ]);
+  assert.deepEqual(
+    metadata.lazyRendererBlockerRows.map((row) => [
+      row.id,
+      row.sourceRowId,
+      row.blockedSurfaces
+    ]),
+    [
+      [
+        "direct-lazy-traversal-not-renderer-lazy-component",
+        "react-reconciler-lazy-component-resolution",
+        [
+          "renderer-lazy-component-execution",
+          "component-tag-selection",
+          "owner-stack",
+          "ref-lifecycle"
+        ]
+      ],
+      [
+        "direct-lazy-traversal-not-suspense-wakeup",
+        "react-reconciler-suspense-wakeup",
+        [
+          "Suspense-fallback-capture",
+          "Suspense-retry-queue",
+          "ping-listener",
+          "offscreen-state"
+        ]
+      ],
+      [
+        "direct-lazy-traversal-not-root-lazy-render",
+        "react-dom-root-lazy-render-entry",
+        [
+          "createRoot",
+          "root.render",
+          "HostRoot-update-queue",
+          "root-scheduling",
+          "DOM-or-native-commit"
+        ]
+      ],
+      [
+        "direct-lazy-traversal-not-portal-ref-prerequisites",
+        "react-children-direct-lazy-traversal",
+        [
+          "real-portal-creation",
+          "ref-attach-detach-lifecycle",
+          "owner-stack-rendering"
+        ]
+      ]
+    ]
+  );
+  assert.deepEqual(metadata.lazyRendererBlockerEvidence, {
+    id: "direct-lazy-children-traversal-renderer-suspense-root-blockers",
+    reactSourceTag: "v19.2.6",
+    reactSourceCommit: "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401",
+    directTraversalOracleScenario: "children-lazy-values",
+    acceptedInputEvidence: "direct-react-lazy-child-traversal",
+    blockerSource:
+      "source-owned React 19.2.6 renderer, Suspense, and root anchors",
+    rendererOwnedEvidenceRequired: true,
+    directLazyTraversalImpliesRendererCompatibility: false,
+    callerShapedRendererEvidenceAccepted: false,
+    callerShapedSuspenseEvidenceAccepted: false,
+    callerShapedRootEvidenceAccepted: false,
+    rendererLazyCompatibilityClaimed: false,
+    suspenseWakeupCompatibilityClaimed: false,
+    rootLazyRenderingCompatibilityClaimed: false,
+    portalOrRefPrerequisiteClaimed: false,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
   assert.deepEqual(metadata.publicCompatibilityFalseFlags, [
     "compatibilityClaimed",
     "publicCompatibilityClaimed",
     "packageCompatibilityClaimed",
     "fullReactChildrenParityClaimed",
     "fastReactBehaviorCompatible",
-    "publicPackageCompatibilityClaimed"
+    "publicPackageCompatibilityClaimed",
+    "publicLazyRendererCompatibilityClaimed",
+    "publicLazySuspenseCompatibilityClaimed",
+    "publicLazyRootCompatibilityClaimed"
   ]);
   assert.deepEqual(metadata.prerequisiteFalseFlags, [
     "ownerStackCompatibilityClaimed",
@@ -178,6 +325,11 @@ test("private Children traversal currentness report records source-owned anchors
     "rootPrerequisitesReady",
     "reactDomRootPrerequisitesReady",
     "schedulerPrerequisitesReady",
+    "lazyRendererPrerequisitesReady",
+    "lazySuspensePrerequisitesReady",
+    "lazyRootPrerequisitesReady",
+    "portalPrerequisitesReady",
+    "refPrerequisitesReady",
     "publicRootCompatibilityClaimed",
     "publicRendererCompatibilityClaimed"
   ]);
@@ -186,6 +338,9 @@ test("private Children traversal currentness report records source-owned anchors
     "fragmentRenderTraversalClaimed",
     "portalCreationClaimed",
     "lazyTraversalClaimed",
+    "lazyRendererCompatibilityClaimed",
+    "lazySuspenseWakeupClaimed",
+    "lazyRootRenderingClaimed",
     "ownerTraversalClaimed",
     "refLifecycleClaimed"
   ]);
@@ -209,6 +364,9 @@ test("private Children traversal currentness is accepted only from the helper so
   assert.equal(report.thrownErrorRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.thrownErrorRows);
   assert.equal(report.unsupportedEdgeCaseRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.unsupportedEdgeCaseRows);
   assert.equal(report.lazyEvidence, childrenHelper.privateChildrenTraversalCurrentnessMetadata.lazyEvidence);
+  assert.equal(report.lazyRendererBlockerSourceRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.lazyRendererBlockerSourceRows);
+  assert.equal(report.lazyRendererBlockerRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.lazyRendererBlockerRows);
+  assert.equal(report.lazyRendererBlockerEvidence, childrenHelper.privateChildrenTraversalCurrentnessMetadata.lazyRendererBlockerEvidence);
   assert.deepEqual(report.behaviorCurrentness, {
     nullishTopLevelCurrent: true,
     booleanChildrenCoerceToNull: true,
@@ -233,14 +391,27 @@ test("private Children traversal currentness is accepted only from the helper so
     lazyTraversalSupported: true,
     lazyTraversalBlocked: false,
     rendererTraversalBlocked: true,
+    lazyRendererSuspenseRootBlockerCurrent: true,
+    lazyRendererCompatibilityBlocked: true,
+    lazySuspenseCompatibilityBlocked: true,
+    lazyRootCompatibilityBlocked: true,
+    callerShapedLazyRendererEvidenceBlocked: true,
     ownerDispatcherRootPrerequisitesBlocked: true,
     compatibilityClaimed: false
   });
   assert.equal(report.fullReactChildrenParityClaimed, false);
   assert.equal(report.rendererTraversalClaimed, false);
   assert.equal(report.lazyTraversalClaimed, false);
+  assert.equal(report.lazyRendererCompatibilityClaimed, false);
+  assert.equal(report.lazySuspenseWakeupClaimed, false);
+  assert.equal(report.lazyRootRenderingClaimed, false);
   assert.equal(report.dispatcherPrerequisitesReady, false);
   assert.equal(report.rootPrerequisitesReady, false);
+  assert.equal(report.lazyRendererPrerequisitesReady, false);
+  assert.equal(report.lazySuspensePrerequisitesReady, false);
+  assert.equal(report.lazyRootPrerequisitesReady, false);
+  assert.equal(report.portalPrerequisitesReady, false);
+  assert.equal(report.refPrerequisitesReady, false);
   assert.equal(Object.isFrozen(report), true);
   assert.equal(Object.isFrozen(report.behaviorCurrentness), true);
   assert.equal(
@@ -262,15 +433,30 @@ test("private Children traversal currentness is accepted only from the helper so
     "iterable-handling",
     "thrown-error-shapes",
     "lazy-child-traversal",
+    "lazy-renderer-suspense-root-blockers",
     "unsupported-edge-blockers"
   ]);
   assert.equal(consumption.sourceReport, report.sourceReport);
   assert.equal(consumption.lazyEvidence, report.lazyEvidence);
+  assert.equal(
+    consumption.lazyRendererBlockerSourceRows,
+    report.lazyRendererBlockerSourceRows
+  );
+  assert.equal(consumption.lazyRendererBlockerRows, report.lazyRendererBlockerRows);
+  assert.equal(
+    consumption.lazyRendererBlockerEvidence,
+    report.lazyRendererBlockerEvidence
+  );
   assert.equal(consumption.behaviorCurrentness, report.behaviorCurrentness);
   assert.equal(consumption.lazyTraversalSupported, true);
   assert.equal(consumption.directLazyTraversalSupported, true);
   assert.equal(consumption.lazyTraversalBlocked, false);
   assert.equal(consumption.rendererTraversalBlocked, true);
+  assert.equal(consumption.lazyRendererSuspenseRootBlocked, true);
+  assert.equal(consumption.lazyRendererCompatibilityClaimed, false);
+  assert.equal(consumption.suspenseWakeupCompatibilityClaimed, false);
+  assert.equal(consumption.rootLazyRenderingCompatibilityClaimed, false);
+  assert.equal(consumption.callerShapedLazyRendererEvidenceAccepted, false);
   assert.equal(consumption.ownerDispatcherRootPrerequisitesBlocked, true);
   assert.equal(consumption.publicCompatibilityClaimed, false);
   assert.equal(consumption.packageCompatibilityClaimed, false);
@@ -388,6 +574,71 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   );
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyRendererBlockerSourceRows: report.lazyRendererBlockerSourceRows.map(
+        (row) => ({
+          ...row,
+          current: false
+        })
+      )
+    }),
+    "children-traversal-currentness-lazy-renderer-source-rows"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyRendererBlockerSourceRows: report.lazyRendererBlockerSourceRows.map(
+        (row) =>
+          row.id === "react-reconciler-suspense-wakeup"
+            ? {
+                ...row,
+                sourceFiles: [
+                  "packages/react-reconciler/src/ReactFiberBeginWork.js",
+                  "packages/react-reconciler/src/ReactFiberThrow.js"
+                ]
+              }
+            : row
+      )
+    }),
+    "children-traversal-currentness-lazy-renderer-source-rows"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyRendererBlockerRows: report.lazyRendererBlockerRows.map((row) => ({
+        ...row,
+        blocked: false
+      }))
+    }),
+    "children-traversal-currentness-lazy-renderer-blocker-rows"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyRendererBlockerEvidence: {
+        ...report.lazyRendererBlockerEvidence,
+        reactSourceCommit: "stale",
+        callerShapedRendererEvidenceAccepted: true
+      }
+    }),
+    "children-traversal-currentness-lazy-renderer-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyRendererBlockerEvidence: {
+        ...report.lazyRendererBlockerEvidence,
+        callerShapedSuspenseEvidenceAccepted: true
+      }
+    }),
+    "children-traversal-currentness-lazy-renderer-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyRendererBlockerEvidence: {
+        ...report.lazyRendererBlockerEvidence,
+        callerShapedRootEvidenceAccepted: true
+      }
+    }),
+    "children-traversal-currentness-lazy-renderer-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
       behaviorCurrentness: {
         keyPathEscapingCurrent: false
       }
@@ -412,7 +663,21 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   );
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
+      behaviorCurrentness: {
+        lazyRendererCompatibilityBlocked: false
+      }
+    }),
+    "children-traversal-currentness-behavior-probes"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
       fullReactChildrenParityClaimed: true
+    }),
+    "children-traversal-currentness-public-compatibility-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      publicLazyRendererCompatibilityClaimed: true
     }),
     "children-traversal-currentness-public-compatibility-claim"
   );
@@ -448,6 +713,30 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   );
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyRendererPrerequisitesReady: true
+    }),
+    "children-traversal-currentness-prerequisite-smuggling"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyRootPrerequisitesReady: true
+    }),
+    "children-traversal-currentness-prerequisite-smuggling"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalPrerequisitesReady: true
+    }),
+    "children-traversal-currentness-prerequisite-smuggling"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      refPrerequisitesReady: true
+    }),
+    "children-traversal-currentness-prerequisite-smuggling"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
       lazyTraversalClaimed: true
     }),
     "children-traversal-currentness-unsupported-edge-claim"
@@ -461,6 +750,24 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
       portalCreationClaimed: true
+    }),
+    "children-traversal-currentness-unsupported-edge-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyRendererCompatibilityClaimed: true
+    }),
+    "children-traversal-currentness-unsupported-edge-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazySuspenseWakeupClaimed: true
+    }),
+    "children-traversal-currentness-unsupported-edge-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyRootRenderingClaimed: true
     }),
     "children-traversal-currentness-unsupported-edge-claim"
   );
@@ -533,8 +840,16 @@ function assertCurrentnessRejected(report, reason) {
       assert.equal(error.fullReactChildrenParityClaimed, false);
       assert.equal(error.rendererTraversalClaimed, false);
       assert.equal(error.lazyTraversalClaimed, false);
+      assert.equal(error.lazyRendererCompatibilityClaimed, false);
+      assert.equal(error.lazySuspenseWakeupClaimed, false);
+      assert.equal(error.lazyRootRenderingClaimed, false);
       assert.equal(error.dispatcherPrerequisitesReady, false);
       assert.equal(error.rootPrerequisitesReady, false);
+      assert.equal(error.lazyRendererPrerequisitesReady, false);
+      assert.equal(error.lazySuspensePrerequisitesReady, false);
+      assert.equal(error.lazyRootPrerequisitesReady, false);
+      assert.equal(error.portalPrerequisitesReady, false);
+      assert.equal(error.refPrerequisitesReady, false);
       return true;
     },
     reason
