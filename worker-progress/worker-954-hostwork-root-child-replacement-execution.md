@@ -17,6 +17,14 @@
 - Added focused canaries for `HostText -> HostComponent` and
   `HostComponent -> HostText`, including child-before-parent cleanup for the
   deleted component subtree.
+- Audit repair: replacement execution now preflights deletion apply plus
+  deletion cleanup before any host mutation, then consumes the execution
+  identity before issuing container remove/append calls so cleanup failures
+  cannot leave a replayable partial mutation.
+- Audit repair: request extraction now uses store-backed single-root-child
+  topology evidence, keeps same-tag root delete/place rejection at
+  `SameTagReplacement`, and rejects nested host placements under a
+  FunctionComponent as `UnsupportedReplacementEvidence`.
 
 ## Changed Files
 
@@ -36,8 +44,10 @@
   afterward and keeps child-before-parent cleanup for deleted component
   subtrees.
 - Added rejection coverage for cross-root detached-host evidence, stale current
-  host nodes, cloned/tampered replacement requests, duplicate execution, and
-  same-tag/multi-level replacement claims.
+  host nodes, cloned/tampered replacement requests, duplicate execution,
+  request-level same-tag root delete/place, request-level unsupported
+  multi-level host placement, and stale deleted-descendant cleanup preflight
+  with retry leaving host operations unchanged.
 
 ## Commands Run
 

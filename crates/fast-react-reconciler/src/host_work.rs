@@ -4046,6 +4046,7 @@ struct RootChildReplacementRecordsForCanary {
 }
 
 pub(crate) fn test_host_root_child_replacement_execution_request_for_canary(
+    store: &FiberRootStore<RecordingHost>,
     handoff: &HostRootFinishedWorkCommitHandoffRecordForCanary,
     request_order: usize,
 ) -> Result<
@@ -4063,7 +4064,7 @@ pub(crate) fn test_host_root_child_replacement_execution_request_for_canary(
     }
 
     let commit = handoff.commit();
-    let replacement = root_child_replacement_records_for_commit(commit)?;
+    let replacement = root_child_replacement_records_for_commit(store, commit)?;
     let request = TestHostRootChildReplacementExecutionRequestForCanary {
         root: commit.root(),
         source_handoff_order: handoff.pending().handoff_order(),
@@ -4178,6 +4179,9 @@ pub(crate) fn execute_test_host_root_child_replacement_after_commit_for_canary(
         );
     }
 
+    preflight_test_host_root_deletion_apply_and_cleanup_for_canary(store, commit, host_work)?;
+    host_work.mark_root_child_replacement_execution_consumed(execution_identity);
+
     let apply = apply_test_host_root_commit_mutations_for_canary(store, host, commit, host_work)?;
     let deletion_status = apply
         .records()
@@ -4235,7 +4239,6 @@ pub(crate) fn execute_test_host_root_child_replacement_after_commit_for_canary(
 
     let cleanup_apply =
         apply_test_host_root_deletion_cleanup_for_canary(store, host, commit, host_work)?;
-    host_work.mark_root_child_replacement_execution_consumed(execution_identity);
 
     Ok(TestHostRootChildReplacementExecutionDiagnosticForCanary {
         request,
@@ -4249,6 +4252,7 @@ pub(crate) fn execute_test_host_root_child_replacement_after_commit_for_canary(
 }
 
 fn root_child_replacement_records_for_commit(
+    store: &FiberRootStore<RecordingHost>,
     commit: &HostRootCommitRecord,
 ) -> Result<RootChildReplacementRecordsForCanary, TestHostRootChildReplacementExecutionErrorForCanary>
 {
@@ -4304,6 +4308,12 @@ fn root_child_replacement_records_for_commit(
                 HostRootMutationPhaseRecordKind::Placement,
             )
         || placement_mutation.alternate_fiber().is_some()
+        || !root_child_replacement_records_have_single_child_topology(
+            store,
+            commit,
+            deletion_mutation,
+            placement_mutation,
+        )
     {
         return Err(
             TestHostRootChildReplacementExecutionErrorForCanary::UnsupportedReplacementEvidence {
@@ -4328,6 +4338,51 @@ fn root_child_replacement_records_for_commit(
         deletion_mutation,
         placement_mutation,
     })
+}
+
+fn root_child_replacement_records_have_single_child_topology(
+    store: &FiberRootStore<RecordingHost>,
+    commit: &HostRootCommitRecord,
+    deletion_mutation: HostRootMutationApplyRecord,
+    placement_mutation: HostRootMutationApplyRecord,
+) -> bool {
+    let HostRootMutationApplyRecordSource::DeletionList(deletion_list_id) =
+        deletion_mutation.source()
+    else {
+        return false;
+    };
+    let Some(deletion_list) = commit
+        .deletion_lists()
+        .iter()
+        .find(|record| record.list() == deletion_list_id)
+    else {
+        return false;
+    };
+    if deletion_list.parent() != commit.finished_work()
+        || deletion_list.deleted() != [deletion_mutation.fiber()]
+    {
+        return false;
+    }
+
+    let arena = store.fiber_arena();
+    let Ok(previous_current) = arena.get(commit.previous_current()) else {
+        return false;
+    };
+    let Ok(deleted_current) = arena.get(deletion_mutation.fiber()) else {
+        return false;
+    };
+    let Ok(finished_work) = arena.get(commit.finished_work()) else {
+        return false;
+    };
+    let Ok(replacement_child) = arena.get(placement_mutation.fiber()) else {
+        return false;
+    };
+
+    previous_current.child() == Some(deletion_mutation.fiber())
+        && deleted_current.sibling().is_none()
+        && finished_work.child() == Some(placement_mutation.fiber())
+        && replacement_child.return_fiber() == Some(commit.finished_work())
+        && replacement_child.sibling().is_none()
 }
 
 const fn root_child_replacement_apply_status_matches_kind(
@@ -12228,9 +12283,10 @@ mod tests {
             954_002,
         )
         .unwrap();
-        let source_request =
-            test_host_root_child_replacement_execution_request_for_canary(&handoff, 954_003)
-                .unwrap();
+        let source_request = test_host_root_child_replacement_execution_request_for_canary(
+            &store, &handoff, 954_003,
+        )
+        .unwrap();
         let operations_before_execute = host.operations();
 
         let diagnostic = execute_test_host_root_child_replacement_after_commit_for_canary(
@@ -12417,9 +12473,10 @@ mod tests {
             954_012,
         )
         .unwrap();
-        let source_request =
-            test_host_root_child_replacement_execution_request_for_canary(&handoff, 954_013)
-                .unwrap();
+        let source_request = test_host_root_child_replacement_execution_request_for_canary(
+            &store, &handoff, 954_013,
+        )
+        .unwrap();
         let operations_before_execute = host.operations();
 
         let diagnostic = execute_test_host_root_child_replacement_after_commit_for_canary(
@@ -12521,9 +12578,10 @@ mod tests {
             954_102,
         )
         .unwrap();
-        let request =
-            test_host_root_child_replacement_execution_request_for_canary(&handoff, 954_103)
-                .unwrap();
+        let request = test_host_root_child_replacement_execution_request_for_canary(
+            &store, &handoff, 954_103,
+        )
+        .unwrap();
         let operations_before_execute = host.operations();
 
         RootReplacementExecutionFixture {
@@ -12536,6 +12594,71 @@ mod tests {
             host_work,
             operations_before_execute,
         }
+    }
+
+    fn root_replacement_component_to_text_execution_fixture()
+    -> (RootReplacementExecutionFixture, StateNodeHandle) {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut source = TestHostTree::new();
+        let initial_element = source.insert_host_element_with_text("article", "old child");
+        let initial_render = render_test_root(&mut store, root_id, initial_element);
+        let mut initial_host_work =
+            mount_test_host_work(&mut store, &mut host, initial_render, &source).unwrap();
+        let initial_commit = commit_finished_host_root(&mut store, initial_render).unwrap();
+        apply_test_host_root_commit_mutations_for_canary(
+            &mut store,
+            &mut host,
+            &initial_commit,
+            &mut initial_host_work,
+        )
+        .unwrap();
+
+        let current_component = initial_host_work.root_child().unwrap();
+        let deleted_text = store
+            .fiber_arena()
+            .get(current_component)
+            .unwrap()
+            .child()
+            .unwrap();
+        let deleted_text_state_node = store.fiber_arena().get(deleted_text).unwrap().state_node();
+        let detached_hosts = initial_host_work.into_detached_hosts_for_canary();
+        let next_element = source.insert_text("new root text");
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        let host_work = replace_test_host_root_child_work_with_detached_hosts_for_canary(
+            &mut store,
+            &mut host,
+            update_render,
+            &source,
+            detached_hosts,
+        )
+        .unwrap();
+        let handoff = commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            &mut store,
+            update_render,
+            954_201,
+            954_202,
+        )
+        .unwrap();
+        let request = test_host_root_child_replacement_execution_request_for_canary(
+            &store, &handoff, 954_203,
+        )
+        .unwrap();
+        let operations_before_execute = host.operations();
+
+        (
+            RootReplacementExecutionFixture {
+                store,
+                root_id,
+                host,
+                update_render,
+                handoff,
+                request,
+                host_work,
+                operations_before_execute,
+            },
+            deleted_text_state_node,
+        )
     }
 
     #[test]
@@ -12572,6 +12695,244 @@ mod tests {
             } if root == fixture.root_id && finished_work == fixture.update_render.finished_work()
         ));
         assert_eq!(fixture.host.operations(), operations_after_first_execute);
+    }
+
+    #[test]
+    fn host_work_root_replacement_preflights_stale_deleted_descendant_cleanup_before_host_call() {
+        let (mut fixture, deleted_text_state_node) =
+            root_replacement_component_to_text_execution_fixture();
+        fixture
+            .host_work
+            .detached_hosts_mut_for_canary()
+            .invalidate_text_for_canary(deleted_text_state_node)
+            .unwrap();
+
+        let error = execute_test_host_root_child_replacement_after_commit_for_canary(
+            &mut fixture.store,
+            &mut fixture.host,
+            &fixture.handoff,
+            fixture.request,
+            fixture.request,
+            &mut fixture.host_work,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootChildReplacementExecutionErrorForCanary::HostWork(
+                HostWorkError::HostNode(ref error)
+            ) if error.violation() == HostNodeViolation::Stale
+        ));
+        assert_eq!(fixture.host.operations(), fixture.operations_before_execute);
+
+        let retry_error = execute_test_host_root_child_replacement_after_commit_for_canary(
+            &mut fixture.store,
+            &mut fixture.host,
+            &fixture.handoff,
+            fixture.request,
+            fixture.request,
+            &mut fixture.host_work,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            retry_error,
+            TestHostRootChildReplacementExecutionErrorForCanary::HostWork(
+                HostWorkError::HostNode(ref error)
+            ) if error.violation() == HostNodeViolation::Stale
+        ));
+        assert_eq!(fixture.host.operations(), fixture.operations_before_execute);
+    }
+
+    #[test]
+    fn host_work_root_replacement_request_rejects_same_tag_root_delete_and_place() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let initial_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(954_301));
+        let current_text = attach_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            initial_render.finished_work(),
+            "same-tag old text",
+            FiberFlags::PLACEMENT,
+        );
+        let initial_commit = commit_finished_host_root(&mut store, initial_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &initial_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let update_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(954_302));
+        let replacement_text = create_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            update_render.finished_work(),
+            "same-tag replacement text",
+            FiberFlags::PLACEMENT,
+        );
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(update_render.finished_work(), current_text)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(update_render.finished_work(), &[replacement_text])
+            .unwrap();
+        complete_host_root(&mut store, update_render.finished_work()).unwrap();
+
+        let handoff = commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            &mut store,
+            update_render,
+            954_303,
+            954_304,
+        )
+        .unwrap();
+        let records = handoff.commit().mutation_apply_log().records();
+        assert_eq!(records.len(), 2);
+        assert_eq!(
+            records[0].kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromContainer
+        );
+        assert_eq!(
+            records[1].kind(),
+            HostRootMutationApplyRecordKind::AppendPlacementToContainer
+        );
+        assert_eq!(records[0].tag(), FiberTag::HostText);
+        assert_eq!(records[1].tag(), FiberTag::HostText);
+
+        let error = test_host_root_child_replacement_execution_request_for_canary(
+            &store, &handoff, 954_305,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootChildReplacementExecutionErrorForCanary::SameTagReplacement {
+                root,
+                finished_work,
+                tag: FiberTag::HostText,
+            } if root == root_id && finished_work == update_render.finished_work()
+        ));
+    }
+
+    #[test]
+    fn host_work_root_replacement_request_rejects_unsupported_multi_level_host_placement() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let initial_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(954_311));
+        let current_text = attach_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            initial_render.finished_work(),
+            "deleted root text",
+            FiberFlags::PLACEMENT,
+        );
+        let initial_commit = commit_finished_host_root(&mut store, initial_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &initial_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let update_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(954_312));
+        let mode = store
+            .fiber_arena()
+            .get(update_render.finished_work())
+            .unwrap()
+            .mode();
+        let function_component = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(954_313),
+            mode,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(function_component)
+            .unwrap()
+            .set_fiber_type(FiberTypeHandle::from_raw(954_314));
+        let nested_text = create_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            update_render.finished_work(),
+            "nested replacement",
+            FiberFlags::PLACEMENT,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(function_component, &[nested_text])
+            .unwrap();
+        complete_function_component_parent(&mut store, function_component).unwrap();
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(update_render.finished_work(), current_text)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(update_render.finished_work(), &[function_component])
+            .unwrap();
+        complete_host_root(&mut store, update_render.finished_work()).unwrap();
+
+        let handoff = commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            &mut store,
+            update_render,
+            954_315,
+            954_316,
+        )
+        .unwrap();
+        let records = handoff.commit().mutation_apply_log().records();
+        assert_eq!(records.len(), 2);
+        assert_eq!(
+            records[0].kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromContainer
+        );
+        assert_eq!(
+            records[1].kind(),
+            HostRootMutationApplyRecordKind::AppendPlacementToContainer
+        );
+        assert_eq!(records[1].fiber(), nested_text);
+        assert_eq!(records[1].parent(), update_render.finished_work());
+        assert_eq!(records[1].parent_tag(), FiberTag::HostRoot);
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(update_render.finished_work())
+                .unwrap()
+                .child(),
+            Some(function_component)
+        );
+
+        let error = test_host_root_child_replacement_execution_request_for_canary(
+            &store, &handoff, 954_317,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootChildReplacementExecutionErrorForCanary::UnsupportedReplacementEvidence {
+                root,
+                finished_work,
+            } if root == root_id && finished_work == update_render.finished_work()
+        ));
     }
 
     #[test]
