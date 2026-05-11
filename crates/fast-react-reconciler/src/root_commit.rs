@@ -2297,6 +2297,17 @@ impl HostRootTextUpdateCommitExecutionRequestForCanary {
     pub(crate) const fn public_renderer_compatibility_claimed(self) -> bool {
         false
     }
+
+    #[must_use]
+    pub(crate) fn private_blockers_intact_for_canary(&self) -> bool {
+        self.blockers == HOST_ROOT_TEXT_UPDATE_COMMIT_EXECUTION_BLOCKERS
+    }
+
+    #[must_use]
+    pub(crate) const fn with_finished_work_for_canary(mut self, finished_work: FiberId) -> Self {
+        self.finished_work = finished_work;
+        self
+    }
 }
 
 #[cfg(test)]
