@@ -422,7 +422,8 @@ const rowData739745 = Object.freeze([
         path: "bindings/node/index.cjs",
         sliceStart:
           "const nativeRootBridgeTransportWorkerThreadTeardownGate = Object.freeze({",
-        sliceEnd: "const nativeRootBridgeRequestShape = Object.freeze({",
+        sliceEnd:
+          "const nativeRootBridgeWorkerThreadTeardownExecutablePreflight = Object.freeze({",
         tokens: [
           "workerThreadTeardownGateStatus:",
           "nativeRootBridgeTransportWorkerThreadTeardownGateStatus",
@@ -499,13 +500,17 @@ const rowData739745 = Object.freeze([
       evidenceData({
         role: "worker-741-client-symbol-source",
         path: "packages/react-dom/client.js",
+        sliceStart:
+          "const hydrateRoot = createUnsupportedFunction(entrypoint, 'hydrateRoot');",
+        sliceEnd: "exports.version = placeholderVersion;",
         tokens: [
-          "createPrivateHydrateRootPublicFacadePreflight",
+          "Object.defineProperty(target, symbol, {",
+          "value,",
+          "definePrivateSymbolOnlyFacadeGate(",
           "privateHydrateRootPublicFacadePreflightSymbol",
           "const hydrateRoot = createUnsupportedFunction(entrypoint, 'hydrateRoot')",
-          "Object.defineProperty(",
           "hydrateRoot,",
-          "value: createPrivateHydrateRootPublicFacadePreflight",
+          "createPrivateHydrateRootPublicFacadePreflight",
           "exports.hydrateRoot = hydrateRoot"
         ]
       }),
@@ -782,7 +787,7 @@ const rowData739745 = Object.freeze([
         sliceStart:
           "pub fn describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(",
         sliceEnd:
-          "pub fn describe_private_to_json_nested_finished_work_identity_gate_for_canary(",
+          "pub fn describe_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(",
         tokens: [
           "validate_private_to_json_sibling_text_update_route_admission_record_for_identity",
           "describe_private_to_json_sibling_text_host_output_row_for_canary(output)?",
