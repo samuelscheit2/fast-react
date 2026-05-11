@@ -90,6 +90,71 @@ const INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE =
   'FAST_REACT_DOM_INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION';
 const INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE =
   'FAST_REACT_DOM_INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE';
+const privateRootListenerCurrentnessPublicBehaviorClaimFields = Object.freeze([
+  'browserDomEventCompatibilityClaimed',
+  'browserInputMutated',
+  'browserListenerInstallation',
+  'browserSyntheticEventCompatibilityClaimed',
+  'compatibilityClaimed',
+  'controlledStateRestoreScheduled',
+  'eventDispatch',
+  'eventDispatchAllowed',
+  'gateInstalledBrowserListener',
+  'hydrationReplayCompatibilityClaimed',
+  'listenerInstallation',
+  'packageCompatibilityClaimed',
+  'publicControlledBehaviorEnabled',
+  'publicDispatchEnabled',
+  'publicEventCompatibilityClaimed',
+  'publicHydrationReplayCompatibilityClaimed',
+  'publicListenerInstallation',
+  'publicPackageCompatibilityClaimed',
+  'publicPortalBubblingEnabled',
+  'publicRootBehaviorChanged',
+  'publicSyntheticEventCompatibilityClaimed',
+  'realDomMutationAllowed',
+  'restoreQueueFlushed',
+  'restoreQueueWritten',
+  'rootListenerInstallation',
+  'syntheticEventCompatibilityClaimed',
+  'syntheticEventCreated',
+  'syntheticEventDispatch',
+  'syntheticFocusEventCreation',
+  'valueTrackerFieldWritten',
+  'willCreateSyntheticFocusEvent',
+  'willDispatchPublicEvent',
+  'willInvokePublicListeners'
+]);
+const privateRootListenerCurrentnessSourceAliasValueFields = Object.freeze([
+  '$$typeof',
+  'facadeCall',
+  'kind',
+  'operation',
+  'queueKind',
+  'requestType',
+  'source',
+  'sourceKind',
+  'status',
+  'targetKind'
+]);
+const privateRootListenerCurrentnessSourceAliasPresenceFields = Object.freeze([
+  'currentTarget',
+  'dispatchPayload',
+  'eventPayload',
+  'fakeDomTarget',
+  'formActionEvidence',
+  'formEvidence',
+  'formResetEvidence',
+  'hydrationReplayEvidence',
+  'liveDomTarget',
+  'nativeEvent',
+  'replayQueueEvidence',
+  'resourceEvidence',
+  'resourceFormEvidence',
+  'syntheticEvent',
+  'target',
+  'targetNode'
+]);
 
 const rootListenerRegistrationPayloads = new WeakMap();
 const rootListenerCleanupRecords = new WeakMap();
@@ -2215,6 +2280,351 @@ function getMaybeStringProperty(value, propertyName) {
     : null;
 }
 
+function containsPrivateRootListenerCurrentnessPublicBehaviorClaim(
+  source,
+  scanSourceRecordContainers
+) {
+  return containsPrivateRootListenerCurrentnessPublicBehaviorClaimImpl(
+    source,
+    new WeakSet(),
+    scanSourceRecordContainers === true
+  );
+}
+
+function containsPrivateRootListenerCurrentnessPublicBehaviorClaimImpl(
+  source,
+  seen,
+  scanSourceRecordContainers
+) {
+  if (!isObjectLike(source)) {
+    return false;
+  }
+  if (seen.has(source)) {
+    return false;
+  }
+  seen.add(source);
+
+  for (const field of privateRootListenerCurrentnessPublicBehaviorClaimFields) {
+    if (
+      hasBlockedPrivateRootListenerCurrentnessPublicClaimField(source, field)
+    ) {
+      return true;
+    }
+  }
+  if (
+    hasBlockedPrivateRootListenerCurrentnessPublicClaimField(
+      source,
+      'syntheticEventCount'
+    )
+  ) {
+    return true;
+  }
+
+  const ownKeys = getPrivateRootListenerCurrentnessOwnKeys(source);
+  if (ownKeys === null) {
+    return true;
+  }
+
+  for (const key of ownKeys) {
+    const descriptor =
+      getPrivateRootListenerCurrentnessOwnPropertyDescriptor(source, key);
+    if (descriptor == null) {
+      return true;
+    }
+    if (
+      isPrivateRootListenerCurrentnessPublicClaimKey(key) &&
+      descriptorContainsBlockedPrivateRootListenerCurrentnessPublicClaim(
+        key,
+        descriptor
+      )
+    ) {
+      return true;
+    }
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return true;
+    }
+    if (
+      isPrivateRootListenerCurrentnessAliasScanSkippedKey(
+        key,
+        scanSourceRecordContainers
+      )
+    ) {
+      continue;
+    }
+    if (
+      containsPrivateRootListenerCurrentnessPublicBehaviorClaimImpl(
+        descriptor.value,
+        seen,
+        scanSourceRecordContainers
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function hasBlockedPrivateRootListenerCurrentnessPublicClaimField(
+  source,
+  field
+) {
+  const descriptor =
+    getPrivateRootListenerCurrentnessOwnPropertyDescriptor(source, field);
+  if (
+    descriptor !== undefined &&
+    descriptor !== null &&
+    descriptorContainsBlockedPrivateRootListenerCurrentnessPublicClaim(
+      field,
+      descriptor
+    )
+  ) {
+    return true;
+  }
+
+  try {
+    return isBlockedPrivateRootListenerCurrentnessPublicClaimValue(
+      field,
+      source[field]
+    );
+  } catch (error) {
+    return true;
+  }
+}
+
+function descriptorContainsBlockedPrivateRootListenerCurrentnessPublicClaim(
+  key,
+  descriptor
+) {
+  if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+    return true;
+  }
+
+  return isBlockedPrivateRootListenerCurrentnessPublicClaimValue(
+    key,
+    descriptor.value
+  );
+}
+
+function isBlockedPrivateRootListenerCurrentnessPublicClaimValue(key, value) {
+  const keyName = getPrivateRootListenerCurrentnessPropertyKeyName(key);
+  if (keyName === 'syntheticEventCount') {
+    return typeof value === 'number' && value > 0;
+  }
+
+  return value === true;
+}
+
+function containsBlockedPrivateRootListenerCurrentnessSourceAlias(source) {
+  return containsBlockedPrivateRootListenerCurrentnessSourceAliasImpl(
+    source,
+    new WeakSet(),
+    true
+  );
+}
+
+function containsBlockedPrivateRootListenerCurrentnessSourceAliasImpl(
+  source,
+  seen,
+  scanSourceRecordContainers
+) {
+  if (!isObjectLike(source)) {
+    return false;
+  }
+  if (seen.has(source)) {
+    return false;
+  }
+  seen.add(source);
+
+  for (const key of privateRootListenerCurrentnessSourceAliasValueFields) {
+    if (getBlockedPrivateRootListenerCurrentnessSourceAliasValue(source, key)) {
+      return true;
+    }
+  }
+
+  for (const key of privateRootListenerCurrentnessSourceAliasPresenceFields) {
+    if (hasPrivateRootListenerCurrentnessSourceAliasPresence(source, key)) {
+      return true;
+    }
+  }
+
+  const ownKeys = getPrivateRootListenerCurrentnessOwnKeys(source);
+  if (ownKeys === null) {
+    return true;
+  }
+
+  for (const key of ownKeys) {
+    const descriptor =
+      getPrivateRootListenerCurrentnessOwnPropertyDescriptor(source, key);
+    if (descriptor == null) {
+      return true;
+    }
+    if (isPrivateRootListenerCurrentnessSourceAliasPresenceKey(key)) {
+      return true;
+    }
+    if (isPrivateRootListenerCurrentnessSourceAliasValueKey(key)) {
+      if (
+        !Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
+        isBlockedPrivateRootListenerCurrentnessSourceAliasValue(
+          descriptor.value
+        )
+      ) {
+        return true;
+      }
+    }
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return true;
+    }
+    if (
+      isPrivateRootListenerCurrentnessAliasScanSkippedKey(
+        key,
+        scanSourceRecordContainers
+      )
+    ) {
+      continue;
+    }
+    if (
+      containsBlockedPrivateRootListenerCurrentnessSourceAliasImpl(
+        descriptor.value,
+        seen,
+        scanSourceRecordContainers
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getBlockedPrivateRootListenerCurrentnessSourceAliasValue(source, key) {
+  const descriptor =
+    getPrivateRootListenerCurrentnessOwnPropertyDescriptor(source, key);
+  if (descriptor !== undefined && descriptor !== null) {
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return true;
+    }
+    if (
+      isBlockedPrivateRootListenerCurrentnessSourceAliasValue(
+        descriptor.value
+      )
+    ) {
+      return true;
+    }
+  }
+
+  try {
+    return isBlockedPrivateRootListenerCurrentnessSourceAliasValue(source[key]);
+  } catch (error) {
+    return true;
+  }
+}
+
+function hasPrivateRootListenerCurrentnessSourceAliasPresence(source, key) {
+  const descriptor =
+    getPrivateRootListenerCurrentnessOwnPropertyDescriptor(source, key);
+  if (descriptor !== undefined && descriptor !== null) {
+    return true;
+  }
+
+  try {
+    return source[key] !== undefined;
+  } catch (error) {
+    return true;
+  }
+}
+
+function getPrivateRootListenerCurrentnessOwnKeys(source) {
+  try {
+    return Reflect.ownKeys(source);
+  } catch (error) {
+    return null;
+  }
+}
+
+function getPrivateRootListenerCurrentnessOwnPropertyDescriptor(source, key) {
+  try {
+    return Object.getOwnPropertyDescriptor(source, key);
+  } catch (error) {
+    return null;
+  }
+}
+
+function isPrivateRootListenerCurrentnessAliasScanSkippedKey(
+  key,
+  scanSourceRecordContainers
+) {
+  if (typeof key !== 'string') {
+    return false;
+  }
+  if (key === 'sourceRecord') {
+    return scanSourceRecordContainers !== true;
+  }
+
+  return (
+    key === 'container' ||
+    key === 'currentTarget' ||
+    key === 'nativeEvent' ||
+    key === 'node' ||
+    key === 'ownerDocument' ||
+    key === 'parentNode' ||
+    key === 'syntheticEvent' ||
+    key === 'target' ||
+    key === 'targetNode'
+  );
+}
+
+function isPrivateRootListenerCurrentnessPublicClaimKey(key) {
+  const keyName = getPrivateRootListenerCurrentnessPropertyKeyName(key);
+  return (
+    keyName === 'syntheticEventCount' ||
+    privateRootListenerCurrentnessPublicBehaviorClaimFields.includes(keyName)
+  );
+}
+
+function isPrivateRootListenerCurrentnessSourceAliasValueKey(key) {
+  const keyName = getPrivateRootListenerCurrentnessPropertyKeyName(key);
+  return privateRootListenerCurrentnessSourceAliasValueFields.includes(keyName);
+}
+
+function isPrivateRootListenerCurrentnessSourceAliasPresenceKey(key) {
+  const keyName = getPrivateRootListenerCurrentnessPropertyKeyName(key);
+  return privateRootListenerCurrentnessSourceAliasPresenceFields.includes(
+    keyName
+  );
+}
+
+function getPrivateRootListenerCurrentnessPropertyKeyName(key) {
+  if (typeof key === 'symbol') {
+    return key.description || String(key).slice(7, -1);
+  }
+
+  return key;
+}
+
+function isBlockedPrivateRootListenerCurrentnessSourceAliasValue(value) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes('hydrationreplay') ||
+    normalized.includes('hydration-replay') ||
+    normalized.includes('eventreplay') ||
+    normalized.includes('event-replay') ||
+    normalized.includes('replayqueue') ||
+    normalized.includes('replay-queue') ||
+    normalized.includes('resource-form') ||
+    normalized.includes('resourceform') ||
+    normalized.includes('form-action') ||
+    normalized.includes('formaction') ||
+    normalized.includes('form-reset') ||
+    normalized.includes('formreset') ||
+    normalized.includes('requestformreset')
+  );
+}
+
 function assertActiveRootListenerRegistrationPayload(
   registrationRecord,
   throwRegistrationError,
@@ -2303,34 +2713,37 @@ function normalizePrivateRootListenerCurrentnessSourceKind(sourceKind) {
 }
 
 function assertNoPrivateRootListenerCurrentnessPublicBehaviorClaims(options) {
-  const blockedClaimFields = [
-    'browserDomEventCompatibilityClaimed',
-    'browserSyntheticEventCompatibilityClaimed',
-    'compatibilityClaimed',
-    'eventDispatch',
-    'hydrationReplayCompatibilityClaimed',
-    'listenerInstallation',
-    'packageCompatibilityClaimed',
-    'publicEventCompatibilityClaimed',
-    'publicDispatchEnabled',
-    'publicHydrationReplayCompatibilityClaimed',
-    'publicListenerInstallation',
-    'publicPackageCompatibilityClaimed',
-    'publicRootBehaviorChanged',
-    'publicSyntheticEventCompatibilityClaimed',
-    'rootListenerInstallation',
-    'syntheticEventCompatibilityClaimed',
-    'syntheticEventDispatch',
-    'willDispatchPublicEvent'
-  ];
+  if (containsPrivateRootListenerCurrentnessPublicBehaviorClaim(options)) {
+    throwRootListenerCurrentnessGateError(
+      'Private root listener currentness diagnostics cannot claim public DOM event behavior.',
+      'public-behavior-claimed'
+    );
+  }
 
-  for (const field of blockedClaimFields) {
-    if (options[field] === true) {
+  for (const field of privateRootListenerCurrentnessPublicBehaviorClaimFields) {
+    if (
+      hasBlockedPrivateRootListenerCurrentnessPublicClaimField(
+        options,
+        field
+      )
+    ) {
       throwRootListenerCurrentnessGateError(
         'Private root listener currentness diagnostics cannot claim public DOM event behavior.',
         'public-behavior-claimed'
       );
     }
+  }
+
+  if (
+    hasBlockedPrivateRootListenerCurrentnessPublicClaimField(
+      options,
+      'syntheticEventCount'
+    )
+  ) {
+    throwRootListenerCurrentnessGateError(
+      'Private root listener currentness diagnostics cannot claim public DOM event behavior.',
+      'public-behavior-claimed'
+    );
   }
 }
 
@@ -2391,6 +2804,25 @@ function assertPrivateRootListenerCurrentnessSourceRecord(
 ) {
   if (sourceRecord === null) {
     return;
+  }
+
+  if (containsBlockedPrivateRootListenerCurrentnessSourceAlias(sourceRecord)) {
+    throwRootListenerCurrentnessGateError(
+      'Private root listener currentness diagnostics cannot consume hydration replay evidence as root listener source evidence.',
+      'hydration-replay-source-alias'
+    );
+  }
+
+  if (
+    containsPrivateRootListenerCurrentnessPublicBehaviorClaim(
+      sourceRecord,
+      true
+    )
+  ) {
+    throwRootListenerCurrentnessGateError(
+      'Private root listener currentness diagnostics cannot claim public DOM event behavior.',
+      'public-behavior-claimed'
+    );
   }
 
   const requestType = getMaybeStringProperty(sourceRecord, 'requestType');

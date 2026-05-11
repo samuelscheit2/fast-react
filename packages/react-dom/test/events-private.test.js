@@ -1182,6 +1182,166 @@ test('private root listener currentness gate rejects cloned stale aliased and mu
         reason: 'hydration-replay-source-alias'
       }
     );
+    for (const testCase of [
+      {
+        requestId: 'root-listener-currentness-form-reset-hidden-target-kind',
+        targetKind: 'form-reset-controlled-restore-source'
+      },
+      {
+        requestId: 'root-listener-currentness-formreset-hidden-target-kind',
+        targetKind: 'formreset-controlled-restore-source'
+      },
+      {
+        requestId:
+          'root-listener-currentness-request-form-reset-hidden-target-kind',
+        targetKind: 'requestFormResetOnFiber'
+      }
+    ]) {
+      let targetKindGetterCalled = false;
+      const proxyHiddenTargetKindSourceRecord = new Proxy(
+        {},
+        {
+          get(target, key) {
+            if (key === 'targetKind') {
+              targetKindGetterCalled = true;
+              return testCase.targetKind;
+            }
+            return target[key];
+          },
+          getOwnPropertyDescriptor() {
+            return undefined;
+          },
+          ownKeys() {
+            return [];
+          }
+        }
+      );
+      assert.throws(
+        () =>
+          rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+            aliasFixture.rootRegistration,
+            {
+              sourceKind: 'createRoot',
+              sourceRecord: {
+                nested: proxyHiddenTargetKindSourceRecord,
+                requestId: testCase.requestId
+              }
+            }
+          ),
+        {
+          code:
+            rootListeners
+              .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+          reason: 'hydration-replay-source-alias'
+        }
+      );
+      assert.equal(targetKindGetterCalled, true);
+    }
+    let nestedSourceRecordTargetKindGetterCalled = false;
+    const nestedSourceRecordHiddenTargetKind = new Proxy(
+      {},
+      {
+        get(target, key) {
+          if (key === 'targetKind') {
+            nestedSourceRecordTargetKindGetterCalled = true;
+            return 'requestFormResetOnFiber';
+          }
+          return target[key];
+        },
+        getOwnPropertyDescriptor() {
+          return undefined;
+        },
+        ownKeys() {
+          return [];
+        }
+      }
+    );
+    assert.throws(
+      () =>
+        rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+          aliasFixture.rootRegistration,
+          {
+            sourceKind: 'createRoot',
+            sourceRecord: {
+              requestId:
+                'root-listener-currentness-nested-source-record-form-reset',
+              sourceRecord: nestedSourceRecordHiddenTargetKind
+            }
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+        reason: 'hydration-replay-source-alias'
+      }
+    );
+    assert.equal(nestedSourceRecordTargetKindGetterCalled, true);
+    assert.throws(
+      () =>
+        rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+          aliasFixture.rootRegistration,
+          {
+            sourceKind: 'createRoot',
+            sourceRecord: {
+              publicControlledBehaviorEnabled: true
+            }
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+        reason: 'public-behavior-claimed'
+      }
+    );
+    assert.throws(
+      () =>
+        rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+          aliasFixture.rootRegistration,
+          {
+            sourceKind: 'createRoot',
+            sourceRecord: {
+              requestId:
+                'root-listener-currentness-nested-source-record-public-claim',
+              sourceRecord: {
+                publicControlledBehaviorEnabled: true
+              }
+            }
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+        reason: 'public-behavior-claimed'
+      }
+    );
+    const accessorAliasSourceRecord = {};
+    Object.defineProperty(accessorAliasSourceRecord, 'nested', {
+      enumerable: true,
+      get() {
+        return {
+          resourceFormEvidence: {operation: 'form-action-event-plugin'}
+        };
+      }
+    });
+    assert.throws(
+      () =>
+        rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+          aliasFixture.rootRegistration,
+          {
+            sourceKind: 'createRoot',
+            sourceRecord: accessorAliasSourceRecord
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+        reason: 'hydration-replay-source-alias'
+      }
+    );
     assert.throws(
       () =>
         rootListeners.createPrivateRootListenerCurrentnessGateRecord(
@@ -3324,6 +3484,315 @@ test('private input/change controlled restore execution rejects stale latest pro
       reason: 'public-or-live-behavior-claimed'
     }
   );
+  const nonEnumerableClaimFakeTarget =
+    createPrivateControlledRestoreFakeDomTarget({
+      value: 'browser-mutated'
+    });
+  const nonEnumerableClaimAdmission =
+    createPrivateInputChangeExecutionAdmission(nonEnumerableClaimFakeTarget);
+  Object.defineProperty(
+    nonEnumerableClaimAdmission,
+    'publicControlledBehaviorEnabled',
+    {
+      value: true
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        publicClaimSources.inputPreflight,
+        publicClaimSources.bridge,
+        publicClaimSources.writeExecution,
+        publicClaimSources.flushBlocker,
+        publicClaimSources.wrapperIntent,
+        nonEnumerableClaimAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.equal(nonEnumerableClaimFakeTarget.value, 'browser-mutated');
+
+  const symbolClaimFakeTarget = createPrivateControlledRestoreFakeDomTarget({
+    value: 'browser-mutated'
+  });
+  const symbolClaimAdmission =
+    createPrivateInputChangeExecutionAdmission(symbolClaimFakeTarget);
+  symbolClaimAdmission[Symbol('publicControlledBehaviorEnabled')] = true;
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        publicClaimSources.inputPreflight,
+        publicClaimSources.bridge,
+        publicClaimSources.writeExecution,
+        publicClaimSources.flushBlocker,
+        publicClaimSources.wrapperIntent,
+        symbolClaimAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.equal(symbolClaimFakeTarget.value, 'browser-mutated');
+
+  const accessorClaimFakeTarget = createPrivateControlledRestoreFakeDomTarget({
+    value: 'browser-mutated'
+  });
+  const accessorClaimAdmission =
+    createPrivateInputChangeExecutionAdmission(accessorClaimFakeTarget);
+  Object.defineProperty(accessorClaimAdmission, 'compatibilityClaimed', {
+    get() {
+      throw new Error('accessor public claim should not be read');
+    }
+  });
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        publicClaimSources.inputPreflight,
+        publicClaimSources.bridge,
+        publicClaimSources.writeExecution,
+        publicClaimSources.flushBlocker,
+        publicClaimSources.wrapperIntent,
+        accessorClaimAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.equal(accessorClaimFakeTarget.value, 'browser-mutated');
+
+  const explicitAdmissionAccessorTarget =
+    createPrivateControlledRestoreFakeDomTarget({
+      value: 'browser-mutated'
+    });
+  const explicitAdmissionAccessor =
+    createPrivateInputChangeExecutionAdmission(
+      explicitAdmissionAccessorTarget
+    );
+  let explicitAdmissionGetterCalled = false;
+  Object.defineProperty(
+    explicitAdmissionAccessor,
+    'explicitAdmission',
+    {
+      get() {
+        explicitAdmissionGetterCalled = true;
+        throw new Error('explicitAdmission getter should not be read');
+      }
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        publicClaimSources.inputPreflight,
+        publicClaimSources.bridge,
+        publicClaimSources.writeExecution,
+        publicClaimSources.flushBlocker,
+        publicClaimSources.wrapperIntent,
+        explicitAdmissionAccessor
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      reason: 'explicitAdmission must be true'
+    }
+  );
+  assert.equal(explicitAdmissionGetterCalled, false);
+  assert.equal(explicitAdmissionAccessorTarget.value, 'browser-mutated');
+
+  const targetKindAccessorTarget =
+    createPrivateControlledRestoreFakeDomTarget({
+      value: 'browser-mutated'
+    });
+  const targetKindAccessorAdmission =
+    createPrivateInputChangeExecutionAdmission(targetKindAccessorTarget);
+  let targetKindGetterCalled = false;
+  Object.defineProperty(targetKindAccessorAdmission, 'targetKind', {
+    get() {
+      targetKindGetterCalled = true;
+      throw new Error('targetKind getter should not be read');
+    }
+  });
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        publicClaimSources.inputPreflight,
+        publicClaimSources.bridge,
+        publicClaimSources.writeExecution,
+        publicClaimSources.flushBlocker,
+        publicClaimSources.wrapperIntent,
+        targetKindAccessorAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.equal(targetKindGetterCalled, false);
+  assert.equal(targetKindAccessorTarget.value, 'browser-mutated');
+
+  const targetKindProxyTarget = createPrivateControlledRestoreFakeDomTarget({
+    value: 'browser-mutated'
+  });
+  const targetKindProxyAdmissionTarget =
+    createPrivateInputChangeExecutionAdmission(targetKindProxyTarget);
+  let targetKindProxyGetterCalled = false;
+  const targetKindProxyAdmission = new Proxy(
+    targetKindProxyAdmissionTarget,
+    {
+      get(target, key, receiver) {
+        if (key === 'targetKind') {
+          targetKindProxyGetterCalled = true;
+          throw new Error('targetKind proxy getter should not be read');
+        }
+        return Reflect.get(target, key, receiver);
+      },
+      getOwnPropertyDescriptor(target, key) {
+        if (key === 'targetKind') {
+          return undefined;
+        }
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+      ownKeys(target) {
+        return Reflect.ownKeys(target).filter(
+          (key) => key !== 'targetKind'
+        );
+      }
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        publicClaimSources.inputPreflight,
+        publicClaimSources.bridge,
+        publicClaimSources.writeExecution,
+        publicClaimSources.flushBlocker,
+        publicClaimSources.wrapperIntent,
+        targetKindProxyAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      reason: 'resource-form-or-hydration-replay-source-alias'
+    }
+  );
+  assert.equal(targetKindProxyGetterCalled, false);
+  assert.equal(targetKindProxyTarget.value, 'browser-mutated');
+
+  const fakeTargetPublicClaim = createPrivateControlledRestoreFakeDomTarget({
+    value: 'browser-mutated'
+  });
+  fakeTargetPublicClaim.publicControlledBehaviorEnabled = true;
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        publicClaimSources.inputPreflight,
+        publicClaimSources.bridge,
+        publicClaimSources.writeExecution,
+        publicClaimSources.flushBlocker,
+        publicClaimSources.wrapperIntent,
+        createPrivateInputChangeExecutionAdmission(fakeTargetPublicClaim)
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.equal(fakeTargetPublicClaim.value, 'browser-mutated');
+
+  const fakeTargetResourceAlias = createPrivateControlledRestoreFakeDomTarget({
+    value: 'browser-mutated'
+  });
+  fakeTargetResourceAlias.resourceFormEvidence = {
+    operation: 'form-action-event-plugin'
+  };
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        publicClaimSources.inputPreflight,
+        publicClaimSources.bridge,
+        publicClaimSources.writeExecution,
+        publicClaimSources.flushBlocker,
+        publicClaimSources.wrapperIntent,
+        createPrivateInputChangeExecutionAdmission(fakeTargetResourceAlias)
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      reason: 'resource-form-or-hydration-replay-source-alias'
+    }
+  );
+  assert.equal(fakeTargetResourceAlias.value, 'browser-mutated');
+
+  const fakeTargetAccessorAlias =
+    createPrivateControlledRestoreFakeDomTarget({
+      value: 'browser-mutated'
+    });
+  Object.defineProperty(fakeTargetAccessorAlias, 'nested', {
+    enumerable: true,
+    get() {
+      return {
+        resourceFormEvidence: {operation: 'form-action-event-plugin'}
+      };
+    }
+  });
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        publicClaimSources.inputPreflight,
+        publicClaimSources.bridge,
+        publicClaimSources.writeExecution,
+        publicClaimSources.flushBlocker,
+        publicClaimSources.wrapperIntent,
+        createPrivateInputChangeExecutionAdmission(fakeTargetAccessorAlias)
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.equal(fakeTargetAccessorAlias.value, 'browser-mutated');
+
+  const acceptedFakeTargetAfterForgedRejections =
+    createPrivateControlledRestoreFakeDomTarget({
+      value: 'browser-mutated'
+    });
+  const acceptedExecutionAfterForgedRejections =
+    gate.recordInputChangeEventControlledRestoreExecution(
+      publicClaimSources.inputPreflight,
+      publicClaimSources.bridge,
+      publicClaimSources.writeExecution,
+      publicClaimSources.flushBlocker,
+      publicClaimSources.wrapperIntent,
+      createPrivateInputChangeExecutionAdmission(
+        acceptedFakeTargetAfterForgedRejections
+      )
+    );
+  assert.equal(acceptedFakeTargetAfterForgedRejections.value, 'alpha');
+  assert.equal(
+    controlledRestoreQueue
+      .isPrivateControlledInputPostEventRestoreQueueInputChangeExecutionRecord(
+        acceptedExecutionAfterForgedRejections
+      ),
+    true
+  );
 
   const bridgeSource = createPrivateInputChangeRestoreExecutionSources(gate, {
     domEventName: 'input',
@@ -3524,6 +3993,73 @@ test('private input/change extraction preflight rejects stale currentness and pu
     }
   );
 
+  const nonEnumerablePublicClaimOptions = {
+    rootListenerCurrentnessGateRecord:
+      source.rootListenerCurrentnessGateRecord
+  };
+  Object.defineProperty(
+    nonEnumerablePublicClaimOptions,
+    'publicControlledBehaviorEnabled',
+    {
+      value: true
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        nonEnumerablePublicClaimOptions
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+
+  const symbolPublicClaimOptions = {
+    rootListenerCurrentnessGateRecord:
+      source.rootListenerCurrentnessGateRecord,
+    [Symbol('publicControlledBehaviorEnabled')]: true
+  };
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        symbolPublicClaimOptions
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+
+  const accessorPublicClaimOptions = {
+    rootListenerCurrentnessGateRecord:
+      source.rootListenerCurrentnessGateRecord
+  };
+  Object.defineProperty(accessorPublicClaimOptions, 'compatibilityClaimed', {
+    get() {
+      throw new Error('accessor public claim should not be read');
+    }
+  });
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        accessorPublicClaimOptions
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+
   assert.throws(
     () =>
       pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
@@ -3570,6 +4106,159 @@ test('private input/change extraction preflight rejects stale currentness and pu
         {
           rootListenerCurrentnessGateRecord:
             source.rootListenerCurrentnessGateRecord,
+          currentTarget: {
+            target: source.targetNode
+          }
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'source-record-alias'
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
+          currentTarget: {
+            publicControlledBehaviorEnabled: true
+          }
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
+          sourceRecord: {
+            currentTarget: source.targetNode
+          }
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
+          sourceRecord: {
+            currentTarget: {
+              publicControlledBehaviorEnabled: true
+            }
+          }
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
+          sourceRecord: {
+            nativeEvent: {
+              target: source.targetNode,
+              type: 'input'
+            },
+            target: source.targetNode
+          }
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'source-record-alias'
+    }
+  );
+  const accessorResourceSourceRecord = {};
+  Object.defineProperty(accessorResourceSourceRecord, 'nested', {
+    enumerable: true,
+    get() {
+      return {
+        resourceFormEvidence: {kind: 'form-action-event-plugin'}
+      };
+    }
+  });
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
+          sourceRecord: accessorResourceSourceRecord
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  const accessorPublicSourceRecord = {};
+  Object.defineProperty(accessorPublicSourceRecord, 'nested', {
+    enumerable: true,
+    get() {
+      return {
+        publicControlledBehaviorEnabled: true
+      };
+    }
+  });
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
+          sourceRecord: accessorPublicSourceRecord
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
           sourceRecord: {
             nested: {
               resourceFormEvidence: {kind: 'form-action-event-plugin'}
@@ -3583,6 +4272,100 @@ test('private input/change extraction preflight rejects stale currentness and pu
           .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
       reason: 'source-record-alias'
     }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
+          sourceRecord: {
+            fakeDomTarget: createPrivateControlledRestoreFakeDomTarget({
+              value: 'smuggled'
+            })
+          }
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'source-record-alias'
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
+          sourceRecord: {
+            [Symbol('resourceFormEvidence')]: {
+              kind: 'form-action-event-plugin'
+            }
+          }
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'source-record-alias'
+    }
+  );
+  const proxyHiddenSourceRecord = new Proxy(
+    {},
+    {
+      get(target, key) {
+        if (key === 'publicControlledBehaviorEnabled') {
+          return true;
+        }
+        if (key === 'resourceFormEvidence') {
+          return {kind: 'form-action-event-plugin'};
+        }
+        return target[key];
+      },
+      getOwnPropertyDescriptor() {
+        return undefined;
+      },
+      ownKeys() {
+        return [];
+      }
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
+          sourceRecord: proxyHiddenSourceRecord
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+
+  const acceptedPreflightAfterForgedRejections =
+    createPrivateInputChangePreflight(source);
+  assert.equal(
+    pluginEventSystem.isInputChangeEventExtractionPreflightRecord(
+      acceptedPreflightAfterForgedRejections
+    ),
+    true
+  );
+  assert.equal(
+    pluginEventSystem.getInputChangeEventExtractionPreflightRecordPayload(
+      acceptedPreflightAfterForgedRejections
+    ).dispatchRecord,
+    source.dispatchRecord
   );
 
   const wrongNativeEventType = createPrivateInputChangeDispatch({
@@ -3757,6 +4540,168 @@ test('private input/change controlled restore bridge rejects cloned and foreign 
       reason: 'resource-form-or-hydration-replay-source-alias'
     }
   );
+  for (const testCase of [
+    {
+      queueId:
+        'event-private-input-change-bridge-hidden-resource-target-kind',
+      targetKind: 'resource-form-controlled-restore-source'
+    },
+    {
+      queueId:
+        'event-private-input-change-bridge-hidden-hydration-target-kind',
+      targetKind: 'hydration-replay-controlled-restore-source'
+    }
+  ]) {
+    let targetKindGetterCalled = false;
+    const proxyHiddenTargetKindSourceRecord = new Proxy(
+      {},
+      {
+        get(target, key) {
+          if (key === 'targetKind') {
+            targetKindGetterCalled = true;
+            return testCase.targetKind;
+          }
+          return target[key];
+        },
+        getOwnPropertyDescriptor() {
+          return undefined;
+        },
+        ownKeys() {
+          return [];
+        }
+      }
+    );
+    assert.throws(
+      () =>
+        gate.recordInputChangeEventControlledRestoreBridge(
+          inputPreflight,
+          restoreIntent,
+          writePreflight,
+          {
+            explicitAdmission: true,
+            queueKind:
+              'deterministic-input-change-event-controlled-restore-bridge',
+            queueId: testCase.queueId,
+            sourceRecord: {
+              nested: proxyHiddenTargetKindSourceRecord
+            },
+            targetKind:
+              'controlled-input-change-event-restore-queue-bridge'
+          }
+        ),
+      {
+        code:
+          controlledRestoreQueue
+            .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+        reason: 'resource-form-or-hydration-replay-source-alias'
+      }
+    );
+    assert.equal(targetKindGetterCalled, true);
+  }
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreBridge(
+        inputPreflight,
+        restoreIntent,
+        writePreflight,
+        {
+          explicitAdmission: true,
+          queueKind:
+            'deterministic-input-change-event-controlled-restore-bridge',
+          queueId: 'event-private-input-change-bridge-current-target',
+          sourceRecord: {
+            currentTarget: source.targetNode
+          },
+          targetKind: 'controlled-input-change-event-restore-queue-bridge'
+        }
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreBridge(
+        inputPreflight,
+        restoreIntent,
+        writePreflight,
+        {
+          explicitAdmission: true,
+          queueKind:
+            'deterministic-input-change-event-controlled-restore-bridge',
+          queueId: 'event-private-input-change-bridge-top-current-target',
+          currentTarget: {
+            target: source.targetNode
+          },
+          targetKind: 'controlled-input-change-event-restore-queue-bridge'
+        }
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+      reason: 'resource-form-or-hydration-replay-source-alias'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreBridge(
+        inputPreflight,
+        restoreIntent,
+        writePreflight,
+        {
+          explicitAdmission: true,
+          queueKind:
+            'deterministic-input-change-event-controlled-restore-bridge',
+          queueId:
+            'event-private-input-change-bridge-public-current-target',
+          currentTarget: {
+            publicControlledBehaviorEnabled: true
+          },
+          targetKind: 'controlled-input-change-event-restore-queue-bridge'
+        }
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
+  const accessorBridgeSourceRecord = {};
+  Object.defineProperty(accessorBridgeSourceRecord, 'nested', {
+    enumerable: true,
+    get() {
+      return {
+        resourceFormEvidence: {operation: 'form-action-event-plugin'}
+      };
+    }
+  });
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreBridge(
+        inputPreflight,
+        restoreIntent,
+        writePreflight,
+        {
+          explicitAdmission: true,
+          queueKind:
+            'deterministic-input-change-event-controlled-restore-bridge',
+          queueId: 'event-private-input-change-bridge-accessor-smuggling',
+          sourceRecord: accessorBridgeSourceRecord,
+          targetKind: 'controlled-input-change-event-restore-queue-bridge'
+        }
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+      reason: 'public-or-live-behavior-claimed'
+    }
+  );
   assert.throws(
     () =>
       gate.recordInputChangeEventControlledRestoreBridge(
@@ -3781,6 +4726,61 @@ test('private input/change controlled restore bridge rejects cloned and foreign 
         controlledRestoreQueue
           .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
       reason: 'resource-form-or-hydration-replay-source-alias'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreBridge(
+        inputPreflight,
+        restoreIntent,
+        writePreflight,
+        {
+          explicitAdmission: true,
+          queueKind:
+            'deterministic-input-change-event-controlled-restore-bridge',
+          queueId: 'event-private-input-change-bridge-fake-target-smuggling',
+          sourceRecord: {
+            fakeDomTarget: createPrivateControlledRestoreFakeDomTarget({
+              value: 'smuggled'
+            })
+          },
+          targetKind: 'controlled-input-change-event-restore-queue-bridge'
+        }
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+      reason: 'resource-form-or-hydration-replay-source-alias'
+    }
+  );
+  const nonEnumerableBridgeAdmission = {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-input-change-event-controlled-restore-bridge',
+    queueId: 'event-private-input-change-bridge-non-enumerable-claim',
+    targetKind: 'controlled-input-change-event-restore-queue-bridge'
+  };
+  Object.defineProperty(
+    nonEnumerableBridgeAdmission,
+    'publicControlledBehaviorEnabled',
+    {
+      value: true
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreBridge(
+        inputPreflight,
+        restoreIntent,
+        writePreflight,
+        nonEnumerableBridgeAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+      reason: 'public-or-live-behavior-claimed'
     }
   );
   assert.throws(
@@ -3851,6 +4851,20 @@ test('private input/change controlled restore bridge rejects cloned and foreign 
           .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
       reason: 'input-change-restore-dispatch-source-mismatch'
     }
+  );
+
+  const acceptedBridgeAfterForgedRejections = recordPrivateInputChangeBridge(
+    gate,
+    inputPreflight,
+    restoreIntent,
+    writePreflight
+  );
+  assert.equal(
+    controlledRestoreQueue
+      .isPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecord(
+        acceptedBridgeAfterForgedRejections
+      ),
+    true
   );
 
   componentTree.detachHostInstanceToken(source.token);

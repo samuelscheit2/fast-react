@@ -180,6 +180,70 @@ const controlledInputPostEventRestoreQueueFakeDomExecutionPayloads =
   new WeakMap();
 const controlledInputPostEventRestoreQueueGateStates = new WeakMap();
 const controlledInputPostEventRestoreQueueSourcePayloads = new WeakMap();
+const controlledRestoreQueuePublicBehaviorClaimFields = freezeArray([
+  'browserDomEventCompatibilityClaimed',
+  'browserInputMutated',
+  'browserSyntheticEventCompatibilityClaimed',
+  'compatibilityClaimed',
+  'controlledStateRestoreInvoked',
+  'controlledStateRestoreScheduled',
+  'eventDispatch',
+  'eventDispatchAllowed',
+  'hydrationReplayCompatibilityClaimed',
+  'hostValueWritten',
+  'hostWrapperInvoked',
+  'packageCompatibilityClaimed',
+  'publicControlledBehaviorEnabled',
+  'publicDispatchEnabled',
+  'publicEventCompatibilityClaimed',
+  'publicHydrationReplayCompatibilityClaimed',
+  'publicPackageCompatibilityClaimed',
+  'publicRootBehaviorChanged',
+  'publicSyntheticEventCompatibilityClaimed',
+  'realDomMutationAllowed',
+  'restoreQueueFlushed',
+  'restoreQueueWritten',
+  'syntheticEventCompatibilityClaimed',
+  'syntheticEventCreated',
+  'syntheticEventDispatch',
+  'valueTrackerFieldWritten',
+  'willDispatchPublicEvent',
+  'willInvokePublicListeners'
+]);
+const controlledRestoreQueueSourceAliasValueFields = freezeArray([
+  '$$typeof',
+  'kind',
+  'source',
+  'sourceKind',
+  'status',
+  'operation',
+  'requestType',
+  'facadeCall',
+  'queueKind',
+  'targetKind'
+]);
+const controlledRestoreQueueSourceAliasPresenceFields = freezeArray([
+  'currentTarget',
+  'dispatchPayload',
+  'eventPayload',
+  'fakeDomTarget',
+  'formActionEvidence',
+  'formEvidence',
+  'formResetEvidence',
+  'hydrationReplayEvidence',
+  'liveDomTarget',
+  'nativeEvent',
+  'replayQueueEvidence',
+  'resourceEvidence',
+  'resourceFormEvidence',
+  'syntheticEvent',
+  'target',
+  'targetNode'
+]);
+const controlledRestoreQueueFakeDomAdmissionTargetKinds = freezeArray([
+  'controlled-input-change-event-restore-queue-execution',
+  'controlled-input-post-event-restore-fake-dom-execution'
+]);
 const defaultControlledInputPostEventRestoreQueueGate =
   createControlledInputPostEventRestoreQueueGate();
 
@@ -7193,38 +7257,18 @@ function assertNoControlledRestoreQueueAdmissionSmuggling(
   admission,
   throwError
 ) {
-  const blockedClaimFields = [
-    'browserDomEventCompatibilityClaimed',
-    'browserInputMutated',
-    'browserSyntheticEventCompatibilityClaimed',
-    'compatibilityClaimed',
-    'controlledStateRestoreInvoked',
-    'controlledStateRestoreScheduled',
-    'eventDispatch',
-    'eventDispatchAllowed',
-    'hydrationReplayCompatibilityClaimed',
-    'hostValueWritten',
-    'hostWrapperInvoked',
-    'packageCompatibilityClaimed',
-    'publicControlledBehaviorEnabled',
-    'publicDispatchEnabled',
-    'publicEventCompatibilityClaimed',
-    'publicHydrationReplayCompatibilityClaimed',
-    'publicPackageCompatibilityClaimed',
-    'publicRootBehaviorChanged',
-    'publicSyntheticEventCompatibilityClaimed',
-    'realDomMutationAllowed',
-    'restoreQueueFlushed',
-    'restoreQueueWritten',
-    'syntheticEventCompatibilityClaimed',
-    'syntheticEventCreated',
-    'syntheticEventDispatch',
-    'valueTrackerFieldWritten',
-    'willDispatchPublicEvent',
-    'willInvokePublicListeners'
-  ];
+  if (containsControlledRestoreQueuePublicBehaviorClaim(admission)) {
+    throwError('public-or-live-behavior-claimed');
+  }
+  if (
+    containsAllowedDirectControlledRestoreQueueTargetPublicBehaviorClaim(
+      admission
+    )
+  ) {
+    throwError('public-or-live-behavior-claimed');
+  }
 
-  for (const field of blockedClaimFields) {
+  for (const field of controlledRestoreQueuePublicBehaviorClaimFields) {
     if (admission[field] === true) {
       throwError('public-or-live-behavior-claimed');
     }
@@ -7249,7 +7293,7 @@ function normalizeInputChangeEventRestoreQueueBridgeAdmission(admission) {
     );
   }
 
-  if (admission.explicitAdmission !== true) {
+  if (getAdmissionExplicitAdmission(admission) !== true) {
     throwInputChangeEventRestoreQueueBridgeError(
       'explicitAdmission must be true'
     );
@@ -7273,10 +7317,10 @@ function normalizeInputChangeEventRestoreQueueBridgeAdmission(admission) {
     );
   }
 
-  const targetKind = getAdmissionStringProperty(
+  const targetKind = getRequiredAdmissionStringProperty(
     admission,
     'targetKind',
-    'controlled-input-change-event-restore-queue-bridge'
+    throwInputChangeEventRestoreQueueBridgeError
   );
   if (targetKind !== 'controlled-input-change-event-restore-queue-bridge') {
     throwInputChangeEventRestoreQueueBridgeError(
@@ -7325,7 +7369,7 @@ function normalizeInputChangeEventRestoreQueueExecutionAdmission(
     );
   }
 
-  if (admission.explicitAdmission !== true) {
+  if (getAdmissionExplicitAdmission(admission) !== true) {
     throwInputChangeEventRestoreQueueExecutionError(
       'explicitAdmission must be true'
     );
@@ -7349,10 +7393,10 @@ function normalizeInputChangeEventRestoreQueueExecutionAdmission(
     );
   }
 
-  const targetKind = getAdmissionStringProperty(
+  const targetKind = getRequiredAdmissionStringProperty(
     admission,
     'targetKind',
-    'controlled-input-change-event-restore-queue-execution'
+    throwInputChangeEventRestoreQueueExecutionError
   );
   if (
     targetKind !==
@@ -7433,7 +7477,7 @@ function normalizePostEventRestoreQueueFakeDomExecutionAdmission(admission) {
     );
   }
 
-  if (admission.explicitAdmission !== true) {
+  if (getAdmissionExplicitAdmission(admission) !== true) {
     throwPostEventRestoreQueueFakeDomExecutionError(
       'explicitAdmission must be true'
     );
@@ -7454,10 +7498,10 @@ function normalizePostEventRestoreQueueFakeDomExecutionAdmission(admission) {
     );
   }
 
-  const targetKind = getAdmissionStringProperty(
+  const targetKind = getRequiredAdmissionStringProperty(
     admission,
     'targetKind',
-    'controlled-input-post-event-restore-fake-dom-execution'
+    throwPostEventRestoreQueueFakeDomExecutionError
   );
   if (
     targetKind !== 'controlled-input-post-event-restore-fake-dom-execution'
@@ -7536,7 +7580,7 @@ function normalizePostEventRestoreQueueAdmission(admission) {
     throwInvalidAdmission('admission metadata must be an object');
   }
 
-  if (admission.explicitAdmission !== true) {
+  if (getAdmissionExplicitAdmission(admission) !== true) {
     throwInvalidAdmission('explicitAdmission must be true');
   }
   assertNoControlledRestoreQueueAdmissionSmuggling(
@@ -7560,10 +7604,10 @@ function normalizePostEventRestoreQueueAdmission(admission) {
     );
   }
 
-  const targetKind = getAdmissionStringProperty(
+  const targetKind = getRequiredAdmissionStringProperty(
     admission,
     'targetKind',
-    'controlled-input-post-event-restore-queue'
+    throwInvalidAdmission
   );
   if (targetKind !== 'controlled-input-post-event-restore-queue') {
     throwInvalidAdmission(
@@ -7617,7 +7661,7 @@ function normalizePostEventRestoreQueueWritePreflightAdmission(admission) {
     );
   }
 
-  if (admission.explicitAdmission !== true) {
+  if (getAdmissionExplicitAdmission(admission) !== true) {
     throwPostEventRestoreQueueWritePreflightError(
       'explicitAdmission must be true'
     );
@@ -7641,10 +7685,10 @@ function normalizePostEventRestoreQueueWritePreflightAdmission(admission) {
     );
   }
 
-  const targetKind = getAdmissionStringProperty(
+  const targetKind = getRequiredAdmissionStringProperty(
     admission,
     'targetKind',
-    'controlled-input-post-event-restore-queue-write-preflight'
+    throwPostEventRestoreQueueWritePreflightError
   );
   if (
     targetKind !==
@@ -7694,7 +7738,7 @@ function normalizePostEventRestoreQueueWriteExecutionAdmission(admission) {
     );
   }
 
-  if (admission.explicitAdmission !== true) {
+  if (getAdmissionExplicitAdmission(admission) !== true) {
     throwPostEventRestoreQueueWriteExecutionError(
       'explicitAdmission must be true'
     );
@@ -7718,10 +7762,10 @@ function normalizePostEventRestoreQueueWriteExecutionAdmission(admission) {
     );
   }
 
-  const targetKind = getAdmissionStringProperty(
+  const targetKind = getRequiredAdmissionStringProperty(
     admission,
     'targetKind',
-    'controlled-input-post-event-restore-queue-write-execution'
+    throwPostEventRestoreQueueWriteExecutionError
   );
   if (
     targetKind !==
@@ -7773,7 +7817,7 @@ function normalizePostEventRestoreQueueFlushBlockerAdmission(admission) {
     );
   }
 
-  if (admission.explicitAdmission !== true) {
+  if (getAdmissionExplicitAdmission(admission) !== true) {
     throwPostEventRestoreQueueFlushBlockerError(
       'explicitAdmission must be true'
     );
@@ -7797,10 +7841,10 @@ function normalizePostEventRestoreQueueFlushBlockerAdmission(admission) {
     );
   }
 
-  const targetKind = getAdmissionStringProperty(
+  const targetKind = getRequiredAdmissionStringProperty(
     admission,
     'targetKind',
-    'controlled-input-post-event-restore-queue-flush-blocker'
+    throwPostEventRestoreQueueFlushBlockerError
   );
   if (
     targetKind !==
@@ -7853,7 +7897,7 @@ function normalizePostEventRestoreQueueWrapperMutationIntentAdmission(
     );
   }
 
-  if (admission.explicitAdmission !== true) {
+  if (getAdmissionExplicitAdmission(admission) !== true) {
     throwPostEventRestoreQueueWrapperMutationIntentError(
       'explicitAdmission must be true'
     );
@@ -7877,10 +7921,10 @@ function normalizePostEventRestoreQueueWrapperMutationIntentAdmission(
     );
   }
 
-  const targetKind = getAdmissionStringProperty(
+  const targetKind = getRequiredAdmissionStringProperty(
     admission,
     'targetKind',
-    'controlled-input-post-event-restore-wrapper-mutation-intent'
+    throwPostEventRestoreQueueWrapperMutationIntentError
   );
   if (
     targetKind !==
@@ -7935,7 +7979,7 @@ function normalizePostEventRestoreQueueLiveMutationPreflightAdmission(
     );
   }
 
-  if (admission.explicitAdmission !== true) {
+  if (getAdmissionExplicitAdmission(admission) !== true) {
     throwPostEventRestoreQueueLiveMutationPreflightError(
       'explicitAdmission must be true'
     );
@@ -7959,10 +8003,10 @@ function normalizePostEventRestoreQueueLiveMutationPreflightAdmission(
     );
   }
 
-  const targetKind = getAdmissionStringProperty(
+  const targetKind = getRequiredAdmissionStringProperty(
     admission,
     'targetKind',
-    'controlled-input-post-event-restore-live-mutation-preflight'
+    throwPostEventRestoreQueueLiveMutationPreflightError
   );
   if (
     targetKind !==
@@ -9526,10 +9570,14 @@ function bridgeArraysEqual(left, right) {
 }
 
 function containsBlockedInputChangeSourceAlias(source) {
-  return containsBlockedInputChangeSourceAliasImpl(source, new WeakSet());
+  return containsBlockedInputChangeSourceAliasImpl(
+    source,
+    new WeakSet(),
+    true
+  );
 }
 
-function containsBlockedInputChangeSourceAliasImpl(source, seen) {
+function containsBlockedInputChangeSourceAliasImpl(source, seen, isRoot) {
   if (!isObjectLike(source)) {
     return false;
   }
@@ -9538,42 +9586,74 @@ function containsBlockedInputChangeSourceAliasImpl(source, seen) {
   }
   seen.add(source);
 
-  for (const key of [
-    '$$typeof',
-    'kind',
-    'source',
-    'sourceKind',
-    'status',
-    'operation',
-    'requestType',
-    'facadeCall',
-    'queueKind',
-    'targetKind'
-  ]) {
-    if (isBlockedInputChangeSourceAliasValue(source[key])) {
+  if (containsControlledRestoreQueuePublicBehaviorClaim(source)) {
+    return true;
+  }
+
+  for (const key of controlledRestoreQueueSourceAliasValueFields) {
+    if (getBlockedInputChangeSourceAliasValue(source, key, isRoot)) {
       return true;
     }
   }
 
-  for (const key of [
-    'resourceFormEvidence',
-    'resourceEvidence',
-    'formEvidence',
-    'formActionEvidence',
-    'formResetEvidence',
-    'hydrationReplayEvidence',
-    'replayQueueEvidence'
-  ]) {
-    if (source[key] !== undefined) {
+  for (const key of controlledRestoreQueueSourceAliasPresenceFields) {
+    if (
+      isAllowedDirectControlledRestoreQueueTargetKey(source, key, isRoot)
+    ) {
+      if (
+        containsBlockedDirectControlledRestoreQueueTargetClaim(
+          source,
+          key
+        )
+      ) {
+        return true;
+      }
+      continue;
+    }
+    if (hasInputChangeSourceAliasPresence(source, key)) {
       return true;
     }
   }
 
-  for (const key of Object.keys(source)) {
+  const ownKeys = getControlledRestoreQueueOwnKeys(source);
+  if (ownKeys === null) {
+    return true;
+  }
+
+  for (const key of ownKeys) {
+    const descriptor =
+      getControlledRestoreQueueOwnPropertyDescriptor(source, key);
+    if (descriptor == null) {
+      return true;
+    }
+    if (
+      isInputChangeSourceAliasPresenceKey(key) &&
+      !isAllowedDirectControlledRestoreQueueTargetKey(source, key, isRoot)
+    ) {
+      return true;
+    }
+    if (isInputChangeSourceAliasValueKey(key)) {
+      if (
+        !Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
+        isBlockedInputChangeSourceAliasValue(descriptor.value)
+      ) {
+        return true;
+      }
+    }
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return true;
+    }
     if (isInputChangeSourceAliasScanSkippedKey(key)) {
       continue;
     }
-    if (containsBlockedInputChangeSourceAliasImpl(source[key], seen)) {
+    if (
+      Object.prototype.hasOwnProperty.call(descriptor, 'value') &&
+      containsBlockedInputChangeSourceAliasImpl(
+        descriptor.value,
+        seen,
+        false
+      )
+    ) {
       return true;
     }
   }
@@ -9582,9 +9662,12 @@ function containsBlockedInputChangeSourceAliasImpl(source, seen) {
 }
 
 function isInputChangeSourceAliasScanSkippedKey(key) {
+  if (typeof key !== 'string') {
+    return false;
+  }
+
   return (
     key === 'container' ||
-    key === 'currentTarget' ||
     key === 'fakeDomTarget' ||
     key === 'liveDomTarget' ||
     key === 'nativeEvent' ||
@@ -9595,6 +9678,338 @@ function isInputChangeSourceAliasScanSkippedKey(key) {
     key === 'target' ||
     key === 'targetNode'
   );
+}
+
+function containsControlledRestoreQueuePublicBehaviorClaim(source) {
+  return containsControlledRestoreQueuePublicBehaviorClaimImpl(
+    source,
+    new WeakSet()
+  );
+}
+
+function containsControlledRestoreQueuePublicBehaviorClaimImpl(source, seen) {
+  if (!isObjectLike(source)) {
+    return false;
+  }
+  if (seen.has(source)) {
+    return false;
+  }
+  seen.add(source);
+
+  for (const field of controlledRestoreQueuePublicBehaviorClaimFields) {
+    if (hasBlockedControlledRestoreQueuePublicClaimField(source, field)) {
+      return true;
+    }
+  }
+  if (
+    hasBlockedControlledRestoreQueuePublicClaimField(
+      source,
+      'syntheticEventCount'
+    )
+  ) {
+    return true;
+  }
+
+  const ownKeys = getControlledRestoreQueueOwnKeys(source);
+  if (ownKeys === null) {
+    return true;
+  }
+
+  for (const key of ownKeys) {
+    const descriptor =
+      getControlledRestoreQueueOwnPropertyDescriptor(source, key);
+    if (descriptor == null) {
+      return true;
+    }
+    if (
+      isControlledRestoreQueuePublicClaimKey(key) &&
+      descriptorContainsBlockedControlledRestoreQueueClaim(key, descriptor)
+    ) {
+      return true;
+    }
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return true;
+    }
+    if (isInputChangeSourceAliasScanSkippedKey(key)) {
+      continue;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(descriptor, 'value') &&
+      containsControlledRestoreQueuePublicBehaviorClaimImpl(
+        descriptor.value,
+        seen
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function hasBlockedControlledRestoreQueuePublicClaimField(source, field) {
+  const descriptor =
+    getControlledRestoreQueueOwnPropertyDescriptor(source, field);
+  if (
+    descriptor !== undefined &&
+    descriptor !== null &&
+    descriptorContainsBlockedControlledRestoreQueueClaim(field, descriptor)
+  ) {
+    return true;
+  }
+
+  try {
+    return isBlockedControlledRestoreQueuePublicClaimValue(
+      field,
+      source[field]
+    );
+  } catch (error) {
+    return true;
+  }
+}
+
+function descriptorContainsBlockedControlledRestoreQueueClaim(
+  key,
+  descriptor
+) {
+  if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+    return true;
+  }
+
+  return isBlockedControlledRestoreQueuePublicClaimValue(
+    key,
+    descriptor.value
+  );
+}
+
+function isBlockedControlledRestoreQueuePublicClaimValue(key, value) {
+  const keyName = getControlledRestoreQueuePropertyKeyName(key);
+  if (keyName === 'syntheticEventCount') {
+    return typeof value === 'number' && value > 0;
+  }
+
+  return value === true;
+}
+
+function getBlockedInputChangeSourceAliasValue(source, key, isRoot) {
+  const descriptor =
+    getControlledRestoreQueueOwnPropertyDescriptor(source, key);
+  if (descriptor !== undefined && descriptor !== null) {
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return true;
+    }
+    if (isBlockedInputChangeSourceAliasValue(descriptor.value)) {
+      return true;
+    }
+  }
+  if (getControlledRestoreQueuePropertyKeyName(key) === 'targetKind') {
+    if (isRoot === true) {
+      return false;
+    }
+    try {
+      return source[key] !== undefined;
+    } catch (error) {
+      return true;
+    }
+  }
+
+  try {
+    return isBlockedInputChangeSourceAliasValue(source[key]);
+  } catch (error) {
+    return true;
+  }
+}
+
+function hasInputChangeSourceAliasPresence(source, key) {
+  const descriptor =
+    getControlledRestoreQueueOwnPropertyDescriptor(source, key);
+  if (descriptor !== undefined && descriptor !== null) {
+    return true;
+  }
+
+  try {
+    return source[key] !== undefined;
+  } catch (error) {
+    return true;
+  }
+}
+
+function getControlledRestoreQueueOwnKeys(source) {
+  try {
+    return Reflect.ownKeys(source);
+  } catch (error) {
+    return null;
+  }
+}
+
+function getControlledRestoreQueueOwnPropertyDescriptor(source, key) {
+  try {
+    return Object.getOwnPropertyDescriptor(source, key);
+  } catch (error) {
+    return null;
+  }
+}
+
+function getControlledRestoreQueueOwnDataPropertyValue(source, key) {
+  const descriptor =
+    getControlledRestoreQueueOwnPropertyDescriptor(source, key);
+  if (
+    descriptor === undefined ||
+    descriptor === null ||
+    !Object.prototype.hasOwnProperty.call(descriptor, 'value')
+  ) {
+    return undefined;
+  }
+
+  return descriptor.value;
+}
+
+function isAllowedDirectControlledRestoreQueueTargetKey(source, key, isRoot) {
+  const keyName = getControlledRestoreQueuePropertyKeyName(key);
+  if (isRoot !== true) {
+    return false;
+  }
+  if (
+    getControlledRestoreQueueOwnDataPropertyValue(
+      source,
+      'explicitAdmission'
+    ) !== true
+  ) {
+    return false;
+  }
+
+  const targetKind = getControlledRestoreQueueOwnDataPropertyValue(
+    source,
+    'targetKind'
+  );
+  if (keyName === 'fakeDomTarget') {
+    return controlledRestoreQueueFakeDomAdmissionTargetKinds.includes(
+      targetKind
+    );
+  }
+  if (keyName === 'liveDomTarget') {
+    return (
+      targetKind ===
+      'controlled-input-post-event-restore-live-mutation-preflight'
+    );
+  }
+
+  return false;
+}
+
+function containsBlockedDirectControlledRestoreQueueTargetClaim(source, key) {
+  const descriptor =
+    getControlledRestoreQueueOwnPropertyDescriptor(source, key);
+  if (descriptor === undefined || descriptor === null) {
+    try {
+      const value = source[key];
+      if (shouldDeferUnsupportedLiveFakeDomTarget(key, value)) {
+        return false;
+      }
+      return (
+        value !== undefined &&
+        containsBlockedInputChangeSourceAliasImpl(
+          value,
+          new WeakSet(),
+          false
+        )
+      );
+    } catch (error) {
+      return true;
+    }
+  }
+  if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+    return true;
+  }
+  if (shouldDeferUnsupportedLiveFakeDomTarget(key, descriptor.value)) {
+    return false;
+  }
+
+  return containsBlockedInputChangeSourceAliasImpl(
+    descriptor.value,
+    new WeakSet(),
+    false
+  );
+}
+
+function containsAllowedDirectControlledRestoreQueueTargetPublicBehaviorClaim(
+  source
+) {
+  for (const key of ['fakeDomTarget', 'liveDomTarget']) {
+    if (!isAllowedDirectControlledRestoreQueueTargetKey(source, key, true)) {
+      continue;
+    }
+    if (
+      containsDirectControlledRestoreQueueTargetPublicBehaviorClaim(source, key)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function containsDirectControlledRestoreQueueTargetPublicBehaviorClaim(
+  source,
+  key
+) {
+  const descriptor =
+    getControlledRestoreQueueOwnPropertyDescriptor(source, key);
+  if (descriptor === undefined || descriptor === null) {
+    try {
+      const value = source[key];
+      if (shouldDeferUnsupportedLiveFakeDomTarget(key, value)) {
+        return false;
+      }
+      return (
+        value !== undefined &&
+        containsControlledRestoreQueuePublicBehaviorClaim(value)
+      );
+    } catch (error) {
+      return true;
+    }
+  }
+  if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+    return true;
+  }
+  if (shouldDeferUnsupportedLiveFakeDomTarget(key, descriptor.value)) {
+    return false;
+  }
+
+  return containsControlledRestoreQueuePublicBehaviorClaim(descriptor.value);
+}
+
+function shouldDeferUnsupportedLiveFakeDomTarget(key, value) {
+  return (
+    getControlledRestoreQueuePropertyKeyName(key) === 'fakeDomTarget' &&
+    isLikelyLiveDomNode(value)
+  );
+}
+
+function isControlledRestoreQueuePublicClaimKey(key) {
+  const keyName = getControlledRestoreQueuePropertyKeyName(key);
+  return (
+    keyName === 'syntheticEventCount' ||
+    controlledRestoreQueuePublicBehaviorClaimFields.includes(keyName)
+  );
+}
+
+function isInputChangeSourceAliasValueKey(key) {
+  const keyName = getControlledRestoreQueuePropertyKeyName(key);
+  return controlledRestoreQueueSourceAliasValueFields.includes(keyName);
+}
+
+function isInputChangeSourceAliasPresenceKey(key) {
+  const keyName = getControlledRestoreQueuePropertyKeyName(key);
+  return controlledRestoreQueueSourceAliasPresenceFields.includes(keyName);
+}
+
+function getControlledRestoreQueuePropertyKeyName(key) {
+  if (typeof key === 'symbol') {
+    return key.description || String(key).slice(7, -1);
+  }
+
+  return key;
 }
 
 function isBlockedInputChangeSourceAliasValue(value) {
@@ -9994,6 +10409,32 @@ function getRecordedRadioGroupIntent(groupIntentRecords) {
   }
 
   return null;
+}
+
+function getAdmissionExplicitAdmission(record) {
+  return getControlledRestoreQueueOwnDataPropertyValue(
+    record,
+    'explicitAdmission'
+  );
+}
+
+function getRequiredAdmissionStringProperty(record, key, throwError) {
+  const descriptor =
+    getControlledRestoreQueueOwnPropertyDescriptor(record, key);
+  if (
+    descriptor === undefined ||
+    descriptor === null ||
+    !Object.prototype.hasOwnProperty.call(descriptor, 'value')
+  ) {
+    throwError(`${key} must be a string`);
+  }
+
+  const value = descriptor.value;
+  if (typeof value !== 'string' || value.length === 0) {
+    throwError(`${key} must be a string`);
+  }
+
+  return value;
 }
 
 function getAdmissionStringProperty(record, key, fallback) {
