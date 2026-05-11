@@ -107,7 +107,9 @@ const scheduler =
     ? require('./cjs/scheduler-unstable_mock.production.js')
     : require('./cjs/scheduler-unstable_mock.development.js');
 
-module.exports = createPrivateSchedulerMockDiagnosticsWrapper(scheduler);
+const wrappedScheduler = createPrivateSchedulerMockDiagnosticsWrapper(scheduler);
+
+module.exports = wrappedScheduler;
 
 function freezeSchedulerOwnedExpiredActRootWorkSource(value) {
   schedulerMockExpiredActRootWorkSources.add(value);
@@ -158,10 +160,10 @@ function createPrivateSchedulerMockDiagnosticsWrapper(sourceScheduler) {
           )
         : value;
     Object.defineProperty(wrappedScheduler, key, {
-      configurable: typeof value !== 'function',
+      configurable: true,
       enumerable: true,
       value: wrappedValue,
-      writable: typeof value !== 'function'
+      writable: true
     });
   }
 

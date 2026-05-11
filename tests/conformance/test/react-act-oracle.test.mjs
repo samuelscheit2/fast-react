@@ -32,6 +32,7 @@ import {
 
 const oracle = readCheckedReactActOracle();
 const require = createRequire(import.meta.url);
+const CommonJsModule = require("node:module");
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -78,6 +79,18 @@ const privateSchedulerMockExpiredActRootWorkDiagnosticsKind =
 const privateSchedulerMockExpiredActRootWorkDiagnosticsBrand = Symbol.for(
   privateSchedulerMockExpiredActRootWorkDiagnosticsKind
 );
+const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind =
+  "fast-react.scheduler.mock-expired-act-root-work-source-validator-module-record";
+const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey =
+  Symbol.for(
+    privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind
+  );
+const privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind =
+  "fast-react.scheduler.mock-expired-act-root-work-source-validator-global-record";
+const privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey =
+  Symbol.for(
+    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind
+  );
 const privateSchedulerMockDelayedActRootWorkDiagnosticsKind =
   "fast-react.scheduler.mock-delayed-act-root-work-diagnostics";
 const privateSchedulerMockDelayedActRootWorkDiagnosticsBrand = Symbol.for(
@@ -104,6 +117,8 @@ const acceptedSchedulerMockExpiredActRootWorkRecords = [
   "HostRootFinishedWorkPendingCommitRecordForCanary",
   "HostRootFinishedWorkCommitHandoffRecordForCanary"
 ];
+
+installPreinstalledFakeSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecord();
 
 test("checked React.act oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -1448,6 +1463,8 @@ test("package-private React act gate consumes Scheduler mock expired act/root di
     ]) {
       assertSchedulerFlushHelperRejectsFakeValidatorMutation(
         Scheduler,
+        gate,
+        report,
         helperName,
         `${nodeEnv}:${helperName}`
       );
@@ -2705,6 +2722,12 @@ test("React act private Scheduler mock consumers reject stale and forged expired
       gate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(expiredReport),
       true,
       nodeEnv
+    );
+    assertSchedulerMockExpiredConsumerRejected(
+      gate,
+      cloneExpiredActRootWorkReport(expiredReport),
+      "scheduler-expired-act-root-diagnostics-source-proof",
+      `${nodeEnv}:expired-clone-rejected-with-preinstalled-global-source-proof-record`
     );
 
     const diagnostics =
@@ -4037,11 +4060,18 @@ function cloneFrozenObject(value, overrides = {}) {
 
 function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
   Scheduler,
+  gate,
+  report,
   helperName,
   label
 ) {
   const originalHelper = Scheduler[helperName];
-  const fakeHelper = createFakeSchedulerFlushHelperWithPrivateDiagnostics();
+  const originalDiagnostics =
+    originalHelper[privateActQueueFlushDiagnosticsExport];
+  const fakeHelper =
+    createFakeSchedulerFlushHelperWithPrivateDiagnostics(
+      originalDiagnostics
+    );
   const helperDescriptor = Object.getOwnPropertyDescriptor(
     Scheduler,
     helperName
@@ -4056,9 +4086,9 @@ function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
       value: helperDescriptor.value
     },
     {
-      configurable: false,
+      configurable: true,
       enumerable: true,
-      writable: false,
+      writable: true,
       value: originalHelper
     },
     label
@@ -4073,21 +4103,40 @@ function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
   );
 
   try {
-    Scheduler[helperName] = fakeHelper;
-  } catch (error) {
-    assert.equal(error instanceof TypeError, true, label);
-  }
-  assert.equal(Scheduler[helperName], originalHelper, label);
-  assert.equal(
-    Reflect.defineProperty(Scheduler, helperName, {
+    try {
+      Scheduler[helperName] = fakeHelper;
+    } catch (error) {
+      assert.equal(error instanceof TypeError, true, label);
+    }
+    assert.equal(Scheduler[helperName], fakeHelper, label);
+
+    if (helperName === "unstable_flushExpired") {
+      assert.equal(
+        gate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(report),
+        true,
+        `${label}:original-report-with-replaced-helper`
+      );
+      assertSchedulerMockExpiredDiagnosticsRejected(
+        gate,
+        cloneExpiredActRootWorkReport(report),
+        "scheduler-expired-act-root-diagnostics-source-proof",
+        `${label}:cloned-report-with-replaced-helper`
+      );
+      assertSchedulerMockExpiredDiagnosticsRejectedWithFakeCacheModuleRecord(
+        gate,
+        report,
+        originalDiagnostics,
+        `${label}:cloned-report-with-fake-cache-module-record`
+      );
+    }
+  } finally {
+    Object.defineProperty(Scheduler, helperName, {
       configurable: true,
       enumerable: true,
-      value: fakeHelper,
+      value: originalHelper,
       writable: true
-    }),
-    false,
-    label
-  );
+    });
+  }
   assert.equal(Scheduler[helperName], originalHelper, label);
   assert.equal(
     Reflect.defineProperty(
@@ -4142,7 +4191,151 @@ function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
   );
 }
 
-function createFakeSchedulerFlushHelperWithPrivateDiagnostics() {
+function installPreinstalledFakeSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecord() {
+  const existingDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey
+  );
+  if (existingDescriptor !== undefined) {
+    return;
+  }
+
+  let fakeSourceValidatorRecord = null;
+  const fakeGlobalRecord = Object.freeze({
+    status:
+      privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind,
+    getSchedulerMockExpiredActRootWorkSourceValidatorRecord() {
+      return fakeSourceValidatorRecord;
+    },
+    setSchedulerMockExpiredActRootWorkSourceValidatorRecord(nextRecord) {
+      const fakeDiagnostics = createFakeSchedulerPrivateDiagnostics(
+        nextRecord?.diagnostics
+      );
+      fakeSourceValidatorRecord = Object.freeze({
+        status:
+          privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind,
+        diagnostics: fakeDiagnostics,
+        schedulerMockExpiredActRootWorkSourceValidator:
+          fakeDiagnostics.schedulerMockExpiredActRootWorkSourceValidator
+      });
+    }
+  });
+
+  Object.defineProperty(
+    globalThis,
+    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey,
+    {
+      configurable: false,
+      enumerable: false,
+      value: fakeGlobalRecord,
+      writable: false
+    }
+  );
+}
+
+function assertSchedulerMockExpiredDiagnosticsRejectedWithFakeCacheModuleRecord(
+  gate,
+  report,
+  originalDiagnostics,
+  label
+) {
+  const resolvedSchedulerMockEntrypoint = require.resolve(
+    path.join(repoRoot, schedulerMockWorkspaceEntrypoint)
+  );
+  const originalModuleRecord = require.cache[resolvedSchedulerMockEntrypoint];
+  const fakeDiagnostics =
+    createFakeSchedulerPrivateDiagnostics(originalDiagnostics);
+  const fakeModuleRecord = new CommonJsModule(
+    resolvedSchedulerMockEntrypoint
+  );
+  fakeModuleRecord.filename = resolvedSchedulerMockEntrypoint;
+  fakeModuleRecord.loaded = true;
+  fakeModuleRecord.paths = CommonJsModule._nodeModulePaths(
+    path.dirname(resolvedSchedulerMockEntrypoint)
+  );
+  fakeModuleRecord.exports = {
+    unstable_flushExpired:
+      createFakeSchedulerFlushHelperWithPrivateDiagnostics(
+        originalDiagnostics
+      )
+  };
+  const fakeCjsChildModule = new CommonJsModule(
+    path.join(
+      repoRoot,
+      "packages/scheduler/cjs/scheduler-unstable_mock.development.js"
+    ),
+    fakeModuleRecord
+  );
+  fakeCjsChildModule.filename = fakeCjsChildModule.id;
+  fakeCjsChildModule.loaded = true;
+  fakeCjsChildModule.paths = CommonJsModule._nodeModulePaths(
+    path.dirname(fakeCjsChildModule.filename)
+  );
+  fakeCjsChildModule.exports = {
+    unstable_flushExpired: fakeModuleRecord.exports.unstable_flushExpired
+  };
+  fakeModuleRecord.children.push(fakeCjsChildModule);
+
+  Object.defineProperty(
+    fakeModuleRecord,
+    privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey,
+    {
+      configurable: false,
+      enumerable: false,
+      value: Object.freeze({
+        status:
+          privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind,
+        diagnostics: fakeDiagnostics,
+        schedulerMockExpiredActRootWorkSourceValidator:
+          fakeDiagnostics.schedulerMockExpiredActRootWorkSourceValidator
+      }),
+      writable: false
+    }
+  );
+
+  require.cache[resolvedSchedulerMockEntrypoint] = fakeModuleRecord;
+  try {
+    assertSchedulerMockExpiredDiagnosticsRejected(
+      gate,
+      cloneExpiredActRootWorkReport(report),
+      "scheduler-expired-act-root-diagnostics-source-proof",
+      label
+    );
+  } finally {
+    if (originalModuleRecord === undefined) {
+      delete require.cache[resolvedSchedulerMockEntrypoint];
+    } else {
+      require.cache[resolvedSchedulerMockEntrypoint] = originalModuleRecord;
+    }
+  }
+}
+
+function assertSchedulerMockExpiredDiagnosticsRejected(
+  gate,
+  diagnostics,
+  reason,
+  label
+) {
+  assert.equal(
+    gate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(diagnostics),
+    false,
+    label
+  );
+  assert.throws(
+    () => gate.consumeSchedulerMockExpiredActRootWorkDiagnostics(diagnostics),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", label);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", label);
+      assert.equal(error.reason, reason, label);
+      return true;
+    },
+    label
+  );
+}
+
+function createFakeSchedulerFlushHelperWithPrivateDiagnostics(
+  originalDiagnostics
+) {
   const fakeHelper = function () {};
   Object.defineProperty(
     fakeHelper,
@@ -4150,15 +4343,16 @@ function createFakeSchedulerFlushHelperWithPrivateDiagnostics() {
     {
       configurable: false,
       enumerable: false,
-      value: createFakeSchedulerPrivateDiagnostics(),
+      value: createFakeSchedulerPrivateDiagnostics(originalDiagnostics),
       writable: false
     }
   );
   return Object.freeze(fakeHelper);
 }
 
-function createFakeSchedulerPrivateDiagnostics() {
+function createFakeSchedulerPrivateDiagnostics(originalDiagnostics = {}) {
   return Object.freeze({
+    ...originalDiagnostics,
     status: "private-scheduler-act-queue-flush-diagnostics",
     exportName: privateActQueueFlushDiagnosticsExport,
     providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics: true,
