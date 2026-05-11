@@ -53,6 +53,8 @@ export const PRIVATE_ADMISSION_850_REQUIRED_ACCEPTED_IDS = freezeRecord({
     "form-action-fulfilled-reset-execution.fake-commit",
     "fast.react_dom.private_form_action_fulfilled_reset_root_lifecycle_boundary_record",
     "bound-private-form-action-fulfilled-reset-root-lifecycle",
+    "fast.react_dom.private_form_action_reset_fake_form_identity_record",
+    "fast.react_dom.private_form_action_reset_currentness_record",
     "after-mutation-form-reset-order"
   ])
 });
@@ -71,6 +73,8 @@ export const PRIVATE_ADMISSION_850_REQUIRED_STATUSES = freezeRecord({
     "executed-private-form-action-fulfilled-reset-state-queue-fake",
     "executed-private-form-action-fulfilled-reset-commit-fake",
     "bound-private-form-action-fulfilled-reset-root-lifecycle",
+    "source-owned-private-form-action-reset-fake-form-identity",
+    "current-private-form-action-reset-generation",
     "recorded-private-form-action-fulfilled-result-metadata",
     "blocked-public-form-action-fulfilled-reset-execution-compatibility",
     "executed-private-form-action-async-callback-fulfilled"
@@ -112,7 +116,17 @@ export const PRIVATE_ADMISSION_850_REQUIRED_FIELD_NAMES = freezeRecord({
     "rootExecutionBoundaryId",
     "rootContainerInfo",
     "lifecycleRequestVersion",
+    "activeRootLifecycle",
+    "requestBoundaryCurrent",
     "sourceOwnedRootLifecycleBoundary",
+    "fakeFormIdentity",
+    "resetCurrentness",
+    "fakeFormIdentityId",
+    "resetCurrentnessId",
+    "resetGeneration",
+    "resetGenerationCurrent",
+    "sourceOwnedResetCurrentness",
+    "replayAfterGenerationAdvanceRejected",
     "fakeResetStateQueueRootExecutionBoundaryId",
     "diagnosticKind",
     "queueExecutionKind",
@@ -155,6 +169,10 @@ export const PRIVATE_ADMISSION_850_REQUIRED_SOURCE_VALUES = freezeRecord({
     commitKind: "after-mutation-form-reset-order",
     rootLifecycleBoundaryStatus:
       "bound-private-form-action-fulfilled-reset-root-lifecycle",
+    fakeFormIdentityStatus:
+      "source-owned-private-form-action-reset-fake-form-identity",
+    resetCurrentnessStatus:
+      "current-private-form-action-reset-generation",
     queueStatus:
       "executed-private-form-action-fulfilled-reset-state-queue-fake",
     commitStatus: "executed-private-form-action-fulfilled-reset-commit-fake"
@@ -174,6 +192,7 @@ export const PRIVATE_ADMISSION_850_REQUIRED_EVIDENCE = freezeRecord({
     "worker-830-fulfilled-reset-fake-queue-source",
     "worker-830-fulfilled-reset-fake-commit-source",
     "worker-830-fulfilled-reset-admission-guards",
+    "worker-942-fulfilled-reset-currentness-source",
     "worker-830-form-resource-bridge-summary",
     "react-dom-private-form-execution-package-export-blocker"
   ])
@@ -515,6 +534,26 @@ const privateAdmission850Rows = freezeArray([
         ]
       }),
       evidenceData({
+        evidenceId: "worker-942-fulfilled-reset-currentness-source",
+        path: formActionsPath,
+        tokens: [
+          "privateFormActionResetFakeFormIdentityRecordType",
+          "privateFormActionResetCurrentnessRecordType",
+          "privateFormActionResetFakeFormIdentityStatus",
+          "privateFormActionResetCurrentnessStatus",
+          "formActionSubmitDispatchResetCurrentnessStates",
+          "formActionSubmitResetExecutionCurrentnessPayloads",
+          "formActionFulfilledResetExecutionCurrentnessPayloads",
+          "createSubmitResetFakeFormIdentity",
+          "createSubmitResetCurrentness",
+          "assertCurrentFormActionSubmitResetExecutionForFulfilledResetExecution",
+          "isCurrentPrivateFormActionFulfilledResetExecutionRecord",
+          "resetGenerationCurrent",
+          "sourceOwnedResetCurrentness",
+          "replayAfterGenerationAdvanceRejected"
+        ]
+      }),
+      evidenceData({
         evidenceId: "worker-830-form-resource-bridge-summary",
         path: resourceFormGatesPath,
         tokens: [
@@ -530,9 +569,12 @@ const privateAdmission850Rows = freezeArray([
           "realFormReset",
           "describePrivateResourceFormRootExecutionConsumerBoundary",
           "requiresFormFulfilledResetRootLifecycleIdentity",
+          "consumesFormFulfilledResetCurrentness",
+          "rejectsFormFulfilledResetReplayAfterGenerationAdvance",
           "rejectsRootlessFormFulfilledResetRecords",
           "rejectsCrossContainerFormFulfilledResetRecords",
           "formFulfilledResetExecutionConsumed",
+          "formFulfilledResetCurrentnessConsumed",
           "deterministicFakeResetStateQueueConsumed",
           "deterministicFakeResetCommitConsumed",
           "privateResourceFormExecutionAdmissionLedgerId"

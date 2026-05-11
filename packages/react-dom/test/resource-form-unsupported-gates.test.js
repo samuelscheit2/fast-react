@@ -19214,6 +19214,19 @@ test('private resource/form root execution consumer links accepted fake evidence
     true
   );
   assert.equal(summary.rejectsStaleRootLifecycleSnapshots, true);
+  assert.equal(summary.consumesFormFulfilledResetCurrentness, true);
+  assert.equal(
+    summary.acceptedFormResetCurrentnessRecordType,
+    formActions.privateFormActionResetCurrentnessRecordType
+  );
+  assert.equal(
+    summary.acceptedFormResetCurrentnessStatus,
+    formActions.privateFormActionResetCurrentnessStatus
+  );
+  assert.equal(
+    summary.rejectsFormFulfilledResetReplayAfterGenerationAdvance,
+    true
+  );
   assert.equal(summary.rejectsCallerBuiltLifecycleSourceRecords, true);
   assert.equal(summary.rejectsRootlessFormFulfilledResetRecords, true);
   assert.equal(summary.rejectsCrossContainerFormFulfilledResetRecords, true);
@@ -19225,6 +19238,9 @@ test('private resource/form root execution consumer links accepted fake evidence
   assert.deepEqual(consumer.ledgerBoundary.workerIds, [
     'worker-829-resource-root-map-storage-private-execution',
     'worker-830-form-action-fulfilled-reset-fake-commit',
+    'worker-883-resource-form-lifecycle-boundary-hardening',
+    'worker-893-resource-form-reset-lifecycle-execution',
+    'worker-942-resource-form-reset-currentness',
     'worker-850-resource-form-execution-admission-ledger'
   ]);
 
@@ -19295,6 +19311,20 @@ test('private resource/form root execution consumer links accepted fake evidence
     lifecycleBoundary.boundaryId
   );
   assert.equal(
+    consumer.formFulfilledResetBoundary.resetCurrentnessId,
+    fulfilledResetExecution.resetCurrentness.currentnessId
+  );
+  assert.equal(consumer.formFulfilledResetBoundary.resetGeneration, 1);
+  assert.equal(
+    consumer.formFulfilledResetBoundary.resetGenerationCurrent,
+    true
+  );
+  assert.equal(
+    consumer.formFulfilledResetBoundary
+      .replayAfterResetGenerationAdvanceRejected,
+    true
+  );
+  assert.equal(
     consumer.formFulfilledResetBoundary.rootId,
     admission.rootId
   );
@@ -19313,6 +19343,8 @@ test('private resource/form root execution consumer links accepted fake evidence
       formActions.formActionFulfilledResetExecutionDiagnosticKind,
       formActions.formActionFulfilledResetExecutionQueueExecutionKind,
       'after-mutation-form-reset-order',
+      formActions.privateFormActionResetCurrentnessRecordType,
+      formActions.privateFormActionResetCurrentnessStatus,
       formActions
         .privateFormActionFulfilledResetRootLifecycleBoundaryRecordType,
       formActions
@@ -19350,6 +19382,10 @@ test('private resource/form root execution consumer links accepted fake evidence
     resourceFormGate.rootExecutionConsumerSideEffects
   );
   assert.equal(consumer.sideEffects.rootExecutionConsumerInvoked, true);
+  assert.equal(
+    consumer.sideEffects.formFulfilledResetCurrentnessConsumed,
+    true
+  );
   assert.equal(consumer.sideEffects.publicRootTouched, false);
   assert.equal(consumer.sideEffects.domMutation, false);
   assert.equal(consumer.publicResourceBoundary.publicResourcesClaimed, false);
@@ -19381,6 +19417,29 @@ test('private resource/form root execution consumer links accepted fake evidence
       compatibilityTarget,
       reason:
         'resource root-map storage execution was already consumed by a root boundary consumer'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        admission,
+        lifecycleBoundary,
+        createRootMapStorageExecutionForRoot(
+          'root-execution-consumer-replay-form-resource',
+          admission.rootId
+        ),
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'form fulfilled reset execution was already consumed by a root boundary consumer'
     }
   );
 });
@@ -19835,6 +19894,36 @@ test('private resource/form root execution consumer rejects stale cross-root mis
         'publicPackageCompatibilityClaimed must remain blocked in the root execution consumer gate'
     }
   );
+  for (const field of [
+    'publicRequestFormResetRequested',
+    'publicActionInvocationRequested',
+    'publicHeadMutation',
+    'realResourceMapsMutated',
+    'nativeExecution',
+    'publicRootExecution'
+  ]) {
+    assert.throws(
+      () =>
+        gate.recordRootExecutionConsumer(
+          freshAdmission,
+          freshLifecycleBoundary,
+          resourceExecution,
+          fulfilledResetExecution,
+          {
+            explicitResourceFormRootExecutionConsumer: true,
+            [field]: true
+          }
+        ),
+      {
+        code:
+          resourceFormGate
+            .rootBoundaryInvalidRootExecutionConsumerAdmissionCode,
+        compatibilityTarget,
+        reason: `${field} must remain blocked in the root execution consumer gate`
+      },
+      field
+    );
+  }
   assert.throws(
     () =>
       gate.recordRootExecutionConsumer(
@@ -19945,6 +20034,60 @@ test('private resource/form root execution consumer rejects stale cross-root mis
       compatibilityTarget,
       reason:
         'form fulfilled reset execution root lifecycle identity must match root bridge admission and lifecycle boundary'
+    }
+  );
+
+  const staleGenerationRoot = createPrivateRootBridgeAdmission();
+  const staleGenerationResourceExecution =
+    createRootMapStorageExecutionForRoot(
+      'root-execution-consumer-stale-reset-generation-resource',
+      staleGenerationRoot.admission.rootId
+    );
+  const staleGenerationScenario =
+    await createPrivateFulfilledResetExecutionRecord(
+      'root-execution-consumer-stale-reset-generation-form',
+      {
+        admission: staleGenerationRoot.admission,
+        lifecycleBoundary: staleGenerationRoot.lifecycleBoundary
+      }
+    );
+  formActions
+    .createFormActionSubmitResetExecutionDiagnosticGate({
+      requestIdPrefix:
+        'root-execution-consumer-stale-reset-generation-later'
+    })
+    .recordSubmitResetExecution(staleGenerationScenario.dispatch, {
+      explicitFormActionSubmitResetExecution: true,
+      fakeFormPath: {
+        pathId: 'root-execution-consumer-stale-reset-generation-fake',
+        pathKind: 'action-completion-submit-reset',
+        hostTag: 'form',
+        resetMode: 'record-only-fake-reset'
+      }
+    });
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceFormRootExecutionConsumerGate({
+          requestIdPrefix:
+            'root-execution-consumer-stale-reset-generation-gate'
+        })
+        .recordRootExecutionConsumer(
+          staleGenerationRoot.admission,
+          staleGenerationRoot.lifecycleBoundary,
+          staleGenerationResourceExecution,
+          staleGenerationScenario.fulfilledResetExecution,
+          {
+            explicitResourceFormRootExecutionConsumer: true
+          }
+        ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'form fulfilled reset execution replay is stale for the current reset generation'
     }
   );
 

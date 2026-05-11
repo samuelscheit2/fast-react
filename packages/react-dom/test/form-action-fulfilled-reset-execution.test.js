@@ -52,6 +52,15 @@ test('private fulfilled form action reset execution records deterministic fake q
   );
   assert.equal(summary.consumesFulfilledAsyncCallbackExecution, true);
   assert.equal(summary.consumesSubmitResetExecutionMetadata, true);
+  assert.equal(summary.consumesSourceOwnedResetCurrentness, true);
+  assert.equal(
+    summary.fakeFormIdentityRecordType,
+    formActions.privateFormActionResetFakeFormIdentityRecordType
+  );
+  assert.equal(
+    summary.resetCurrentnessRecordType,
+    formActions.privateFormActionResetCurrentnessRecordType
+  );
   assert.equal(summary.recordsFulfilledActionResultMetadata, true);
   assert.equal(summary.acceptsPrivateRootLifecycleBinding, true);
   assert.equal(summary.rootlessStandaloneFormEvidenceAllowed, true);
@@ -65,6 +74,7 @@ test('private fulfilled form action reset execution records deterministic fake q
   assert.equal(summary.rejectsRejectedAsyncCallbacks, true);
   assert.equal(summary.rejectsNonThenableAsyncCallbacks, true);
   assert.equal(summary.rejectsSynchronousThrowAsyncCallbacks, true);
+  assert.equal(summary.rejectsReplayAfterResetGenerationAdvance, true);
   assert.equal(summary.rejectsForeignSubmitResetExecutionMetadata, true);
   assert.equal(summary.rejectsPublicDomMutation, true);
   assert.equal(summary.rejectsPackageCompatibilityClaims, true);
@@ -117,6 +127,15 @@ test('private fulfilled form action reset execution records deterministic fake q
     record.acceptedMetadataIds.submitResetExecutionId,
     execution.executionId
   );
+  assert.equal(
+    record.acceptedMetadataIds.fakeFormIdentityId,
+    execution.fakeFormIdentity.fakeFormIdentityId
+  );
+  assert.equal(
+    record.acceptedMetadataIds.resetCurrentnessId,
+    execution.resetCurrentness.currentnessId
+  );
+  assert.equal(record.acceptedMetadataIds.resetGeneration, 1);
   assert.equal(record.admission.deterministicFakeResetCommitOnly, true);
   assert.equal(record.admission.postFulfillmentOnly, true);
   assert.equal(
@@ -132,6 +151,27 @@ test('private fulfilled form action reset execution records deterministic fake q
   assert.equal(record.admission.privateAsyncActionCallbackInvoked, false);
   assert.equal(record.admission.reactUpdateQueued, false);
   assert.equal(record.admission.realFormReset, false);
+  assert.equal(
+    record.resetCurrentness.$$typeof,
+    formActions.privateFormActionResetCurrentnessRecordType
+  );
+  assert.equal(
+    record.resetCurrentness.status,
+    formActions.privateFormActionResetCurrentnessStatus
+  );
+  assert.equal(
+    record.resetCurrentness.fakeFormIdentityId,
+    execution.fakeFormIdentity.fakeFormIdentityId
+  );
+  assert.equal(record.resetCurrentness.resetGeneration, 1);
+  assert.equal(record.resetCurrentness.resetGenerationCurrent, true);
+  assert.equal(
+    record.resetCurrentness.replayAfterGenerationAdvanceRejected,
+    true
+  );
+  assert.equal(record.resetCurrentness.publicResetExecution, false);
+  assert.equal(record.resetCurrentness.reactUpdateQueued, false);
+  assert.equal(record.resetCurrentness.realFormReset, false);
   assert.equal(
     record.rootExecutionBoundary.$$typeof,
     formActions.privateFormActionFulfilledResetRootLifecycleBoundaryRecordType
@@ -192,7 +232,25 @@ test('private fulfilled form action reset execution records deterministic fake q
   assert.equal(record.sourceAsyncCallbackExecution.reactUpdateQueued, false);
   assert.equal(record.sourceAsyncCallbackExecution.realFormReset, false);
   assert.equal(
+    record.sourceAsyncCallbackExecution.resetCurrentnessId,
+    record.resetCurrentness.currentnessId
+  );
+  assert.equal(record.sourceAsyncCallbackExecution.resetGeneration, 1);
+  assert.equal(
+    record.sourceAsyncCallbackExecution.resetGenerationCurrent,
+    true
+  );
+  assert.equal(
     record.sourceSubmitResetExecution.fakeFormResetPathExecuted,
+    true
+  );
+  assert.equal(
+    record.sourceSubmitResetExecution.resetCurrentnessId,
+    record.resetCurrentness.currentnessId
+  );
+  assert.equal(record.sourceSubmitResetExecution.resetGeneration, 1);
+  assert.equal(
+    record.sourceSubmitResetExecution.resetGenerationCurrent,
     true
   );
   assert.equal(record.sourceSubmitResetExecution.reactUpdateQueued, false);
@@ -245,6 +303,15 @@ test('private fulfilled form action reset execution records deterministic fake q
     formActions.formActionFulfilledResetExecutionQueueExecutionKind
   );
   assert.equal(
+    record.fakeResetStateQueueExecution.resetCurrentnessId,
+    record.resetCurrentness.currentnessId
+  );
+  assert.equal(record.fakeResetStateQueueExecution.resetGeneration, 1);
+  assert.equal(
+    record.fakeResetStateQueueExecution.resetGenerationCurrent,
+    true
+  );
+  assert.equal(
     record.fakeResetStateQueueExecution.rootExecutionBoundaryId,
     record.rootExecutionBoundary.boundaryId
   );
@@ -279,6 +346,15 @@ test('private fulfilled form action reset execution records deterministic fake q
   assert.equal(
     record.fakeResetCommitExecution.fakeResetStateQueueExecutionId,
     record.fakeResetStateQueueExecution.queueExecutionId
+  );
+  assert.equal(
+    record.fakeResetCommitExecution.resetCurrentnessId,
+    record.resetCurrentness.currentnessId
+  );
+  assert.equal(record.fakeResetCommitExecution.resetGeneration, 1);
+  assert.equal(
+    record.fakeResetCommitExecution.resetGenerationCurrent,
+    true
   );
   assert.equal(
     record.fakeResetCommitExecution.rootExecutionBoundaryId,
@@ -342,6 +418,7 @@ test('private fulfilled form action reset execution records deterministic fake q
     asyncExecution.executionId
   );
   assert.equal(error.rootExecutionBoundary, record.rootExecutionBoundary);
+  assert.equal(error.resetCurrentness, record.resetCurrentness);
   assert.deepEqual(
     error.fakeResetStateQueueExecution,
     record.fakeResetStateQueueExecution
@@ -421,6 +498,42 @@ test('private fulfilled form action reset execution rejects stale foreign cloned
       compatibilityTarget,
       reason:
         'source submit reset execution must match the fulfilled async callback reset metadata'
+    }
+  );
+
+  const replayScenario = await createFulfilledAsyncScenario(
+    'fulfilled-reset-negative-replay'
+  );
+  const laterResetExecution = formActions
+    .createFormActionSubmitResetExecutionDiagnosticGate({
+      requestIdPrefix: 'fulfilled-reset-negative-later-reset'
+    })
+    .recordSubmitResetExecution(replayScenario.dispatch, {
+      explicitFormActionSubmitResetExecution: true,
+      fakeFormPath: {
+        pathId: 'fulfilled-reset-negative-replay-fake-reset',
+        pathKind: 'action-completion-submit-reset',
+        hostTag: 'form',
+        resetMode: 'record-only-fake-reset'
+      }
+    });
+  assert.equal(replayScenario.execution.resetCurrentness.resetGeneration, 1);
+  assert.equal(laterResetExecution.resetCurrentness.resetGeneration, 2);
+  assert.throws(
+    () =>
+      gate.recordFulfilledResetExecution(
+        replayScenario.asyncExecution,
+        replayScenario.execution,
+        {
+          explicitFormActionFulfilledResetExecution: true
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionFulfilledResetExecutionInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source submit reset execution metadata is stale for the current reset generation'
     }
   );
 
@@ -686,6 +799,27 @@ test('private fulfilled form action reset execution rejects stale foreign cloned
         domMutationRequested: true
       },
       reason: 'DOM mutation must remain blocked'
+    },
+    {
+      admission: {
+        explicitFormActionFulfilledResetExecution: true,
+        publicHeadMutation: true
+      },
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      admission: {
+        explicitFormActionFulfilledResetExecution: true,
+        publicResourceMapCommitBehavior: true
+      },
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      admission: {
+        explicitFormActionFulfilledResetExecution: true,
+        nativeExecution: true
+      },
+      reason: 'native/root execution must remain blocked'
     },
     {
       admission: {
