@@ -14,6 +14,12 @@
   compatibility, or public compatibility is admitted.
 - The ledger reads source/test/package files and the existing 778-779 ledger
   only. It does not execute resource/form gates or public APIs.
+- Audit follow-up added the missing root-map negative blocker fields for
+  stylesheet resource behavior, stylesheet precedence behavior, and root
+  manifest/lockfile mutation; added Worker 800 reset/action blocker fields for
+  action invocation requests and public reset requests; and replaced brittle
+  expression/object-literal evidence tokens with durable field/function/status
+  identifiers.
 
 ## Changed Files
 
@@ -26,8 +32,15 @@
   - Rejects public resource/form claims, reset/action/submit/error routing
     leaks, DOM/head/lifecycle leaks, package/export leaks, static-mode drift,
     missing evidence tokens, stale status/id arrays, and blocker field drift.
+  - Audit follow-up: expanded the public blocker inventory and evidence tokens
+    for `publicStylesheetResourceBehavior`,
+    `publicStylesheetPrecedenceBehavior`,
+    `rootManifestsOrLockfilesMutated`, `actionInvocationRequested`, and
+    `publicRequestFormResetRequested`.
 - `tests/conformance/test/private-admission-808-resource-form-ledger.test.mjs`
   - New focused tests for the accepted ledger and its fail-closed cases.
+  - Audit follow-up: asserts the added resource/package and form reset/action
+    blockers fail closed without brittle evidence snippets.
 - `worker-progress/worker-808-resource-form-admission-ledger.md`
   - This handoff.
 
@@ -46,6 +59,17 @@
 - `git diff --cached --check`
 - `git diff --check`
 - `git commit -m "Add resource form admission ledger"`
+- Audit follow-up:
+  - `node --check tests/conformance/src/private-admission-808-resource-form-ledger.mjs`
+  - `node --check tests/conformance/test/private-admission-808-resource-form-ledger.test.mjs`
+  - `node --test tests/conformance/test/private-admission-808-resource-form-ledger.test.mjs`
+    - 6 tests passed.
+  - `node --test --test-name-pattern "root-map storage preflight" tests/conformance/test/react-dom-resource-hints-oracle.test.mjs`
+    - 4 tests passed.
+  - `node --test --test-name-pattern "rejected-error preflight|async callback execution" tests/conformance/test/react-dom-form-actions-oracle.test.mjs`
+    - 2 tests passed.
+  - `node tests/smoke/package-surface-guard.mjs`
+  - `node tests/smoke/import-entrypoints.mjs`
 
 ## Evidence Gathered
 
@@ -57,11 +81,13 @@
   validation, stale source rejection, and unchanged React DOM package exports.
 - Worker 802 negative coverage pins mixed-row rejection, preload-props/root
   storage claims, public head/DOM mutation claims, stylesheet/script lifecycle
-  claims, raw target blockers, and package/export claim rejection.
+  claims, stylesheet resource/precedence public behavior blockers, raw target
+  blockers, root manifest/lockfile mutation blockers, and package/export claim
+  rejection.
 - Worker 779/800 form source and conformance coverage pins rejected async
   preflight IDs/statuses, stale rejected execution consumption, reset/action
-  public blockers, submit dispatch, action invocation, error routing, DOM
-  mutation, and package compatibility blockers.
+  public blockers, submit dispatch, action invocation requests, public reset
+  requests, error routing, DOM mutation, and package compatibility blockers.
 - Package surface and import smoke checks still pass, so no public resource/form
   package export was added.
 
@@ -78,6 +104,14 @@ Passed:
 - `node tests/smoke/import-entrypoints.mjs`
 - `git diff --cached --check`
 - `git diff --check`
+- Audit follow-up:
+  - `node --check tests/conformance/src/private-admission-808-resource-form-ledger.mjs`
+  - `node --check tests/conformance/test/private-admission-808-resource-form-ledger.test.mjs`
+  - `node --test tests/conformance/test/private-admission-808-resource-form-ledger.test.mjs`
+  - `node --test --test-name-pattern "root-map storage preflight" tests/conformance/test/react-dom-resource-hints-oracle.test.mjs`
+  - `node --test --test-name-pattern "rejected-error preflight|async callback execution" tests/conformance/test/react-dom-form-actions-oracle.test.mjs`
+  - `node tests/smoke/package-surface-guard.mjs`
+  - `node tests/smoke/import-entrypoints.mjs`
 
 ## Risks Or Blockers
 

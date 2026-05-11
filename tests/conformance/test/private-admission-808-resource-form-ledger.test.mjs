@@ -109,6 +109,8 @@ test("private admission 808 gate recognizes accepted resource/form hardening wit
     "consumedRejectedExecutions",
     "consumedFormActionRejectedErrorPreflightExecutions",
     "sourceAsyncCallbackExecutionId",
+    "actionInvocationRequested",
+    "publicRequestFormResetRequested",
     "publicDomMutationReachable",
     "packageCompatibilityClaimed"
   ]);
@@ -138,16 +140,16 @@ test("private admission 808 gate rejects public resource and form compatibility 
   const gate = evaluatePrivateAdmission808Gate({
     rowOverrides: {
       [worker778]: {
-        publicBlockers: {
-          publicResourceRootMapStorageCompatibilityClaimed: true,
-          publicResourceMapCommitBehavior: true
-        }
+        publicBlockers: trueBlockers([
+          "publicResourceRootMapStorageCompatibilityClaimed",
+          "publicResourceMapCommitBehavior"
+        ])
       },
       [worker779]: {
-        publicBlockers: {
-          publicFormRejectedErrorCompatibilityClaimed: true,
-          publicSubmitDispatchReachable: true
-        }
+        publicBlockers: trueBlockers([
+          "publicFormRejectedErrorCompatibilityClaimed",
+          "publicSubmitDispatchReachable"
+        ])
       }
     }
   });
@@ -177,24 +179,26 @@ test("private admission 808 gate rejects submit reset action and error routing l
   const gate = evaluatePrivateAdmission808Gate({
     rowOverrides: {
       [worker800]: {
-        publicBlockers: {
-          publicFormSubmissionReachable: true,
-          publicSubmitDispatchReachable: true,
-          publicRequestFormResetReachable: true,
-          publicActionInvocationReachable: true,
-          publicErrorRoutingReachable: true,
-          actionInvoked: true,
-          publicActionInvoked: true,
-          resetStateQueued: true,
-          resetUpdateEnqueued: true,
-          afterMutationEffectsVisited: true,
-          resetFormInstanceCalled: true,
-          formResetCommitted: true,
-          realFormReset: true,
-          rootErrorUpdateScheduled: true,
-          publicRootErrorCallbackInvoked: true,
-          errorBoundaryScheduled: true
-        }
+        publicBlockers: trueBlockers([
+          "publicFormSubmissionReachable",
+          "publicSubmitDispatchReachable",
+          "publicRequestFormResetReachable",
+          "publicActionInvocationReachable",
+          "publicErrorRoutingReachable",
+          "actionInvocationRequested",
+          "actionInvoked",
+          "publicActionInvoked",
+          "resetStateQueued",
+          "resetUpdateEnqueued",
+          "publicRequestFormResetRequested",
+          "afterMutationEffectsVisited",
+          "resetFormInstanceCalled",
+          "formResetCommitted",
+          "realFormReset",
+          "rootErrorUpdateScheduled",
+          "publicRootErrorCallbackInvoked",
+          "errorBoundaryScheduled"
+        ])
       }
     }
   });
@@ -206,10 +210,12 @@ test("private admission 808 gate rejects submit reset action and error routing l
     `${worker800}.publicRequestFormResetReachable`,
     `${worker800}.publicActionInvocationReachable`,
     `${worker800}.publicErrorRoutingReachable`,
+    `${worker800}.actionInvocationRequested`,
     `${worker800}.actionInvoked`,
     `${worker800}.publicActionInvoked`,
     `${worker800}.resetStateQueued`,
     `${worker800}.resetUpdateEnqueued`,
+    `${worker800}.publicRequestFormResetRequested`,
     `${worker800}.afterMutationEffectsVisited`,
     `${worker800}.resetFormInstanceCalled`,
     `${worker800}.formResetCommitted`,
@@ -227,17 +233,20 @@ test("private admission 808 gate rejects DOM head lifecycle package and export l
       [worker802]: {
         sourceTokenChecksOnly: false,
         runtimeExecutionClaimed: true,
-        publicBlockers: {
-          realDocumentMutated: true,
-          fakeHeadMutated: true,
-          publicHeadSingletonBehavior: true,
-          scriptExecutionStarted: true,
-          stylesheetLoadStateMutated: true,
-          packageCompatibilityClaimed: true,
-          packageExportCompatibilityClaimed: true,
-          exportsPrivateResourceHintRootMapStoragePreflight: true,
-          compatibilityClaimed: true
-        }
+        publicBlockers: trueBlockers([
+          "realDocumentMutated",
+          "fakeHeadMutated",
+          "publicHeadSingletonBehavior",
+          "publicStylesheetResourceBehavior",
+          "publicStylesheetPrecedenceBehavior",
+          "scriptExecutionStarted",
+          "stylesheetLoadStateMutated",
+          "packageCompatibilityClaimed",
+          "packageExportCompatibilityClaimed",
+          "rootManifestsOrLockfilesMutated",
+          "exportsPrivateResourceHintRootMapStoragePreflight",
+          "compatibilityClaimed"
+        ])
       }
     }
   });
@@ -245,6 +254,10 @@ test("private admission 808 gate rejects DOM head lifecycle package and export l
   assert.equal(gate.status, PRIVATE_ADMISSION_808_VIOLATION_STATUS);
   assert.equal(gate.staticReadOnlyRecognized, false);
   assert.deepEqual(gate.staticReadOnlyViolationIds, [worker802]);
+  assert.deepEqual(gate.resourceLeakClaimIds, [
+    `${worker802}.publicStylesheetResourceBehavior`,
+    `${worker802}.publicStylesheetPrecedenceBehavior`
+  ]);
   assert.deepEqual(gate.domHeadLifecycleLeakClaimIds, [
     `${worker802}.realDocumentMutated`,
     `${worker802}.fakeHeadMutated`,
@@ -255,6 +268,7 @@ test("private admission 808 gate rejects DOM head lifecycle package and export l
   assert.deepEqual(gate.packageExportLeakClaimIds, [
     `${worker802}.packageCompatibilityClaimed`,
     `${worker802}.packageExportCompatibilityClaimed`,
+    `${worker802}.rootManifestsOrLockfilesMutated`,
     `${worker802}.exportsPrivateResourceHintRootMapStoragePreflight`
   ]);
   assert.deepEqual(gate.publicCompatibilityClaimIds, [
@@ -262,6 +276,7 @@ test("private admission 808 gate rejects DOM head lifecycle package and export l
   ]);
   assertViolationIds(gate, [
     "resource-form-hardening-static-mode-mismatch",
+    "resource-public-claim-detected",
     "dom-head-or-lifecycle-claim-detected",
     "package-or-export-compatibility-claim-detected",
     "public-compatibility-claim-detected"
@@ -325,6 +340,10 @@ function assertIncludes(actual, expectedSubset) {
   for (const value of expectedSubset) {
     assert.equal(actual.includes(value), true, value);
   }
+}
+
+function trueBlockers(fields) {
+  return Object.fromEntries(fields.map((field) => [field, true]));
 }
 
 function assertViolationIds(gate, expectedIds) {
