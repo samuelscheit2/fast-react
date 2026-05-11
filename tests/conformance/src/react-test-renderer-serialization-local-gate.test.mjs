@@ -97,6 +97,10 @@ const privateToJSONSiblingTextJSAdmissionDiagnosticName =
   "fast-react-test-renderer.tojson.sibling-text.private-js-cjs-admission";
 const privateToJSONSiblingTextJSAdmissionStatus =
   "private-tojson-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked";
+const privateToTreeSiblingTextJSAdmissionDiagnosticName =
+  "fast-react-test-renderer.totree.sibling-text.private-js-cjs-admission";
+const privateToTreeSiblingTextJSAdmissionStatus =
+  "private-totree-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked";
 const privateRootFinishedLanesHandoffDiagnosticName =
   "react-test-renderer-root-finished-lanes-handoff-private-diagnostic";
 const privateRootFinishedLanesHandoffStatus =
@@ -1378,6 +1382,42 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       true
     );
     assert.equal(facadeGate.consumesCommittedHostRootFinishedWorkLanes, true);
+    if (entry.entrypoint.includes("/cjs/")) {
+      assert.equal(
+        facadeGate.privateSiblingTextFinishedWorkIdentityGateAvailable,
+        true
+      );
+      assert.equal(
+        facadeGate.privateSiblingTextFinishedWorkIdentityDiagnosticName,
+        privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName
+      );
+      assert.equal(
+        facadeGate.privateSiblingTextFinishedWorkIdentityStatus,
+        privateToJSONSiblingTextFinishedWorkIdentityStatus
+      );
+      assert.equal(
+        facadeGate.privateSiblingTextJSAdmissionDiagnosticName,
+        privateToTreeSiblingTextJSAdmissionDiagnosticName
+      );
+      assert.equal(
+        facadeGate.privateSiblingTextJSAdmissionStatus,
+        privateToTreeSiblingTextJSAdmissionStatus
+      );
+      assert.equal(
+        facadeGate.siblingTextJSAdmissionConsumesDedicatedIdentity,
+        true
+      );
+      assert.equal(
+        facadeGate.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
+        true
+      );
+      assert.equal(facadeGate.rejectsGenericSiblingTextFinishedWorkIdentity, true);
+      assert.equal(facadeGate.rejectsBroadMultichildFinishedWorkIdentity, true);
+      assert.equal(
+        facadeGate.privateSiblingTextHostOutputRowId,
+        privateToJSONSiblingTextHostOutputRowId
+      );
+    }
     assert.equal(
       facadeGate.privateFacadeSymbol,
       privateToTreeFacadeSymbol.description
@@ -1428,7 +1468,13 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
         ? [
             "TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary",
             "TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary",
-            "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary"
+            "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary",
+            ...(entry.entrypoint.includes("/cjs/")
+              ? [
+                  "TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary",
+                  "TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary"
+                ]
+              : [])
           ]
         : []),
       "TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary",
@@ -1458,6 +1504,13 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
             ...(compositeNativeToTreeEvidence
               ? [
                   "root_private_to_tree_native_execution_evidence_records_composite_host_shape"
+                ]
+              : []),
+            ...(entry.entrypoint.includes("/cjs/")
+              ? [
+                  "root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate",
+                  "root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity",
+                  "root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate"
                 ]
               : [])
           ]
@@ -1767,6 +1820,16 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       typeof privateFacade.canValidateAcceptedFinishedWorkIdentity,
       "function"
     );
+    if (entry.entrypoint.includes("/cjs/")) {
+      assert.equal(
+        typeof privateFacade.createAcceptedSiblingTextDiagnosticResult,
+        "function"
+      );
+      assert.equal(
+        typeof privateFacade.canCreateAcceptedSiblingTextDiagnosticResult,
+        "function"
+      );
+    }
 
     const privateTree = privateFacade.serializeAcceptedTreeMetadata(
       createAcceptedMinimalTreeMetadataDiagnostic()
@@ -2638,6 +2701,202 @@ test("react-test-renderer JS private serialization finished-work identity valida
     assert.equal(treeUpdateIdentity.rootRequestOperation, "update");
     assert.equal(treeUpdateIdentity.hostOutputUpdateKind, "Update");
 
+    if (entry.entrypoint.includes("/cjs/")) {
+      const siblingTreeReport = createAcceptedMultiChildTreeMetadataDiagnostic({
+        composite: true,
+        hostOutputUpdateKind: "Update"
+      });
+      const siblingTextIdentity =
+        createAcceptedSiblingTextFinishedWorkIdentityEvidence({
+          rootRequest: updateError.rootRequest
+        });
+      assert.equal(
+        treeFacade.canValidateAcceptedFinishedWorkIdentity(
+          treeUpdateEvidence,
+          siblingTreeReport,
+          updateError.rootRequest
+        ),
+        false
+      );
+      const genericSiblingTreeError = captureThrown(() =>
+        treeFacade.validateAcceptedFinishedWorkIdentity(
+          treeUpdateEvidence,
+          siblingTreeReport,
+          updateError.rootRequest
+        )
+      );
+      assert.equal(
+        genericSiblingTreeError.name,
+        "FastReactTestRendererPrivateToTreeMetadataError"
+      );
+      assert.match(
+        genericSiblingTreeError.message,
+        /broad-multichild-identity-unexpectedly-open/u
+      );
+      assert.equal(
+        treeFacade.canCreateAcceptedSiblingTextDiagnosticResult(
+          siblingTreeReport,
+          jsonUpdateEvidence,
+          updateError.rootRequest
+        ),
+        false
+      );
+      assert.equal(
+        treeFacade.canCreateAcceptedSiblingTextDiagnosticResult(
+          siblingTreeReport,
+          siblingTextIdentity,
+          updateError.rootRequest
+        ),
+        true
+      );
+      const siblingTreeDiagnostic =
+        treeFacade.createAcceptedSiblingTextDiagnosticResult(
+          siblingTreeReport,
+          siblingTextIdentity,
+          updateError.rootRequest
+        );
+      assert.equal(Object.isFrozen(siblingTreeDiagnostic), true);
+      assert.equal(
+        siblingTreeDiagnostic.diagnosticName,
+        privateToTreeSiblingTextJSAdmissionDiagnosticName
+      );
+      assert.equal(
+        siblingTreeDiagnostic.status,
+        privateToTreeSiblingTextJSAdmissionStatus
+      );
+      assert.equal(
+        siblingTreeDiagnostic.sourceFinishedWorkIdentityDiagnosticName,
+        privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName
+      );
+      assert.equal(siblingTreeDiagnostic.hostOutputUpdateKind, "Update");
+      assert.equal(siblingTreeDiagnostic.hostOutputShape, "SiblingText");
+      assert.equal(
+        siblingTreeDiagnostic.hostOutputRowId,
+        privateToJSONSiblingTextHostOutputRowId
+      );
+      assert.equal(siblingTreeDiagnostic.rootChildCount, 2);
+      assert.equal(siblingTreeDiagnostic.sourceNodeCount, 3);
+      assert.equal(
+        siblingTreeDiagnostic.sourceFiberCount,
+        privateToTreeCompositeMultiChildAcceptedFiberShape.length
+      );
+      assert.equal(
+        siblingTreeDiagnostic.consumesPrivateSiblingTextFinishedWorkIdentityGate,
+        true
+      );
+      assert.equal(
+        siblingTreeDiagnostic.consumesPrivateRootFinishedLanesHandoffGate,
+        true
+      );
+      assert.equal(siblingTreeDiagnostic.rootFinishedLanesHandoffAccepted, true);
+      assert.equal(
+        siblingTreeDiagnostic.rootFinishedLanesHandoffDiagnosticName,
+        privateRootFinishedLanesHandoffDiagnosticName
+      );
+      assert.equal(
+        siblingTreeDiagnostic.rootFinishedLanesHandoffStatus,
+        privateRootFinishedLanesHandoffStatus
+      );
+      assert.equal(
+        Object.isFrozen(siblingTreeDiagnostic.rootFinishedLanesHandoff),
+        true
+      );
+      assert.equal(
+        siblingTreeDiagnostic.finishedWorkIdentity.rootFinishedLanesHandoffAccepted,
+        true
+      );
+      assert.deepEqual(siblingTreeDiagnostic.result, {
+        nodeType: "component",
+        type: privateToTreeFunctionComponentType,
+        props: {},
+        instance: null,
+        rendered: [
+          "first sibling",
+          {
+            nodeType: "host",
+            type: "span",
+            props: {},
+            instance: null,
+            rendered: ["second sibling"]
+          }
+        ]
+      });
+      assert.equal(siblingTreeDiagnostic.publicToTreeAvailable, false);
+      assert.equal(siblingTreeDiagnostic.publicTestInstanceAvailable, false);
+      assert.equal(siblingTreeDiagnostic.nativeBridgeAvailable, false);
+      assert.equal(siblingTreeDiagnostic.nativeExecution, false);
+      assert.equal(siblingTreeDiagnostic.packageCompatibilityClaimed, false);
+      assert.equal(siblingTreeDiagnostic.compatibilityClaimed, false);
+
+      assertToTreeSiblingTextAdmissionRejection(
+        treeFacade,
+        siblingTreeReport,
+        jsonUpdateEvidence,
+        updateError.rootRequest,
+        /sibling-text-finished-work-identity-diagnostic-mismatch/u
+      );
+      assertToTreeSiblingTextAdmissionRejection(
+        treeFacade,
+        withSiblingTextReportChange(siblingTreeReport, (report) => {
+          delete report.committedFiberInspection;
+        }),
+        siblingTextIdentity,
+        updateError.rootRequest,
+        /committedFiberInspection/u
+      );
+      assertToTreeSiblingTextAdmissionRejection(
+        treeFacade,
+        withSiblingTextReportChange(siblingTreeReport, (report) => {
+          report.committedFiberInspection.compatibilityClaimed = true;
+        }),
+        siblingTextIdentity,
+        updateError.rootRequest,
+        /compatibilityClaimed/u
+      );
+      assertToTreeSiblingTextAdmissionRejection(
+        treeFacade,
+        siblingTreeReport,
+        withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+          delete evidence.rootFinishedLanesHandoff;
+        }),
+        updateError.rootRequest,
+        /rootFinishedLanesHandoff/u
+      );
+      assertToTreeSiblingTextRootFinishedLanesAliasRejections(
+        treeFacade,
+        siblingTreeReport,
+        siblingTextIdentity,
+        updateError.rootRequest
+      );
+      assertToTreeSiblingTextAdmissionRejection(
+        treeFacade,
+        siblingTreeReport,
+        withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+          evidence.rootFinishedLanesHandoff.commitFinishedLanesBits = 2;
+        }),
+        updateError.rootRequest,
+        /finished_lanes handoff/u
+      );
+      assertToTreeSiblingTextAdmissionRejection(
+        treeFacade,
+        siblingTreeReport,
+        withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+          evidence.broadMultichildIdentityAvailable = true;
+        }),
+        updateError.rootRequest,
+        /broad-multichild-identity-unexpectedly-open/u
+      );
+      assertToTreeSiblingTextAdmissionRejection(
+        treeFacade,
+        siblingTreeReport,
+        withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+          evidence.publicToTreeAvailable = true;
+        }),
+        updateError.rootRequest,
+        /public-or-native-package-js-compatibility-claim/u
+      );
+    }
+
     assertFinishedWorkIdentityRejection(
       treeFacade,
       withFinishedWorkIdentityChange(treeUpdateEvidence, (evidence) => {
@@ -2965,6 +3224,76 @@ test("react-test-renderer JS private root finished-work/lanes handoff clone and 
       }),
       clonedReport,
       "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+  }
+});
+
+test("react-test-renderer CJS dev/prod private toTree sibling text admission requires committed fiber inspection", () => {
+  const cjsEntries = jsEntrypoints.filter((entry) =>
+    entry.entrypoint.includes("/cjs/")
+  );
+  assert.deepEqual(
+    cjsEntries.map((entry) => entry.entrypoint),
+    [
+      "react-test-renderer/cjs/react-test-renderer.development",
+      "react-test-renderer/cjs/react-test-renderer.production"
+    ]
+  );
+
+  for (const entry of cjsEntries) {
+    const moduleExports = loadFresh(entry.specifier);
+    const renderer = moduleExports.create({
+      type: "span",
+      props: {},
+      children: ["hello"]
+    });
+    const updateError = captureThrown(() =>
+      renderer.update({
+        type: "span",
+        props: {},
+        children: ["goodbye"]
+      })
+    );
+    captureThrown(() => renderer.toTree());
+    const treeFacade = Object.getOwnPropertyDescriptor(
+      renderer.toTree,
+      privateToTreeFacadeSymbol
+    ).value;
+    const siblingTreeReport = createAcceptedMultiChildTreeMetadataDiagnostic({
+      composite: true,
+      hostOutputUpdateKind: "Update"
+    });
+    const siblingTextIdentity =
+      createAcceptedSiblingTextFinishedWorkIdentityEvidence({
+        rootRequest: updateError.rootRequest
+      });
+
+    assert.equal(
+      treeFacade.canCreateAcceptedSiblingTextDiagnosticResult(
+        siblingTreeReport,
+        siblingTextIdentity,
+        updateError.rootRequest
+      ),
+      true,
+      entry.entrypoint
+    );
+    assertToTreeSiblingTextAdmissionRejection(
+      treeFacade,
+      withSiblingTextReportChange(siblingTreeReport, (report) => {
+        delete report.committedFiberInspection;
+      }),
+      siblingTextIdentity,
+      updateError.rootRequest,
+      /committedFiberInspection/u
+    );
+    assertToTreeSiblingTextAdmissionRejection(
+      treeFacade,
+      withSiblingTextReportChange(siblingTreeReport, (report) => {
+        report.committedFiberInspection.compatibilityClaimed = true;
+      }),
+      siblingTextIdentity,
+      updateError.rootRequest,
+      /compatibilityClaimed/u
     );
   }
 });
@@ -4587,6 +4916,60 @@ function assertSiblingTextAdmissionRejection(
   assert.equal(
     error.name,
     "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(error.message, messagePattern);
+  assert.equal(error.nativeBridgeAvailable, false);
+  assert.equal(error.nativeExecution, false);
+  assert.equal(error.compatibilityClaimed, false);
+  return error;
+}
+
+function assertToTreeSiblingTextRootFinishedLanesAliasRejections(
+  privateFacade,
+  report,
+  evidence,
+  sourceRootRequest
+) {
+  for (const alias of privateRootFinishedLanesHandoffAliasKeys) {
+    assertToTreeSiblingTextAdmissionRejection(
+      privateFacade,
+      report,
+      withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+        const handoff = changedEvidence.rootFinishedLanesHandoff;
+        delete changedEvidence.rootFinishedLanesHandoff;
+        changedEvidence[alias] = handoff;
+      }),
+      sourceRootRequest,
+      /rootFinishedLanesHandoff/u
+    );
+  }
+}
+
+function assertToTreeSiblingTextAdmissionRejection(
+  privateFacade,
+  report,
+  evidence,
+  sourceRootRequest,
+  messagePattern
+) {
+  assert.equal(
+    privateFacade.canCreateAcceptedSiblingTextDiagnosticResult(
+      report,
+      evidence,
+      sourceRootRequest
+    ),
+    false
+  );
+  const error = captureThrown(() =>
+    privateFacade.createAcceptedSiblingTextDiagnosticResult(
+      report,
+      evidence,
+      sourceRootRequest
+    )
+  );
+  assert.equal(
+    error.name,
+    "FastReactTestRendererPrivateToTreeMetadataError"
   );
   assert.match(error.message, messagePattern);
   assert.equal(error.nativeBridgeAvailable, false);

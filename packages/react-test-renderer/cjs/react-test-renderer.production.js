@@ -2411,6 +2411,14 @@ const privateToJSONSiblingTextIdentityPublicSurface =
   'create().update -> create().toJSON';
 const privateToJSONSiblingTextJSAdmissionResultId =
   'react-test-renderer-private-tojson-sibling-text-js-cjs-admission-result';
+const privateToTreeSiblingTextJSAdmissionDiagnosticName =
+  'fast-react-test-renderer.totree.sibling-text.private-js-cjs-admission';
+const privateToTreeSiblingTextJSAdmissionStatus =
+  'private-totree-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked';
+const privateToTreeSiblingTextIdentityPublicSurface =
+  'create().update -> create().toTree';
+const privateToTreeSiblingTextJSAdmissionResultId =
+  'react-test-renderer-private-totree-sibling-text-js-cjs-admission-result';
 const privateRootFinishedLanesHandoffDiagnosticName =
   'react-test-renderer-root-finished-lanes-handoff-private-diagnostic';
 const privateRootFinishedLanesHandoffStatus =
@@ -2655,6 +2663,8 @@ const privateToTreeNativeExecutionStatus =
   'private-totree-native-execution-records-consumed-public-totree-blocked';
 const privateToTreeAcceptedDiagnosticName =
   'fast-react-test-renderer.serialization.private-tree-canary';
+const privateToTreeCommittedFiberInspectionDiagnosticName =
+  'fast-react-test-renderer.serialization.private-tree-committed-fiber-inspection-canary';
 const privateToTreeAcceptedFiberShape = Object.freeze([
   'HostRoot',
   'HostComponent',
@@ -2663,6 +2673,19 @@ const privateToTreeAcceptedFiberShape = Object.freeze([
 const privateToTreeCompositeAcceptedFiberShape = Object.freeze([
   'HostRoot',
   'FunctionComponent',
+  'HostComponent',
+  'HostText'
+]);
+const privateToTreeMultiChildAcceptedFiberShape = Object.freeze([
+  'HostRoot',
+  'HostText',
+  'HostComponent',
+  'HostText'
+]);
+const privateToTreeCompositeMultiChildAcceptedFiberShape = Object.freeze([
+  'HostRoot',
+  'FunctionComponent',
+  'HostText',
   'HostComponent',
   'HostText'
 ]);
@@ -2797,6 +2820,20 @@ const toTreePrivateFacadeGate = Object.freeze({
   rejectsMissingRootFinishedLanesHandoff: true,
   rejectsStaleRootFinishedLanesHandoff: true,
   rejectsPublicNativePackageRootFinishedLanesHandoffClaims: true,
+  privateSiblingTextFinishedWorkIdentityGateAvailable: true,
+  privateSiblingTextFinishedWorkIdentityDiagnosticName:
+    privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+  privateSiblingTextFinishedWorkIdentityStatus:
+    privateToJSONSiblingTextFinishedWorkIdentityStatus,
+  privateSiblingTextJSAdmissionDiagnosticName:
+    privateToTreeSiblingTextJSAdmissionDiagnosticName,
+  privateSiblingTextJSAdmissionStatus:
+    privateToTreeSiblingTextJSAdmissionStatus,
+  siblingTextJSAdmissionConsumesDedicatedIdentity: true,
+  siblingTextJSAdmissionConsumesRootFinishedLanesHandoff: true,
+  rejectsGenericSiblingTextFinishedWorkIdentity: true,
+  rejectsBroadMultichildFinishedWorkIdentity: true,
+  privateSiblingTextHostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
   acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
   acceptedNativeExecutionOperations:
     privateToJSONNativeExecutionAcceptedOperations,
@@ -2828,6 +2865,8 @@ const toTreePrivateFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary',
     'TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary',
     'TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary',
     'TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary',
     'TestRendererPrivateTreeMetadataReport',
     'TestRendererPrivateToTreeNativeExecutionEvidence',
@@ -2843,6 +2882,9 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records',
     'root_private_to_tree_update_native_execution_requires_finished_work_identity_gate',
     'root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate',
+    'root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate',
+    'root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity',
+    'root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate',
     'root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
@@ -10580,6 +10622,20 @@ function createPrivateToTreeFacade(rootRequest) {
     privateRootFinishedLanesHandoffDiagnosticName,
     privateRootFinishedLanesHandoffStatus,
     requiresRootFinishedLanesHandoffEvidence: true,
+    privateSiblingTextFinishedWorkIdentityGateAvailable: true,
+    privateSiblingTextFinishedWorkIdentityDiagnosticName:
+      privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+    privateSiblingTextFinishedWorkIdentityStatus:
+      privateToJSONSiblingTextFinishedWorkIdentityStatus,
+    privateSiblingTextJSAdmissionDiagnosticName:
+      privateToTreeSiblingTextJSAdmissionDiagnosticName,
+    privateSiblingTextJSAdmissionStatus:
+      privateToTreeSiblingTextJSAdmissionStatus,
+    siblingTextJSAdmissionConsumesDedicatedIdentity: true,
+    siblingTextJSAdmissionConsumesRootFinishedLanesHandoff: true,
+    rejectsGenericSiblingTextFinishedWorkIdentity: true,
+    rejectsBroadMultichildFinishedWorkIdentity: true,
+    privateSiblingTextHostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
     acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
     acceptedNativeExecutionOperations:
       privateToJSONNativeExecutionAcceptedOperations,
@@ -10626,6 +10682,35 @@ function createPrivateToTreeFacade(rootRequest) {
         executionRecord,
         report,
         finishedWorkIdentityEvidence
+      );
+    },
+    canCreateAcceptedSiblingTextDiagnosticResult(
+      report,
+      siblingTextFinishedWorkIdentityEvidence,
+      sourceRootRequest = undefined
+    ) {
+      try {
+        createPrivateToTreeSiblingTextJSAdmissionDiagnosticResult(
+          rootRequest,
+          report,
+          siblingTextFinishedWorkIdentityEvidence,
+          sourceRootRequest
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    createAcceptedSiblingTextDiagnosticResult(
+      report,
+      siblingTextFinishedWorkIdentityEvidence,
+      sourceRootRequest = undefined
+    ) {
+      return createPrivateToTreeSiblingTextJSAdmissionDiagnosticResult(
+        rootRequest,
+        report,
+        siblingTextFinishedWorkIdentityEvidence,
+        sourceRootRequest
       );
     },
     canValidateAcceptedFinishedWorkIdentity(
@@ -11063,6 +11148,365 @@ function serializePrivateToTreeMetadataDiagnostic(report) {
     instance: null,
     rendered: renderedHostTree
   });
+}
+
+function validatePrivateToTreeSiblingTextHostOutputDiagnostic(report) {
+  try {
+    assertPrivateToJSONRecord(report, 'report');
+    assertPrivateToJSONStringField(
+      report,
+      'diagnosticName',
+      'diagnostic_name',
+      privateToTreeAcceptedDiagnosticName
+    );
+    assertPrivateToJSONStringField(
+      report,
+      'sourceJsonDiagnosticName',
+      'source_json_diagnostic_name',
+      privateToJSONAcceptedDiagnosticName
+    );
+    assertPrivateToJSONStringField(
+      report,
+      'hostOutputUpdateKind',
+      'host_output_update_kind',
+      'Update'
+    );
+    assertPrivateToJSONBooleanField(
+      report,
+      'hostOutputSnapshotCurrent',
+      'host_output_snapshot_current',
+      true
+    );
+    assertPrivateToJSONNumberField(report, 'rootChildCount', 'root_child_count', 2);
+    assertPrivateToTreeStringArrayField(
+      report,
+      'acceptedFiberShape',
+      'accepted_fiber_shape',
+      privateToTreeMultiChildAcceptedFiberShape
+    );
+    const acceptedCompositeMultiChildFiberShape = readPrivateToJSONField(
+      report,
+      'acceptedCompositeMultiChildFiberShape',
+      'accepted_composite_multi_child_fiber_shape'
+    );
+    if (acceptedCompositeMultiChildFiberShape !== undefined) {
+      assertPrivateToTreeStringArrayValue(
+        acceptedCompositeMultiChildFiberShape,
+        privateToTreeCompositeMultiChildAcceptedFiberShape,
+        'acceptedCompositeMultiChildFiberShape'
+      );
+    }
+
+    const hostRoot = readPrivateToJSONRecordField(report, 'hostRoot', 'host_root');
+    assertPrivateToJSONStringField(hostRoot, 'fiberTag', 'fiber_tag', 'HostRoot');
+    assertPrivateToJSONBooleanField(
+      hostRoot,
+      'delegatesToChild',
+      'delegates_to_child',
+      true
+    );
+    assertPrivateToTreeStringArrayField(
+      hostRoot,
+      'childFiberTags',
+      'child_fiber_tags',
+      ['HostText', 'HostComponent']
+    );
+    assertPrivateToJSONBooleanField(
+      hostRoot,
+      'publicTreeObjectAvailable',
+      'public_tree_object_available',
+      false
+    );
+
+    const functionComponent = readPrivateToJSONRecordField(
+      report,
+      'functionComponent',
+      'function_component'
+    );
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'fiberTag',
+      'fiber_tag',
+      'FunctionComponent'
+    );
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'nodeType',
+      'node_type',
+      'component'
+    );
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'componentType',
+      'component_type',
+      privateToTreeFunctionComponentType
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'instanceAvailable',
+      'instance_available',
+      false
+    );
+    assertPrivateToTreeStringArrayField(
+      functionComponent,
+      'renderedChildFiberTags',
+      'rendered_child_fiber_tags',
+      ['HostText', 'HostComponent']
+    );
+    assertPrivateToJSONNumberField(
+      functionComponent,
+      'renderedChildCount',
+      'rendered_child_count',
+      2
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'wrapsCommittedHostOutput',
+      'wraps_committed_host_output',
+      true
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'publicTreeObjectAvailable',
+      'public_tree_object_available',
+      false
+    );
+
+    const hostChildren = readPrivateToJSONArrayField(
+      report,
+      'hostChildren',
+      'host_children'
+    );
+    if (hostChildren.length !== 2) {
+      throwPrivateToTreeMetadataError(
+        'sibling-text-report-row-or-shape-mismatch'
+      );
+    }
+    const firstText = readPrivateToTreeSiblingTextChild(hostChildren[0]);
+    const hostComponent = readPrivateToTreeSiblingHostComponent(hostChildren[1]);
+    assertPrivateToJSONPublicBlockers(
+      readPrivateToJSONRecordField(report, 'publicBlockers', 'public_blockers')
+    );
+    assertPrivateToJSONBooleanField(
+      report,
+      'publicTreeObjectAvailable',
+      'public_tree_object_available',
+      false
+    );
+    const committedFiberInspection =
+      validatePrivateToTreeSiblingTextCommittedFiberInspectionDiagnostic(report);
+
+    return {
+      hostOutputUpdateKind: 'Update',
+      rootChildCount: 2,
+      sourceFiberCount: privateToTreeCompositeMultiChildAcceptedFiberShape.length,
+      committedFiberInspection,
+      result: freezeRecord({
+        nodeType: 'component',
+        type: privateToTreeFunctionComponentType,
+        props: normalizePrivateToJSONEmptyProps(
+          readPrivateToJSONField(functionComponent, 'props')
+        ),
+        instance: null,
+        rendered: freezeArray([
+          firstText,
+          freezeRecord({
+            nodeType: 'host',
+            type: hostComponent.type,
+            props: hostComponent.props,
+            instance: null,
+            rendered: freezeArray([hostComponent.text])
+          })
+        ])
+      })
+    };
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      error.code === 'FAST_REACT_TEST_RENDERER_PRIVATE_TOTREE_METADATA'
+    ) {
+      throw error;
+    }
+    const message =
+      error instanceof Error && typeof error.message === 'string'
+        ? error.message
+        : 'sibling-text-report-row-or-shape-mismatch';
+    throwPrivateToTreeMetadataError(message);
+  }
+}
+
+function validatePrivateToTreeSiblingTextCommittedFiberInspectionDiagnostic(report) {
+  const record = readPrivateToJSONRecordField(
+    report,
+    'committedFiberInspection',
+    'committed_fiber_inspection'
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'diagnosticName',
+    'diagnostic_name',
+    privateToTreeCommittedFiberInspectionDiagnosticName
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'sourceTreeDiagnosticName',
+    'source_tree_diagnostic_name',
+    privateToTreeAcceptedDiagnosticName
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'fiberShape',
+    'fiber_shape',
+    privateToTreeCompositeMultiChildAcceptedFiberShape
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'rootChildFiberTags',
+    'root_child_fiber_tags',
+    ['FunctionComponent']
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'hostChildFiberTags',
+    'host_child_fiber_tags',
+    ['HostText', 'HostComponent']
+  );
+  assertPrivateToJSONNumberField(record, 'rootChildCount', 'root_child_count', 1);
+  assertPrivateToJSONNumberField(record, 'hostChildCount', 'host_child_count', 2);
+  assertPrivateToJSONNumberField(
+    record,
+    'hostComponentCount',
+    'host_component_count',
+    1
+  );
+  assertPrivateToJSONNumberField(record, 'hostTextCount', 'host_text_count', 2);
+  assertPrivateToJSONBooleanField(
+    record,
+    'functionComponentPresent',
+    'function_component_present',
+    true
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'functionComponentFiberTag',
+    'function_component_fiber_tag',
+    'FunctionComponent'
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'wrapsCommittedHostOutput',
+    'wraps_committed_host_output',
+    true
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'compatibilityClaimed',
+    'compatibility_claimed',
+    false
+  );
+
+  return freezeRecord({
+    diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+    sourceTreeDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    fiberShape: freezeArray(privateToTreeCompositeMultiChildAcceptedFiberShape),
+    rootChildFiberTags: freezeArray(['FunctionComponent']),
+    hostChildFiberTags: freezeArray(['HostText', 'HostComponent']),
+    rootChildCount: 1,
+    hostChildCount: 2,
+    hostComponentCount: 1,
+    hostTextCount: 2,
+    functionComponentFiberTag: 'FunctionComponent',
+    functionComponentPresent: true,
+    wrapsCommittedHostOutput: true,
+    publicTreeObjectAvailable: false,
+    compatibilityClaimed: false
+  });
+}
+
+function readPrivateToTreeSiblingTextChild(record) {
+  assertPrivateToJSONRecord(record, 'hostChildren[0]');
+  assertPrivateToJSONStringField(record, 'fiberTag', 'fiber_tag', 'HostText');
+  assertPrivateToJSONBooleanField(
+    record,
+    'returnsTextValue',
+    'returns_text_value',
+    true
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+  return readPrivateToJSONStringField(record, 'text');
+}
+
+function readPrivateToTreeSiblingHostComponent(record) {
+  assertPrivateToJSONRecord(record, 'hostChildren[1]');
+  assertPrivateToJSONStringField(record, 'fiberTag', 'fiber_tag', 'HostComponent');
+  assertPrivateToJSONStringField(record, 'nodeType', 'node_type', 'host');
+  assertPrivateToJSONBooleanField(
+    record,
+    'instanceAvailable',
+    'instance_available',
+    false
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'renderedChildCount',
+    'rendered_child_count',
+    1
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+  const renderedChildren = readPrivateToJSONArrayField(
+    record,
+    'renderedChildren',
+    'rendered_children'
+  );
+  if (renderedChildren.length !== 1) {
+    throwPrivateToTreeMetadataError(
+      'sibling-text-report-row-or-shape-mismatch'
+    );
+  }
+  return {
+    type: normalizePrivateToJSONElementType(
+      readPrivateToJSONField(record, 'elementType', 'element_type')
+    ),
+    props: normalizePrivateToJSONEmptyProps(readPrivateToJSONField(record, 'props')),
+    text: readPrivateToTreeSiblingTextChild(renderedChildren[0])
+  };
+}
+
+function assertPrivateToTreeStringArrayField(record, camelName, snakeName, expected) {
+  assertPrivateToTreeStringArrayValue(
+    readPrivateToJSONArrayField(record, camelName, snakeName),
+    expected,
+    camelName
+  );
+}
+
+function assertPrivateToTreeStringArrayValue(value, expected, label) {
+  if (
+    !Array.isArray(value) ||
+    value.length !== expected.length ||
+    value.some((item, index) => item !== expected[index])
+  ) {
+    throwPrivateToTreeMetadataError(
+      `Expected private tree metadata ${label} to match the accepted fiber shape.`
+    );
+  }
 }
 
 function createPrivateToTreeNativeExecutionDiagnosticResult(
@@ -12085,19 +12529,132 @@ function createPrivateToJSONSiblingTextJSAdmissionDiagnosticResult(
   });
 }
 
+function createPrivateToTreeSiblingTextJSAdmissionDiagnosticResult(
+  rootRequest,
+  report,
+  siblingTextFinishedWorkIdentityEvidence,
+  sourceRootRequest = undefined
+) {
+  const finishedWorkIdentity =
+    createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
+      rootRequest,
+      siblingTextFinishedWorkIdentityEvidence,
+      report,
+      sourceRootRequest,
+      {
+        publicSurface: 'create().toTree',
+        sourceReportKind: 'toTree',
+        requireRootFinishedLanesHandoff: true
+      }
+    );
+  const diagnostic = validatePrivateToTreeSiblingTextHostOutputDiagnostic(
+    report
+  );
+  if (
+    diagnostic.hostOutputUpdateKind !==
+      finishedWorkIdentity.hostOutputUpdateKind ||
+    diagnostic.rootChildCount !== finishedWorkIdentity.rootChildCount
+  ) {
+    throwPrivateToTreeMetadataError(
+      'sibling-text-report-row-or-shape-mismatch'
+    );
+  }
+
+  return freezeRecord({
+    id: privateToTreeSiblingTextJSAdmissionResultId,
+    diagnosticName: privateToTreeSiblingTextJSAdmissionDiagnosticName,
+    status: privateToTreeSiblingTextJSAdmissionStatus,
+    entrypoint,
+    publicSurface: privateToTreeSiblingTextIdentityPublicSurface,
+    sourceFinishedWorkIdentityDiagnosticName:
+      privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+    sourceFinishedWorkIdentityStatus:
+      privateToJSONSiblingTextFinishedWorkIdentityStatus,
+    sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    sourceJsonDiagnosticName: privateToJSONAcceptedDiagnosticName,
+    rootRequest: finishedWorkIdentity.rootRequest,
+    rootRequestId: finishedWorkIdentity.rootRequestId,
+    rootRequestSequence: finishedWorkIdentity.rootRequestSequence,
+    rootRequestOperation: 'update',
+    rootId: finishedWorkIdentity.rootId,
+    rootFinishedLanesHandoff: finishedWorkIdentity.rootFinishedLanesHandoff,
+    rootFinishedLanesHandoffDiagnosticName:
+      finishedWorkIdentity.rootFinishedLanesHandoffDiagnosticName,
+    rootFinishedLanesHandoffStatus:
+      finishedWorkIdentity.rootFinishedLanesHandoffStatus,
+    rootFinishedLanesHandoffAccepted: true,
+    consumesPrivateRootFinishedLanesHandoffGate: true,
+    hostOutputUpdateKind: 'Update',
+    hostOutputShape: 'SiblingText',
+    rootNodeKind: finishedWorkIdentity.rootNodeKind,
+    rootChildCount: 2,
+    sourceNodeCount: 3,
+    sourceFiberCount: diagnostic.sourceFiberCount,
+    hostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
+    hostOutputRow: freezeRecord({
+      id: privateToJSONSiblingTextHostOutputRowId,
+      status: privateToJSONUpdateUnmountRowStatus,
+      hostOutputUpdateKind: 'Update',
+      hostOutputShape: 'SiblingText'
+    }),
+    result: diagnostic.result,
+    finishedWorkIdentity,
+    consumesPrivateSiblingTextFinishedWorkIdentityGate: true,
+    consumesWorker738ReportRow: true,
+    consumesPrivateToTreeEvidence: true,
+    consumesAcceptedHostOutputRow: true,
+    hostOutputSnapshotCurrent: true,
+    siblingTextJSAdmissionAvailable: true,
+    functionComponentAboveHostOutputShape: true,
+    genericFinishedWorkIdentityGateAccepted: false,
+    broadMultichildIdentityAvailable: false,
+    publicToJSONAvailable: false,
+    publicToTreeAvailable: false,
+    publicTestInstanceAvailable: false,
+    publicSerializationAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeLoadingAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
   rootRequest,
   evidence,
   report,
-  sourceRootRequest = undefined
+  sourceRootRequest = undefined,
+  options = undefined
 ) {
+  const publicSurface =
+    options !== undefined &&
+    options !== null &&
+    typeof options.publicSurface === 'string'
+      ? options.publicSurface
+      : privateToJSONSiblingTextIdentityPublicSurface;
+  const sourceReportKind =
+    options !== undefined &&
+    options !== null &&
+    options.sourceReportKind === 'toTree'
+      ? 'toTree'
+      : 'toJSON';
+  const requireRootFinishedLanesHandoff =
+    options !== undefined &&
+    options !== null &&
+    options.requireRootFinishedLanesHandoff === true;
+  const throwSiblingTextFinishedWorkIdentityError =
+    publicSurface === 'create().toTree'
+      ? throwPrivateToTreeMetadataError
+      : throwPrivateToJSONSerializationError;
   if (!isRootRequestRecord(rootRequest)) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'Expected a private root request for sibling-text finished-work identity evidence.'
     );
   }
   if (evidence === null || typeof evidence !== 'object') {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'Expected accepted sibling-text finished-work identity evidence.'
     );
   }
@@ -12107,19 +12664,22 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     readPrivateToJSONField(evidence, 'status') !==
       privateToJSONSiblingTextFinishedWorkIdentityStatus
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-diagnostic-mismatch'
     );
   }
 
   const normalized =
-    normalizePrivateToJSONSiblingTextFinishedWorkIdentityEvidence(evidence);
+    normalizePrivateToJSONSiblingTextFinishedWorkIdentityEvidence(
+      evidence,
+      publicSurface
+    );
   if (
     normalized.diagnosticName !==
       privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName ||
     normalized.status !== privateToJSONSiblingTextFinishedWorkIdentityStatus
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-diagnostic-mismatch'
     );
   }
@@ -12132,7 +12692,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.sourceSerializationDiagnosticName !==
       privateToJSONAcceptedDiagnosticName
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-source-mismatch'
     );
   }
@@ -12140,7 +12700,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
   const identityRootRequest =
     sourceRootRequest === undefined ? rootRequest : sourceRootRequest;
   if (!isRootRequestRecord(identityRootRequest)) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'Expected a private update root request for sibling-text finished-work identity evidence.'
     );
   }
@@ -12148,7 +12708,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     identityRootRequest.rootHandle !== rootRequest.rootHandle ||
     identityRootRequest.rootId !== rootRequest.rootId
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
@@ -12156,7 +12716,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     identityRootRequest.operation !== 'update' ||
     identityRootRequest.scheduled !== true
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-source-mismatch'
     );
   }
@@ -12165,7 +12725,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
       identityRootRequest.rootHandle
     ) !== identityRootRequest
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
@@ -12173,14 +12733,14 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.rootRequestId !== undefined &&
     normalized.rootRequestId !== identityRootRequest.requestId
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
   if (
     normalized.rootRequestSequence !== identityRootRequest.requestSequence
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
@@ -12188,15 +12748,27 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.rootId !== undefined &&
     normalized.rootId !== identityRootRequest.rootId
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
 
-  validatePrivateToJSONSiblingTextIdentitySourceReport(
-    normalized,
-    report
-  );
+  if (sourceReportKind === 'toTree') {
+    validatePrivateToTreeSiblingTextIdentitySourceReport(normalized, report);
+  } else {
+    validatePrivateToJSONSiblingTextIdentitySourceReport(
+      normalized,
+      report
+    );
+  }
+  const rootFinishedLanesHandoff = requireRootFinishedLanesHandoff
+    ? validatePrivateRootFinishedLanesHandoffEvidence(
+        publicSurface,
+        identityRootRequest,
+        normalized,
+        evidence
+      )
+    : null;
 
   if (
     normalized.worker738ReportRowId !== privateToJSONSiblingTextHostOutputRowId ||
@@ -12206,7 +12778,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.rootChildCount !== 2 ||
     normalized.sourceNodeCount !== 3
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-report-row-or-shape-mismatch'
     );
   }
@@ -12229,7 +12801,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
       normalized.commitCurrent
     )
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-route-finished-work-identity-mismatch'
     );
   }
@@ -12251,7 +12823,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.reportFinishedWorkMatchesCommitCurrent !== true ||
     normalized.committedFiberInspectionCurrentMatchesCommit !== true
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-mismatch'
     );
   }
@@ -12269,7 +12841,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.commitLanesMatchRenderLanes !== true ||
     normalized.reportLanesMatchCommitLanes !== true
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-lane-mismatch'
     );
   }
@@ -12291,13 +12863,13 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     'identityAdmissionAvailable'
   ]) {
     if (normalized[fieldName] !== true) {
-      throwPrivateToJSONSerializationError(
+      throwSiblingTextFinishedWorkIdentityError(
         'sibling-text-finished-work-evidence-not-consumed'
       );
     }
   }
   if (normalized.broadMultichildIdentityAvailable !== false) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'broad-multichild-identity-unexpectedly-open'
     );
   }
@@ -12316,7 +12888,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     'compatibilityClaimed'
   ]) {
     if (normalized[fieldName] !== false) {
-      throwPrivateToJSONSerializationError(
+      throwSiblingTextFinishedWorkIdentityError(
         'public-or-native-package-js-compatibility-claim'
       );
     }
@@ -12336,6 +12908,16 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     rootRequestId: identityRootRequest.requestId,
     rootRequestSequence: identityRootRequest.requestSequence,
     rootId: identityRootRequest.rootId,
+    rootFinishedLanesHandoff,
+    rootFinishedLanesHandoffDiagnosticName:
+      rootFinishedLanesHandoff === null
+        ? null
+        : rootFinishedLanesHandoff.diagnosticName,
+    rootFinishedLanesHandoffStatus:
+      rootFinishedLanesHandoff === null ? null : rootFinishedLanesHandoff.status,
+    rootFinishedLanesHandoffAccepted: rootFinishedLanesHandoff !== null,
+    consumesPrivateRootFinishedLanesHandoffGate:
+      rootFinishedLanesHandoff !== null,
     hostOutputUpdateKind: 'Update',
     hostOutputShape: 'SiblingText',
     rootNodeKind: normalized.rootNodeKind,
@@ -13092,9 +13674,9 @@ function normalizePrivateSerializationFinishedWorkIdentityEvidence(
 }
 
 function normalizePrivateToJSONSiblingTextFinishedWorkIdentityEvidence(
-  evidence
+  evidence,
+  publicSurface = privateToJSONSiblingTextIdentityPublicSurface
 ) {
-  const publicSurface = privateToJSONSiblingTextIdentityPublicSurface;
   return freezeRecord({
     diagnosticName: readPrivateToJSONField(
       evidence,
@@ -13137,7 +13719,8 @@ function normalizePrivateToJSONSiblingTextFinishedWorkIdentityEvidence(
       'rootRequestSequence',
       'root_request_sequence',
       'rootScheduledUpdateSequence',
-      'root_scheduled_update_sequence'
+      'root_scheduled_update_sequence',
+      publicSurface
     ),
     rootId:
       readPrivateToJSONField(evidence, 'rootId', 'root_id') ??
@@ -13160,12 +13743,18 @@ function normalizePrivateToJSONSiblingTextFinishedWorkIdentityEvidence(
     rootChildCount: readPrivateToJSONSiblingTextIdentityInteger(
       evidence,
       'rootChildCount',
-      'root_child_count'
+      'root_child_count',
+      undefined,
+      undefined,
+      publicSurface
     ),
     sourceNodeCount: readPrivateToJSONSiblingTextIdentityInteger(
       evidence,
       'sourceNodeCount',
-      'source_node_count'
+      'source_node_count',
+      undefined,
+      undefined,
+      publicSurface
     ),
     routeRenderCurrent: normalizePrivateSerializationFinishedWorkHandle(
       publicSurface,
@@ -13466,7 +14055,8 @@ function readPrivateToJSONSiblingTextIdentityInteger(
   camelName,
   snakeName,
   alternateCamelName,
-  alternateSnakeName
+  alternateSnakeName,
+  publicSurface = privateToJSONSiblingTextIdentityPublicSurface
 ) {
   const value =
     readPrivateToJSONField(record, camelName, snakeName) ??
@@ -13476,7 +14066,8 @@ function readPrivateToJSONSiblingTextIdentityInteger(
       alternateSnakeName
     );
   if (!isNonNegativeInteger(value)) {
-    throwPrivateToJSONSerializationError(
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
       `Expected sibling-text finished-work identity ${camelName} to be a non-negative integer.`
     );
   }
@@ -14363,6 +14954,43 @@ function validatePrivateToJSONSiblingTextIdentitySourceReport(
   );
   if (publicBlockers !== undefined) {
     assertPrivateToJSONPublicBlockers(publicBlockers);
+  }
+}
+
+function validatePrivateToTreeSiblingTextIdentitySourceReport(
+  identity,
+  report
+) {
+  if (report === null || typeof report !== 'object') {
+    throwPrivateToTreeMetadataError(
+      'Expected private sibling-text toTree source report.'
+    );
+  }
+  if (
+    readPrivateToJSONField(report, 'diagnosticName', 'diagnostic_name') !==
+      privateToTreeAcceptedDiagnosticName ||
+    readPrivateToJSONField(
+      report,
+      'sourceJsonDiagnosticName',
+      'source_json_diagnostic_name'
+    ) !== privateToJSONAcceptedDiagnosticName
+  ) {
+    throwPrivateToTreeMetadataError(
+      'sibling-text-finished-work-identity-source-mismatch'
+    );
+  }
+  const diagnostic = validatePrivateToTreeSiblingTextHostOutputDiagnostic(
+    report
+  );
+  if (
+    diagnostic.hostOutputUpdateKind !== identity.hostOutputUpdateKind ||
+    diagnostic.rootChildCount !== identity.rootChildCount ||
+    diagnostic.sourceFiberCount !==
+      privateToTreeCompositeMultiChildAcceptedFiberShape.length
+  ) {
+    throwPrivateToTreeMetadataError(
+      'sibling-text-report-row-or-shape-mismatch'
+    );
   }
 }
 
