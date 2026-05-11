@@ -48,6 +48,8 @@ const nativeRootBridgeWorkerThreadCleanupHookIdentityMismatchCode =
   'FAST_REACT_NAPI_CLEANUP_HOOK_IDENTITY_MISMATCH';
 const nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimCode =
   'FAST_REACT_NAPI_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM';
+const nativeRootBridgeWorkerThreadCleanupHookCanonicalSetMismatchCode =
+  'FAST_REACT_NAPI_CLEANUP_HOOK_CANONICAL_SET_MISMATCH';
 const nativeRootBridgeWorkerThreadCleanupHookRootSourceRowId =
   'worker-render-root-stale-executable-preflight';
 const nativeRootBridgeWorkerThreadCleanupHookValueSourceRowId =
@@ -1046,11 +1048,9 @@ function freezeNativeRootBridgeWorkerThreadCleanupHookPreflight(rows) {
     (row) => row.staleOrForgedCleanupEvidenceRejected
   ).length;
   const canonicalExecutableEvidenceAccepted =
-    acceptedCleanupEvidenceCount ===
-      nativeRootBridgeWorkerThreadCleanupHookCount &&
-    frozenRows
-      .filter((row) => row.status === 'accepted')
-      .every((row) => row.canonicalExecutableEvidence);
+    hasExactNativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceSet(
+      frozenRows
+    );
   const preflight = {
     preflightStatus: nativeRootBridgeWorkerThreadCleanupHookPreflightStatus,
     model: nativeRootBridgeWorkerThreadCleanupHookPreflightModel,
@@ -1098,11 +1098,65 @@ function freezeNativeRootBridgeWorkerThreadCleanupHookPreflight(rows) {
 }
 
 function createNativeRootBridgeWorkerThreadCleanupHookPreflight(rows) {
-  return freezeNativeRootBridgeWorkerThreadCleanupHookPreflight(
-    Array.from(
-      rows,
-      validateNativeRootBridgeWorkerThreadCleanupHookEvidenceForPreflight
-    )
+  const validatedRows =
+    enforceNativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceSet(
+      Array.from(
+        rows,
+        validateNativeRootBridgeWorkerThreadCleanupHookEvidenceForPreflight
+      )
+    );
+
+  return freezeNativeRootBridgeWorkerThreadCleanupHookPreflight(validatedRows);
+}
+
+function enforceNativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceSet(
+  rows
+) {
+  if (
+    hasExactNativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceSet(rows)
+  ) {
+    return rows;
+  }
+
+  return rows.map((row) => {
+    if (row.status === 'accepted' && row.canonicalExecutableEvidence) {
+      return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
+        row,
+        nativeRootBridgeWorkerThreadCleanupHookCanonicalSetMismatchCode
+      );
+    }
+
+    return row;
+  });
+}
+
+function hasExactNativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceSet(
+  rows
+) {
+  let rootCount = 0;
+  let valueCount = 0;
+
+  for (const row of rows) {
+    const role =
+      getNativeRootBridgeWorkerThreadCleanupHookAcceptedCanonicalRole(row);
+    if (role === nativeRootBridgeHandleKindRoot) {
+      rootCount += 1;
+    } else if (role === nativeRootBridgeHandleKindValue) {
+      valueCount += 1;
+    }
+  }
+
+  return rootCount === 1 && valueCount === 1;
+}
+
+function getNativeRootBridgeWorkerThreadCleanupHookAcceptedCanonicalRole(row) {
+  if (row.status !== 'accepted' || row.canonicalExecutableEvidence !== true) {
+    return null;
+  }
+
+  return getNativeRootBridgeWorkerThreadCleanupHookCanonicalRole(
+    row.sourceRowId,
+    row.sourceHandleKind
   );
 }
 
@@ -1113,6 +1167,20 @@ function validateNativeRootBridgeWorkerThreadCleanupHookPreflightRows(rows) {
 function validateNativeRootBridgeWorkerThreadCleanupHookEvidenceForPreflight(
   evidence
 ) {
+  if (evidence.status === 'rejected') {
+    return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
+      evidence,
+      evidence.code ?? nativeRootBridgeWorkerThreadCleanupHookForgedEvidenceCode
+    );
+  }
+
+  if (evidence.code !== undefined && evidence.code !== null) {
+    return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
+      evidence,
+      nativeRootBridgeWorkerThreadCleanupHookForgedEvidenceCode
+    );
+  }
+
   if (hasNativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaim(evidence)) {
     return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
       evidence,
@@ -1194,6 +1262,16 @@ function validateNativeRootBridgeWorkerThreadCleanupHookEvidenceForPreflight(
     );
   }
 
+  if (
+    evidence.registrationOrder !== expectedIdentity.registrationOrder ||
+    evidence.expectedExecutionOrder !== expectedIdentity.expectedExecutionOrder
+  ) {
+    return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
+      evidence,
+      nativeRootBridgeWorkerThreadCleanupHookOrderMismatchCode
+    );
+  }
+
   return freezeNativeRootBridgeWorkerThreadCleanupHookPreflightRow({
     id: evidence.id,
     operation: evidence.operation,
@@ -1255,30 +1333,54 @@ function freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
 }
 
 function getNativeRootBridgeWorkerThreadCleanupHookExpectedIdentity(sourceRow) {
-  if (
-    sourceRow.id === nativeRootBridgeWorkerThreadCleanupHookRootSourceRowId &&
-    sourceRow.handleKind === nativeRootBridgeHandleKindRoot
-  ) {
+  const role = getNativeRootBridgeWorkerThreadCleanupHookCanonicalRole(
+    sourceRow.id,
+    sourceRow.handleKind
+  );
+
+  if (role === nativeRootBridgeHandleKindRoot) {
     return {
       cleanupHookId: nativeRootBridgeWorkerThreadCleanupHookRootId,
       cleanupHookFunctionIdentityToken:
         nativeRootBridgeWorkerThreadCleanupHookRootFunctionIdentityToken,
       cleanupHookArgumentIdentityToken:
-        nativeRootBridgeWorkerThreadCleanupHookRootArgumentIdentityToken
+        nativeRootBridgeWorkerThreadCleanupHookRootArgumentIdentityToken,
+      registrationOrder: 2,
+      expectedExecutionOrder: 1
     };
   }
 
-  if (
-    sourceRow.id === nativeRootBridgeWorkerThreadCleanupHookValueSourceRowId &&
-    sourceRow.handleKind === nativeRootBridgeHandleKindValue
-  ) {
+  if (role === nativeRootBridgeHandleKindValue) {
     return {
       cleanupHookId: nativeRootBridgeWorkerThreadCleanupHookValueId,
       cleanupHookFunctionIdentityToken:
         nativeRootBridgeWorkerThreadCleanupHookValueFunctionIdentityToken,
       cleanupHookArgumentIdentityToken:
-        nativeRootBridgeWorkerThreadCleanupHookValueArgumentIdentityToken
+        nativeRootBridgeWorkerThreadCleanupHookValueArgumentIdentityToken,
+      registrationOrder: 1,
+      expectedExecutionOrder: 2
     };
+  }
+
+  return null;
+}
+
+function getNativeRootBridgeWorkerThreadCleanupHookCanonicalRole(
+  sourceRowId,
+  sourceHandleKind
+) {
+  if (
+    sourceRowId === nativeRootBridgeWorkerThreadCleanupHookRootSourceRowId &&
+    sourceHandleKind === nativeRootBridgeHandleKindRoot
+  ) {
+    return nativeRootBridgeHandleKindRoot;
+  }
+
+  if (
+    sourceRowId === nativeRootBridgeWorkerThreadCleanupHookValueSourceRowId &&
+    sourceHandleKind === nativeRootBridgeHandleKindValue
+  ) {
+    return nativeRootBridgeHandleKindValue;
   }
 
   return null;

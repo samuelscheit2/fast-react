@@ -51,6 +51,8 @@ mod root_bridge_requests {
         "FAST_REACT_NAPI_CLEANUP_HOOK_IDENTITY_MISMATCH";
     pub(crate) const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM_CODE: &str =
         "FAST_REACT_NAPI_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM";
+    pub(crate) const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_CANONICAL_SET_MISMATCH_CODE:
+        &str = "FAST_REACT_NAPI_CLEANUP_HOOK_CANONICAL_SET_MISMATCH";
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_ROW_ID: &str =
         "worker-render-root-stale-executable-preflight";
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_ROW_ID: &str =
@@ -2642,6 +2644,8 @@ mod root_bridge_requests {
         source_error_code: Option<&'static str>,
         source_boundary_error_code: Option<&'static str>,
         public_native_package_claimed: bool,
+        preflight_row_status: Option<NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus>,
+        preflight_row_code: Option<&'static str>,
     }
 
     impl NativeRootBridgeWorkerThreadCleanupHookEvidence {
@@ -2679,6 +2683,8 @@ mod root_bridge_requests {
                 source_error_code,
                 source_boundary_error_code,
                 public_native_package_claimed: false,
+                preflight_row_status: None,
+                preflight_row_code: None,
             }
         }
 
@@ -2733,6 +2739,8 @@ mod root_bridge_requests {
                 source_error_code: row.source_error_code(),
                 source_boundary_error_code: row.source_boundary_error_code(),
                 public_native_package_claimed: false,
+                preflight_row_status: Some(row.status()),
+                preflight_row_code: row.code(),
             }
         }
 
@@ -2816,33 +2824,60 @@ mod root_bridge_requests {
         pub(crate) const fn public_native_package_claimed(self) -> bool {
             self.public_native_package_claimed
         }
+
+        #[must_use]
+        pub(crate) const fn preflight_row_status(
+            self,
+        ) -> Option<NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus> {
+            self.preflight_row_status
+        }
+
+        #[must_use]
+        pub(crate) const fn preflight_row_code(self) -> Option<&'static str> {
+            self.preflight_row_code
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum NativeRootBridgeWorkerThreadCleanupHookCanonicalRole {
+        Root,
+        Value,
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     struct NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity {
+        role: NativeRootBridgeWorkerThreadCleanupHookCanonicalRole,
         cleanup_hook_id: &'static str,
         cleanup_hook_function_identity_token: &'static str,
         cleanup_hook_argument_identity_token: &'static str,
+        registration_order: u8,
+        expected_execution_order: u8,
     }
 
     impl NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity {
         const fn root() -> Self {
             Self {
+                role: NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root,
                 cleanup_hook_id: NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_ID,
                 cleanup_hook_function_identity_token:
                     NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_FUNCTION_IDENTITY_TOKEN,
                 cleanup_hook_argument_identity_token:
                     NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_ARGUMENT_IDENTITY_TOKEN,
+                registration_order: 2,
+                expected_execution_order: 1,
             }
         }
 
         const fn value() -> Self {
             Self {
+                role: NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value,
                 cleanup_hook_id: NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_ID,
                 cleanup_hook_function_identity_token:
                     NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_FUNCTION_IDENTITY_TOKEN,
                 cleanup_hook_argument_identity_token:
                     NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_ARGUMENT_IDENTITY_TOKEN,
+                registration_order: 1,
+                expected_execution_order: 2,
             }
         }
 
@@ -2855,6 +2890,14 @@ mod root_bridge_requests {
                     == self.cleanup_hook_function_identity_token
                 && evidence.cleanup_hook_argument_identity_token()
                     == self.cleanup_hook_argument_identity_token
+        }
+
+        const fn matches_order(
+            self,
+            evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence,
+        ) -> bool {
+            evidence.registration_order() == self.registration_order
+                && evidence.expected_execution_order() == self.expected_execution_order
         }
     }
 
@@ -4627,6 +4670,7 @@ mod root_bridge_requests {
                 )
             })
             .collect::<Vec<_>>();
+        let rows = enforce_cleanup_hook_canonical_evidence_set(rows);
         let accepted_cleanup_evidence_count = rows
             .iter()
             .filter(|row| {
@@ -4643,15 +4687,8 @@ mod root_bridge_requests {
             .iter()
             .filter(|row| row.stale_or_forged_cleanup_evidence_rejected())
             .count();
-        let canonical_executable_evidence_accepted = accepted_cleanup_evidence_count
-            == usize::from(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_COUNT)
-            && rows
-                .iter()
-                .filter(|row| {
-                    row.status()
-                        == NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted
-                })
-                .all(|row| row.canonical_executable_evidence());
+        let canonical_executable_evidence_accepted =
+            cleanup_hook_has_exact_canonical_evidence_set(&rows);
 
         NativeRootBridgeWorkerThreadCleanupHookPreflight {
             status: NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PREFLIGHT_STATUS,
@@ -4683,6 +4720,63 @@ mod root_bridge_requests {
             public_native_compatibility: false,
             react_behavior_error: false,
         }
+    }
+
+    fn enforce_cleanup_hook_canonical_evidence_set(
+        rows: Vec<NativeRootBridgeWorkerThreadCleanupHookPreflightRow>,
+    ) -> Vec<NativeRootBridgeWorkerThreadCleanupHookPreflightRow> {
+        if cleanup_hook_has_exact_canonical_evidence_set(&rows) {
+            return rows;
+        }
+
+        rows.into_iter()
+            .map(|row| {
+                if row.status()
+                    == NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted
+                    && row.canonical_executable_evidence()
+                {
+                    NativeRootBridgeWorkerThreadCleanupHookPreflightRow::rejected(
+                        NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(row),
+                        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_CANONICAL_SET_MISMATCH_CODE,
+                    )
+                } else {
+                    row
+                }
+            })
+            .collect()
+    }
+
+    fn cleanup_hook_has_exact_canonical_evidence_set(
+        rows: &[NativeRootBridgeWorkerThreadCleanupHookPreflightRow],
+    ) -> bool {
+        let mut root_count = 0;
+        let mut value_count = 0;
+
+        for row in rows {
+            match cleanup_hook_accepted_canonical_role(*row) {
+                Some(NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root) => {
+                    root_count += 1;
+                }
+                Some(NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value) => {
+                    value_count += 1;
+                }
+                None => {}
+            }
+        }
+
+        root_count == 1 && value_count == 1
+    }
+
+    fn cleanup_hook_accepted_canonical_role(
+        row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+    ) -> Option<NativeRootBridgeWorkerThreadCleanupHookCanonicalRole> {
+        if row.status() != NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted
+            || !row.canonical_executable_evidence()
+        {
+            return None;
+        }
+
+        cleanup_hook_canonical_role_for_source(row.source_row_id(), row.source_handle_kind())
     }
 
     fn worker_thread_teardown_json_transport_payload() -> &'static str {
@@ -5052,15 +5146,29 @@ mod root_bridge_requests {
     fn cleanup_hook_expected_identity_for_executable_preflight_row(
         source_row: NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow,
     ) -> Option<NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity> {
-        if source_row.id() == NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_ROW_ID
-            && source_row.handle_kind() == BridgeHandleKind::Root
+        match cleanup_hook_canonical_role_for_source(source_row.id(), source_row.handle_kind()) {
+            Some(NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root) => {
+                Some(NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity::root())
+            }
+            Some(NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value) => {
+                Some(NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity::value())
+            }
+            None => None,
+        }
+    }
+
+    fn cleanup_hook_canonical_role_for_source(
+        source_row_id: &str,
+        source_handle_kind: BridgeHandleKind,
+    ) -> Option<NativeRootBridgeWorkerThreadCleanupHookCanonicalRole> {
+        if source_row_id == NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_ROW_ID
+            && source_handle_kind == BridgeHandleKind::Root
         {
-            Some(NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity::root())
-        } else if source_row.id()
-            == NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_ROW_ID
-            && source_row.handle_kind() == BridgeHandleKind::Value
+            Some(NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root)
+        } else if source_row_id == NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_ROW_ID
+            && source_handle_kind == BridgeHandleKind::Value
         {
-            Some(NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity::value())
+            Some(NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value)
         } else {
             None
         }
@@ -5070,6 +5178,24 @@ mod root_bridge_requests {
         executable_preflight: &NativeRootBridgeWorkerThreadTeardownExecutablePreflight,
         evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence,
     ) -> NativeRootBridgeWorkerThreadCleanupHookPreflightRow {
+        if evidence.preflight_row_status()
+            == Some(NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Rejected)
+        {
+            return NativeRootBridgeWorkerThreadCleanupHookPreflightRow::rejected(
+                evidence,
+                evidence
+                    .preflight_row_code()
+                    .unwrap_or(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE),
+            );
+        }
+
+        if evidence.preflight_row_code().is_some() {
+            return NativeRootBridgeWorkerThreadCleanupHookPreflightRow::rejected(
+                evidence,
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE,
+            );
+        }
+
         if evidence.public_native_package_claimed() {
             return NativeRootBridgeWorkerThreadCleanupHookPreflightRow::rejected(
                 evidence,
@@ -5143,6 +5269,13 @@ mod root_bridge_requests {
             return NativeRootBridgeWorkerThreadCleanupHookPreflightRow::rejected(
                 evidence,
                 NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_IDENTITY_MISMATCH_CODE,
+            );
+        }
+
+        if !expected_identity.matches_order(evidence) {
+            return NativeRootBridgeWorkerThreadCleanupHookPreflightRow::rejected(
+                evidence,
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ORDER_MISMATCH_CODE,
             );
         }
 
@@ -7302,6 +7435,7 @@ mod tests {
         BridgeHandleTableError, PlaceholderRootRecord, PlaceholderValueRecord,
     };
     use crate::root_bridge_requests::{
+        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_CANONICAL_SET_MISMATCH_CODE,
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE,
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_IDENTITY_MISMATCH_CODE,
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ORDER_MISMATCH_CODE,
@@ -9763,7 +9897,7 @@ mod tests {
                     canonical_root.cleanup_hook_id(),
                     canonical_root.cleanup_hook_function_identity_token(),
                     canonical_root.cleanup_hook_argument_identity_token(),
-                    canonical_root.registration_order(),
+                    1,
                     2,
                     canonical_root.source_preflight_status(),
                     canonical_root.source_worker_thread_id(),
@@ -9849,6 +9983,94 @@ mod tests {
                 "{}",
                 case.id
             );
+        }
+
+        let public_claim = callable
+            .rows()
+            .iter()
+            .find(|row| {
+                row.code()
+                    == Some(
+                        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM_CODE,
+                    )
+            })
+            .expect("public native package claim rejection row exists");
+        let revalidated_public_claim =
+            validate_native_root_bridge_worker_thread_cleanup_hook_preflight_rows([*public_claim]);
+        assert_eq!(
+            revalidated_public_claim.accepted_cleanup_evidence_count(),
+            0
+        );
+        assert_eq!(
+            revalidated_public_claim.rejected_cleanup_evidence_count(),
+            1
+        );
+        assert!(!revalidated_public_claim.canonical_executable_evidence_accepted());
+        assert_rejected_cleanup_hook_evidence(
+            revalidated_public_claim.rows()[0],
+            NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM_CODE,
+            "cleanup-hook-callable-public-native-package-claim-revalidated",
+        );
+    }
+
+    #[test]
+    fn cleanup_hook_preflight_callable_rejects_duplicate_or_missing_canonical_roles() {
+        let preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+        let root_row = preflight.rows()[0];
+        let value_row = preflight.rows()[1];
+
+        for (id, rows, expected_rejected_count) in [
+            (
+                "cleanup-hook-callable-duplicate-root-rejected",
+                vec![root_row, root_row],
+                2,
+            ),
+            (
+                "cleanup-hook-callable-duplicate-value-rejected",
+                vec![value_row, value_row],
+                2,
+            ),
+            (
+                "cleanup-hook-callable-missing-value-rejected",
+                vec![root_row],
+                1,
+            ),
+            (
+                "cleanup-hook-callable-missing-root-rejected",
+                vec![value_row],
+                1,
+            ),
+        ] {
+            let callable =
+                validate_native_root_bridge_worker_thread_cleanup_hook_preflight_rows(rows);
+
+            assert_eq!(callable.accepted_cleanup_evidence_count(), 0, "{id}");
+            assert_eq!(
+                callable.rejected_cleanup_evidence_count(),
+                expected_rejected_count,
+                "{id}"
+            );
+            assert_eq!(
+                callable.stale_or_forged_cleanup_evidence_rejection_count(),
+                0,
+                "{id}"
+            );
+            assert!(!callable.canonical_executable_evidence_accepted(), "{id}");
+            assert!(!callable.node_worker_threads_execution(), "{id}");
+            assert!(!callable.napi_cleanup_hook_execution(), "{id}");
+            assert!(!callable.native_addon_loaded(), "{id}");
+            assert!(!callable.native_execution(), "{id}");
+            assert!(!callable.renderer_execution(), "{id}");
+            assert!(!callable.reconciler_execution(), "{id}");
+            assert!(!callable.public_native_compatibility(), "{id}");
+
+            for row in callable.rows() {
+                assert_rejected_cleanup_hook_evidence(
+                    *row,
+                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_CANONICAL_SET_MISMATCH_CODE,
+                    id,
+                );
+            }
         }
     }
 

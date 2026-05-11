@@ -344,6 +344,7 @@ function assertPrivateCleanupHookPreflightCallable(native) {
     {
       row: cleanupHookRow(canonicalRoot, {
         id: 'cleanup-hook-callable-wrong-order-rejected',
+        registrationOrder: 1,
         expectedExecutionOrder: 2
       }),
       code: 'FAST_REACT_NAPI_CLEANUP_HOOK_ORDER_MISMATCH',
@@ -397,6 +398,68 @@ function assertPrivateCleanupHookPreflightCallable(native) {
     );
     assert.equal(Object.hasOwn(row, 'packageCompatibilityClaimed'), false);
     assertNoNativeCleanupHookExecution(row, diagnosticCase.row.id);
+  }
+
+  const publicClaimResult = validateCleanupHookEvidenceRows([cases[4].row]);
+  const publicClaimRevalidated = validateCleanupHookEvidenceRows([
+    publicClaimResult.rows[0]
+  ]);
+  assert.equal(publicClaimRevalidated.acceptedCleanupEvidenceCount, 0);
+  assert.equal(publicClaimRevalidated.rejectedCleanupEvidenceCount, 1);
+  assert.equal(
+    publicClaimRevalidated.rows[0].code,
+    'FAST_REACT_NAPI_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM'
+  );
+  assertNoNativeCleanupHookExecution(
+    publicClaimRevalidated.rows[0],
+    'callable cleanup-hook revalidated public claim'
+  );
+
+  const canonicalValue = cleanupHookPreflight.rows[1];
+  for (const diagnosticCase of [
+    {
+      id: 'cleanup-hook-callable-duplicate-root-rejected',
+      rows: [canonicalRoot, canonicalRoot]
+    },
+    {
+      id: 'cleanup-hook-callable-duplicate-value-rejected',
+      rows: [canonicalValue, canonicalValue]
+    },
+    {
+      id: 'cleanup-hook-callable-missing-value-rejected',
+      rows: [canonicalRoot]
+    },
+    {
+      id: 'cleanup-hook-callable-missing-root-rejected',
+      rows: [canonicalValue]
+    }
+  ]) {
+    const result = validateCleanupHookEvidenceRows(diagnosticCase.rows);
+
+    assert.equal(result.acceptedCleanupEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(
+      result.rejectedCleanupEvidenceCount,
+      diagnosticCase.rows.length,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.canonicalExecutableEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assertNoNativeCleanupHookExecution(result, diagnosticCase.id);
+
+    for (const row of result.rows) {
+      assert.equal(row.status, 'rejected', diagnosticCase.id);
+      assert.equal(
+        row.code,
+        'FAST_REACT_NAPI_CLEANUP_HOOK_CANONICAL_SET_MISMATCH',
+        diagnosticCase.id
+      );
+      assert.equal(row.observedExecutionOrder, null, diagnosticCase.id);
+      assert.equal(row.canonicalExecutableEvidence, false, diagnosticCase.id);
+      assertNoNativeCleanupHookExecution(row, diagnosticCase.id);
+    }
   }
 }
 
