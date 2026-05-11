@@ -28,6 +28,8 @@ const schedulerPostTaskYieldActRootHandoffConsumptionStatus =
   'consumed-accepted-scheduler-post-task-yield-act-root-handoff-diagnostics';
 const schedulerMockExpiredActRootWorkConsumptionStatus =
   'consumed-accepted-scheduler-mock-expired-act-root-work-diagnostics';
+const schedulerMockDelayedActRootWorkPreflightStatus =
+  'preflighted-accepted-scheduler-mock-delayed-act-root-work-nested-expired-diagnostics';
 const acceptedActQueueMetadataKind =
   'fast-react.react.act-queue-metadata';
 const acceptedActQueueMetadataVersion = 1;
@@ -87,6 +89,17 @@ const privateSchedulerMockExpiredActRootWorkMetadataKind =
 const privateSchedulerMockExpiredActRootWorkMetadataVersion = 1;
 const schedulerMockExpiredActRootWorkDiagnosticsStatus =
   'drained-expired-mock-scheduler-work-with-act-root-metadata-for-diagnostics';
+const privateSchedulerMockDelayedActRootWorkDiagnosticsKind =
+  'fast-react.scheduler.mock-delayed-act-root-work-diagnostics';
+const privateSchedulerMockDelayedActRootWorkDiagnosticsBrand = Symbol.for(
+  privateSchedulerMockDelayedActRootWorkDiagnosticsKind
+);
+const privateSchedulerMockDelayedActRootWorkDiagnosticsVersion = 1;
+const privateSchedulerMockDelayedActRootWorkMetadataKind =
+  'fast-react.scheduler.mock-delayed-act-root-work-metadata';
+const privateSchedulerMockDelayedActRootWorkMetadataVersion = 1;
+const schedulerMockDelayedActRootWorkDiagnosticsStatus =
+  'drained-delayed-mock-scheduler-work-with-act-root-metadata-for-diagnostics';
 const acceptedSchedulerMockExpiredActRootWorkRecords = Object.freeze([
   'RootLaneSchedulingSnapshot',
   'UpdateContainerResult',
@@ -461,6 +474,14 @@ function isAcceptedActQueueMetadata(metadata) {
       privateSchedulerMockExpiredActRootWorkDiagnosticsVersion &&
     metadata.drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics ===
       true &&
+    metadata.schedulerMockDelayedActRootWorkDiagnosticsReady === true &&
+    metadata.preflightsSchedulerMockDelayedActRootWorkDiagnostics === true &&
+    metadata.schedulerMockDelayedActRootWorkDiagnosticKind ===
+      privateSchedulerMockDelayedActRootWorkDiagnosticsKind &&
+    metadata.schedulerMockDelayedActRootWorkDiagnosticVersion ===
+      privateSchedulerMockDelayedActRootWorkDiagnosticsVersion &&
+    metadata.acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics ===
+      true &&
     metadata.publicSchedulerTimingCompatibilityClaimed === false &&
     metadata.publicReactActCompatibilityClaimed === false &&
     metadata.publicRootSchedulerCompatibilityClaimed === false &&
@@ -554,6 +575,14 @@ function createActQueueMetadata(overrides = {}) {
       privateSchedulerMockExpiredActRootWorkDiagnosticsVersion,
     drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics: true,
     acceptedSchedulerMockExpiredActRootWorkRecords,
+    schedulerMockDelayedActRootWorkDiagnosticsReady: true,
+    preflightsSchedulerMockDelayedActRootWorkDiagnostics: true,
+    schedulerMockDelayedActRootWorkDiagnosticKind:
+      privateSchedulerMockDelayedActRootWorkDiagnosticsKind,
+    schedulerMockDelayedActRootWorkDiagnosticVersion:
+      privateSchedulerMockDelayedActRootWorkDiagnosticsVersion,
+    acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics:
+      true,
     publicSchedulerTimingCompatibilityClaimed: false,
     publicReactActCompatibilityClaimed: false,
     publicRootSchedulerCompatibilityClaimed: false,
@@ -926,6 +955,14 @@ function isNonNegativeInteger(value) {
 
 function isPositiveInteger(value) {
   return Number.isInteger(value) && value > 0;
+}
+
+function isNonNegativeFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function isPositiveFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function frozenStringArray(value, fallback) {
@@ -2492,6 +2529,333 @@ function consumeSchedulerMockExpiredActRootWorkDiagnostics(report) {
   });
 }
 
+function isAcceptedSchedulerMockDelayedActRootWorkMetadataSummary(
+  metadata
+) {
+  return (
+    isObjectLike(metadata) &&
+    Object.isFrozen(metadata) &&
+    metadata.kind === privateSchedulerMockDelayedActRootWorkMetadataKind &&
+    metadata.version ===
+      privateSchedulerMockDelayedActRootWorkMetadataVersion &&
+    metadata.accepted === true &&
+    metadata.rejectionReason === null &&
+    metadata.compatibilityTarget === schedulerCompatibilityTarget &&
+    metadata.reactCompatibilityTarget === compatibilityTarget &&
+    typeof metadata.rootLabel === 'string' &&
+    typeof metadata.laneLabel === 'string' &&
+    isPositiveInteger(metadata.priorityLevel) &&
+    typeof metadata.priorityLabel === 'string' &&
+    typeof metadata.schedulerPriority === 'string' &&
+    metadata.callbackHandleMatched === true &&
+    metadata.callbackHandleDelayedPending === true &&
+    metadata.producedByPrivateDelayedActRootWorkMetadataProducer === true &&
+    metadata.producerStatus ===
+      'produced-private-delayed-act-root-work-metadata-from-accepted-root-metadata' &&
+    isNonNegativeFiniteNumber(metadata.scheduledVirtualTime) &&
+    isPositiveFiniteNumber(metadata.delayMs) &&
+    isPositiveFiniteNumber(metadata.startTime) &&
+    isPositiveFiniteNumber(metadata.expirationTime) &&
+    isPositiveFiniteNumber(metadata.priorityTimeoutMs) &&
+    metadata.promotionTargetVirtualTime === metadata.expirationTime &&
+    metadata.advanceTimeBy ===
+      metadata.expirationTime - metadata.currentVirtualTime &&
+    metadata.delayMatchesCallbackHandle === true &&
+    metadata.startTimeMatchesCallbackHandle === true &&
+    metadata.expirationTimeMatchesCallbackHandle === true &&
+    metadata.priorityTimeoutMatchesCallbackHandle === true &&
+    isAcceptedSchedulerMockExpiredActRootWorkMetadataSummary(
+      metadata.expiredActRootWorkMetadata
+    ) &&
+    metadata.rendererWorkExecutionBlocked === true &&
+    metadata.rootWorkMetadataOnly === true &&
+    metadata.actQueueHandoffOnly === true &&
+    metadata.delayedCallbackPromotionOnly === true &&
+    hasBlockedPublicCompatibilityClaims(metadata) &&
+    hasBlockedPublicQueueAndExecutionClaims(metadata)
+  );
+}
+
+function isAcceptedSchedulerMockDelayedActRootWorkPromotionEvidence(
+  evidence,
+  metadata,
+  report
+) {
+  return (
+    isObjectLike(evidence) &&
+    Object.isFrozen(evidence) &&
+    isObjectLike(metadata) &&
+    evidence.status ===
+      'promoted-delayed-callback-to-expired-mock-scheduler-work-for-diagnostics' &&
+    evidence.accepted === true &&
+    evidence.scheduledVirtualTime === metadata.scheduledVirtualTime &&
+    evidence.delayMs === metadata.delayMs &&
+    evidence.startTime === metadata.startTime &&
+    evidence.expirationTime === metadata.expirationTime &&
+    evidence.priorityTimeoutMs === metadata.priorityTimeoutMs &&
+    evidence.virtualTimeBefore === report.delayedCallbackVirtualTimeBefore &&
+    evidence.virtualTimeAfterPromotion ===
+      report.delayedCallbackVirtualTimeAfterPromotion &&
+    evidence.advanceTimeBy === report.delayedCallbackAdvanceTimeBy &&
+    evidence.advanceTimeReturnedUndefined === true &&
+    evidence.sortIndexBefore === metadata.startTime &&
+    evidence.sortIndexAfterPromotion === metadata.expirationTime &&
+    evidence.delayedPendingBefore === true &&
+    evidence.expiredAfterPromotion === true &&
+    evidence.promotedDelayedCallbackToExpiredWork === true &&
+    evidence.usesWallClockTime === false &&
+    evidence.usesPublicSchedulerFrameInterval === false &&
+    hasBlockedPublicCompatibilityClaims(evidence) &&
+    hasBlockedPublicQueueAndExecutionClaims(evidence)
+  );
+}
+
+function isAcceptedSchedulerMockDelayedActRootWorkNestedExpiredLink(
+  report,
+  nestedExpiredReport
+) {
+  return (
+    isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(
+      nestedExpiredReport
+    ) &&
+    report.expiredActRootWorkDrainStatus === nestedExpiredReport.status &&
+    report.expiredActRootWorkRouteSelectedFlushHelper ===
+      nestedExpiredReport.flushAllOrFlushExpiredRoute.selectedFlushHelper &&
+    report.delayedCallbackPriorityLevel ===
+      report.delayedActRootWorkMetadata.priorityLevel &&
+    report.delayedCallbackPriorityLabel ===
+      report.delayedActRootWorkMetadata.priorityLabel &&
+    report.delayedCallbackSchedulerPriority ===
+      report.delayedActRootWorkMetadata.schedulerPriority &&
+    report.delayedCallbackScheduledVirtualTime ===
+      report.delayedActRootWorkMetadata.scheduledVirtualTime &&
+    report.delayedCallbackDelayMs ===
+      report.delayedActRootWorkMetadata.delayMs &&
+    report.delayedCallbackStartTime ===
+      report.delayedActRootWorkMetadata.startTime &&
+    report.delayedCallbackExpirationTime ===
+      report.delayedActRootWorkMetadata.expirationTime &&
+    report.delayedCallbackPriorityTimeoutMs ===
+      report.delayedActRootWorkMetadata.priorityTimeoutMs &&
+    report.delayedCallbackVirtualTimeBefore === report.nowBefore &&
+    report.delayedCallbackVirtualTimeAfterPromotion ===
+      report.nowAfterPromotion &&
+    report.delayedCallbackAdvanceTimeBy ===
+      report.delayedCallbackExpirationTime - report.nowBefore &&
+    report.actQueuePendingBefore ===
+      nestedExpiredReport.actQueuePendingBefore &&
+    report.actQueuePendingAfter === nestedExpiredReport.actQueuePendingAfter &&
+    report.rootWorkRecordsPendingBefore ===
+      nestedExpiredReport.rootWorkRecordsPendingBefore &&
+    report.rootWorkRecordsPendingAfter ===
+      nestedExpiredReport.rootWorkRecordsPendingAfter &&
+    report.rootWorkRecordsConsumedCount ===
+      nestedExpiredReport.rootWorkRecordsConsumedCount &&
+    report.sourceDrainReport === nestedExpiredReport.sourceDrainReport &&
+    report.sourceDrainStatus === nestedExpiredReport.sourceDrainStatus &&
+    report.sourceDrainFlushedExpiredWork ===
+      nestedExpiredReport.sourceDrainFlushedExpiredWork &&
+    report.sourceDrainHasMoreWorkAfterDrain ===
+      nestedExpiredReport.sourceDrainHasMoreWorkAfterDrain
+  );
+}
+
+function getRejectedSchedulerMockDelayedActRootWorkDiagnosticsReason(
+  report
+) {
+  if (!isObjectLike(report)) {
+    return 'scheduler-delayed-act-root-diagnostics';
+  }
+  if (!Object.isFrozen(report)) {
+    return 'scheduler-delayed-act-root-diagnostics-not-frozen';
+  }
+  if (
+    report[privateSchedulerMockDelayedActRootWorkDiagnosticsBrand] !== true
+  ) {
+    return 'scheduler-delayed-act-root-diagnostics-brand';
+  }
+  if (
+    report.kind !== privateSchedulerMockDelayedActRootWorkDiagnosticsKind
+  ) {
+    return 'scheduler-delayed-act-root-diagnostics-kind';
+  }
+  if (
+    report.version !==
+    privateSchedulerMockDelayedActRootWorkDiagnosticsVersion
+  ) {
+    return 'scheduler-delayed-act-root-diagnostics-version';
+  }
+  if (
+    report.status !== schedulerMockDelayedActRootWorkDiagnosticsStatus ||
+    report.accepted !== true ||
+    report.compatibilityTarget !== schedulerCompatibilityTarget ||
+    report.reactCompatibilityTarget !== compatibilityTarget ||
+    report.schedulerDiagnosticStatus !==
+      schedulerPrivateActQueueFlushDiagnosticsStatus
+  ) {
+    return 'scheduler-delayed-act-root-diagnostics-shape';
+  }
+  if (
+    !hasBlockedPublicCompatibilityClaims(report) ||
+    !hasBlockedPublicQueueAndExecutionClaims(report) ||
+    report.drainsPublicSchedulerTaskQueue !== false ||
+    report.drainsPublicReactActQueue !== false ||
+    report.executesQueuedWork !== false ||
+    report.executesEffects !== false ||
+    report.executesRendererWork !== false ||
+    report.executesRendererRoots !== false ||
+    report.invokesPublicSchedulerFlushHelper !== false ||
+    report.publicSchedulerFlushBehaviorExecuted !== false
+  ) {
+    return 'scheduler-delayed-act-root-diagnostics-public-claim';
+  }
+  if (
+    report.recognizesDelayedActRootWorkMetadata !== true ||
+    report.validatesDelayedCallbackDelayStartAndExpirationMetadata !== true ||
+    report.recordsDelayedCallbackVirtualTimePromotionEvidence !== true ||
+    report.advancesMockVirtualTimeToDelayedCallbackExpiration !== true ||
+    report.consumesDelayedActRootWorkThroughExpiredActRootRoute !== true ||
+    report.rejectsAmbiguousDelayedOrExpiredCallbackHandles !== true ||
+    report.rejectsDelayedActRootWorkPublicCompatibilityClaims !== true ||
+    report.producesDelayedActRootWorkMetadataFromAcceptedRootMetadata !==
+      true ||
+    report.rejectsUnownedDelayedActRootWorkMetadata !== true ||
+    report.rejectsClonedDelayedActRootWorkEvidence !== true ||
+    report.bindsProducedDelayedActRootWorkNestedEvidence !== true ||
+    report.rejectsMutatedDelayedActRootWorkNestedEvidence !== true ||
+    report.recognizesExpiredActRootWorkMetadata !== true ||
+    report.linksExpiredCallbacksToAcceptedActRootWorkRecords !== true ||
+    report.routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics !==
+      true ||
+    report.consumesAcceptedExpiredActRootWorkRecords !== true ||
+    report.drainsExpiredMockSchedulerWork !== true ||
+    report.drainsAcceptedInternalTestQueues !== true ||
+    report.executesAcceptedInternalTestCallbacks !== true
+  ) {
+    return 'scheduler-delayed-act-root-diagnostics-policy';
+  }
+  if (
+    !isAcceptedSchedulerMockDelayedActRootWorkMetadataSummary(
+      report.delayedActRootWorkMetadata
+    )
+  ) {
+    return 'scheduler-delayed-act-root-diagnostics-metadata';
+  }
+  if (
+    !isAcceptedSchedulerMockDelayedActRootWorkPromotionEvidence(
+      report.delayedCallbackPromotionEvidence,
+      report.delayedActRootWorkMetadata,
+      report
+    )
+  ) {
+    return 'scheduler-delayed-act-root-diagnostics-promotion-evidence';
+  }
+  if (
+    !isObjectLike(report.expiredActRootWorkDrainReport) ||
+    !isAcceptedSchedulerMockDelayedActRootWorkNestedExpiredLink(
+      report,
+      report.expiredActRootWorkDrainReport
+    )
+  ) {
+    return 'scheduler-delayed-act-root-diagnostics-nested-expired';
+  }
+  if (!isAcceptedSchedulerMockExpiredActRootWorkSourceDrain(report)) {
+    return 'scheduler-delayed-act-root-diagnostics-source-drain';
+  }
+  if (!hasSchedulerMockExpiredActRootWorkSourceProof(report)) {
+    return 'scheduler-delayed-act-root-diagnostics-source-proof';
+  }
+  return null;
+}
+
+function isAcceptedSchedulerMockDelayedActRootWorkDiagnostics(report) {
+  return (
+    getRejectedSchedulerMockDelayedActRootWorkDiagnosticsReason(report) ===
+    null
+  );
+}
+
+function preflightSchedulerMockDelayedActRootWorkDiagnostics(report) {
+  const rejectionReason =
+    getRejectedSchedulerMockDelayedActRootWorkDiagnosticsReason(report);
+  if (rejectionReason !== null) {
+    throw createSchedulerMockDelayedActRootWorkDiagnosticsGateError(
+      rejectionReason
+    );
+  }
+
+  const nestedExpiredConsumption =
+    consumeSchedulerMockExpiredActRootWorkDiagnostics(
+      report.expiredActRootWorkDrainReport
+    );
+
+  return Object.freeze({
+    status: schedulerMockDelayedActRootWorkPreflightStatus,
+    accepted: true,
+    schedulerMockDelayedActRootWorkDiagnosticsStatus: report.status,
+    schedulerMockDelayedActRootWorkDiagnosticKind: report.kind,
+    schedulerMockDelayedActRootWorkDiagnosticVersion: report.version,
+    schedulerMockExpiredActRootWorkDiagnosticsStatus:
+      report.expiredActRootWorkDrainReport.status,
+    schedulerMockExpiredActRootWorkDiagnosticKind:
+      report.expiredActRootWorkDrainReport.kind,
+    schedulerMockExpiredActRootWorkDiagnosticVersion:
+      report.expiredActRootWorkDrainReport.version,
+    schedulerDiagnosticStatus: report.schedulerDiagnosticStatus,
+    delayedCallbackPriorityLevel: report.delayedCallbackPriorityLevel,
+    delayedCallbackPriorityLabel: report.delayedCallbackPriorityLabel,
+    delayedCallbackSchedulerPriority:
+      report.delayedCallbackSchedulerPriority,
+    delayedCallbackScheduledVirtualTime:
+      report.delayedCallbackScheduledVirtualTime,
+    delayedCallbackDelayMs: report.delayedCallbackDelayMs,
+    delayedCallbackStartTime: report.delayedCallbackStartTime,
+    delayedCallbackExpirationTime: report.delayedCallbackExpirationTime,
+    delayedCallbackPriorityTimeoutMs:
+      report.delayedCallbackPriorityTimeoutMs,
+    delayedCallbackVirtualTimeBefore:
+      report.delayedCallbackVirtualTimeBefore,
+    delayedCallbackVirtualTimeAfterPromotion:
+      report.delayedCallbackVirtualTimeAfterPromotion,
+    delayedCallbackAdvanceTimeBy: report.delayedCallbackAdvanceTimeBy,
+    selectedFlushHelper: report.expiredActRootWorkRouteSelectedFlushHelper,
+    nestedExpiredActRootWorkConsumption: nestedExpiredConsumption,
+    rootWorkRecordSummary:
+      nestedExpiredConsumption.rootWorkRecordSummary,
+    actQueueDrainSummary: nestedExpiredConsumption.actQueueDrainSummary,
+    delayedActRootWorkMetadata: report.delayedActRootWorkMetadata,
+    expiredActRootWorkDrainReport: report.expiredActRootWorkDrainReport,
+    delayedCallbackPromotionEvidence:
+      report.delayedCallbackPromotionEvidence,
+    schedulerMockDelayedActRootWorkDiagnosticsReady: true,
+    preflightsSchedulerMockDelayedActRootWorkDiagnostics: true,
+    acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics:
+      true,
+    acceptsTopLevelDelayedActRootWorkAsPublicActEvidence: false,
+    consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
+    drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics: true,
+    consumesAcceptedExpiredActRootWorkRecords: true,
+    drainsAcceptedInternalTestQueues: true,
+    queueFlushingReady: false,
+    rendererRootsReady: false,
+    passiveEffectsReady: false,
+    continuationFlushingReady: false,
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    invokesPublicSchedulerFlushHelper: false,
+    publicSchedulerFlushBehaviorExecuted: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false
+  });
+}
+
 function getDispatcherActQueueMetadata(dispatcher) {
   if (!isObjectLike(dispatcher)) {
     return null;
@@ -2576,6 +2940,31 @@ function createSchedulerMockExpiredActRootWorkDiagnosticsGateError(
   error.publicRendererCompatibilityClaimed = false;
   error.drainsPublicSchedulerTaskQueue = false;
   error.drainsPublicReactActQueue = false;
+  error.executesQueuedWork = false;
+  error.executesEffects = false;
+  error.executesRendererWork = false;
+  error.executesRendererRoots = false;
+  return error;
+}
+
+function createSchedulerMockDelayedActRootWorkDiagnosticsGateError(
+  reason
+) {
+  const error = createUnimplementedError(
+    entrypoint,
+    `${privateActDispatcherGateExport}.preflightSchedulerMockDelayedActRootWorkDiagnostics`,
+    'rejected Scheduler mock delayed act/root work diagnostics',
+    'Only accepted private scheduler/unstable_mock delayed act/root work diagnostics with nested expired act/root evidence can pass this package-private preflight.'
+  );
+  error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  error.publicRootSchedulerCompatibilityClaimed = false;
+  error.publicRendererCompatibilityClaimed = false;
+  error.drainsPublicSchedulerTaskQueue = false;
+  error.drainsPublicReactActQueue = false;
+  error.acceptsTopLevelDelayedActRootWorkAsPublicActEvidence = false;
   error.executesQueuedWork = false;
   error.executesEffects = false;
   error.executesRendererWork = false;
@@ -2831,6 +3220,8 @@ module.exports = Object.freeze({
     privatePostTaskActRootWorkHandoffVersion,
   schedulerMockExpiredActRootWorkDiagnosticsStatus,
   schedulerMockExpiredActRootWorkConsumptionStatus,
+  schedulerMockDelayedActRootWorkDiagnosticsStatus,
+  schedulerMockDelayedActRootWorkPreflightStatus,
   requiredRecords: acceptedActQueueRecordKinds,
   requiredTaskKinds: acceptedActQueueTaskKinds,
   requiredContinuationStatuses: acceptedActQueueContinuationStatuses,
@@ -2880,6 +3271,14 @@ module.exports = Object.freeze({
     privateSchedulerMockExpiredActRootWorkDiagnosticsVersion,
   drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics: true,
   acceptedSchedulerMockExpiredActRootWorkRecords,
+  schedulerMockDelayedActRootWorkDiagnosticsReady: true,
+  preflightsSchedulerMockDelayedActRootWorkDiagnostics: true,
+  schedulerMockDelayedActRootWorkDiagnosticKind:
+    privateSchedulerMockDelayedActRootWorkDiagnosticsKind,
+  schedulerMockDelayedActRootWorkDiagnosticVersion:
+    privateSchedulerMockDelayedActRootWorkDiagnosticsVersion,
+  acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics:
+    true,
   publicSchedulerTimingCompatibilityClaimed: false,
   publicReactActCompatibilityClaimed: false,
   publicRootSchedulerCompatibilityClaimed: false,
@@ -2892,6 +3291,7 @@ module.exports = Object.freeze({
   consumeSchedulerPrivateActContinuationDiagnostics,
   consumeSchedulerPostTaskYieldActRootHandoffDiagnostics,
   consumeSchedulerMockExpiredActRootWorkDiagnostics,
+  preflightSchedulerMockDelayedActRootWorkDiagnostics,
   createActQueueMetadata,
   createInternalActQueueTestCallback,
   createInternalActQueueTestQueue,
@@ -2903,6 +3303,7 @@ module.exports = Object.freeze({
   isAcceptedInternalActQueueTestQueue,
   isAcceptedInternalActQueueTestTask,
   isAcceptedRendererBackedActDrainDiagnostics,
+  isAcceptedSchedulerMockDelayedActRootWorkDiagnostics,
   isAcceptedSchedulerMockExpiredActRootWorkDiagnostics,
   isAcceptedSchedulerPrivateActQueueFlushDiagnostics,
   isAcceptedSchedulerPostTaskYieldActRootHandoffDiagnostics,
