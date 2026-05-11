@@ -7,6 +7,7 @@ const {
 } = require('../placeholder-utils.js');
 
 const hasOwn = Object.prototype.hasOwnProperty;
+let rootBridgeModule = null;
 
 const resourceFormActionInternalsGateSchemaVersion = 1;
 const formActionResetDispatcherGateSchemaVersion = 1;
@@ -55,6 +56,8 @@ const privateResourceHintRootMapStoragePreflightRecordType =
   'fast.react_dom.private_resource_hint_root_map_storage_preflight_record';
 const privateResourceHintRootMapStorageRecordType =
   'fast.react_dom.private_resource_hint_root_map_storage_record';
+const privateResourceHintRootMapStorageRootLifecycleBoundaryRecordType =
+  'fast.react_dom.private_resource_hint_root_map_storage_root_lifecycle_boundary_record';
 const privateResourceHintStylesheetLoadErrorStateRecordType =
   'fast.react_dom.private_resource_hint_stylesheet_load_error_state_record';
 const privateControlledInputValueTrackerGateRecordType =
@@ -167,6 +170,8 @@ const privateResourceHintRootMapStorageExecutionStatus =
   'executed-private-resource-hint-deterministic-fake-root-map-storage';
 const privateResourceHintRootMapStorageCompatibilityBlockedStatus =
   'blocked-private-resource-hint-root-map-storage-compatibility';
+const privateResourceHintRootMapStorageRootLifecycleBoundaryStatus =
+  'bound-private-resource-hint-root-map-storage-root-lifecycle';
 const privateResourceHintPreloadPreinitFakeHeadExecutionStatus =
   'executed-private-resource-hint-fake-head-preload-preinit-precedence-path';
 const privateResourceHintStylesheetLoadErrorStateAdmissionRequiredStatus =
@@ -2256,6 +2261,7 @@ const resourceHintStylesheetPrecedencePayloads = new WeakMap();
 const resourceHintResourceMapCommitPayloads = new WeakMap();
 const resourceHintRootMapStoragePreflightPayloads = new WeakMap();
 const resourceHintRootMapStoragePayloads = new WeakMap();
+const resourceHintRootMapStorageRootIdentityPayloads = new WeakMap();
 const resourceHintStylesheetLoadErrorStatePayloads = new WeakMap();
 const controlledInputValueTrackerRecordPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticPayloads = new WeakMap();
@@ -2617,11 +2623,16 @@ function createResourceHintRootMapStorageGate(options) {
   gateState.rootMapStorageConsumed = false;
 
   return Object.freeze({
-    recordRootMapStorageExecution(rootMapStoragePreflightRecord, admission) {
+    recordRootMapStorageExecution(
+      rootMapStoragePreflightRecord,
+      admission,
+      rootLifecycleBinding
+    ) {
       return recordResourceHintRootMapStorageWithGate(
         gateState,
         rootMapStoragePreflightRecord,
-        admission
+        admission,
+        rootLifecycleBinding
       );
     }
   });
@@ -2890,6 +2901,10 @@ function isPrivateResourceHintRootMapStoragePreflightRecord(value) {
 
 function getPrivateResourceHintRootMapStorageRecordPayload(record) {
   return resourceHintRootMapStoragePayloads.get(record) || null;
+}
+
+function getPrivateResourceHintRootMapStorageRootIdentityPayload(record) {
+  return resourceHintRootMapStorageRootIdentityPayloads.get(record) || null;
 }
 
 function isPrivateResourceHintRootMapStorageRecord(value) {
@@ -3471,8 +3486,15 @@ function describePrivateResourceHintRootMapStorageGate() {
       privateResourceHintRootMapStoragePreflightRecordType,
     acceptedRootMapStoragePreflightStatus:
       privateResourceHintRootMapStoragePreflightStatus,
+    acceptedRootMapStorageRootLifecycleBoundaryRecordType:
+      privateResourceHintRootMapStorageRootLifecycleBoundaryRecordType,
+    acceptedRootMapStorageRootLifecycleBoundaryStatus:
+      privateResourceHintRootMapStorageRootLifecycleBoundaryStatus,
     deterministicPrivateRecordsOnly: true,
     deterministicFakeRootMapStorageOnly: true,
+    acceptsSourceOwnedRootLifecycleBinding: true,
+    recordsRootMapStorageRootLifecycleBoundary: true,
+    requiresRenderOperationForRootLifecycleBinding: true,
     createsPrivateFakeRootResourceStorage: true,
     mutatesFakeRootResourceStorage: true,
     mutatesFakeHoistableStylesMap: true,
@@ -5028,7 +5050,8 @@ function recordResourceHintRootMapStoragePreflightWithGate(
 function recordResourceHintRootMapStorageWithGate(
   gateState,
   rootMapStoragePreflightRecord,
-  admission
+  admission,
+  rootLifecycleBinding
 ) {
   if (gateState.rootMapStorageConsumed === true) {
     throwInvalidResourceHintRootMapStorageAdmission(
@@ -5045,6 +5068,11 @@ function recordResourceHintRootMapStorageWithGate(
       admission,
       rootMapStoragePreflight
     );
+  const rootLifecycleIdentity =
+    normalizeResourceHintRootMapStorageRootLifecycleBinding(
+      rootLifecycleBinding,
+      storageAdmission
+    );
   const executionPlan = createResourceHintRootMapStoragePlan(
     rootMapStoragePreflight,
     storageAdmission
@@ -5054,6 +5082,11 @@ function recordResourceHintRootMapStorageWithGate(
   const rootMapStorageExecutionSequence = gateState.nextRequestSequence++;
   const rootMapStorageExecutionId =
     `${gateState.requestIdPrefix}:${rootMapStorageExecutionSequence}`;
+  const rootExecutionBoundary =
+    createResourceHintRootMapStorageRootLifecycleBoundary(
+      rootMapStorageExecutionId,
+      rootLifecycleIdentity
+    );
 
   const payload = freezeRecord({
     schemaVersion: resourceHintRootMapStorageGateSchemaVersion,
@@ -5107,6 +5140,7 @@ function recordResourceHintRootMapStorageWithGate(
     rootMapStorageSnapshot: executionPlan.rootMapStorageSnapshot,
     rootMapStorageValidationBoundary:
       executionPlan.rootMapStorageValidationBoundary,
+    rootExecutionBoundary,
     rootMapPublicBoundary:
       createPublicResourceRootMapStorageBoundary(),
     publicResourceBoundary: createPublicResourceHintDomInsertionBoundary(),
@@ -5120,6 +5154,13 @@ function recordResourceHintRootMapStorageWithGate(
   });
 
   resourceHintRootMapStoragePayloads.set(payload, payload);
+  resourceHintRootMapStorageRootIdentityPayloads.set(
+    payload,
+    createResourceHintRootMapStorageRootIdentityPayload(
+      rootLifecycleIdentity,
+      rootExecutionBoundary
+    )
+  );
   return payload;
 }
 
@@ -10063,6 +10104,181 @@ function normalizeResourceHintRootMapStorageAdmission(
     publicStylesheetLoadStateDispatch: false,
     publicRootTouched: false,
     compatibilityClaimed: false
+  });
+}
+
+function getRootBridge() {
+  if (rootBridgeModule === null) {
+    rootBridgeModule = require('./client/root-bridge.js');
+  }
+  return rootBridgeModule;
+}
+
+function normalizeResourceHintRootMapStorageRootLifecycleBinding(
+  binding,
+  storageAdmission
+) {
+  if (binding == null) {
+    throwInvalidResourceHintRootMapStorageAdmission(
+      'root lifecycle binding for resource root-map storage is required'
+    );
+  }
+
+  if (typeof binding !== 'object') {
+    throwInvalidResourceHintRootMapStorageAdmission(
+      'root lifecycle binding for resource root-map storage must be source-owned private root metadata'
+    );
+  }
+
+  const rootBridgeAdmission = binding.rootBridgeAdmission;
+  const rootLifecycleRequestBoundary =
+    binding.rootLifecycleRequestBoundary;
+  const rootBridge = getRootBridge();
+  const rootLifecyclePayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      rootLifecycleRequestBoundary
+    );
+
+  if (
+    !rootBridge.isPrivateRootBridgeAdmissionRecord(rootBridgeAdmission) ||
+    !rootBridge.isSourceOwnedPrivateRootBridgeAdmissionRecord(
+      rootBridgeAdmission
+    )
+  ) {
+    throwInvalidResourceHintRootMapStorageAdmission(
+      'root lifecycle binding for resource root-map storage must be source-owned active and current'
+    );
+  }
+
+  if (
+    rootBridgeAdmission.operation !== 'render' ||
+    (
+      rootLifecycleRequestBoundary != null &&
+      rootLifecycleRequestBoundary.sourceOperation !== 'render'
+    )
+  ) {
+    throwInvalidResourceHintRootMapStorageAdmission(
+      'root lifecycle binding for resource root-map storage must come from a render operation'
+    );
+  }
+
+  if (
+    !rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      rootBridgeAdmission,
+      rootLifecycleRequestBoundary
+    ) ||
+    rootLifecyclePayload === null ||
+    rootLifecyclePayload.admissionRecord !== rootBridgeAdmission ||
+    rootLifecyclePayload.rootHandleState == null ||
+    rootLifecyclePayload.rootHandleState.container == null ||
+    rootLifecyclePayload.rootHandleState.containerInfo == null
+  ) {
+    throwInvalidResourceHintRootMapStorageAdmission(
+      'root lifecycle binding for resource root-map storage must be source-owned active and current'
+    );
+  }
+
+  if (
+    rootBridgeAdmission.rootId !== storageAdmission.rootId ||
+    storageAdmission.ownerRootId !== rootBridgeAdmission.rootId
+  ) {
+    throwInvalidResourceHintRootMapStorageAdmission(
+      'root lifecycle binding for resource root-map storage must match the storage root'
+    );
+  }
+
+  return freezeRecord({
+    rootBridgeAdmission,
+    rootLifecycleRequestBoundary,
+    rootLifecyclePayload,
+    bridgeState: rootLifecyclePayload.bridgeState,
+    rootHandleState: rootLifecyclePayload.rootHandleState,
+    sourceRecord: rootLifecyclePayload.sourceRecord,
+    container: rootLifecyclePayload.rootHandleState.container,
+    containerInfo: rootLifecyclePayload.rootHandleState.containerInfo
+  });
+}
+
+function createResourceHintRootMapStorageRootLifecycleBoundary(
+  rootMapStorageExecutionId,
+  rootLifecycleIdentity
+) {
+  if (rootLifecycleIdentity === null) {
+    throwInvalidResourceHintRootMapStorageAdmission(
+      'root lifecycle binding for resource root-map storage is required'
+    );
+  }
+
+  const admission = rootLifecycleIdentity.rootBridgeAdmission;
+  const boundary = rootLifecycleIdentity.rootLifecycleRequestBoundary;
+  const rootBridge = getRootBridge();
+  return freezeRecord({
+    $$typeof:
+      privateResourceHintRootMapStorageRootLifecycleBoundaryRecordType,
+    kind:
+      'FastReactDomPrivateResourceHintRootMapStorageRootLifecycleBoundaryRecord',
+    status: privateResourceHintRootMapStorageRootLifecycleBoundaryStatus,
+    boundaryId: `${rootMapStorageExecutionId}:root-lifecycle-boundary`,
+    sourceWorkerId:
+      'worker-952-react-dom-resource-hints-currentness',
+    sourceRootBridgeAdmissionId: admission.requestId,
+    sourceRootBridgeAdmissionStatus: admission.admissionStatus,
+    sourceRootRequestId: boundary.sourceRequestId,
+    sourceRootRequestSequence: boundary.sourceRequestSequence,
+    sourceRootRequestType: boundary.sourceRequestType,
+    sourceRootOperation: boundary.sourceOperation,
+    sourceRootLifecycleBoundaryId: boundary.boundaryId,
+    sourceRootLifecycleBoundaryStatus: boundary.boundaryStatus,
+    rootId: admission.rootId,
+    rootKind: admission.rootKind,
+    rootTag: admission.rootTag,
+    rootContainerInfo: rootLifecycleIdentity.containerInfo,
+    sourceLifecycleStatusBefore: boundary.sourceLifecycleStatusBefore,
+    sourceLifecycleStatusAfter: boundary.sourceLifecycleStatusAfter,
+    lifecycleTransition: boundary.lifecycleTransition,
+    activeLifecycleStatus: boundary.activeLifecycleStatus,
+    lifecycleRequestVersion: boundary.lifecycleRequestVersion,
+    sourceOwnedRootLifecycleBoundary: true,
+    activeRootLifecycle: true,
+    requestBoundaryCurrent: true,
+    publicRootExecution: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
+    sourceOwnedTokens: freezeArray([
+      privateResourceHintRootMapStorageRootLifecycleBoundaryRecordType,
+      privateResourceHintRootMapStorageRootLifecycleBoundaryStatus,
+      rootBridge.privateRootAdmissionRecordType,
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+      rootBridge.privateRootLifecycleRequestBoundaryRecordType,
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
+      admission.rootId,
+      boundary.boundaryId,
+      boundary.lifecycleTransition
+    ])
+  });
+}
+
+function createResourceHintRootMapStorageRootIdentityPayload(
+  rootLifecycleIdentity,
+  rootExecutionBoundary
+) {
+  return freezeRecord({
+    rootBridgeAdmission: rootLifecycleIdentity.rootBridgeAdmission,
+    rootLifecycleRequestBoundary:
+      rootLifecycleIdentity.rootLifecycleRequestBoundary,
+    rootLifecyclePayload: rootLifecycleIdentity.rootLifecyclePayload,
+    bridgeState: rootLifecycleIdentity.bridgeState,
+    rootHandleState: rootLifecycleIdentity.rootHandleState,
+    sourceRecord: rootLifecycleIdentity.sourceRecord,
+    container: rootLifecycleIdentity.container,
+    containerInfo: rootLifecycleIdentity.containerInfo,
+    rootExecutionBoundary
   });
 }
 
@@ -16562,6 +16778,7 @@ module.exports = {
   getPrivateResourceHintPreloadPreinitOrderRecordPayload,
   getPrivateResourceHintResourceMapCommitRecordPayload,
   getPrivateResourceHintRootMapStorageRecordPayload,
+  getPrivateResourceHintRootMapStorageRootIdentityPayload,
   getPrivateResourceHintRootMapStoragePreflightRecordPayload,
   getPrivateResourceHintStylesheetLoadErrorStateRecordPayload,
   getPrivateResourceHintStylesheetPrecedenceRecordPayload,
@@ -16691,6 +16908,8 @@ module.exports = {
   privateResourceHintRootMapStorageInvalidAdmissionCode,
   privateResourceHintRootMapStorageInvalidRecordCode,
   privateResourceHintRootMapStorageRecordType,
+  privateResourceHintRootMapStorageRootLifecycleBoundaryRecordType,
+  privateResourceHintRootMapStorageRootLifecycleBoundaryStatus,
   privateResourceHintRootMapStorageStatus,
   privateResourceHintRootMapStoragePreflightAdmissionRequiredStatus,
   privateResourceHintRootMapStoragePreflightCompatibilityBlockedStatus,

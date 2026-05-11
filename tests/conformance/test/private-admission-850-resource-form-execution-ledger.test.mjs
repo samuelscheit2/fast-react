@@ -139,6 +139,10 @@ test("private admission 850 recognizes accepted private execution evidence witho
   assertIncludes(resource.requiredFieldNames, [
     "rootMapStorageExecutionRows",
     "rootMapStorageSnapshot",
+    "rootExecutionBoundary",
+    "sourceRootBridgeAdmissionId",
+    "sourceRootLifecycleBoundaryId",
+    "rootContainerInfo",
     "hoistableStylesRootMapExecutionRows",
     "hoistableScriptsRootMapExecutionRows",
     "storedInRootMap",

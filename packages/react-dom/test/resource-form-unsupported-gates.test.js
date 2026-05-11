@@ -15206,6 +15206,11 @@ test('private resource root-map fake metadata negative matrix stays fail-closed 
 });
 
 test('private resource root-map storage execution mutates deterministic fake maps only', () => {
+  const rootContext = createPrivateRootBridgeAdmission();
+  const rootLifecycleBinding = {
+    rootBridgeAdmission: rootContext.admission,
+    rootLifecycleRequestBoundary: rootContext.lifecycleBoundary
+  };
   const scenario = createRootMapStoragePreflightScenario(
     'root-map-storage-private-execution'
   );
@@ -15214,7 +15219,7 @@ test('private resource root-map storage execution mutates deterministic fake map
     {
       explicitRootMapStoragePreflight: true,
       preflightId: 'private-execution-root-map-preflight',
-      rootId: 'private-execution-resource-root',
+      rootId: rootContext.admission.rootId,
       expectedSourceResourceMapCommitRowIds: [
         'resource-map-commit-1',
         'resource-map-commit-3',
@@ -15225,16 +15230,24 @@ test('private resource root-map storage execution mutates deterministic fake map
   const storageGate = resourceFormGate.createResourceHintRootMapStorageGate({
     requestIdPrefix: 'root-map-storage-private-execution-run'
   });
-  const execution = storageGate.recordRootMapStorageExecution(preflight, {
-    explicitRootMapStorageExecution: true,
-    executionId: 'private-execution-root-map-storage',
-    rootId: 'private-execution-resource-root',
-    expectedRootMapStorageRowIds: [
-      'root-map-storage-preflight-0',
-      'root-map-storage-preflight-1',
-      'root-map-storage-preflight-2'
-    ]
-  });
+  const execution = storageGate.recordRootMapStorageExecution(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      executionId: 'private-execution-root-map-storage',
+      rootId: rootContext.admission.rootId,
+      expectedRootMapStorageRowIds: [
+        'root-map-storage-preflight-0',
+        'root-map-storage-preflight-1',
+        'root-map-storage-preflight-2'
+      ]
+    },
+    rootLifecycleBinding
+  );
+  const rootIdentityPayload =
+    resourceFormGate.getPrivateResourceHintRootMapStorageRootIdentityPayload(
+      execution
+    );
   const summary =
     resourceFormGate.describePrivateResourceHintRootMapStorageGate();
 
@@ -15247,6 +15260,33 @@ test('private resource root-map storage execution mutates deterministic fake map
       execution
     ),
     execution
+  );
+  assert.notEqual(rootIdentityPayload, null);
+  assert.equal(rootIdentityPayload.rootBridgeAdmission, rootContext.admission);
+  assert.equal(
+    rootIdentityPayload.rootLifecycleRequestBoundary,
+    rootContext.lifecycleBoundary
+  );
+  assert.equal(
+    rootIdentityPayload.rootExecutionBoundary,
+    execution.rootExecutionBoundary
+  );
+  assert.equal(rootIdentityPayload.container, rootContext.container);
+  assert.equal(
+    execution.rootExecutionBoundary.rootId,
+    rootContext.admission.rootId
+  );
+  assert.equal(
+    execution.rootExecutionBoundary.sourceRootBridgeAdmissionId,
+    rootContext.admission.requestId
+  );
+  assert.equal(
+    execution.rootExecutionBoundary.sourceRootLifecycleBoundaryId,
+    rootContext.lifecycleBoundary.boundaryId
+  );
+  assert.equal(
+    execution.rootExecutionBoundary.rootContainerInfo,
+    rootIdentityPayload.containerInfo
   );
   assert.equal(
     execution.rootMapStorageStatus,
@@ -15370,6 +15410,17 @@ test('private resource root-map storage execution mutates deterministic fake map
   assert.equal(execution.sideEffects.compatibilityClaimed, false);
   assert.equal(summary.gateId, resourceFormGate.privateResourceHintRootMapStorageGateId);
   assert.equal(summary.mutatesFakeRootResourceStorage, true);
+  assert.equal(summary.acceptsSourceOwnedRootLifecycleBinding, true);
+  assert.equal(
+    summary.acceptedRootMapStorageRootLifecycleBoundaryRecordType,
+    resourceFormGate
+      .privateResourceHintRootMapStorageRootLifecycleBoundaryRecordType
+  );
+  assert.equal(
+    summary.acceptedRootMapStorageRootLifecycleBoundaryStatus,
+    resourceFormGate
+      .privateResourceHintRootMapStorageRootLifecycleBoundaryStatus
+  );
   assert.equal(summary.mutatesRealRootResourceStorage, false);
   assert.equal(summary.mutatesPreloadPropsMap, false);
   assert.equal(summary.publicResourceMapCommitBehavior, false);
@@ -15408,6 +15459,21 @@ test('private resource root-map storage execution mutates deterministic fake map
     }
   );
 
+  assertRootMapStorageExecutionAdmissionRejects(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      executionId: 'private-execution-root-map-storage-missing-lifecycle',
+      rootId: rootContext.admission.rootId,
+      expectedRootMapStorageRowIds: [
+        'root-map-storage-preflight-0',
+        'root-map-storage-preflight-1',
+        'root-map-storage-preflight-2'
+      ]
+    },
+    undefined,
+    'root lifecycle binding for resource root-map storage is required'
+  );
   assertRootMapStorageExecutionAdmissionRejects(
     preflight,
     {
@@ -15460,6 +15526,25 @@ test('private resource root-map storage execution mutates deterministic fake map
       explicitRootMapStorageExecution: true,
       scriptExecutionStarted: true
     }
+  );
+  const unmountRoot = createPrivateRootBridgeAdmission();
+  const unmount = unmountRoot.bridge.unmountContainer(
+    unmountRoot.create.handle
+  );
+  const unmountAdmission = unmountRoot.bridge.admitRequest(unmount);
+  const unmountLifecycleBoundary =
+    rootBridge.createPrivateRootLifecycleRequestBoundary(unmountAdmission);
+  assertRootMapStorageExecutionAdmissionRejects(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      rootId: rootContext.admission.rootId
+    },
+    {
+      rootBridgeAdmission: unmountAdmission,
+      rootLifecycleRequestBoundary: unmountLifecycleBoundary
+    },
+    'root lifecycle binding for resource root-map storage must come from a render operation'
   );
   for (const field of [
     'publicResourceRootMapStorageCompatibilityClaimed',
@@ -19086,7 +19171,11 @@ test('private resource/form root execution consumer links accepted fake evidence
     createPrivateRootBridgeAdmission();
   const resourceExecution = createRootMapStorageExecutionForRoot(
     'root-execution-consumer',
-    admission.rootId
+    admission.rootId,
+    {
+      admission,
+      lifecycleBoundary
+    }
   );
   const { fulfilledResetExecution } =
     await createPrivateFulfilledResetExecutionRecord(
@@ -19210,9 +19299,18 @@ test('private resource/form root execution consumer links accepted fake evidence
     true
   );
   assert.equal(
+    summary.requiresCurrentRenderRootLifecycleRequestBoundary,
+    true
+  );
+  assert.equal(
+    summary.requiresResourceRootMapStorageRootLifecycleIdentity,
+    true
+  );
+  assert.equal(
     summary.requiresFormFulfilledResetRootLifecycleIdentity,
     true
   );
+  assert.equal(summary.rejectsWrongRootLifecycleOperation, true);
   assert.equal(summary.rejectsStaleRootLifecycleSnapshots, true);
   assert.equal(summary.consumesFormFulfilledResetCurrentness, true);
   assert.equal(
@@ -19229,6 +19327,11 @@ test('private resource/form root execution consumer links accepted fake evidence
   );
   assert.equal(summary.rejectsCallerBuiltLifecycleSourceRecords, true);
   assert.equal(summary.rejectsRootlessFormFulfilledResetRecords, true);
+  assert.equal(
+    summary.rejectsRootlessResourceRootMapStorageRecords,
+    true
+  );
+  assert.equal(summary.rejectsCrossContainerResourceRecords, true);
   assert.equal(summary.rejectsCrossContainerFormFulfilledResetRecords, true);
   assert.equal(consumer.ledgerBoundary.runtimeRecordsRequired, true);
   assert.equal(
@@ -19237,6 +19340,7 @@ test('private resource/form root execution consumer links accepted fake evidence
   );
   assert.deepEqual(consumer.ledgerBoundary.workerIds, [
     'worker-829-resource-root-map-storage-private-execution',
+    'worker-952-react-dom-resource-hints-currentness',
     'worker-830-form-action-fulfilled-reset-fake-commit',
     'worker-883-resource-form-lifecycle-boundary-hardening',
     'worker-893-resource-form-reset-lifecycle-execution',
@@ -19252,6 +19356,49 @@ test('private resource/form root execution consumer links accepted fake evidence
     consumer.resourceRootMapStorageBoundary.rootId,
     admission.rootId
   );
+  assert.equal(
+    resourceFormGate.getPrivateResourceHintRootMapStorageRootIdentityPayload(
+      resourceExecution
+    ).rootExecutionBoundary,
+    resourceExecution.rootExecutionBoundary
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.rootExecutionBoundaryId,
+    resourceExecution.rootExecutionBoundary.boundaryId
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.rootExecutionBoundaryStatus,
+    resourceFormGate
+      .privateResourceHintRootMapStorageRootLifecycleBoundaryStatus
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.sourceRootBridgeAdmissionId,
+    admission.requestId
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.sourceRootLifecycleBoundaryId,
+    lifecycleBoundary.boundaryId
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.rootContainerInfo,
+    resourceExecution.rootExecutionBoundary.rootContainerInfo
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.lifecycleTransition,
+    lifecycleBoundary.lifecycleTransition
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.lifecycleRequestVersion,
+    lifecycleBoundary.lifecycleRequestVersion
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.activeRootLifecycle,
+    true
+  );
+  assert.equal(
+    consumer.resourceRootMapStorageBoundary.requestBoundaryCurrent,
+    true
+  );
   assert.equal(consumer.resourceRootMapStorageBoundary.rowCount, 3);
   assert.deepEqual(
     consumer.resourceRootMapStorageBoundary.sourceOwnedTokens,
@@ -19265,7 +19412,13 @@ test('private resource/form root execution consumer links accepted fake evidence
       'deterministic-private-root-map-storage-execution',
       'react-19.2.6-resource-root-map-storage-private-execution',
       'react-19.2.6-resource-root-map-storage-private-execution-snapshot',
-      'validated-private-resource-root-map-storage-execution'
+      'validated-private-resource-root-map-storage-execution',
+      resourceFormGate
+        .privateResourceHintRootMapStorageRootLifecycleBoundaryRecordType,
+      resourceFormGate
+        .privateResourceHintRootMapStorageRootLifecycleBoundaryStatus,
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
     ]
   );
   assert.equal(
@@ -19426,7 +19579,11 @@ test('private resource/form root execution consumer links accepted fake evidence
         lifecycleBoundary,
         createRootMapStorageExecutionForRoot(
           'root-execution-consumer-replay-form-resource',
-          admission.rootId
+          admission.rootId,
+          {
+            admission,
+            lifecycleBoundary
+          }
         ),
         fulfilledResetExecution,
         {
@@ -19456,13 +19613,27 @@ test('private resource/form root execution consumer rejects stale cross-root mis
   const freshAdmission = bridge.admitRequest(nextRender);
   const freshLifecycleBoundary =
     rootBridge.createPrivateRootLifecycleRequestBoundary(freshAdmission);
+  const foreignRootId = createPrivateRootBridgeAdmission({
+    requestIdPrefix: 'foreign-root-execution-consumer-request',
+    rootIdPrefix: 'foreign-root-execution-consumer-root',
+    updateIdPrefix: 'foreign-root-execution-consumer-update'
+  });
+  const foreignRootIdResourceExecution =
+    createRootMapStorageExecutionForRoot(
+      'root-execution-consumer-foreign-root-id',
+      foreignRootId.admission.rootId,
+      {
+        admission: foreignRootId.admission,
+        lifecycleBoundary: foreignRootId.lifecycleBoundary
+      }
+    );
   const resourceExecution = createRootMapStorageExecutionForRoot(
     'root-execution-consumer-negative',
-    admission.rootId
-  );
-  const foreignResourceExecution = createRootMapStorageExecutionForRoot(
-    'root-execution-consumer-foreign',
-    'foreign-root-execution-consumer-root'
+    freshAdmission.rootId,
+    {
+      admission: freshAdmission,
+      lifecycleBoundary: freshLifecycleBoundary
+    }
   );
   const { fulfilledResetExecution: rootlessFulfilledResetExecution } =
     await createPrivateFulfilledResetExecutionRecord(
@@ -19492,6 +19663,14 @@ test('private resource/form root execution consumer rejects stale cross-root mis
     rootBridge.createPrivateRootLifecycleRequestBoundary(
       foreignFreshAdmission
     );
+  const foreignResourceExecution = createRootMapStorageExecutionForRoot(
+    'root-execution-consumer-foreign',
+    foreignFreshAdmission.rootId,
+    {
+      admission: foreignFreshAdmission,
+      lifecycleBoundary: foreignFreshLifecycleBoundary
+    }
+  );
   const {
     fulfilledResetExecution: crossContainerFulfilledResetExecution
   } = await createPrivateFulfilledResetExecutionRecord(
@@ -19499,6 +19678,47 @@ test('private resource/form root execution consumer rejects stale cross-root mis
     {
       admission: foreignFreshAdmission,
       lifecycleBoundary: foreignFreshLifecycleBoundary
+    }
+  );
+  const unmountRoot = createPrivateRootBridgeAdmission();
+  const unmount = unmountRoot.bridge.unmountContainer(
+    unmountRoot.create.handle
+  );
+  const unmountAdmission = unmountRoot.bridge.admitRequest(unmount);
+  const unmountLifecycleBoundary =
+    rootBridge.createPrivateRootLifecycleRequestBoundary(unmountAdmission);
+  const staleResourceRoot = createPrivateRootBridgeAdmission();
+  const staleResourceExecution = createRootMapStorageExecutionForRoot(
+    'root-execution-consumer-stale-resource',
+    staleResourceRoot.admission.rootId,
+    {
+      admission: staleResourceRoot.admission,
+      lifecycleBoundary: staleResourceRoot.lifecycleBoundary
+    }
+  );
+  const staleResourceLaterRender =
+    staleResourceRoot.bridge.renderContainer(
+      staleResourceRoot.create.handle,
+      {
+        props: {
+          children: 'fresh resource boundary'
+        },
+        type: 'span'
+      }
+    );
+  const staleResourceLaterAdmission =
+    staleResourceRoot.bridge.admitRequest(staleResourceLaterRender);
+  const staleResourceLaterLifecycleBoundary =
+    rootBridge.createPrivateRootLifecycleRequestBoundary(
+      staleResourceLaterAdmission
+    );
+  const {
+    fulfilledResetExecution: staleResourceLaterFulfilledResetExecution
+  } = await createPrivateFulfilledResetExecutionRecord(
+    'root-execution-consumer-stale-resource-form',
+    {
+      admission: staleResourceLaterAdmission,
+      lifecycleBoundary: staleResourceLaterLifecycleBoundary
     }
   );
   const gate = resourceFormGate.createResourceFormRootExecutionConsumerGate({
@@ -19673,7 +19893,47 @@ test('private resource/form root execution consumer rejects stale cross-root mis
         'root lifecycle request boundary must be source-owned active and match root bridge admission'
     }
   );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        unmountAdmission,
+        unmountLifecycleBoundary,
+        resourceExecution,
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'root lifecycle request boundary must come from a render operation'
+    }
+  );
 
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        freshAdmission,
+        freshLifecycleBoundary,
+        foreignRootIdResourceExecution,
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'resource root-map storage execution rootId must match root bridge admission'
+    }
+  );
   assert.throws(
     () =>
       gate.recordRootExecutionConsumer(
@@ -19691,7 +19951,27 @@ test('private resource/form root execution consumer rejects stale cross-root mis
           .rootBoundaryInvalidRootExecutionConsumerRecordCode,
       compatibilityTarget,
       reason:
-        'resource root-map storage execution rootId must match root bridge admission'
+        'resource root-map storage execution root lifecycle identity must match root bridge admission and lifecycle boundary'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        staleResourceLaterAdmission,
+        staleResourceLaterLifecycleBoundary,
+        staleResourceExecution,
+        staleResourceLaterFulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'resource root-map storage execution root lifecycle identity must match root bridge admission and lifecycle boundary'
     }
   );
   assert.throws(
@@ -19900,6 +20180,8 @@ test('private resource/form root execution consumer rejects stale cross-root mis
     'publicHeadMutation',
     'realResourceMapsMutated',
     'nativeExecution',
+    'rustExecution',
+    'nativeRustExecution',
     'publicRootExecution'
   ]) {
     assert.throws(
@@ -19924,6 +20206,27 @@ test('private resource/form root execution consumer rejects stale cross-root mis
       field
     );
   }
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        freshAdmission,
+        freshLifecycleBoundary,
+        resourceExecution,
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true,
+          worker910Evidence: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'source-owned root execution tokens must come from private records'
+    }
+  );
   assert.throws(
     () =>
       gate.recordRootExecutionConsumer(
@@ -19984,11 +20287,6 @@ test('private resource/form root execution consumer rejects stale cross-root mis
     rootBridge.createPrivateRootLifecycleRequestBoundary(
       staleFormAdmission
     );
-  const staleFormResourceExecution =
-    createRootMapStorageExecutionForRoot(
-      'root-execution-consumer-stale-form-resource',
-      staleFormAdmission.rootId
-    );
   const { fulfilledResetExecution: staleFormFulfilledResetExecution } =
     await createPrivateFulfilledResetExecutionRecord(
       'root-execution-consumer-stale-form',
@@ -20012,6 +20310,15 @@ test('private resource/form root execution consumer rejects stale cross-root mis
     rootBridge.createPrivateRootLifecycleRequestBoundary(
       staleFormLaterAdmission
     );
+  const staleFormLaterResourceExecution =
+    createRootMapStorageExecutionForRoot(
+      'root-execution-consumer-stale-form-resource',
+      staleFormLaterAdmission.rootId,
+      {
+        admission: staleFormLaterAdmission,
+        lifecycleBoundary: staleFormLaterLifecycleBoundary
+      }
+    );
   assert.throws(
     () =>
       resourceFormGate
@@ -20021,7 +20328,7 @@ test('private resource/form root execution consumer rejects stale cross-root mis
         .recordRootExecutionConsumer(
           staleFormLaterAdmission,
           staleFormLaterLifecycleBoundary,
-          staleFormResourceExecution,
+          staleFormLaterResourceExecution,
           staleFormFulfilledResetExecution,
           {
             explicitResourceFormRootExecutionConsumer: true
@@ -20041,7 +20348,11 @@ test('private resource/form root execution consumer rejects stale cross-root mis
   const staleGenerationResourceExecution =
     createRootMapStorageExecutionForRoot(
       'root-execution-consumer-stale-reset-generation-resource',
-      staleGenerationRoot.admission.rootId
+      staleGenerationRoot.admission.rootId,
+      {
+        admission: staleGenerationRoot.admission,
+        lifecycleBoundary: staleGenerationRoot.lifecycleBoundary
+      }
     );
   const staleGenerationScenario =
     await createPrivateFulfilledResetExecutionRecord(
@@ -20631,7 +20942,11 @@ function createPrivateFormActionCallbackPreflightScenario(prefix) {
   };
 }
 
-function createRootMapStorageExecutionForRoot(prefix, rootId) {
+function createRootMapStorageExecutionForRoot(
+  prefix,
+  rootId,
+  rootLifecycleBinding
+) {
   const scenario = createRootMapStoragePreflightScenario(prefix);
   const preflight = scenario.storageGate.recordRootMapStoragePreflight(
     scenario.commit,
@@ -20651,16 +20966,26 @@ function createRootMapStorageExecutionForRoot(prefix, rootId) {
     .createResourceHintRootMapStorageGate({
       requestIdPrefix: `${prefix}-execution`
     })
-    .recordRootMapStorageExecution(preflight, {
-      explicitRootMapStorageExecution: true,
-      executionId: `${prefix}-root-map-storage-execution`,
-      rootId,
-      expectedRootMapStorageRowIds: [
-        'root-map-storage-preflight-0',
-        'root-map-storage-preflight-1',
-        'root-map-storage-preflight-2'
-      ]
-    });
+    .recordRootMapStorageExecution(
+      preflight,
+      {
+        explicitRootMapStorageExecution: true,
+        executionId: `${prefix}-root-map-storage-execution`,
+        rootId,
+        expectedRootMapStorageRowIds: [
+          'root-map-storage-preflight-0',
+          'root-map-storage-preflight-1',
+          'root-map-storage-preflight-2'
+        ]
+      },
+      rootLifecycleBinding == null
+        ? undefined
+        : {
+            rootBridgeAdmission: rootLifecycleBinding.admission,
+            rootLifecycleRequestBoundary:
+              rootLifecycleBinding.lifecycleBoundary
+          }
+    );
 }
 
 async function createPrivateFulfilledResetExecutionRecord(
@@ -20849,13 +21174,23 @@ function createPrivateControlledWrapperPropertyPayloadScenario() {
   };
 }
 
-function createPrivateRootBridgeAdmission() {
+function createPrivateRootBridgeAdmission(options) {
+  const requestIdPrefix =
+    options && options.requestIdPrefix
+      ? options.requestIdPrefix
+      : 'root-gate-request';
+  const rootIdPrefix =
+    options && options.rootIdPrefix ? options.rootIdPrefix : 'root-gate';
+  const updateIdPrefix =
+    options && options.updateIdPrefix
+      ? options.updateIdPrefix
+      : 'root-gate-update';
   const document = createRootBridgeDocument();
   const container = createRootBridgeElement('DIV', document);
   const bridge = rootBridge.createPrivateRootBridgeShell({
-    requestIdPrefix: 'root-gate-request',
-    rootIdPrefix: 'root-gate',
-    updateIdPrefix: 'root-gate-update'
+    requestIdPrefix,
+    rootIdPrefix,
+    updateIdPrefix
   });
   const create = bridge.createClientRoot(container, {
     identifierPrefix: 'resource-form-'
@@ -21441,19 +21776,30 @@ function assertRootMapStoragePreflightAdmissionRejects(
 
 function assertRootMapStorageExecutionAdmissionRejects(
   rootMapStoragePreflight,
-  admission
+  admission,
+  rootLifecycleBinding,
+  reason
 ) {
+  const expected = {
+    code:
+      resourceFormGate
+        .privateResourceHintRootMapStorageInvalidAdmissionCode,
+    compatibilityTarget
+  };
+  if (reason !== undefined) {
+    expected.reason = reason;
+  }
+
   assert.throws(
     () =>
       resourceFormGate
         .createResourceHintRootMapStorageGate()
-        .recordRootMapStorageExecution(rootMapStoragePreflight, admission),
-    {
-      code:
-        resourceFormGate
-          .privateResourceHintRootMapStorageInvalidAdmissionCode,
-      compatibilityTarget
-    }
+        .recordRootMapStorageExecution(
+          rootMapStoragePreflight,
+          admission,
+          rootLifecycleBinding
+        ),
+    expected
   );
 }
 
