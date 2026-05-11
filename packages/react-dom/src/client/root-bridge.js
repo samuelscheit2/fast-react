@@ -28732,4 +28732,9 @@ const rootBridgeExports = Object.freeze({
   revertPrivateCreateRootSideEffects
 });
 
-module.exports = rootBridgeExports;
+Object.defineProperty(module, 'exports', {
+  configurable: false,
+  enumerable: true,
+  value: rootBridgeExports,
+  writable: false
+});

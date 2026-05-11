@@ -2,67 +2,91 @@
 
 ## Summary
 
-- Added a private/test-only `FastReactDomHydrationRecoverableErrorBoundaryAdmissionRecord`.
-- Extended accepted hydration boundary metadata with `hydration-recoverable-error-boundary-admission`.
-- The new admission requires canonical WeakMap-backed hydration boundary, recoverable-error preflight, target-claiming, and blocked replay execution records.
-- The admission also requires hydrateRoot public-facade source-ledger evidence: current hydrateRoot preflight, event replay preflight, execution preflight, and source-owned active lifecycle request boundary derived from root-bridge WeakMap payload ownership.
-- Rechecks marker and target currentness at admission time so replay is rejected after marker or target state changes.
-- Rejects cloned/caller-built rows, cloned or rewired source-ledger records, cross-root source ledgers, missing lifecycle/source ledger evidence, stale marker/target evidence, and recoverable-error callback/value alias options.
-- Freezes the root-bridge export object so the hydrateRoot source-ledger getter capabilities are non-writable/non-configurable before source-ledger lookup can use them.
-- Removes the source-ledger lazy `require('./root-bridge.js')` path and the caller-importable reader installer; source-ledger now captures root-bridge's frozen WeakMap-backed getter references during module initialization.
+- Repaired the first-load hydrateRoot source-ledger cache-poisoning hole.
+- `root-bridge.js` now publishes its already frozen export object through a
+  non-writable, non-configurable `module.exports` property. Loading
+  `root-bridge.js` first no longer leaves a mutable
+  `require.cache[rootBridgePath].exports` slot that can be swapped before
+  `hydrate-root-source-ledger.js` imports the bridge getters.
+- Kept the removed source-ledger registration/installer surface absent.
+- Added a fresh-process regression that requires `root-bridge.js`, attempts to
+  replace its cache `exports`, then imports the ledger through
+  `hydration-boundary-gate.js` and proves tailored cloned source-ledger rows
+  still resolve to `null` and cannot create an accepted recoverable-error
+  boundary admission record.
 
 ## Changed Files
 
-- `packages/react-dom/src/client/hydration-boundary-gate.js`
-- `packages/react-dom/src/client/hydrate-root-source-ledger.js`
 - `packages/react-dom/src/client/root-bridge.js`
 - `packages/react-dom/test/hydration-boundary.test.js`
-- `tests/smoke/package-surface-snapshot.json`
-- `tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
 - `worker-progress/worker-910-hydration-recoverable-error-boundary-admission.md`
 
-## Admission And Currentness Path
+## First-Load Fix
 
-1. `recordUnsupportedHydrateRoot` creates the private hydration boundary record and accepted metadata ledger.
-2. hydrateRoot public facade preflight creates the recoverable-error preflight plus lifecycle request-boundary ledger.
-3. target claiming and event replay preflight create canonical target-claiming and blocked replay execution records.
-4. `hydrate-root-source-ledger.js` imports root-bridge after root-bridge's hydration-boundary dependency was made lazy, then captures the frozen WeakMap-backed hydrateRoot public-facade payload readers during module initialization.
-5. `createHydrationRecoverableErrorBoundaryAdmissionRecord` accepts only when all identities match the same boundary/options/source ledger and all ledger rows resolve to root-bridge source-owned WeakMap payloads.
-6. The admission re-inspects current markers and re-resolves the target path against the original dispatch target before recording the boundary row.
+1. `root-bridge.js` builds `rootBridgeExports` with `Object.freeze(...)` as
+   before.
+2. Instead of assigning `module.exports = rootBridgeExports`, it defines the
+   module `exports` property with `writable: false` and
+   `configurable: false`.
+3. The first-load attack sequence can still require `root-bridge.js`, but
+   `Reflect.set(require.cache[rootBridgePath], 'exports', fakeExports)` now
+   returns `false`, and strict assignment throws `TypeError`.
+4. When `hydrate-root-source-ledger.js` is imported after that failed swap, it
+   captures the real frozen root-bridge WeakMap-backed getter functions.
 
 ## Commands Run
 
-- `node --check packages/react-dom/src/client/hydration-boundary-gate.js`
-- `node --check packages/react-dom/src/client/hydrate-root-source-ledger.js`
 - `node --check packages/react-dom/src/client/root-bridge.js`
+- `node --check packages/react-dom/src/client/hydrate-root-source-ledger.js`
+- `node --check packages/react-dom/src/client/hydration-boundary-gate.js`
 - `node --check packages/react-dom/test/hydration-boundary.test.js`
-- `node --check tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
 - `node --test packages/react-dom/test/hydration-boundary.test.js`
 - `node --test packages/react-dom/test/hydration-private.test.js`
 - `node --test packages/react-dom/test/react-dom-private-root-bridge-shell.test.js`
-- `node --test tests/conformance/test/react-dom-hydration-boundary-gate.test.mjs`
+- `node --test packages/react-dom/test/hydrate-root-text-claim-patch-bridge.test.js`
+- `node --test tests/conformance/test/private-admission-806-hydrateroot-preflight-ledger.test.mjs`
+- `node --test tests/conformance/test/private-admission-849-hydrateroot-text-patch-ledger.test.mjs`
 - `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
-- `npm run check --workspace @fast-react/react-dom`
-- `npm run check:package-surface` (failed before snapshot update for the new private implementation file, then passed)
+- `node --test tests/conformance/test/react-dom-hydration-boundary-gate.test.mjs`
+- `node --test tests/conformance/test/react-dom-client-root-oracle.test.mjs`
+- `node --test tests/conformance/test/react-dom-hydration-marker-oracle.test.mjs`
 - `node tests/smoke/import-entrypoints.mjs`
-- `git diff --check`
-
-All commands passed after the root-bridge export freeze, installer removal, module-initialization source-ledger reader capture, require-cache export replacement regression, and monkeypatch regression rerun.
+- `node tests/smoke/package-surface-guard.mjs`
+- `node tests/smoke/react-dom-root-exports.mjs`
+- `npm run check --workspace @fast-react/react-dom`
+- `node tests/smoke/react-dom-private-root-bridge-shell.mjs` failed with
+  `FAST_REACT_DOM_INVALID_UNMOUNT_HOST_OUTPUT_CLEANUP_RECORD` at the existing
+  unmount host-output cleanup path.
 
 ## Evidence Gathered
 
-- Positive hydration boundary test proves a current hydrateRoot lifecycle/replay/recoverable-error source chain admits exactly one private recoverable-error boundary row without invoking callbacks or mutating DOM/listeners.
-- Negative hydration boundary test proves cloned preflight/claim/replay records, cloned/rewired source-ledger rows, caller registrar import abuse, one-at-a-time mixed source-ledger swaps, missing lifecycle ledger, cross-root source ledger, callback/root-options aliases, stale marker rows, and stale target rows fail closed.
-- Negative hydration boundary test also proves direct assignment and `Object.defineProperty` monkeypatch attempts against the four hydrateRoot source-ledger getter exports throw, filename-spoofed `/tmp/root-bridge.js` installer calls fail because no installer is exported, replacing `require.cache[rootBridgePath].exports` with fake getter payloads does not redirect source-ledger reads, and cloned source-ledger rows still resolve to `null`.
-- Adjacent private hydration/root-bridge tests pass with the added accepted metadata row.
+- Focused hydration-boundary tests pass and include the new fresh-process
+  first-load cache export replacement regression.
+- Adjacent private hydration, hydrateRoot text patch, and root-bridge suites
+  pass.
+- HydrateRoot preflight/text patch conformance ledgers, hydration boundary
+  conformance, public facade blocked-gate conformance, client-root oracle, and
+  hydration-marker oracle tests pass.
+- Package surface and import smoke checks pass.
+- Workspace React DOM check passes.
 
 ## Risks Or Blockers
 
-- This remains diagnostic/private evidence only; no public `hydrateRoot`, real replay, real hydration, root scheduling, or DOM mutation behavior is opened.
-- Source-ledger validation uses module-initialization captured `hydrate-root-source-ledger.js` readers over root-bridge WeakMap payloads. The source-ledger module exports no ledger record registration or reader installation capability, it no longer lazily resolves root-bridge through `require.cache`, and the root-bridge getter capabilities it reads are frozen/non-writable/non-configurable, so caller-shaped clones cannot become source-owned by importing or monkeypatching the bridge modules.
-- Worker 901 is concurrently changing React DOM root bridge lifecycle evidence. If its lifecycle record field names/status strings change, this admission canary may need a small alignment patch.
+- The optional `tests/smoke/react-dom-private-root-bridge-shell.mjs` smoke still
+  fails on an unmount host-output cleanup mismatch unrelated to the source-ledger
+  cache export repair. The focused `react-dom-private-root-bridge-shell.test.js`
+  suite passes.
+- This remains private diagnostic evidence only; no public `hydrateRoot`, real
+  hydration/replay, root scheduling, callback routing, native execution,
+  reconciler execution, or DOM mutation compatibility is opened.
+- A caller that replaces the entire `require.cache[rootBridgePath]` module
+  entry is outside this repair; this patch specifically closes the audited
+  first-load `require.cache[rootBridgePath].exports` replacement path.
 
 ## Recommended Next Tasks
 
-- After Worker 901 lands, rerun hydrateRoot public-facade lifecycle/currentness tests and align the source-ledger shape if needed.
-- Add a root-bridge-owned wrapper for this admission if the orchestrator wants the canary reachable directly from hydrateRoot preflight APIs.
+- Decide whether to refresh or retire
+  `tests/smoke/react-dom-private-root-bridge-shell.mjs`; its unmount cleanup
+  expectation no longer matches the passing focused root-bridge test suite.
+- If later work changes hydrateRoot lifecycle/source-ledger field names, rerun
+  the Worker 910 admission tests and align the ledger assertions.
