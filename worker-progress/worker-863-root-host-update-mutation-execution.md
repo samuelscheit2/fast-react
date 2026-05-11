@@ -65,6 +65,49 @@ cargo test -p fast-react-reconciler --all-features host_work_host_component_upda
 - `cargo fmt --all --check`: passed.
 - `git diff --check`: passed.
 
+## Audit Follow-Up - Consumed Update Payloads
+
+Added private consumed-update tracking for root HostComponent and HostText
+mutation records. `apply_test_host_root_commit_mutations` now preflights update
+records against consumed payload evidence before any host mutation loop, and the
+per-record application helpers retain the same guard at the call boundary.
+
+Successful HostComponent updates, private style-store updates, and HostText
+updates now consume their private payload evidence. Replaying the same accepted
+update commit record returns `ConsumedHostUpdatePayload` before another
+`commit_update` or `commit_text_update` can run.
+
+Added negative canaries for replayed HostComponent and HostText update commit
+records. They assert the replay error kind and prove the second apply leaves
+host operations, host tokens, and text update counts unchanged.
+
+Merged current `origin/main` before verification; the branch was already up to
+date.
+
+### Audit Commands Run
+
+```sh
+git fetch origin main && git merge origin/main --no-edit
+cargo fmt --all
+cargo test -p fast-react-reconciler --all-features root_work_loop_host_update
+cargo test -p fast-react-reconciler --all-features host_work_host_text_update
+cargo test -p fast-react-reconciler --all-features root_commit_host_component_update
+cargo test -p fast-react-reconciler --all-features host_work_host_component_update
+cargo check -p fast-react-reconciler --all-features
+cargo fmt --all --check
+git diff --check
+```
+
+### Audit Verification Results
+
+- `root_work_loop_host_update`: passed, 5 tests.
+- `host_work_host_text_update`: passed, 3 tests.
+- `root_commit_host_component_update`: passed, 1 test.
+- `host_work_host_component_update`: passed, 4 tests.
+- `cargo check -p fast-react-reconciler --all-features`: passed.
+- `cargo fmt --all --check`: passed.
+- `git diff --check`: passed.
+
 ## Risks Or Blockers
 
 - The execution remains private test-host canary code only.

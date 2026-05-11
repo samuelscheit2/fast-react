@@ -124,6 +124,12 @@ pub(crate) enum HostWorkError {
         fiber: FiberId,
         state_node: StateNodeHandle,
     },
+    ConsumedHostUpdatePayload {
+        root: FiberRootId,
+        fiber: FiberId,
+        state_node: StateNodeHandle,
+        kind: HostRootMutationApplyRecordKind,
+    },
     UnchangedHostTextUpdatePayload {
         root: FiberRootId,
         current: FiberId,
@@ -273,6 +279,19 @@ impl Display for HostWorkError {
                 fiber.slot().get(),
                 state_node.raw()
             ),
+            Self::ConsumedHostUpdatePayload {
+                root,
+                fiber,
+                state_node,
+                kind,
+            } => write!(
+                formatter,
+                "root {} host update execution for fiber slot {} state node {} has already consumed private {:?} payload evidence",
+                root.raw(),
+                fiber.slot().get(),
+                state_node.raw(),
+                kind
+            ),
             Self::UnchangedHostTextUpdatePayload {
                 root,
                 current,
@@ -337,6 +356,7 @@ impl Error for HostWorkError {
             | Self::MissingHostComponentTextChild { .. }
             | Self::MissingHostTextUpdatePayload { .. }
             | Self::MissingHostComponentUpdatePayload { .. }
+            | Self::ConsumedHostUpdatePayload { .. }
             | Self::UnchangedHostTextUpdatePayload { .. }
             | Self::HostTextCommitRecordMismatch { .. }
             | Self::InvalidHostComponentPropertyUpdatePayload { .. } => None,
@@ -386,6 +406,7 @@ pub(crate) struct DetachedHostRecords {
     scopes: Vec<Option<HostNodeScope>>,
     component_updates: Vec<HostComponentUpdatePayload>,
     text_updates: Vec<HostTextUpdatePayload>,
+    consumed_host_updates: Vec<HostRootMutationApplyRecord>,
     test_host_text_records: Vec<Option<TestHostTextRecord>>,
 }
 
@@ -509,6 +530,35 @@ impl DetachedHostRecords {
 
     fn record_text_update(&mut self, payload: HostTextUpdatePayload) {
         self.text_updates.push(payload);
+    }
+
+    fn ensure_host_update_not_consumed(
+        &self,
+        mutation: HostRootMutationApplyRecord,
+    ) -> Result<(), HostWorkError> {
+        if self
+            .consumed_host_updates
+            .iter()
+            .any(|consumed| *consumed == mutation)
+        {
+            return Err(HostWorkError::ConsumedHostUpdatePayload {
+                root: mutation.root(),
+                fiber: mutation.fiber(),
+                state_node: mutation.state_node(),
+                kind: mutation.kind(),
+            });
+        }
+        Ok(())
+    }
+
+    fn mark_host_update_consumed(&mut self, mutation: HostRootMutationApplyRecord) {
+        debug_assert!(
+            !self
+                .consumed_host_updates
+                .iter()
+                .any(|consumed| *consumed == mutation)
+        );
+        self.consumed_host_updates.push(mutation);
     }
 
     fn component_update_payload(
@@ -2830,6 +2880,7 @@ fn apply_test_host_root_commit_mutations(
     let mut container = *root.container_info();
     let mut records = Vec::new();
 
+    preflight_test_host_root_update_consumption(commit, detached_hosts)?;
     preflight_test_host_root_component_property_updates(store, commit, detached_hosts)?;
 
     for &mutation in commit.mutation_apply_log().records() {
@@ -3634,6 +3685,22 @@ fn preflight_test_host_root_component_property_updates(
     Ok(())
 }
 
+fn preflight_test_host_root_update_consumption(
+    commit: &HostRootCommitRecord,
+    detached_hosts: &DetachedHostRecords,
+) -> Result<(), HostWorkError> {
+    for &mutation in commit.mutation_apply_log().records() {
+        if matches!(
+            mutation.kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+                | HostRootMutationApplyRecordKind::CommitHostTextUpdate
+        ) {
+            detached_hosts.ensure_host_update_not_consumed(mutation)?;
+        }
+    }
+    Ok(())
+}
+
 fn apply_test_host_root_deletion_cleanup(
     store: &FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -4141,6 +4208,7 @@ fn apply_test_host_component_update_record(
     mutation: HostRootMutationApplyRecord,
     detached_hosts: &mut DetachedHostRecords,
 ) -> Result<TestHostRootMutationApplyStatus, HostWorkError> {
+    detached_hosts.ensure_host_update_not_consumed(mutation)?;
     let Some(payload) = detached_hosts.component_update_payload(mutation) else {
         return Ok(TestHostRootMutationApplyStatus::RecordedOnly);
     };
@@ -4165,6 +4233,7 @@ fn apply_test_host_component_update_record(
             )?;
         debug_assert!(commit.private_host_store_only());
         debug_assert!(!commit.public_dom_compatibility_claimed());
+        detached_hosts.mark_host_update_consumed(mutation);
         return Ok(TestHostRootMutationApplyStatus::PrivateHostStoreOnly(
             TestHostRootPrivateStoreMutation::HostComponentPropertyAndLatestProps,
         ));
@@ -4185,6 +4254,7 @@ fn apply_test_host_component_update_record(
             host_node_property_update_execution_for_host_call(host_call),
         ),
     )?;
+    detached_hosts.mark_host_update_consumed(mutation);
     Ok(TestHostRootMutationApplyStatus::Applied(host_call))
 }
 
@@ -4282,6 +4352,7 @@ fn apply_test_host_text_update_record(
     mutation: HostRootMutationApplyRecord,
     detached_hosts: &mut DetachedHostRecords,
 ) -> Result<TestHostRootMutationApplyStatus, HostWorkError> {
+    detached_hosts.ensure_host_update_not_consumed(mutation)?;
     let Some(payload) = detached_hosts.text_update_payload(mutation) else {
         return Ok(TestHostRootMutationApplyStatus::RecordedOnly);
     };
@@ -4314,6 +4385,7 @@ fn apply_test_host_text_update_record(
         &old_text,
         &new_text,
     )?;
+    detached_hosts.mark_host_update_consumed(mutation);
     Ok(TestHostRootMutationApplyStatus::Applied(
         TestHostRootMutationHostCall::CommitTextUpdate,
     ))
@@ -9813,6 +9885,89 @@ mod tests {
     }
 
     #[test]
+    fn host_work_host_component_update_rejects_replayed_commit_record_before_second_host_call() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let initial_element = source.insert_host_element_with_text("section", "ignored");
+        let initial = element_from_root(&source, initial_element);
+        let create_render = render_test_root(&mut store, root_id, initial_element);
+        let current_component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            initial,
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store
+            .fiber_arena()
+            .get(current_component)
+            .unwrap()
+            .state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let next_element = source.insert_host_element_with_text("section", "updated");
+        let next = element_from_root(&source, next_element);
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        let payload = update_root_component_for_commit(
+            &mut store,
+            root_id,
+            update_render.finished_work(),
+            current_component,
+            next,
+            &mut detached_hosts,
+        );
+        let update_commit = commit_finished_host_root(&mut store, update_render).unwrap();
+        let first_apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &update_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+        assert_eq!(first_apply.applied_host_call_count(), 1);
+        assert_eq!(
+            first_apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::CommitUpdate)
+        );
+        let operations_after_first_apply = host.operations();
+        let token_count_after_first_apply = store.host_tokens().len();
+
+        let error = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &update_commit,
+            &mut detached_hosts,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostWorkError::ConsumedHostUpdatePayload {
+                root,
+                fiber,
+                state_node: consumed_state_node,
+                kind,
+            } if root == root_id
+                && fiber == payload.work_in_progress()
+                && consumed_state_node == state_node
+                && kind == HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        ));
+        assert_eq!(host.operations(), operations_after_first_apply);
+        assert_eq!(store.host_tokens().len(), token_count_after_first_apply);
+    }
+
+    #[test]
     fn host_work_finished_work_handoff_applies_one_host_component_update_to_test_host_commit_path()
     {
         let (mut store, root_id) = root_store();
@@ -11565,6 +11720,96 @@ mod tests {
         let mut expected_operations = operations_before_apply;
         expected_operations.push("commit_text_update");
         assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_host_text_update_rejects_replayed_commit_record_before_second_host_call() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(75_100));
+        let current_text = attach_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "before",
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let mut source = TestHostTree::new();
+        let next_element = source.insert_text("after");
+        let next_text = text_from_root(&source, next_element);
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        let diff = update_root_text_for_commit_with_payload(
+            &mut store,
+            root_id,
+            update_render.finished_work(),
+            current_text,
+            next_text,
+            &mut detached_hosts,
+        );
+        let update_commit = commit_finished_host_root(&mut store, update_render).unwrap();
+        let first_apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &update_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+        assert_eq!(first_apply.applied_host_call_count(), 1);
+        assert_eq!(
+            first_apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::CommitTextUpdate
+            )
+        );
+        assert_eq!(
+            detached_hosts
+                .test_host_text_record_update_count(state_node)
+                .unwrap(),
+            1
+        );
+        let operations_after_first_apply = host.operations();
+
+        let error = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &update_commit,
+            &mut detached_hosts,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostWorkError::ConsumedHostUpdatePayload {
+                root,
+                fiber,
+                state_node: consumed_state_node,
+                kind,
+            } if root == root_id
+                && fiber == diff.work_in_progress()
+                && consumed_state_node == state_node
+                && kind == HostRootMutationApplyRecordKind::CommitHostTextUpdate
+        ));
+        assert_eq!(host.operations(), operations_after_first_apply);
+        assert_eq!(
+            detached_hosts
+                .test_host_text_record_update_count(state_node)
+                .unwrap(),
+            1
+        );
     }
 
     #[test]
