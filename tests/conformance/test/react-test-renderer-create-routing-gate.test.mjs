@@ -5087,6 +5087,14 @@ test("react-test-renderer cjs development private toJSON facade records nested u
     privateToJSONSiblingTextJSAdmissionStatus
   );
   assert.equal(
+    facade.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
+    true
+  );
+  assert.equal(
+    facade.siblingTextJSAdmissionConsumesCommittedFiberInspection,
+    true
+  );
+  assert.equal(
     typeof facade.createAcceptedSiblingTextDiagnosticResult,
     "function"
   );
@@ -5124,6 +5132,24 @@ test("react-test-renderer cjs development private toJSON facade records nested u
     true
   );
   assert.equal(
+    siblingDiagnostic.consumesPrivateRootFinishedLanesHandoffGate,
+    true
+  );
+  assert.equal(siblingDiagnostic.rootFinishedLanesHandoffAccepted, true);
+  assert.equal(
+    siblingDiagnostic.rootFinishedLanesHandoffDiagnosticName,
+    privateRootFinishedLanesHandoffDiagnosticName
+  );
+  assert.equal(
+    siblingDiagnostic.rootFinishedLanesHandoffStatus,
+    privateRootFinishedLanesHandoffStatus
+  );
+  assert.equal(siblingDiagnostic.consumesCommittedFiberInspection, true);
+  assert.deepEqual(
+    siblingDiagnostic.committedFiberInspection,
+    privateSiblingTextToJSONCommittedFiberInspection()
+  );
+  assert.equal(
     siblingDiagnostic.finishedWorkIdentity.diagnosticName,
     privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName
   );
@@ -5134,6 +5160,64 @@ test("react-test-renderer cjs development private toJSON facade records nested u
   assert.equal(siblingDiagnostic.publicToJSONAvailable, false);
   assert.equal(siblingDiagnostic.nativeExecution, false);
   assert.equal(siblingDiagnostic.compatibilityClaimed, false);
+  assertSiblingTextAdmissionRejection(
+    facade,
+    withSiblingTextReportChange(siblingReport, (report) => {
+      delete report.committedFiberInspection;
+    }),
+    siblingIdentity,
+    updateError.rootRequest,
+    /committedFiberInspection/u
+  );
+  assertSiblingTextAdmissionRejection(
+    facade,
+    withSiblingTextReportChange(siblingReport, (report) => {
+      report.committedFiberInspection.compatibilityClaimed = true;
+    }),
+    siblingIdentity,
+    updateError.rootRequest,
+    /compatibilityClaimed/u
+  );
+  assertSiblingTextAdmissionRejection(
+    facade,
+    siblingReport,
+    withSiblingTextIdentityChange(siblingIdentity, (evidence) => {
+      delete evidence.rootFinishedLanesHandoff;
+    }),
+    updateError.rootRequest,
+    /rootFinishedLanesHandoff/u
+  );
+  assertSiblingTextAdmissionRejection(
+    facade,
+    siblingReport,
+    withInheritedSiblingTextRootFinishedLanesHandoff(siblingIdentity),
+    updateError.rootRequest,
+    /rootFinishedLanesHandoff/u
+  );
+  assertSiblingTextAdmissionRejection(
+    facade,
+    siblingReport,
+    withSiblingTextIdentityChange(siblingIdentity, (evidence) => {
+      evidence.rootFinishedLanesHandoff.commitFinishedLanesBits = 2;
+    }),
+    updateError.rootRequest,
+    /finished_lanes handoff/u
+  );
+  assertSiblingTextAdmissionRejection(
+    facade,
+    siblingReport,
+    privateSerializationFinishedWorkIdentityEvidence({
+      rootRequest: updateError.rootRequest,
+      publicSurface: "create().toJSON",
+      sourceSerializationDiagnosticName:
+        "fast-react-test-renderer.serialization.private-json-canary",
+      consumesPrivateToJSONEvidence: true,
+      consumesPrivateToTreeEvidence: false,
+      hostOutputUpdateKind: "Update"
+    }),
+    updateError.rootRequest,
+    /sibling-text-finished-work-identity-diagnostic-mismatch/u
+  );
 
   const mismatchReport = privateToJSONReport({
     rowId: privateToJSONNestedUpdateHostOutputRowId,
@@ -5249,12 +5333,92 @@ function privateRootFinishedLanesHandoffEvidence(rootRequest, evidence) {
   };
 }
 
+function privateSiblingTextToJSONCommittedFiberInspection() {
+  return {
+    diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+    sourceJsonDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    fiberShape: ["HostRoot", "HostText", "HostComponent", "HostText"],
+    rootChildFiberTags: ["HostText", "HostComponent"],
+    hostChildFiberTags: ["HostText", "HostComponent"],
+    rootChildCount: 2,
+    hostChildCount: 2,
+    hostComponentCount: 1,
+    hostTextCount: 2,
+    functionComponentFiberTag: null,
+    functionComponentPresent: false,
+    wrapsCommittedHostOutput: false,
+    publicTreeObjectAvailable: false,
+    compatibilityClaimed: false
+  };
+}
+
+function withSiblingTextIdentityChange(evidence, mutate) {
+  const clone = JSON.parse(JSON.stringify(evidence));
+  mutate(clone);
+  return clone;
+}
+
+function withInheritedSiblingTextRootFinishedLanesHandoff(evidence) {
+  const clone = JSON.parse(JSON.stringify(evidence));
+  const rootFinishedLanesHandoff = clone.rootFinishedLanesHandoff;
+  delete clone.rootFinishedLanesHandoff;
+  const inheritedEvidence = Object.assign(
+    Object.create({ rootFinishedLanesHandoff }),
+    clone
+  );
+  assert.equal(
+    Object.hasOwn(inheritedEvidence, "rootFinishedLanesHandoff"),
+    false
+  );
+  return inheritedEvidence;
+}
+
+function withSiblingTextReportChange(report, mutate) {
+  const clone = JSON.parse(JSON.stringify(report));
+  mutate(clone);
+  return clone;
+}
+
+function assertSiblingTextAdmissionRejection(
+  privateFacade,
+  report,
+  evidence,
+  sourceRootRequest,
+  messagePattern
+) {
+  assert.equal(
+    privateFacade.canCreateAcceptedSiblingTextDiagnosticResult(
+      report,
+      evidence,
+      sourceRootRequest
+    ),
+    false
+  );
+  const error = captureThrown(() =>
+    privateFacade.createAcceptedSiblingTextDiagnosticResult(
+      report,
+      evidence,
+      sourceRootRequest
+    )
+  );
+  assert.equal(
+    error.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(error.message, messagePattern);
+  assert.equal(error.nativeBridgeAvailable, false);
+  assert.equal(error.nativeExecution, false);
+  assert.equal(error.compatibilityClaimed, false);
+  return error;
+}
+
 function privateSiblingTextFinishedWorkIdentityEvidence({
   rootRequest
 }) {
   const current = { arenaId: 1, slot: 20, generation: 1 };
   const finishedWork = { arenaId: 1, slot: 21, generation: 1 };
-  return {
+  const evidence = {
     diagnosticName: privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
     status: privateToJSONSiblingTextFinishedWorkIdentityStatus,
     publicSurface: "create().update -> create().toJSON",
@@ -5325,6 +5489,11 @@ function privateSiblingTextFinishedWorkIdentityEvidence({
     packageCompatibilityClaimed: false,
     compatibilityClaimed: false
   };
+  evidence.rootFinishedLanesHandoff = privateRootFinishedLanesHandoffEvidence(
+    rootRequest,
+    evidence
+  );
+  return evidence;
 }
 
 function privateToJSONReport({
@@ -5373,6 +5542,12 @@ function privateToJSONReport({
       publicActBlocked: true,
       compatibilityClaimBlocked: true
     },
+    ...(rowShape === "SiblingText"
+      ? {
+          committedFiberInspection:
+            privateSiblingTextToJSONCommittedFiberInspection()
+        }
+      : {}),
     nodes
   };
 }

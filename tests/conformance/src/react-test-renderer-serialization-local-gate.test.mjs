@@ -429,8 +429,24 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         facadeGate.siblingTextJSAdmissionConsumesDedicatedIdentity,
         true
       );
+      assert.equal(
+        facadeGate.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
+        true
+      );
+      assert.equal(
+        facadeGate.siblingTextJSAdmissionConsumesCommittedFiberInspection,
+        true
+      );
       assert.equal(facadeGate.rejectsGenericSiblingTextFinishedWorkIdentity, true);
       assert.equal(facadeGate.rejectsBroadMultichildFinishedWorkIdentity, true);
+      assert.equal(
+        facadeGate.rejectsMissingSiblingTextCommittedFiberInspection,
+        true
+      );
+      assert.equal(
+        facadeGate.rejectsInvalidSiblingTextCommittedFiberInspection,
+        true
+      );
     }
     if (entry.entrypoint.endsWith(".development")) {
       assert.equal(
@@ -781,11 +797,27 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         true
       );
       assert.equal(
+        privateFacade.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
+        true
+      );
+      assert.equal(
+        privateFacade.siblingTextJSAdmissionConsumesCommittedFiberInspection,
+        true
+      );
+      assert.equal(
         privateFacade.rejectsGenericSiblingTextFinishedWorkIdentity,
         true
       );
       assert.equal(
         privateFacade.rejectsBroadMultichildFinishedWorkIdentity,
+        true
+      );
+      assert.equal(
+        privateFacade.rejectsMissingSiblingTextCommittedFiberInspection,
+        true
+      );
+      assert.equal(
+        privateFacade.rejectsInvalidSiblingTextCommittedFiberInspection,
         true
       );
       assert.equal(
@@ -2258,6 +2290,28 @@ test("react-test-renderer JS private serialization finished-work identity valida
         true
       );
       assert.equal(
+        siblingTextDiagnostic.consumesPrivateRootFinishedLanesHandoffGate,
+        true
+      );
+      assert.equal(siblingTextDiagnostic.rootFinishedLanesHandoffAccepted, true);
+      assert.equal(
+        siblingTextDiagnostic.rootFinishedLanesHandoffDiagnosticName,
+        privateRootFinishedLanesHandoffDiagnosticName
+      );
+      assert.equal(
+        siblingTextDiagnostic.rootFinishedLanesHandoffStatus,
+        privateRootFinishedLanesHandoffStatus
+      );
+      assert.equal(
+        Object.isFrozen(siblingTextDiagnostic.rootFinishedLanesHandoff),
+        true
+      );
+      assert.equal(siblingTextDiagnostic.consumesCommittedFiberInspection, true);
+      assert.deepEqual(
+        siblingTextDiagnostic.committedFiberInspection,
+        createSiblingTextToJSONCommittedFiberInspectionDiagnostic()
+      );
+      assert.equal(
         siblingTextDiagnostic.finishedWorkIdentity.rootRequest,
         updateError.rootRequest
       );
@@ -2323,6 +2377,24 @@ test("react-test-renderer JS private serialization finished-work identity valida
       );
       assertSiblingTextAdmissionRejection(
         jsonFacade,
+        withSiblingTextReportChange(siblingTextReport, (report) => {
+          delete report.committedFiberInspection;
+        }),
+        siblingTextIdentity,
+        updateError.rootRequest,
+        /committedFiberInspection/u
+      );
+      assertSiblingTextAdmissionRejection(
+        jsonFacade,
+        withSiblingTextReportChange(siblingTextReport, (report) => {
+          report.committedFiberInspection.compatibilityClaimed = true;
+        }),
+        siblingTextIdentity,
+        updateError.rootRequest,
+        /compatibilityClaimed/u
+      );
+      assertSiblingTextAdmissionRejection(
+        jsonFacade,
         siblingTextReport,
         withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
           evidence.rootRequestSequence += 1;
@@ -2338,6 +2410,39 @@ test("react-test-renderer JS private serialization finished-work identity valida
         siblingTextIdentity,
         updateError.rootRequest,
         /sibling-text-report-row-or-shape-mismatch/u
+      );
+      assertSiblingTextAdmissionRejection(
+        jsonFacade,
+        siblingTextReport,
+        withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+          delete evidence.rootFinishedLanesHandoff;
+        }),
+        updateError.rootRequest,
+        /rootFinishedLanesHandoff/u
+      );
+      assertSiblingTextRootFinishedLanesAliasRejections(
+        jsonFacade,
+        siblingTextReport,
+        siblingTextIdentity,
+        updateError.rootRequest
+      );
+      assertSiblingTextAdmissionRejection(
+        jsonFacade,
+        siblingTextReport,
+        withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+          evidence.rootFinishedLanesHandoff.commitFinishedLanesBits = 2;
+        }),
+        updateError.rootRequest,
+        /finished_lanes handoff/u
+      );
+      assertSiblingTextAdmissionRejection(
+        jsonFacade,
+        siblingTextReport,
+        withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+          evidence.rootFinishedLanesHandoff.nativeBridgeAvailable = true;
+        }),
+        updateError.rootRequest,
+        /public, native, or package compatibility/u
       );
       assertSiblingTextAdmissionRejection(
         jsonFacade,
@@ -3224,6 +3329,124 @@ test("react-test-renderer JS private root finished-work/lanes handoff clone and 
       }),
       clonedReport,
       "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+  }
+});
+
+test("react-test-renderer CJS dev/prod private toJSON sibling text admission requires handoff and committed fiber inspection", () => {
+  const cjsEntries = jsEntrypoints.filter((entry) =>
+    entry.entrypoint.includes("/cjs/")
+  );
+  assert.deepEqual(
+    cjsEntries.map((entry) => entry.entrypoint),
+    [
+      "react-test-renderer/cjs/react-test-renderer.development",
+      "react-test-renderer/cjs/react-test-renderer.production"
+    ]
+  );
+
+  for (const entry of cjsEntries) {
+    const moduleExports = loadFresh(entry.specifier);
+    const renderer = moduleExports.create({
+      type: "span",
+      props: {},
+      children: ["hello"]
+    });
+    const updateError = captureThrown(() =>
+      renderer.update({
+        type: "span",
+        props: {},
+        children: ["goodbye"]
+      })
+    );
+    const jsonFacade = Object.getOwnPropertyDescriptor(
+      renderer.toJSON,
+      privateToJSONSerializationFacadeSymbol
+    ).value;
+    const siblingTextReport = createAcceptedSiblingTextHostOutputDiagnostic();
+    const siblingTextIdentity =
+      createAcceptedSiblingTextFinishedWorkIdentityEvidence({
+        rootRequest: updateError.rootRequest
+      });
+
+    assert.equal(
+      jsonFacade.canCreateAcceptedSiblingTextDiagnosticResult(
+        siblingTextReport,
+        siblingTextIdentity,
+        updateError.rootRequest
+      ),
+      true,
+      entry.entrypoint
+    );
+    const diagnostic = jsonFacade.createAcceptedSiblingTextDiagnosticResult(
+      siblingTextReport,
+      siblingTextIdentity,
+      updateError.rootRequest
+    );
+    assert.equal(diagnostic.rootFinishedLanesHandoffAccepted, true);
+    assert.equal(diagnostic.consumesPrivateRootFinishedLanesHandoffGate, true);
+    assert.equal(diagnostic.consumesCommittedFiberInspection, true);
+    assert.deepEqual(
+      diagnostic.committedFiberInspection,
+      createSiblingTextToJSONCommittedFiberInspectionDiagnostic()
+    );
+    assertSiblingTextAdmissionRejection(
+      jsonFacade,
+      siblingTextReport,
+      createAcceptedFinishedWorkIdentityEvidence({
+        rootRequest: updateError.rootRequest,
+        publicSurface: "create().toJSON",
+        sourceSerializationDiagnosticName:
+          "fast-react-test-renderer.serialization.private-json-canary",
+        consumesPrivateToJSONEvidence: true,
+        consumesPrivateToTreeEvidence: false,
+        hostOutputUpdateKind: "Update"
+      }),
+      updateError.rootRequest,
+      /sibling-text-finished-work-identity-diagnostic-mismatch/u
+    );
+    assertSiblingTextAdmissionRejection(
+      jsonFacade,
+      withSiblingTextReportChange(siblingTextReport, (report) => {
+        delete report.committedFiberInspection;
+      }),
+      siblingTextIdentity,
+      updateError.rootRequest,
+      /committedFiberInspection/u
+    );
+    assertSiblingTextAdmissionRejection(
+      jsonFacade,
+      withSiblingTextReportChange(siblingTextReport, (report) => {
+        report.committedFiberInspection.compatibilityClaimed = true;
+      }),
+      siblingTextIdentity,
+      updateError.rootRequest,
+      /compatibilityClaimed/u
+    );
+    assertSiblingTextAdmissionRejection(
+      jsonFacade,
+      siblingTextReport,
+      withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+        delete evidence.rootFinishedLanesHandoff;
+      }),
+      updateError.rootRequest,
+      /rootFinishedLanesHandoff/u
+    );
+    assertSiblingTextAdmissionRejection(
+      jsonFacade,
+      siblingTextReport,
+      withInheritedSiblingTextRootFinishedLanesHandoff(siblingTextIdentity),
+      updateError.rootRequest,
+      /rootFinishedLanesHandoff/u
+    );
+    assertSiblingTextAdmissionRejection(
+      jsonFacade,
+      siblingTextReport,
+      withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+        evidence.rootFinishedLanesHandoff.commitFinishedLanesBits = 2;
+      }),
+      updateError.rootRequest,
+      /finished_lanes handoff/u
     );
   }
 });
@@ -4209,6 +4432,25 @@ function createCommittedFiberInspectionDiagnostic({
   };
 }
 
+function createSiblingTextToJSONCommittedFiberInspectionDiagnostic() {
+  return {
+    diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+    sourceJsonDiagnosticName: "fast-react-test-renderer.serialization.private-json-canary",
+    fiberShape: privateToTreeMultiChildAcceptedFiberShape,
+    rootChildFiberTags: ["HostText", "HostComponent"],
+    hostChildFiberTags: ["HostText", "HostComponent"],
+    rootChildCount: 2,
+    hostChildCount: 2,
+    hostComponentCount: 1,
+    hostTextCount: 2,
+    functionComponentFiberTag: null,
+    functionComponentPresent: false,
+    wrapsCommittedHostOutput: false,
+    publicTreeObjectAvailable: false,
+    compatibilityClaimed: false
+  };
+}
+
 function captureThrown(callback) {
   try {
     callback();
@@ -4727,6 +4969,21 @@ function withSiblingTextIdentityChange(evidence, mutate) {
   return clone;
 }
 
+function withInheritedSiblingTextRootFinishedLanesHandoff(evidence) {
+  const clone = JSON.parse(JSON.stringify(evidence));
+  const rootFinishedLanesHandoff = clone.rootFinishedLanesHandoff;
+  delete clone.rootFinishedLanesHandoff;
+  const inheritedEvidence = Object.assign(
+    Object.create({ rootFinishedLanesHandoff }),
+    clone
+  );
+  assert.equal(
+    Object.hasOwn(inheritedEvidence, "rootFinishedLanesHandoff"),
+    false
+  );
+  return inheritedEvidence;
+}
+
 function withSiblingTextReportChange(report, mutate) {
   const clone = JSON.parse(JSON.stringify(report));
   mutate(clone);
@@ -4922,6 +5179,27 @@ function assertSiblingTextAdmissionRejection(
   assert.equal(error.nativeExecution, false);
   assert.equal(error.compatibilityClaimed, false);
   return error;
+}
+
+function assertSiblingTextRootFinishedLanesAliasRejections(
+  privateFacade,
+  report,
+  evidence,
+  sourceRootRequest
+) {
+  for (const alias of privateRootFinishedLanesHandoffAliasKeys) {
+    assertSiblingTextAdmissionRejection(
+      privateFacade,
+      report,
+      withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+        const handoff = changedEvidence.rootFinishedLanesHandoff;
+        delete changedEvidence.rootFinishedLanesHandoff;
+        changedEvidence[alias] = handoff;
+      }),
+      sourceRootRequest,
+      /rootFinishedLanesHandoff/u
+    );
+  }
 }
 
 function assertToTreeSiblingTextRootFinishedLanesAliasRejections(
@@ -5196,6 +5474,8 @@ function createAcceptedSiblingTextHostOutputDiagnostic({
       nativeExecution: false,
       compatibilityClaimed: false
     },
+    committedFiberInspection:
+      createSiblingTextToJSONCommittedFiberInspectionDiagnostic(),
     nodes: [
       {
         ordinal: 0,
