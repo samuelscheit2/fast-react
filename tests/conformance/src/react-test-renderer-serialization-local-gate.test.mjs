@@ -44,6 +44,18 @@ function hasSiblingTextPrivateAdmission(entry) {
     entry.entrypoint.includes("/cjs/")
   );
 }
+function hasPackageRootOrCjsPrivateAdmission(entry) {
+  return (
+    entry.entrypoint === packageRootEntrypoint ||
+    entry.entrypoint.includes("/cjs/")
+  );
+}
+function hasPackageRootOrDevelopmentRows(entry) {
+  return (
+    entry.entrypoint === packageRootEntrypoint ||
+    entry.entrypoint.endsWith(".development")
+  );
+}
 const expectedToJSONFacadeRustApis = [
   "TestRendererRoot::describe_private_json_serialization_for_canary",
   "TestRendererRoot::describe_private_json_serialization_after_update_for_canary",
@@ -371,7 +383,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     );
     assert.equal(facadeGate.privateFinishedWorkIdentityGateAvailable, true);
     assert.equal(facadeGate.privateUpdateFinishedWorkIdentityGateAvailable, true);
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasPackageRootOrCjsPrivateAdmission(entry)) {
       assert.equal(
         facadeGate.privateUnmountFinishedWorkIdentityGateAvailable,
         true
@@ -432,7 +444,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       assert.equal(facadeGate.rejectsGenericSiblingTextFinishedWorkIdentity, true);
       assert.equal(facadeGate.rejectsBroadMultichildFinishedWorkIdentity, true);
     }
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasPackageRootOrCjsPrivateAdmission(entry)) {
       assert.equal(
         facadeGate.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
         true
@@ -450,7 +462,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         true
       );
     }
-    if (entry.entrypoint.endsWith(".development")) {
+    if (hasPackageRootOrDevelopmentRows(entry)) {
       assert.equal(
         facadeGate.privateUpdateHostComponentPropSerializationEvidenceAvailable,
         true
@@ -491,23 +503,6 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     const expectedRustApis = expectedToJSONFacadeRustApis.slice();
     const expectedRustTests = expectedToJSONFacadeRustTests.slice();
     const expectedHostOutputUpdateKinds = ["Create", "Update"];
-    if (entry.entrypoint === "react-test-renderer") {
-      expectedRustApis.splice(
-        expectedRustApis.indexOf(
-          "TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics"
-        ),
-        0,
-        "TestRendererRoot::describe_private_to_json_unmount_finished_work_identity_gate_for_canary"
-      );
-      expectedRustTests.splice(
-        expectedRustTests.indexOf(
-          "root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence"
-        ),
-        0,
-        "root_private_to_json_unmount_finished_work_identity_gate_accepts_ref_passive_cleanup_handoff",
-        "root_private_to_json_unmount_native_execution_requires_finished_work_identity_gate"
-      );
-    }
     if (
       entry.entrypoint.includes("/cjs/") &&
       !entry.entrypoint.endsWith(".development")
@@ -528,7 +523,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       );
       expectedHostOutputUpdateKinds.push("Unmount");
     }
-    if (entry.entrypoint.endsWith(".development")) {
+    if (hasPackageRootOrDevelopmentRows(entry)) {
       const expectedFinishedWorkIdentityTests = [
         "root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff",
         "root_private_to_json_update_serialization_finished_work_identity_gate_accepts_committed_handoff",
@@ -545,14 +540,22 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         ),
         1
       );
+      const nativeExecutionIdentityApis = [
+        "TestRendererRoot::describe_private_to_json_host_output_update_row_for_canary",
+        "TestRendererRoot::describe_private_to_json_host_output_unmount_row_for_canary",
+        "TestRendererRoot::describe_private_to_json_finished_work_identity_gate_for_canary"
+      ];
+      if (entry.entrypoint === packageRootEntrypoint) {
+        nativeExecutionIdentityApis.push(
+          "TestRendererRoot::describe_private_to_json_unmount_finished_work_identity_gate_for_canary"
+        );
+      }
       expectedRustApis.splice(
         expectedRustApis.indexOf(
           "TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics"
         ),
         0,
-        "TestRendererRoot::describe_private_to_json_host_output_update_row_for_canary",
-        "TestRendererRoot::describe_private_to_json_host_output_unmount_row_for_canary",
-        "TestRendererRoot::describe_private_to_json_finished_work_identity_gate_for_canary"
+        ...nativeExecutionIdentityApis
       );
       expectedRustApis.splice(
         expectedRustApis.indexOf(
@@ -569,13 +572,24 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       for (const identityTest of expectedFinishedWorkIdentityTests) {
         expectedRustTests.splice(expectedRustTests.indexOf(identityTest), 1);
       }
+      const nativeExecutionIdentityTests = [
+        ...expectedFinishedWorkIdentityTests.slice(0, 2),
+        "root_private_to_json_update_native_execution_requires_finished_work_identity_gate"
+      ];
+      if (entry.entrypoint === packageRootEntrypoint) {
+        nativeExecutionIdentityTests.push(
+          "root_private_to_json_unmount_finished_work_identity_gate_accepts_ref_passive_cleanup_handoff",
+          "root_private_to_json_unmount_native_execution_requires_finished_work_identity_gate"
+        );
+      }
+      nativeExecutionIdentityTests.push(
+        ...expectedFinishedWorkIdentityTests.slice(2)
+      );
       expectedRustTests.push(
         "root_private_to_json_unmount_host_output_row_records_empty_snapshot_blockers",
         "root_private_to_json_unmount_host_output_row_rejects_stale_snapshot",
         "root_private_to_json_update_host_output_row_rejects_mismatched_row_kind",
-        ...expectedFinishedWorkIdentityTests.slice(0, 2),
-        "root_private_to_json_update_native_execution_requires_finished_work_identity_gate",
-        ...expectedFinishedWorkIdentityTests.slice(2)
+        ...nativeExecutionIdentityTests
       );
       expectedHostOutputUpdateKinds.push("Unmount");
       assert.equal(
@@ -741,7 +755,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     assert.equal(privateFacade.privateDiagnosticResultAvailable, true);
     assert.equal(privateFacade.privateFinishedWorkIdentityGateAvailable, true);
     assert.equal(privateFacade.privateUpdateFinishedWorkIdentityGateAvailable, true);
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasPackageRootOrCjsPrivateAdmission(entry)) {
       assert.equal(
         privateFacade.privateUnmountFinishedWorkIdentityGateAvailable,
         true
@@ -811,7 +825,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         privateToJSONSiblingTextHostOutputRowId
       );
     }
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasPackageRootOrCjsPrivateAdmission(entry)) {
       assert.equal(
         privateFacade.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
         true
@@ -829,7 +843,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         true
       );
     }
-    if (entry.entrypoint.endsWith(".development")) {
+    if (hasPackageRootOrDevelopmentRows(entry)) {
       assert.equal(
         privateFacade.privateUpdateHostComponentPropSerializationEvidenceAvailable,
         true
@@ -1071,7 +1085,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       );
     assert.equal(emptyPrivateDiagnosticResult.sourceNodeCount, 0);
     assert.equal(emptyPrivateDiagnosticResult.result, null);
-    if (entry.entrypoint.endsWith(".development")) {
+    if (hasPackageRootOrDevelopmentRows(entry)) {
       const unmountPrivateJson =
         privateFacade.serializeAcceptedHostOutputDiagnostic(
           createAcceptedEmptyRootHostOutputDiagnostic({
@@ -3897,12 +3911,143 @@ test("react-test-renderer package-root private unmount finished-work identity re
   );
 });
 
+test("react-test-renderer package-root private native create/update serialization consumes accepted records", () => {
+  const entry = jsEntrypoints.find(
+    (candidate) => candidate.entrypoint === packageRootEntrypoint
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.specifier);
+  const renderer = moduleExports.create({
+    type: "span",
+    props: {},
+    children: ["hello"]
+  });
+  const jsonError = captureThrown(() => renderer.toJSON());
+  const jsonFacade = Object.getOwnPropertyDescriptor(
+    renderer.toJSON,
+    privateToJSONSerializationFacadeSymbol
+  ).value;
+  const treeError = captureThrown(() => renderer.toTree());
+  const treeFacade = Object.getOwnPropertyDescriptor(
+    renderer.toTree,
+    privateToTreeFacadeSymbol
+  ).value;
+  const createRequest = jsonError.rootRequest;
+  assert.equal(treeError.rootRequest.rootHandle, createRequest.rootHandle);
+
+  const createJSONResult =
+    jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+      createAcceptedNativeExecutionRecord(createRequest),
+      createAcceptedMinimalHostOutputDiagnostic({
+        hostOutputUpdateKind: "Create"
+      }),
+      createAcceptedFinishedWorkIdentityEvidence({
+        rootRequest: createRequest,
+        publicSurface: "create().toJSON",
+        sourceSerializationDiagnosticName:
+          "fast-react-test-renderer.serialization.private-json-canary",
+        consumesPrivateToJSONEvidence: true,
+        consumesPrivateToTreeEvidence: false,
+        hostOutputUpdateKind: "Create"
+      })
+    );
+  assert.equal(createJSONResult.operation, "create");
+  assert.equal(createJSONResult.hostOutputUpdateKind, "Create");
+  assert.equal(createJSONResult.hostOutputShape, "SingleHostText");
+  assert.equal(createJSONResult.hostOutputRowId, null);
+  assert.equal(createJSONResult.consumesAcceptedNativeCreateExecutionRecord, true);
+  assert.equal(createJSONResult.consumesAcceptedFinishedWorkIdentityGate, true);
+  assert.equal(createJSONResult.nativeExecution, false);
+
+  const createTreeResult =
+    treeFacade.createAcceptedNativeExecutionDiagnosticResult(
+      createAcceptedNativeExecutionRecord(createRequest),
+      createAcceptedMinimalTreeMetadataDiagnostic({
+        hostOutputUpdateKind: "Create",
+        compositeNativeExecution: true
+      }),
+      createAcceptedFinishedWorkIdentityEvidence({
+        rootRequest: createRequest,
+        publicSurface: "create().toTree",
+        sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+        consumesPrivateToJSONEvidence: false,
+        consumesPrivateToTreeEvidence: true,
+        hostOutputUpdateKind: "Create"
+      })
+    );
+  assert.equal(createTreeResult.operation, "create");
+  assert.equal(createTreeResult.hostOutputUpdateKind, "Create");
+  assert.equal(createTreeResult.functionComponentAboveHostOutputShape, true);
+  assert.equal(createTreeResult.publicTreeAvailable, false);
+  assert.equal(createTreeResult.nativeExecution, false);
+
+  const updateError = captureThrown(() =>
+    renderer.update({
+      type: "span",
+      props: { "data-state": "new", children: "goodbye" }
+    })
+  );
+  const updateRequest = updateError.rootRequest;
+  const updateRecord = createAcceptedNativeExecutionRecord(updateRequest);
+
+  const updateJSONResult =
+    jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+      updateRecord,
+      createAcceptedMinimalHostOutputDiagnostic({
+        hostOutputUpdateKind: "Update",
+        propsAttributes: { "data-state": "new" },
+        text: "goodbye"
+      }),
+      createAcceptedFinishedWorkIdentityEvidence({
+        rootRequest: updateRequest,
+        publicSurface: "create().toJSON",
+        sourceSerializationDiagnosticName:
+          "fast-react-test-renderer.serialization.private-json-canary",
+        consumesPrivateToJSONEvidence: true,
+        consumesPrivateToTreeEvidence: false,
+        hostOutputUpdateKind: "Update"
+      })
+    );
+  assert.equal(updateJSONResult.operation, "update");
+  assert.equal(updateJSONResult.hostOutputUpdateKind, "Update");
+  assert.equal(updateJSONResult.hostOutputRowId, privateToJSONUpdateHostOutputRowId);
+  assert.equal(updateJSONResult.consumesAcceptedNativeUpdateExecutionRecord, true);
+  assert.equal(updateJSONResult.acceptedHostOutputRowShape, true);
+  assert.equal(updateJSONResult.nativeExecution, false);
+
+  const updateTreeResult =
+    treeFacade.createAcceptedNativeExecutionDiagnosticResult(
+      updateRecord,
+      createAcceptedMinimalTreeMetadataDiagnostic({
+        hostOutputUpdateKind: "Update",
+        text: "goodbye",
+        compositeNativeExecution: true
+      }),
+      createAcceptedFinishedWorkIdentityEvidence({
+        rootRequest: updateRequest,
+        publicSurface: "create().toTree",
+        sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+        consumesPrivateToJSONEvidence: false,
+        consumesPrivateToTreeEvidence: true,
+        hostOutputUpdateKind: "Update"
+      })
+    );
+  assert.equal(updateTreeResult.operation, "update");
+  assert.equal(updateTreeResult.hostOutputUpdateKind, "Update");
+  assert.equal(updateTreeResult.hostOutputRowId, privateToJSONUpdateHostOutputRowId);
+  assert.equal(updateTreeResult.consumesAcceptedNativeUpdateExecutionRecord, true);
+  assert.equal(updateTreeResult.functionComponentAboveHostOutputShape, true);
+  assert.equal(updateTreeResult.nativeExecution, false);
+});
+
 test("react-test-renderer JS private native unmount serialization accepts strict finished-work identity evidence", () => {
-  const cjsEntrypoints = jsEntrypoints.filter((entry) =>
+  const nativeUnmountEntrypoints = jsEntrypoints.filter((entry) =>
+    entry.entrypoint === packageRootEntrypoint ||
     entry.entrypoint.startsWith("react-test-renderer/cjs/")
   );
 
-  for (const entry of cjsEntrypoints) {
+  for (const entry of nativeUnmountEntrypoints) {
     const moduleExports = loadFresh(entry.specifier);
     const renderer = moduleExports.create({
       type: "span",
@@ -6102,8 +6247,12 @@ function createAcceptedPrivateJsonPublicBlockers() {
 function createAcceptedMinimalTreeMetadataDiagnostic({
   hostOutputSnapshotCurrent = true,
   hostOutputUpdateKind = "Create",
+  compositeNativeExecution = false,
   text = "hello"
 } = {}) {
+  const committedFiberShape = compositeNativeExecution
+    ? privateToTreeCompositeAcceptedFiberShape
+    : ["HostRoot", "HostComponent", "HostText"];
   const diagnostic = {
     diagnosticName: privateToTreeAcceptedDiagnosticName,
     sourceJsonDiagnosticName:
@@ -6168,14 +6317,16 @@ function createAcceptedMinimalTreeMetadataDiagnostic({
       publicTreeObjectAvailable: false
     },
     committedFiberInspection: createCommittedFiberInspectionDiagnostic({
-      fiberShape: ["HostRoot", "HostComponent", "HostText"],
-      rootChildFiberTags: ["HostComponent"],
+      fiberShape: committedFiberShape,
+      rootChildFiberTags: compositeNativeExecution
+        ? ["FunctionComponent"]
+        : ["HostComponent"],
       hostChildFiberTags: ["HostComponent"],
       rootChildCount: 1,
       hostChildCount: 1,
       hostTextCount: 1,
-      functionComponentPresent: false,
-      wrapsCommittedHostOutput: false
+      functionComponentPresent: compositeNativeExecution,
+      wrapsCommittedHostOutput: compositeNativeExecution
     }),
     publicBlockers: {
       jsonMethodBlocked: true,
