@@ -1,6 +1,6 @@
 # Fast React Master Progress
 
-Last updated: 2026-05-10
+Last updated: 2026-05-11
 
 This file owns accepted history only. Current queues, next actions, and future
 sequencing belong in `MASTER_PLAN.md`.
@@ -28,6 +28,47 @@ sequencing belong in `MASTER_PLAN.md`.
   package probes.
 
 ## Accepted Implementation History
+
+### Workers 803-809, 811-818
+
+- Workers 803, 804, and 817 advanced Rust reconciler private evidence. Worker
+  803 added managed-child sibling-order canaries, Worker 804 added the static
+  private-admission ledger for Worker 785 managed-child evidence, and Worker
+  817 added finished-lanes handoff negative coverage. Public root and broad
+  renderer compatibility remain blocked.
+- Workers 805, 813, and 814 hardened Scheduler and React act private evidence.
+  Worker 805 added a static Scheduler diagnostics admission ledger, Worker 813
+  added Scheduler mock descriptor negative coverage, and Worker 814 added React
+  act expired/delayed Scheduler negative coverage. Public Scheduler timing,
+  public `act`, renderer/effect execution, and package compatibility remain
+  blocked. Worker 810 remained under re-audit after this accepted batch.
+- Workers 806 and 811 advanced hydrateRoot private coverage. Worker 806 added a
+  fail-closed static hydrateRoot admission ledger with field-scoped public
+  blocker evidence, and Worker 811 hardened replay-target/recoverable-error
+  nested metadata negatives. Public hydration, root creation, marker/listener
+  installation, DOM mutation, event replay dispatch/drain, recoverable callback
+  invocation, and package compatibility remain blocked.
+- Workers 807 and 815 hardened native boundaries. Worker 807 added the static
+  native no-load admission ledger, and Worker 815 added stale-evidence cleanup
+  matrix coverage. Native addon loading/execution, renderer/reconciler
+  execution, public native compatibility, and package compatibility remain
+  blocked.
+- Workers 808 and 812 advanced resource/form private gates. Worker 808 added
+  the static resource/form admission ledger, and Worker 812 added fake-metadata
+  negative coverage. Public resources/forms, reset/action invocation, DOM/head
+  mutation, and package compatibility remain blocked.
+- Workers 809, 816, and 818 hardened test-renderer and bridge evidence. Worker
+  809 added sibling-text negative coverage, Worker 816 added the unmount/nested
+  source-report bridge gate with committed-fiber ownership checks, and Worker
+  818 added the static private-admission bridge ledger for Workers 733/736 with
+  required evidence and row-contract validation. Public serialization,
+  JS/CJS/native bridge execution, package compatibility, and broad multichild
+  identity remain blocked.
+- The batch was accepted after paired read-only audits where needed, focused
+  ledger/hydration/root-facade/resource/form/native/test-renderer/Rust checks,
+  package-surface guards, import-smoke, formatting where applicable, and
+  `git diff --check` verification. Accepted branches and worktrees were cleaned
+  up after merge.
 
 ### Workers 785-802
 

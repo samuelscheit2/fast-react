@@ -45,30 +45,25 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Workers 785-802 have been accepted, verified,
-merged, and cleaned up. Workers 803-818 are active in isolated worktrees.
-Accepted private evidence still keeps public root, act, Scheduler timing,
-hydration, serialization, native execution, package compatibility, and broad
-renderer compatibility blocked.
+Top-level cap: 30 workers. Workers 803-809 and 811-818 have been accepted,
+verified, merged, and cleaned up. Worker 810 remains active after re-audit
+follow-up. Workers 819, 820, 821, 823, 824, and 825 are active in isolated
+worktrees. Worker 822 is held until Worker 810 is accepted. Accepted private
+evidence still keeps public root, act, Scheduler timing, hydration,
+serialization, native execution, package compatibility, and broad renderer
+compatibility blocked.
 
 Active workers:
 
-- Worker 803: Rust managed-child sibling-order private canary.
-- Worker 804: static admission ledger for Worker 785 managed child evidence.
-- Worker 805: static Scheduler diagnostics admission ledger.
-- Worker 806: static hydrateRoot admission ledger.
-- Worker 807: static native no-load admission ledger.
-- Worker 808: static resource/form admission ledger.
-- Worker 809: test-renderer sibling-text negative matrix.
-- Worker 810: static React act/Scheduler diagnostics ledger.
-- Worker 811: React DOM hydration replay/target negative matrix.
-- Worker 812: resource/form fake-metadata negative matrix.
-- Worker 813: Scheduler mock diagnostics descriptor negative matrix.
-- Worker 814: React act expired/delayed Scheduler negative matrix.
-- Worker 815: native worker-thread cleanup stale-evidence matrix.
-- Worker 816: test-renderer unmount/nested source-report bridge gate.
-- Worker 817: root work-loop finished-lanes handoff negative matrix.
-- Worker 818: static private-admission ledger for Workers 733/736.
+- Worker 810: static React act/Scheduler diagnostics ledger, in final
+  re-audit after evidence-role and schema-closure fixes.
+- Worker 819: Rust managed-child delete/sibling execution follow-up.
+- Worker 820: static private-admission ledger for accepted Workers 803/817.
+- Worker 821: static native cleanup stale-evidence admission ledger.
+- Worker 823: resource/form reset-action private preflight.
+- Worker 824: hydrateRoot private execution-preflight boundary.
+- Worker 825: static test-renderer private-admission ledger for accepted
+  Workers 816/818.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -76,23 +71,23 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Audit and merge Workers 803-818 as they complete. Expect overlap in
-   Scheduler/React act static evidence, React DOM hydration/resource/form
-   ledgers and negative matrices, test-renderer sibling-text/unmount/nested
-   tests, native no-load cleanup coverage, and Rust managed-child/root
-   handoffs.
-2. Launch the next parallel batch from accepted private evidence when a task has
-   a narrow proof boundary: delayed Scheduler/React act diagnostics, hydrateRoot
-   marker/listener/target/recoverable-error rows, resource/form fake metadata,
-   sibling-text serialization/native evidence, and managed child host traversal.
-3. Prefer parallelizable independent proofs even when they may conflict in test
+1. Finish Worker 810 re-audit, then merge or send back precise blockers.
+2. Audit and merge Workers 819, 820, 821, 823, 824, and 825 as they complete.
+   Expect overlap in conformance ledgers, React DOM hydration/resource/form
+   tests, and Rust host-work/test-renderer private evidence.
+3. Launch Worker 822 after Worker 810 is accepted so React DOM test-utils act
+   negatives can consume the final Scheduler/React act ledger shape.
+4. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
-4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+5. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
 
+- Worker 822: React DOM test-utils act negative matrix after Worker 810 is
+  accepted; keep public `act`, root execution, Scheduler timing, effects,
+  renderer execution, and compatibility blocked until proven together.
 - Scheduler work can move beyond the accepted delayed renderer-root producer and
   React delayed mock preflight only after public Scheduler timing, public
   `act`/root semantics, renderer/effect execution, public flush helper
@@ -101,9 +96,10 @@ canonical evidence requirements.
   mirror only after executable native addon loading, cleanup hooks, scheduling,
   renderer/reconciler output, and no-stale-value behavior are proven together.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
-  target-claiming, and recoverable-error preflights. Future hydration work must
-  prove real root creation, marker/listener behavior, recoverable error routing,
-  event replay, and DOM mutation semantics against React 19.2.6.
+  target-claiming, recoverable-error, and replay-target preflights. Future
+  hydration work must prove real root creation, marker/listener behavior,
+  recoverable error routing, event replay, and DOM mutation semantics against
+  React 19.2.6.
 - Future sibling-text native execution or JS/CJS serialization work should
   consume the dedicated private sibling-text identity gates explicitly. Public
   sibling-text serialization, package compatibility, native bridge
@@ -112,8 +108,8 @@ canonical evidence requirements.
   and rejected-error preflights. Public resources, forms, reset/action
   invocation, DOM/head mutation, and package compatibility remain blocked.
 - Worker 736's nested `toJSON` source-report identity and Worker 733's unmount
-  identity gates remain available private evidence for later native or
-  serialization gates. JS/CJS, public serialization, native bridge
+  identity gates are now connected by an accepted static bridge ledger and are
+  active input for Worker 825. JS/CJS, public serialization, native bridge
   loading/execution, and package compatibility remain blocked.
 - Additional private root/test-renderer bridge gates that require accepted
   `finished_work` / `finished_lanes` handoff before any wider serialization or
