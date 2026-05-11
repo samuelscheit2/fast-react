@@ -2692,7 +2692,27 @@ function isAcceptedReactSchedulerDrivenPassiveLifecycleBoundary(
     Array.isArray(rootPayload.renderRecords) &&
     rootPayload.requestRecords.includes(createRecord) &&
     rootPayload.requestRecords.includes(sourceRecord) &&
-    rootPayload.renderRecords.includes(sourceRecord)
+    rootPayload.renderRecords.includes(sourceRecord) &&
+    isCurrentReactSchedulerDrivenPassiveLifecycleBoundarySourceRecord(
+      rootPayload,
+      sourceRecord
+    )
+  );
+}
+
+function isCurrentReactSchedulerDrivenPassiveLifecycleBoundarySourceRecord(
+  rootPayload,
+  sourceRecord
+) {
+  return (
+    Array.isArray(rootPayload.requestRecords) &&
+    Array.isArray(rootPayload.renderRecords) &&
+    rootPayload.requestRecords.length > 0 &&
+    rootPayload.renderRecords.length > 0 &&
+    rootPayload.requestRecords[rootPayload.requestRecords.length - 1] ===
+      sourceRecord &&
+    rootPayload.renderRecords[rootPayload.renderRecords.length - 1] ===
+      sourceRecord
   );
 }
 

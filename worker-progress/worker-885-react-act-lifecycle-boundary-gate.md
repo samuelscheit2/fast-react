@@ -7,7 +7,8 @@
   `packages/react-dom/src/client/root-bridge.js`.
 - React private act now rejects scheduler-driven passive diagnostics unless
   they include root-bridge WeakMap-owned lifecycle evidence for the same root,
-  with request identity tied to the snapshot source record.
+  with request identity tied to the snapshot source record and that source
+  record still current for the root.
 - React DOM `test-utils` now verifies the React consumption report carries the
   same root-bridge-owned lifecycle snapshot before accepting the private
   passive diagnostic route.
@@ -59,6 +60,9 @@
 - Negative coverage rejects missing lifecycle boundaries, cloned/caller-built
   lifecycle snapshots, arbitrary lifecycle request id/sequence overrides, and
   cross-root lifecycle snapshots.
+- Same-root stale lifecycle snapshots now reject after a later root.render
+  update because the boundary source record must be the latest root-bridge
+  request record and latest render/update record.
 - Existing negative coverage continues to reject cloned top-level passive
   diagnostics, caller-built nested scheduler/passive records, missing Scheduler
   source proof, stale passive handoffs, cross-root scheduler/root rows, prose

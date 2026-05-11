@@ -18,6 +18,7 @@ const worker810LedgerModuleUrl = pathToFileURL(
   )
 ).href;
 const {
+  createReactDomLifecycleBoundaryOptions,
   createSourceOwnedReactDomLifecycleBoundary
 } = require(path.resolve(
   packageRoot,
@@ -1010,6 +1011,18 @@ test('private act gate consumes scheduler-driven passive diagnostics through Rea
       ),
       'scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership',
       `${nodeEnv}:replayed-lifecycle-request-sequence`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        expiredReport,
+        {
+          ...createReactDomLifecycleBoundaryOptions(
+            lifecycle.initialDiagnostic.sourceContainerSnapshot
+          )
+        }
+      ),
+      'scheduler-driven-passive-diagnostics-lifecycle-boundary',
+      `${nodeEnv}:stale-same-root-render-lifecycle-boundary`
     );
     const crossRootLifecycle =
       createSourceOwnedReactDomLifecycleBoundary(

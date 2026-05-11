@@ -49,6 +49,7 @@ const {
   )
 );
 const {
+  createReactDomLifecycleBoundaryOptions,
   createSourceOwnedReactDomLifecycleBoundary
 } = require(
   path.join(
@@ -2263,6 +2264,15 @@ test("React act gate consumes source-owned scheduler-driven passive effect diagn
       }),
       "scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership",
       `${nodeEnv}:replayed-lifecycle-request-sequence`
+    );
+    assertRejected(
+      gate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(report, {
+        ...createReactDomLifecycleBoundaryOptions(
+          lifecycle.initialDiagnostic.sourceContainerSnapshot
+        )
+      }),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary",
+      `${nodeEnv}:stale-same-root-render-lifecycle-boundary`
     );
     const crossRootLifecycle =
       createSourceOwnedReactDomLifecycleBoundary(

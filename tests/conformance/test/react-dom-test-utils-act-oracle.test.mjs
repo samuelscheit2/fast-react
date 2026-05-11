@@ -23,6 +23,7 @@ import {
 const oracle = readCheckedReactDomTestUtilsActOracle();
 const require = createRequire(import.meta.url);
 const {
+  createReactDomLifecycleBoundaryOptions,
   createSourceOwnedReactDomLifecycleBoundary
 } = require(
   fileURLToPath(
@@ -2470,6 +2471,19 @@ test("Fast React test-utils private act route consumes source-owned scheduler-dr
       ),
       "scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership",
       `${nodeEnv}:replayed-lifecycle-request-sequence`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          ...createReactDomLifecycleBoundaryOptions(
+            lifecycle.initialDiagnostic.sourceContainerSnapshot
+          )
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary",
+      `${nodeEnv}:stale-same-root-render-lifecycle-boundary`
     );
     const crossRootLifecycle =
       createSourceOwnedReactDomLifecycleBoundary(
