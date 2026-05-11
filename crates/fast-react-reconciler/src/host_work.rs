@@ -938,6 +938,8 @@ pub(crate) struct HostWorkResult {
     completed_child: Option<FiberId>,
     completed_children: Vec<FiberId>,
     detached_hosts: DetachedHostRecords,
+    sync_flush_host_work_epoch: usize,
+    consumed_sync_flush_host_mutations: Vec<SyncFlushHostMutationExecutionIdentityForCanary>,
 }
 
 impl HostWorkResult {
@@ -997,12 +999,47 @@ impl HostWorkResult {
         self.detached_hosts
     }
 
+    fn sync_flush_host_mutation_execution_identity(
+        &self,
+        request: SyncFlushHostMutationExecutionRequestForCanary,
+    ) -> SyncFlushHostMutationExecutionIdentityForCanary {
+        SyncFlushHostMutationExecutionIdentityForCanary {
+            root: request.root(),
+            order: request.order(),
+            render_lanes: request.render_lanes(),
+            finished_lanes: request.finished_lanes(),
+            finished_work: request.finished_work(),
+            committed_current: request.committed_current(),
+            mutation_record_count: request.mutation_record_count(),
+            mutation_apply_record_count: request.mutation_apply_record_count(),
+            host_root_placement_apply_count: request.host_root_placement_apply_count(),
+            host_work_epoch: self.sync_flush_host_work_epoch,
+        }
+    }
+
+    fn has_consumed_sync_flush_host_mutation_execution(
+        &self,
+        identity: SyncFlushHostMutationExecutionIdentityForCanary,
+    ) -> bool {
+        self.consumed_sync_flush_host_mutations
+            .iter()
+            .any(|consumed| *consumed == identity)
+    }
+
+    fn mark_sync_flush_host_mutation_execution_consumed(
+        &mut self,
+        identity: SyncFlushHostMutationExecutionIdentityForCanary,
+    ) {
+        self.consumed_sync_flush_host_mutations.push(identity);
+    }
+
     fn retarget_finished_work_for_canary(
         &mut self,
         render: HostRootRenderPhaseRecord,
         completed_children: Vec<FiberId>,
     ) {
         let completed_child = completed_children.first().copied();
+        self.sync_flush_host_work_epoch += 1;
         self.root = render.root();
         self.work_in_progress = render.work_in_progress();
         self.root_child = completed_child;
@@ -1010,6 +1047,20 @@ impl HostWorkResult {
         self.completed_child = completed_child;
         self.completed_children = completed_children;
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SyncFlushHostMutationExecutionIdentityForCanary {
+    root: FiberRootId,
+    order: usize,
+    render_lanes: Lanes,
+    finished_lanes: Lanes,
+    finished_work: FiberId,
+    committed_current: FiberId,
+    mutation_record_count: usize,
+    mutation_apply_record_count: usize,
+    host_root_placement_apply_count: usize,
+    host_work_epoch: usize,
 }
 
 const TEST_HOST_SAFE_PROPERTY_PROP_NAME: &str = "testHostProperty";
@@ -1659,6 +1710,11 @@ pub(crate) enum SyncFlushHostMutationExecutionErrorForCanary {
         expected_finished_work: FiberId,
         actual_finished_work: FiberId,
     },
+    ReplayedHostMutationExecution {
+        root: FiberRootId,
+        order: usize,
+        finished_work: FiberId,
+    },
     MissingHostMutationMetadata {
         root: FiberRootId,
         finished_work: FiberId,
@@ -1710,6 +1766,17 @@ impl Display for SyncFlushHostMutationExecutionErrorForCanary {
                 expected_finished_work.slot().get(),
                 actual_finished_work.slot().get()
             ),
+            Self::ReplayedHostMutationExecution {
+                root,
+                order,
+                finished_work,
+            } => write!(
+                formatter,
+                "sync-flush host mutation execution rejected replay for root {} order {} finished work fiber slot {}",
+                root.raw(),
+                order,
+                finished_work.slot().get()
+            ),
             Self::MissingHostMutationMetadata {
                 root,
                 finished_work,
@@ -1732,6 +1799,7 @@ impl Error for SyncFlushHostMutationExecutionErrorForCanary {
             | Self::MismatchedRootOwnership { .. }
             | Self::MismatchedSyncFlushLanes { .. }
             | Self::MismatchedFinishedWork { .. }
+            | Self::ReplayedHostMutationExecution { .. }
             | Self::MissingHostMutationMetadata { .. } => None,
         }
     }
@@ -3131,6 +3199,19 @@ pub(crate) fn execute_sync_flush_host_mutations_for_canary(
             },
         );
     }
+
+    let execution_identity = host_work.sync_flush_host_mutation_execution_identity(request);
+    if host_work.has_consumed_sync_flush_host_mutation_execution(execution_identity) {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::ReplayedHostMutationExecution {
+                root: request.root(),
+                order: request.order(),
+                finished_work: request.finished_work(),
+            },
+        );
+    }
+
+    host_work.mark_sync_flush_host_mutation_execution_consumed(execution_identity);
 
     let apply =
         apply_test_host_root_commit_mutations_for_canary(store, host, record.commit(), host_work)?;
@@ -5008,6 +5089,8 @@ pub(crate) fn mount_test_host_work(
         completed_child: root_child,
         completed_children: root_child.into_iter().collect(),
         detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
     })
 }
 
@@ -5174,6 +5257,8 @@ pub(crate) fn mount_test_host_sibling_work_with_detached_hosts_for_canary(
         completed_child: root_child,
         completed_children: root_children,
         detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
     })
 }
 
@@ -5227,6 +5312,8 @@ pub(crate) fn mount_test_function_component_single_host_child_work(
         completed_child: Some(host_child),
         completed_children: vec![host_child],
         detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
     })
 }
 
