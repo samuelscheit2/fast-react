@@ -2887,15 +2887,604 @@ test("react-test-renderer private root request bridge can call a private Rust ex
     assertRootExecutionResult(createResult, createRequest);
     assertRootExecutionResult(updateResult, updateError.rootRequest);
     assertRootExecutionResult(unmountResult, unmountError.rootRequest);
-    if (entry.entrypoint.includes("/cjs/")) {
-      assertPrivateUpdateNativeBridgeAdmission(
-        updateResult.privateUpdateNativeBridgeAdmission,
-        updateError.rootRequest
+    assertPrivateUpdateNativeBridgeAdmission(
+      updateResult.privateUpdateNativeBridgeAdmission,
+      updateError.rootRequest
+    );
+    assert.equal(updateResult.hostOutputProduced, true);
+
+    const minimalCreateHandoff = {
+      id: privateCreateNativeBridgeHostOutputHandoffDiagnosticId,
+      status: privateCreateNativeBridgeHostOutputHandoffStatus,
+      operation: "create",
+      publicSurface: "create()",
+      hostOutputSnapshotCurrent: true
+    };
+    assert.equal(
+      bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+        createRequest,
+        minimalCreateHandoff
+      ),
+      false,
+      `${entry.entrypoint} rejects minimal caller-shaped create handoff`
+    );
+    const fakeCreateExecutionResult = {
+      rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(createRequest),
+      privateCreateNativeBridgeHostOutputHandoff: minimalCreateHandoff,
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rustExecution: true
+    };
+    assert.equal(
+      bridge.canConsumeRootExecutionResult(
+        createRequest,
+        fakeCreateExecutionResult
+      ),
+      false,
+      `${entry.entrypoint} rejects fake create root execution host output`
+    );
+    const fakeCreateExecutionError = captureThrown(() =>
+      bridge.consumeRootExecutionResult(
+        createRequest,
+        fakeCreateExecutionResult
+      )
+    );
+    assert.equal(
+      fakeCreateExecutionError.name,
+      "FastReactTestRendererPrivateRootRequestError"
+    );
+    assert.match(
+      fakeCreateExecutionError.message,
+      /request id is missing|host-output diagnostics|finished work|accepted root finished work|create-route admission/u,
+      entry.entrypoint
+    );
+
+    const minimalUpdateHandoff = {
+      rustLifecycleDiagnostic:
+        createRustLifecycleDiagnosticSource(updateError.rootRequest),
+      updateRouteRootWorkLoopDiagnostic: {
+        diagnosticName: privateUpdateRouteRootWorkLoopDiagnosticName,
+        status: privateUpdateRouteRootWorkLoopStatus,
+        rootOperation: "update",
+        updateKind: "Update",
+        updateOutcome: "Scheduled",
+        hostOutputUpdateKind: "Update"
+      },
+      hostOutputProduced: true,
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rustExecution: true
+    };
+    assert.equal(
+      bridge.canConsumePrivateUpdateNativeBridgeAdmission(
+        updateError.rootRequest,
+        minimalUpdateHandoff
+      ),
+      false,
+      `${entry.entrypoint} rejects minimal caller-shaped update handoff`
+    );
+    assert.equal(
+      bridge.canConsumeRootExecutionResult(
+        updateError.rootRequest,
+        minimalUpdateHandoff
+      ),
+      false,
+      `${entry.entrypoint} rejects fake update root execution host output`
+    );
+    const fakeUpdateExecutionError = captureThrown(() =>
+      bridge.consumeRootExecutionResult(
+        updateError.rootRequest,
+        minimalUpdateHandoff
+      )
+    );
+    assert.equal(
+      fakeUpdateExecutionError.name,
+      "FastReactTestRendererPrivateRootRequestError"
+    );
+    assert.match(
+      fakeUpdateExecutionError.message,
+      /request id is missing|missing update queue evidence|update queue evidence is missing|host output evidence is missing|cannot open public, native, or package compatibility/u,
+      entry.entrypoint
+    );
+
+    if (entry.entrypoint === packageRootEntrypoint) {
+      const packageRootClaimFields = [
+        "publicRouteAvailable",
+        "publicRootAvailable",
+        "publicRootUpdateAvailable",
+        "publicRendererRootCreated",
+        "publicCreateUpdateUnmountBehaviorAvailable",
+        "publicCreateBehaviorAvailable",
+        "publicUpdateCompatibilityClaimed",
+        "publicSerializationAvailable",
+        "public_serialization_available",
+        "publicToJSONAvailable",
+        "public_to_json_available",
+        "publicToTreeAvailable",
+        "public_to_tree_available",
+        "publicTreeAvailable",
+        "public_tree_available",
+        "packageSerializationAvailable",
+        "packageCompatibilityClaimed",
+        "jsPackageCompatibilityAvailable",
+        "nativeBridgeLoadingAvailable",
+        "native_bridge_loading_available",
+        "nativeExecutionAvailable",
+        "native_execution_available"
+      ];
+      const packageRootExecutionWrapperClaimFields = [
+        ...packageRootClaimFields,
+        "publicTestInstanceAvailable",
+        "nativeAddonLoaded",
+        "nativeBridgeAvailable",
+        "nativeExecution",
+        "hostOutputProducedFromJs",
+        "compatibilityClaimed"
+      ];
+      const acceptedCreateAdmission =
+        createPackageRootCreateRouteAdmissionSource(createRequest);
+      const acceptedCreateHandoff =
+        createRustCreateNativeBridgeHostOutputHandoffSource(
+          createRequest,
+          acceptedCreateAdmission
+        );
+      assert.equal(
+        bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+          createRequest,
+          acceptedCreateHandoff
+        ),
+        true,
+        "package-root accepted create handoff baseline"
       );
-      assert.equal(updateResult.hostOutputProduced, true);
-    } else {
-      assert.equal(updateResult.privateUpdateNativeBridgeAdmission, undefined);
-      assert.equal(updateResult.hostOutputProduced, false);
+      assert.equal(
+        bridge.canConsumeRootExecutionResult(createRequest, {
+          rustLifecycleDiagnostic:
+            createRustLifecycleDiagnosticSource(createRequest),
+          privateCreateNativeBridgeHostOutputHandoff:
+            acceptedCreateHandoff,
+          nativeAddonLoaded: false,
+          nativeExecution: false,
+          rustExecution: true
+        }),
+        true,
+        "package-root accepted create root execution baseline"
+      );
+      const noAdmissionCreateHandoff =
+        createRustCreateNativeBridgeHostOutputHandoffSource(
+          createRequest,
+          null
+        );
+      assert.equal(
+        bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+          createRequest,
+          noAdmissionCreateHandoff
+        ),
+        false,
+        "package-root no-admission create handoff rejected"
+      );
+      assert.equal(
+        bridge.canConsumeRootExecutionResult(createRequest, {
+          rustLifecycleDiagnostic:
+            createRustLifecycleDiagnosticSource(createRequest),
+          privateCreateNativeBridgeHostOutputHandoff:
+            noAdmissionCreateHandoff,
+          nativeAddonLoaded: false,
+          nativeExecution: false,
+          rustExecution: true
+        }),
+        false,
+        "package-root no-admission create root execution blocked"
+      );
+      assert.equal(
+        bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+          createRequest,
+          {
+            ...acceptedCreateHandoff,
+            createRouteAdmission: {
+              createRouteAdmissionAccepted: true,
+              workLoopFinishedWorkPreflight:
+                acceptedCreateHandoff.workLoopFinishedWorkPreflight
+            }
+          }
+        ),
+        false,
+        "package-root caller-shaped create admission rejected"
+      );
+
+      for (const field of packageRootExecutionWrapperClaimFields) {
+        assert.equal(
+          bridge.canConsumeRootExecutionResult(createRequest, {
+            rustLifecycleDiagnostic:
+              createRustLifecycleDiagnosticSource(createRequest),
+            privateCreateNativeBridgeHostOutputHandoff:
+              acceptedCreateHandoff,
+            nativeAddonLoaded: false,
+            nativeExecution: false,
+            rustExecution: true,
+            [field]: true
+          }),
+          false,
+          `${field} create root execution wrapper blocked`
+        );
+      }
+
+      const updateLifecycleWrapper = {
+        rustLifecycleDiagnostic:
+          createRustLifecycleDiagnosticSource(updateError.rootRequest),
+        nativeAddonLoaded: false,
+        nativeExecution: false,
+        rustExecution: true
+      };
+      const unmountLifecycleWrapper = {
+        rustLifecycleDiagnostic:
+          createRustLifecycleDiagnosticSource(unmountError.rootRequest),
+        nativeAddonLoaded: false,
+        nativeExecution: false,
+        rustExecution: true
+      };
+      assert.equal(
+        bridge.canConsumeRootExecutionResult(
+          updateError.rootRequest,
+          updateLifecycleWrapper
+        ),
+        true,
+        "package-root update lifecycle-only root execution baseline"
+      );
+      assert.equal(
+        bridge.canConsumeRootExecutionResult(
+          unmountError.rootRequest,
+          unmountLifecycleWrapper
+        ),
+        true,
+        "package-root unmount lifecycle-only root execution baseline"
+      );
+
+      for (const field of packageRootExecutionWrapperClaimFields) {
+        const claimedUpdateWrapper = {
+          ...updateLifecycleWrapper,
+          [field]: true
+        };
+        const claimedUnmountWrapper = {
+          ...unmountLifecycleWrapper,
+          [field]: true
+        };
+        assert.equal(
+          bridge.canConsumeRootExecutionResult(
+            updateError.rootRequest,
+            claimedUpdateWrapper
+          ),
+          false,
+          `${field} update lifecycle-only root execution wrapper blocked`
+        );
+        const updateWrapperError = captureThrown(() =>
+          bridge.consumeRootExecutionResult(
+            updateError.rootRequest,
+            claimedUpdateWrapper
+          )
+        );
+        assert.equal(
+          updateWrapperError.name,
+          "FastReactTestRendererPrivateRootRequestError"
+        );
+        assert.match(
+          updateWrapperError.message,
+          /cannot open public, native, or package compatibility/u,
+          `${field} update lifecycle-only wrapper rejects top-level claims`
+        );
+        assert.equal(
+          bridge.canConsumeRootExecutionResult(
+            unmountError.rootRequest,
+            claimedUnmountWrapper
+          ),
+          false,
+          `${field} unmount lifecycle-only root execution wrapper blocked`
+        );
+        const unmountWrapperError = captureThrown(() =>
+          bridge.consumeRootExecutionResult(
+            unmountError.rootRequest,
+            claimedUnmountWrapper
+          )
+        );
+        assert.equal(
+          unmountWrapperError.name,
+          "FastReactTestRendererPrivateRootRequestError"
+        );
+        assert.match(
+          unmountWrapperError.message,
+          /cannot open public, native, or package compatibility/u,
+          `${field} unmount lifecycle-only wrapper rejects top-level claims`
+        );
+      }
+
+      const hiddenUpdateWrapperClaim = withHiddenTrueProperty(
+        updateLifecycleWrapper,
+        "publicToJSONAvailable"
+      );
+      assert.equal(
+        bridge.canConsumeRootExecutionResult(
+          updateError.rootRequest,
+          hiddenUpdateWrapperClaim
+        ),
+        false,
+        "hidden publicToJSONAvailable update lifecycle-only wrapper blocked"
+      );
+      const hiddenUnmountWrapperClaim = withHiddenTrueProperty(
+        unmountLifecycleWrapper,
+        "nativeExecutionAvailable"
+      );
+      assert.equal(
+        bridge.canConsumeRootExecutionResult(
+          unmountError.rootRequest,
+          hiddenUnmountWrapperClaim
+        ),
+        false,
+        "hidden nativeExecutionAvailable unmount lifecycle-only wrapper blocked"
+      );
+      const proxyUpdateWrapperClaim = withProxyHiddenTrueProperty(
+        updateLifecycleWrapper,
+        "packageSerializationAvailable"
+      );
+      assert.equal(
+        Reflect.ownKeys(proxyUpdateWrapperClaim).includes(
+          "packageSerializationAvailable"
+        ),
+        false,
+        "proxy hides packageSerializationAvailable from ownKeys"
+      );
+      assert.equal(
+        Object.hasOwn(proxyUpdateWrapperClaim, "packageSerializationAvailable"),
+        true,
+        "proxy exposes packageSerializationAvailable to Object.hasOwn"
+      );
+      assert.equal(
+        proxyUpdateWrapperClaim.packageSerializationAvailable,
+        true,
+        "proxy exposes packageSerializationAvailable through property access"
+      );
+      assert.equal(
+        bridge.canConsumeRootExecutionResult(
+          updateError.rootRequest,
+          proxyUpdateWrapperClaim
+        ),
+        false,
+        "proxy-hidden packageSerializationAvailable update wrapper blocked"
+      );
+      const proxyInTrapUpdateWrapperClaim = withProxyInTrapTrueProperty(
+        updateLifecycleWrapper,
+        "packageSerializationAvailable"
+      );
+      assert.equal(
+        Reflect.ownKeys(proxyInTrapUpdateWrapperClaim).includes(
+          "packageSerializationAvailable"
+        ),
+        false,
+        "proxy in-trap hides packageSerializationAvailable from ownKeys"
+      );
+      assert.equal(
+        Object.hasOwn(
+          proxyInTrapUpdateWrapperClaim,
+          "packageSerializationAvailable"
+        ),
+        false,
+        "proxy in-trap hides packageSerializationAvailable from Object.hasOwn"
+      );
+      assert.equal(
+        "packageSerializationAvailable" in proxyInTrapUpdateWrapperClaim,
+        true,
+        "proxy in-trap exposes packageSerializationAvailable through in"
+      );
+      assert.equal(
+        proxyInTrapUpdateWrapperClaim.packageSerializationAvailable,
+        true,
+        "proxy in-trap exposes packageSerializationAvailable through property access"
+      );
+      assert.equal(
+        bridge.canConsumeRootExecutionResult(
+          updateError.rootRequest,
+          proxyInTrapUpdateWrapperClaim
+        ),
+        false,
+        "proxy in-trap packageSerializationAvailable update wrapper blocked"
+      );
+
+      const acceptedUpdateEvidence =
+        createRustUpdateNativeBridgeAdmissionEvidence(updateError.rootRequest);
+      assert.equal(
+        bridge.canConsumePrivateUpdateNativeBridgeAdmission(
+          updateError.rootRequest,
+          acceptedUpdateEvidence
+        ),
+        true,
+        "package-root accepted update admission baseline"
+      );
+      assert.equal(
+        bridge.canConsumeRootExecutionResult(
+          updateError.rootRequest,
+          acceptedUpdateEvidence
+        ),
+        true,
+        "package-root accepted update root execution baseline"
+      );
+      const acceptedUpdateRouteDiagnostic =
+        acceptedUpdateEvidence.updateRouteRootWorkLoopDiagnostic;
+      const acceptedHostTextUpdateMetadata =
+        acceptedUpdateRouteDiagnostic.hostTextUpdateMetadata;
+      for (const field of [
+        "hostTextUpdate",
+        "host_text_update",
+        "hostOutputEvidence"
+      ]) {
+        const aliasOnlyUpdateEvidence =
+          createRustUpdateNativeBridgeAdmissionEvidence(
+            updateError.rootRequest,
+            {
+              updateRouteRootWorkLoopDiagnostic: {
+                hostTextUpdateMetadata: undefined,
+                host_text_update_metadata: undefined,
+                [field]: acceptedHostTextUpdateMetadata
+              }
+            }
+          );
+        assert.equal(
+          bridge.canConsumePrivateUpdateNativeBridgeAdmission(
+            updateError.rootRequest,
+            aliasOnlyUpdateEvidence
+          ),
+          false,
+          `${field} alias-only update admission rejected`
+        );
+        assert.equal(
+          bridge.canConsumeRootExecutionResult(
+            updateError.rootRequest,
+            aliasOnlyUpdateEvidence
+          ),
+          false,
+          `${field} alias-only update root execution rejected`
+        );
+      }
+
+      for (const field of packageRootClaimFields) {
+        const claimedCreateHandoff = {
+          ...acceptedCreateHandoff,
+          [field]: true
+        };
+        assert.equal(
+          bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+            createRequest,
+            claimedCreateHandoff
+          ),
+          false,
+          `${field} create handoff rejected`
+        );
+        assert.equal(
+          bridge.canConsumeRootExecutionResult(createRequest, {
+            rustLifecycleDiagnostic:
+              createRustLifecycleDiagnosticSource(createRequest),
+            privateCreateNativeBridgeHostOutputHandoff: claimedCreateHandoff,
+            nativeAddonLoaded: false,
+            nativeExecution: false,
+            rustExecution: true
+          }),
+          false,
+          `${field} create root execution host output blocked`
+        );
+
+        const claimedCreateAdmissionHandoff = {
+          ...acceptedCreateHandoff,
+          createRouteAdmission: {
+            ...acceptedCreateHandoff.createRouteAdmission,
+            [field]: true
+          }
+        };
+        assert.equal(
+          bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+            createRequest,
+            claimedCreateAdmissionHandoff
+          ),
+          false,
+          `${field} create route admission rejected`
+        );
+        assert.equal(
+          bridge.canConsumeRootExecutionResult(createRequest, {
+            rustLifecycleDiagnostic:
+              createRustLifecycleDiagnosticSource(createRequest),
+            privateCreateNativeBridgeHostOutputHandoff:
+              claimedCreateAdmissionHandoff,
+            nativeAddonLoaded: false,
+            nativeExecution: false,
+            rustExecution: true
+          }),
+          false,
+          `${field} create route admission root execution blocked`
+        );
+
+        if (
+          [
+            "nativeExecutionAvailable",
+            "nativeBridgeLoadingAvailable",
+            "publicToJSONAvailable",
+            "public_to_json_available",
+            "packageSerializationAvailable"
+          ].includes(field)
+        ) {
+          const hiddenCreateHandoff = withHiddenTrueProperty(
+            acceptedCreateHandoff,
+            field
+          );
+          assert.equal(
+            bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+              createRequest,
+              hiddenCreateHandoff
+            ),
+            false,
+            `hidden ${field} create handoff rejected`
+          );
+          const hiddenCreateAdmissionHandoff = {
+            ...acceptedCreateHandoff,
+            createRouteAdmission: withHiddenTrueProperty(
+              acceptedCreateHandoff.createRouteAdmission,
+              field
+            )
+          };
+          assert.equal(
+            bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+              createRequest,
+              hiddenCreateAdmissionHandoff
+            ),
+            false,
+            `hidden ${field} create route admission rejected`
+          );
+        }
+
+        const claimedUpdateEvidence = {
+          ...createRustUpdateNativeBridgeAdmissionEvidence(
+            updateError.rootRequest
+          ),
+          [field]: true
+        };
+        assert.equal(
+          bridge.canConsumePrivateUpdateNativeBridgeAdmission(
+            updateError.rootRequest,
+            claimedUpdateEvidence
+          ),
+          false,
+          `${field} update admission rejected`
+        );
+        assert.equal(
+          bridge.canConsumeRootExecutionResult(
+            updateError.rootRequest,
+            claimedUpdateEvidence
+          ),
+          false,
+          `${field} update root execution host output blocked`
+        );
+
+        const routeClaimEvidence =
+          createRustUpdateNativeBridgeAdmissionEvidence(
+            updateError.rootRequest,
+            {
+              updateRouteRootWorkLoopDiagnostic: {
+                [field]: true
+              }
+            }
+          );
+        assert.equal(
+          bridge.canConsumePrivateUpdateNativeBridgeAdmission(
+            updateError.rootRequest,
+            routeClaimEvidence
+          ),
+          false,
+          `${field} update route diagnostic rejected`
+        );
+        assert.equal(
+          bridge.canConsumeRootExecutionResult(
+            updateError.rootRequest,
+            routeClaimEvidence
+          ),
+          false,
+          `${field} update route root execution host output blocked`
+        );
+      }
     }
     assert.equal(
       bridge.canConsumeRootExecutionResult(
@@ -10273,27 +10862,93 @@ function createRustCreateRouteAdmissionDiagnosticSource(admission) {
   };
 }
 
+function createPackageRootCreateRouteAdmissionSource(request) {
+  return {
+    rustAdmissionMetadata: {
+      metadataId: privateCreateRouteAdmissionMetadataId,
+      metadataStatus: privateCreateRouteAdmissionMetadataStatus,
+      recordId: privateCreateRouteAdmissionRecordId,
+      diagnosticName: privateCreateRouteAdmissionDiagnosticName,
+      status: privateCreateRouteAdmissionStatus,
+      acceptedWorker: "worker-390-test-renderer-root-create-route",
+      acceptedRustCrate: "fast-react-test-renderer",
+      rootApi: "TestRendererRoot::create",
+      preflightApi: "describe_private_root_create_preflight_for_canary",
+      workLoopRenderPhaseApi:
+        "describe_private_root_create_work_loop_finished_work_for_canary",
+      lifecycleRecord: "TestRendererRootLifecycle",
+      executionResultRecord: "TestRendererRootCreateExecutionEvidence",
+      acceptedInputShape: "host-text"
+    },
+    rootCreatePreflight: {
+      diagnosticName: privateRootCreatePreflightDiagnosticName,
+      status: privateRootCreatePreflightStatus,
+      operation: "create",
+      createInputShape: "host-text",
+      rootOptionsMetadata: request.optionsInfo,
+      canaryApiIdentity: {
+        rootApi: "TestRendererRoot::create",
+        metadataId: "fast-react-test-renderer-root-create-canary-metadata"
+      }
+    },
+    workLoopFinishedWorkPreflight: {
+      id: privateRootCreateWorkLoopFinishedWorkPreflightRowId,
+      status: privateRootCreateWorkLoopFinishedWorkPreflightStatus,
+      operation: "create",
+      rootRequestId: request.requestId,
+      rootRequestSequence: request.requestSequence,
+      rootId: request.rootId,
+      rootSequence: request.rootSequence,
+      rootApi: "TestRendererRoot::create",
+      updateKind: "Create",
+      updateOutcome: "Scheduled",
+      previousCurrent: createRustRootCreatePreviousCurrentHandle(),
+      finishedWork: createRustRootCreateFinishedWorkHandle(),
+      renderLanesEmpty: false,
+      renderLanesBits: 1,
+      remainingLanesEmpty: true,
+      remainingLanesBits: 0,
+      finishedWorkMatchesRenderPhase: true
+    },
+    rootCreateExecutionEvidence: {
+      operation: "create",
+      requestId: request.requestId,
+      requestSequence: request.requestSequence,
+      rootRequestId: request.requestId,
+      rootRequestSequence: request.requestSequence,
+      rootId: request.rootId,
+      rootSequence: request.rootSequence,
+      rootApi: "TestRendererRoot::create",
+      updateKind: "Create",
+      rustOutcome: "Scheduled",
+      scheduled: true
+    }
+  };
+}
+
 function createRustCreateNativeBridgeHostOutputHandoffSource(
   request,
   admission
 ) {
   const finishedWork = createRustRootCreateFinishedWorkHandle();
 
-  return {
+  const handoff = {
     id: privateCreateNativeBridgeHostOutputHandoffDiagnosticId,
     status: privateCreateNativeBridgeHostOutputHandoffStatus,
     operation: "create",
     publicSurface: "create()",
     rootRequestId: request.requestId,
     rootRequestSequence: request.requestSequence,
+    rootId: request.rootId,
+    rootSequence: request.rootSequence,
     rootApi: "TestRendererRoot::create",
+    lifecycleStatusBefore: request.lifecycleStatusBefore,
+    lifecycleStatusAfter: normalizeExpectedRustLifecycle(
+      request.lifecycleStatusAfter
+    ),
     updateKind: "Create",
     rustOutcome: "Scheduled",
     scheduled: true,
-    createRouteAdmission:
-      createRustCreateRouteAdmissionDiagnosticSource(admission),
-    createRouteAdmissionRecordId: privateCreateRouteAdmissionRecordId,
-    createRouteAdmissionStatus: privateCreateRouteAdmissionStatus,
     hostOutputUpdateKind: "Create",
     hostOutputShape: "SingleHostText",
     hostOutputSnapshotCurrent: true,
@@ -10305,10 +10960,6 @@ function createRustCreateNativeBridgeHostOutputHandoffSource(
     },
     serializationGateStatus:
       "ReadyForPrivateSerializationDiagnostics",
-    workLoopFinishedWorkPreflight:
-      createRustRootCreateWorkLoopFinishedWorkPreflightSource(
-        admission.workLoopFinishedWorkPreflight
-      ),
     renderFinishedWork: finishedWork,
     commitCurrent: finishedWork,
     renderLanesBits: 1,
@@ -10324,7 +10975,13 @@ function createRustCreateNativeBridgeHostOutputHandoffSource(
     hostOutputHandoffAccepted: true,
     actualRustCreateHostOutputHandoff: true,
     hostOutputProducedByRust: true,
+    publicRouteAvailable: false,
+    publicRootAvailable: false,
+    publicRootUpdateAvailable: false,
+    publicRendererRootCreated: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
     publicCreateBehaviorAvailable: false,
+    publicUpdateCompatibilityClaimed: false,
     publicSerializationAvailable: false,
     publicTestInstanceAvailable: false,
     nativeAddonLoaded: false,
@@ -10332,8 +10989,23 @@ function createRustCreateNativeBridgeHostOutputHandoffSource(
     nativeExecution: false,
     rustExecutionFromJs: false,
     hostOutputProducedFromJs: false,
+    packageCompatibilityClaimed: false,
+    jsPackageCompatibilityAvailable: false,
     compatibilityClaimed: false
   };
+
+  if (admission !== null) {
+    handoff.createRouteAdmission =
+      createRustCreateRouteAdmissionDiagnosticSource(admission);
+    handoff.createRouteAdmissionRecordId = privateCreateRouteAdmissionRecordId;
+    handoff.createRouteAdmissionStatus = privateCreateRouteAdmissionStatus;
+    handoff.workLoopFinishedWorkPreflight =
+      createRustRootCreateWorkLoopFinishedWorkPreflightSource(
+        admission.workLoopFinishedWorkPreflight
+      );
+  }
+
+  return handoff;
 }
 
 function createRustUpdateRouteRootWorkLoopDiagnosticSource(request) {
@@ -10342,6 +11014,8 @@ function createRustUpdateRouteRootWorkLoopDiagnosticSource(request) {
     status: privateUpdateRouteRootWorkLoopStatus,
     rootRequestId: request.requestId,
     rootRequestSequence: request.requestSequence,
+    rootId: request.rootId,
+    rootSequence: request.rootSequence,
     rootOperation: "update",
     updateKind: "Update",
     updateOutcome: request.rustOutcome,
@@ -10384,10 +11058,22 @@ function createRustUpdateRouteRootWorkLoopDiagnosticSource(request) {
       hostTextUpdateApplyCount: 1,
       hostComponentUpdateApplyCount: 1
     },
+    publicRouteAvailable: false,
+    publicRootAvailable: false,
     publicRootUpdateAvailable: false,
+    publicRendererRootCreated: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    publicCreateBehaviorAvailable: false,
+    publicUpdateCompatibilityClaimed: false,
     publicSerializationAvailable: false,
+    publicTestInstanceAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
     nativeExecution: false,
     rustExecutionFromJs: false,
+    hostOutputProducedFromJs: false,
+    packageCompatibilityClaimed: false,
+    jsPackageCompatibilityAvailable: false,
     compatibilityClaimed: false
   };
 }
@@ -10405,6 +11091,20 @@ function createRustUpdateNativeBridgeAdmissionEvidence(request, overrides = {}) 
       overrides.hostOutputProduced === undefined
         ? true
         : overrides.hostOutputProduced,
+    publicRouteAvailable: false,
+    publicRootAvailable: false,
+    publicRootUpdateAvailable: false,
+    publicRendererRootCreated: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    publicCreateBehaviorAvailable: false,
+    publicUpdateCompatibilityClaimed: false,
+    publicSerializationAvailable: false,
+    publicTestInstanceAvailable: false,
+    nativeBridgeAvailable: false,
+    hostOutputProducedFromJs: false,
+    packageCompatibilityClaimed: false,
+    jsPackageCompatibilityAvailable: false,
+    compatibilityClaimed: false,
     privateErrorBoundaryCommitRecoveryMetadata:
       overrides.privateErrorBoundaryCommitRecoveryMetadata ??
       createRustErrorBoundaryCommitRecoveryMetadataSource(request),
@@ -17435,6 +18135,75 @@ function captureThrown(callback) {
 
 function cloneDiagnostic(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function withHiddenTrueProperty(value, property) {
+  const clone = { ...value };
+  Object.defineProperty(clone, property, {
+    configurable: true,
+    enumerable: false,
+    value: true
+  });
+  return clone;
+}
+
+function withProxyHiddenTrueProperty(value, property) {
+  const target = { ...value };
+  return new Proxy(target, {
+    get(targetValue, key, receiver) {
+      if (key === property) {
+        return true;
+      }
+      return Reflect.get(targetValue, key, receiver);
+    },
+    getOwnPropertyDescriptor(targetValue, key) {
+      if (key === property) {
+        return {
+          configurable: true,
+          enumerable: false,
+          value: true,
+          writable: true
+        };
+      }
+      return Reflect.getOwnPropertyDescriptor(targetValue, key);
+    },
+    has(targetValue, key) {
+      if (key === property) {
+        return true;
+      }
+      return Reflect.has(targetValue, key);
+    },
+    ownKeys(targetValue) {
+      return Reflect.ownKeys(targetValue).filter((key) => key !== property);
+    }
+  });
+}
+
+function withProxyInTrapTrueProperty(value, property) {
+  const target = { ...value };
+  return new Proxy(target, {
+    get(targetValue, key, receiver) {
+      if (key === property) {
+        return true;
+      }
+      return Reflect.get(targetValue, key, receiver);
+    },
+    getOwnPropertyDescriptor(targetValue, key) {
+      if (key === property) {
+        return undefined;
+      }
+      return Reflect.getOwnPropertyDescriptor(targetValue, key);
+    },
+    has(targetValue, key) {
+      if (key === property) {
+        return true;
+      }
+      return Reflect.has(targetValue, key);
+    },
+    ownKeys(targetValue) {
+      return Reflect.ownKeys(targetValue).filter((key) => key !== property);
+    }
+  });
 }
 
 function isForbiddenNativeLoad(request) {

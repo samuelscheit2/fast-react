@@ -1,10 +1,24 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   readCheckedReactTestRendererSerializationOracle
 } from "./react-test-renderer-serialization-oracle.mjs";
+import {
+  readCheckedReactTestRendererErrorSurfaceOracle
+} from "./react-test-renderer-error-surface-oracle.mjs";
 import {
   REACT_TEST_RENDERER_SERIALIZATION_SCENARIO_IDS
 } from "./react-test-renderer-serialization-scenarios.mjs";
@@ -16,11 +30,14 @@ import {
   REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS,
+  evaluateReactTestRendererErrorSurfaceLocalGate,
   evaluateReactTestRendererSerializationLocalGate
 } from "./react-test-renderer-serialization-local-gate.mjs";
 
 const require = createRequire(import.meta.url);
+const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const oracle = readCheckedReactTestRendererSerializationOracle();
+const errorSurfaceOracle = readCheckedReactTestRendererErrorSurfaceOracle();
 const jsEntrypoints = [
   {
     entrypoint: "react-test-renderer",
@@ -38,6 +55,7 @@ const jsEntrypoints = [
   }
 ];
 const packageRootEntrypoint = "react-test-renderer";
+const rootLifecycleEvidenceByRootRequest = new WeakMap();
 function hasSiblingTextPrivateAdmission(entry) {
   return (
     entry.entrypoint === packageRootEntrypoint ||
@@ -142,6 +160,34 @@ const privateToJSONUpdateUnmountDependencyIds = [
   "react-test-renderer-unmount-route-private-diagnostic",
   "react-test-renderer-serialization-private-json-diagnostic"
 ];
+const privateCreateRouteAdmissionDiagnosticName =
+  "fast-react-test-renderer.create-route.private-admission";
+const privateCreateRouteAdmissionStatus =
+  "private-create-route-admission-rust-root-create-work-loop-evidence-public-create-blocked";
+const privateCreateRouteAdmissionRecordId =
+  "react-test-renderer-create-route-admission-private-diagnostic";
+const privateCreateNativeBridgeHostOutputHandoffDiagnosticId =
+  "react-test-renderer-create-native-bridge-host-output-handoff-private-diagnostic";
+const privateCreateNativeBridgeHostOutputHandoffStatus =
+  "private-create-native-bridge-host-output-handoff-public-create-blocked";
+const privateUpdateRouteRootWorkLoopDiagnosticName =
+  "fast-react-test-renderer.update-route.private-root-work-loop";
+const privateUpdateRouteRootWorkLoopStatus =
+  "private-update-route-root-work-loop-metadata-ready-public-update-blocked";
+const privateUpdateNativeBridgeAdmissionDiagnosticId =
+  "react-test-renderer-update-native-bridge-admission-private-diagnostic";
+const privateUpdateNativeBridgeAdmissionStatus =
+  "private-update-native-bridge-admission-host-output-handoff-public-update-blocked";
+const privateErrorBoundaryCommitRecoveryRustApi =
+  "TestRendererRoot::describe_private_error_boundary_commit_recovery_for_canary";
+const privateErrorBoundaryCommitRecoveryDiagnosticName =
+  "fast-react-test-renderer.error-boundary.private-commit-recovery-evidence";
+const privateErrorBoundaryCommitRecoveryStatus =
+  "private-error-boundary-commit-recovery-metadata-public-recovery-blocked";
+const privateErrorBoundaryCommitRecoveryPath =
+  "ReactFiberWorkLoop.captureCommitPhaseError";
+const privateErrorBoundaryCommitRecoveryAction =
+  "createRootErrorUpdate(SyncLane)";
 const privateUnmountDeletionCommitHandoffDiagnosticId =
   "react-test-renderer-unmount-deletion-commit-handoff-private-diagnostic";
 const privateUnmountDeletionCommitHandoffStatus =
@@ -195,6 +241,15 @@ const privateToTreeCompositeMultiChildAcceptedFiberShape = [
   "HostText"
 ];
 const privateToTreeFunctionComponentType = "CanaryFunctionComponent";
+const serializationGateEntrypointSourceFiles = [
+  "packages/react-test-renderer/index.js",
+  "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+  "packages/react-test-renderer/cjs/react-test-renderer.production.js"
+];
+const toJSONPrivateSerializationFacadeGateDeclaration =
+  "const toJSONPrivateSerializationFacadeGate = Object.freeze({";
+const toTreePrivateFacadeGateDeclaration =
+  "const toTreePrivateFacadeGate = Object.freeze({";
 
 test("react-test-renderer serialization gate is ready for private diagnostics while public compatibility stays blocked", () => {
   const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });
@@ -227,12 +282,14 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateTreeMetadataPresent: true,
     privateToJSONSerializationFacadeGatePresent: true,
     privateToJSONSerializationFacadeRecognizesRustDiagnostics: true,
+    privateToJSONHostOutputDiagnosticSourceEvidencePresent: true,
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics: true,
     privateToJSONSerializationFacadeCoversBroaderHostShapes: true,
     privateToJSONSerializationFacadeExposesDiagnosticResult: true,
     privateToJSONUpdateUnmountRowsPresent: true,
     privateToJSONUpdatePropAndTextDiagnosticsPresent: true,
     privateToJSONFinishedWorkIdentityGatePresent: true,
+    privateSerializationLifecycleSourceEvidencePresent: true,
     privateToJSONSerializationFacadePubliclyBlocked: true,
     privateToTreeHostOutputMetadataGatePresent: true,
     privateToTreePrivateFacadeGatePresent: true,
@@ -254,6 +311,663 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     publicTestInstanceWrappersPresent: false,
     publicJsFacadeRoutingPresent: false
   });
+});
+
+test("react-test-renderer serialization source evidence rejects block-comment and string spoofing", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/index.js",
+    mutate(text) {
+      return replaceInSerializationGateSlice(text, {
+        gateDeclaration: toJSONPrivateSerializationFacadeGateDeclaration,
+        find: "privateRootLifecycleExecutionEvidenceRequired: true",
+        replace:
+          "privateRootLifecycleExecutionEvidenceRequired: false /* privateRootLifecycleExecutionEvidenceRequired: true */,\n  spoofedLifecycleEvidenceString: 'privateRootLifecycleExecutionEvidenceRequired: true'"
+      });
+    }
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      gate.localChecks.privateToJSONFinishedWorkIdentityGatePresent,
+      false
+    );
+    assert.equal(gate.privateToJSONFacadeGateReady, false);
+    assert.equal(gate.privateDiagnosticsReady, true);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization lifecycle source evidence rejects block-comment spoofing", () => {
+  const replacements = [
+    [
+      "rootLifecycleExecutionEvidences",
+      "rootLifecycleEvidenceSetForSpoofProbe"
+    ],
+    [
+      "validatePrivateSerializationLifecycleExecutionEvidence",
+      "validatePrivateSerializationLifecycleEvidenceForSpoofProbe"
+    ],
+    [
+      "Expected source-owned private root lifecycle execution evidence for unmount serialization currentness.",
+      "Expected private root lifecycle execution evidence replaced by spoof probe."
+    ]
+  ];
+  const forgedLifecycleEvidence =
+    "\n/*\n" +
+    "rootLifecycleExecutionEvidences\n" +
+    "validatePrivateSerializationLifecycleExecutionEvidence\n" +
+    "Expected source-owned private root lifecycle execution evidence for unmount serialization currentness.\n" +
+    "*/\n";
+
+  for (const evidencePath of serializationGateEntrypointSourceFiles) {
+    const workspace = createSerializationGateWorkspaceWithMutatedFile({
+      evidencePath,
+      mutate(text) {
+        let mutated = text;
+        for (const [find, replace] of replacements) {
+          assert.equal(
+            mutated.includes(find),
+            true,
+            `${evidencePath} contains ${find}`
+          );
+          mutated = mutated.split(find).join(replace);
+        }
+        return `${mutated}${forgedLifecycleEvidence}`;
+      }
+    });
+
+    try {
+      const gate = evaluateReactTestRendererSerializationLocalGate({
+        oracle,
+        workspaceRoot: workspace.root
+      });
+
+      assert.equal(
+        gate.localChecks.privateToJSONFinishedWorkIdentityGatePresent,
+        false,
+        evidencePath
+      );
+      assert.equal(
+        gate.localChecks.privateToTreeFinishedWorkIdentityGatePresent,
+        false,
+        evidencePath
+      );
+      assert.equal(
+        gate.localChecks.privateSerializationLifecycleSourceEvidencePresent,
+        false,
+        evidencePath
+      );
+      assert.equal(gate.privateDiagnosticsReady, false, evidencePath);
+      assert.equal(gate.privateToJSONFacadeGateReady, false, evidencePath);
+      assert.equal(gate.privateToTreeMetadataGateReady, false, evidencePath);
+    } finally {
+      workspace.cleanup();
+    }
+  }
+});
+
+test("react-test-renderer serialization lifecycle source evidence rejects regex-literal spoofing", () => {
+  const replacements = [
+    [
+      "rootLifecycleExecutionEvidences",
+      "rootLifecycleEvidenceSetForRegexSpoofProbe"
+    ],
+    [
+      "validatePrivateSerializationLifecycleExecutionEvidence",
+      "validatePrivateSerializationLifecycleEvidenceForRegexSpoofProbe"
+    ],
+    [
+      "Expected source-owned private root lifecycle execution evidence for unmount serialization currentness.",
+      "Expected private root lifecycle execution evidence replaced by regex spoof probe."
+    ]
+  ];
+  const forgedLifecycleEvidence = [
+    "/* regex spoof prefix */ /rootLifecycleExecutionEvidences/u;",
+    "// regex spoof prefix",
+    "/validatePrivateSerializationLifecycleExecutionEvidence/u;",
+    "/* regex spoof prefix */ /Expected source-owned private root lifecycle execution evidence for unmount serialization currentness\\./u;"
+  ].join("\n");
+
+  for (const evidencePath of serializationGateEntrypointSourceFiles) {
+    const workspace = createSerializationGateWorkspaceWithMutatedFile({
+      evidencePath,
+      mutate(text) {
+        let mutated = text;
+        for (const [find, replace] of replacements) {
+          assert.equal(
+            mutated.includes(find),
+            true,
+            `${evidencePath} contains ${find}`
+          );
+          mutated = mutated.split(find).join(replace);
+        }
+        return `${mutated}\n${forgedLifecycleEvidence}\n`;
+      }
+    });
+
+    try {
+      const gate = evaluateReactTestRendererSerializationLocalGate({
+        oracle,
+        workspaceRoot: workspace.root
+      });
+
+      assert.equal(
+        gate.localChecks.privateToJSONFinishedWorkIdentityGatePresent,
+        false,
+        evidencePath
+      );
+      assert.equal(
+        gate.localChecks.privateToTreeFinishedWorkIdentityGatePresent,
+        false,
+        evidencePath
+      );
+      assert.equal(
+        gate.localChecks.privateSerializationLifecycleSourceEvidencePresent,
+        false,
+        evidencePath
+      );
+      assert.equal(gate.privateDiagnosticsReady, false, evidencePath);
+      assert.equal(gate.requiredLocalTargetsReady, false, evidencePath);
+      assert.equal(gate.privateToJSONFacadeGateReady, false, evidencePath);
+      assert.equal(gate.privateToTreeMetadataGateReady, false, evidencePath);
+    } finally {
+      workspace.cleanup();
+    }
+  }
+});
+
+test("react-test-renderer ToJSON host-output source evidence rejects comment string template and regex spoofing", () => {
+  const serializerToken = "serializePrivateToJSONHostOutputDiagnostic";
+  const replacementToken = "privateToJSONHostOutputDiagnosticSpoofProbe";
+  const forgedSerializerEvidence = [
+    `/* ${serializerToken} */`,
+    `const spoofedToJSONSerializerString = ${JSON.stringify(serializerToken)};`,
+    `const spoofedToJSONSerializerTemplate = \`${serializerToken}\`;`,
+    `/* regex spoof prefix */ /${serializerToken}/u;`
+  ].join("\n");
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate(text) {
+        assert.equal(
+          text.includes(serializerToken),
+          true,
+          `${evidencePath} contains ${serializerToken}`
+        );
+        return `${text.split(serializerToken).join(replacementToken)}\n${forgedSerializerEvidence}\n`;
+      }
+    }))
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      gate.localChecks.privateToJSONHostOutputDiagnosticSourceEvidencePresent,
+      false
+    );
+    assert.equal(
+      gate.localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
+      false
+    );
+    assert.equal(gate.privateDiagnosticsReady, true);
+    assert.equal(gate.privateToJSONFacadeGateReady, false);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer ToJSON host-output source evidence rejects standalone alias spoofing", () => {
+  const serializerToken = "serializePrivateToJSONHostOutputDiagnostic";
+  const replacementToken = "privateToJSONHostOutputDiagnosticAliasSpoofProbe";
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate(text) {
+        assert.equal(
+          text.includes(serializerToken),
+          true,
+          `${evidencePath} contains ${serializerToken}`
+        );
+        return (
+          `${text.split(serializerToken).join(replacementToken)}\n` +
+          `const ${serializerToken} = ${replacementToken};\n`
+        );
+      }
+    }))
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      gate.localChecks.privateToJSONHostOutputDiagnosticSourceEvidencePresent,
+      false
+    );
+    assert.equal(
+      gate.localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
+      false
+    );
+    assert.equal(gate.privateDiagnosticsReady, true);
+    assert.equal(gate.privateToJSONFacadeGateReady, false);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer ToJSON host-output source evidence rejects dead function declaration spoofing", () => {
+  const serializerToken = "serializePrivateToJSONHostOutputDiagnostic";
+  const replacementToken = "privateToJSONHostOutputDiagnosticDeadFunctionProbe";
+  const resultFunctionDeclaration =
+    "function createPrivateToJSONHostOutputDiagnosticResult";
+  const deadSerializerDeclaration = [
+    `function ${serializerToken}(`,
+    "  report,",
+    "  rootRequest = undefined,",
+    "  rootLifecycleExecutionEvidence = undefined",
+    ") {",
+    "  const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);",
+    "  if (rootRequest !== undefined) {",
+    "    validatePrivateSerializationHostOutputLifecycleExecutionEvidence(",
+    "      'create().toJSON',",
+    "      rootRequest,",
+    "      diagnostic.hostOutputUpdateKind,",
+    "      rootLifecycleExecutionEvidence",
+    "    );",
+    "  }",
+    "",
+    "  return diagnostic.result;",
+    "}"
+  ].join("\n");
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate(text) {
+        assert.equal(
+          text.includes(serializerToken),
+          true,
+          `${evidencePath} contains ${serializerToken}`
+        );
+        assert.equal(
+          text.includes(resultFunctionDeclaration),
+          true,
+          `${evidencePath} contains ${resultFunctionDeclaration}`
+        );
+        const renamed = text.split(serializerToken).join(replacementToken);
+        return renamed.replace(
+          resultFunctionDeclaration,
+          `${deadSerializerDeclaration}\n\n${resultFunctionDeclaration}`
+        );
+      }
+    }))
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      gate.localChecks.privateToJSONHostOutputDiagnosticSourceEvidencePresent,
+      false
+    );
+    assert.equal(
+      gate.localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
+      false
+    );
+    assert.equal(gate.privateDiagnosticsReady, true);
+    assert.equal(gate.privateToJSONFacadeGateReady, false);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer ToJSON host-output source evidence rejects nested facade-method spoofing", () => {
+  const serializerToken = "serializePrivateToJSONHostOutputDiagnostic";
+  const replacementToken = "privateToJSONHostOutputDiagnosticNestedFacadeProbe";
+  const canSerializeReturnedFacadeCall = [
+    "        serializePrivateToJSONHostOutputDiagnostic(",
+    "          report,",
+    "          rootRequest,",
+    "          rootLifecycleExecutionEvidence",
+    "        );"
+  ].join("\n");
+  const serializeReturnedFacadeCall = [
+    "      return serializePrivateToJSONHostOutputDiagnostic(",
+    "        report,",
+    "        rootRequest,",
+    "        rootLifecycleExecutionEvidence",
+    "      );"
+  ].join("\n");
+  const returnedFacadeAnchor =
+    "function createPrivateToJSONSerializationFacade(rootRequest) {\n" +
+    "  return freezeRecord({";
+  const dummyNestedFacade = [
+    "function createPrivateToJSONSerializationFacade(rootRequest) {",
+    "  const nestedFacadeSpoof = {",
+    "    canSerializeAcceptedHostOutputDiagnostic(",
+    "      report,",
+    "      rootLifecycleExecutionEvidence = undefined",
+    "    ) {",
+    "      try {",
+    "        serializePrivateToJSONHostOutputDiagnostic(",
+    "          report,",
+    "          rootRequest,",
+    "          rootLifecycleExecutionEvidence",
+    "        );",
+    "        return true;",
+    "      } catch (_error) {",
+    "        return false;",
+    "      }",
+    "    },",
+    "    serializeAcceptedHostOutputDiagnostic(",
+    "      report,",
+    "      rootLifecycleExecutionEvidence = undefined",
+    "    ) {",
+    "      return serializePrivateToJSONHostOutputDiagnostic(",
+    "        report,",
+    "        rootRequest,",
+    "        rootLifecycleExecutionEvidence",
+    "      );",
+    "    }",
+    "  };",
+    "  void nestedFacadeSpoof;",
+    "  return freezeRecord({"
+  ].join("\n");
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate(text) {
+        assert.equal(
+          text.includes(canSerializeReturnedFacadeCall),
+          true,
+          `${evidencePath} contains returned canSerialize call`
+        );
+        assert.equal(
+          text.includes(serializeReturnedFacadeCall),
+          true,
+          `${evidencePath} contains returned serialize call`
+        );
+        assert.equal(
+          text.includes(returnedFacadeAnchor),
+          true,
+          `${evidencePath} contains returned facade anchor`
+        );
+        return text
+          .replace(
+            canSerializeReturnedFacadeCall,
+            canSerializeReturnedFacadeCall.replace(
+              serializerToken,
+              replacementToken
+            )
+          )
+          .replace(
+            serializeReturnedFacadeCall,
+            serializeReturnedFacadeCall.replace(serializerToken, replacementToken)
+          )
+          .replace(returnedFacadeAnchor, dummyNestedFacade);
+      }
+    }))
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      gate.localChecks.privateToJSONHostOutputDiagnosticSourceEvidencePresent,
+      false
+    );
+    assert.equal(
+      gate.localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
+      false
+    );
+    assert.equal(gate.privateDiagnosticsReady, true);
+    assert.equal(gate.privateToJSONFacadeGateReady, false);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer error-surface lifecycle diagnostics reject comment string and regex spoofing", () => {
+  const replacements = [
+    [
+      "rootLifecycleExecutionEvidences",
+      "rootLifecycleEvidenceSetForErrorSurfaceSpoofProbe"
+    ],
+    [
+      "validatePrivateSerializationLifecycleExecutionEvidence",
+      "validatePrivateSerializationLifecycleEvidenceForErrorSurfaceSpoofProbe"
+    ],
+    [
+      "react-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate",
+      "react-test-renderer-update-unmount-lifecycle-spoofed-gate"
+    ],
+    [
+      "acceptedRustLifecycleDiagnostics",
+      "acceptedRustLifecycleDiagnosticsSpoofed"
+    ],
+    [
+      "consumesAcceptedRustLifecycleDiagnostics",
+      "consumesAcceptedRustLifecycleDiagnosticsSpoofed"
+    ],
+    [
+      "consumeAcceptedRustLifecycleDiagnostic",
+      "consumeAcceptedRustLifecycleDiagnosticSpoofed"
+    ]
+  ];
+  const forgedTokens =
+    "rootLifecycleExecutionEvidences " +
+    "validatePrivateSerializationLifecycleExecutionEvidence " +
+    "react-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate " +
+    "acceptedRustLifecycleDiagnostics " +
+    "consumesAcceptedRustLifecycleDiagnostics " +
+    "consumeAcceptedRustLifecycleDiagnostic";
+  const spoofCases = [
+    {
+      label: "block-comment",
+      source: `\n/* ${forgedTokens} */\n`
+    },
+    {
+      label: "string",
+      source: `\nconst spoofedLifecycleDiagnostics = ${JSON.stringify(forgedTokens)};\n`
+    },
+    {
+      label: "regex",
+      source:
+        "\n/* regex spoof prefix */ /rootLifecycleExecutionEvidences|validatePrivateSerializationLifecycleExecutionEvidence|react-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate|acceptedRustLifecycleDiagnostics|consumesAcceptedRustLifecycleDiagnostics|consumeAcceptedRustLifecycleDiagnostic/u;\n"
+    }
+  ];
+
+  for (const evidencePath of serializationGateEntrypointSourceFiles) {
+    for (const spoofCase of spoofCases) {
+      const workspace = createSerializationGateWorkspaceWithMutatedFile({
+        evidencePath,
+        mutate(text) {
+          let mutated = text;
+          for (const [find, replace] of replacements) {
+            assert.equal(
+              mutated.includes(find),
+              true,
+              `${evidencePath} contains ${find}`
+            );
+            mutated = mutated.split(find).join(replace);
+          }
+          return `${mutated}${spoofCase.source}`;
+        }
+      });
+
+      try {
+        const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+          oracle,
+          workspaceRoot: workspace.root
+        });
+        const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+          oracle: errorSurfaceOracle,
+          workspaceRoot: workspace.root
+        });
+        const label = `${evidencePath} ${spoofCase.label}`;
+
+        assert.equal(
+          serializationGate.privateDiagnosticsReady,
+          false,
+          label
+        );
+        assert.equal(
+          errorSurfaceGate.localChecks.updatePrivateRouteConsumesLifecycleDiagnostics,
+          false,
+          label
+        );
+        assert.equal(
+          errorSurfaceGate.localChecks.unmountPrivateRouteConsumesLifecycleDiagnostics,
+          false,
+          label
+        );
+        assert.equal(errorSurfaceGate.privateDiagnosticsReady, false, label);
+        assert.equal(
+          errorSurfaceGate.privateDiagnosticBlockers.includes(
+            "react-test-renderer-update-route-private-diagnostic"
+          ),
+          true,
+          label
+        );
+        assert.equal(
+          errorSurfaceGate.privateDiagnosticBlockers.includes(
+            "react-test-renderer-unmount-route-private-diagnostic"
+          ),
+          true,
+          label
+        );
+      } finally {
+        workspace.cleanup();
+      }
+    }
+  }
+});
+
+test("react-test-renderer serialization source evidence rejects per-file public and native blocker drift", () => {
+  const cases = serializationGateEntrypointSourceFiles.flatMap(
+    (evidencePath) => [
+      {
+        evidencePath,
+        gateDeclaration: toJSONPrivateSerializationFacadeGateDeclaration,
+        property: "publicSerializationAvailable",
+        localCheck: "privateToJSONSerializationFacadePubliclyBlocked"
+      },
+      {
+        evidencePath,
+        gateDeclaration: toTreePrivateFacadeGateDeclaration,
+        property: "publicTreeAvailable",
+        localCheck: "privateToTreeHostOutputMetadataPubliclyBlocked"
+      },
+      {
+        evidencePath,
+        gateDeclaration: toJSONPrivateSerializationFacadeGateDeclaration,
+        property: "nativeExecution",
+        localCheck: "privateToJSONSerializationFacadePubliclyBlocked"
+      },
+      {
+        evidencePath,
+        gateDeclaration: toTreePrivateFacadeGateDeclaration,
+        property: "nativeExecution",
+        localCheck: "privateToTreeHostOutputMetadataPubliclyBlocked"
+      }
+    ]
+  );
+
+  for (const testCase of cases) {
+    const workspace = createSerializationGateWorkspaceWithMutatedFile({
+      evidencePath: testCase.evidencePath,
+      mutate(text) {
+        return replaceInSerializationGateSlice(text, {
+          gateDeclaration: testCase.gateDeclaration,
+          find: `${testCase.property}: false`,
+          replace:
+            `${testCase.property}: true /* ${testCase.property}: false */,\n` +
+            `  spoofed${testCase.property}: '${testCase.property}: false'`
+        });
+      }
+    });
+
+    try {
+      const gate = evaluateReactTestRendererSerializationLocalGate({
+        oracle,
+        workspaceRoot: workspace.root
+      });
+
+      assert.equal(
+        gate.localChecks[testCase.localCheck],
+        false,
+        `${testCase.evidencePath} ${testCase.property}`
+      );
+    } finally {
+      workspace.cleanup();
+    }
+  }
+});
+
+test("react-test-renderer serialization source evidence ignores forged gate anchors inside block comments", () => {
+  const cases = [
+    {
+      gateDeclaration: toJSONPrivateSerializationFacadeGateDeclaration,
+      localCheck: "privateToJSONFinishedWorkIdentityGatePresent",
+      forgedBody:
+        "  privateFinishedWorkIdentityGateAvailable: true,\n  privateUnmountFinishedWorkIdentityGateAvailable: true,\n  unmountNativeExecutionRequiresFinishedWorkIdentity: true,\n  rejectsStaleUnmountFinishedWorkIdentity: true,\n  requiresUnmountDeletionCleanupHandoffEvidence: true,\n  privateRootLifecycleExecutionEvidenceRequired: true,\n  publicRouteAvailable: false,\n  nativeBridgeAvailable: false,\n  nativeExecution: false,\n  compatibilityClaimed: false,\n  publicSerializationAvailable: false\n"
+    },
+    {
+      gateDeclaration: toTreePrivateFacadeGateDeclaration,
+      localCheck: "privateToTreeFinishedWorkIdentityGatePresent",
+      forgedBody:
+        "  privateFinishedWorkIdentityGateAvailable: true,\n  privateUnmountFinishedWorkIdentityGateAvailable: true,\n  unmountNativeExecutionRequiresFinishedWorkIdentity: true,\n  rejectsStaleUnmountFinishedWorkIdentity: true,\n  requiresUnmountDeletionCleanupHandoffEvidence: true,\n  privateRootLifecycleExecutionEvidenceRequired: true,\n  publicRouteAvailable: false,\n  nativeBridgeAvailable: false,\n  nativeExecution: false,\n  compatibilityClaimed: false,\n  publicTreeAvailable: false\n"
+    }
+  ];
+
+  for (const testCase of cases) {
+    const workspace = createSerializationGateWorkspaceWithMutatedFile({
+      evidencePath: "packages/react-test-renderer/index.js",
+      mutate(text) {
+        assert.equal(text.includes(testCase.gateDeclaration), true);
+        return text.replace(
+          testCase.gateDeclaration,
+          `/*\n${testCase.gateDeclaration}\n${testCase.forgedBody}});\n*/\n${testCase.gateDeclaration.replace("Object.freeze", "forgedObjectFreeze")}`
+        );
+      }
+    });
+
+    try {
+      const gate = evaluateReactTestRendererSerializationLocalGate({
+        oracle,
+        workspaceRoot: workspace.root
+      });
+
+      assert.equal(
+        gate.localChecks[testCase.localCheck],
+        false,
+        testCase.localCheck
+      );
+    } finally {
+      workspace.cleanup();
+    }
+  }
 });
 
 test("react-test-renderer serialization gate records accepted Rust-private prerequisites without public TestInstance admission", () => {
@@ -341,9 +1055,8 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     const moduleExports = loadFresh(entry.specifier);
     const renderer = moduleExports.create({
       type: "span",
-      props: {},
-      children: ["hello"]
-    });
+      props: { children: "hello" }
+    }, {});
     const error = captureThrown(() => renderer.toJSON());
 
     assert.equal(error.name, "FastReactTestRendererUnimplementedError");
@@ -1131,18 +1844,39 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     assert.equal(emptyPrivateDiagnosticResult.sourceNodeCount, 0);
     assert.equal(emptyPrivateDiagnosticResult.result, null);
     if (hasPackageRootOrDevelopmentRows(entry)) {
+      const { lifecycleEvidence } = createPrivateRootLifecycleExecution(
+        moduleExports,
+        { renderer }
+      );
+      const unmountHostOutputReport =
+        createAcceptedEmptyRootHostOutputDiagnostic({
+          hostOutputUpdateKind: "Unmount"
+        });
+      assert.equal(
+        privateFacade.canSerializeAcceptedHostOutputDiagnostic(
+          unmountHostOutputReport
+        ),
+        false
+      );
+      const omittedLifecycleError = captureThrown(() =>
+        privateFacade.serializeAcceptedHostOutputDiagnostic(
+          unmountHostOutputReport
+        )
+      );
+      assert.match(
+        omittedLifecycleError.message,
+        /Expected source-owned private root lifecycle execution evidence/u
+      );
       const unmountPrivateJson =
         privateFacade.serializeAcceptedHostOutputDiagnostic(
-          createAcceptedEmptyRootHostOutputDiagnostic({
-            hostOutputUpdateKind: "Unmount"
-          })
+          unmountHostOutputReport,
+          lifecycleEvidence
         );
       assert.equal(unmountPrivateJson, null);
       const unmountPrivateDiagnosticResult =
         privateFacade.createAcceptedHostOutputDiagnosticResult(
-          createAcceptedEmptyRootHostOutputDiagnostic({
-            hostOutputUpdateKind: "Unmount"
-          })
+          unmountHostOutputReport,
+          lifecycleEvidence
         );
       assert.equal(
         unmountPrivateDiagnosticResult.hostOutputRowId,
@@ -1160,6 +1894,98 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       assert.equal(unmountPrivateDiagnosticResult.sourceNodeCount, 0);
       assert.equal(unmountPrivateDiagnosticResult.result, null);
 
+      const clonedLifecycleEvidence = JSON.parse(
+        JSON.stringify(lifecycleEvidence)
+      );
+      assert.equal(
+        privateFacade.canCreateAcceptedHostOutputDiagnosticResult(
+          unmountHostOutputReport,
+          clonedLifecycleEvidence
+        ),
+        false
+      );
+      const clonedLifecycleError = captureThrown(() =>
+        privateFacade.createAcceptedHostOutputDiagnosticResult(
+          unmountHostOutputReport,
+          clonedLifecycleEvidence
+        )
+      );
+      assert.match(
+        clonedLifecycleError.message,
+        /source-owned private root lifecycle execution evidence/u
+      );
+      const staleRenderer = moduleExports.create(
+        { type: "span", props: { children: "same-root-stale" } },
+        {}
+      );
+      const stalePrivateFacade = Object.getOwnPropertyDescriptor(
+        staleRenderer.toJSON,
+        privateToJSONSerializationFacadeSymbol
+      ).value;
+      const {
+        lifecycleEvidence: staleLifecycleEvidence,
+        unmountRequest: staleLifecycleUnmountRequest
+      } = createPrivateRootLifecycleExecution(moduleExports, {
+        renderer: staleRenderer
+      });
+      const sameRootLaterUnmountError = captureThrown(() =>
+        staleRenderer.unmount()
+      );
+      assert.equal(
+        sameRootLaterUnmountError.rootRequest.rootId,
+        staleLifecycleEvidence.rootId
+      );
+      assert.equal(
+        sameRootLaterUnmountError.rootRequest.rootSequence,
+        staleLifecycleEvidence.rootSequence
+      );
+      assert.notEqual(
+        sameRootLaterUnmountError.rootRequest.requestSequence,
+        staleLifecycleUnmountRequest.requestSequence
+      );
+      assert.equal(
+        stalePrivateFacade.canSerializeAcceptedHostOutputDiagnostic(
+          unmountHostOutputReport,
+          staleLifecycleEvidence
+        ),
+        false
+      );
+      const staleLifecycleError = captureThrown(() =>
+        stalePrivateFacade.serializeAcceptedHostOutputDiagnostic(
+          unmountHostOutputReport,
+          staleLifecycleEvidence
+        )
+      );
+      assert.match(
+        staleLifecycleError.message,
+        /stale for the current renderer root/u
+      );
+      assert.doesNotMatch(
+        staleLifecycleError.message,
+        /foreign root/u
+      );
+      const compatibilityClaimLifecycleEvidence = JSON.parse(
+        JSON.stringify(lifecycleEvidence)
+      );
+      compatibilityClaimLifecycleEvidence.publicSerializationAvailable = true;
+      assert.equal(
+        privateFacade.canCreateAcceptedHostOutputDiagnosticResult(
+          unmountHostOutputReport,
+          compatibilityClaimLifecycleEvidence
+        ),
+        false
+      );
+      const compatibilityClaimLifecycleError = captureThrown(() =>
+        privateFacade.createAcceptedHostOutputDiagnosticResult(
+          unmountHostOutputReport,
+          compatibilityClaimLifecycleEvidence
+        )
+      );
+      assert.match(
+        compatibilityClaimLifecycleError.message,
+        /public, native, or package compatibility|public, native, package, act, scheduler, or compatibility/u
+      );
+
       const mismatchedUpdateRow = createAcceptedMinimalHostOutputDiagnostic({
         hostOutputUpdateKind: "Update",
         text: "goodbye"
@@ -1176,7 +2002,10 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         false
       );
       const mismatchedUpdateError = captureThrown(() =>
-        privateFacade.serializeAcceptedHostOutputDiagnostic(mismatchedUpdateRow)
+        privateFacade.serializeAcceptedHostOutputDiagnostic(
+          mismatchedUpdateRow,
+          lifecycleEvidence
+        )
       );
       assert.match(
         mismatchedUpdateError.message,
@@ -1252,8 +2081,7 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     const moduleExports = loadFresh(entry.specifier);
     const renderer = moduleExports.create({
       type: "span",
-      props: {},
-      children: ["hello"]
+      props: { children: "hello" }
     });
     const error = captureThrown(() => renderer.toTree());
 
@@ -2199,8 +3027,7 @@ test("react-test-renderer JS private serialization finished-work identity valida
     const moduleExports = loadFresh(entry.specifier);
     const renderer = moduleExports.create({
       type: "span",
-      props: {},
-      children: ["hello"]
+      props: { children: "hello" }
     });
     const jsonError = captureThrown(() => renderer.toJSON());
     const jsonFacade = Object.getOwnPropertyDescriptor(
@@ -3441,9 +4268,8 @@ test("react-test-renderer JS private root finished-work/lanes handoff clone and 
     const moduleExports = loadFresh(entry.specifier);
     const renderer = moduleExports.create({
       type: "span",
-      props: {},
-      children: ["hello"]
-    });
+      props: { children: "hello" }
+    }, {});
 
     const jsonError = captureThrown(() => renderer.toJSON());
     const jsonFacade = Object.getOwnPropertyDescriptor(
@@ -3923,11 +4749,11 @@ test("react-test-renderer package-root private unmount finished-work identity re
   assert.notEqual(entry, undefined);
 
   const moduleExports = loadFresh(entry.specifier);
-  const renderer = moduleExports.create({
-    type: "span",
-    props: {},
-    children: ["hello"]
-  });
+  const {
+    renderer,
+    lifecycleEvidence,
+    unmountError
+  } = createPrivateRootLifecycleExecution(moduleExports);
   const jsonFacade = Object.getOwnPropertyDescriptor(
     renderer.toJSON,
     privateToJSONSerializationFacadeSymbol
@@ -3936,7 +4762,6 @@ test("react-test-renderer package-root private unmount finished-work identity re
     renderer.toTree,
     privateToTreeFacadeSymbol
   ).value;
-  const unmountError = captureThrown(() => renderer.unmount());
 
   assert.equal(jsonFacade.privateUnmountFinishedWorkIdentityGateAvailable, true);
   assert.equal(jsonFacade.validatesUnmountRootRequestIdentity, true);
@@ -3978,12 +4803,33 @@ test("react-test-renderer package-root private unmount finished-work identity re
       jsonReport,
       unmountError.rootRequest
     ),
+    false
+  );
+  const missingLifecycleError = captureThrown(() =>
+    jsonFacade.validateAcceptedFinishedWorkIdentity(
+      jsonEvidence,
+      jsonReport,
+      unmountError.rootRequest
+    )
+  );
+  assert.match(
+    missingLifecycleError.message,
+    /Expected source-owned private root lifecycle execution evidence/u
+  );
+  assert.equal(
+    jsonFacade.canValidateAcceptedFinishedWorkIdentity(
+      jsonEvidence,
+      jsonReport,
+      unmountError.rootRequest,
+      lifecycleEvidence
+    ),
     true
   );
   const jsonIdentity = jsonFacade.validateAcceptedFinishedWorkIdentity(
     jsonEvidence,
     jsonReport,
-    unmountError.rootRequest
+    unmountError.rootRequest,
+    lifecycleEvidence
   );
   assert.equal(jsonIdentity.rootRequest, unmountError.rootRequest);
   assert.equal(jsonIdentity.rootRequestOperation, "unmount");
@@ -4008,7 +4854,8 @@ test("react-test-renderer package-root private unmount finished-work identity re
     }),
     jsonReport,
     "FastReactTestRendererPrivateToJSONSerializationError",
-    unmountError.rootRequest
+    unmountError.rootRequest,
+    lifecycleEvidence
   );
   assertFinishedWorkIdentityRejection(
     jsonFacade,
@@ -4017,7 +4864,8 @@ test("react-test-renderer package-root private unmount finished-work identity re
     }),
     jsonReport,
     "FastReactTestRendererPrivateToJSONSerializationError",
-    unmountError.rootRequest
+    unmountError.rootRequest,
+    lifecycleEvidence
   );
   assertFinishedWorkIdentityRejection(
     jsonFacade,
@@ -4027,7 +4875,8 @@ test("react-test-renderer package-root private unmount finished-work identity re
     }),
     jsonReport,
     "FastReactTestRendererPrivateToJSONSerializationError",
-    unmountError.rootRequest
+    unmountError.rootRequest,
+    lifecycleEvidence
   );
   assertFinishedWorkIdentityRejection(
     jsonFacade,
@@ -4037,7 +4886,8 @@ test("react-test-renderer package-root private unmount finished-work identity re
     }),
     jsonReport,
     "FastReactTestRendererPrivateToJSONSerializationError",
-    unmountError.rootRequest
+    unmountError.rootRequest,
+    lifecycleEvidence
   );
   assertFinishedWorkIdentityRejection(
     jsonFacade,
@@ -4046,7 +4896,8 @@ test("react-test-renderer package-root private unmount finished-work identity re
     }),
     jsonReport,
     "FastReactTestRendererPrivateToJSONSerializationError",
-    unmountError.rootRequest
+    unmountError.rootRequest,
+    lifecycleEvidence
   );
   assertFinishedWorkIdentityRejection(
     jsonFacade,
@@ -4055,7 +4906,8 @@ test("react-test-renderer package-root private unmount finished-work identity re
     }),
     jsonReport,
     "FastReactTestRendererPrivateToJSONSerializationError",
-    unmountError.rootRequest
+    unmountError.rootRequest,
+    lifecycleEvidence
   );
 
   const treeReport = createAcceptedUnmountTreeMetadataDiagnostic();
@@ -4072,14 +4924,16 @@ test("react-test-renderer package-root private unmount finished-work identity re
     treeFacade.canValidateAcceptedFinishedWorkIdentity(
       treeEvidence,
       treeReport,
-      unmountError.rootRequest
+      unmountError.rootRequest,
+      lifecycleEvidence
     ),
     true
   );
   const treeIdentity = treeFacade.validateAcceptedFinishedWorkIdentity(
     treeEvidence,
     treeReport,
-    unmountError.rootRequest
+    unmountError.rootRequest,
+    lifecycleEvidence
   );
   assert.equal(treeIdentity.cleanupHandoffVariant, "ref-passive");
   assert.equal(treeIdentity.refCleanupReturnCount, 1);
@@ -4089,14 +4943,9 @@ test("react-test-renderer package-root private unmount finished-work identity re
   assert.equal(treeIdentity.publicToTreeAvailable, false);
   assert.equal(treeIdentity.compatibilityClaimed, false);
 
-  const foreignRenderer = moduleExports.create({
-    type: "span",
-    props: {},
-    children: ["foreign"]
-  });
-  const foreignUnmountError = captureThrown(() => foreignRenderer.unmount());
+  const foreignLifecycle = createPrivateRootLifecycleExecution(moduleExports);
   const foreignEvidence = createAcceptedFinishedWorkIdentityEvidence({
-    rootRequest: foreignUnmountError.rootRequest,
+    rootRequest: foreignLifecycle.unmountRequest,
     publicSurface: "create().toTree",
     sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
     consumesPrivateToJSONEvidence: false,
@@ -4109,7 +4958,8 @@ test("react-test-renderer package-root private unmount finished-work identity re
     foreignEvidence,
     treeReport,
     "FastReactTestRendererPrivateToTreeMetadataError",
-    foreignUnmountError.rootRequest
+    foreignLifecycle.unmountRequest,
+    foreignLifecycle.lifecycleEvidence
   );
 });
 
@@ -4567,11 +5417,13 @@ test("react-test-renderer JS private native unmount serialization accepts strict
 
   for (const entry of nativeUnmountEntrypoints) {
     const moduleExports = loadFresh(entry.specifier);
-    const renderer = moduleExports.create({
-      type: "span",
-      props: {},
-      children: ["hello"]
-    });
+    const renderer = moduleExports.create(
+      {
+        type: "span",
+        props: { children: "hello" }
+      },
+      {}
+    );
     const jsonError = captureThrown(() => renderer.toJSON());
     const jsonFacade = Object.getOwnPropertyDescriptor(
       renderer.toJSON,
@@ -4582,11 +5434,11 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       renderer.toTree,
       privateToTreeFacadeSymbol
     ).value;
-    const unmountError = captureThrown(() => renderer.unmount());
-    const unmountExecutionRecord = createAcceptedNativeExecutionRecord(
-      moduleExports,
-      unmountError.rootRequest
-    );
+    const {
+      lifecycleEvidence,
+      unmountError,
+      unmountResult: unmountExecutionRecord
+    } = createPrivateRootLifecycleExecution(moduleExports, { renderer });
 
     const jsonUnmountReport = createAcceptedEmptyRootHostOutputDiagnostic({
       hostOutputUpdateKind: "Unmount"
@@ -4615,13 +5467,34 @@ test("react-test-renderer JS private native unmount serialization accepts strict
         jsonUnmountReport,
         jsonUnmountIdentityEvidence
       ),
+      false
+    );
+    const missingNativeLifecycleError = captureThrown(() =>
+      jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        jsonUnmountReport,
+        jsonUnmountIdentityEvidence
+      )
+    );
+    assert.match(
+      missingNativeLifecycleError.message,
+      /Expected source-owned private root lifecycle execution evidence|Expected private unmount finished-work identity admission id/u
+    );
+    assert.equal(
+      jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        jsonUnmountReport,
+        jsonUnmountIdentityEvidence,
+        lifecycleEvidence
+      ),
       true
     );
     const jsonUnmountResult =
       jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
         unmountExecutionRecord,
         jsonUnmountReport,
-        jsonUnmountIdentityEvidence
+        jsonUnmountIdentityEvidence,
+        lifecycleEvidence
       );
     assert.equal(jsonUnmountResult.operation, "unmount");
     assert.equal(jsonUnmountResult.rootId, unmountError.rootRequest.rootId);
@@ -4656,7 +5529,8 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
         refPassiveUnmountExecutionRecord,
         jsonUnmountReport,
-        jsonUnmountIdentityEvidence
+        jsonUnmountIdentityEvidence,
+        lifecycleEvidence
       ),
       true
     );
@@ -4664,7 +5538,8 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
         refPassiveUnmountExecutionRecord,
         jsonUnmountReport,
-        jsonUnmountIdentityEvidence
+        jsonUnmountIdentityEvidence,
+        lifecycleEvidence
       );
     assert.equal(jsonRefPassiveUnmountResult.operation, "unmount");
     assert.equal(
@@ -4689,6 +5564,7 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       ),
       report: jsonUnmountReport,
       identityEvidence: jsonUnmountIdentityEvidence,
+      rootLifecycleExecutionEvidence: lifecycleEvidence,
       errorName: "FastReactTestRendererPrivateToJSONSerializationError"
     });
     assertNativeExecutionIdentityRejection({
@@ -4702,6 +5578,7 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       ),
       report: jsonUnmountReport,
       identityEvidence: jsonUnmountIdentityEvidence,
+      rootLifecycleExecutionEvidence: lifecycleEvidence,
       errorName: "FastReactTestRendererPrivateToJSONSerializationError"
     });
     assertNativeExecutionIdentityRejection({
@@ -4717,6 +5594,7 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       ),
       report: jsonUnmountReport,
       identityEvidence: jsonUnmountIdentityEvidence,
+      rootLifecycleExecutionEvidence: lifecycleEvidence,
       errorName: "FastReactTestRendererPrivateToJSONSerializationError"
     });
     assertNativeExecutionIdentityRejection({
@@ -4733,6 +5611,7 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       ),
       report: jsonUnmountReport,
       identityEvidence: jsonUnmountIdentityEvidence,
+      rootLifecycleExecutionEvidence: lifecycleEvidence,
       errorName: "FastReactTestRendererPrivateToJSONSerializationError"
     });
     assertNativeExecutionIdentityRejection({
@@ -4748,6 +5627,7 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       ),
       report: jsonUnmountReport,
       identityEvidence: jsonUnmountIdentityEvidence,
+      rootLifecycleExecutionEvidence: lifecycleEvidence,
       errorName: "FastReactTestRendererPrivateToJSONSerializationError"
     });
     assertNativeExecutionIdentityRejection({
@@ -4763,6 +5643,7 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       ),
       report: jsonUnmountReport,
       identityEvidence: jsonUnmountIdentityEvidence,
+      rootLifecycleExecutionEvidence: lifecycleEvidence,
       errorName: "FastReactTestRendererPrivateToJSONSerializationError"
     });
     assertNativeExecutionIdentityRejection({
@@ -4778,6 +5659,7 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       ),
       report: jsonUnmountReport,
       identityEvidence: jsonUnmountIdentityEvidence,
+      rootLifecycleExecutionEvidence: lifecycleEvidence,
       errorName: "FastReactTestRendererPrivateToJSONSerializationError"
     });
     assertNativeExecutionIdentityRejection({
@@ -4793,6 +5675,7 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       ),
       report: jsonUnmountReport,
       identityEvidence: jsonUnmountIdentityEvidence,
+      rootLifecycleExecutionEvidence: lifecycleEvidence,
       errorName: "FastReactTestRendererPrivateToJSONSerializationError"
     });
 
@@ -5072,13 +5955,23 @@ test("react-test-renderer JS private native unmount serialization accepts strict
         treeUnmountReport,
         treeUnmountIdentityEvidence
       ),
+      false
+    );
+    assert.equal(
+      treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        treeUnmountReport,
+        treeUnmountIdentityEvidence,
+        lifecycleEvidence
+      ),
       true
     );
     const treeUnmountResult =
       treeFacade.createAcceptedNativeExecutionDiagnosticResult(
         unmountExecutionRecord,
         treeUnmountReport,
-        treeUnmountIdentityEvidence
+        treeUnmountIdentityEvidence,
+        lifecycleEvidence
       );
     assert.equal(treeUnmountResult.operation, "unmount");
     assert.equal(treeUnmountResult.rootId, unmountError.rootRequest.rootId);
@@ -5103,7 +5996,8 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
         refPassiveUnmountExecutionRecord,
         treeUnmountReport,
-        treeUnmountIdentityEvidence
+        treeUnmountIdentityEvidence,
+        lifecycleEvidence
       ),
       true
     );
@@ -5111,7 +6005,8 @@ test("react-test-renderer JS private native unmount serialization accepts strict
       treeFacade.createAcceptedNativeExecutionDiagnosticResult(
         refPassiveUnmountExecutionRecord,
         treeUnmountReport,
-        treeUnmountIdentityEvidence
+        treeUnmountIdentityEvidence,
+        lifecycleEvidence
       );
     assert.equal(treeRefPassiveUnmountResult.operation, "unmount");
     assert.equal(treeRefPassiveUnmountResult.publicTreeAvailable, false);
@@ -5240,6 +6135,66 @@ test("react-test-renderer serialization gate rejects premature public compatibil
   );
 });
 
+function createSerializationGateWorkspaceWithMutatedFile({
+  evidencePath,
+  mutate
+}) {
+  return createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: [{ evidencePath, mutate }]
+  });
+}
+
+function createSerializationGateWorkspaceWithMutatedFiles({ mutations }) {
+  const root = mkdtempSync(join(tmpdir(), "serialization-local-gate-"));
+  const copiedPaths = [
+    "crates/fast-react-test-renderer/Cargo.toml",
+    "crates/fast-react-test-renderer/src",
+    "crates/fast-react-reconciler/src",
+    "packages/react-test-renderer",
+    "packages/fast-react-test-renderer"
+  ];
+
+  for (const relativePath of copiedPaths) {
+    const sourcePath = join(repoRoot, relativePath);
+    try {
+      const targetPath = join(root, relativePath);
+      mkdirSync(dirname(targetPath), { recursive: true });
+      cpSync(sourcePath, targetPath, { recursive: true });
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
+
+  for (const { evidencePath, mutate } of mutations) {
+    const targetEvidencePath = join(root, evidencePath);
+    const text = readFileSync(targetEvidencePath, "utf8");
+    writeFileSync(targetEvidencePath, mutate(text));
+  }
+
+  return {
+    root,
+    cleanup() {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+}
+
+function replaceInSerializationGateSlice(
+  text,
+  { gateDeclaration, find, replace }
+) {
+  const startIndex = text.indexOf(gateDeclaration);
+  assert.notEqual(startIndex, -1, gateDeclaration);
+  const endIndex = text.indexOf("\n});", startIndex + gateDeclaration.length);
+  assert.notEqual(endIndex, -1, gateDeclaration);
+  const slice = text.slice(startIndex, endIndex);
+  assert.equal(slice.includes(find), true, find);
+  const updatedSlice = slice.replace(find, replace);
+  return `${text.slice(0, startIndex)}${updatedSlice}${text.slice(endIndex)}`;
+}
+
 function loadFresh(specifier) {
   const resolved = require.resolve(specifier);
   delete require.cache[resolved];
@@ -5327,6 +6282,25 @@ function createAcceptedNativeExecutionRecord(
     nativeExecution: false,
     rustExecution: true
   };
+  if (rootRequest.operation === "create") {
+    const admission =
+      typeof bridge.getRootCreateRouteAdmission === "function"
+        ? bridge.getRootCreateRouteAdmission(rootRequest)
+        : rootRequest.entrypoint === packageRootEntrypoint
+          ? createPackageRootCreateRouteAdmissionSource(rootRequest)
+          : null;
+    source.privateCreateNativeBridgeHostOutputHandoff =
+      createRustCreateNativeBridgeHostOutputHandoffSource(
+        rootRequest,
+        admission
+      );
+  }
+  if (rootRequest.operation === "update") {
+    Object.assign(
+      source,
+      createRustUpdateNativeBridgeAdmissionEvidence(rootRequest, options)
+    );
+  }
   if (rootRequest.operation === "unmount") {
     const deletionCommitHandoff =
       createAcceptedUnmountDeletionCommitHandoff(rootRequest, options);
@@ -5348,6 +6322,402 @@ function createAcceptedNativeExecutionRecord(
   }
 
   return bridge.consumeRootExecutionResult(rootRequest, source);
+}
+
+function createPrivateRootLifecycleExecution(moduleExports, options = {}) {
+  const bridge = getPrivateRootRequestBridge(moduleExports);
+  const renderer =
+    options.renderer ??
+    moduleExports.create(
+      options.element ?? {
+        type: "span",
+        props: { children: "hello" }
+      },
+      options.rootOptions ?? {}
+    );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const createResult = createAcceptedNativeExecutionRecord(
+    moduleExports,
+    createRequest
+  );
+  const updateError = captureThrown(() =>
+    renderer.update(
+      options.updateElement ?? {
+        type: "span",
+        props: { children: "goodbye" }
+      }
+    )
+  );
+  const updateResult = createAcceptedNativeExecutionRecord(
+    moduleExports,
+    updateError.rootRequest
+  );
+  const unmountError = captureThrown(() => renderer.unmount());
+  const unmountResult = createAcceptedNativeExecutionRecord(
+    moduleExports,
+    unmountError.rootRequest,
+    options.unmountOptions ?? {}
+  );
+  const lifecycleEvidence =
+    bridge.consumePrivateRootLifecycleExecutionEvidence({
+      create: createResult,
+      update: updateResult,
+      unmount: unmountResult
+    });
+  rootLifecycleEvidenceByRootRequest.set(createRequest, lifecycleEvidence);
+  rootLifecycleEvidenceByRootRequest.set(updateError.rootRequest, lifecycleEvidence);
+  rootLifecycleEvidenceByRootRequest.set(unmountError.rootRequest, lifecycleEvidence);
+
+  return {
+    renderer,
+    bridge,
+    createRequest,
+    createResult,
+    updateError,
+    updateRequest: updateError.rootRequest,
+    updateResult,
+    unmountError,
+    unmountRequest: unmountError.rootRequest,
+    unmountResult,
+    lifecycleEvidence
+  };
+}
+
+function createRustCreateNativeBridgeHostOutputHandoffSource(
+  request,
+  admission
+) {
+  const finishedWork = createRustRootCreateFinishedWorkHandle();
+  const handoff = {
+    id: privateCreateNativeBridgeHostOutputHandoffDiagnosticId,
+    status: privateCreateNativeBridgeHostOutputHandoffStatus,
+    operation: "create",
+    publicSurface: "create()",
+    rootRequestId: request.requestId,
+    rootRequestSequence: request.requestSequence,
+    rootId: request.rootId,
+    rootSequence: request.rootSequence,
+    rootApi: "TestRendererRoot::create",
+    lifecycleStatusBefore: request.lifecycleStatusBefore,
+    lifecycleStatusAfter: normalizeExpectedRustLifecycle(
+      request.lifecycleStatusAfter
+    ),
+    updateKind: "Create",
+    rustOutcome: "Scheduled",
+    scheduled: true,
+    hostOutputUpdateKind: "Create",
+    hostOutputShape: "SingleHostText",
+    hostOutputSnapshotCurrent: true,
+    hostOutput: {
+      containerChildCount: 1,
+      instanceCount: 1,
+      textCount: 1,
+      realHostOutputAvailable: true
+    },
+    serializationGateStatus: "ReadyForPrivateSerializationDiagnostics",
+    renderFinishedWork: finishedWork,
+    commitCurrent: finishedWork,
+    renderLanesBits: 1,
+    commitFinishedLanesBits: 1,
+    commitRemainingLanesBits: 0,
+    commitPendingLanesBits: 0,
+    renderFinishedWorkMatchesCreateRoutePreflight: true,
+    commitCurrentMatchesRenderFinishedWork: true,
+    commitLanesMatchRenderLanes: true,
+    minimalTreeHostOutputConsumesRootFinishedWork: true,
+    minimalTreeHostOutputConsumesRootFinishedLanes: true,
+    createRouteAdmissionAccepted: true,
+    hostOutputHandoffAccepted: true,
+    actualRustCreateHostOutputHandoff: true,
+    hostOutputProducedByRust: true,
+    publicRouteAvailable: false,
+    publicRootAvailable: false,
+    publicRootUpdateAvailable: false,
+    publicRendererRootCreated: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    publicCreateBehaviorAvailable: false,
+    publicUpdateCompatibilityClaimed: false,
+    publicSerializationAvailable: false,
+    publicTestInstanceAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    hostOutputProducedFromJs: false,
+    packageCompatibilityClaimed: false,
+    jsPackageCompatibilityAvailable: false,
+    compatibilityClaimed: false
+  };
+
+  if (admission !== null) {
+    handoff.createRouteAdmission =
+      createRustCreateRouteAdmissionDiagnosticSource(admission);
+    handoff.createRouteAdmissionRecordId = privateCreateRouteAdmissionRecordId;
+    handoff.createRouteAdmissionStatus = privateCreateRouteAdmissionStatus;
+    handoff.workLoopFinishedWorkPreflight =
+      createRustRootCreateWorkLoopFinishedWorkPreflightSource(
+        admission.workLoopFinishedWorkPreflight
+      );
+  }
+
+  return handoff;
+}
+
+function createPackageRootCreateRouteAdmissionSource(request) {
+  return {
+    rustAdmissionMetadata: {
+      metadataId: "fast-react-test-renderer-create-route-admission-metadata",
+      metadataStatus: "accepted-create-route-rust-root-work-loop-metadata",
+      recordId: privateCreateRouteAdmissionRecordId,
+      diagnosticName: privateCreateRouteAdmissionDiagnosticName,
+      status: privateCreateRouteAdmissionStatus,
+      acceptedWorker: "worker-390-test-renderer-root-create-route",
+      acceptedRustCrate: "fast-react-test-renderer",
+      rootApi: "TestRendererRoot::create",
+      preflightApi: "describe_private_root_create_preflight_for_canary",
+      workLoopRenderPhaseApi:
+        "describe_private_root_create_work_loop_finished_work_for_canary",
+      lifecycleRecord: "TestRendererRootLifecycle",
+      executionResultRecord: "TestRendererRootCreateExecutionEvidence",
+      acceptedInputShape: "host-text"
+    },
+    rootCreatePreflight: {
+      diagnosticName: "fast-react-test-renderer.root-create.private-preflight",
+      status: "private-root-create-preflight-ready-public-root-blocked",
+      operation: "create",
+      createInputShape: "host-text",
+      rootOptionsMetadata: request.optionsInfo,
+      canaryApiIdentity: {
+        rootApi: "TestRendererRoot::create",
+        metadataId: "fast-react-test-renderer-root-create-canary-metadata"
+      }
+    },
+    workLoopFinishedWorkPreflight: {
+      id: "react-test-renderer-root-create-work-loop-finished-work-private-diagnostic",
+      status:
+        "private-root-create-work-loop-finished-work-preflight-public-root-blocked",
+      operation: "create",
+      rootRequestId: request.requestId,
+      rootRequestSequence: request.requestSequence,
+      rootId: request.rootId,
+      rootSequence: request.rootSequence,
+      rootApi: "TestRendererRoot::create",
+      updateKind: "Create",
+      updateOutcome: "Scheduled",
+      previousCurrent: createRustRootCreatePreviousCurrentHandle(),
+      finishedWork: createRustRootCreateFinishedWorkHandle(),
+      renderLanesEmpty: false,
+      renderLanesBits: 1,
+      remainingLanesEmpty: true,
+      remainingLanesBits: 0,
+      finishedWorkMatchesRenderPhase: true
+    },
+    rootCreateExecutionEvidence: {
+      operation: "create",
+      requestId: request.requestId,
+      requestSequence: request.requestSequence,
+      rootRequestId: request.requestId,
+      rootRequestSequence: request.requestSequence,
+      rootId: request.rootId,
+      rootSequence: request.rootSequence,
+      rootApi: "TestRendererRoot::create",
+      updateKind: "Create",
+      rustOutcome: "Scheduled",
+      scheduled: true
+    }
+  };
+}
+
+function createRustCreateRouteAdmissionDiagnosticSource(admission) {
+  return {
+    id: privateCreateRouteAdmissionRecordId,
+    diagnosticName: privateCreateRouteAdmissionDiagnosticName,
+    status: privateCreateRouteAdmissionStatus,
+    operation: "create",
+    publicSurface: "create()",
+    jsFacadeMetadataSource: "FastReactTestRendererPrivateRootRequestRecord",
+    rustAdmissionMetadata: admission.rustAdmissionMetadata,
+    rootCreatePreflight: admission.rootCreatePreflight,
+    workLoopFinishedWorkPreflight:
+      createRustRootCreateWorkLoopFinishedWorkPreflightSource(
+        admission.workLoopFinishedWorkPreflight
+      ),
+    rootCreateExecutionEvidence: admission.rootCreateExecutionEvidence,
+    consumesJsFacadeCreateMetadata: true,
+    consumesAcceptedRustRootCreateExecutionEvidence: true,
+    consumesAcceptedRustRootCreatePreflightDiagnostics: true,
+    consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true
+  };
+}
+
+function createRustRootCreateWorkLoopFinishedWorkPreflightSource(row) {
+  return {
+    ...row,
+    previousCurrent: createRustRootCreatePreviousCurrentHandle(),
+    finishedWork: createRustRootCreateFinishedWorkHandle(),
+    renderLanesEmpty: false,
+    renderLanesBits: 1,
+    remainingLanesEmpty: true,
+    remainingLanesBits: 0,
+    finishedWorkMatchesRenderPhase: true
+  };
+}
+
+function createRustRootCreatePreviousCurrentHandle() {
+  return {
+    arenaId: 1,
+    slot: 1,
+    generation: 1
+  };
+}
+
+function createRustRootCreateFinishedWorkHandle() {
+  return {
+    arenaId: 1,
+    slot: 2,
+    generation: 1
+  };
+}
+
+function createRustUpdateNativeBridgeAdmissionEvidence(
+  request,
+  overrides = {}
+) {
+  return {
+    rustLifecycleDiagnostic:
+      overrides.rustLifecycleDiagnostic ??
+      createRustLifecycleDiagnosticSource(request),
+    updateRouteRootWorkLoopDiagnostic: {
+      ...createRustUpdateRouteRootWorkLoopDiagnosticSource(request),
+      ...(overrides.updateRouteRootWorkLoopDiagnostic ?? {})
+    },
+    privateErrorBoundaryCommitRecoveryMetadata:
+      overrides.privateErrorBoundaryCommitRecoveryMetadata ??
+      createRustErrorBoundaryCommitRecoveryMetadataSource(request),
+    hostOutputProduced:
+      overrides.hostOutputProduced === undefined
+        ? true
+        : overrides.hostOutputProduced,
+    publicRouteAvailable: false,
+    publicRootAvailable: false,
+    publicRootUpdateAvailable: false,
+    publicRendererRootCreated: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    publicCreateBehaviorAvailable: false,
+    publicUpdateCompatibilityClaimed: false,
+    publicSerializationAvailable: false,
+    publicTestInstanceAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    hostOutputProducedFromJs: false,
+    packageCompatibilityClaimed: false,
+    jsPackageCompatibilityAvailable: false,
+    compatibilityClaimed: false,
+    rustExecution: true,
+    reconcilerExecution: true
+  };
+}
+
+function createRustErrorBoundaryCommitRecoveryMetadataSource(request) {
+  return {
+    id: privateErrorBoundaryCommitRecoveryDiagnosticName,
+    kind: "FastReactTestRendererPrivateErrorBoundaryCommitRecoveryMetadata",
+    status: privateErrorBoundaryCommitRecoveryStatus,
+    acceptedRustApi: privateErrorBoundaryCommitRecoveryRustApi,
+    rootRequestId: request.requestId,
+    rootId: request.rootId,
+    operation: "update",
+    updateFailurePath: "commit",
+    commitPhaseRecoveryPath: privateErrorBoundaryCommitRecoveryPath,
+    commitPhaseRecoveryAction: privateErrorBoundaryCommitRecoveryAction,
+    sourceUpdateRecord: "TestRendererUpdateNativeBridgeAdmission",
+    sourceUpdateRecordId: privateUpdateNativeBridgeAdmissionDiagnosticId,
+    sourceUpdateRecordStatus: privateUpdateNativeBridgeAdmissionStatus,
+    sourceUpdateKind: "Update",
+    sourceFailureRecord: "HostRootRenderFailureRecoveryCommitEvidenceForCanary",
+    sourceCommitRecoverySnapshotRecord: "HostRootCommitRecoverySnapshotForCanary",
+    consumesAcceptedRustUpdateMetadata: true,
+    consumesAcceptedRustFailureMetadata: true,
+    consumesAcceptedCommitRecoverySnapshot: true,
+    preservesRootErrorOptionHandles: true,
+    commitPhaseRecoveryPathConsumed: true,
+    rootErrorUpdateScheduled: false,
+    publicRootErrorCallbacksInvoked: false,
+    publicErrorBoundaryBehaviorAvailable: false,
+    publicErrorRecoveryAvailable: false,
+    compatibilityClaimed: false
+  };
+}
+
+function createRustUpdateRouteRootWorkLoopDiagnosticSource(request) {
+  return {
+    diagnosticName: privateUpdateRouteRootWorkLoopDiagnosticName,
+    status: privateUpdateRouteRootWorkLoopStatus,
+    rootRequestId: request.requestId,
+    rootRequestSequence: request.requestSequence,
+    rootId: request.rootId,
+    rootSequence: request.rootSequence,
+    rootOperation: "update",
+    updateKind: "Update",
+    updateOutcome: request.rustOutcome,
+    lifecycleStatusBefore: normalizeExpectedRustLifecycle(
+      request.lifecycleStatusBefore
+    ),
+    lifecycleStatusAfter: normalizeExpectedRustLifecycle(
+      request.lifecycleStatusAfter
+    ),
+    hostOutputUpdateKind: "Update",
+    updateQueueMetadata: {
+      record: "UpdateContainerResult",
+      scheduleRecord: "RootScheduleUpdateRecord",
+      scheduledUpdateRecord: "TestRendererRootScheduledUpdate",
+      scheduledUpdateKind: "Update",
+      laneSource: "update_container",
+      queueMatchesRenderCurrentQueue: true,
+      selectedLanesMatchRenderLanes: true,
+      pendingLanesAfterEnqueueMatchRenderLanes: true
+    },
+    rootWorkLoopMetadata: {
+      renderPhaseRecord: "HostRootRenderPhaseRecord",
+      commitRecord: "HostRootCommitRecord",
+      appliedUpdateCount: 1,
+      skippedUpdateCount: 0,
+      remainingLanesEmpty: true,
+      commitCurrentMatchesRenderFinishedWork: true,
+      commitPreviousCurrentMatchesRenderCurrent: true,
+      commitLanesMatchRenderLanes: true,
+      rootCurrentMatchesCommitCurrent: true
+    },
+    hostTextUpdateMetadata: {
+      hostOutputUpdateRecord: "TestRendererUpdatedHostOutput",
+      hostTextUpdateApplyRequired: true,
+      hostComponentPropUpdateRecorded: true,
+      hostComponentStyleUpdateRecorded: true,
+      acceptedHostComponentUpdatePayloadShape:
+        "HostComponentPropStyleTextUpdate",
+      textUpdateApplyRecorded: true,
+      hostTextUpdateApplyCount: 1,
+      hostComponentUpdateApplyCount: 1
+    },
+    publicRouteAvailable: false,
+    publicRootAvailable: false,
+    publicRootUpdateAvailable: false,
+    publicRendererRootCreated: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    publicCreateBehaviorAvailable: false,
+    publicUpdateCompatibilityClaimed: false,
+    publicSerializationAvailable: false,
+    publicTestInstanceAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    hostOutputProducedFromJs: false,
+    packageCompatibilityClaimed: false,
+    jsPackageCompatibilityAvailable: false,
+    compatibilityClaimed: false
+  };
 }
 
 function createRustLifecycleDiagnosticSource(rootRequest) {
@@ -5651,13 +7021,20 @@ function createAcceptedFinishedWorkIdentityEvidence({
     evidence.rootRequestOperation = rootRequest.operation;
     evidence.rootRequestUpdateKind = rootRequest.updateKind;
     evidence.deletionCommitHandoff = deletionCommitHandoff;
-    evidence.cleanupHandoff = createAcceptedUnmountCleanupHandoff(
+    const cleanupHandoff = createAcceptedUnmountCleanupHandoff(
       rootRequest,
       deletionCommitHandoff,
       {
         variant: unmountCleanupVariant
       }
     );
+    evidence.cleanupHandoff = cleanupHandoff;
+    evidence.privateUnmountNativeBridgeAdmission =
+      createAcceptedUnmountNativeBridgeAdmission(
+        rootRequest,
+        cleanupHandoff,
+        deletionCommitHandoff
+      );
   }
   return evidence;
 }
@@ -5799,6 +7176,19 @@ function getUnmountCleanupCounts(variant) {
 function withFinishedWorkIdentityChange(evidence, mutate) {
   const clone = JSON.parse(JSON.stringify(evidence));
   mutate(clone);
+  const admission = clone.privateUnmountNativeBridgeAdmission;
+  if (admission !== undefined && admission !== null) {
+    if (Object.hasOwn(clone, "cleanupHandoff")) {
+      admission.cleanupHandoff = clone.cleanupHandoff;
+    } else {
+      delete admission.cleanupHandoff;
+    }
+    if (Object.hasOwn(clone, "deletionCommitHandoff")) {
+      admission.deletionCommitHandoff = clone.deletionCommitHandoff;
+    } else {
+      delete admission.deletionCommitHandoff;
+    }
+  }
   return clone;
 }
 
@@ -6230,15 +7620,22 @@ function assertNativeExecutionIdentityRejection({
   executionRecord,
   report,
   identityEvidence = undefined,
+  rootLifecycleExecutionEvidence = undefined,
   errorName,
   messagePattern = undefined,
   label = undefined
 }) {
+  const effectiveRootLifecycleExecutionEvidence =
+    rootLifecycleExecutionEvidence ??
+    (executionRecord?.request === undefined
+      ? undefined
+      : rootLifecycleEvidenceByRootRequest.get(executionRecord.request));
   assert.equal(
     facade.canCreateAcceptedNativeExecutionDiagnosticResult(
       executionRecord,
       report,
-      identityEvidence
+      identityEvidence,
+      effectiveRootLifecycleExecutionEvidence
     ),
     false,
     label
@@ -6247,7 +7644,8 @@ function assertNativeExecutionIdentityRejection({
     facade.createAcceptedNativeExecutionDiagnosticResult(
       executionRecord,
       report,
-      identityEvidence
+      identityEvidence,
+      effectiveRootLifecycleExecutionEvidence
     )
   );
   assert.equal(error.name, errorName, label);
@@ -6350,13 +7748,15 @@ function assertFinishedWorkIdentityRejection(
   evidence,
   report,
   errorName,
-  sourceRootRequest = undefined
+  sourceRootRequest = undefined,
+  rootLifecycleExecutionEvidence = undefined
 ) {
   assert.equal(
     privateFacade.canValidateAcceptedFinishedWorkIdentity(
       evidence,
       report,
-      sourceRootRequest
+      sourceRootRequest,
+      rootLifecycleExecutionEvidence
     ),
     false
   );
@@ -6364,7 +7764,8 @@ function assertFinishedWorkIdentityRejection(
     privateFacade.validateAcceptedFinishedWorkIdentity(
       evidence,
       report,
-      sourceRootRequest
+      sourceRootRequest,
+      rootLifecycleExecutionEvidence
     )
   );
   assert.equal(error.name, errorName);

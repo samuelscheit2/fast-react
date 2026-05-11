@@ -118,6 +118,17 @@ const cjsDevelopmentSource =
   "packages/react-test-renderer/cjs/react-test-renderer.development.js";
 const cjsProductionSource =
   "packages/react-test-renderer/cjs/react-test-renderer.production.js";
+const serializationLocalGateTestSource =
+  "tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs";
+
+const jsonUnmountIdentityWithoutLifecycleRejectedToken =
+  "jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        jsonUnmountReport,\n        jsonUnmountIdentityEvidence\n      ),\n      false";
+const jsonUnmountIdentityWithoutLifecycleAcceptedToken =
+  "jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        jsonUnmountReport,\n        jsonUnmountIdentityEvidence\n      ),\n      true";
+const treeUnmountIdentityWithoutLifecycleRejectedToken =
+  "treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        treeUnmountReport,\n        treeUnmountIdentityEvidence\n      ),\n      false";
+const treeUnmountIdentityWithoutLifecycleAcceptedToken =
+  "treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        treeUnmountReport,\n        treeUnmountIdentityEvidence\n      ),\n      true";
 
 const expectedPublicCompatibilityClaims = [
   "publicTestRendererCompatibilityClaimed",
