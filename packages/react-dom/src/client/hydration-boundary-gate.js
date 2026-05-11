@@ -2936,10 +2936,7 @@ function isPrivateFakeHydrationTextNode(node) {
   }
 
   const constructorName = getHydrationTextNodeConstructorName(node);
-  return (
-    constructorName === 'PrivateHostOutputText' ||
-    Array.isArray(node.writeLog)
-  );
+  return constructorName === 'PrivateHostOutputText';
 }
 
 function getHydrationTextNodeConstructorName(node) {

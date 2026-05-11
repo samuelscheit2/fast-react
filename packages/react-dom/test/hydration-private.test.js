@@ -1960,6 +1960,36 @@ test('private hydration text node claim patch execution mutates one admitted fak
     }
   );
 
+  const spoofDocument =
+    createDocument('text-node-claim-patch-write-log-spoof');
+  const spoofContainer = createElement('DIV', spoofDocument);
+  const spoofTextNode = createWriteLogOnlyText('server text');
+  spoofTextNode.parentNode = spoofContainer;
+  spoofContainer.childNodes = [spoofTextNode];
+  const spoofRecord = gate.recordUnsupportedHydrateRoot(
+    spoofContainer,
+    initialChildren,
+    hydrationOptions
+  );
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationTextNodeClaimPatchExecutionRecord(
+        spoofRecord,
+        spoofRecord.acceptedPrivateMetadataDiagnostics,
+        {
+          enableTextNodeClaimPatchExecution: true,
+          hydrationOptions,
+          mismatchRow: spoofRecord.textMismatchDiagnostics.mismatchRows[0]
+        }
+      ),
+    {
+      code:
+        hydrationGate.INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_CODE
+    }
+  );
+  assert.equal(spoofTextNode.nodeValue, 'server text');
+  assert.deepEqual(spoofTextNode.writeLog, []);
+
   class Text {}
   const realLikeDocument = createDocument('text-node-claim-patch-real-like');
   const realLikeContainer = createElement('DIV', realLikeDocument);
@@ -2072,6 +2102,27 @@ function createText(nodeValue) {
     nodeType: domContainer.TEXT_NODE,
     nodeValue
   };
+}
+
+function createWriteLogOnlyText(nodeValue) {
+  const textNode = {
+    nodeName: '#text',
+    nodeType: domContainer.TEXT_NODE,
+    writeLog: []
+  };
+  let textValue = nodeValue;
+  Object.defineProperty(textNode, 'nodeValue', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return textValue;
+    },
+    set(value) {
+      textValue = String(value);
+      this.writeLog.push(['nodeValue', textValue]);
+    }
+  });
+  return textNode;
 }
 
 function createDocument(label) {
