@@ -1,5 +1,9 @@
 'use strict';
 
+const {
+  createContext: createSourceOwnedContextObject,
+  isSourceOwnedContextObject
+} = require('./context-object.js');
 const { createUnimplementedError } = require('./placeholder-utils.js');
 
 const invalidHookCallMessage =
@@ -38,6 +42,11 @@ const useRefHookExecutionEvidenceOverrideKeysByReport = new WeakMap();
 const useRefHookRendererLifecycleBlockerReports = new WeakSet();
 const useRefHookRendererLifecycleBlockerRowsByReport = new WeakMap();
 const useRefHookRendererLifecycleBlockerOverrideKeysByReport = new WeakMap();
+const contextHookRendererReadinessReports = new WeakSet();
+const contextHookRendererReadinessRowsByReport = new WeakMap();
+const contextHookRendererReadinessOverrideKeysByReport = new WeakMap();
+const contextHookRendererReadinessContextObjectSnapshotsByReport =
+  new WeakMap();
 const unsupportedPlaceholderHookCurrentnessReports = new WeakSet();
 const unsupportedPlaceholderHookSurfaceCurrentnessRowsByReport = new WeakMap();
 const unsupportedPlaceholderHookCurrentnessReportOverrideKeys = new WeakMap();
@@ -142,6 +151,202 @@ const contextPropagationRecordFieldNames = Object.freeze([
   'scanned_dependency_count',
   'marked_dependencies',
   'roots'
+]);
+const contextHookNames = freezeArray(['useContext']);
+const contextHookRendererReadinessSourceReportFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'reactSourceTag',
+  'reactSourceCommit',
+  'reactHooksSource',
+  'reactClientSource',
+  'reactReconcilerSource',
+  'fastReactSource',
+  'fastReactContextObjectSource',
+  'privateDispatcherMetadataCapability',
+  'createContextDirectObjectBehaviorAdmitted',
+  'privateUseContextProviderReadinessAccepted',
+  'publicUseContextCompatibilityAdmitted',
+  'compatibilityClaimed'
+]);
+const contextHookRendererReadinessSourceReport = freezeRecord({
+  kind: 'fast-react.private.context_hook_renderer_readiness_source_report',
+  version: 1,
+  status:
+    'source-current-for-react-19.2.6-useContext-provider-renderer-blockers',
+  reactSourceTag: 'v19.2.6',
+  reactSourceCommit: 'eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401',
+  reactHooksSource: 'packages/react/src/ReactHooks.js',
+  reactClientSource: 'packages/react/src/ReactClient.js',
+  reactReconcilerSource:
+    'packages/react-reconciler/src/ReactFiberNewContext.js',
+  fastReactSource: 'packages/react/hook-dispatcher.js',
+  fastReactContextObjectSource: 'packages/react/context-object.js',
+  privateDispatcherMetadataCapability:
+    'fast-react.private.context_hook_dispatcher',
+  createContextDirectObjectBehaviorAdmitted: true,
+  privateUseContextProviderReadinessAccepted: false,
+  publicUseContextCompatibilityAdmitted: false,
+  compatibilityClaimed: false
+});
+const contextHookRendererReadinessRowFieldNames = freezeArray([
+  'rowId',
+  'acceptedPrivateEvidence',
+  'sourceOwnedEvidence',
+  'missingRendererProviderPrerequisite',
+  'requiredPublicEvidence',
+  'currentBlocked',
+  'compatibilityClaimed'
+]);
+const contextHookRendererReadinessRows = freezeContextRendererReadinessRows([
+  {
+    rowId: 'context-object-consumption-not-source-owned-renderer-read',
+    acceptedPrivateEvidence: 'React.createContext direct object oracle',
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      'source-owned context object consumption through renderer-owned Provider state',
+    requiredPublicEvidence:
+      'useContext reads the nearest Provider value through a renderer root',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    rowId: 'private-dispatcher-not-root-render-backed',
+    acceptedPrivateEvidence: 'private context hook dispatcher marker',
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      'renderer-owned dispatcher installation during function component render',
+    requiredPublicEvidence:
+      'renderWithHooks installs and tears down the context dispatcher for the current fiber',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    rowId: 'provider-begin-work-not-default-renderer-integrated',
+    acceptedPrivateEvidence: 'private ContextProvider begin-work handoffs',
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      'default begin-work ContextProvider traversal for public Provider elements',
+    requiredPublicEvidence:
+      'Provider fibers push values, reconcile children, and unwind in broad renderer trees',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    rowId: 'context-dependencies-not-renderer-visible',
+    acceptedPrivateEvidence: 'private context dependency metadata',
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      'fiber-owned context dependency list and propagation lanes',
+    requiredPublicEvidence:
+      'changed Provider values mark dependent consumers under renderer-visible dependencies',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    rowId: 'suspense-nested-provider-propagation-not-admitted',
+    acceptedPrivateEvidence: 'private exact nested-provider canaries',
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      'Suspense, Offscreen, sibling, array, and nested-provider propagation',
+    requiredPublicEvidence:
+      'broad context propagation remains current across interrupted and nested renderer work',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    rowId: 'root-scheduler-package-compatibility-not-admitted',
+    acceptedPrivateEvidence: 'blocked package-private context diagnostics',
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      'root scheduling, Scheduler timing, act, and package compatibility evidence',
+    requiredPublicEvidence:
+      'published React surfaces prove useContext/provider compatibility under public roots',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  }
+]);
+const contextHookRendererReadinessCompatibilityFalseFlags = freezeArray([
+  'compatibilityClaimed',
+  'publicCompatibilityClaimed',
+  'publicHookCompatibility',
+  'exposesPublicHookImplementation',
+  'hookExecutionCompatibility',
+  'contextObjectConsumptionCompatibility',
+  'providerRenderCompatibility',
+  'runtimeProviderPropagation',
+  'rendererVisiblePropagation',
+  'rendererIntegration',
+  'rendererCompatibility',
+  'publicActIntegration',
+  'schedulerIntegration',
+  'schedulerPrerequisitesReady',
+  'schedulerTimingCompatibility',
+  'rootLaneIntegration',
+  'rootScheduling',
+  'rootExecution',
+  'suspenseContextPropagation',
+  'packageCompatibility',
+  'publicPackageCompatibility'
+]);
+const contextHookRendererReadinessReportFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'compatibilityTarget',
+  'hookNames',
+  'sourceReport',
+  'privateDispatcherMetadata',
+  'readinessRowFieldNames',
+  'readinessRows',
+  'contextObjectRecord',
+  'rootUseContextSourceFunctionCurrent',
+  'sourceOwnedContextObject',
+  'sourceOwnedContextObjectConsumed',
+  'callerSuppliedContextObjectAccepted',
+  'privateDispatcherMarked',
+  'privateDispatcherMetadataIdentityCurrent',
+  'sourceOwnedPrivateDispatcher',
+  'callerSuppliedDispatcherAccepted',
+  'publicUseContextCompatibilityBlocked',
+  'contextObjectConsumptionBlocked',
+  'providerRendererLifecycleBlocked',
+  'contextDependencyPropagationBlocked',
+  'rootRendererSchedulingBlocked',
+  'schedulerTimingBlocked',
+  'actIntegrationBlocked',
+  'suspenseContextPropagationBlocked',
+  'packageCompatibilityBlocked',
+  ...contextHookRendererReadinessCompatibilityFalseFlags
+]);
+const contextHookRendererReadinessReportKind =
+  'fast-react.private.context_hook_renderer_readiness_blockers';
+const contextHookRendererReadinessReportVersion = 1;
+const contextHookRendererReadinessStatus =
+  'accepted-private-context-useContext-provider-renderer-readiness-blocked';
+const contextHookRendererReadinessConsumptionStatus =
+  'accepted-context-useContext-provider-renderer-readiness-blockers';
+const contextHookRendererReadinessReportOptionNames = freezeArray([
+  'hookNames',
+  'sourceReport',
+  'privateDispatcherMetadata',
+  'readinessRows',
+  'readinessRowOverrides',
+  'contextObject',
+  'dispatcher',
+  'dispatcherMetadata',
+  'useGenericDispatcher',
+  'publicUseContextCompatibilityBlocked',
+  'contextObjectConsumptionBlocked',
+  'providerRendererLifecycleBlocked',
+  'contextDependencyPropagationBlocked',
+  'rootRendererSchedulingBlocked',
+  'schedulerTimingBlocked',
+  'actIntegrationBlocked',
+  'suspenseContextPropagationBlocked',
+  'packageCompatibilityBlocked',
+  ...contextHookRendererReadinessCompatibilityFalseFlags
 ]);
 const transitionHookNames = freezeArray(['useDeferredValue', 'useTransition']);
 const transitionHookPublicShapeBlockerFields = freezeArray([
@@ -949,12 +1154,26 @@ const privateContextHookDispatcherMetadata = freezeRecord({
   rendererIntegration: false,
   runtimeProviderPropagation: false,
   rendererVisiblePropagation: false,
-  hookNames: freezeArray(['useContext']),
+  hookNames: contextHookNames,
   contextReadRecordFields: contextReadRecordFieldNames,
   contextDependencyRecordFields: contextDependencyRecordFieldNames,
   contextPropagationDependencyRecordFields:
     contextPropagationDependencyRecordFieldNames,
   contextPropagationRecordFields: contextPropagationRecordFieldNames,
+  rendererReadinessSourceReportFieldNames:
+    contextHookRendererReadinessSourceReportFieldNames,
+  rendererReadinessSourceReport: contextHookRendererReadinessSourceReport,
+  rendererReadinessRowFieldNames: contextHookRendererReadinessRowFieldNames,
+  rendererReadinessRows: contextHookRendererReadinessRows,
+  rendererReadinessReportFieldNames:
+    contextHookRendererReadinessReportFieldNames,
+  rendererReadinessStatus: contextHookRendererReadinessStatus,
+  rendererReadinessCompatibilityFalseFlags:
+    contextHookRendererReadinessCompatibilityFalseFlags,
+  sourceOwnedContextObjectRequired: true,
+  callerSuppliedContextObjectsAccepted: false,
+  callerSuppliedDispatchersAccepted: false,
+  providerRowOverridesAccepted: false,
   acceptedReconcilerRecords: freezeArray([
     'FunctionComponentContextReadRecord',
     'FunctionComponentContextDependencyRecord',
@@ -970,6 +1189,10 @@ const privateContextHookDispatcherMetadataArrayKeys = freezeArray([
   'contextDependencyRecordFields',
   'contextPropagationDependencyRecordFields',
   'contextPropagationRecordFields',
+  'rendererReadinessSourceReportFieldNames',
+  'rendererReadinessRowFieldNames',
+  'rendererReadinessReportFieldNames',
+  'rendererReadinessCompatibilityFalseFlags',
   'acceptedReconcilerRecords'
 ]);
 
@@ -2086,6 +2309,45 @@ function createUseRefHookRendererLifecycleBlockerGateError(reason) {
   error.externalStoreSnapshotReadClaimed = false;
   error.idGenerationClaimed = false;
   error.packageCompatibility = false;
+  error.compatibilityClaimed = false;
+  return error;
+}
+
+function createContextHookRendererReadinessGateError(reason) {
+  const error = createUnimplementedError(
+    'react',
+    'contextHookRendererReadiness',
+    'rejected context/useContext renderer readiness blocker report',
+    'Only current source-owned context/useContext renderer readiness blocker reports can pass this package-private gate.'
+  );
+  error.reason = reason;
+  error.publicUseContextCompatibilityBlocked = true;
+  error.contextObjectConsumptionBlocked = true;
+  error.providerRendererLifecycleBlocked = true;
+  error.contextDependencyPropagationBlocked = true;
+  error.rootRendererSchedulingBlocked = true;
+  error.schedulerTimingBlocked = true;
+  error.actIntegrationBlocked = true;
+  error.suspenseContextPropagationBlocked = true;
+  error.packageCompatibilityBlocked = true;
+  error.publicCompatibilityClaimed = false;
+  error.publicHookCompatibility = false;
+  error.exposesPublicHookImplementation = false;
+  error.hookExecutionCompatibility = false;
+  error.contextObjectConsumptionCompatibility = false;
+  error.providerRenderCompatibility = false;
+  error.runtimeProviderPropagation = false;
+  error.rendererVisiblePropagation = false;
+  error.rendererCompatibility = false;
+  error.schedulerIntegration = false;
+  error.schedulerPrerequisitesReady = false;
+  error.schedulerTimingCompatibility = false;
+  error.rootLaneIntegration = false;
+  error.rootScheduling = false;
+  error.rootExecution = false;
+  error.suspenseContextPropagation = false;
+  error.packageCompatibility = false;
+  error.publicPackageCompatibility = false;
   error.compatibilityClaimed = false;
   return error;
 }
@@ -3453,6 +3715,241 @@ function consumeUseRefHookRendererLifecycleBlockerReport(report) {
   });
 }
 
+function createContextHookRendererReadinessReport(overrides = {}) {
+  const normalized = captureKnownOwnDataOptions(
+    overrides,
+    arguments.length > 0,
+    contextHookRendererReadinessReportOptionNames
+  );
+  const optionValues = normalized.values;
+  const hasOption = (key) =>
+    Object.prototype.hasOwnProperty.call(optionValues, key);
+  const contextObject = hasOption('contextObject')
+    ? optionValues.contextObject
+    : createSourceOwnedContextObject('fast-react-private-context-default');
+  const hasRowsOverride = hasOption('readinessRows');
+  const hasRowOverrides = hasOption('readinessRowOverrides');
+  const readinessRows = hasRowsOverride
+    ? freezeContextRendererReadinessRows(optionValues.readinessRows)
+    : hasRowOverrides
+      ? createContextRendererReadinessRows(optionValues.readinessRowOverrides)
+      : contextHookRendererReadinessRows;
+  const rootReact = require('./index.js');
+  const currentUseContext = rootReact.useContext;
+  const calls = [];
+  let dispatcher = null;
+  let markError = null;
+  let readError = null;
+  let readValue;
+
+  const dispatcherTarget = hasOption('dispatcher')
+    ? optionValues.dispatcher
+    : {
+        useContext(context) {
+          calls.push({
+            context,
+            thisMatchesDispatcher: this === dispatcher,
+            privateDispatcherMarked: isPrivateContextHookDispatcher(this),
+            metadataIdentityCurrent:
+              getPrivateContextHookDispatcherMetadata(this) ===
+              privateContextHookDispatcherMetadata
+          });
+          return context?._currentValue;
+        }
+      };
+  const dispatcherMetadata = hasOption('dispatcherMetadata')
+    ? optionValues.dispatcherMetadata
+    : privateContextHookDispatcherMetadata;
+
+  try {
+    dispatcher = markPrivateContextHookDispatcher(
+      dispatcherTarget,
+      dispatcherMetadata
+    );
+  } catch (error) {
+    markError = error;
+    dispatcher = dispatcherTarget;
+  }
+
+  const previousDispatcher = ReactSharedInternals.H;
+  if (markError === null) {
+    ReactSharedInternals.H = optionValues.useGenericDispatcher === true
+      ? {
+          useContext(context) {
+            calls.push({
+              context,
+              thisMatchesDispatcher: false,
+              privateDispatcherMarked: false,
+              metadataIdentityCurrent: false
+            });
+            return context?._currentValue;
+          }
+        }
+      : dispatcher;
+
+    try {
+      readValue = currentUseContext(contextObject);
+    } catch (error) {
+      readError = error;
+    } finally {
+      ReactSharedInternals.H = previousDispatcher;
+    }
+  }
+
+  const sourceOwnedContextObject = isSourceOwnedContextObject(contextObject);
+  const consumedCall = calls[0] ?? null;
+  const contextObjectRecord = freezeRecord({
+    contextObject,
+    sourceOwnedContextObject,
+    providerEqualsContext:
+      isObjectLike(contextObject) && contextObject.Provider === contextObject,
+    consumerContextMatchesContext:
+      isObjectLike(contextObject?.Consumer) &&
+      contextObject.Consumer._context === contextObject,
+    contextTypeMatchesReactContextSymbol:
+      isObjectLike(contextObject) &&
+      contextObject.$$typeof === Symbol.for('react.context'),
+    consumedContextObject: consumedCall?.context ?? null,
+    consumedSourceOwnedContextObject:
+      sourceOwnedContextObject && consumedCall?.context === contextObject,
+    readValue,
+    readErrorCode: (markError ?? readError)?.code ?? null,
+    callerSuppliedContextObjectAccepted: hasOption('contextObject')
+  });
+  const report = freezeRecord({
+    kind: contextHookRendererReadinessReportKind,
+    version: contextHookRendererReadinessReportVersion,
+    status: contextHookRendererReadinessStatus,
+    compatibilityTarget: 'react@19.2.6',
+    hookNames: freezeArray(optionValues.hookNames ?? contextHookNames),
+    sourceReport: freezeRecord({
+      ...contextHookRendererReadinessSourceReport,
+      ...(optionValues.sourceReport ?? {})
+    }),
+    privateDispatcherMetadata:
+      optionValues.privateDispatcherMetadata ?? privateContextHookDispatcherMetadata,
+    readinessRowFieldNames: freezeArray(
+      contextHookRendererReadinessRowFieldNames
+    ),
+    readinessRows,
+    contextObjectRecord,
+    rootUseContextSourceFunctionCurrent: currentUseContext === useContext,
+    sourceOwnedContextObject,
+    sourceOwnedContextObjectConsumed:
+      contextObjectRecord.consumedSourceOwnedContextObject === true &&
+      contextObjectRecord.readErrorCode === null,
+    callerSuppliedContextObjectAccepted: hasOption('contextObject'),
+    privateDispatcherMarked: isPrivateContextHookDispatcher(dispatcher),
+    privateDispatcherMetadataIdentityCurrent:
+      getPrivateContextHookDispatcherMetadata(dispatcher) ===
+      privateContextHookDispatcherMetadata,
+    sourceOwnedPrivateDispatcher:
+      !hasOption('dispatcher') &&
+      consumedCall !== null &&
+      consumedCall.thisMatchesDispatcher === true &&
+      consumedCall.privateDispatcherMarked === true &&
+      consumedCall.metadataIdentityCurrent === true,
+    callerSuppliedDispatcherAccepted: hasOption('dispatcher'),
+    publicUseContextCompatibilityBlocked:
+      optionValues.publicUseContextCompatibilityBlocked ?? true,
+    contextObjectConsumptionBlocked:
+      optionValues.contextObjectConsumptionBlocked ?? true,
+    providerRendererLifecycleBlocked:
+      optionValues.providerRendererLifecycleBlocked ?? true,
+    contextDependencyPropagationBlocked:
+      optionValues.contextDependencyPropagationBlocked ?? true,
+    rootRendererSchedulingBlocked:
+      optionValues.rootRendererSchedulingBlocked ?? true,
+    schedulerTimingBlocked: optionValues.schedulerTimingBlocked ?? true,
+    actIntegrationBlocked: optionValues.actIntegrationBlocked ?? true,
+    suspenseContextPropagationBlocked:
+      optionValues.suspenseContextPropagationBlocked ?? true,
+    packageCompatibilityBlocked:
+      optionValues.packageCompatibilityBlocked ?? true,
+    compatibilityClaimed: optionValues.compatibilityClaimed ?? false,
+    publicCompatibilityClaimed:
+      optionValues.publicCompatibilityClaimed ?? false,
+    publicHookCompatibility: optionValues.publicHookCompatibility ?? false,
+    exposesPublicHookImplementation:
+      optionValues.exposesPublicHookImplementation ?? false,
+    hookExecutionCompatibility:
+      optionValues.hookExecutionCompatibility ?? false,
+    contextObjectConsumptionCompatibility:
+      optionValues.contextObjectConsumptionCompatibility ?? false,
+    providerRenderCompatibility:
+      optionValues.providerRenderCompatibility ?? false,
+    runtimeProviderPropagation:
+      optionValues.runtimeProviderPropagation ?? false,
+    rendererVisiblePropagation:
+      optionValues.rendererVisiblePropagation ?? false,
+    rendererIntegration: optionValues.rendererIntegration ?? false,
+    rendererCompatibility: optionValues.rendererCompatibility ?? false,
+    publicActIntegration: optionValues.publicActIntegration ?? false,
+    schedulerIntegration: optionValues.schedulerIntegration ?? false,
+    schedulerPrerequisitesReady:
+      optionValues.schedulerPrerequisitesReady ?? false,
+    schedulerTimingCompatibility:
+      optionValues.schedulerTimingCompatibility ?? false,
+    rootLaneIntegration: optionValues.rootLaneIntegration ?? false,
+    rootScheduling: optionValues.rootScheduling ?? false,
+    rootExecution: optionValues.rootExecution ?? false,
+    suspenseContextPropagation:
+      optionValues.suspenseContextPropagation ?? false,
+    packageCompatibility: optionValues.packageCompatibility ?? false,
+    publicPackageCompatibility:
+      optionValues.publicPackageCompatibility ?? false
+  });
+
+  contextHookRendererReadinessReports.add(report);
+  contextHookRendererReadinessOverrideKeysByReport.set(
+    report,
+    normalized.overrideKeys
+  );
+
+  if (!hasRowsOverride && !hasRowOverrides) {
+    contextHookRendererReadinessRowsByReport.set(report, readinessRows);
+  }
+
+  contextHookRendererReadinessContextObjectSnapshotsByReport.set(
+    report,
+    captureContextHookRendererReadinessContextObjectSnapshot(contextObject)
+  );
+
+  return report;
+}
+
+function consumeContextHookRendererReadinessReport(report) {
+  const rejectionReason = validateContextHookRendererReadinessReport(report);
+
+  if (rejectionReason !== null) {
+    throw createContextHookRendererReadinessGateError(rejectionReason);
+  }
+
+  return freezeRecord({
+    status: contextHookRendererReadinessConsumptionStatus,
+    accepted: true,
+    readinessStatus: report.status,
+    compatibilityTarget: 'react@19.2.6',
+    hookNames: report.hookNames,
+    readinessRows: report.readinessRows,
+    sourceOwnedContextObject: true,
+    sourceOwnedContextObjectConsumed: true,
+    sourceOwnedPrivateDispatcher: true,
+    publicUseContextCompatibilityBlocked: true,
+    contextObjectConsumptionBlocked: true,
+    providerRendererLifecycleBlocked: true,
+    contextDependencyPropagationBlocked: true,
+    rootRendererSchedulingBlocked: true,
+    schedulerTimingBlocked: true,
+    actIntegrationBlocked: true,
+    suspenseContextPropagationBlocked: true,
+    packageCompatibilityBlocked: true,
+    publicCompatibilityClaimed: false,
+    publicPackageCompatibility: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createUnsupportedPlaceholderHookSurfaceCurrentnessRows(
   rowOverridesBySurfaceId
 ) {
@@ -4022,6 +4519,10 @@ function isPrivateRefHookDispatcherMetadata(metadata) {
 }
 
 function isPrivateContextHookDispatcherMetadata(metadata) {
+  if (metadata !== privateContextHookDispatcherMetadata) {
+    return false;
+  }
+
   if (
     !isObjectLike(metadata) ||
     metadata.capability !== privateContextHookDispatcherMetadata.capability ||
@@ -4031,7 +4532,11 @@ function isPrivateContextHookDispatcherMetadata(metadata) {
     metadata.exposesPublicHookImplementation !== false ||
     metadata.rendererIntegration !== false ||
     metadata.runtimeProviderPropagation !== false ||
-    metadata.rendererVisiblePropagation !== false
+    metadata.rendererVisiblePropagation !== false ||
+    metadata.sourceOwnedContextObjectRequired !== true ||
+    metadata.callerSuppliedContextObjectsAccepted !== false ||
+    metadata.callerSuppliedDispatchersAccepted !== false ||
+    metadata.providerRowOverridesAccepted !== false
   ) {
     return false;
   }
@@ -4047,7 +4552,17 @@ function isPrivateContextHookDispatcherMetadata(metadata) {
     }
   }
 
-  return true;
+  return (
+    hasSameRecordFields(
+      metadata.rendererReadinessSourceReport,
+      privateContextHookDispatcherMetadata.rendererReadinessSourceReport,
+      contextHookRendererReadinessSourceReportFieldNames
+    ) &&
+    hasSameContextRendererReadinessRows(
+      metadata.rendererReadinessRows,
+      privateContextHookDispatcherMetadata.rendererReadinessRows
+    )
+  );
 }
 
 function isPrivateEffectHookDispatcherMetadata(metadata) {
@@ -4214,6 +4729,10 @@ function isUseRefHookExecutionEvidence(report) {
 
 function isUseRefHookRendererLifecycleBlockerReport(report) {
   return validateUseRefHookRendererLifecycleBlockerReport(report) === null;
+}
+
+function isContextHookRendererReadinessReport(report) {
+  return validateContextHookRendererReadinessReport(report) === null;
 }
 
 function validateUseRefHookCurrentnessReport(report) {
@@ -4488,6 +5007,106 @@ function validateUseRefHookRendererLifecycleBlockerReport(report) {
     freezeArray([]);
   if (overrideKeys.length > 0) {
     return 'useRef-hook-renderer-lifecycle-caller-overrides';
+  }
+
+  return null;
+}
+
+function validateContextHookRendererReadinessReport(report) {
+  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+    return 'context-hook-renderer-readiness-not-frozen';
+  }
+
+  if (!contextHookRendererReadinessReports.has(report)) {
+    return 'context-hook-renderer-readiness-source-proof';
+  }
+
+  if (
+    report.kind !== contextHookRendererReadinessReportKind ||
+    report.version !== contextHookRendererReadinessReportVersion ||
+    report.status !== contextHookRendererReadinessStatus ||
+    report.compatibilityTarget !== 'react@19.2.6' ||
+    !hasSameStringArray(report.hookNames, contextHookNames) ||
+    !hasSameStringArray(
+      report.readinessRowFieldNames,
+      contextHookRendererReadinessRowFieldNames
+    )
+  ) {
+    return 'context-hook-renderer-readiness-shape';
+  }
+
+  if (
+    !hasSameRecordFields(
+      report.sourceReport,
+      contextHookRendererReadinessSourceReport,
+      contextHookRendererReadinessSourceReportFieldNames
+    )
+  ) {
+    return 'context-hook-renderer-readiness-source-report';
+  }
+
+  if (report.privateDispatcherMetadata !== privateContextHookDispatcherMetadata) {
+    return 'context-hook-renderer-readiness-dispatcher-source-identity';
+  }
+
+  if (
+    contextHookRendererReadinessRowsByReport.get(report) !==
+    report.readinessRows
+  ) {
+    return 'context-hook-renderer-readiness-provider-rows-source-proof';
+  }
+
+  if (
+    !hasSameContextRendererReadinessRows(
+      report.readinessRows,
+      contextHookRendererReadinessRows
+    )
+  ) {
+    return 'context-hook-renderer-readiness-provider-rows';
+  }
+
+  if (report.callerSuppliedContextObjectAccepted !== false) {
+    return 'context-hook-renderer-readiness-caller-context-object';
+  }
+
+  if (report.callerSuppliedDispatcherAccepted !== false) {
+    return 'context-hook-renderer-readiness-caller-dispatcher';
+  }
+
+  if (
+    report.sourceOwnedContextObject !== true ||
+    report.sourceOwnedContextObjectConsumed !== true ||
+    !hasSourceOwnedContextObjectRecord(
+      report.contextObjectRecord,
+      contextHookRendererReadinessContextObjectSnapshotsByReport.get(report)
+    )
+  ) {
+    return 'context-hook-renderer-readiness-context-object-source-identity';
+  }
+
+  if (
+    report.rootUseContextSourceFunctionCurrent !== true ||
+    !isRootUseContextSourceFunctionCurrent() ||
+    report.privateDispatcherMarked !== true ||
+    report.privateDispatcherMetadataIdentityCurrent !== true ||
+    report.sourceOwnedPrivateDispatcher !== true
+  ) {
+    return 'context-hook-renderer-readiness-dispatcher-source-identity';
+  }
+
+  if (!hasBlockedContextHookRendererReadinessPrerequisites(report)) {
+    return 'context-hook-renderer-readiness-prerequisite-smuggling';
+  }
+
+  if (!hasBlockedContextHookRendererReadinessCompatibilityClaims(report)) {
+    return 'context-hook-renderer-readiness-public-compatibility-claim';
+  }
+
+  const overrideKeys =
+    contextHookRendererReadinessOverrideKeysByReport.get(report) ||
+    freezeArray([]);
+  if (overrideKeys.length > 0) {
+    return 'context-hook-renderer-readiness-caller-overrides';
   }
 
   return null;
@@ -4952,6 +5571,147 @@ function hasBlockedUseRefRendererLifecycleCompatibilityClaims(report) {
   return true;
 }
 
+function hasSameContextRendererReadinessRows(actual, expected) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) {
+    return false;
+  }
+
+  for (let index = 0; index < expected.length; index += 1) {
+    if (!hasSameContextRendererReadinessRow(actual[index], expected[index])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasSameContextRendererReadinessRow(actual, expected) {
+  if (!isObjectLike(actual) || !Object.isFrozen(actual)) {
+    return false;
+  }
+
+  for (const fieldName of contextHookRendererReadinessRowFieldNames) {
+    if (actual[fieldName] !== expected[fieldName]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasSourceOwnedContextObjectRecord(record, snapshot) {
+  if (
+    !isObjectLike(record) ||
+    !Object.isFrozen(record) ||
+    !isObjectLike(snapshot) ||
+    snapshot.contextObject !== record.contextObject ||
+    !isSourceOwnedContextObject(record.contextObject) ||
+    record.sourceOwnedContextObject !== true ||
+    record.providerEqualsContext !== true ||
+    record.consumerContextMatchesContext !== true ||
+    record.contextTypeMatchesReactContextSymbol !== true ||
+    record.consumedContextObject !== record.contextObject ||
+    record.consumedSourceOwnedContextObject !== true ||
+    record.readValue !== snapshot.currentValue ||
+    record.readErrorCode !== null ||
+    record.callerSuppliedContextObjectAccepted !== false
+  ) {
+    return false;
+  }
+
+  return hasCurrentContextObjectSnapshot(record.contextObject, snapshot);
+}
+
+function captureContextHookRendererReadinessContextObjectSnapshot(context) {
+  if (!isObjectLike(context)) {
+    return null;
+  }
+
+  const consumer = context.Consumer;
+  return freezeRecord({
+    contextObject: context,
+    provider: context.Provider,
+    consumer,
+    contextType: context.$$typeof,
+    consumerType: isObjectLike(consumer) ? consumer.$$typeof : undefined,
+    consumerContext: isObjectLike(consumer) ? consumer._context : undefined,
+    currentValue: context._currentValue,
+    currentValue2: context._currentValue2
+  });
+}
+
+function hasCurrentContextObjectSnapshot(context, snapshot) {
+  try {
+    const consumer = context.Consumer;
+
+    return (
+      isObjectLike(context) &&
+      isSourceOwnedContextObject(context) &&
+      snapshot.contextObject === context &&
+      context.Provider === snapshot.provider &&
+      snapshot.provider === context &&
+      consumer === snapshot.consumer &&
+      isObjectLike(consumer) &&
+      consumer.$$typeof === snapshot.consumerType &&
+      snapshot.consumerType === Symbol.for('react.consumer') &&
+      consumer._context === snapshot.consumerContext &&
+      snapshot.consumerContext === context &&
+      context.$$typeof === snapshot.contextType &&
+      snapshot.contextType === Symbol.for('react.context') &&
+      context._currentValue === snapshot.currentValue &&
+      context._currentValue2 === snapshot.currentValue2
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isRootUseContextSourceFunctionCurrent() {
+  try {
+    return require('./index.js').useContext === useContext;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function hasBlockedContextHookRendererReadinessPrerequisites(report) {
+  return (
+    report.publicUseContextCompatibilityBlocked === true &&
+    report.contextObjectConsumptionBlocked === true &&
+    report.providerRendererLifecycleBlocked === true &&
+    report.contextDependencyPropagationBlocked === true &&
+    report.rootRendererSchedulingBlocked === true &&
+    report.schedulerTimingBlocked === true &&
+    report.actIntegrationBlocked === true &&
+    report.suspenseContextPropagationBlocked === true &&
+    report.packageCompatibilityBlocked === true &&
+    report.contextObjectConsumptionCompatibility === false &&
+    report.providerRenderCompatibility === false &&
+    report.runtimeProviderPropagation === false &&
+    report.rendererVisiblePropagation === false &&
+    report.rendererIntegration === false &&
+    report.rendererCompatibility === false &&
+    report.publicActIntegration === false &&
+    report.schedulerIntegration === false &&
+    report.schedulerPrerequisitesReady === false &&
+    report.schedulerTimingCompatibility === false &&
+    report.rootLaneIntegration === false &&
+    report.rootScheduling === false &&
+    report.rootExecution === false &&
+    report.suspenseContextPropagation === false
+  );
+}
+
+function hasBlockedContextHookRendererReadinessCompatibilityClaims(report) {
+  for (const flagName of contextHookRendererReadinessCompatibilityFalseFlags) {
+    if (report[flagName] !== false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function hasSameSurfaceCurrentnessRows(actual, expected) {
   if (!Array.isArray(actual) || actual.length !== expected.length) {
     return false;
@@ -5156,6 +5916,18 @@ function createUseRefRendererLifecycleBlockerRows(rowOverridesById) {
   );
 }
 
+function createContextRendererReadinessRows(rowOverridesById) {
+  const rowOverrides = rowOverridesById ?? {};
+
+  return freezeContextRendererReadinessRows(
+    contextHookRendererReadinessRows.map((row) =>
+      Object.prototype.hasOwnProperty.call(rowOverrides, row.rowId)
+        ? { ...row, ...rowOverrides[row.rowId] }
+        : row
+    )
+  );
+}
+
 function freezeUseRefSurfaceCurrentnessRow(row) {
   const surfaceRow = {};
 
@@ -5184,6 +5956,20 @@ function freezeUseRefRendererLifecycleBlockerRows(rows) {
   return freezeArray(
     (rows ?? []).map(freezeUseRefRendererLifecycleBlockerRow)
   );
+}
+
+function freezeContextRendererReadinessRow(row) {
+  const readinessRow = {};
+
+  for (const fieldName of contextHookRendererReadinessRowFieldNames) {
+    readinessRow[fieldName] = row[fieldName];
+  }
+
+  return freezeRecord(readinessRow);
+}
+
+function freezeContextRendererReadinessRows(rows) {
+  return freezeArray((rows ?? []).map(freezeContextRendererReadinessRow));
 }
 
 function freezeUseRefHookExecutionCallRecord({
@@ -5307,11 +6093,13 @@ module.exports = {
   callPrivateMemoDispatcherHook,
   callPrivateRefDispatcherHook,
   callPrivateStateDispatcherHook,
+  consumeContextHookRendererReadinessReport,
   consumeUseRefHookExecutionEvidence,
   consumeUseRefHookCurrentnessReport,
   consumeUseRefHookRendererLifecycleBlockerReport,
   consumeUnsupportedPlaceholderHookCurrentnessReport,
   createInvalidHookCallError,
+  createContextHookRendererReadinessReport,
   createMissingPrivateStateHookDispatcherError,
   createUseRefHookExecutionEvidence,
   createUseRefHookCurrentnessReport,
@@ -5345,6 +6133,7 @@ module.exports = {
   isPrivateStateHookDispatcherMetadata,
   isPrivateTransitionHookDispatcher,
   isPrivateTransitionHookDispatcherMetadata,
+  isContextHookRendererReadinessReport,
   isUseRefHookExecutionEvidence,
   isUseRefHookCurrentnessReport,
   isUseRefHookRendererLifecycleBlockerReport,
@@ -5366,6 +6155,15 @@ module.exports = {
   privateTransitionHookDispatcherMetadata,
   recordPrivateStartTransitionDispatcherRouting,
   resolveDispatcher,
+  contextHookNames,
+  contextHookRendererReadinessConsumptionStatus,
+  contextHookRendererReadinessReportFieldNames,
+  contextHookRendererReadinessRowFieldNames,
+  contextHookRendererReadinessRows,
+  contextHookRendererReadinessSourceReport,
+  contextHookRendererReadinessSourceReportFieldNames,
+  contextHookRendererReadinessStatus,
+  contextHookRendererReadinessCompatibilityFalseFlags,
   transitionHookNames,
   useRefHookExecutionEvidenceConsumptionStatus,
   useRefHookExecutionEvidenceStatus,
@@ -5392,6 +6190,7 @@ module.exports = {
   unsupportedPlaceholderHookCurrentnessConsumptionStatus,
   unsupportedPlaceholderHookCurrentnessStatus,
   unsupportedPlaceholderHookNames,
+  validateContextHookRendererReadinessReport,
   validateUseRefHookExecutionEvidence,
   validateUseRefHookCurrentnessReport,
   validateUseRefHookRendererLifecycleBlockerReport,

@@ -4,6 +4,17 @@ const REACT_CONTEXT_TYPE = Symbol.for('react.context');
 const REACT_CONSUMER_TYPE = Symbol.for('react.consumer');
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
+const sourceOwnedContextObjects = new WeakSet();
+const sourceOwnedContextObjectMetadata = Object.freeze({
+  capability: 'fast-react.private.source_owned_context_object',
+  compatibilityTarget: 'react@19.2.6',
+  source: 'packages/react/context-object.js',
+  createContextDirectObjectBehavior: true,
+  useContextConsumptionCompatibility: false,
+  providerRendererCompatibility: false,
+  packageCompatibility: false,
+  compatibilityClaimed: false
+});
 
 const createContext = function (defaultValue) {
   const context = {
@@ -26,6 +37,7 @@ const createContext = function (defaultValue) {
     context._currentRenderer2 = null;
   }
 
+  sourceOwnedContextObjects.add(context);
   return context;
 };
 
@@ -34,6 +46,19 @@ Object.defineProperty(createContext, 'name', {
   value: ''
 });
 
+function isSourceOwnedContextObject(context) {
+  return sourceOwnedContextObjects.has(context);
+}
+
+function getSourceOwnedContextObjectMetadata(context) {
+  return isSourceOwnedContextObject(context)
+    ? sourceOwnedContextObjectMetadata
+    : null;
+}
+
 module.exports = {
-  createContext
+  createContext,
+  getSourceOwnedContextObjectMetadata,
+  isSourceOwnedContextObject,
+  sourceOwnedContextObjectMetadata
 };
