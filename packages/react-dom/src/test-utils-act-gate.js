@@ -41,6 +41,16 @@ const privateSchedulerMockExpiredActRootWorkPrerequisiteId =
   'scheduler-mock-expired-act-root-work-diagnostics';
 const privateSchedulerMockExpiredActRootWorkConsumptionStatus =
   'consumed-private-test-utils-act-scheduler-mock-expired-act-root-work-diagnostics';
+const privateReactActSchedulerDiagnosticsLedgerPrerequisiteId =
+  'react-act-scheduler-private-diagnostics-ledger';
+const privateReactActSchedulerDiagnosticsLedgerGateId =
+  'private-admission-810-react-act-scheduler-diagnostics-ledger-1';
+const privateReactActSchedulerDiagnosticsLedgerStatus =
+  'recognized-react-act-scheduler-private-diagnostics-ledger-public-blocked';
+const privateReactActSchedulerDiagnosticsLedgerWorkerId =
+  'worker-810-react-act-scheduler-diagnostics-ledger';
+const privateReactActSchedulerDiagnosticsLedgerSource =
+  'tests/conformance/src/private-admission-810-react-act-scheduler-diagnostics-ledger.mjs';
 const reactActSchedulerMockExpiredActRootWorkConsumptionStatus =
   'consumed-accepted-scheduler-mock-expired-act-root-work-diagnostics';
 const schedulerMockFlushHelperStatus =
@@ -405,10 +415,274 @@ const privateSchedulerMockExpiredActRootWorkDiagnosticSummary = freezeRecord({
   executesRendererRoots: false,
   compatibilityClaimed: false
 });
+const privateReactActSchedulerDiagnosticsLedgerWorkerIds = freezeArray([
+  'worker-747-react-private-act-expired-scheduler-consumer',
+  'worker-772-scheduler-delayed-root-producer',
+  'worker-773-test-utils-act-expired-scheduler-handoff',
+  'worker-775-react-act-delayed-mock-consumer',
+  'worker-791-scheduler-source-proof-private-diagnostics',
+  'worker-792-react-delayed-renderer-root-preflight',
+  'worker-793-delayed-renderer-root-negative-coverage',
+  'worker-798-scheduler-private-diagnostics-integrity'
+]);
+const privateReactActSchedulerDiagnosticsLedgerEvidenceKinds = freezeArray([
+  'scheduler-expired-private-diagnostics',
+  'scheduler-delayed-renderer-root-private-producer',
+  'react-dom-test-utils-expired-private-handoff',
+  'react-act-delayed-nested-expired-preflight',
+  'scheduler-source-validator-private-diagnostics-object',
+  'react-act-delayed-renderer-root-nested-private-preflight',
+  'scheduler-delayed-renderer-root-negative-blockers',
+  'scheduler-private-diagnostics-integrity-blockers'
+]);
+const privateReactActSchedulerDiagnosticsLedgerRendererRootScopes = freezeArray([
+  'not-applicable',
+  'scheduler-produced-delayed-renderer-root-private-only',
+  'not-applicable',
+  'delayed-act-root-private-context-nested-expired-only',
+  'source-validator-private-diagnostics-object',
+  'delayed-renderer-root-nested-private-only',
+  'delayed-renderer-root-public-blockers-only',
+  'delayed-renderer-root-public-blockers-only'
+]);
+const privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields =
+  freezeArray([
+    'publicActReady',
+    'publicTestUtilsActReady',
+    'publicRootBehaviorReady',
+    'publicSchedulerTimingReady',
+    'publicSchedulerFlushHelperReady',
+    'publicSchedulerFlushExecutionAvailable',
+    'publicSchedulerFlushBehaviorExecuted',
+    'publicRendererCompatibilityClaimed',
+    'publicRootSchedulerCompatibilityClaimed',
+    'publicReactActCompatibilityClaimed',
+    'publicSchedulerTimingCompatibilityClaimed',
+    'publicCompatibilityClaimed',
+    'publicPackageCompatibilityClaimed',
+    'packageCompatibilityClaimed',
+    'drainsPublicSchedulerTaskQueue',
+    'drainsPublicReactActQueue',
+    'invokesPublicSchedulerFlushHelper',
+    'routesAcceptedMockSchedulerFlushHelperMetadata',
+    'publicActExecution',
+    'publicRootExecution',
+    'publicEffectExecution',
+    'publicActPassiveDrain',
+    'rendererExecutionReady',
+    'effectsExecutionReady',
+    'executesQueuedWork',
+    'executesEffects',
+    'executesRendererWork',
+    'executesRendererRoots',
+    'acceptsTopLevelDelayedActRootWorkAsPublicActEvidence',
+    'publicDelayedRendererRootAdmissionClaimed',
+    'publicFlushHelperValidatorExposed',
+    'packageSurfaceChanged',
+    'compatibilityClaimed'
+  ]);
+const privateReactActSchedulerDiagnosticsLedgerRequirementFields = freezeArray([
+  'schedulerOwnedDiagnosticsRecognized',
+  'sourceValidatorOwnedByScheduler',
+  'schedulerValidatorPrivateDiagnosticsOnly',
+  'privateEvidenceOnly',
+  'staticReadOnlyLedger',
+  'sourceTokenChecksOnly',
+  'manifestEvaluationOnly',
+  'runtimeExecutionClaimed',
+  'packageSurfaceChanged',
+  'publicCompatibilityClaimed',
+  'publicActReady',
+  'publicRootBehaviorReady',
+  'publicSchedulerTimingReady',
+  'publicSchedulerFlushHelperReady',
+  'rendererExecutionReady',
+  'effectsExecutionReady',
+  'packageCompatibilityClaimed',
+  'publicFlushHelperValidatorExposed',
+  'publicDelayedRendererRootAdmissionClaimed'
+]);
+const privateReactActSchedulerDiagnosticsLedgerRequiredTrueFields =
+  freezeArray([
+    'privateDiagnosticsRecognized',
+    'evidenceRecognized',
+    'evidenceRolesRecognized',
+    'durableEvidenceTokensRecognized',
+    'diagnosticIdsRecognized',
+    'statusesRecognized',
+    'evidenceKindsRecognized',
+    'rendererRootScopesRecognized',
+    'requirementsRecognized',
+    'blockedPublicClaimsRecognized',
+    'staticReadOnlyRecognized',
+    'sourceValidatorOwnershipRecognized',
+    'delayedRendererRootPrivateOnlyRecognized',
+    'schedulerOwnedDiagnosticsRecognized',
+    'sourceValidatorOwnedByScheduler',
+    'schedulerValidatorPrivateDiagnosticsOnly',
+    'privateEvidenceOnly',
+    'staticReadOnlyLedger',
+    'sourceTokenChecksOnly',
+    'manifestEvaluationOnly',
+    'staleEvidenceRejected',
+    'rejectsStaleWorkerLedgerMetadata',
+    'rejectsForeignWorkerLedgerMetadata',
+    'rejectsTamperedPublicClaims'
+  ]);
+const privateReactActSchedulerDiagnosticsLedgerRequiredFalseFields =
+  freezeArray([
+    'staleEvidence',
+    'compatibilityClaimed',
+    'runtimeExecutionClaimed',
+    'packageSurfaceChanged',
+    'publicCompatibilityClaimed',
+    'publicPackageCompatibilityClaimed',
+    'packageCompatibilityClaimed',
+    'publicActReady',
+    'publicReactActReady',
+    'publicTestUtilsActReady',
+    'publicRootBehaviorReady',
+    'publicSchedulerTimingReady',
+    'publicSchedulerFlushHelperReady',
+    'publicSchedulerFlushExecutionAvailable',
+    'publicSchedulerFlushBehaviorExecuted',
+    'publicRendererCompatibilityClaimed',
+    'publicRootSchedulerCompatibilityClaimed',
+    'publicReactActCompatibilityClaimed',
+    'publicSchedulerTimingCompatibilityClaimed',
+    'drainsPublicSchedulerTaskQueue',
+    'drainsPublicReactActQueue',
+    'invokesPublicSchedulerFlushHelper',
+    'routesAcceptedMockSchedulerFlushHelperMetadata',
+    'publicActExecution',
+    'publicRootExecution',
+    'publicEffectExecution',
+    'publicActPassiveDrain',
+    'rendererExecutionReady',
+    'effectsExecutionReady',
+    'publicFlushHelperValidatorExposed',
+    'publicDelayedRendererRootAdmissionClaimed',
+    'acceptsTopLevelDelayedActRootWorkAsPublicActEvidence',
+    'executesQueuedWork',
+    'executesEffects',
+    'executesPassiveEffects',
+    'executesRendererWork',
+    'executesRendererRoots'
+  ]);
+const privateReactActSchedulerDiagnosticsLedgerRequirements = freezeRecord({
+  schedulerOwnedDiagnosticsRecognized: true,
+  sourceValidatorOwnedByScheduler: true,
+  schedulerValidatorPrivateDiagnosticsOnly: true,
+  privateEvidenceOnly: true,
+  staticReadOnlyLedger: true,
+  sourceTokenChecksOnly: true,
+  manifestEvaluationOnly: true,
+  runtimeExecutionClaimed: false,
+  packageSurfaceChanged: false,
+  publicCompatibilityClaimed: false,
+  publicActReady: false,
+  publicRootBehaviorReady: false,
+  publicSchedulerTimingReady: false,
+  publicSchedulerFlushHelperReady: false,
+  rendererExecutionReady: false,
+  effectsExecutionReady: false,
+  packageCompatibilityClaimed: false,
+  publicFlushHelperValidatorExposed: false,
+  publicDelayedRendererRootAdmissionClaimed: false
+});
+const privateReactActSchedulerDiagnosticsLedgerPublicBlockerClaims =
+  falseRecord(privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields);
+const privateReactActSchedulerDiagnosticsLedgerSummary = freezeRecord({
+  gateId: privateReactActSchedulerDiagnosticsLedgerGateId,
+  status: privateReactActSchedulerDiagnosticsLedgerStatus,
+  workerId: privateReactActSchedulerDiagnosticsLedgerWorkerId,
+  workerIds: privateReactActSchedulerDiagnosticsLedgerWorkerIds,
+  workerCount: privateReactActSchedulerDiagnosticsLedgerWorkerIds.length,
+  source: privateReactActSchedulerDiagnosticsLedgerSource,
+  evidenceKinds: privateReactActSchedulerDiagnosticsLedgerEvidenceKinds,
+  delayedRendererRootEvidenceScopes:
+    privateReactActSchedulerDiagnosticsLedgerRendererRootScopes,
+  privateDiagnosticsRecognized: true,
+  evidenceRecognized: true,
+  evidenceRolesRecognized: true,
+  durableEvidenceTokensRecognized: true,
+  diagnosticIdsRecognized: true,
+  statusesRecognized: true,
+  evidenceKindsRecognized: true,
+  rendererRootScopesRecognized: true,
+  requirementsRecognized: true,
+  blockedPublicClaimsRecognized: true,
+  staticReadOnlyRecognized: true,
+  sourceValidatorOwnershipRecognized: true,
+  delayedRendererRootPrivateOnlyRecognized: true,
+  schedulerOwnedDiagnosticsRecognized: true,
+  sourceValidatorOwnedByScheduler: true,
+  schedulerValidatorPrivateDiagnosticsOnly: true,
+  privateEvidenceOnly: true,
+  staticReadOnlyLedger: true,
+  sourceTokenChecksOnly: true,
+  manifestEvaluationOnly: true,
+  requirements: privateReactActSchedulerDiagnosticsLedgerRequirements,
+  publicBlockerClaims:
+    privateReactActSchedulerDiagnosticsLedgerPublicBlockerClaims,
+  staleEvidence: false,
+  staleEvidenceRejected: true,
+  rejectsStaleWorkerLedgerMetadata: true,
+  rejectsForeignWorkerLedgerMetadata: true,
+  rejectsTamperedPublicClaims: true,
+  runtimeExecutionClaimed: false,
+  packageSurfaceChanged: false,
+  publicCompatibilityClaimed: false,
+  publicActReady: false,
+  publicReactActReady: false,
+  publicTestUtilsActReady: false,
+  publicRootBehaviorReady: false,
+  publicSchedulerTimingReady: false,
+  publicSchedulerFlushHelperReady: false,
+  publicSchedulerFlushExecutionAvailable: false,
+  publicSchedulerFlushBehaviorExecuted: false,
+  publicRendererCompatibilityClaimed: false,
+  publicRootSchedulerCompatibilityClaimed: false,
+  publicReactActCompatibilityClaimed: false,
+  publicSchedulerTimingCompatibilityClaimed: false,
+  publicPackageCompatibilityClaimed: false,
+  packageCompatibilityClaimed: false,
+  drainsPublicSchedulerTaskQueue: false,
+  drainsPublicReactActQueue: false,
+  invokesPublicSchedulerFlushHelper: false,
+  routesAcceptedMockSchedulerFlushHelperMetadata: false,
+  publicActExecution: false,
+  publicRootExecution: false,
+  publicEffectExecution: false,
+  publicActPassiveDrain: false,
+  rendererExecutionReady: false,
+  effectsExecutionReady: false,
+  publicFlushHelperValidatorExposed: false,
+  publicDelayedRendererRootAdmissionClaimed: false,
+  acceptsTopLevelDelayedActRootWorkAsPublicActEvidence: false,
+  executesQueuedWork: false,
+  executesEffects: false,
+  executesPassiveEffects: false,
+  executesRendererWork: false,
+  executesRendererRoots: false,
+  compatibilityClaimed: false
+});
 const acceptedPrivatePrerequisitePublicClaimFields = freezeArray([
+  'publicActReady',
+  'publicReactActReady',
+  'publicTestUtilsActReady',
+  'publicRootBehaviorReady',
+  'publicSchedulerTimingReady',
+  'publicSchedulerFlushHelperReady',
+  'publicSchedulerFlushHelperCompatibilityClaimed',
+  'publicSchedulerFlushExecutionAvailable',
   'compatibilityClaimed',
   'publicCompatibilityClaimed',
+  'publicPackageCompatibilityClaimed',
+  'packageCompatibilityClaimed',
+  'packageSurfaceChanged',
   'publicSchedulerTimingCompatibilityClaimed',
+  'publicReactActCompatibilityClaimed',
   'publicActCompatibilityClaimed',
   'publicFlushSyncCompatibilityClaimed',
   'publicRootCompatibilityClaimed',
@@ -425,6 +699,7 @@ const acceptedPrivatePrerequisitePublicClaimFields = freezeArray([
   'drainsPublicSchedulerTaskQueue',
   'drainsPublicReactActQueue',
   'invokesPublicSchedulerFlushHelper',
+  'routesAcceptedMockSchedulerFlushHelperMetadata',
   'publicSchedulerFlushBehaviorExecuted',
   'executesQueuedWork',
   'executesEffects',
@@ -433,6 +708,11 @@ const acceptedPrivatePrerequisitePublicClaimFields = freezeArray([
   'executesRendererRoots',
   'executesPublicRendererRoots',
   'publicActPassiveDrain',
+  'rendererExecutionReady',
+  'effectsExecutionReady',
+  'acceptsTopLevelDelayedActRootWorkAsPublicActEvidence',
+  'publicDelayedRendererRootAdmissionClaimed',
+  'publicFlushHelperValidatorExposed',
   'schedulerDrivenPassiveExecution',
   'executesPublicFlushSync'
 ]);
@@ -706,6 +986,16 @@ const acceptedPrivatePrerequisites = freezeRecords([
     compatibilityClaimed: false,
     records: privateSchedulerMockExpiredActRootWorkRecords,
     evidence: privateSchedulerMockExpiredActRootWorkEvidence
+  },
+  {
+    id: privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
+    present: true,
+    recordOnly: false,
+    privateDiagnostic: true,
+    diagnosticGateId: privateReactActSchedulerDiagnosticsLedgerGateId,
+    diagnosticStatus: privateReactActSchedulerDiagnosticsLedgerStatus,
+    summary: privateReactActSchedulerDiagnosticsLedgerSummary,
+    ...privateReactActSchedulerDiagnosticsLedgerSummary
   },
   {
     id: 'scheduler-act-queue-routing-records',
@@ -1360,7 +1650,18 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
     sideEffectPolicy,
     deprecationWarningBehavior:
       'preserved-no-warning-while-public-test-utils-act-is-placeholder',
-    ...overrides
+    ...overrides,
+    privateReactActSchedulerDiagnosticsLedger:
+      createReactActSchedulerDiagnosticsLedgerGateSurface()
+  });
+}
+
+function createReactActSchedulerDiagnosticsLedgerGateSurface() {
+  return freezeRecord({
+    prerequisiteId: privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
+    acceptedPrerequisiteId: privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
+    summary: privateReactActSchedulerDiagnosticsLedgerSummary,
+    ...privateReactActSchedulerDiagnosticsLedgerSummary
   });
 }
 
@@ -1732,6 +2033,25 @@ function collectStaleAcceptedPrivatePrerequisites(prerequisites) {
     }
   }
 
+  const ledgerPrerequisite = prerequisitesById.get(
+    privateReactActSchedulerDiagnosticsLedgerPrerequisiteId
+  );
+  if (ledgerPrerequisite) {
+    const reasons =
+      collectReactActSchedulerDiagnosticsLedgerStaleReasons(
+        ledgerPrerequisite
+      );
+    if (reasons.length > 0) {
+      stalePrerequisites.push(
+        freezeRecord({
+          prerequisiteId:
+            privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
+          reasons
+        })
+      );
+    }
+  }
+
   return freezeArray(stalePrerequisites);
 }
 
@@ -1739,19 +2059,214 @@ function collectAcceptedPrivatePrerequisitePublicClaims(prerequisites) {
   const claims = [];
 
   for (const prerequisite of prerequisites) {
-    for (const field of acceptedPrivatePrerequisitePublicClaimFields) {
-      if (prerequisite[field] === true) {
+    collectPrivatePrerequisitePublicClaimsFromRecord({
+      claims,
+      prerequisite,
+      record: prerequisite,
+      prefix: ''
+    });
+    if (isObjectLike(prerequisite.summary)) {
+      collectPrivatePrerequisitePublicClaimsFromRecord({
+        claims,
+        prerequisite,
+        record: prerequisite.summary,
+        prefix: 'summary.'
+      });
+    }
+  }
+
+  return freezeArray(claims);
+}
+
+function collectReactActSchedulerDiagnosticsLedgerStaleReasons(prerequisite) {
+  const reasons = collectReactActSchedulerDiagnosticsLedgerRecordReasons({
+    record: prerequisite,
+    prefix: '',
+    validateDiagnosticAliases: true
+  });
+
+  if (!isObjectLike(prerequisite.summary)) {
+    reasons.push('summary-missing');
+  } else {
+    reasons.push(
+      ...collectReactActSchedulerDiagnosticsLedgerRecordReasons({
+        record: prerequisite.summary,
+        prefix: 'summary.',
+        validateDiagnosticAliases: false
+      })
+    );
+  }
+
+  return freezeArray(reasons);
+}
+
+function collectReactActSchedulerDiagnosticsLedgerRecordReasons({
+  record,
+  prefix,
+  validateDiagnosticAliases
+}) {
+  const reasons = [];
+  if (record.workerId !== privateReactActSchedulerDiagnosticsLedgerWorkerId) {
+    reasons.push(`${prefix}worker-id-mismatch`);
+  }
+  if (record.status !== privateReactActSchedulerDiagnosticsLedgerStatus) {
+    reasons.push(`${prefix}status-mismatch`);
+  }
+  if (record.source !== privateReactActSchedulerDiagnosticsLedgerSource) {
+    reasons.push(`${prefix}source-mismatch`);
+  }
+  if (record.gateId !== privateReactActSchedulerDiagnosticsLedgerGateId) {
+    reasons.push(`${prefix}gate-id-mismatch`);
+  }
+  if (
+    validateDiagnosticAliases &&
+    record.diagnosticGateId !== privateReactActSchedulerDiagnosticsLedgerGateId
+  ) {
+    reasons.push(`${prefix}diagnostic-gate-id-mismatch`);
+  }
+  if (
+    validateDiagnosticAliases &&
+    record.diagnosticStatus !== privateReactActSchedulerDiagnosticsLedgerStatus
+  ) {
+    reasons.push(`${prefix}diagnostic-status-mismatch`);
+  }
+  if (
+    record.workerCount !==
+    privateReactActSchedulerDiagnosticsLedgerWorkerIds.length
+  ) {
+    reasons.push(`${prefix}worker-count-mismatch`);
+  }
+  if (
+    !sameStringArray(
+      record.workerIds,
+      privateReactActSchedulerDiagnosticsLedgerWorkerIds
+    )
+  ) {
+    reasons.push(`${prefix}worker-ids-mismatch`);
+  }
+  if (
+    !sameStringArray(
+      record.evidenceKinds,
+      privateReactActSchedulerDiagnosticsLedgerEvidenceKinds
+    )
+  ) {
+    reasons.push(`${prefix}evidence-kinds-mismatch`);
+  }
+  if (
+    !sameStringArray(
+      record.delayedRendererRootEvidenceScopes,
+      privateReactActSchedulerDiagnosticsLedgerRendererRootScopes
+    )
+  ) {
+    reasons.push(`${prefix}delayed-renderer-root-scopes-mismatch`);
+  }
+  for (const field of privateReactActSchedulerDiagnosticsLedgerRequiredTrueFields) {
+    if (record[field] !== true) {
+      reasons.push(`${prefix}${field}-not-true`);
+    }
+  }
+  for (const field of privateReactActSchedulerDiagnosticsLedgerRequiredFalseFields) {
+    if (record[field] !== false) {
+      reasons.push(`${prefix}${field}-not-false`);
+    }
+  }
+
+  const requirements = record.requirements;
+  collectReactActSchedulerDiagnosticsLedgerRequirementsReasons(
+    reasons,
+    requirements,
+    `${prefix}requirements`
+  );
+
+  const publicBlockerClaims = record.publicBlockerClaims;
+  collectReactActSchedulerDiagnosticsLedgerPublicBlockerReasons(
+    reasons,
+    publicBlockerClaims,
+    `${prefix}publicBlockerClaims`
+  );
+
+  return reasons;
+}
+
+function collectReactActSchedulerDiagnosticsLedgerRequirementsReasons(
+  reasons,
+  requirements,
+  label
+) {
+  if (!isObjectLike(requirements)) {
+    reasons.push(`${label}-missing`);
+    return;
+  }
+  if (
+    !sameStringSet(
+      Object.keys(requirements),
+      privateReactActSchedulerDiagnosticsLedgerRequirementFields
+    )
+  ) {
+    reasons.push(`${label}-field-mismatch`);
+  }
+  for (const field of privateReactActSchedulerDiagnosticsLedgerRequirementFields) {
+    if (
+      requirements[field] !==
+      privateReactActSchedulerDiagnosticsLedgerRequirements[field]
+    ) {
+      reasons.push(`${label}.${field}-mismatch`);
+    }
+  }
+}
+
+function collectReactActSchedulerDiagnosticsLedgerPublicBlockerReasons(
+  reasons,
+  publicBlockerClaims,
+  label
+) {
+  if (!isObjectLike(publicBlockerClaims)) {
+    reasons.push(`${label}-missing`);
+    return;
+  }
+  if (
+    !sameStringSet(
+      Object.keys(publicBlockerClaims),
+      privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields
+    )
+  ) {
+    reasons.push(`${label}-field-mismatch`);
+  }
+  for (const field of privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields) {
+    if (publicBlockerClaims[field] !== false) {
+      reasons.push(`${label}.${field}-not-false`);
+    }
+  }
+}
+
+function collectPrivatePrerequisitePublicClaimsFromRecord({
+  claims,
+  prerequisite,
+  record,
+  prefix
+}) {
+  for (const field of acceptedPrivatePrerequisitePublicClaimFields) {
+    if (record[field] === true) {
+      claims.push(
+        freezeRecord({
+          prerequisiteId: prerequisite.id,
+          field: `${prefix}${field}`
+        })
+      );
+    }
+  }
+  if (isObjectLike(record.publicBlockerClaims)) {
+    for (const field of privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields) {
+      if (record.publicBlockerClaims[field] === true) {
         claims.push(
           freezeRecord({
             prerequisiteId: prerequisite.id,
-            field
+            field: `${prefix}publicBlockerClaims.${field}`
           })
         );
       }
     }
   }
-
-  return freezeArray(claims);
 }
 
 function createViolation(id, extra = {}) {
@@ -1782,12 +2297,41 @@ function freezeRecord(record) {
   return Object.freeze(record);
 }
 
+function falseRecord(fields) {
+  return freezeRecord(
+    Object.fromEntries(fields.map((field) => [field, false]))
+  );
+}
+
 function freezeArray(array) {
   return Object.freeze(array.slice());
 }
 
 function freezeRecords(records) {
   return freezeArray(records.map((record) => freezeRecord(record)));
+}
+
+function sameStringArray(actual, expected) {
+  return (
+    Array.isArray(actual) &&
+    Array.isArray(expected) &&
+    actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index])
+  );
+}
+
+function sameStringSet(actual, expected) {
+  if (!Array.isArray(actual) || !Array.isArray(expected)) {
+    return false;
+  }
+  const actualSet = new Set(actual);
+  const expectedSet = new Set(expected);
+  return (
+    actualSet.size === expectedSet.size &&
+    actualSet.size === actual.length &&
+    expectedSet.size === expected.length &&
+    actual.every((value) => expectedSet.has(value))
+  );
 }
 
 module.exports = {
@@ -1806,6 +2350,12 @@ module.exports = {
   getReactDomTestUtilsActPrivateRoutingGate,
   isAcceptedSchedulerMockExpiredActRootWorkDiagnostics,
   passiveEffectDeletedSubtreeRefPassiveOrderingStatus,
+  privateReactActSchedulerDiagnosticsLedgerGateId,
+  privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
+  privateReactActSchedulerDiagnosticsLedgerStatus,
+  privateReactActSchedulerDiagnosticsLedgerSummary,
+  privateReactActSchedulerDiagnosticsLedgerWorkerId,
+  privateReactActSchedulerDiagnosticsLedgerWorkerIds,
   privateSchedulerMockExpiredActRootWorkConsumptionStatus,
   privateSchedulerMockExpiredActRootWorkDiagnosticGateId,
   privateSchedulerMockExpiredActRootWorkDiagnosticStatus,

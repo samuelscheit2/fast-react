@@ -3084,6 +3084,7 @@ test("React DOM test-utils act private routing gate tracks React act metadata wi
   assert.deepEqual(domGate.acceptedPrivatePrerequisiteIds, [
     "react-act-private-dispatcher-gate",
     "scheduler-mock-expired-act-root-work-diagnostics",
+    "react-act-scheduler-private-diagnostics-ledger",
     "scheduler-act-queue-routing-records",
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
@@ -3114,6 +3115,23 @@ test("React DOM test-utils act private routing gate tracks React act metadata wi
   assert.equal(domGate.publicReactActReady, false);
   assert.equal(domGate.publicTestUtilsActReady, false);
   assert.equal(domGate.publicCompatibilityClaimed, false);
+  assert.equal(
+    domGate.privateReactActSchedulerDiagnosticsLedger.gateId,
+    "private-admission-810-react-act-scheduler-diagnostics-ledger-1"
+  );
+  assert.equal(
+    domGate.privateReactActSchedulerDiagnosticsLedger.publicTestUtilsActReady,
+    false
+  );
+  assert.equal(
+    domGate.privateReactActSchedulerDiagnosticsLedger
+      .publicSchedulerFlushBehaviorExecuted,
+    false
+  );
+  assert.equal(
+    domGate.privateReactActSchedulerDiagnosticsLedger.executesRendererRoots,
+    false
+  );
   assert.deepEqual(domGate.violations, []);
 
   const React = loadFreshWorkspaceModule(publicReactEntrypoints[0]);
