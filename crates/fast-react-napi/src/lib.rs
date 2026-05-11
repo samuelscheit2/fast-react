@@ -109,6 +109,16 @@ mod root_bridge_requests {
         "FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_STALE_OR_FOREIGN_JSON_BATCH_ROW";
     const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_VALIDATE_NAME: &str =
         "validateNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRows";
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STATUS: &str =
+        "consumed-native-root-bridge-cleanup-generation-evidence";
+    const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_MODEL: &str =
+        "fast-react-napi.NativeRootBridgeCleanupGenerationConsumer";
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE: &str =
+        "FAST_REACT_NAPI_CLEANUP_GENERATION_STALE_OR_FOREIGN_EVIDENCE";
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_REPLAYED_EVIDENCE_CODE: &str =
+        "FAST_REACT_NAPI_CLEANUP_GENERATION_REPLAYED_EVIDENCE";
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE: &str =
+        "FAST_REACT_NAPI_CLEANUP_GENERATION_PUBLIC_NATIVE_EXECUTION_CLAIM";
     const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_LINKED_STATUS: &str =
         "linked";
     const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_REJECTED_STATUS: &str =
@@ -129,6 +139,9 @@ mod root_bridge_requests {
     ];
     const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_CLEANUP_HOOK_NOT_REQUIRED_STATUS: &str =
         "not-required";
+    static CONSUMED_NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_EVIDENCE: OnceLock<
+        Mutex<HashSet<NativeRootBridgeCleanupGenerationConsumptionKey>>,
+    > = OnceLock::new();
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) enum NativeRootBridgeRequestKind {
@@ -4114,6 +4127,400 @@ mod root_bridge_requests {
         stale_or_forged_cleanup_evidence_rejected: bool,
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    struct NativeRootBridgeCleanupGenerationConsumptionKey {
+        executor_generation: u64,
+        source_environment_id: BridgeEnvironmentId,
+        source_root_handle: BridgeHandle,
+        source_root_id: u64,
+        root_handle_current_generation: u64,
+        root_cleanup_current_generation: u64,
+        source_value_handle: BridgeHandle,
+        value_handle_current_generation: u64,
+        value_cleanup_current_generation: u64,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeCleanupGenerationConsumer {
+        status: &'static str,
+        model: &'static str,
+        validation_model: &'static str,
+        handle_table_model: &'static str,
+        executor_status: &'static str,
+        cleanup_hook_preflight_status: &'static str,
+        executor_generation: u64,
+        source_rows_validated: bool,
+        cleanup_hook_preflight_accepted: bool,
+        cleanup_generation_consumed: bool,
+        cleanup_generation_error_code: Option<&'static str>,
+        consumed_cleanup_generation_count: usize,
+        rows: Vec<NativeRootBridgeCleanupGenerationConsumerRow>,
+        node_worker_threads_execution: bool,
+        napi_cleanup_hook_execution: bool,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        public_native_compatibility: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeCleanupGenerationConsumer {
+        fn new(
+            executor: &NativeRootBridgeJsonBatchLifecycleExecutor,
+            cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+            result: Result<Vec<NativeRootBridgeCleanupGenerationConsumerRow>, &'static str>,
+        ) -> Self {
+            let cleanup_generation_error_code = result.as_ref().err().copied();
+            let rows = result.unwrap_or_default();
+            let cleanup_generation_consumed = cleanup_generation_error_code.is_none();
+
+            Self {
+                status: NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STATUS,
+                model: NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_MODEL,
+                validation_model: super::NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL,
+                handle_table_model: super::NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL,
+                executor_status: executor.status(),
+                cleanup_hook_preflight_status: cleanup_hook_preflight.status(),
+                executor_generation: executor.executor_generation(),
+                source_rows_validated: cleanup_generation_consumed,
+                cleanup_hook_preflight_accepted: cleanup_hook_preflight
+                    .canonical_executable_evidence_accepted(),
+                cleanup_generation_consumed,
+                cleanup_generation_error_code,
+                consumed_cleanup_generation_count: rows.len(),
+                rows,
+                node_worker_threads_execution: false,
+                napi_cleanup_hook_execution: false,
+                native_addon_loaded: false,
+                native_execution: false,
+                renderer_execution: false,
+                reconciler_execution: false,
+                public_native_compatibility: false,
+                react_behavior_error: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn status(&self) -> &'static str {
+            self.status
+        }
+
+        #[must_use]
+        pub(crate) const fn model(&self) -> &'static str {
+            self.model
+        }
+
+        #[must_use]
+        pub(crate) const fn validation_model(&self) -> &'static str {
+            self.validation_model
+        }
+
+        #[must_use]
+        pub(crate) const fn handle_table_model(&self) -> &'static str {
+            self.handle_table_model
+        }
+
+        #[must_use]
+        pub(crate) const fn executor_status(&self) -> &'static str {
+            self.executor_status
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_preflight_status(&self) -> &'static str {
+            self.cleanup_hook_preflight_status
+        }
+
+        #[must_use]
+        pub(crate) const fn executor_generation(&self) -> u64 {
+            self.executor_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn source_rows_validated(&self) -> bool {
+            self.source_rows_validated
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_preflight_accepted(&self) -> bool {
+            self.cleanup_hook_preflight_accepted
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_generation_consumed(&self) -> bool {
+            self.cleanup_generation_consumed
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_generation_error_code(&self) -> Option<&'static str> {
+            self.cleanup_generation_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn consumed_cleanup_generation_count(&self) -> usize {
+            self.consumed_cleanup_generation_count
+        }
+
+        #[must_use]
+        pub(crate) fn rows(&self) -> &[NativeRootBridgeCleanupGenerationConsumerRow] {
+            &self.rows
+        }
+
+        #[must_use]
+        pub(crate) const fn node_worker_threads_execution(&self) -> bool {
+            self.node_worker_threads_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn napi_cleanup_hook_execution(&self) -> bool {
+            self.napi_cleanup_hook_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_compatibility(&self) -> bool {
+            self.public_native_compatibility
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeCleanupGenerationConsumerRow {
+        id: String,
+        executor_generation: u64,
+        executor_row_id: String,
+        cleanup_hook_evidence_row_id: &'static str,
+        cleanup_hook_source_row_id: &'static str,
+        batch_index: usize,
+        request_id: u64,
+        kind: &'static str,
+        source_environment_id: BridgeEnvironmentId,
+        source_root_handle: BridgeHandle,
+        source_root_id: u64,
+        source_handle_kind: BridgeHandleKind,
+        source_handle: BridgeHandle,
+        executor_handle_current_generation: u64,
+        cleanup_hook_source_current_generation: u64,
+        source_owned_executor_row: bool,
+        cleanup_hook_order_private: bool,
+        cleanup_hook_identity_private: bool,
+        canonical_executable_evidence: bool,
+        node_worker_threads_execution: bool,
+        napi_cleanup_hook_execution: bool,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        public_native_compatibility: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeCleanupGenerationConsumerRow {
+        fn new(
+            executor_generation: u64,
+            executor_row: &NativeRootBridgeJsonBatchLifecycleExecutorRow,
+            cleanup_hook_row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+            source_handle: BridgeHandle,
+            executor_handle_current_generation: u64,
+            cleanup_hook_source_current_generation: u64,
+        ) -> Self {
+            let source_handle_kind = cleanup_hook_row.source_handle_kind();
+
+            Self {
+                id: format!(
+                    "cleanup-generation-consumer-{}-{}",
+                    executor_row.batch_index(),
+                    bridge_handle_kind_code(source_handle_kind)
+                ),
+                executor_generation,
+                executor_row_id: executor_row.id().to_owned(),
+                cleanup_hook_evidence_row_id: cleanup_hook_row.id(),
+                cleanup_hook_source_row_id: cleanup_hook_row.source_row_id(),
+                batch_index: executor_row.batch_index(),
+                request_id: executor_row.request_id(),
+                kind: executor_row.kind(),
+                source_environment_id: executor_row.source_environment_id(),
+                source_root_handle: executor_row.source_root_handle(),
+                source_root_id: executor_row.source_root_id(),
+                source_handle_kind,
+                source_handle,
+                executor_handle_current_generation,
+                cleanup_hook_source_current_generation,
+                source_owned_executor_row: executor_row.source_owned_json_row()
+                    && executor_row.rust_state_machine_execution(),
+                cleanup_hook_order_private: cleanup_hook_row.cleanup_hook_order_private(),
+                cleanup_hook_identity_private: cleanup_hook_row.cleanup_hook_identity_private(),
+                canonical_executable_evidence: cleanup_hook_row.canonical_executable_evidence(),
+                node_worker_threads_execution: false,
+                napi_cleanup_hook_execution: false,
+                native_addon_loaded: false,
+                native_execution: false,
+                renderer_execution: false,
+                reconciler_execution: false,
+                public_native_compatibility: false,
+                react_behavior_error: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) fn id(&self) -> &str {
+            &self.id
+        }
+
+        #[must_use]
+        pub(crate) const fn executor_generation(&self) -> u64 {
+            self.executor_generation
+        }
+
+        #[must_use]
+        pub(crate) fn executor_row_id(&self) -> &str {
+            &self.executor_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_evidence_row_id(&self) -> &'static str {
+            self.cleanup_hook_evidence_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_row_id(&self) -> &'static str {
+            self.cleanup_hook_source_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn batch_index(&self) -> usize {
+            self.batch_index
+        }
+
+        #[must_use]
+        pub(crate) const fn request_id(&self) -> u64 {
+            self.request_id
+        }
+
+        #[must_use]
+        pub(crate) const fn kind(&self) -> &'static str {
+            self.kind
+        }
+
+        #[must_use]
+        pub(crate) const fn source_environment_id(&self) -> BridgeEnvironmentId {
+            self.source_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_handle(&self) -> BridgeHandle {
+            self.source_root_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_id(&self) -> u64 {
+            self.source_root_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_handle_kind(&self) -> BridgeHandleKind {
+            self.source_handle_kind
+        }
+
+        #[must_use]
+        pub(crate) const fn source_handle(&self) -> BridgeHandle {
+            self.source_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn executor_handle_current_generation(&self) -> u64 {
+            self.executor_handle_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_current_generation(&self) -> u64 {
+            self.cleanup_hook_source_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn source_owned_executor_row(&self) -> bool {
+            self.source_owned_executor_row
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_order_private(&self) -> bool {
+            self.cleanup_hook_order_private
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_identity_private(&self) -> bool {
+            self.cleanup_hook_identity_private
+        }
+
+        #[must_use]
+        pub(crate) const fn canonical_executable_evidence(&self) -> bool {
+            self.canonical_executable_evidence
+        }
+
+        #[must_use]
+        pub(crate) const fn node_worker_threads_execution(&self) -> bool {
+            self.node_worker_threads_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn napi_cleanup_hook_execution(&self) -> bool {
+            self.napi_cleanup_hook_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_compatibility(&self) -> bool {
+            self.public_native_compatibility
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) struct NativeRootBridgeBatchLifecycleConsumer {
         status: &'static str,
@@ -6830,6 +7237,43 @@ mod root_bridge_requests {
         Ok(native_root_bridge_batch_lifecycle_consumer_for_gate(&gate))
     }
 
+    pub(crate) fn native_root_bridge_cleanup_generation_consumer_for_json(
+        json: &str,
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+    ) -> Result<NativeRootBridgeCleanupGenerationConsumer, NativeRootBridgeJsonTransportParseError>
+    {
+        let gate = parse_native_root_bridge_json_transport_for_gate(json)?;
+        Ok(native_root_bridge_cleanup_generation_consumer_for_gate(
+            &gate,
+            cleanup_hook_preflight,
+        ))
+    }
+
+    pub(crate) fn native_root_bridge_cleanup_generation_consumer_for_gate(
+        gate: &NativeRootBridgeJsonTransportParserGate,
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+    ) -> NativeRootBridgeCleanupGenerationConsumer {
+        native_root_bridge_cleanup_generation_consumer_for_sources(
+            gate.json_batch_lifecycle_executor(),
+            gate.json_batch_lifecycle_executor().rows(),
+            cleanup_hook_preflight,
+        )
+    }
+
+    pub(crate) fn native_root_bridge_cleanup_generation_consumer_for_sources(
+        executor: &NativeRootBridgeJsonBatchLifecycleExecutor,
+        candidate_rows: &[NativeRootBridgeJsonBatchLifecycleExecutorRow],
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+    ) -> NativeRootBridgeCleanupGenerationConsumer {
+        let result = consume_native_root_bridge_cleanup_generation_evidence(
+            executor,
+            candidate_rows,
+            cleanup_hook_preflight,
+        );
+
+        NativeRootBridgeCleanupGenerationConsumer::new(executor, cleanup_hook_preflight, result)
+    }
+
     pub(crate) fn native_root_bridge_batch_lifecycle_consumer_for_gate(
         gate: &NativeRootBridgeJsonTransportParserGate,
     ) -> NativeRootBridgeBatchLifecycleConsumer {
@@ -7483,6 +7927,322 @@ mod root_bridge_requests {
             || row.reconciler_execution()
             || row.public_native_compatibility()
             || row.react_behavior_error()
+    }
+
+    fn has_native_root_bridge_cleanup_hook_preflight_public_native_claim(
+        preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+    ) -> bool {
+        let preflight_claims_public_native = preflight.node_worker_threads_execution()
+            || preflight.napi_cleanup_hook_execution()
+            || preflight.native_addon_loaded()
+            || preflight.native_execution()
+            || preflight.renderer_execution()
+            || preflight.reconciler_execution()
+            || preflight.public_native_compatibility()
+            || preflight.react_behavior_error();
+        let row_claims_public_native = preflight.rows().iter().any(|row| {
+            row.code()
+                == Some(
+                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM_CODE,
+                )
+                || has_native_root_bridge_cleanup_hook_preflight_row_public_native_claim(row)
+        });
+
+        preflight_claims_public_native || row_claims_public_native
+    }
+
+    fn has_native_root_bridge_cleanup_hook_preflight_row_public_native_claim(
+        row: &NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+    ) -> bool {
+        row.node_worker_threads_execution()
+            || row.napi_cleanup_hook_execution()
+            || row.native_addon_loaded()
+            || row.native_execution()
+            || row.renderer_execution()
+            || row.reconciler_execution()
+            || row.public_native_compatibility()
+            || row.react_behavior_error()
+    }
+
+    fn consume_native_root_bridge_cleanup_generation_evidence(
+        executor: &NativeRootBridgeJsonBatchLifecycleExecutor,
+        candidate_rows: &[NativeRootBridgeJsonBatchLifecycleExecutorRow],
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+    ) -> Result<Vec<NativeRootBridgeCleanupGenerationConsumerRow>, &'static str> {
+        let rows = validate_native_root_bridge_cleanup_generation_source_evidence(
+            executor,
+            candidate_rows,
+            cleanup_hook_preflight,
+        )?;
+        let key = native_root_bridge_cleanup_generation_consumption_key(&rows)?;
+        let consumed_generations = CONSUMED_NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_EVIDENCE
+            .get_or_init(|| Mutex::new(HashSet::new()));
+        let mut consumed_generations = consumed_generations
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        if consumed_generations.insert(key) {
+            return Ok(rows);
+        }
+
+        Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_REPLAYED_EVIDENCE_CODE)
+    }
+
+    fn validate_native_root_bridge_cleanup_generation_source_evidence(
+        executor: &NativeRootBridgeJsonBatchLifecycleExecutor,
+        candidate_rows: &[NativeRootBridgeJsonBatchLifecycleExecutorRow],
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+    ) -> Result<Vec<NativeRootBridgeCleanupGenerationConsumerRow>, &'static str> {
+        validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(
+            executor,
+            candidate_rows,
+        )
+        .map_err(cleanup_generation_executor_source_error_code)?;
+
+        if has_native_root_bridge_cleanup_hook_preflight_public_native_claim(cleanup_hook_preflight)
+        {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
+            );
+        }
+
+        if !cleanup_hook_preflight.canonical_executable_evidence_accepted() {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        }
+
+        let rows = cleanup_hook_preflight
+            .rows()
+            .iter()
+            .copied()
+            .filter(|row| cleanup_hook_accepted_canonical_role(*row).is_some())
+            .map(|cleanup_hook_row| {
+                native_root_bridge_cleanup_generation_consumer_row_for_cleanup_hook(
+                    executor,
+                    candidate_rows,
+                    cleanup_hook_row,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        if !native_root_bridge_cleanup_generation_consumer_has_root_and_value_rows(&rows) {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        }
+
+        Ok(rows)
+    }
+
+    fn cleanup_generation_executor_source_error_code(code: &'static str) -> &'static str {
+        if code
+            == NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE
+        {
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE
+        } else {
+            code
+        }
+    }
+
+    fn native_root_bridge_cleanup_generation_consumer_row_for_cleanup_hook(
+        executor: &NativeRootBridgeJsonBatchLifecycleExecutor,
+        candidate_rows: &[NativeRootBridgeJsonBatchLifecycleExecutorRow],
+        cleanup_hook_row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+    ) -> Result<NativeRootBridgeCleanupGenerationConsumerRow, &'static str> {
+        let Some(source_handle_environment_id) = cleanup_hook_row.source_handle_environment_id()
+        else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        };
+        let Some(source_handle_slot) = cleanup_hook_row.source_handle_slot() else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        };
+        let Some(source_handle_generation) = cleanup_hook_row.source_handle_generation() else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        };
+        let Some(cleanup_hook_source_current_generation) =
+            cleanup_hook_row.source_current_generation()
+        else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        };
+        let Some(cleanup_hook_source_root_id) = cleanup_hook_row.source_root_id() else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        };
+
+        if cleanup_hook_row.status()
+            != NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted
+            || !cleanup_hook_row.canonical_executable_evidence()
+            || !cleanup_hook_row.cleanup_hook_order_private()
+            || !cleanup_hook_row.cleanup_hook_identity_private()
+            || cleanup_hook_row.source_error_code() != Some("FAST_REACT_NAPI_STALE_HANDLE")
+            || cleanup_hook_row.source_boundary_error_code()
+                != Some(super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code())
+            || cleanup_hook_row.source_environment_id() != executor.environment_id()
+            || source_handle_environment_id != executor.environment_id()
+            || cleanup_hook_source_root_id != executor.root_id().unwrap_or_default()
+        {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        }
+
+        let source_handle = BridgeHandle::new(
+            source_handle_environment_id,
+            source_handle_slot,
+            source_handle_generation,
+            cleanup_hook_row.source_handle_kind(),
+        );
+        let Some(executor_row) = native_root_bridge_cleanup_generation_matching_executor_row(
+            candidate_rows,
+            cleanup_hook_row,
+            source_handle,
+            cleanup_hook_source_root_id,
+        ) else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        };
+        let Some(executor_handle_current_generation) =
+            executor_current_generation_for_cleanup_hook_source(executor_row, source_handle)
+        else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        };
+        let Some(expected_cleanup_current_generation) =
+            executor_handle_current_generation.checked_add(1)
+        else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        };
+
+        if cleanup_hook_source_current_generation != expected_cleanup_current_generation {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        }
+
+        Ok(NativeRootBridgeCleanupGenerationConsumerRow::new(
+            executor.executor_generation(),
+            executor_row,
+            cleanup_hook_row,
+            source_handle,
+            executor_handle_current_generation,
+            cleanup_hook_source_current_generation,
+        ))
+    }
+
+    fn native_root_bridge_cleanup_generation_matching_executor_row<'a>(
+        candidate_rows: &'a [NativeRootBridgeJsonBatchLifecycleExecutorRow],
+        cleanup_hook_row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+        source_handle: BridgeHandle,
+        cleanup_hook_source_root_id: u64,
+    ) -> Option<&'a NativeRootBridgeJsonBatchLifecycleExecutorRow> {
+        candidate_rows.iter().find(|row| {
+            row.kind() == "render"
+                && row.source_environment_id() == cleanup_hook_row.source_environment_id()
+                && row.source_root_id() == cleanup_hook_source_root_id
+                && cleanup_generation_executor_row_matches_source_handle(row, source_handle)
+        })
+    }
+
+    fn cleanup_generation_executor_row_matches_source_handle(
+        row: &NativeRootBridgeJsonBatchLifecycleExecutorRow,
+        source_handle: BridgeHandle,
+    ) -> bool {
+        match source_handle.kind() {
+            BridgeHandleKind::Root => row.source_root_handle() == source_handle,
+            BridgeHandleKind::Value => row.source_value_handle() == Some(source_handle),
+        }
+    }
+
+    fn executor_current_generation_for_cleanup_hook_source(
+        row: &NativeRootBridgeJsonBatchLifecycleExecutorRow,
+        source_handle: BridgeHandle,
+    ) -> Option<u64> {
+        match source_handle.kind() {
+            BridgeHandleKind::Root => (row.source_root_handle() == source_handle)
+                .then_some(row.root_handle_current_generation()),
+            BridgeHandleKind::Value => (row.source_value_handle() == Some(source_handle))
+                .then_some(row.value_handle_current_generation())
+                .flatten(),
+        }
+    }
+
+    fn native_root_bridge_cleanup_generation_consumer_has_root_and_value_rows(
+        rows: &[NativeRootBridgeCleanupGenerationConsumerRow],
+    ) -> bool {
+        let root_count = rows
+            .iter()
+            .filter(|row| row.source_handle_kind() == BridgeHandleKind::Root)
+            .count();
+        let value_count = rows
+            .iter()
+            .filter(|row| row.source_handle_kind() == BridgeHandleKind::Value)
+            .count();
+
+        root_count == 1 && value_count == 1
+    }
+
+    fn native_root_bridge_cleanup_generation_consumption_key(
+        rows: &[NativeRootBridgeCleanupGenerationConsumerRow],
+    ) -> Result<NativeRootBridgeCleanupGenerationConsumptionKey, &'static str> {
+        let Some(root_row) = rows
+            .iter()
+            .find(|row| row.source_handle_kind() == BridgeHandleKind::Root)
+        else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        };
+        let Some(value_row) = rows
+            .iter()
+            .find(|row| row.source_handle_kind() == BridgeHandleKind::Value)
+        else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        };
+
+        if root_row.executor_generation() != value_row.executor_generation()
+            || root_row.source_environment_id() != value_row.source_environment_id()
+            || root_row.source_root_handle() != value_row.source_root_handle()
+            || root_row.source_root_id() != value_row.source_root_id()
+        {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+            );
+        }
+
+        Ok(NativeRootBridgeCleanupGenerationConsumptionKey {
+            executor_generation: root_row.executor_generation(),
+            source_environment_id: root_row.source_environment_id(),
+            source_root_handle: root_row.source_root_handle(),
+            source_root_id: root_row.source_root_id(),
+            root_handle_current_generation: root_row.executor_handle_current_generation(),
+            root_cleanup_current_generation: root_row.cleanup_hook_source_current_generation(),
+            source_value_handle: value_row.source_handle(),
+            value_handle_current_generation: value_row.executor_handle_current_generation(),
+            value_cleanup_current_generation: value_row.cleanup_hook_source_current_generation(),
+        })
+    }
+
+    const fn bridge_handle_kind_code(kind: BridgeHandleKind) -> &'static str {
+        match kind {
+            BridgeHandleKind::Root => "root",
+            BridgeHandleKind::Value => "value",
+        }
     }
 
     fn validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows_for_preflight(
@@ -10457,6 +11217,10 @@ mod tests {
         NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_ROW_ORDER_MISMATCH_CODE,
         NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_STALE_OR_FOREIGN_JSON_BATCH_ROW_CODE,
         NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_STATUS,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_REPLAYED_EVIDENCE_CODE,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STATUS,
         NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_CALLER_BUILT_ROW_CODE,
         NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
         NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE,
@@ -10476,11 +11240,12 @@ mod tests {
         NativeRootBridgeBatchLifecycleConsumerRow, NativeRootBridgeBatchResponseErrorRowStatus,
         NativeRootBridgeBatchResponseTeardownState,
         NativeRootBridgeBatchedJsonTransportLifecycleState,
-        NativeRootBridgeBatchedJsonTransportLifecycleStatus, NativeRootBridgeCreateRequest,
-        NativeRootBridgeHandleAdmissionAction, NativeRootBridgeJsonBatchLifecycleExecutor,
-        NativeRootBridgeJsonBatchLifecycleExecutorRow, NativeRootBridgeJsonTransportHandle,
-        NativeRootBridgeJsonTransportParseError, NativeRootBridgeJsonTransportRecord,
-        NativeRootBridgeJsonTransportStreamAssemblyState,
+        NativeRootBridgeBatchedJsonTransportLifecycleStatus,
+        NativeRootBridgeCleanupGenerationConsumer, NativeRootBridgeCleanupGenerationConsumerRow,
+        NativeRootBridgeCreateRequest, NativeRootBridgeHandleAdmissionAction,
+        NativeRootBridgeJsonBatchLifecycleExecutor, NativeRootBridgeJsonBatchLifecycleExecutorRow,
+        NativeRootBridgeJsonTransportHandle, NativeRootBridgeJsonTransportParseError,
+        NativeRootBridgeJsonTransportRecord, NativeRootBridgeJsonTransportStreamAssemblyState,
         NativeRootBridgeJsonTransportStreamChunkKind,
         NativeRootBridgeJsonTransportStreamChunkStatus,
         NativeRootBridgeJsonTransportStreamTeardownBlocker, NativeRootBridgeJsonTransportValueKind,
@@ -10494,6 +11259,9 @@ mod tests {
         native_root_bridge_batch_lifecycle_consumer_for_gate,
         native_root_bridge_batch_lifecycle_consumer_for_json,
         native_root_bridge_batched_json_transport_error_rows,
+        native_root_bridge_cleanup_generation_consumer_for_gate,
+        native_root_bridge_cleanup_generation_consumer_for_json,
+        native_root_bridge_cleanup_generation_consumer_for_sources,
         native_root_bridge_cross_environment_teardown_gate,
         native_root_bridge_json_batch_lifecycle_executor_for_json,
         native_root_bridge_json_batch_lifecycle_executor_for_records,
@@ -10518,6 +11286,12 @@ mod tests {
         TestRendererOptions, TestRendererRootLifecycle, TestRendererRootUpdateKind,
     };
     use std::path::Path;
+
+    fn native_root_bridge_cleanup_generation_consumer_json(environment_id: u64) -> String {
+        format!(
+            r#"{{"transport":"json","schemaVersion":1,"requestRecords":[{{"request_id":1,"kind":"create","environment_id":{environment_id},"root_handle":{{"environment_id":{environment_id},"slot":1,"generation":1,"kind":"root"}},"root_id":1,"value_handle":{{"environment_id":{environment_id},"slot":2,"generation":1,"kind":"value"}},"root_handle_state":"active"}},{{"request_id":2,"kind":"render","environment_id":{environment_id},"root_handle":{{"environment_id":{environment_id},"slot":1,"generation":1,"kind":"root"}},"root_id":1,"value_handle":{{"environment_id":{environment_id},"slot":3,"generation":1,"kind":"value"}},"root_handle_state":"active"}}]}}"#
+        )
+    }
 
     #[test]
     fn native_boundary_is_a_placeholder() {
@@ -12391,6 +13165,395 @@ mod tests {
                     )
             }));
         assert_consumer_inert(&replayed_consumer);
+    }
+
+    #[test]
+    fn native_root_bridge_batch_lifecycle_cleanup_hook_generation_consumer_consumes_current_executor_evidence()
+     {
+        fn assert_consumer_inert(consumer: &NativeRootBridgeCleanupGenerationConsumer) {
+            assert!(!consumer.node_worker_threads_execution());
+            assert!(!consumer.napi_cleanup_hook_execution());
+            assert!(!consumer.native_addon_loaded());
+            assert!(!consumer.native_execution());
+            assert!(!consumer.renderer_execution());
+            assert!(!consumer.reconciler_execution());
+            assert!(!consumer.public_native_compatibility());
+            assert!(!consumer.react_behavior_error());
+        }
+
+        fn assert_row_inert(row: &NativeRootBridgeCleanupGenerationConsumerRow) {
+            assert!(!row.node_worker_threads_execution());
+            assert!(!row.napi_cleanup_hook_execution());
+            assert!(!row.native_addon_loaded());
+            assert!(!row.native_execution());
+            assert!(!row.renderer_execution());
+            assert!(!row.reconciler_execution());
+            assert!(!row.public_native_compatibility());
+            assert!(!row.react_behavior_error());
+        }
+
+        let json = native_root_bridge_cleanup_generation_consumer_json(764);
+        let gate = parse_native_root_bridge_json_transport_for_gate(&json).unwrap();
+        let cleanup_hook_preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+        let consumer =
+            native_root_bridge_cleanup_generation_consumer_for_gate(&gate, &cleanup_hook_preflight);
+
+        assert_eq!(
+            consumer.status(),
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STATUS
+        );
+        assert_eq!(
+            consumer.model(),
+            "fast-react-napi.NativeRootBridgeCleanupGenerationConsumer"
+        );
+        assert_eq!(
+            consumer.validation_model(),
+            NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL
+        );
+        assert_eq!(
+            consumer.handle_table_model(),
+            NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL
+        );
+        assert_eq!(
+            consumer.executor_status(),
+            NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STATUS
+        );
+        assert_eq!(
+            consumer.cleanup_hook_preflight_status(),
+            NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PREFLIGHT_STATUS
+        );
+        assert_eq!(
+            consumer.executor_generation(),
+            gate.json_batch_lifecycle_executor().executor_generation()
+        );
+        assert!(consumer.executor_generation() > 0);
+        assert!(consumer.source_rows_validated());
+        assert!(consumer.cleanup_hook_preflight_accepted());
+        assert!(consumer.cleanup_generation_consumed());
+        assert_eq!(consumer.cleanup_generation_error_code(), None);
+        assert_eq!(consumer.consumed_cleanup_generation_count(), 2);
+        assert_consumer_inert(&consumer);
+
+        let rows = consumer.rows();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(
+            rows.iter().map(|row| row.id()).collect::<Vec<_>>(),
+            [
+                "cleanup-generation-consumer-1-root",
+                "cleanup-generation-consumer-1-value"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.executor_generation())
+                .collect::<Vec<_>>(),
+            [
+                consumer.executor_generation(),
+                consumer.executor_generation()
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.executor_row_id())
+                .collect::<Vec<_>>(),
+            [
+                "json-batch-lifecycle-executor-1-render",
+                "json-batch-lifecycle-executor-1-render"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_evidence_row_id())
+                .collect::<Vec<_>>(),
+            [
+                "cleanup-hook-worker-root-before-value-release",
+                "cleanup-hook-worker-value-after-root-release"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_row_id())
+                .collect::<Vec<_>>(),
+            [
+                "worker-render-root-stale-executable-preflight",
+                "worker-render-value-stale-executable-preflight"
+            ]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.batch_index()).collect::<Vec<_>>(),
+            [1, 1]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.request_id()).collect::<Vec<_>>(),
+            [2, 2]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.kind()).collect::<Vec<_>>(),
+            ["render", "render"]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_environment_id())
+                .collect::<Vec<_>>(),
+            [
+                BridgeEnvironmentId::from_raw(764),
+                BridgeEnvironmentId::from_raw(764)
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_root_id())
+                .collect::<Vec<_>>(),
+            [1, 1]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_handle_kind())
+                .collect::<Vec<_>>(),
+            [BridgeHandleKind::Root, BridgeHandleKind::Value]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_handle().slot())
+                .collect::<Vec<_>>(),
+            [1, 3]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_handle().generation())
+                .collect::<Vec<_>>(),
+            [1, 1]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.executor_handle_current_generation())
+                .collect::<Vec<_>>(),
+            [1, 1]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_current_generation())
+                .collect::<Vec<_>>(),
+            [2, 2]
+        );
+        assert!(rows.iter().all(|row| {
+            row.source_root_handle().slot() == 1
+                && row.source_root_handle().generation() == 1
+                && row.source_owned_executor_row()
+                && row.cleanup_hook_order_private()
+                && row.cleanup_hook_identity_private()
+                && row.canonical_executable_evidence()
+        }));
+        for row in rows {
+            assert_row_inert(row);
+        }
+
+        let replayed =
+            native_root_bridge_cleanup_generation_consumer_for_gate(&gate, &cleanup_hook_preflight);
+        assert!(!replayed.source_rows_validated());
+        assert!(!replayed.cleanup_generation_consumed());
+        assert_eq!(
+            replayed.cleanup_generation_error_code(),
+            Some(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_REPLAYED_EVIDENCE_CODE)
+        );
+        assert_eq!(replayed.consumed_cleanup_generation_count(), 0);
+        assert!(replayed.rows().is_empty());
+        assert_consumer_inert(&replayed);
+    }
+
+    #[test]
+    fn native_root_bridge_batch_lifecycle_cleanup_hook_generation_consumer_rejects_executor_row_forgery()
+     {
+        fn assert_cleanup_generation_rejection(
+            executor: &NativeRootBridgeJsonBatchLifecycleExecutor,
+            candidate_rows: &[NativeRootBridgeJsonBatchLifecycleExecutorRow],
+            cleanup_hook_preflight: &crate::root_bridge_requests::NativeRootBridgeWorkerThreadCleanupHookPreflight,
+            expected_code: &'static str,
+        ) {
+            let consumer = native_root_bridge_cleanup_generation_consumer_for_sources(
+                executor,
+                candidate_rows,
+                cleanup_hook_preflight,
+            );
+
+            assert!(!consumer.cleanup_generation_consumed());
+            assert_eq!(
+                consumer.cleanup_generation_error_code(),
+                Some(expected_code)
+            );
+            assert_eq!(consumer.consumed_cleanup_generation_count(), 0);
+            assert!(consumer.rows().is_empty());
+            assert!(!consumer.node_worker_threads_execution());
+            assert!(!consumer.napi_cleanup_hook_execution());
+            assert!(!consumer.native_addon_loaded());
+            assert!(!consumer.native_execution());
+            assert!(!consumer.renderer_execution());
+            assert!(!consumer.reconciler_execution());
+            assert!(!consumer.public_native_compatibility());
+            assert!(!consumer.react_behavior_error());
+        }
+
+        let json = native_root_bridge_cleanup_generation_consumer_json(764);
+        let gate = parse_native_root_bridge_json_transport_for_gate(&json).unwrap();
+        let executor = gate.json_batch_lifecycle_executor();
+        let cleanup_hook_preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+        let source_rows = executor.rows().to_vec();
+
+        let mut stale_generation_rows = source_rows.clone();
+        let stale_guard = stale_generation_rows[1]
+            .source_guard()
+            .with_executor_generation_for_test(executor.executor_generation().saturating_add(1));
+        stale_generation_rows[1] = stale_generation_rows[1]
+            .clone()
+            .with_source_guard_for_test(stale_guard);
+        assert_cleanup_generation_rejection(
+            executor,
+            &stale_generation_rows,
+            &cleanup_hook_preflight,
+            NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE,
+        );
+
+        let mut caller_built_rows = source_rows.clone();
+        caller_built_rows[0] = caller_built_rows[0]
+            .clone()
+            .with_source_owned_json_row_for_test(false);
+        assert_cleanup_generation_rejection(
+            executor,
+            &caller_built_rows,
+            &cleanup_hook_preflight,
+            NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_CALLER_BUILT_ROW_CODE,
+        );
+
+        let mut native_claim_rows = source_rows.clone();
+        native_claim_rows[0] = native_claim_rows[0]
+            .clone()
+            .with_native_execution_claim_for_test();
+        assert_cleanup_generation_rejection(
+            executor,
+            &native_claim_rows,
+            &cleanup_hook_preflight,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
+        );
+
+        let mut cloned_rows = source_rows.clone();
+        cloned_rows[0] = cloned_rows[1].clone();
+        assert_cleanup_generation_rejection(
+            executor,
+            &cloned_rows,
+            &cleanup_hook_preflight,
+            NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE,
+        );
+
+        let foreign_json = native_root_bridge_cleanup_generation_consumer_json(1764);
+        let foreign_gate = parse_native_root_bridge_json_transport_for_gate(&foreign_json).unwrap();
+        assert_cleanup_generation_rejection(
+            executor,
+            foreign_gate.json_batch_lifecycle_executor().rows(),
+            &cleanup_hook_preflight,
+            NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE,
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_batch_lifecycle_cleanup_hook_generation_consumer_rejects_cleanup_identity_forgery()
+     {
+        fn assert_cleanup_preflight_rejection(
+            cleanup_hook_preflight: &crate::root_bridge_requests::NativeRootBridgeWorkerThreadCleanupHookPreflight,
+            expected_code: &'static str,
+        ) {
+            let json = native_root_bridge_cleanup_generation_consumer_json(764);
+            let gate = parse_native_root_bridge_json_transport_for_gate(&json).unwrap();
+            let consumer = native_root_bridge_cleanup_generation_consumer_for_gate(
+                &gate,
+                cleanup_hook_preflight,
+            );
+
+            assert!(!consumer.cleanup_generation_consumed());
+            assert_eq!(
+                consumer.cleanup_generation_error_code(),
+                Some(expected_code)
+            );
+            assert!(consumer.rows().is_empty());
+            assert!(!consumer.native_addon_loaded());
+            assert!(!consumer.native_execution());
+            assert!(!consumer.renderer_execution());
+            assert!(!consumer.reconciler_execution());
+            assert!(!consumer.node_worker_threads_execution());
+            assert!(!consumer.napi_cleanup_hook_execution());
+            assert!(!consumer.public_native_compatibility());
+            assert!(!consumer.react_behavior_error());
+        }
+
+        let cleanup_hook_preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+        let foreign_json = native_root_bridge_cleanup_generation_consumer_json(1764);
+        let foreign_gate = parse_native_root_bridge_json_transport_for_gate(&foreign_json).unwrap();
+        let foreign_consumer = native_root_bridge_cleanup_generation_consumer_for_gate(
+            &foreign_gate,
+            &cleanup_hook_preflight,
+        );
+        assert!(!foreign_consumer.cleanup_generation_consumed());
+        assert_eq!(
+            foreign_consumer.cleanup_generation_error_code(),
+            Some(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE)
+        );
+
+        let missing_value_canonical =
+            validate_native_root_bridge_worker_thread_cleanup_hook_preflight_rows([
+                cleanup_hook_preflight.rows()[0],
+            ]);
+        assert_cleanup_preflight_rejection(
+            &missing_value_canonical,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
+        );
+
+        let public_package_claim =
+            NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(
+                cleanup_hook_preflight.rows()[0],
+            )
+            .with_public_native_package_claim();
+        let public_package_preflight =
+            validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows([
+                public_package_claim,
+                NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(
+                    cleanup_hook_preflight.rows()[1],
+                ),
+            ]);
+        assert_cleanup_preflight_rejection(
+            &public_package_preflight,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_batch_lifecycle_cleanup_hook_generation_consumer_rejects_stale_json_handles()
+     {
+        let cleanup_hook_preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+        let stale_root_json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":764,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":2,"kind":"root"},"root_id":1,"value_handle":{"environment_id":764,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"}]}"#;
+        let stale_root_error = native_root_bridge_cleanup_generation_consumer_for_json(
+            stale_root_json,
+            &cleanup_hook_preflight,
+        )
+        .unwrap_err();
+        assert_eq!(stale_root_error.code(), "FAST_REACT_NAPI_STALE_HANDLE");
+
+        let stale_value_json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":764,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":764,"slot":3,"generation":2,"kind":"value"},"root_handle_state":"active"}]}"#;
+        let stale_value_error = native_root_bridge_cleanup_generation_consumer_for_json(
+            stale_value_json,
+            &cleanup_hook_preflight,
+        )
+        .unwrap_err();
+        assert_eq!(stale_value_error.code(), "FAST_REACT_NAPI_STALE_HANDLE");
+
+        let reused_value_json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":764,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":764,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"}]}"#;
+        let reused_value_error = native_root_bridge_cleanup_generation_consumer_for_json(
+            reused_value_json,
+            &cleanup_hook_preflight,
+        )
+        .unwrap_err();
+        assert_eq!(
+            reused_value_error.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_VALUE_HANDLE_REUSE"
+        );
     }
 
     #[test]
