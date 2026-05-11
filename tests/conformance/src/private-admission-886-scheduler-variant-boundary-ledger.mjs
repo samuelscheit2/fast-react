@@ -1,0 +1,1456 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
+  new URL("../../../", import.meta.url)
+);
+
+export const PRIVATE_ADMISSION_886_GATE_ID =
+  "private-admission-886-scheduler-variant-boundary-ledger-1";
+export const PRIVATE_ADMISSION_886_GATE_STATUS =
+  "recognized-scheduler-variant-private-diagnostic-boundaries-public-blocked";
+export const PRIVATE_ADMISSION_886_VIOLATION_STATUS =
+  "blocked-scheduler-variant-private-diagnostic-boundaries-with-violations";
+
+export const PRIVATE_ADMISSION_886_VARIANTS = freezeArray([
+  "scheduler-index-wrapper",
+  "scheduler-cjs-index-development",
+  "scheduler-cjs-index-production",
+  "scheduler-unstable-mock-root",
+  "scheduler-cjs-unstable-mock-development",
+  "scheduler-cjs-unstable-mock-production",
+  "scheduler-unstable-post-task-wrapper",
+  "scheduler-cjs-unstable-post-task-development",
+  "scheduler-cjs-unstable-post-task-production",
+  "scheduler-native-wrapper",
+  "scheduler-cjs-native-development",
+  "scheduler-cjs-native-production"
+]);
+
+export const PRIVATE_ADMISSION_886_PUBLIC_BLOCKER_FIELDS = freezeArray([
+  "publicSchedulerTimingCompatibilityClaimed",
+  "publicSchedulerFlushHelperCompatibilityClaimed",
+  "publicSchedulerFlushBehaviorExecuted",
+  "publicSchedulerFlushExecutionAvailable",
+  "drainsPublicSchedulerTaskQueue",
+  "publicRootSchedulerCompatibilityClaimed",
+  "publicRootExecutionClaimed",
+  "rootExecutionClaimed",
+  "executesQueuedWork",
+  "publicReactActCompatibilityClaimed",
+  "publicActBehaviorClaimed",
+  "reactActBehaviorClaimed",
+  "packageCompatibilityClaimed",
+  "publicPackageCompatibilityClaimed",
+  "packageSurfaceChanged",
+  "newPublicExportsAdded",
+  "publicDiagnosticExportAdded",
+  "nativeCompatibilityClaimed",
+  "publicNativeCompatibilityClaimed",
+  "nativeRuntimeCompatibilityClaimed",
+  "nativePublicBehaviorClaimed",
+  "postTaskCompatibilityClaimed",
+  "browserPostTaskCompatibilityClaimed",
+  "browserTaskOrderingCompatibilityClaimed",
+  "postTaskPublicBehaviorClaimed",
+  "mockSchedulerCompatibilityClaimed",
+  "mockSchedulerPublicBehaviorClaimed",
+  "schedulerMockCompatibilityClaimed",
+  "publicTimingAliasAccepted",
+  "publicRootAliasAccepted",
+  "publicActAliasAccepted",
+  "publicPackageAliasAccepted",
+  "publicNativeAliasAccepted",
+  "publicPostTaskAliasAccepted",
+  "publicMockAliasAccepted",
+  "rendererExecutionClaimed",
+  "passiveEffectsExecutionClaimed",
+  "publicRendererCompatibilityClaimed",
+  "publicEffectExecutionClaimed"
+]);
+
+export const PRIVATE_ADMISSION_886_REQUIRED_TRUE_REQUIREMENTS = freezeArray([
+  "privateEvidenceOnly",
+  "sourceOwnedPackageEntrypoint",
+  "sourceOwnedDiagnosticIdentifiers",
+  "sourceOwnedDiagnosticRoles",
+  "variantBoundaryPinned",
+  "crossVariantEvidenceRejected",
+  "staticReadOnlyLedger",
+  "sourceTokenChecksOnly",
+  "manifestEvaluationOnly",
+  "packageSurfaceUnchanged"
+]);
+
+export const PRIVATE_ADMISSION_886_REQUIRED_FALSE_REQUIREMENTS = freezeArray([
+  "runtimeExecutionClaimed",
+  "publicSchedulerTimingCompatibilityClaimed",
+  "publicRootSchedulerCompatibilityClaimed",
+  "publicReactActCompatibilityClaimed",
+  "publicPackageCompatibilityClaimed",
+  "publicNativeCompatibilityClaimed",
+  "publicPostTaskCompatibilityClaimed",
+  "publicMockSchedulerCompatibilityClaimed",
+  "rootExecutionClaimed",
+  "nativePublicBehaviorClaimed",
+  "postTaskPublicBehaviorClaimed",
+  "mockPublicBehaviorClaimed",
+  "newPublicExportsAdded",
+  "packageSurfaceChanged"
+]);
+
+export const PRIVATE_ADMISSION_886_REQUIRED_REQUIREMENT_FIELDS = freezeArray([
+  ...PRIVATE_ADMISSION_886_REQUIRED_TRUE_REQUIREMENTS,
+  ...PRIVATE_ADMISSION_886_REQUIRED_FALSE_REQUIREMENTS
+]);
+
+export const PRIVATE_ADMISSION_886_DURABLE_EVIDENCE_TOKEN_CLASSES =
+  freezeArray([
+    freezeRecord({
+      id: "js-identifier-field-function-or-constant",
+      pattern: /^[$A-Z_a-z][\w$]*$/u
+    }),
+    freezeRecord({
+      id: "private-fast-react-export-marker",
+      pattern: /^__FAST_REACT_[A-Z0-9_]+__$/u
+    }),
+    freezeRecord({
+      id: "diagnostic-status-or-private-kind",
+      pattern: /^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$/u
+    }),
+    freezeRecord({
+      id: "scheduler-package-target",
+      pattern: /^scheduler@\d+\.\d+\.\d+$/u
+    }),
+    freezeRecord({
+      id: "scheduler-package-subpath",
+      pattern: /^scheduler(?:\/[a-z0-9_.-]+)*$/u
+    }),
+    freezeRecord({
+      id: "scheduler-physical-entrypoint-file",
+      pattern: /^[a-z][a-z0-9_-]*(?:[./][a-z0-9_-]+)*\.js$/u
+    })
+  ]);
+
+export const PRIVATE_ADMISSION_886_NON_DURABLE_EVIDENCE_TOKEN_SHAPES =
+  freezeArray([
+    freezeRecord({
+      id: "object-api-expression",
+      pattern: /\bObject\.[A-Za-z_$][\w$]*\s*\(/u
+    }),
+    freezeRecord({
+      id: "source-declaration-snippet",
+      pattern: /^\s*(?:const|let|var|function)\s/u
+    }),
+    freezeRecord({
+      id: "field-value-expression",
+      pattern: /:\s*(?:true|false|null|undefined|["']|\d)/u
+    }),
+    freezeRecord({
+      id: "string-literal-snippet",
+      pattern: /^["'][\s\S]*["']$/u
+    }),
+    freezeRecord({
+      id: "member-call-expression",
+      pattern: /\b[$A-Z_a-z][\w$]*\.[_$A-Z_a-z][\w$]*\s*\(/u
+    }),
+    freezeRecord({
+      id: "member-expression-snippet",
+      pattern: /\b[$A-Z_a-z][\w$]*\.[_$A-Z_a-z][\w$]*/u
+    }),
+    freezeRecord({
+      id: "block-or-statement-syntax",
+      pattern: /[{};]/u
+    }),
+    freezeRecord({
+      id: "prose-test-title-or-error-message",
+      pattern: /\s/u
+    }),
+    freezeRecord({
+      id: "unapproved-evidence-token-context",
+      pattern: /[\s\S]/u
+    })
+  ]);
+
+const noPrivateDiagnostics = freezeArray([]);
+const noPrivateDiagnosticStatuses = freezeArray([]);
+const noPrivateDiagnosticRoles = freezeArray([]);
+
+const mockRootDiagnosticIds = freezeArray([
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__",
+  "fast-react.scheduler.mock-expired-act-root-work-source-validator",
+  "fast-react.scheduler.mock-expired-work-diagnostics",
+  "fast-react.scheduler.mock-frame-budget-diagnostics",
+  "fast-react.scheduler.mock-expired-lane-priority-root-metadata",
+  "fast-react.scheduler.mock-expired-lane-flush-diagnostics",
+  "fast-react.scheduler.mock-expired-act-root-work-metadata",
+  "fast-react.scheduler.mock-expired-act-root-work-diagnostics",
+  "fast-react.scheduler.mock-delayed-act-root-work-metadata",
+  "fast-react.scheduler.mock-delayed-act-root-work-diagnostics",
+  "fast-react.scheduler.mock-delayed-renderer-root-work-metadata"
+]);
+
+const mockRootDiagnosticStatuses = freezeArray([
+  "private-scheduler-act-queue-flush-diagnostics",
+  "described-expired-mock-scheduler-work-for-diagnostics",
+  "described-mock-scheduler-frame-budget-for-diagnostics",
+  "drained-expired-mock-scheduler-work-with-lane-metadata-for-diagnostics",
+  "drained-expired-mock-scheduler-work-with-act-root-metadata-for-diagnostics",
+  "drained-delayed-mock-scheduler-work-with-act-root-metadata-for-diagnostics",
+  "accepted-private-delayed-renderer-root-work-metadata-for-diagnostics",
+  "produced-private-delayed-renderer-root-work-metadata-for-private-act-root-handoff",
+  "produced-private-delayed-act-root-work-metadata-from-accepted-renderer-root-metadata"
+]);
+
+const mockRootDiagnosticRoles = freezeArray([
+  "mock-private-act-queue-flush-diagnostics",
+  "mock-private-expired-work-diagnostics",
+  "mock-private-frame-budget-diagnostics",
+  "mock-private-expired-lane-diagnostics",
+  "mock-private-expired-act-root-diagnostics",
+  "mock-private-delayed-act-root-diagnostics",
+  "mock-private-delayed-renderer-root-diagnostics"
+]);
+
+const mockCjsDiagnosticIds = freezeArray([
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+]);
+
+const mockCjsDiagnosticStatuses = freezeArray([
+  "private-scheduler-act-queue-flush-diagnostics"
+]);
+
+const mockCjsDiagnosticRoles = freezeArray([
+  "mock-cjs-private-act-queue-flush-diagnostics"
+]);
+
+const postTaskDiagnosticIds = freezeArray([
+  "__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__",
+  "fast-react.scheduler.unstable_post_task.priority-diagnostics",
+  "fast-react.scheduler.post_task.private-act-root-work-handoff"
+]);
+
+const postTaskDiagnosticStatuses = freezeArray([
+  "private-scheduler-post-task-priority-diagnostics",
+  "scheduler-post-task-private-priority-timeout-diagnostics",
+  "accepted-private-scheduler-post-task-act-root-work-handoff",
+  "pending-private-root-continuation-execution-route"
+]);
+
+const postTaskDiagnosticRoles = freezeArray([
+  "post-task-private-priority-diagnostics",
+  "post-task-private-act-root-handoff-diagnostics"
+]);
+
+const privateDiagnosticForbiddenTokens = freezeArray([
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__",
+  "__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__",
+  "private-scheduler-act-queue-flush-diagnostics",
+  "private-scheduler-post-task-priority-diagnostics",
+  "fast-react.scheduler.mock-expired-act-root-work-diagnostics",
+  "fast-react.scheduler.unstable_post_task.priority-diagnostics"
+]);
+
+const postTaskForbiddenMockTokens = freezeArray([
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__",
+  "fast-react.scheduler.mock-expired-act-root-work-diagnostics",
+  "fast-react.scheduler.mock-delayed-act-root-work-diagnostics",
+  "fast-react.scheduler.mock-delayed-renderer-root-work-metadata"
+]);
+
+const mockCjsForbiddenRootOnlyTokens = freezeArray([
+  "fast-react.scheduler.mock-expired-act-root-work-diagnostics",
+  "fast-react.scheduler.mock-delayed-act-root-work-diagnostics",
+  "fast-react.scheduler.mock-delayed-renderer-root-work-metadata"
+]);
+
+const schedulerIndexWrapperPath = "packages/scheduler/index.js";
+const schedulerMockPath = "packages/scheduler/unstable_mock.js";
+const schedulerPostTaskWrapperPath = "packages/scheduler/unstable_post_task.js";
+const schedulerNativeWrapperPath = "packages/scheduler/index.native.js";
+const schedulerCjsIndexDevelopmentPath =
+  "packages/scheduler/cjs/scheduler.development.js";
+const schedulerCjsIndexProductionPath =
+  "packages/scheduler/cjs/scheduler.production.js";
+const schedulerCjsMockDevelopmentPath =
+  "packages/scheduler/cjs/scheduler-unstable_mock.development.js";
+const schedulerCjsMockProductionPath =
+  "packages/scheduler/cjs/scheduler-unstable_mock.production.js";
+const schedulerCjsPostTaskDevelopmentPath =
+  "packages/scheduler/cjs/scheduler-unstable_post_task.development.js";
+const schedulerCjsPostTaskProductionPath =
+  "packages/scheduler/cjs/scheduler-unstable_post_task.production.js";
+const schedulerCjsNativeDevelopmentPath =
+  "packages/scheduler/cjs/scheduler.native.development.js";
+const schedulerCjsNativeProductionPath =
+  "packages/scheduler/cjs/scheduler.native.production.js";
+
+const privateAdmission886Rows = freezeArray([
+  ledgerRow({
+    variantId: "scheduler-index-wrapper",
+    variantFamily: "index",
+    entrypoint: "scheduler",
+    sourceFile: schedulerIndexWrapperPath,
+    physicalEntrypoint: "index.js",
+    runtimeMode: "node-env-wrapper",
+    acceptedDiagnosticIds: noPrivateDiagnostics,
+    acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
+    acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
+    evidence: freezeArray([
+      evidenceData({
+        role: "scheduler-index-wrapper-source",
+        path: schedulerIndexWrapperPath,
+        tokens: ["scheduler.production.js", "scheduler.development.js"],
+        forbiddenTokens: privateDiagnosticForbiddenTokens
+      })
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-cjs-index-development",
+    variantFamily: "index",
+    entrypoint: "scheduler/cjs/scheduler.development.js",
+    sourceFile: schedulerCjsIndexDevelopmentPath,
+    physicalEntrypoint: "cjs/scheduler.development.js",
+    runtimeMode: "development",
+    acceptedDiagnosticIds: noPrivateDiagnostics,
+    acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
+    acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
+    evidence: freezeArray([
+      evidenceData({
+        role: "scheduler-cjs-index-development-source",
+        path: schedulerCjsIndexDevelopmentPath,
+        tokens: ["scheduler.development.js"],
+        forbiddenTokens: privateDiagnosticForbiddenTokens
+      })
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-cjs-index-production",
+    variantFamily: "index",
+    entrypoint: "scheduler/cjs/scheduler.production.js",
+    sourceFile: schedulerCjsIndexProductionPath,
+    physicalEntrypoint: "cjs/scheduler.production.js",
+    runtimeMode: "production",
+    acceptedDiagnosticIds: noPrivateDiagnostics,
+    acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
+    acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
+    evidence: freezeArray([
+      evidenceData({
+        role: "scheduler-cjs-index-production-source",
+        path: schedulerCjsIndexProductionPath,
+        tokens: ["scheduler.production.js"],
+        forbiddenTokens: privateDiagnosticForbiddenTokens
+      })
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-unstable-mock-root",
+    variantFamily: "unstable_mock",
+    entrypoint: "scheduler/unstable_mock",
+    sourceFile: schedulerMockPath,
+    physicalEntrypoint: "unstable_mock.js",
+    runtimeMode: "package-root-source",
+    acceptedDiagnosticIds: mockRootDiagnosticIds,
+    acceptedDiagnosticStatuses: mockRootDiagnosticStatuses,
+    acceptedDiagnosticRoles: mockRootDiagnosticRoles,
+    evidence: freezeArray([
+      evidenceData({
+        role: "scheduler-unstable-mock-private-diagnostic-ids",
+        path: schedulerMockPath,
+        tokens: mockRootDiagnosticIds
+      }),
+      evidenceData({
+        role: "scheduler-unstable-mock-private-diagnostic-statuses",
+        path: schedulerMockPath,
+        tokens: mockRootDiagnosticStatuses
+      }),
+      evidenceData({
+        role: "scheduler-unstable-mock-source-owned-boundary",
+        path: schedulerMockPath,
+        tokens: [
+          "schedulerCompatibilityTarget",
+          "scheduler@0.27.0",
+          "scheduler/unstable_mock",
+          "schedulerMockExpiredActRootWorkSources",
+          "schedulerMockExpiredActRootWorkSourceValidator",
+          "freezeSchedulerOwnedExpiredActRootWorkSource",
+          "isSchedulerMockExpiredActRootWorkSource",
+          "providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics"
+        ],
+        forbiddenTokens: ["__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__"]
+      })
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-cjs-unstable-mock-development",
+    variantFamily: "unstable_mock",
+    entrypoint: "scheduler/cjs/scheduler-unstable_mock.development.js",
+    sourceFile: schedulerCjsMockDevelopmentPath,
+    physicalEntrypoint: "cjs/scheduler-unstable_mock.development.js",
+    runtimeMode: "development",
+    acceptedDiagnosticIds: mockCjsDiagnosticIds,
+    acceptedDiagnosticStatuses: mockCjsDiagnosticStatuses,
+    acceptedDiagnosticRoles: mockCjsDiagnosticRoles,
+    evidence: freezeArray([
+      cjsMockEvidence(
+        "scheduler-cjs-unstable-mock-development-source",
+        schedulerCjsMockDevelopmentPath
+      )
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-cjs-unstable-mock-production",
+    variantFamily: "unstable_mock",
+    entrypoint: "scheduler/cjs/scheduler-unstable_mock.production.js",
+    sourceFile: schedulerCjsMockProductionPath,
+    physicalEntrypoint: "cjs/scheduler-unstable_mock.production.js",
+    runtimeMode: "production",
+    acceptedDiagnosticIds: mockCjsDiagnosticIds,
+    acceptedDiagnosticStatuses: mockCjsDiagnosticStatuses,
+    acceptedDiagnosticRoles: mockCjsDiagnosticRoles,
+    evidence: freezeArray([
+      cjsMockEvidence(
+        "scheduler-cjs-unstable-mock-production-source",
+        schedulerCjsMockProductionPath
+      )
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-unstable-post-task-wrapper",
+    variantFamily: "unstable_post_task",
+    entrypoint: "scheduler/unstable_post_task",
+    sourceFile: schedulerPostTaskWrapperPath,
+    physicalEntrypoint: "unstable_post_task.js",
+    runtimeMode: "node-env-wrapper",
+    acceptedDiagnosticIds: noPrivateDiagnostics,
+    acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
+    acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
+    evidence: freezeArray([
+      evidenceData({
+        role: "scheduler-unstable-post-task-wrapper-source",
+        path: schedulerPostTaskWrapperPath,
+        tokens: [
+          "scheduler-unstable_post_task.production.js",
+          "scheduler-unstable_post_task.development.js"
+        ],
+        forbiddenTokens: privateDiagnosticForbiddenTokens
+      })
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-cjs-unstable-post-task-development",
+    variantFamily: "unstable_post_task",
+    entrypoint: "scheduler/unstable_post_task",
+    sourceFile: schedulerCjsPostTaskDevelopmentPath,
+    physicalEntrypoint: "cjs/scheduler-unstable_post_task.development.js",
+    runtimeMode: "development",
+    acceptedDiagnosticIds: postTaskDiagnosticIds,
+    acceptedDiagnosticStatuses: postTaskDiagnosticStatuses,
+    acceptedDiagnosticRoles: postTaskDiagnosticRoles,
+    evidence: freezeArray([
+      postTaskEvidence(
+        "scheduler-cjs-unstable-post-task-development-source",
+        schedulerCjsPostTaskDevelopmentPath
+      )
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-cjs-unstable-post-task-production",
+    variantFamily: "unstable_post_task",
+    entrypoint: "scheduler/unstable_post_task",
+    sourceFile: schedulerCjsPostTaskProductionPath,
+    physicalEntrypoint: "cjs/scheduler-unstable_post_task.production.js",
+    runtimeMode: "production",
+    acceptedDiagnosticIds: postTaskDiagnosticIds,
+    acceptedDiagnosticStatuses: postTaskDiagnosticStatuses,
+    acceptedDiagnosticRoles: postTaskDiagnosticRoles,
+    evidence: freezeArray([
+      postTaskEvidence(
+        "scheduler-cjs-unstable-post-task-production-source",
+        schedulerCjsPostTaskProductionPath
+      )
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-native-wrapper",
+    variantFamily: "native",
+    entrypoint: "scheduler/index.native.js",
+    sourceFile: schedulerNativeWrapperPath,
+    physicalEntrypoint: "index.native.js",
+    runtimeMode: "node-env-wrapper",
+    acceptedDiagnosticIds: noPrivateDiagnostics,
+    acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
+    acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
+    evidence: freezeArray([
+      evidenceData({
+        role: "scheduler-native-wrapper-source",
+        path: schedulerNativeWrapperPath,
+        tokens: [
+          "scheduler.native.production.js",
+          "scheduler.native.development.js"
+        ],
+        forbiddenTokens: privateDiagnosticForbiddenTokens
+      })
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-cjs-native-development",
+    variantFamily: "native",
+    entrypoint: "scheduler/cjs/scheduler.native.development.js",
+    sourceFile: schedulerCjsNativeDevelopmentPath,
+    physicalEntrypoint: "cjs/scheduler.native.development.js",
+    runtimeMode: "development",
+    acceptedDiagnosticIds: noPrivateDiagnostics,
+    acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
+    acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
+    evidence: freezeArray([
+      evidenceData({
+        role: "scheduler-cjs-native-development-source",
+        path: schedulerCjsNativeDevelopmentPath,
+        tokens: ["nativeRuntimeScheduler"],
+        forbiddenTokens: privateDiagnosticForbiddenTokens
+      })
+    ])
+  }),
+  ledgerRow({
+    variantId: "scheduler-cjs-native-production",
+    variantFamily: "native",
+    entrypoint: "scheduler/cjs/scheduler.native.production.js",
+    sourceFile: schedulerCjsNativeProductionPath,
+    physicalEntrypoint: "cjs/scheduler.native.production.js",
+    runtimeMode: "production",
+    acceptedDiagnosticIds: noPrivateDiagnostics,
+    acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
+    acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
+    evidence: freezeArray([
+      evidenceData({
+        role: "scheduler-cjs-native-production-source",
+        path: schedulerCjsNativeProductionPath,
+        tokens: ["nativeRuntimeScheduler"],
+        forbiddenTokens: privateDiagnosticForbiddenTokens
+      })
+    ])
+  })
+]);
+
+export const PRIVATE_ADMISSION_886_REQUIRED_SOURCE_BOUNDARIES = freezeRecord(
+  Object.fromEntries(
+    privateAdmission886Rows.map((row) => [
+      row.variantId,
+      freezeRecord(row.sourceBoundary)
+    ])
+  )
+);
+
+export const PRIVATE_ADMISSION_886_REQUIRED_DIAGNOSTIC_IDS = freezeRecord(
+  Object.fromEntries(
+    privateAdmission886Rows.map((row) => [
+      row.variantId,
+      freezeArray(row.acceptedDiagnosticIds)
+    ])
+  )
+);
+
+export const PRIVATE_ADMISSION_886_REQUIRED_STATUSES = freezeRecord(
+  Object.fromEntries(
+    privateAdmission886Rows.map((row) => [
+      row.variantId,
+      freezeArray(row.acceptedDiagnosticStatuses)
+    ])
+  )
+);
+
+export const PRIVATE_ADMISSION_886_REQUIRED_DIAGNOSTIC_ROLES = freezeRecord(
+  Object.fromEntries(
+    privateAdmission886Rows.map((row) => [
+      row.variantId,
+      freezeArray(row.acceptedDiagnosticRoles)
+    ])
+  )
+);
+
+export const PRIVATE_ADMISSION_886_REQUIRED_EVIDENCE_ROLES = freezeRecord(
+  Object.fromEntries(
+    privateAdmission886Rows.map((row) => [
+      row.variantId,
+      freezeArray(row.evidence.map((evidenceRow) => evidenceRow.role))
+    ])
+  )
+);
+
+export const PRIVATE_ADMISSION_886_APPROVED_EVIDENCE_CONTEXTS_BY_ROLE =
+  freezeRecord(
+    Object.fromEntries(
+      privateAdmission886Rows.flatMap((row) =>
+        row.evidence.map((evidenceRow) => [
+          evidenceRow.role,
+          freezeRecord({
+            variantId: row.variantId,
+            path: evidenceRow.path,
+            tokens: freezeArray(evidenceRow.tokens)
+          })
+        ])
+      )
+    )
+  );
+
+export const PRIVATE_ADMISSION_886_ROWS = freezeArray(
+  privateAdmission886Rows.map((row) => freezeLedgerRow(row))
+);
+
+export function evaluatePrivateAdmission886Gate({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT,
+  rowOverrides = {}
+} = {}) {
+  const fileCache = new Map();
+  const rows = PRIVATE_ADMISSION_886_ROWS.map((row) =>
+    mergeRowOverride(row, rowOverrides[row.variantId] ?? {})
+  );
+  const evaluatedRows = rows.map((row) =>
+    evaluateLedgerRow({ fileCache, row, workspaceRoot })
+  );
+  const manifestVariantIds = evaluatedRows.map((row) => row.variantId);
+  const manifest = freezeRecord({
+    variantIds: freezeArray(manifestVariantIds),
+    missingVariantIds: freezeArray(
+      PRIVATE_ADMISSION_886_VARIANTS.filter(
+        (variantId) => !manifestVariantIds.includes(variantId)
+      )
+    ),
+    unexpectedVariantIds: freezeArray(
+      manifestVariantIds.filter(
+        (variantId) => !PRIVATE_ADMISSION_886_VARIANTS.includes(variantId)
+      )
+    ),
+    duplicateVariantIds: freezeArray(
+      manifestVariantIds.filter(
+        (variantId, index) => manifestVariantIds.indexOf(variantId) !== index
+      )
+    )
+  });
+
+  const evidenceMismatches = evaluatedRows.flatMap((row) =>
+    row.evidence
+      .filter(
+        (evidenceRow) =>
+          evidenceRow.missingTokens.length > 0 ||
+          evidenceRow.forbiddenTokensPresent.length > 0 ||
+          evidenceRow.readError !== null ||
+          evidenceRow.approvedContextPathMismatch === true
+      )
+      .map((evidenceRow) =>
+        freezeRecord({
+          variantId: row.variantId,
+          role: evidenceRow.role,
+          path: evidenceRow.path,
+          expectedPath: evidenceRow.expectedPath,
+          missingTokens: evidenceRow.missingTokens,
+          forbiddenTokensPresent: evidenceRow.forbiddenTokensPresent,
+          readError: evidenceRow.readError
+        })
+      )
+  );
+  const nonDurableEvidenceTokenMismatches = evaluatedRows.flatMap((row) =>
+    row.evidence
+      .filter((evidenceRow) => evidenceRow.nonDurableTokens.length > 0)
+      .map((evidenceRow) =>
+        freezeRecord({
+          variantId: row.variantId,
+          role: evidenceRow.role,
+          path: evidenceRow.path,
+          nonDurableTokens: evidenceRow.nonDurableTokens
+        })
+      )
+  );
+  const evidenceRoleMismatches = evaluatedRows.flatMap((row) => {
+    const expectedRoles =
+      PRIVATE_ADMISSION_886_REQUIRED_EVIDENCE_ROLES[row.variantId] ??
+      freezeArray([]);
+    const actualRoles = row.evidence.map((evidenceRow) => evidenceRow.role);
+    const duplicateRoles = actualRoles.filter(
+      (role, index) => actualRoles.indexOf(role) !== index
+    );
+    const missingRoles = expectedRoles.filter(
+      (role) => !actualRoles.includes(role)
+    );
+    const unexpectedRoles = actualRoles.filter(
+      (role) => !expectedRoles.includes(role)
+    );
+
+    if (
+      actualRoles.length > 0 &&
+      missingRoles.length === 0 &&
+      unexpectedRoles.length === 0 &&
+      duplicateRoles.length === 0 &&
+      sameStringArray(actualRoles, expectedRoles)
+    ) {
+      return [];
+    }
+
+    return [
+      freezeRecord({
+        variantId: row.variantId,
+        expectedEvidenceRoles: expectedRoles,
+        actualEvidenceRoles: freezeArray(actualRoles),
+        missingEvidenceRoles: freezeArray(missingRoles),
+        unexpectedEvidenceRoles: freezeArray(unexpectedRoles),
+        duplicateEvidenceRoles: freezeArray(duplicateRoles)
+      })
+    ];
+  });
+  const sourceBoundaryMismatches = evaluatedRows.flatMap((row) => {
+    const expected =
+      PRIVATE_ADMISSION_886_REQUIRED_SOURCE_BOUNDARIES[row.variantId];
+    if (
+      expected &&
+      sameStringRecord(row.sourceBoundary, expected, [
+        "packageName",
+        "compatibilityTarget",
+        "variantFamily",
+        "entrypoint",
+        "sourceFile",
+        "physicalEntrypoint",
+        "runtimeMode"
+      ])
+    ) {
+      return [];
+    }
+    return [
+      freezeRecord({
+        variantId: row.variantId,
+        expectedSourceBoundary: expected ?? null,
+        actualSourceBoundary: freezeRecord(row.sourceBoundary)
+      })
+    ];
+  });
+  const diagnosticMismatches = compareRequiredArrayByVariant({
+    rows: evaluatedRows,
+    requiredByVariant: PRIVATE_ADMISSION_886_REQUIRED_DIAGNOSTIC_IDS,
+    actualKey: "acceptedDiagnosticIds",
+    expectedKey: "expectedAcceptedDiagnosticIds",
+    actualKeyForViolation: "actualAcceptedDiagnosticIds"
+  });
+  const statusMismatches = compareRequiredArrayByVariant({
+    rows: evaluatedRows,
+    requiredByVariant: PRIVATE_ADMISSION_886_REQUIRED_STATUSES,
+    actualKey: "acceptedDiagnosticStatuses",
+    expectedKey: "expectedAcceptedDiagnosticStatuses",
+    actualKeyForViolation: "actualAcceptedDiagnosticStatuses"
+  });
+  const diagnosticRoleMismatches = compareRequiredArrayByVariant({
+    rows: evaluatedRows,
+    requiredByVariant: PRIVATE_ADMISSION_886_REQUIRED_DIAGNOSTIC_ROLES,
+    actualKey: "acceptedDiagnosticRoles",
+    expectedKey: "expectedAcceptedDiagnosticRoles",
+    actualKeyForViolation: "actualAcceptedDiagnosticRoles"
+  });
+  const crossVariantDiagnosticRows = findCrossVariantDiagnosticRows(
+    evaluatedRows
+  );
+  const requirementMismatches = evaluatedRows.flatMap((row) => {
+    const mismatches = [];
+    for (const key of PRIVATE_ADMISSION_886_REQUIRED_TRUE_REQUIREMENTS) {
+      if (row.requirements[key] !== true) {
+        mismatches.push(
+          freezeRecord({
+            variantId: row.variantId,
+            requirement: key,
+            expected: true,
+            actual: row.requirements[key]
+          })
+        );
+      }
+    }
+    for (const key of PRIVATE_ADMISSION_886_REQUIRED_FALSE_REQUIREMENTS) {
+      if (row.requirements[key] !== false) {
+        mismatches.push(
+          freezeRecord({
+            variantId: row.variantId,
+            requirement: key,
+            expected: false,
+            actual: row.requirements[key]
+          })
+        );
+      }
+    }
+    return mismatches;
+  });
+  const requirementFieldMismatches = evaluatedRows.flatMap((row) => {
+    const actualFields = Object.keys(row.requirements ?? {});
+    const missingFields = PRIVATE_ADMISSION_886_REQUIRED_REQUIREMENT_FIELDS.filter(
+      (field) => !actualFields.includes(field)
+    );
+    const unexpectedFields = actualFields.filter(
+      (field) =>
+        !PRIVATE_ADMISSION_886_REQUIRED_REQUIREMENT_FIELDS.includes(field)
+    );
+
+    if (
+      missingFields.length === 0 &&
+      unexpectedFields.length === 0 &&
+      sameStringSet(
+        PRIVATE_ADMISSION_886_REQUIRED_REQUIREMENT_FIELDS,
+        actualFields
+      )
+    ) {
+      return [];
+    }
+
+    return [
+      freezeRecord({
+        variantId: row.variantId,
+        expectedRequirementFields:
+          PRIVATE_ADMISSION_886_REQUIRED_REQUIREMENT_FIELDS,
+        actualRequirementFields: freezeArray(actualFields),
+        missingRequirementFields: freezeArray(missingFields),
+        unexpectedRequirementFields: freezeArray(unexpectedFields)
+      })
+    ];
+  });
+  const publicBlockerFieldMismatches = evaluatedRows.flatMap((row) => {
+    const actualFields = Object.keys(row.publicBlockerClaims ?? {});
+    if (sameStringSet(PRIVATE_ADMISSION_886_PUBLIC_BLOCKER_FIELDS, actualFields)) {
+      return [];
+    }
+    return [
+      freezeRecord({
+        variantId: row.variantId,
+        expectedPublicBlockerFields: PRIVATE_ADMISSION_886_PUBLIC_BLOCKER_FIELDS,
+        actualPublicBlockerFields: freezeArray(actualFields)
+      })
+    ];
+  });
+  const publicBlockerClaimViolationIds = evaluatedRows.flatMap((row) =>
+    Object.entries(row.publicBlockerClaims ?? {})
+      .filter(([, claimed]) => claimed !== false)
+      .map(([field]) => `${row.variantId}.${field}`)
+  );
+  const publicCompatibilityAliasClaimIds = publicBlockerClaimViolationIds.filter(
+    (claimId) =>
+      /(?:publicTimingAliasAccepted|publicRootAliasAccepted|publicActAliasAccepted|publicPackageAliasAccepted|publicNativeAliasAccepted|publicPostTaskAliasAccepted|publicMockAliasAccepted)$/.test(
+        claimId
+      )
+  );
+  const publicVariantBehaviorClaimIds = publicBlockerClaimViolationIds.filter(
+    (claimId) =>
+      /(?:nativeCompatibilityClaimed|publicNativeCompatibilityClaimed|nativeRuntimeCompatibilityClaimed|nativePublicBehaviorClaimed|postTaskCompatibilityClaimed|browserPostTaskCompatibilityClaimed|browserTaskOrderingCompatibilityClaimed|postTaskPublicBehaviorClaimed|mockSchedulerCompatibilityClaimed|mockSchedulerPublicBehaviorClaimed|schedulerMockCompatibilityClaimed)$/.test(
+        claimId
+      )
+  );
+  const publicPackageSurfaceClaimIds = publicBlockerClaimViolationIds.filter(
+    (claimId) =>
+      /(?:packageCompatibilityClaimed|publicPackageCompatibilityClaimed|packageSurfaceChanged|newPublicExportsAdded|publicDiagnosticExportAdded)$/.test(
+        claimId
+      )
+  );
+  const staticReadOnlyViolationIds = evaluatedRows
+    .filter(
+      (row) =>
+        row.ledgerEvaluationMode !== "source-token-checks-and-manifest-only" ||
+        row.requirements.staticReadOnlyLedger !== true ||
+        row.requirements.sourceTokenChecksOnly !== true ||
+        row.requirements.manifestEvaluationOnly !== true ||
+        row.requirements.runtimeExecutionClaimed !== false
+    )
+    .map((row) => row.variantId);
+  const sourceOwnedBoundaryViolationIds = evaluatedRows
+    .filter(
+      (row) =>
+        row.requirements.sourceOwnedPackageEntrypoint !== true ||
+        row.requirements.sourceOwnedDiagnosticIdentifiers !== true ||
+        row.requirements.sourceOwnedDiagnosticRoles !== true ||
+        row.requirements.variantBoundaryPinned !== true
+    )
+    .map((row) => row.variantId);
+
+  const violations = [];
+  if (
+    manifest.missingVariantIds.length > 0 ||
+    manifest.unexpectedVariantIds.length > 0 ||
+    manifest.duplicateVariantIds.length > 0
+  ) {
+    violations.push(
+      createViolation("scheduler-variant-manifest-mismatch", {
+        missingVariantIds: manifest.missingVariantIds,
+        unexpectedVariantIds: manifest.unexpectedVariantIds,
+        duplicateVariantIds: manifest.duplicateVariantIds
+      })
+    );
+  }
+  pushRowsViolation(
+    violations,
+    "scheduler-variant-source-token-missing-or-context-mismatch",
+    evidenceMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "scheduler-variant-non-durable-evidence-token",
+    nonDurableEvidenceTokenMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "scheduler-variant-evidence-role-mismatch",
+    evidenceRoleMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "scheduler-variant-boundary-mismatch",
+    sourceBoundaryMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "scheduler-variant-private-diagnostic-id-mismatch",
+    diagnosticMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "scheduler-variant-private-diagnostic-status-mismatch",
+    statusMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "scheduler-variant-private-diagnostic-role-mismatch",
+    diagnosticRoleMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "scheduler-cross-variant-private-diagnostic-row",
+    crossVariantDiagnosticRows
+  );
+  pushRowsViolation(
+    violations,
+    "scheduler-variant-requirement-mismatch",
+    requirementMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "scheduler-variant-requirement-field-mismatch",
+    requirementFieldMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "scheduler-variant-public-blocker-field-mismatch",
+    publicBlockerFieldMismatches
+  );
+  pushIdsViolation(
+    violations,
+    "scheduler-variant-public-compatibility-claim-detected",
+    publicBlockerClaimViolationIds
+  );
+  pushIdsViolation(
+    violations,
+    "scheduler-variant-public-alias-claim-detected",
+    publicCompatibilityAliasClaimIds
+  );
+  pushIdsViolation(
+    violations,
+    "scheduler-variant-public-behavior-claim-detected",
+    publicVariantBehaviorClaimIds
+  );
+  pushIdsViolation(
+    violations,
+    "scheduler-variant-package-surface-claim-detected",
+    publicPackageSurfaceClaimIds
+  );
+  pushIdsViolation(
+    violations,
+    "scheduler-variant-static-read-only-claim-mismatch",
+    staticReadOnlyViolationIds
+  );
+  pushIdsViolation(
+    violations,
+    "scheduler-variant-source-owned-boundary-requirement-mismatch",
+    sourceOwnedBoundaryViolationIds
+  );
+
+  const evidenceRecognized =
+    evidenceMismatches.length === 0 && evidenceRoleMismatches.length === 0;
+  const durableEvidenceTokensRecognized =
+    nonDurableEvidenceTokenMismatches.length === 0;
+  const evidenceRolesRecognized = evidenceRoleMismatches.length === 0;
+  const sourceOwnedPackageEntrypointsRecognized =
+    sourceBoundaryMismatches.length === 0 &&
+    sourceOwnedBoundaryViolationIds.length === 0;
+  const privateDiagnosticIdsRecognized = diagnosticMismatches.length === 0;
+  const privateDiagnosticStatusesRecognized = statusMismatches.length === 0;
+  const privateDiagnosticRolesRecognized =
+    diagnosticRoleMismatches.length === 0;
+  const crossVariantRowsRejected = crossVariantDiagnosticRows.length === 0;
+  const requirementsRecognized =
+    requirementMismatches.length === 0 && requirementFieldMismatches.length === 0;
+  const blockedPublicClaimsRecognized =
+    publicBlockerFieldMismatches.length === 0 &&
+    publicBlockerClaimViolationIds.length === 0;
+  const publicCompatibilityAliasesBlocked =
+    publicCompatibilityAliasClaimIds.length === 0;
+  const publicVariantBehaviorClaimsBlocked =
+    publicVariantBehaviorClaimIds.length === 0;
+  const packageSurfaceBlocked = publicPackageSurfaceClaimIds.length === 0;
+  const staticReadOnlyRecognized = staticReadOnlyViolationIds.length === 0;
+  const compatibilityClaimed = publicBlockerClaimViolationIds.length > 0;
+  const privateDiagnosticsRecognized =
+    manifest.missingVariantIds.length === 0 &&
+    manifest.unexpectedVariantIds.length === 0 &&
+    manifest.duplicateVariantIds.length === 0 &&
+    evidenceRecognized &&
+    durableEvidenceTokensRecognized &&
+    sourceOwnedPackageEntrypointsRecognized &&
+    privateDiagnosticIdsRecognized &&
+    privateDiagnosticStatusesRecognized &&
+    privateDiagnosticRolesRecognized &&
+    crossVariantRowsRejected &&
+    requirementsRecognized &&
+    blockedPublicClaimsRecognized &&
+    publicCompatibilityAliasesBlocked &&
+    publicVariantBehaviorClaimsBlocked &&
+    packageSurfaceBlocked &&
+    staticReadOnlyRecognized &&
+    compatibilityClaimed === false;
+
+  return freezeRecord({
+    gateId: PRIVATE_ADMISSION_886_GATE_ID,
+    status: privateDiagnosticsRecognized
+      ? PRIVATE_ADMISSION_886_GATE_STATUS
+      : PRIVATE_ADMISSION_886_VIOLATION_STATUS,
+    privateDiagnosticsRecognized,
+    evidenceRecognized,
+    evidenceRolesRecognized,
+    durableEvidenceTokensRecognized,
+    sourceOwnedPackageEntrypointsRecognized,
+    privateDiagnosticIdsRecognized,
+    privateDiagnosticStatusesRecognized,
+    privateDiagnosticRolesRecognized,
+    crossVariantRowsRejected,
+    requirementsRecognized,
+    blockedPublicClaimsRecognized,
+    publicCompatibilityAliasesBlocked,
+    publicVariantBehaviorClaimsBlocked,
+    packageSurfaceBlocked,
+    staticReadOnlyRecognized,
+    compatibilityClaimed,
+    queueVariants: PRIVATE_ADMISSION_886_VARIANTS,
+    recognizedVariantIds: freezeArray(
+      evaluatedRows.map((row) => row.variantId)
+    ),
+    publicBlockerClaimViolationIds: freezeArray(
+      publicBlockerClaimViolationIds
+    ),
+    publicCompatibilityAliasClaimIds: freezeArray(
+      publicCompatibilityAliasClaimIds
+    ),
+    publicVariantBehaviorClaimIds: freezeArray(publicVariantBehaviorClaimIds),
+    publicPackageSurfaceClaimIds: freezeArray(publicPackageSurfaceClaimIds),
+    nonDurableEvidenceTokenViolationIds: freezeArray(
+      nonDurableEvidenceTokenMismatches.map(
+        (mismatch) => `${mismatch.variantId}.${mismatch.role}`
+      )
+    ),
+    evidenceRoleViolationIds: freezeArray(
+      evidenceRoleMismatches.map((mismatch) => mismatch.variantId)
+    ),
+    sourceBoundaryViolationIds: freezeArray(
+      sourceBoundaryMismatches.map((mismatch) => mismatch.variantId)
+    ),
+    requirementFieldViolationIds: freezeArray(
+      requirementFieldMismatches.map((mismatch) => mismatch.variantId)
+    ),
+    staticReadOnlyViolationIds: freezeArray(staticReadOnlyViolationIds),
+    sourceOwnedBoundaryViolationIds: freezeArray(
+      sourceOwnedBoundaryViolationIds
+    ),
+    crossVariantDiagnosticViolationIds: freezeArray(
+      crossVariantDiagnosticRows.map((row) => row.variantId)
+    ),
+    manifest,
+    rows: freezeArray(evaluatedRows),
+    rowsByVariant: indexRowsByVariant(evaluatedRows),
+    violations: freezeArray(violations)
+  });
+}
+
+function ledgerRow({
+  variantId,
+  variantFamily,
+  entrypoint,
+  sourceFile,
+  physicalEntrypoint,
+  runtimeMode,
+  acceptedDiagnosticIds,
+  acceptedDiagnosticStatuses,
+  acceptedDiagnosticRoles,
+  evidence
+}) {
+  return freezeRecord({
+    variantId,
+    sourceBoundary: freezeRecord({
+      packageName: "scheduler",
+      compatibilityTarget: "scheduler@0.27.0",
+      variantFamily,
+      entrypoint,
+      sourceFile,
+      physicalEntrypoint,
+      runtimeMode
+    }),
+    privateAdmission:
+      acceptedDiagnosticIds.length === 0
+        ? "scheduler-variant-boundary-no-private-diagnostic-admission"
+        : "accepted-private-scheduler-variant-diagnostic-boundary",
+    acceptedDiagnosticIds,
+    acceptedDiagnosticStatuses,
+    acceptedDiagnosticRoles,
+    evidence,
+    ledgerEvaluationMode: "source-token-checks-and-manifest-only",
+    requirements: freezeRecord({
+      privateEvidenceOnly: true,
+      sourceOwnedPackageEntrypoint: true,
+      sourceOwnedDiagnosticIdentifiers: true,
+      sourceOwnedDiagnosticRoles: true,
+      variantBoundaryPinned: true,
+      crossVariantEvidenceRejected: true,
+      staticReadOnlyLedger: true,
+      sourceTokenChecksOnly: true,
+      manifestEvaluationOnly: true,
+      packageSurfaceUnchanged: true,
+      runtimeExecutionClaimed: false,
+      publicSchedulerTimingCompatibilityClaimed: false,
+      publicRootSchedulerCompatibilityClaimed: false,
+      publicReactActCompatibilityClaimed: false,
+      publicPackageCompatibilityClaimed: false,
+      publicNativeCompatibilityClaimed: false,
+      publicPostTaskCompatibilityClaimed: false,
+      publicMockSchedulerCompatibilityClaimed: false,
+      rootExecutionClaimed: false,
+      nativePublicBehaviorClaimed: false,
+      postTaskPublicBehaviorClaimed: false,
+      mockPublicBehaviorClaimed: false,
+      newPublicExportsAdded: false,
+      packageSurfaceChanged: false
+    }),
+    publicBlockerClaims: falseRecord(PRIVATE_ADMISSION_886_PUBLIC_BLOCKER_FIELDS)
+  });
+}
+
+function cjsMockEvidence(role, path) {
+  return evidenceData({
+    role,
+    path,
+    tokens: [
+      "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__",
+      "private-scheduler-act-queue-flush-diagnostics",
+      "schedulerCompatibilityTarget",
+      "scheduler@0.27.0",
+      "scheduler/unstable_mock"
+    ],
+    forbiddenTokens: mockCjsForbiddenRootOnlyTokens
+  });
+}
+
+function postTaskEvidence(role, path) {
+  return evidenceData({
+    role,
+    path,
+    tokens: [
+      "__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__",
+      "fast-react.scheduler.unstable_post_task.priority-diagnostics",
+      "fast-react.scheduler.post_task.private-act-root-work-handoff",
+      "private-scheduler-post-task-priority-diagnostics",
+      "scheduler-post-task-private-priority-timeout-diagnostics",
+      "accepted-private-scheduler-post-task-act-root-work-handoff",
+      "pending-private-root-continuation-execution-route",
+      "schedulerCompatibilityTarget",
+      "scheduler@0.27.0",
+      "scheduler/unstable_post_task",
+      "actRootWorkHandoffDiagnostics",
+      "rootContinuationExecutionRouteDiagnostics"
+    ],
+    forbiddenTokens: postTaskForbiddenMockTokens
+  });
+}
+
+function evidenceData({ role, path, tokens, forbiddenTokens = [] }) {
+  return freezeRecord({
+    role,
+    path,
+    tokens: freezeArray(tokens),
+    forbiddenTokens: freezeArray(forbiddenTokens)
+  });
+}
+
+function freezeLedgerRow(row) {
+  return freezeRecord({
+    ...row,
+    sourceBoundary: freezeRecord(row.sourceBoundary),
+    acceptedDiagnosticIds: freezeArray(row.acceptedDiagnosticIds),
+    acceptedDiagnosticStatuses: freezeArray(row.acceptedDiagnosticStatuses),
+    acceptedDiagnosticRoles: freezeArray(row.acceptedDiagnosticRoles),
+    evidence: freezeArray(row.evidence.map((evidenceRow) => evidenceData(evidenceRow))),
+    requirements: freezeRecord(row.requirements),
+    publicBlockerClaims: freezeRecord(row.publicBlockerClaims)
+  });
+}
+
+function mergeRowOverride(row, override) {
+  return freezeLedgerRow({
+    ...row,
+    ...override,
+    sourceBoundary: freezeRecord({
+      ...row.sourceBoundary,
+      ...(override.sourceBoundary ?? {})
+    }),
+    acceptedDiagnosticIds: freezeArray(
+      override.acceptedDiagnosticIds ?? row.acceptedDiagnosticIds
+    ),
+    acceptedDiagnosticStatuses: freezeArray(
+      override.acceptedDiagnosticStatuses ?? row.acceptedDiagnosticStatuses
+    ),
+    acceptedDiagnosticRoles: freezeArray(
+      override.acceptedDiagnosticRoles ?? row.acceptedDiagnosticRoles
+    ),
+    evidence: freezeArray(
+      (override.evidence ?? row.evidence).map((evidenceRow) =>
+        evidenceData(evidenceRow)
+      )
+    ),
+    requirements: freezeRecord({
+      ...row.requirements,
+      ...(override.requirements ?? {})
+    }),
+    publicBlockerClaims: freezeRecord({
+      ...row.publicBlockerClaims,
+      ...(override.publicBlockerClaims ?? {})
+    })
+  });
+}
+
+function evaluateLedgerRow({ fileCache, row, workspaceRoot }) {
+  const evidence = row.evidence.map((evidenceRow) =>
+    evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot })
+  );
+  return freezeRecord({
+    ...row,
+    evidence: freezeArray(evidence),
+    evidenceRecognized: evidence.every((evidenceRow) => evidenceRow.recognized)
+  });
+}
+
+function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
+  const approvedContext =
+    PRIVATE_ADMISSION_886_APPROVED_EVIDENCE_CONTEXTS_BY_ROLE[
+      evidenceRow.role
+    ] ?? null;
+  const expectedPath = approvedContext?.path ?? null;
+  const approvedTokens = approvedContext?.tokens ?? freezeArray([]);
+  const approvedContextPathMismatch =
+    expectedPath !== null && expectedPath !== evidenceRow.path;
+  let text = "";
+  let readError = null;
+
+  try {
+    text = readCachedFile(fileCache, workspaceRoot, evidenceRow.path);
+  } catch (error) {
+    readError = error instanceof Error ? error.message : String(error);
+  }
+
+  const missingTokens =
+    readError === null
+      ? evidenceRow.tokens.filter((token) => !text.includes(token))
+      : freezeArray(evidenceRow.tokens);
+  const forbiddenTokensPresent =
+    readError === null
+      ? evidenceRow.forbiddenTokens.filter((token) => text.includes(token))
+      : freezeArray([]);
+  const nonDurableTokens = evidenceRow.tokens.flatMap((token) => {
+    const shapeId = classifyNonDurableEvidenceToken(token, approvedTokens);
+    if (shapeId === null) {
+      return [];
+    }
+    return [
+      freezeRecord({
+        token,
+        shapeId
+      })
+    ];
+  });
+
+  return freezeRecord({
+    ...evidenceRow,
+    expectedPath,
+    approvedContextPathMismatch,
+    missingTokens: freezeArray(missingTokens),
+    forbiddenTokensPresent: freezeArray(forbiddenTokensPresent),
+    nonDurableTokens: freezeArray(nonDurableTokens),
+    readError,
+    recognized:
+      readError === null &&
+      approvedContext !== null &&
+      approvedContextPathMismatch === false &&
+      missingTokens.length === 0 &&
+      forbiddenTokensPresent.length === 0 &&
+      nonDurableTokens.length === 0
+  });
+}
+
+function classifyNonDurableEvidenceToken(token, approvedTokens) {
+  if (approvedTokens.includes(token)) {
+    for (const tokenClass of PRIVATE_ADMISSION_886_DURABLE_EVIDENCE_TOKEN_CLASSES) {
+      if (tokenClass.pattern.test(token)) {
+        return null;
+      }
+    }
+  }
+
+  for (const shape of PRIVATE_ADMISSION_886_NON_DURABLE_EVIDENCE_TOKEN_SHAPES) {
+    if (
+      shape.id !== "unapproved-evidence-token-context" &&
+      shape.pattern.test(token)
+    ) {
+      return shape.id;
+    }
+  }
+
+  if (!approvedTokens.includes(token)) {
+    return "unapproved-evidence-token-context";
+  }
+
+  return "unapproved-evidence-token-context";
+}
+
+function readCachedFile(fileCache, workspaceRoot, relativePath) {
+  const absolutePath = join(workspaceRoot, relativePath);
+  if (!fileCache.has(absolutePath)) {
+    fileCache.set(absolutePath, readFileSync(absolutePath, "utf8"));
+  }
+  return fileCache.get(absolutePath);
+}
+
+function compareRequiredArrayByVariant({
+  rows,
+  requiredByVariant,
+  actualKey,
+  expectedKey,
+  actualKeyForViolation
+}) {
+  return rows.flatMap((row) => {
+    const expected = requiredByVariant[row.variantId] ?? freezeArray([]);
+    const actual = row[actualKey] ?? freezeArray([]);
+    if (sameStringArray(actual, expected)) {
+      return [];
+    }
+    return [
+      freezeRecord({
+        variantId: row.variantId,
+        [expectedKey]: expected,
+        [actualKeyForViolation]: freezeArray(actual),
+        missingValues: freezeArray(
+          expected.filter((value) => !actual.includes(value))
+        ),
+        unexpectedValues: freezeArray(
+          actual.filter((value) => !expected.includes(value))
+        )
+      })
+    ];
+  });
+}
+
+function findCrossVariantDiagnosticRows(rows) {
+  const diagnosticOwners = new Map();
+  for (const [variantId, diagnosticIds] of Object.entries(
+    PRIVATE_ADMISSION_886_REQUIRED_DIAGNOSTIC_IDS
+  )) {
+    for (const diagnosticId of diagnosticIds) {
+      if (!diagnosticOwners.has(diagnosticId)) {
+        diagnosticOwners.set(diagnosticId, []);
+      }
+      diagnosticOwners.get(diagnosticId).push(variantId);
+    }
+  }
+
+  return rows.flatMap((row) => {
+    const expected = PRIVATE_ADMISSION_886_REQUIRED_DIAGNOSTIC_IDS[row.variantId];
+    const crossVariantDiagnostics = row.acceptedDiagnosticIds.flatMap(
+      (diagnosticId) => {
+        if (expected?.includes(diagnosticId)) {
+          return [];
+        }
+        const ownerVariants = diagnosticOwners.get(diagnosticId) ?? [];
+        if (ownerVariants.length === 0) {
+          return [];
+        }
+        return [
+          freezeRecord({
+            diagnosticId,
+            ownerVariants: freezeArray(ownerVariants)
+          })
+        ];
+      }
+    );
+
+    if (crossVariantDiagnostics.length === 0) {
+      return [];
+    }
+
+    return [
+      freezeRecord({
+        variantId: row.variantId,
+        sourceBoundary: row.sourceBoundary,
+        crossVariantDiagnostics: freezeArray(crossVariantDiagnostics)
+      })
+    ];
+  });
+}
+
+function sameStringArray(actual, expected) {
+  return (
+    actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index])
+  );
+}
+
+function sameStringSet(expected, actual) {
+  return (
+    expected.length === actual.length &&
+    expected.every((value) => actual.includes(value))
+  );
+}
+
+function sameStringRecord(actual, expected, keys) {
+  return keys.every((key) => actual?.[key] === expected?.[key]);
+}
+
+function indexRowsByVariant(rows) {
+  return freezeRecord(
+    Object.fromEntries(rows.map((row) => [row.variantId, row]))
+  );
+}
+
+function createViolation(id, fields = {}) {
+  return freezeRecord({
+    id,
+    ...fields
+  });
+}
+
+function pushRowsViolation(violations, id, rows) {
+  if (rows.length > 0) {
+    violations.push(createViolation(id, { rows: freezeArray(rows) }));
+  }
+}
+
+function pushIdsViolation(violations, id, ids) {
+  if (ids.length > 0) {
+    violations.push(createViolation(id, { ids: freezeArray(ids) }));
+  }
+}
+
+function falseRecord(keys) {
+  return freezeRecord(Object.fromEntries(keys.map((key) => [key, false])));
+}
+
+function freezeArray(values) {
+  return Object.freeze([...values]);
+}
+
+function freezeRecord(record) {
+  return Object.freeze({ ...record });
+}
