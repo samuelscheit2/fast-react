@@ -583,6 +583,16 @@ const cjsDevelopmentEntrypoint =
 const cjsEntrypoints = entrypoints.filter((entry) =>
   entry.entrypoint.includes("/cjs/")
 );
+const packageRootEntrypoint = "react-test-renderer";
+function isPackageRootEntrypoint(entrypoint) {
+  return (
+    entrypoint === packageRootEntrypoint ||
+    entrypoint.startsWith(`${packageRootEntrypoint} `)
+  );
+}
+function hasSiblingTextPrivateAdmission(entrypoint) {
+  return isPackageRootEntrypoint(entrypoint) || entrypoint.includes("/cjs/");
+}
 
 test("react-test-renderer create shell exposes routing gate metadata without changing public keys", () => {
   for (const entry of entrypoints) {
@@ -5290,7 +5300,9 @@ test("react-test-renderer sibling-text JS admissions reject stale and public/nat
     });
   }
 
-  for (const entry of cjsEntrypoints) {
+  for (const entry of entrypoints.filter((candidate) =>
+    hasSiblingTextPrivateAdmission(candidate.entrypoint)
+  )) {
     const { jsonFacade, treeFacade, updateRootRequest } =
       privateSiblingTextAdmissionRuntime(entry);
     const siblingReport = privateSiblingTextToJSONReport();
@@ -5299,43 +5311,45 @@ test("react-test-renderer sibling-text JS admissions reject stale and public/nat
       rootRequest: updateRootRequest
     });
 
-    assert.equal(
-      jsonFacade.canCreateAcceptedSiblingTextDiagnosticResult(
-        siblingReport,
-        siblingIdentity,
-        updateRootRequest
-      ),
-      true,
-      `${entry.entrypoint} toJSON`
-    );
-    assertCreateRoutingSiblingTextIdentityRejections({
-      report: siblingReport,
-      evidence: siblingIdentity,
-      sourceRootRequest: updateRootRequest,
-      reject(report, evidence, messagePattern) {
-        return assertSiblingTextAdmissionRejection(
-          jsonFacade,
-          report,
-          evidence,
-          updateRootRequest,
-          messagePattern
-        );
-      }
-    });
-    assertCreateRoutingSiblingTextJsonReportRejections({
-      report: siblingReport,
-      evidence: siblingIdentity,
-      includeCommittedFiberInspection: true,
-      reject(report, evidence, messagePattern) {
-        return assertSiblingTextAdmissionRejection(
-          jsonFacade,
-          report,
-          evidence,
-          updateRootRequest,
-          messagePattern
-        );
-      }
-    });
+    if (entry.entrypoint.includes("/cjs/")) {
+      assert.equal(
+        jsonFacade.canCreateAcceptedSiblingTextDiagnosticResult(
+          siblingReport,
+          siblingIdentity,
+          updateRootRequest
+        ),
+        true,
+        `${entry.entrypoint} toJSON`
+      );
+      assertCreateRoutingSiblingTextIdentityRejections({
+        report: siblingReport,
+        evidence: siblingIdentity,
+        sourceRootRequest: updateRootRequest,
+        reject(report, evidence, messagePattern) {
+          return assertSiblingTextAdmissionRejection(
+            jsonFacade,
+            report,
+            evidence,
+            updateRootRequest,
+            messagePattern
+          );
+        }
+      });
+      assertCreateRoutingSiblingTextJsonReportRejections({
+        report: siblingReport,
+        evidence: siblingIdentity,
+        includeCommittedFiberInspection: true,
+        reject(report, evidence, messagePattern) {
+          return assertSiblingTextAdmissionRejection(
+            jsonFacade,
+            report,
+            evidence,
+            updateRootRequest,
+            messagePattern
+          );
+        }
+      });
+    }
 
     assert.equal(
       treeFacade.canCreateAcceptedSiblingTextDiagnosticResult(
@@ -11151,7 +11165,7 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     entrypoint
   );
   assert.equal(gate.requiresRootFinishedLanesHandoffEvidence, true, entrypoint);
-  if (entrypoint.includes("/cjs/")) {
+  if (hasSiblingTextPrivateAdmission(entrypoint)) {
     assert.equal(
       gate.privateSiblingTextFinishedWorkIdentityGateAvailable,
       true,
@@ -11183,6 +11197,13 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
       true,
       entrypoint
     );
+    if (isPackageRootEntrypoint(entrypoint)) {
+      assert.equal(
+        gate.siblingTextJSAdmissionConsumesCommittedFiberInspection,
+        true,
+        entrypoint
+      );
+    }
     assert.equal(gate.rejectsGenericSiblingTextFinishedWorkIdentity, true, entrypoint);
     assert.equal(gate.rejectsBroadMultichildFinishedWorkIdentity, true, entrypoint);
     assert.equal(
@@ -11295,12 +11316,12 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
           "TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary",
           "TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary",
           "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary",
-          ...(entrypoint.includes("/cjs/")
-            ? [
-                "TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary",
-                "TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary"
-              ]
-            : [])
+        ]
+      : []),
+    ...(hasSiblingTextPrivateAdmission(entrypoint)
+      ? [
+          "TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary",
+          "TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary"
         ]
       : []),
     "TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary",
@@ -11332,13 +11353,13 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
                 "root_private_to_tree_native_execution_evidence_records_composite_host_shape"
               ]
             : []),
-          ...(entrypoint.includes("/cjs/")
-            ? [
-                "root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate",
-                "root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity",
-                "root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate"
-              ]
-            : [])
+        ]
+      : []),
+    ...(hasSiblingTextPrivateAdmission(entrypoint)
+      ? [
+          "root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate",
+          "root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity",
+          "root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate"
         ]
       : []),
     "root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff",
@@ -11471,7 +11492,7 @@ function assertPrivateToTreeFacade(record, entrypoint) {
     true,
     entrypoint
   );
-  if (entrypoint.includes("/cjs/")) {
+  if (hasSiblingTextPrivateAdmission(entrypoint)) {
     assert.equal(
       record.privateSiblingTextFinishedWorkIdentityGateAvailable,
       true,
@@ -11507,6 +11528,13 @@ function assertPrivateToTreeFacade(record, entrypoint) {
       true,
       entrypoint
     );
+    if (isPackageRootEntrypoint(entrypoint)) {
+      assert.equal(
+        record.siblingTextJSAdmissionConsumesCommittedFiberInspection,
+        true,
+        entrypoint
+      );
+    }
     assert.equal(record.rejectsGenericSiblingTextFinishedWorkIdentity, true, entrypoint);
     assert.equal(record.rejectsBroadMultichildFinishedWorkIdentity, true, entrypoint);
     assert.equal(
@@ -11595,7 +11623,7 @@ function assertPrivateToTreeFacade(record, entrypoint) {
       entrypoint
     );
   }
-  if (entrypoint.includes("/cjs/")) {
+  if (hasSiblingTextPrivateAdmission(entrypoint)) {
     assert.equal(
       typeof record.canCreateAcceptedSiblingTextDiagnosticResult,
       "function",

@@ -980,6 +980,14 @@ const privateToJSONSiblingTextIdentityPublicSurface =
   'create().update -> create().toJSON';
 const privateToJSONSiblingTextJSAdmissionResultId =
   'react-test-renderer-private-tojson-sibling-text-js-cjs-admission-result';
+const privateToTreeSiblingTextJSAdmissionDiagnosticName =
+  'fast-react-test-renderer.totree.sibling-text.private-js-cjs-admission';
+const privateToTreeSiblingTextJSAdmissionStatus =
+  'private-totree-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked';
+const privateToTreeSiblingTextIdentityPublicSurface =
+  'create().update -> create().toTree';
+const privateToTreeSiblingTextJSAdmissionResultId =
+  'react-test-renderer-private-totree-sibling-text-js-cjs-admission-result';
 const privateUpdateRouteRootWorkLoopAdmissionId =
   'react-test-renderer-update-route-root-work-loop-private-admission';
 const privateUpdateRouteRootWorkLoopAdmissionStatus =
@@ -1236,6 +1244,8 @@ const privateToTreeFacadeStatus =
   'private-tree-diagnostics-serializable-public-totree-blocked';
 const privateToTreeAcceptedDiagnosticName =
   'fast-react-test-renderer.serialization.private-tree-canary';
+const privateToTreeCommittedFiberInspectionDiagnosticName =
+  'fast-react-test-renderer.serialization.private-tree-committed-fiber-inspection-canary';
 const privateToTreeAcceptedFiberShape = Object.freeze([
   'HostRoot',
   'HostComponent',
@@ -1244,6 +1254,19 @@ const privateToTreeAcceptedFiberShape = Object.freeze([
 const privateToTreeCompositeAcceptedFiberShape = Object.freeze([
   'HostRoot',
   'FunctionComponent',
+  'HostComponent',
+  'HostText'
+]);
+const privateToTreeMultiChildAcceptedFiberShape = Object.freeze([
+  'HostRoot',
+  'HostText',
+  'HostComponent',
+  'HostText'
+]);
+const privateToTreeCompositeMultiChildAcceptedFiberShape = Object.freeze([
+  'HostRoot',
+  'FunctionComponent',
+  'HostText',
   'HostComponent',
   'HostText'
 ]);
@@ -1260,6 +1283,9 @@ const toTreePrivateHostOutputMetadataGate = Object.freeze({
   privateFacadeStatus: privateToTreeFacadeStatus,
   acceptedMinimalFiberShape: privateToTreeAcceptedFiberShape,
   acceptedCompositeFiberShape: privateToTreeCompositeAcceptedFiberShape,
+  acceptedMultiChildFiberShape: privateToTreeMultiChildAcceptedFiberShape,
+  acceptedCompositeMultiChildFiberShape:
+    privateToTreeCompositeMultiChildAcceptedFiberShape,
   acceptedReactSourceAlgorithm: 'ReactTestRenderer.js toTree',
   hostRootBehavior: 'childrenToTree(node.child)',
   functionComponentBehavior:
@@ -1271,7 +1297,13 @@ const toTreePrivateHostOutputMetadataGate = Object.freeze({
   acceptedRustPrivateTreeMetadata: true,
   acceptedRustPrivateCompositeTreeMetadata: true,
   acceptedCommittedFiberInspection: true,
+  acceptedCommittedFiberInspectionDiagnosticName:
+    privateToTreeCommittedFiberInspectionDiagnosticName,
+  privateCommittedFiberInspectionShapeDiagnosticsAvailable: true,
+  privateMultiChildCommittedFiberInspectionAvailable: true,
+  privateFunctionComponentCommittedFiberInspectionAvailable: true,
   privateCompositeFunctionMetadataAvailable: true,
+  privateMultiChildHostOutputTreeMetadataAvailable: true,
   publicTreeAvailable: false,
   publicRouteAvailable: false,
   nativeBridgeAvailable: false,
@@ -1280,26 +1312,56 @@ const toTreePrivateHostOutputMetadataGate = Object.freeze({
   acceptedWorker: 'worker-364-test-renderer-totree-private-host-output',
   acceptedRustWorkers: Object.freeze([
     'worker-235-test-renderer-private-fiber-inspection',
-    'worker-265-test-renderer-private-json-ready-diagnostics'
+    'worker-265-test-renderer-private-json-ready-diagnostics',
+    'worker-516-test-renderer-committed-fiber-tree-inspection'
   ]),
   acceptedRustApis: Object.freeze([
     'inspect_test_renderer_committed_fiber_tree',
+    'TestRendererCommittedFiberTreeInspection::shape_name',
+    'TestRendererCommittedFiberTreeInspection::nodes',
+    'TestRendererCommittedFiberTreeInspection::root_children',
+    'TestRendererCommittedFiberTreeInspection::host_children',
+    'TestRendererCommittedFiberTreeInspection::function_component',
+    'TestRendererCommittedFiberTreeInspection::host_components',
+    'TestRendererCommittedFiberTreeInspection::host_texts',
+    'TestRendererCommittedFiberTreeInspection::fiber_tag_order',
     'TestRendererCommittedFiberTreeInspection::host_root',
     'TestRendererCommittedFiberTreeInspection::host_component',
     'TestRendererCommittedFiberTreeInspection::host_text',
     'TestRendererRoot::describe_private_json_serialization_for_canary',
     'TestRendererRoot::describe_private_tree_metadata_for_canary',
     'TestRendererRoot::describe_private_tree_metadata_after_update_for_canary',
+    'TestRendererRoot::describe_private_tree_committed_fiber_inspection_for_canary',
     'TestRendererPrivateJsonSerializationReport',
     'TestRendererPrivateTreeMetadataReport',
+    'TestRendererPrivateTreeCommittedFiberInspectionReport',
     'TestRendererPrivateTreeFunctionComponentDiagnostic'
   ]),
   acceptedRustTests: Object.freeze([
     'committed_fiber_inspection_describes_host_root_component_and_text',
+    'committed_fiber_inspection_describes_multi_child_host_root_shape',
+    'committed_fiber_inspection_describes_function_component_above_host_shape',
+    'committed_fiber_inspection_describes_function_component_above_multi_child_shape',
     'root_private_json_serialization_canary_describes_minimal_host_component_with_text',
     'root_private_tree_metadata_canary_describes_minimal_host_component_with_text',
     'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit',
-    'root_private_tree_metadata_canary_describes_function_component_above_host_output'
+    'root_private_tree_metadata_canary_describes_function_component_above_host_output',
+    'root_private_tree_committed_fiber_inspection_records_minimal_shape_privately'
+  ]),
+  multiChildAcceptedWorker:
+    'worker-485-test-renderer-totree-multichild-gate',
+  multiChildAcceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics',
+    'TestRendererRoot::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics',
+    'TestRendererCommittedFiberTreeInspection::host_child_tags',
+    'TestRendererCommittedFiberTreeInspection::has_function_component_wrapper',
+    'TestRendererPrivateTreeRenderedRoot',
+    'TestRendererPrivateTreeRenderedHostComponent',
+    'TestRendererPrivateTreeRenderedFunctionComponent'
+  ]),
+  multiChildAcceptedRustTests: Object.freeze([
+    'root_private_to_tree_shape_diagnostics_serialize_multiple_host_children_and_text_siblings',
+    'root_private_to_tree_shape_diagnostics_wrap_composite_above_multi_child_host_output'
   ]),
   blockedPublicSurfaces: Object.freeze([
     'create().toTree',
@@ -1323,6 +1385,7 @@ const toTreePrivateFacadeGate = Object.freeze({
   privateFacadeGateAvailable: true,
   privateTreeMetadataSerializable: true,
   privateCompositeFunctionMetadataSerializable: true,
+  privateMultiChildTreeMetadataSerializable: true,
   privateFinishedWorkIdentityGateAvailable: true,
   privateUpdateFinishedWorkIdentityGateAvailable: true,
   privateUnmountFinishedWorkIdentityGateAvailable: true,
@@ -1342,6 +1405,21 @@ const toTreePrivateFacadeGate = Object.freeze({
   rejectsMissingRootFinishedLanesHandoff: true,
   rejectsStaleRootFinishedLanesHandoff: true,
   rejectsPublicNativePackageRootFinishedLanesHandoffClaims: true,
+  privateSiblingTextFinishedWorkIdentityGateAvailable: true,
+  privateSiblingTextFinishedWorkIdentityDiagnosticName:
+    privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+  privateSiblingTextFinishedWorkIdentityStatus:
+    privateToJSONSiblingTextFinishedWorkIdentityStatus,
+  privateSiblingTextJSAdmissionDiagnosticName:
+    privateToTreeSiblingTextJSAdmissionDiagnosticName,
+  privateSiblingTextJSAdmissionStatus:
+    privateToTreeSiblingTextJSAdmissionStatus,
+  siblingTextJSAdmissionConsumesDedicatedIdentity: true,
+  siblingTextJSAdmissionConsumesRootFinishedLanesHandoff: true,
+  siblingTextJSAdmissionConsumesCommittedFiberInspection: true,
+  rejectsGenericSiblingTextFinishedWorkIdentity: true,
+  rejectsBroadMultichildFinishedWorkIdentity: true,
+  privateSiblingTextHostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
   acceptedUnmountFinishedWorkIdentityWorker:
     'worker-733-test-renderer-unmount-finished-work-identity',
   acceptedUnmountHostOutputUpdateKindForFinishedWorkIdentity: 'Unmount',
@@ -1368,6 +1446,8 @@ const toTreePrivateFacadeGate = Object.freeze({
   acceptedRustApis: Object.freeze([
     'TestRendererRoot::describe_private_tree_metadata_for_canary',
     'TestRendererRoot::describe_private_tree_metadata_after_update_for_canary',
+    'TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary',
     'TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary',
     'TestRendererRoot::describe_private_to_tree_unmount_finished_work_identity_gate_for_canary',
     'TestRendererPrivateTreeMetadataReport',
@@ -1380,11 +1460,29 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_tree_metadata_canary_describes_minimal_host_component_with_text',
     'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit',
     'root_private_tree_metadata_canary_describes_function_component_above_host_output',
+    'root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate',
+    'root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity',
+    'root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate',
     'root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate',
     'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
     'root_private_tree_metadata_canary_rejects_stale_host_output_snapshot'
+  ]),
+  multiChildAcceptedWorker:
+    'worker-485-test-renderer-totree-multichild-gate',
+  multiChildAcceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics',
+    'TestRendererRoot::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics',
+    'TestRendererCommittedFiberTreeInspection::host_child_tags',
+    'TestRendererCommittedFiberTreeInspection::has_function_component_wrapper',
+    'TestRendererPrivateTreeRenderedRoot',
+    'TestRendererPrivateTreeRenderedHostComponent',
+    'TestRendererPrivateTreeRenderedFunctionComponent'
+  ]),
+  multiChildAcceptedRustTests: Object.freeze([
+    'root_private_to_tree_shape_diagnostics_serialize_multiple_host_children_and_text_siblings',
+    'root_private_to_tree_shape_diagnostics_wrap_composite_above_multi_child_host_output'
   ]),
   blockedPublicSurfaces: Object.freeze([
     'create().toTree',
@@ -4328,6 +4426,7 @@ function createPrivateToTreeHostOutputMetadata(rootRequest) {
     rootRequest,
     privateHostOutputTreeMetadataAvailable: true,
     privateCompositeFunctionMetadataAvailable: true,
+    privateMultiChildHostOutputTreeMetadataAvailable: true,
     publicTreeAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -4359,6 +4458,7 @@ function createPrivateToTreeFacade(rootRequest) {
     rootRequest,
     privateTreeMetadataSerializable: true,
     privateCompositeFunctionMetadataSerializable: true,
+    privateMultiChildTreeMetadataSerializable: true,
     privateFinishedWorkIdentityGateAvailable: true,
     privateUpdateFinishedWorkIdentityGateAvailable: true,
     privateUnmountFinishedWorkIdentityGateAvailable: true,
@@ -4375,6 +4475,21 @@ function createPrivateToTreeFacade(rootRequest) {
     privateRootFinishedLanesHandoffDiagnosticName,
     privateRootFinishedLanesHandoffStatus,
     requiresRootFinishedLanesHandoffEvidence: true,
+    privateSiblingTextFinishedWorkIdentityGateAvailable: true,
+    privateSiblingTextFinishedWorkIdentityDiagnosticName:
+      privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+    privateSiblingTextFinishedWorkIdentityStatus:
+      privateToJSONSiblingTextFinishedWorkIdentityStatus,
+    privateSiblingTextJSAdmissionDiagnosticName:
+      privateToTreeSiblingTextJSAdmissionDiagnosticName,
+    privateSiblingTextJSAdmissionStatus:
+      privateToTreeSiblingTextJSAdmissionStatus,
+    siblingTextJSAdmissionConsumesDedicatedIdentity: true,
+    siblingTextJSAdmissionConsumesRootFinishedLanesHandoff: true,
+    siblingTextJSAdmissionConsumesCommittedFiberInspection: true,
+    rejectsGenericSiblingTextFinishedWorkIdentity: true,
+    rejectsBroadMultichildFinishedWorkIdentity: true,
+    privateSiblingTextHostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
     publicTreeAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -4390,6 +4505,35 @@ function createPrivateToTreeFacade(rootRequest) {
     },
     serializeAcceptedTreeMetadata(report) {
       return serializePrivateToTreeMetadataDiagnostic(report);
+    },
+    canCreateAcceptedSiblingTextDiagnosticResult(
+      report,
+      siblingTextFinishedWorkIdentityEvidence,
+      sourceRootRequest = undefined
+    ) {
+      try {
+        createPrivateToTreeSiblingTextJSAdmissionDiagnosticResult(
+          rootRequest,
+          report,
+          siblingTextFinishedWorkIdentityEvidence,
+          sourceRootRequest
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    createAcceptedSiblingTextDiagnosticResult(
+      report,
+      siblingTextFinishedWorkIdentityEvidence,
+      sourceRootRequest = undefined
+    ) {
+      return createPrivateToTreeSiblingTextJSAdmissionDiagnosticResult(
+        rootRequest,
+        report,
+        siblingTextFinishedWorkIdentityEvidence,
+        sourceRootRequest
+      );
     },
     canValidateAcceptedFinishedWorkIdentity(
       evidence,
@@ -4429,6 +4573,10 @@ function createPrivateToTreeFacade(rootRequest) {
 
 function describePrivateToTreeHostOutputDiagnostic(report) {
   const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+
+  if (diagnostic.kind === 'multi-child') {
+    return describePrivateToTreeMultiChildHostOutputDiagnostic(diagnostic);
+  }
 
   return freezeRecord({
     id: 'react-test-renderer-private-totree-minimal-host-output-metadata',
@@ -4497,6 +4645,7 @@ function describePrivateToTreeHostOutputDiagnostic(report) {
       returnsTextValue: true,
       publicTreeObject: false
     }),
+    committedFiberInspection: diagnostic.committedFiberInspection,
     publicTreeObjectAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -4520,15 +4669,33 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
       'source_json_diagnostic_name',
       privateToJSONAcceptedDiagnosticName
     );
-    assertPrivateToJSONHostOutputUpdateKind(report);
+    const hostOutputUpdateKind = assertPrivateToJSONHostOutputUpdateKind(report);
     assertPrivateToJSONBooleanField(
       report,
       'hostOutputSnapshotCurrent',
       'host_output_snapshot_current',
       true
     );
-    assertPrivateToJSONNumberField(report, 'rootChildCount', 'root_child_count', 1);
+    const rootChildCount = readPrivateToJSONNonNegativeIntegerField(
+      report,
+      'rootChildCount',
+      'root_child_count'
+    );
     assertPrivateToJSONGateIfPresent(readPrivateToJSONField(report, 'gate'));
+
+    if (Array.isArray(readPrivateToJSONField(report, 'hostChildren', 'host_children'))) {
+      return validatePrivateToTreeMultiChildHostOutputDiagnostic(
+        report,
+        rootChildCount,
+        hostOutputUpdateKind
+      );
+    }
+
+    if (rootChildCount !== 1) {
+      throwPrivateToTreeMetadataError(
+        'Expected private tree metadata rootChildCount to be 1.'
+      );
+    }
     assertPrivateToTreeAcceptedFiberShape(
       readPrivateToJSONArrayField(report, 'acceptedFiberShape', 'accepted_fiber_shape')
     );
@@ -4696,13 +4863,26 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
       'public_tree_object_available',
       false
     );
+    const committedFiberInspection =
+      validatePrivateToTreeCommittedFiberInspectionDiagnostic(report, {
+        expectedFiberShape: privateToTreeAcceptedFiberShape,
+        expectedRootChildFiberTags: ['HostComponent'],
+        expectedHostChildFiberTags: ['HostComponent'],
+        expectedRootChildCount: 1,
+        expectedHostChildCount: 1,
+        expectedHostTextCount: 1,
+        expectedFunctionComponentPresent: false,
+        expectedWrapsCommittedHostOutput: false
+      });
 
     return {
-      hostOutputUpdateKind: readPrivateToJSONStringField(
-        report,
-        'hostOutputUpdateKind',
-        'host_output_update_kind'
-      ),
+      kind: 'minimal',
+      hostOutputUpdateKind,
+      hostOutputShape: 'SingleHostText',
+      rootChildCount,
+      sourceFiberCount: privateToTreeAcceptedFiberShape.length,
+      functionComponentAboveHostOutputShape: false,
+      committedFiberInspection,
       componentProps,
       componentType: readPrivateToJSONStringField(
         functionComponent,
@@ -4735,8 +4915,492 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
   }
 }
 
+function describePrivateToTreeMultiChildHostOutputDiagnostic(diagnostic) {
+  const record = {
+    id: diagnostic.componentWrapped
+      ? 'react-test-renderer-private-totree-composite-multi-child-host-output-metadata'
+      : 'react-test-renderer-private-totree-multi-child-host-output-metadata',
+    status: privateToTreeHostOutputMetadataStatus,
+    entrypoint,
+    publicSurface: 'create().toTree',
+    sourceDiagnostic: privateToTreeAcceptedDiagnosticName,
+    acceptedMinimalFiberShape:
+      toTreePrivateHostOutputMetadataGate.acceptedMinimalFiberShape,
+    acceptedCompositeFiberShape:
+      toTreePrivateHostOutputMetadataGate.acceptedCompositeFiberShape,
+    acceptedMultiChildFiberShape:
+      toTreePrivateHostOutputMetadataGate.acceptedMultiChildFiberShape,
+    acceptedCompositeMultiChildFiberShape:
+      toTreePrivateHostOutputMetadataGate.acceptedCompositeMultiChildFiberShape,
+    traversal: freezeRecord({
+      source: 'ReactTestRenderer.js toTree childrenToTree',
+      order: diagnostic.componentWrapped
+        ? privateToTreeCompositeMultiChildAcceptedFiberShape
+        : privateToTreeMultiChildAcceptedFiberShape,
+      committedHostOutputOrder: privateToTreeMultiChildAcceptedFiberShape,
+      hostRootDelegatesToChild: true,
+      hostRootReturnsArrayForMultipleChildren: !diagnostic.componentWrapped,
+      functionComponentProducesComponentNodeMetadata:
+        diagnostic.componentWrapped,
+      functionComponentRendersCommittedHostOutput: diagnostic.componentWrapped,
+      hostComponentProducesHostNodeMetadata: true,
+      hostTextProducesTextValueMetadata: true,
+      textSiblingProducesTextValueMetadata: true
+    }),
+    hostRoot: freezeRecord({
+      fiberTag: 'HostRoot',
+      source: 'ReactTestRenderer.js toTree HostRoot childrenToTree',
+      delegatesToChild: true,
+      childFiberTags: freezeArray(
+        privateToTreeMultiChildAcceptedFiberShape.slice(1)
+      ),
+      rootChildCount: diagnostic.rootChildCount,
+      returnsArrayForMultipleChildren: !diagnostic.componentWrapped,
+      compositeChildFiberTag: diagnostic.componentWrapped
+        ? 'FunctionComponent'
+        : null,
+      publicTreeObject: false
+    }),
+    hostChildren: diagnostic.hostChildren,
+    committedFiberInspection: diagnostic.committedFiberInspection,
+    publicTreeObjectAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  };
+
+  if (diagnostic.componentWrapped) {
+    record.functionComponent = freezeRecord({
+      fiberTag: 'FunctionComponent',
+      source: 'ReactTestRenderer.js toTree FunctionComponent',
+      treeNodeType: 'component',
+      componentType: diagnostic.componentType,
+      props: diagnostic.componentProps,
+      instanceAvailable: false,
+      renderedChildFiberTags: freezeArray(
+        privateToTreeMultiChildAcceptedFiberShape.slice(1)
+      ),
+      renderedChildNodeTypes: freezeArray(['text', 'host']),
+      renderedChildCount: diagnostic.rootChildCount,
+      wrapsCommittedHostOutput: true,
+      publicTreeObject: false
+    });
+  }
+
+  return freezeRecord(record);
+}
+
+function validatePrivateToTreeMultiChildHostOutputDiagnostic(
+  report,
+  rootChildCount,
+  hostOutputUpdateKind
+) {
+  assertPrivateToTreeMultiChildAcceptedFiberShape(
+    readPrivateToJSONArrayField(report, 'acceptedFiberShape', 'accepted_fiber_shape')
+  );
+  const acceptedMultiChildFiberShape = readPrivateToJSONField(
+    report,
+    'acceptedMultiChildFiberShape',
+    'accepted_multi_child_fiber_shape'
+  );
+  if (acceptedMultiChildFiberShape !== undefined) {
+    assertPrivateToTreeMultiChildAcceptedFiberShape(acceptedMultiChildFiberShape);
+  }
+  const acceptedCompositeMultiChildFiberShape = readPrivateToJSONField(
+    report,
+    'acceptedCompositeMultiChildFiberShape',
+    'accepted_composite_multi_child_fiber_shape'
+  );
+  if (acceptedCompositeMultiChildFiberShape !== undefined) {
+    assertPrivateToTreeCompositeMultiChildAcceptedFiberShape(
+      acceptedCompositeMultiChildFiberShape
+    );
+  }
+  if (rootChildCount !== 2) {
+    throwPrivateToTreeMetadataError(
+      'Expected private multi-child tree metadata rootChildCount to be 2.'
+    );
+  }
+
+  const hostRoot = readPrivateToJSONRecordField(report, 'hostRoot', 'host_root');
+  assertPrivateToJSONStringField(hostRoot, 'fiberTag', 'fiber_tag', 'HostRoot');
+  assertPrivateToJSONBooleanField(
+    hostRoot,
+    'delegatesToChild',
+    'delegates_to_child',
+    true
+  );
+  assertPrivateToTreeStringArrayField(
+    hostRoot,
+    'childFiberTags',
+    'child_fiber_tags',
+    ['HostText', 'HostComponent']
+  );
+  assertPrivateToJSONBooleanField(
+    hostRoot,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+
+  const hostChildren = readPrivateToJSONArrayField(
+    report,
+    'hostChildren',
+    'host_children'
+  );
+  if (hostChildren.length !== rootChildCount) {
+    throwPrivateToTreeMetadataError(
+      'Expected private multi-child tree metadata hostChildren length to match rootChildCount.'
+    );
+  }
+
+  const firstText = validatePrivateToTreeTextChild(hostChildren[0], 'hostChildren[0]');
+  const hostComponent = validatePrivateToTreeHostComponentChild(
+    hostChildren[1],
+    'hostChildren[1]'
+  );
+  const renderedChildren = freezeArray([firstText.text, hostComponent.tree]);
+  const functionComponent = readPrivateToJSONField(
+    report,
+    'functionComponent',
+    'function_component'
+  );
+  let componentWrapped = false;
+  let componentType = null;
+  let componentProps = null;
+
+  if (functionComponent !== undefined) {
+    assertPrivateToJSONRecord(functionComponent, 'functionComponent');
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'fiberTag',
+      'fiber_tag',
+      'FunctionComponent'
+    );
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'nodeType',
+      'node_type',
+      'component'
+    );
+    componentType = readPrivateToJSONStringField(
+      functionComponent,
+      'componentType',
+      'component_type'
+    );
+    if (componentType !== privateToTreeFunctionComponentType) {
+      throwPrivateToTreeMetadataError(
+        `Expected private multi-child FunctionComponent type to be ${privateToTreeFunctionComponentType}.`
+      );
+    }
+    componentProps = normalizePrivateToJSONEmptyProps(
+      readPrivateToJSONField(functionComponent, 'props')
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'instanceAvailable',
+      'instance_available',
+      false
+    );
+    assertPrivateToTreeStringArrayField(
+      functionComponent,
+      'renderedChildFiberTags',
+      'rendered_child_fiber_tags',
+      ['HostText', 'HostComponent']
+    );
+    assertPrivateToJSONNumberField(
+      functionComponent,
+      'renderedChildCount',
+      'rendered_child_count',
+      rootChildCount
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'wrapsCommittedHostOutput',
+      'wraps_committed_host_output',
+      true
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'publicTreeObjectAvailable',
+      'public_tree_object_available',
+      false
+    );
+    componentWrapped = true;
+  }
+
+  assertPrivateToJSONPublicBlockers(
+    readPrivateToJSONRecordField(report, 'publicBlockers', 'public_blockers')
+  );
+  assertPrivateToJSONBooleanField(
+    report,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+  const committedFiberInspection =
+    validatePrivateToTreeCommittedFiberInspectionDiagnostic(report, {
+      expectedFiberShape: componentWrapped
+        ? privateToTreeCompositeMultiChildAcceptedFiberShape
+        : privateToTreeMultiChildAcceptedFiberShape,
+      expectedRootChildFiberTags: componentWrapped
+        ? ['FunctionComponent']
+        : ['HostText', 'HostComponent'],
+      expectedHostChildFiberTags: ['HostText', 'HostComponent'],
+      expectedRootChildCount: componentWrapped ? 1 : rootChildCount,
+      expectedHostChildCount: rootChildCount,
+      expectedHostTextCount: 2,
+      expectedFunctionComponentPresent: componentWrapped,
+      expectedWrapsCommittedHostOutput: componentWrapped
+    });
+
+  return {
+    kind: 'multi-child',
+    hostOutputUpdateKind,
+    hostOutputShape: 'SiblingText',
+    rootChildCount,
+    sourceFiberCount: componentWrapped
+      ? privateToTreeCompositeMultiChildAcceptedFiberShape.length
+      : privateToTreeMultiChildAcceptedFiberShape.length,
+    componentWrapped,
+    committedFiberInspection,
+    componentProps,
+    componentType,
+    hostChildren: freezeArray([firstText.metadata, hostComponent.metadata]),
+    renderedChildren
+  };
+}
+
+function validatePrivateToTreeCommittedFiberInspectionDiagnostic(
+  report,
+  {
+    expectedFiberShape,
+    expectedRootChildFiberTags,
+    expectedHostChildFiberTags,
+    expectedRootChildCount,
+    expectedHostChildCount,
+    expectedHostTextCount,
+    expectedFunctionComponentPresent,
+    expectedWrapsCommittedHostOutput
+  }
+) {
+  const record = readPrivateToJSONRecordField(
+    report,
+    'committedFiberInspection',
+    'committed_fiber_inspection'
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'diagnosticName',
+    'diagnostic_name',
+    privateToTreeCommittedFiberInspectionDiagnosticName
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'sourceTreeDiagnosticName',
+    'source_tree_diagnostic_name',
+    privateToTreeAcceptedDiagnosticName
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'fiberShape',
+    'fiber_shape',
+    expectedFiberShape
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'rootChildFiberTags',
+    'root_child_fiber_tags',
+    expectedRootChildFiberTags
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'hostChildFiberTags',
+    'host_child_fiber_tags',
+    expectedHostChildFiberTags
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'rootChildCount',
+    'root_child_count',
+    expectedRootChildCount
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'hostChildCount',
+    'host_child_count',
+    expectedHostChildCount
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'hostComponentCount',
+    'host_component_count',
+    1
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'hostTextCount',
+    'host_text_count',
+    expectedHostTextCount
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'functionComponentPresent',
+    'function_component_present',
+    expectedFunctionComponentPresent
+  );
+  const functionTag = readPrivateToJSONField(
+    record,
+    'functionComponentFiberTag',
+    'function_component_fiber_tag'
+  );
+  if (expectedFunctionComponentPresent) {
+    if (functionTag !== 'FunctionComponent') {
+      throwPrivateToTreeMetadataError(
+        'Expected committed-fiber inspection to record a FunctionComponent wrapper.'
+      );
+    }
+  } else if (functionTag !== undefined && functionTag !== null) {
+    throwPrivateToTreeMetadataError(
+      'Expected committed-fiber inspection to omit FunctionComponent metadata.'
+    );
+  }
+  assertPrivateToJSONBooleanField(
+    record,
+    'wrapsCommittedHostOutput',
+    'wraps_committed_host_output',
+    expectedWrapsCommittedHostOutput
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'compatibilityClaimed',
+    'compatibility_claimed',
+    false
+  );
+
+  return freezeRecord({
+    diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+    sourceTreeDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    fiberShape: freezeArray(expectedFiberShape),
+    rootChildFiberTags: freezeArray(expectedRootChildFiberTags),
+    hostChildFiberTags: freezeArray(expectedHostChildFiberTags),
+    rootChildCount: expectedRootChildCount,
+    hostChildCount: expectedHostChildCount,
+    hostComponentCount: 1,
+    hostTextCount: expectedHostTextCount,
+    functionComponentFiberTag: expectedFunctionComponentPresent
+      ? 'FunctionComponent'
+      : null,
+    functionComponentPresent: expectedFunctionComponentPresent,
+    wrapsCommittedHostOutput: expectedWrapsCommittedHostOutput,
+    publicTreeObjectAvailable: false,
+    compatibilityClaimed: false
+  });
+}
+
+function validatePrivateToTreeTextChild(record, label) {
+  assertPrivateToJSONRecord(record, label);
+  assertPrivateToJSONStringField(record, 'fiberTag', 'fiber_tag', 'HostText');
+  const text = readPrivateToJSONStringField(record, 'text');
+  assertPrivateToJSONBooleanField(
+    record,
+    'returnsTextValue',
+    'returns_text_value',
+    true
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+
+  return {
+    text,
+    metadata: freezeRecord({
+      fiberTag: 'HostText',
+      source: 'ReactTestRenderer.js toTree HostText',
+      text,
+      returnsTextValue: true,
+      publicTreeObject: false
+    })
+  };
+}
+
+function validatePrivateToTreeHostComponentChild(record, label) {
+  assertPrivateToJSONRecord(record, label);
+  assertPrivateToJSONStringField(record, 'fiberTag', 'fiber_tag', 'HostComponent');
+  assertPrivateToJSONStringField(record, 'nodeType', 'node_type', 'host');
+  const type = normalizePrivateToJSONElementType(
+    readPrivateToJSONField(record, 'elementType', 'element_type')
+  );
+  const props = normalizePrivateToJSONProps(readPrivateToJSONField(record, 'props'));
+  assertPrivateToJSONBooleanField(
+    record,
+    'instanceAvailable',
+    'instance_available',
+    false
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'renderedChildCount',
+    'rendered_child_count',
+    1
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+  const renderedChildren = readPrivateToJSONArrayField(
+    record,
+    'renderedChildren',
+    'rendered_children'
+  );
+  if (renderedChildren.length !== 1) {
+    throwPrivateToTreeMetadataError(
+      'Expected private multi-child host component to have one rendered text child.'
+    );
+  }
+  const textChild = validatePrivateToTreeTextChild(
+    renderedChildren[0],
+    `${label}.renderedChildren[0]`
+  );
+  const tree = freezeRecord({
+    nodeType: 'host',
+    type,
+    props,
+    instance: null,
+    rendered: freezeArray([textChild.text])
+  });
+
+  return {
+    tree,
+    metadata: freezeRecord({
+      fiberTag: 'HostComponent',
+      source: 'ReactTestRenderer.js toTree HostComponent',
+      treeNodeType: 'host',
+      elementType: type,
+      props,
+      instanceAvailable: false,
+      renderedChildCount: 1,
+      renderedChildren: freezeArray([textChild.metadata]),
+      publicTreeObject: false
+    })
+  };
+}
+
 function assertPrivateToTreeAcceptedFiberShape(shape) {
   if (
+    !Array.isArray(shape) ||
     shape.length !== privateToTreeAcceptedFiberShape.length ||
     shape.some((tag, index) => tag !== privateToTreeAcceptedFiberShape[index])
   ) {
@@ -4746,8 +5410,23 @@ function assertPrivateToTreeAcceptedFiberShape(shape) {
   }
 }
 
+function assertPrivateToTreeMultiChildAcceptedFiberShape(shape) {
+  if (
+    !Array.isArray(shape) ||
+    shape.length !== privateToTreeMultiChildAcceptedFiberShape.length ||
+    shape.some(
+      (tag, index) => tag !== privateToTreeMultiChildAcceptedFiberShape[index]
+    )
+  ) {
+    throwPrivateToTreeMetadataError(
+      'Expected private tree metadata accepted multi-child fiber shape to be HostRoot, HostText, HostComponent, HostText.'
+    );
+  }
+}
+
 function assertPrivateToTreeCompositeAcceptedFiberShape(shape) {
   if (
+    !Array.isArray(shape) ||
     shape.length !== privateToTreeCompositeAcceptedFiberShape.length ||
     shape.some(
       (tag, index) => tag !== privateToTreeCompositeAcceptedFiberShape[index]
@@ -4759,8 +5438,49 @@ function assertPrivateToTreeCompositeAcceptedFiberShape(shape) {
   }
 }
 
+function assertPrivateToTreeCompositeMultiChildAcceptedFiberShape(shape) {
+  if (
+    !Array.isArray(shape) ||
+    shape.length !== privateToTreeCompositeMultiChildAcceptedFiberShape.length ||
+    shape.some(
+      (tag, index) =>
+        tag !== privateToTreeCompositeMultiChildAcceptedFiberShape[index]
+    )
+  ) {
+    throwPrivateToTreeMetadataError(
+      'Expected private tree metadata accepted composite multi-child fiber shape to be HostRoot, FunctionComponent, HostText, HostComponent, HostText.'
+    );
+  }
+}
+
+function assertPrivateToTreeStringArrayField(record, camelName, snakeName, expected) {
+  const actual = readPrivateToJSONArrayField(record, camelName, snakeName);
+  if (
+    actual.length !== expected.length ||
+    actual.some((value, index) => value !== expected[index])
+  ) {
+    throwPrivateToTreeMetadataError(
+      `Expected private tree metadata ${camelName} to be ${expected.join(', ')}.`
+    );
+  }
+}
+
 function serializePrivateToTreeMetadataDiagnostic(report) {
   const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+
+  if (diagnostic.kind === 'multi-child') {
+    if (diagnostic.componentWrapped) {
+      return freezeRecord({
+        nodeType: 'component',
+        type: diagnostic.componentType,
+        props: diagnostic.componentProps,
+        instance: null,
+        rendered: diagnostic.renderedChildren
+      });
+    }
+
+    return diagnostic.renderedChildren;
+  }
 
   const renderedHostTree = freezeRecord({
     nodeType: 'host',
@@ -4886,19 +5606,130 @@ function createPrivateToJSONSiblingTextJSAdmissionDiagnosticResult(
   });
 }
 
+function createPrivateToTreeSiblingTextJSAdmissionDiagnosticResult(
+  rootRequest,
+  report,
+  siblingTextFinishedWorkIdentityEvidence,
+  sourceRootRequest = undefined
+) {
+  const finishedWorkIdentity =
+    createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
+      rootRequest,
+      siblingTextFinishedWorkIdentityEvidence,
+      report,
+      sourceRootRequest,
+      {
+        publicSurface: 'create().toTree',
+        sourceReportKind: 'toTree',
+        requireRootFinishedLanesHandoff: true
+      }
+    );
+  const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+  if (
+    diagnostic.kind !== 'multi-child' ||
+    diagnostic.hostOutputUpdateKind !==
+      finishedWorkIdentity.hostOutputUpdateKind ||
+    diagnostic.rootChildCount !== finishedWorkIdentity.rootChildCount ||
+    diagnostic.componentWrapped !== true
+  ) {
+    throwPrivateToTreeMetadataError(
+      'sibling-text-report-row-or-shape-mismatch'
+    );
+  }
+
+  return freezeRecord({
+    id: privateToTreeSiblingTextJSAdmissionResultId,
+    diagnosticName: privateToTreeSiblingTextJSAdmissionDiagnosticName,
+    status: privateToTreeSiblingTextJSAdmissionStatus,
+    entrypoint,
+    publicSurface: privateToTreeSiblingTextIdentityPublicSurface,
+    sourceFinishedWorkIdentityDiagnosticName:
+      privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+    sourceFinishedWorkIdentityStatus:
+      privateToJSONSiblingTextFinishedWorkIdentityStatus,
+    sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    sourceJsonDiagnosticName: privateToJSONAcceptedDiagnosticName,
+    rootRequest: finishedWorkIdentity.rootRequest,
+    rootRequestId: finishedWorkIdentity.rootRequestId,
+    rootRequestSequence: finishedWorkIdentity.rootRequestSequence,
+    rootRequestOperation: 'update',
+    rootId: finishedWorkIdentity.rootId,
+    rootFinishedLanesHandoff: finishedWorkIdentity.rootFinishedLanesHandoff,
+    rootFinishedLanesHandoffDiagnosticName:
+      finishedWorkIdentity.rootFinishedLanesHandoffDiagnosticName,
+    rootFinishedLanesHandoffStatus:
+      finishedWorkIdentity.rootFinishedLanesHandoffStatus,
+    rootFinishedLanesHandoffAccepted: true,
+    consumesPrivateRootFinishedLanesHandoffGate: true,
+    hostOutputUpdateKind: 'Update',
+    hostOutputShape: 'SiblingText',
+    rootNodeKind: finishedWorkIdentity.rootNodeKind,
+    rootChildCount: 2,
+    sourceNodeCount: 3,
+    sourceFiberCount: diagnostic.sourceFiberCount,
+    hostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
+    hostOutputRow: freezeRecord({
+      id: privateToJSONSiblingTextHostOutputRowId,
+      status: privateToJSONUpdateUnmountRowStatus,
+      hostOutputUpdateKind: 'Update',
+      hostOutputShape: 'SiblingText'
+    }),
+    result: serializePrivateToTreeMetadataDiagnostic(report),
+    finishedWorkIdentity,
+    committedFiberInspection: diagnostic.committedFiberInspection,
+    consumesPrivateSiblingTextFinishedWorkIdentityGate: true,
+    consumesWorker738ReportRow: true,
+    consumesPrivateToTreeEvidence: true,
+    consumesAcceptedHostOutputRow: true,
+    consumesCommittedFiberInspection: true,
+    hostOutputSnapshotCurrent: true,
+    siblingTextJSAdmissionAvailable: true,
+    functionComponentAboveHostOutputShape: true,
+    genericFinishedWorkIdentityGateAccepted: false,
+    broadMultichildIdentityAvailable: false,
+    publicToJSONAvailable: false,
+    publicToTreeAvailable: false,
+    publicTestInstanceAvailable: false,
+    publicSerializationAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeLoadingAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
   rootRequest,
   evidence,
   report,
-  sourceRootRequest = undefined
+  sourceRootRequest = undefined,
+  options = undefined
 ) {
+  const publicSurface =
+    options !== undefined &&
+    options !== null &&
+    typeof options.publicSurface === 'string'
+      ? options.publicSurface
+      : privateToJSONSiblingTextIdentityPublicSurface;
+  const sourceReportKind =
+    options !== undefined &&
+    options !== null &&
+    options.sourceReportKind === 'toTree'
+      ? 'toTree'
+      : 'toJSON';
+  const throwSiblingTextFinishedWorkIdentityError =
+    publicSurface === 'create().toTree'
+      ? throwPrivateToTreeMetadataError
+      : throwPrivateToJSONSerializationError;
   if (!isRootRequestRecord(rootRequest)) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'Expected a private root request for sibling-text finished-work identity evidence.'
     );
   }
   if (evidence === null || typeof evidence !== 'object') {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'Expected accepted sibling-text finished-work identity evidence.'
     );
   }
@@ -4908,7 +5739,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     readPrivateToJSONField(evidence, 'status') !==
       privateToJSONSiblingTextFinishedWorkIdentityStatus
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-diagnostic-mismatch'
     );
   }
@@ -4920,7 +5751,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
       privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName ||
     normalized.status !== privateToJSONSiblingTextFinishedWorkIdentityStatus
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-diagnostic-mismatch'
     );
   }
@@ -4933,7 +5764,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.sourceSerializationDiagnosticName !==
       privateToJSONAcceptedDiagnosticName
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-source-mismatch'
     );
   }
@@ -4941,7 +5772,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
   const identityRootRequest =
     sourceRootRequest === undefined ? rootRequest : sourceRootRequest;
   if (!isRootRequestRecord(identityRootRequest)) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'Expected a private update root request for sibling-text finished-work identity evidence.'
     );
   }
@@ -4949,7 +5780,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     identityRootRequest.rootHandle !== rootRequest.rootHandle ||
     identityRootRequest.rootId !== rootRequest.rootId
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
@@ -4957,7 +5788,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     identityRootRequest.operation !== 'update' ||
     identityRootRequest.scheduled !== true
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-source-mismatch'
     );
   }
@@ -4966,43 +5797,47 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
       identityRootRequest.rootHandle
     ) !== identityRootRequest
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
   if (
     normalized.rootRequestId !== identityRootRequest.requestId
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
   if (
     normalized.rootRequestSequence !== identityRootRequest.requestSequence
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
   if (
     normalized.rootId !== identityRootRequest.rootId
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
 
   const rootFinishedLanesHandoff =
     validatePrivateRootFinishedLanesHandoffEvidence(
-      privateToJSONSiblingTextIdentityPublicSurface,
+      publicSurface,
       identityRootRequest,
       normalized,
       evidence
     );
-  validatePrivateToJSONSiblingTextIdentitySourceReport(
-    normalized,
-    report
-  );
+  if (sourceReportKind === 'toTree') {
+    validatePrivateToTreeSiblingTextIdentitySourceReport(normalized, report);
+  } else {
+    validatePrivateToJSONSiblingTextIdentitySourceReport(
+      normalized,
+      report
+    );
+  }
 
   if (
     normalized.worker738ReportRowId !== privateToJSONSiblingTextHostOutputRowId ||
@@ -5012,7 +5847,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.rootChildCount !== 2 ||
     normalized.sourceNodeCount !== 3
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-report-row-or-shape-mismatch'
     );
   }
@@ -5035,7 +5870,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
       normalized.commitCurrent
     )
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-route-finished-work-identity-mismatch'
     );
   }
@@ -5057,7 +5892,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.reportFinishedWorkMatchesCommitCurrent !== true ||
     normalized.committedFiberInspectionCurrentMatchesCommit !== true
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-mismatch'
     );
   }
@@ -5075,7 +5910,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.commitLanesMatchRenderLanes !== true ||
     normalized.reportLanesMatchCommitLanes !== true
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-lane-mismatch'
     );
   }
@@ -5097,13 +5932,13 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     'identityAdmissionAvailable'
   ]) {
     if (normalized[fieldName] !== true) {
-      throwPrivateToJSONSerializationError(
+      throwSiblingTextFinishedWorkIdentityError(
         'sibling-text-finished-work-evidence-not-consumed'
       );
     }
   }
   if (normalized.broadMultichildIdentityAvailable !== false) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'broad-multichild-identity-unexpectedly-open'
     );
   }
@@ -5122,7 +5957,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     'compatibilityClaimed'
   ]) {
     if (normalized[fieldName] !== false) {
-      throwPrivateToJSONSerializationError(
+      throwSiblingTextFinishedWorkIdentityError(
         'public-or-native-package-js-compatibility-claim'
       );
     }
@@ -7672,6 +8507,43 @@ function validatePrivateToJSONSiblingTextIdentitySourceReport(
   );
   if (publicBlockers !== undefined) {
     assertPrivateToJSONPublicBlockers(publicBlockers);
+  }
+}
+
+function validatePrivateToTreeSiblingTextIdentitySourceReport(
+  identity,
+  report
+) {
+  if (report === null || typeof report !== 'object') {
+    throwPrivateToTreeMetadataError(
+      'Expected private sibling-text toTree source report.'
+    );
+  }
+  if (
+    readPrivateToJSONField(report, 'diagnosticName', 'diagnostic_name') !==
+      privateToTreeAcceptedDiagnosticName ||
+    readPrivateToJSONField(
+      report,
+      'sourceJsonDiagnosticName',
+      'source_json_diagnostic_name'
+    ) !== privateToJSONAcceptedDiagnosticName
+  ) {
+    throwPrivateToTreeMetadataError(
+      'sibling-text-finished-work-identity-source-mismatch'
+    );
+  }
+  const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+  if (
+    diagnostic.kind !== 'multi-child' ||
+    diagnostic.hostOutputUpdateKind !== identity.hostOutputUpdateKind ||
+    diagnostic.rootChildCount !== identity.rootChildCount ||
+    diagnostic.componentWrapped !== true ||
+    diagnostic.sourceFiberCount !==
+      privateToTreeCompositeMultiChildAcceptedFiberShape.length
+  ) {
+    throwPrivateToTreeMetadataError(
+      'sibling-text-report-row-or-shape-mismatch'
+    );
   }
 }
 
