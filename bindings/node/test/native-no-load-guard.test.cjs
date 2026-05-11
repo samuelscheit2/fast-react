@@ -6,6 +6,8 @@ const Module = require('node:module');
 const forbiddenLoads = [];
 const originalLoad = Module._load;
 const originalNodeExtension = Module._extensions['.node'];
+let moduleLoadHooks = null;
+let moduleGuardsRestored = false;
 
 function isForbiddenLoad(request) {
   const specifier = String(request);
@@ -32,6 +34,36 @@ function blockForbiddenLoad(kind, request) {
   error.attemptedLoad = attemptedLoad;
   throw error;
 }
+
+function restoreModuleGuards() {
+  if (moduleGuardsRestored) {
+    return;
+  }
+
+  moduleGuardsRestored = true;
+  Module._load = originalLoad;
+  Module._extensions['.node'] = originalNodeExtension;
+  if (moduleLoadHooks !== null) {
+    moduleLoadHooks.deregister();
+    moduleLoadHooks = null;
+  }
+}
+
+assert.equal(
+  typeof Module.registerHooks,
+  'function',
+  'native no-load guard requires Module.registerHooks to observe ESM imports'
+);
+
+moduleLoadHooks = Module.registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (isForbiddenLoad(specifier)) {
+      blockForbiddenLoad('module-resolve', specifier);
+    }
+
+    return nextResolve(specifier, context);
+  }
+});
 
 Module._extensions['.node'] = function blockedNodeExtension(module, filename) {
   blockForbiddenLoad('node-extension', filename);
@@ -376,22 +408,20 @@ async function main() {
     assert.equal(esmNative.default, native);
     assert.equal(esmNative.nativeBindingManifest, native.nativeBindingManifest);
   } finally {
-    Module._load = originalLoad;
-    Module._extensions['.node'] = originalNodeExtension;
+    restoreModuleGuards();
   }
 
   assert.deepEqual(
     forbiddenLoads,
     [],
-    'placeholder imports and loadNativeBinding() must not load native artifacts, platform packages, child_process, worker_threads, or network modules'
+    'placeholder imports and loadNativeBinding() must not resolve or load native artifacts, platform packages, child_process, worker_threads, or network modules'
   );
 
   console.log('Fast React native no-load guard checks passed.');
 }
 
 main().catch((error) => {
-  Module._load = originalLoad;
-  Module._extensions['.node'] = originalNodeExtension;
+  restoreModuleGuards();
   console.error(error);
   process.exitCode = 1;
 });
