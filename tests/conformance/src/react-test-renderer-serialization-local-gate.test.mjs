@@ -4412,6 +4412,153 @@ test("react-test-renderer package-root private native create/update serializatio
   assert.equal(updateTreeResult.nativeExecution, false);
 });
 
+test("react-test-renderer CJS private native serialization rejects malformed execution records", () => {
+  const cjsNativeSerializationEntries = jsEntrypoints.filter((entry) =>
+    entry.entrypoint.includes("/cjs/")
+  );
+  assert.equal(cjsNativeSerializationEntries.length, 2);
+
+  const rejectedExecutionRecords = [
+    {
+      label: "missing kind",
+      mutate(record) {
+        delete record.kind;
+      },
+      messagePattern: /FastReactTestRendererPrivateRootExecutionResult/u
+    },
+    {
+      label: "missing status",
+      mutate(record) {
+        delete record.status;
+      },
+      messagePattern: /accepted private root execution result status/u
+    },
+    {
+      label: "missing kind and status",
+      mutate(record) {
+        delete record.kind;
+        delete record.status;
+      },
+      messagePattern: /FastReactTestRendererPrivateRootExecutionResult/u
+    },
+    {
+      label: "wrong kind",
+      mutate(record) {
+        record.kind = "CallerBuiltRootExecutionResult";
+      },
+      messagePattern: /FastReactTestRendererPrivateRootExecutionResult/u
+    },
+    {
+      label: "wrong status",
+      mutate(record) {
+        record.status = "caller-built-root-execution-result";
+      },
+      messagePattern: /accepted private root execution result status/u
+    },
+    {
+      label: "caller-built clone",
+      mutate() {},
+      messagePattern: /source-owned private native root execution result/u
+    }
+  ];
+
+  for (const entry of cjsNativeSerializationEntries) {
+    const moduleExports = loadFresh(entry.specifier);
+    const renderer = moduleExports.create({
+      type: "span",
+      props: { children: "hello" }
+    });
+    const jsonFacade = Object.getOwnPropertyDescriptor(
+      renderer.toJSON,
+      privateToJSONSerializationFacadeSymbol
+    ).value;
+    const treeFacade = Object.getOwnPropertyDescriptor(
+      renderer.toTree,
+      privateToTreeFacadeSymbol
+    ).value;
+    const updateError = captureThrown(() =>
+      renderer.update({
+        type: "span",
+        props: { children: "goodbye" }
+      })
+    );
+    const updateRequest = updateError.rootRequest;
+    const updateRecord = createAcceptedNativeExecutionRecord(
+      moduleExports,
+      updateRequest
+    );
+    const jsonReport = createAcceptedMinimalHostOutputDiagnostic({
+      hostOutputUpdateKind: "Update",
+      text: "goodbye"
+    });
+    const jsonIdentity = createAcceptedFinishedWorkIdentityEvidence({
+      rootRequest: updateRequest,
+      publicSurface: "create().toJSON",
+      sourceSerializationDiagnosticName:
+        "fast-react-test-renderer.serialization.private-json-canary",
+      consumesPrivateToJSONEvidence: true,
+      consumesPrivateToTreeEvidence: false,
+      hostOutputUpdateKind: "Update"
+    });
+    const treeReport = createAcceptedMinimalTreeMetadataDiagnostic({
+      hostOutputUpdateKind: "Update",
+      text: "goodbye",
+      compositeNativeExecution: true
+    });
+    const treeIdentity = createAcceptedFinishedWorkIdentityEvidence({
+      rootRequest: updateRequest,
+      publicSurface: "create().toTree",
+      sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+      consumesPrivateToJSONEvidence: false,
+      consumesPrivateToTreeEvidence: true,
+      hostOutputUpdateKind: "Update"
+    });
+
+    assert.equal(
+      jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
+        updateRecord,
+        jsonReport,
+        jsonIdentity
+      ),
+      true,
+      `${entry.entrypoint} accepts source-owned toJSON record`
+    );
+    assert.equal(
+      treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
+        updateRecord,
+        treeReport,
+        treeIdentity
+      ),
+      true,
+      `${entry.entrypoint} accepts source-owned toTree record`
+    );
+
+    for (const rejected of rejectedExecutionRecords) {
+      const executionRecord = { ...updateRecord };
+      rejected.mutate(executionRecord);
+
+      assertNativeExecutionIdentityRejection({
+        facade: jsonFacade,
+        executionRecord,
+        report: jsonReport,
+        identityEvidence: jsonIdentity,
+        errorName: "FastReactTestRendererPrivateToJSONSerializationError",
+        messagePattern: rejected.messagePattern,
+        label: `${entry.entrypoint} toJSON ${rejected.label}`
+      });
+      assertNativeExecutionIdentityRejection({
+        facade: treeFacade,
+        executionRecord,
+        report: treeReport,
+        identityEvidence: treeIdentity,
+        errorName: "FastReactTestRendererPrivateToTreeMetadataError",
+        messagePattern: rejected.messagePattern,
+        label: `${entry.entrypoint} toTree ${rejected.label}`
+      });
+    }
+  }
+});
+
 test("react-test-renderer JS private native unmount serialization accepts strict finished-work identity evidence", () => {
   const nativeUnmountEntrypoints = jsEntrypoints.filter((entry) =>
     entry.entrypoint === packageRootEntrypoint ||
@@ -6083,7 +6230,9 @@ function assertNativeExecutionIdentityRejection({
   executionRecord,
   report,
   identityEvidence = undefined,
-  errorName
+  errorName,
+  messagePattern = undefined,
+  label = undefined
 }) {
   assert.equal(
     facade.canCreateAcceptedNativeExecutionDiagnosticResult(
@@ -6091,7 +6240,8 @@ function assertNativeExecutionIdentityRejection({
       report,
       identityEvidence
     ),
-    false
+    false,
+    label
   );
   const error = captureThrown(() =>
     facade.createAcceptedNativeExecutionDiagnosticResult(
@@ -6100,10 +6250,13 @@ function assertNativeExecutionIdentityRejection({
       identityEvidence
     )
   );
-  assert.equal(error.name, errorName);
-  assert.equal(error.nativeBridgeAvailable, false);
-  assert.equal(error.nativeExecution, false);
-  assert.equal(error.compatibilityClaimed, false);
+  assert.equal(error.name, errorName, label);
+  if (messagePattern !== undefined) {
+    assert.match(error.message, messagePattern, label);
+  }
+  assert.equal(error.nativeBridgeAvailable, false, label);
+  assert.equal(error.nativeExecution, false, label);
+  assert.equal(error.compatibilityClaimed, false, label);
 }
 
 function assertPrivateUnmountExecutionEvidenceBlocked(record) {

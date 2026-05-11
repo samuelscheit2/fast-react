@@ -7359,6 +7359,7 @@ const rootRequestTestInstanceQueryDiagnostics = new WeakMap();
 const rootRequestCreateRouteAdmissions = new WeakMap();
 const rootRequestUpdateRouteAdmissions = new WeakMap();
 const rootRequestUpdateNativeBridgeAdmissions = new WeakMap();
+const rootExecutionResults = new WeakSet();
 
 function createTestRendererRootRequestBridge(options) {
   const bridgeState = {
@@ -9969,7 +9970,7 @@ function consumeRootExecutionResult(record, result, handoff) {
   const executionHandoff =
     handoff === undefined ? createRootExecutionHandoff(record) : handoff;
 
-  return freezeRecord({
+  const executionResult = freezeRecord({
     kind: 'FastReactTestRendererPrivateRootExecutionResult',
     status: 'accepted-private-test-renderer-root-execution-result',
     executionStatus: rootRequestExecutionStatus,
@@ -10022,6 +10023,8 @@ function consumeRootExecutionResult(record, result, handoff) {
     publicCreateUpdateUnmountBehaviorAvailable: false,
     compatibilityClaimed: false
   });
+  rootExecutionResults.add(executionResult);
+  return executionResult;
 }
 
 function readDiagnosticField(record, names) {
@@ -14571,20 +14574,21 @@ function consumeAcceptedToJSONNativeExecutionRecordImpl(
       'Expected an accepted private native root execution result.'
     );
   }
-  if (
-    executionRecord.kind !== undefined &&
-    executionRecord.kind !== privateToJSONNativeExecutionRecordKind
-  ) {
+  if (executionRecord.kind !== privateToJSONNativeExecutionRecordKind) {
     throwPrivateToJSONSerializationError(
       'Expected a FastReactTestRendererPrivateRootExecutionResult record.'
     );
   }
   if (
-    executionRecord.status !== undefined &&
     executionRecord.status !== 'accepted-private-test-renderer-root-execution-result'
   ) {
     throwPrivateToJSONSerializationError(
       'Expected an accepted private root execution result status.'
+    );
+  }
+  if (!rootExecutionResults.has(executionRecord)) {
+    throwPrivateToJSONSerializationError(
+      'Expected a source-owned private native root execution result.'
     );
   }
 
