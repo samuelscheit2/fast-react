@@ -6276,6 +6276,11 @@ test('private react-dom/client facade adapter routes root calls to bridge record
     rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
       renderSnapshot
     );
+  const renderLifecycleBoundary = renderDiagnostic.lifecycleRequestBoundary;
+  const renderLifecycleBoundaryPayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      renderLifecycleBoundary
+    );
   const hostNode = hostOutputPayload.hostNode;
   const textNode = hostOutputPayload.textNode;
 
@@ -6289,6 +6294,25 @@ test('private react-dom/client facade adapter routes root calls to bridge record
   );
   assert.equal(renderDiagnostic.renderRequestId, 'facade-request:2');
   assert.equal(renderDiagnostic.renderUpdateId, 'facade-update:1');
+  assert.equal(
+    renderDiagnostic.lifecycleRequestAdmission,
+    renderDiagnosticPayload.lifecycleRequestAdmission
+  );
+  assert.equal(
+    renderDiagnostic.lifecycleRequestAdmissionStatus,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+  );
+  assert.equal(
+    renderDiagnostic.lifecycleRequestBoundary,
+    renderLifecycleBoundary
+  );
+  assert.equal(
+    renderDiagnostic.lifecycleRequestBoundaryStatus,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
+  );
+  assert.equal(renderDiagnostic.lifecycleRequestBoundaryAccepted, true);
+  assert.equal(renderDiagnostic.lifecycleRequestBoundarySourceOwned, true);
+  assert.equal(renderDiagnostic.lifecycleRequestBoundaryCurrent, true);
   assert.equal(renderDiagnostic.hostType, 'span');
   assert.equal(renderDiagnostic.textContent, 'private facade child');
   assert.equal(renderDiagnostic.privateFacadeRoot, true);
@@ -6322,6 +6346,32 @@ test('private react-dom/client facade adapter routes root calls to bridge record
   assert.equal(renderSnapshotPayload.createRecord, create);
   assert.equal(renderSnapshotPayload.before.childCount, 0);
   assert.equal(renderSnapshotPayload.after.childCount, 1);
+  assert.equal(
+    rootBridge.isPrivateRootLifecycleRequestBoundaryRecord(
+      renderLifecycleBoundary
+    ),
+    true
+  );
+  assert.equal(renderLifecycleBoundary.sourceRequestId, render.requestId);
+  assert.equal(renderLifecycleBoundary.sourceRequestType, 'root.render');
+  assert.equal(renderLifecycleBoundary.sourceOwned, true);
+  assert.equal(renderLifecycleBoundary.activeRootLifecycle, true);
+  assert.equal(renderLifecycleBoundary.requestBoundaryCurrent, true);
+  assert.equal(
+    renderLifecycleBoundaryPayload.sourceRecord,
+    render
+  );
+  assert.equal(
+    renderLifecycleBoundaryPayload.admissionRecord,
+    renderDiagnosticPayload.lifecycleRequestAdmission
+  );
+  assert.equal(
+    rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      renderDiagnosticPayload.lifecycleRequestAdmission,
+      renderLifecycleBoundary
+    ),
+    true
+  );
   assert.equal(render.$$typeof, rootBridge.privateRootUpdateRecordType);
   assert.equal(render.requestType, 'root.render');
   assert.equal(render.updateId, 'facade-update:1');
@@ -6369,6 +6419,10 @@ test('private react-dom/client facade adapter routes root calls to bridge record
     secondUnmount
   ]);
   assert.deepEqual(adapter.getRootPayload(root).renderRecords, [render]);
+  assert.deepEqual(
+    adapter.getRootPayload(root).lifecycleRequestBoundaryRecords,
+    [renderLifecycleBoundary]
+  );
   assert.deepEqual(adapter.getRootHostOutputRenderDiagnostics(root), [
     renderDiagnostic
   ]);
@@ -6478,6 +6532,12 @@ test('private react-dom/client facade root.render lifecycle update mutates fake 
     rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
       snapshot
     );
+  const updateLifecycleBoundary =
+    updateDiagnostic.lifecycleRequestBoundary;
+  const updateLifecycleBoundaryPayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      updateLifecycleBoundary
+    );
 
   assert.equal(
     initialDiagnostic.$$typeof,
@@ -6494,6 +6554,25 @@ test('private react-dom/client facade root.render lifecycle update mutates fake 
   assert.equal(updateDiagnostic.updateRequestId, 'facade-lifecycle-request:3');
   assert.equal(updateDiagnostic.updateRequestType, 'root.render');
   assert.equal(updateDiagnostic.updateUpdateId, 'facade-lifecycle-update-id:2');
+  assert.equal(
+    updateDiagnostic.lifecycleRequestAdmission,
+    updatePayload.lifecycleRequestAdmission
+  );
+  assert.equal(
+    updateDiagnostic.lifecycleRequestAdmissionStatus,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+  );
+  assert.equal(
+    updateDiagnostic.lifecycleRequestBoundary,
+    updateLifecycleBoundary
+  );
+  assert.equal(
+    updateDiagnostic.lifecycleRequestBoundaryStatus,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
+  );
+  assert.equal(updateDiagnostic.lifecycleRequestBoundaryAccepted, true);
+  assert.equal(updateDiagnostic.lifecycleRequestBoundarySourceOwned, true);
+  assert.equal(updateDiagnostic.lifecycleRequestBoundaryCurrent, true);
   assert.equal(
     updateDiagnostic.updateLifecycleStatusBefore,
     rootBridge.ROOT_LIFECYCLE_RENDERED
@@ -6567,6 +6646,29 @@ test('private react-dom/client facade root.render lifecycle update mutates fake 
   assert.equal(snapshotPayload.after.textContent, 'updated lifecycle output');
   assert.equal(updatePayload.sourceContainerSnapshot, snapshot);
   assert.equal(updatePayload.sourceContainerSnapshotPayload, snapshotPayload);
+  assert.equal(
+    rootBridge.isPrivateRootLifecycleRequestBoundaryRecord(
+      updateLifecycleBoundary
+    ),
+    true
+  );
+  assert.equal(updateLifecycleBoundary.sourceRequestId, updateRecord.requestId);
+  assert.equal(updateLifecycleBoundary.sourceRequestType, 'root.render');
+  assert.equal(updateLifecycleBoundary.sourceOwned, true);
+  assert.equal(updateLifecycleBoundary.activeRootLifecycle, true);
+  assert.equal(updateLifecycleBoundary.requestBoundaryCurrent, true);
+  assert.equal(updateLifecycleBoundaryPayload.sourceRecord, updateRecord);
+  assert.equal(
+    updateLifecycleBoundaryPayload.admissionRecord,
+    updatePayload.lifecycleRequestAdmission
+  );
+  assert.equal(
+    rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      updatePayload.lifecycleRequestAdmission,
+      updateLifecycleBoundary
+    ),
+    true
+  );
 
   assert.deepEqual(adapter.getRootRequestRecords(root), [
     create,
@@ -6577,6 +6679,13 @@ test('private react-dom/client facade root.render lifecycle update mutates fake 
     initialPayload.renderRecord,
     updateRecord
   ]);
+  assert.deepEqual(
+    adapter.getRootPayload(root).lifecycleRequestBoundaryRecords,
+    [
+      initialPayload.lifecycleRequestBoundary,
+      updateLifecycleBoundary
+    ]
+  );
   assert.deepEqual(adapter.getRootHostOutputRenderDiagnostics(root), [
     initialDiagnostic
   ]);
@@ -10039,6 +10148,25 @@ test('private react-dom/client facade render native handoff consumes facade, wor
   assert.equal(handoff.createRequestId, 'facade-native-request:1');
   assert.equal(handoff.renderRequestId, 'facade-native-request:2');
   assert.equal(handoff.renderUpdateId, 'facade-native-update:1');
+  assert.equal(
+    handoff.lifecycleRequestAdmission,
+    hidden.lifecycleRequestAdmission
+  );
+  assert.equal(
+    handoff.lifecycleRequestAdmissionStatus,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+  );
+  assert.equal(
+    handoff.lifecycleRequestBoundary,
+    hidden.lifecycleRequestBoundary
+  );
+  assert.equal(
+    handoff.lifecycleRequestBoundaryStatus,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
+  );
+  assert.equal(handoff.lifecycleRequestBoundaryAccepted, true);
+  assert.equal(handoff.lifecycleRequestBoundarySourceOwned, true);
+  assert.equal(handoff.lifecycleRequestBoundaryCurrent, true);
   assert.equal(handoff.hostOutputHandoffId, 'facade-native-initial:1');
   assert.equal(
     handoff.hostOutputHandoffStatus,
@@ -10120,6 +10248,16 @@ test('private react-dom/client facade render native handoff consumes facade, wor
   assert.equal(hidden.renderRecord.requestType, 'root.render');
   assert.equal(hidden.hostOutputRenderRecord, diagnostic);
   assert.equal(hidden.hostOutputPayload, hostOutputPayload);
+  assert.equal(
+    hidden.lifecycleRequestBoundary,
+    diagnostic.lifecycleRequestBoundary
+  );
+  assert.equal(
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      hidden.lifecycleRequestBoundary
+    ).sourceRecord,
+    hidden.renderRecord
+  );
   assert.equal(
     hidden.rootWorkLoopFinishedWorkPayload,
     rootWorkLoopPayload
@@ -12344,6 +12482,35 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
     activePayload.hostOutputHandoff
   );
 
+  const sameContainerDocument = createDocument(
+    'private-client-facade-host-output-same-container-boundary'
+  );
+  const sameContainer = createElement('DIV', sameContainerDocument);
+  const sameContainerRoot = adapter.createRoot(sameContainer);
+  const sameContainerDiagnostic = adapter.renderHostOutput(
+    sameContainerRoot,
+    element
+  );
+  const sameContainerPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      sameContainerDiagnostic
+    );
+  adapter.createRoot(sameContainer);
+  assert.throws(
+    () =>
+      adapter.createRenderNativeHandoff(
+        sameContainerRoot,
+        sameContainerDiagnostic
+      ),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_RENDER_NATIVE_HANDOFF',
+      message: /stale same-container lifecycle request-boundary/
+    }
+  );
+  sameContainerPayload.bridge.cleanupInitialRenderHostOutput(
+    sameContainerPayload.hostOutputHandoff
+  );
+
   const hydrateRecord = rootBridge.createHydrateRootRecord(
     createElement('DIV', document),
     'hydrated',
@@ -12492,6 +12659,41 @@ test('private react-dom/client facade lifecycle source records fail closed', () 
     rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
       initialDiagnostic
     );
+  const clonedLifecycleRequestBoundary = Object.freeze({
+    ...initialPayload.lifecycleRequestBoundary
+  });
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(updateRoot, nextElement, {
+        lifecycleRequestBoundary:
+          initialPayload.lifecycleRequestBoundary
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE',
+      message: /caller-supplied, stale, replayed, cloned, cross-root/
+    }
+  );
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(updateRoot, nextElement, {
+        lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE',
+      message: /caller-supplied, stale, replayed, cloned, cross-root/
+    }
+  );
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(updateRoot, nextElement, {
+        sourceContainerSnapshot:
+          initialDiagnostic.sourceContainerSnapshot
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE',
+      message: /lifecycle request-boundary evidence/
+    }
+  );
   assert.throws(
     () =>
       adapter.updateHostOutput(updateRoot, nextElement, {
