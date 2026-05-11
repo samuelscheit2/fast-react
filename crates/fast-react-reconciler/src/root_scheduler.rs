@@ -16,6 +16,8 @@ use fast_react_core::{
     EventPriority, FiberId, FiberTag, Lane, LaneTimestamp, Lanes, RootLaneState, UpdateQueueHandle,
     lanes_to_event_priority,
 };
+#[cfg(test)]
+use fast_react_core::{FiberTopologyError, StateNodeHandle};
 use fast_react_host_config::HostTypes;
 
 use crate::begin_work::UnsupportedSuspenseChildShapeRecord;
@@ -55,8 +57,478 @@ use crate::{
     UpdateContainerResult, UpdateId, render_host_root_for_lanes,
     render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
 };
+#[cfg(test)]
+use crate::{RootElementHandle, UpdateQueueError};
 
 pub(crate) const SYNC_FLUSH_LANES: Lanes = Lanes::SYNC_HYDRATION.merge(Lanes::SYNC);
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary {
+    root: FiberRootId,
+    previous_current: FiberId,
+    finished_work: FiberId,
+    selected_lanes: Lanes,
+    finished_lanes: Lanes,
+    remaining_lanes: Lanes,
+    requested_callback_node: RootSchedulerCallbackHandle,
+    current_callback_node: RootSchedulerCallbackHandle,
+    handoff_order: usize,
+    commit_order: usize,
+    update_sequence_ids: Vec<UpdateId>,
+    resulting_element: RootElementHandle,
+}
+
+#[cfg(test)]
+impl RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(&self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(&self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(&self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(&self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn requested_callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.requested_callback_node
+    }
+
+    #[must_use]
+    pub(crate) const fn current_callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.current_callback_node
+    }
+
+    #[must_use]
+    pub(crate) const fn handoff_order(&self) -> usize {
+        self.handoff_order
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_order(&self) -> usize {
+        self.commit_order
+    }
+
+    #[must_use]
+    pub(crate) fn update_sequence_ids(&self) -> &[UpdateId] {
+        &self.update_sequence_ids
+    }
+
+    #[must_use]
+    pub(crate) const fn resulting_element(&self) -> RootElementHandle {
+        self.resulting_element
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary {
+    identity: RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+    root_token: StateNodeHandle,
+    source_pending_before_consume: bool,
+    source_consumed_after: bool,
+    root_current_after_consume: FiberId,
+    root_finished_work_after_consume: Option<FiberId>,
+    root_finished_lanes_after_consume: Lanes,
+    root_pending_lanes_after_consume: Lanes,
+    committed_element_after_consume: RootElementHandle,
+    committed_root_children: Vec<FiberId>,
+    commit_mutation_record_count: usize,
+    commit_deletion_list_count: usize,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "private currentness records are inspected by focused queue-lane commit canaries"
+)]
+impl RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary {
+    #[must_use]
+    pub(crate) const fn identity(
+        &self,
+    ) -> &RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary {
+        &self.identity
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.identity.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(&self) -> FiberId {
+        self.identity.previous_current()
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.identity.finished_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(&self) -> Lanes {
+        self.identity.selected_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(&self) -> Lanes {
+        self.identity.finished_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(&self) -> Lanes {
+        self.identity.remaining_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn root_token(&self) -> StateNodeHandle {
+        self.root_token
+    }
+
+    #[must_use]
+    pub(crate) const fn requested_callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.identity.requested_callback_node()
+    }
+
+    #[must_use]
+    pub(crate) const fn current_callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.identity.current_callback_node()
+    }
+
+    #[must_use]
+    pub(crate) const fn handoff_order(&self) -> usize {
+        self.identity.handoff_order()
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_order(&self) -> usize {
+        self.identity.commit_order()
+    }
+
+    #[must_use]
+    pub(crate) fn update_sequence_ids(&self) -> &[UpdateId] {
+        self.identity.update_sequence_ids()
+    }
+
+    #[must_use]
+    pub(crate) const fn resulting_element(&self) -> RootElementHandle {
+        self.identity.resulting_element()
+    }
+
+    #[must_use]
+    pub(crate) const fn source_pending_before_consume(&self) -> bool {
+        self.source_pending_before_consume
+    }
+
+    #[must_use]
+    pub(crate) const fn source_consumed_after(&self) -> bool {
+        self.source_consumed_after
+    }
+
+    #[must_use]
+    pub(crate) const fn root_current_after_consume(&self) -> FiberId {
+        self.root_current_after_consume
+    }
+
+    #[must_use]
+    pub(crate) const fn root_finished_work_after_consume(&self) -> Option<FiberId> {
+        self.root_finished_work_after_consume
+    }
+
+    #[must_use]
+    pub(crate) const fn root_finished_lanes_after_consume(&self) -> Lanes {
+        self.root_finished_lanes_after_consume
+    }
+
+    #[must_use]
+    pub(crate) const fn root_pending_lanes_after_consume(&self) -> Lanes {
+        self.root_pending_lanes_after_consume
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_element_after_consume(&self) -> RootElementHandle {
+        self.committed_element_after_consume
+    }
+
+    #[must_use]
+    pub(crate) fn committed_root_children(&self) -> &[FiberId] {
+        &self.committed_root_children
+    }
+
+    #[must_use]
+    pub(crate) fn committed_root_child_count(&self) -> usize {
+        self.committed_root_children.len()
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_mutation_record_count(&self) -> usize {
+        self.commit_mutation_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_deletion_list_count(&self) -> usize {
+        self.commit_deletion_list_count
+    }
+
+    #[must_use]
+    pub(crate) fn source_owned_currentness_consumed(&self) -> bool {
+        self.source_pending_before_consume
+            && self.source_consumed_after
+            && self.root_current_after_consume == self.finished_work()
+            && self.root_finished_work_after_consume.is_none()
+            && self.root_finished_lanes_after_consume.is_empty()
+            && self.committed_element_after_consume == self.resulting_element()
+    }
+
+    #[must_use]
+    pub(crate) fn ties_finished_work_queue_lane_commit_to_live_tree_state_for_canary(
+        &self,
+    ) -> bool {
+        self.source_owned_currentness_consumed()
+            && self.root_token == self.root().state_node_handle()
+            && self.previous_current() != self.finished_work()
+            && self.selected_lanes() == self.finished_lanes()
+            && self.root_pending_lanes_after_consume == self.remaining_lanes()
+            && self.requested_callback_node() == self.current_callback_node()
+            && self.commit_order() > self.handoff_order()
+            && !self.update_sequence_ids().is_empty()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_timing_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_public_effects(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary {
+    UnacceptedSchedulerContinuation,
+    MissingQueueCommitHandoff,
+    SourceAlreadyConsumed {
+        root: FiberRootId,
+        finished_work: FiberId,
+        commit_order: usize,
+    },
+    SourceNotPending {
+        root: FiberRootId,
+        finished_work: FiberId,
+        commit_order: usize,
+    },
+    LiveRootStateMismatch {
+        root: FiberRootId,
+        expected_current: FiberId,
+        actual_current: FiberId,
+        expected_finished_work: Option<FiberId>,
+        actual_finished_work: Option<FiberId>,
+        expected_finished_lanes: Lanes,
+        actual_finished_lanes: Lanes,
+        expected_pending_lanes: Lanes,
+        actual_pending_lanes: Lanes,
+    },
+    CommittedTreeStateMismatch {
+        root: FiberRootId,
+        field: &'static str,
+    },
+    QueueRowMetadataMismatch {
+        root: FiberRootId,
+        update: UpdateId,
+        expected_lanes: Lanes,
+        actual_lanes: Lanes,
+    },
+    QueueOrderMismatch {
+        root: FiberRootId,
+        queue: UpdateQueueHandle,
+        expected_updates: Vec<UpdateId>,
+        actual_updates: Vec<UpdateId>,
+    },
+    FiberRootStore(FiberRootStoreError),
+    FiberTopology(FiberTopologyError),
+    UpdateQueue(UpdateQueueError),
+}
+
+#[cfg(test)]
+impl Display for RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnacceptedSchedulerContinuation => write!(
+                formatter,
+                "finished-work queue-lane currentness requires an accepted scheduler continuation"
+            ),
+            Self::MissingQueueCommitHandoff => write!(
+                formatter,
+                "finished-work queue-lane currentness requires queue commit handoff evidence"
+            ),
+            Self::SourceAlreadyConsumed {
+                root,
+                finished_work,
+                commit_order,
+            } => write!(
+                formatter,
+                "root {} finished work {} commit order {} queue-lane currentness source was already consumed",
+                root.raw(),
+                finished_work.slot().get(),
+                commit_order
+            ),
+            Self::SourceNotPending {
+                root,
+                finished_work,
+                commit_order,
+            } => write!(
+                formatter,
+                "root {} finished work {} commit order {} has no source-owned queue-lane currentness source",
+                root.raw(),
+                finished_work.slot().get(),
+                commit_order
+            ),
+            Self::LiveRootStateMismatch {
+                root,
+                expected_current,
+                actual_current,
+                expected_finished_work,
+                actual_finished_work,
+                expected_finished_lanes,
+                actual_finished_lanes,
+                expected_pending_lanes,
+                actual_pending_lanes,
+            } => write!(
+                formatter,
+                "root {} live queue-lane currentness mismatch current {}/{}, finished work {:?}/{:?}, finished lanes {:?}/{:?}, pending lanes {:?}/{:?}",
+                root.raw(),
+                actual_current.slot().get(),
+                expected_current.slot().get(),
+                actual_finished_work,
+                expected_finished_work,
+                actual_finished_lanes,
+                expected_finished_lanes,
+                actual_pending_lanes,
+                expected_pending_lanes
+            ),
+            Self::CommittedTreeStateMismatch { root, field } => write!(
+                formatter,
+                "root {} committed tree state mismatch for queue-lane currentness field {}",
+                root.raw(),
+                field
+            ),
+            Self::QueueRowMetadataMismatch {
+                root,
+                update,
+                expected_lanes,
+                actual_lanes,
+            } => write!(
+                formatter,
+                "root {} queue-lane currentness row {:?} lanes {:?}/{:?} do not match source",
+                root.raw(),
+                update,
+                actual_lanes,
+                expected_lanes
+            ),
+            Self::QueueOrderMismatch {
+                root,
+                queue,
+                expected_updates,
+                actual_updates,
+            } => write!(
+                formatter,
+                "root {} queue {} queue-lane currentness expected updates {:?}, found {:?}",
+                root.raw(),
+                queue.raw(),
+                expected_updates,
+                actual_updates
+            ),
+            Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::UpdateQueue(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberRootStore(error) => Some(error),
+            Self::FiberTopology(error) => Some(error),
+            Self::UpdateQueue(error) => Some(error),
+            Self::UnacceptedSchedulerContinuation
+            | Self::MissingQueueCommitHandoff
+            | Self::SourceAlreadyConsumed { .. }
+            | Self::SourceNotPending { .. }
+            | Self::LiveRootStateMismatch { .. }
+            | Self::CommittedTreeStateMismatch { .. }
+            | Self::QueueRowMetadataMismatch { .. }
+            | Self::QueueOrderMismatch { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<FiberRootStoreError> for RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::FiberRootStore(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FiberTopologyError> for RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+#[cfg(test)]
+impl From<UpdateQueueError> for RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary {
+    fn from(error: UpdateQueueError) -> Self {
+        Self::UpdateQueue(error)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RootErrorCaptureSource {
@@ -174,6 +646,12 @@ pub struct RootSchedulerState {
     might_have_pending_sync_work: bool,
     is_flushing_work: bool,
     current_event_transition_lane: Lane,
+    #[cfg(test)]
+    finished_work_queue_lane_commit_currentness_sources:
+        Vec<RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary>,
+    #[cfg(test)]
+    consumed_finished_work_queue_lane_commit_currentness:
+        Vec<RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary>,
 }
 
 impl RootSchedulerState {
@@ -187,6 +665,10 @@ impl RootSchedulerState {
             might_have_pending_sync_work: false,
             is_flushing_work: false,
             current_event_transition_lane: Lane::NO,
+            #[cfg(test)]
+            finished_work_queue_lane_commit_currentness_sources: Vec::new(),
+            #[cfg(test)]
+            consumed_finished_work_queue_lane_commit_currentness: Vec::new(),
         }
     }
 
@@ -256,6 +738,66 @@ impl RootSchedulerState {
 
     fn set_current_event_transition_lane(&mut self, lane: Lane) {
         self.current_event_transition_lane = lane;
+    }
+
+    #[cfg(test)]
+    fn record_finished_work_queue_lane_commit_currentness_source(
+        &mut self,
+        identity: RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+    ) {
+        if !self
+            .finished_work_queue_lane_commit_currentness_sources
+            .iter()
+            .any(|source| *source == identity)
+            && !self
+                .consumed_finished_work_queue_lane_commit_currentness
+                .iter()
+                .any(|consumed| *consumed == identity)
+        {
+            self.finished_work_queue_lane_commit_currentness_sources
+                .push(identity);
+        }
+    }
+
+    #[cfg(test)]
+    fn has_pending_finished_work_queue_lane_commit_currentness_source(
+        &self,
+        identity: &RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+    ) -> bool {
+        self.finished_work_queue_lane_commit_currentness_sources
+            .iter()
+            .any(|source| source == identity)
+    }
+
+    #[cfg(test)]
+    fn has_consumed_finished_work_queue_lane_commit_currentness_source(
+        &self,
+        identity: &RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+    ) -> bool {
+        self.consumed_finished_work_queue_lane_commit_currentness
+            .iter()
+            .any(|consumed| consumed == identity)
+    }
+
+    #[cfg(test)]
+    fn consume_finished_work_queue_lane_commit_currentness_source(
+        &mut self,
+        identity: &RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+    ) -> bool {
+        let Some(index) = self
+            .finished_work_queue_lane_commit_currentness_sources
+            .iter()
+            .position(|source| source == identity)
+        else {
+            return false;
+        };
+
+        let consumed = self
+            .finished_work_queue_lane_commit_currentness_sources
+            .remove(index);
+        self.consumed_finished_work_queue_lane_commit_currentness
+            .push(consumed);
+        true
     }
 }
 
@@ -2235,6 +2777,315 @@ impl RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
                 })
             })
     }
+}
+
+#[cfg(test)]
+fn root_finished_work_queue_lane_commit_currentness_identity_for_canary(
+    handoff: RootSyncFlushRecord,
+    requested_callback_node: RootSchedulerCallbackHandle,
+    current_callback_node: RootSchedulerCallbackHandle,
+    selected_lanes: Lanes,
+    queue_commit_handoff: &HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary,
+) -> RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary {
+    let commit = queue_commit_handoff.commit();
+    RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary {
+        root: handoff.root(),
+        previous_current: commit.previous_current(),
+        finished_work: commit.finished_work(),
+        selected_lanes,
+        finished_lanes: commit.finished_lanes(),
+        remaining_lanes: commit.remaining_lanes(),
+        requested_callback_node,
+        current_callback_node,
+        handoff_order: handoff.order(),
+        commit_order: queue_commit_handoff.finished_work_handoff().commit_order(),
+        update_sequence_ids: queue_commit_handoff.update_sequence_ids().to_vec(),
+        resulting_element: queue_commit_handoff.resulting_element(),
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    dead_code,
+    reason = "private currentness consumer is exercised by focused queue-lane commit canaries"
+)]
+pub(crate) fn consume_finished_work_queue_lane_commit_currentness_for_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    execution: &RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary,
+) -> Result<
+    RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary,
+    RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary,
+> {
+    if !execution.routed_through_root_scheduler_queue_lane_and_commit_evidence_for_canary() {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::UnacceptedSchedulerContinuation,
+        );
+    }
+
+    let queue_commit_handoff = execution.queue_commit_handoff().ok_or(
+        RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::MissingQueueCommitHandoff,
+    )?;
+    let identity = root_finished_work_queue_lane_commit_currentness_identity_for_canary(
+        execution.handoff(),
+        execution.requested_callback_node(),
+        execution.current_callback_node(),
+        execution.selected_lanes(),
+        queue_commit_handoff,
+    );
+
+    if store
+        .root_scheduler()
+        .has_consumed_finished_work_queue_lane_commit_currentness_source(&identity)
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceAlreadyConsumed {
+                root: identity.root(),
+                finished_work: identity.finished_work(),
+                commit_order: identity.commit_order(),
+            },
+        );
+    }
+
+    if !store
+        .root_scheduler()
+        .has_pending_finished_work_queue_lane_commit_currentness_source(&identity)
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
+                root: identity.root(),
+                finished_work: identity.finished_work(),
+                commit_order: identity.commit_order(),
+            },
+        );
+    }
+
+    validate_finished_work_queue_lane_commit_currentness_live_state_for_canary(
+        store,
+        execution,
+        queue_commit_handoff,
+        &identity,
+    )?;
+
+    let (root_token, committed_element_after_consume, committed_root_children) =
+        committed_host_root_tree_state_for_queue_lane_currentness_for_canary(
+            store,
+            identity.root(),
+            identity.finished_work(),
+        )?;
+    let root = store.root(identity.root())?;
+    let root_current_after_consume = root.current();
+    let root_finished_work_after_consume = root.finished_work();
+    let root_finished_lanes_after_consume = root.finished_lanes();
+    let root_pending_lanes_after_consume = root.lanes().pending_lanes();
+    let commit_mutation_record_count = queue_commit_handoff.commit().mutation_log().len();
+    let commit_deletion_list_count = queue_commit_handoff.commit().deletion_lists().len();
+
+    let source_pending_before_consume = true;
+    if !store
+        .root_scheduler_mut()
+        .consume_finished_work_queue_lane_commit_currentness_source(&identity)
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
+                root: identity.root(),
+                finished_work: identity.finished_work(),
+                commit_order: identity.commit_order(),
+            },
+        );
+    }
+    let source_consumed_after = store
+        .root_scheduler()
+        .has_consumed_finished_work_queue_lane_commit_currentness_source(&identity);
+
+    Ok(RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary {
+        identity,
+        root_token,
+        source_pending_before_consume,
+        source_consumed_after,
+        root_current_after_consume,
+        root_finished_work_after_consume,
+        root_finished_lanes_after_consume,
+        root_pending_lanes_after_consume,
+        committed_element_after_consume,
+        committed_root_children,
+        commit_mutation_record_count,
+        commit_deletion_list_count,
+    })
+}
+
+#[cfg(test)]
+fn validate_finished_work_queue_lane_commit_currentness_live_state_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    execution: &RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary,
+    queue_commit_handoff: &HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary,
+    identity: &RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+) -> Result<(), RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary> {
+    let commit = queue_commit_handoff.commit();
+    if execution.commit() != Some(commit)
+        || commit.root() != identity.root()
+        || commit.previous_current() != identity.previous_current()
+        || commit.current() != identity.finished_work()
+        || commit.finished_work() != identity.finished_work()
+        || commit.finished_lanes() != identity.finished_lanes()
+        || commit.remaining_lanes() != identity.remaining_lanes()
+        || commit.pending_lanes() != identity.remaining_lanes()
+        || queue_commit_handoff.selected_lanes() != identity.selected_lanes()
+        || queue_commit_handoff.finished_lanes() != identity.finished_lanes()
+        || queue_commit_handoff.remaining_lanes() != identity.remaining_lanes()
+        || queue_commit_handoff.update_sequence_ids() != identity.update_sequence_ids()
+        || queue_commit_handoff.resulting_element() != identity.resulting_element()
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::UnacceptedSchedulerContinuation,
+        );
+    }
+
+    let root = store.root(identity.root())?;
+    if root.current() != identity.finished_work()
+        || root.finished_work().is_some()
+        || !root.finished_lanes().is_empty()
+        || root.lanes().pending_lanes() != identity.remaining_lanes()
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::LiveRootStateMismatch {
+                root: identity.root(),
+                expected_current: identity.finished_work(),
+                actual_current: root.current(),
+                expected_finished_work: None,
+                actual_finished_work: root.finished_work(),
+                expected_finished_lanes: Lanes::NO,
+                actual_finished_lanes: root.finished_lanes(),
+                expected_pending_lanes: identity.remaining_lanes(),
+                actual_pending_lanes: root.lanes().pending_lanes(),
+            },
+        );
+    }
+
+    validate_queue_lane_commit_currentness_rows_for_canary(
+        store,
+        queue_commit_handoff.queue_handoff(),
+    )?;
+
+    let (root_token, committed_element, _children) =
+        committed_host_root_tree_state_for_queue_lane_currentness_for_canary(
+            store,
+            identity.root(),
+            identity.finished_work(),
+        )?;
+    if root_token != identity.root().state_node_handle() {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::CommittedTreeStateMismatch {
+                root: identity.root(),
+                field: "root_token",
+            },
+        );
+    }
+    if committed_element != identity.resulting_element() {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::CommittedTreeStateMismatch {
+                root: identity.root(),
+                field: "resulting_element",
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn validate_queue_lane_commit_currentness_rows_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    queue_handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
+) -> Result<(), RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary> {
+    if !queue_handoff.proves_source_owned_lane_handoff() {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::QueueOrderMismatch {
+                root: queue_handoff.root(),
+                queue: queue_handoff.current_update_queue(),
+                expected_updates: queue_handoff.current_queue_base_updates().to_vec(),
+                actual_updates: queue_handoff.update_sequence_ids(),
+            },
+        );
+    }
+
+    let current_queue_base_updates = store
+        .update_queues()
+        .base_updates(queue_handoff.current_update_queue())?;
+    if current_queue_base_updates != queue_handoff.current_queue_base_updates() {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::QueueOrderMismatch {
+                root: queue_handoff.root(),
+                queue: queue_handoff.current_update_queue(),
+                expected_updates: queue_handoff.current_queue_base_updates().to_vec(),
+                actual_updates: current_queue_base_updates,
+            },
+        );
+    }
+
+    let pending_updates = store
+        .update_queues()
+        .pending_updates(queue_handoff.current_update_queue())?;
+    if !pending_updates.is_empty() {
+        let mut actual_updates = current_queue_base_updates;
+        actual_updates.extend(pending_updates);
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::QueueOrderMismatch {
+                root: queue_handoff.root(),
+                queue: queue_handoff.current_update_queue(),
+                expected_updates: queue_handoff.current_queue_base_updates().to_vec(),
+                actual_updates,
+            },
+        );
+    }
+
+    for row in queue_handoff.update_records() {
+        let actual_lanes = store
+            .update_queues()
+            .update(row.update())?
+            .lane()
+            .remove_lane(Lane::OFFSCREEN);
+        if actual_lanes != row.source_lanes() || actual_lanes != row.lane().to_lanes() {
+            return Err(
+                RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::QueueRowMetadataMismatch {
+                    root: queue_handoff.root(),
+                    update: row.update(),
+                    expected_lanes: row.source_lanes(),
+                    actual_lanes,
+                },
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn committed_host_root_tree_state_for_queue_lane_currentness_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    current: FiberId,
+) -> Result<
+    (StateNodeHandle, RootElementHandle, Vec<FiberId>),
+    RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary,
+> {
+    let host_root = store.fiber_arena().get(current)?;
+    if host_root.tag() != FiberTag::HostRoot {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::CommittedTreeStateMismatch {
+                root,
+                field: "tag",
+            },
+        );
+    }
+    let root_token = host_root.state_node();
+    let state = store
+        .host_root_states()
+        .get(host_root.memoized_state())
+        .map_err(FiberRootStoreError::from)?;
+    let children = store.fiber_arena().child_ids(current)?;
+
+    Ok((root_token, state.element(), children))
 }
 
 #[cfg(test)]
@@ -6057,6 +6908,16 @@ pub(crate) fn execute_sync_scheduler_continuation_for_queue_lane_handoff_for_can
         };
     let commit = queue_commit_handoff.commit().clone();
     recompute_might_have_pending_sync_work(store)?;
+    let currentness_identity = root_finished_work_queue_lane_commit_currentness_identity_for_canary(
+        handoff,
+        requested_callback_node,
+        current_callback_node,
+        selected_lanes,
+        &queue_commit_handoff,
+    );
+    store
+        .root_scheduler_mut()
+        .record_finished_work_queue_lane_commit_currentness_source(currentness_identity);
 
     Ok(
         sync_scheduler_queue_lane_continuation_execution_record_for_canary(
@@ -7036,8 +7897,9 @@ mod tests {
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
         RootElementHandle, RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle,
-        SchedulerActQueueTaskKind, commit_finished_host_root, update_container,
-        update_container_sync,
+        SchedulerActQueueTaskKind, TestRendererHostOutputCanaryFixture, commit_finished_host_root,
+        finish_test_renderer_host_output_canary_fibers,
+        prepare_test_renderer_host_output_canary_fibers, update_container, update_container_sync,
     };
     use fast_react_core::{
         FiberMode, FiberTag, Lanes, PropsHandle, ReactKey, RootFinishedLanes, RootLaneState,
@@ -10970,6 +11832,287 @@ fn main() {{}}
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
         assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
         assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_finished_work_queue_lane_commit_currentness_consumes_live_tree_state() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (accepted, handoff, queue_handoff) = sync_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9481),
+        );
+        let prepared = prepare_test_renderer_host_output_canary_fibers(
+            &mut store,
+            handoff.render_phase(),
+            TestRendererHostOutputCanaryFixture::new(94810, 94811, 94812),
+        )
+        .unwrap();
+        let completed =
+            finish_test_renderer_host_output_canary_fibers(&mut store, prepared, 94813, 94814)
+                .unwrap();
+
+        let execution = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+        let currentness =
+            consume_finished_work_queue_lane_commit_currentness_for_canary(&mut store, &execution)
+                .unwrap();
+
+        assert!(execution.did_execute_queue_lane_scheduler_continuation());
+        assert!(
+            execution.routed_through_root_scheduler_queue_lane_and_commit_evidence_for_canary()
+        );
+        assert!(currentness.source_pending_before_consume());
+        assert!(currentness.source_consumed_after());
+        assert!(currentness.source_owned_currentness_consumed());
+        assert!(currentness.ties_finished_work_queue_lane_commit_to_live_tree_state_for_canary());
+        assert_eq!(currentness.root(), root_id);
+        assert_eq!(currentness.root_token(), root_id.state_node_handle());
+        assert_eq!(currentness.previous_current(), current);
+        assert_eq!(
+            currentness.finished_work(),
+            handoff.render_phase().finished_work()
+        );
+        assert_eq!(currentness.selected_lanes(), Lanes::SYNC);
+        assert_eq!(currentness.finished_lanes(), Lanes::SYNC);
+        assert_eq!(currentness.remaining_lanes(), Lanes::NO);
+        assert_eq!(currentness.update_sequence_ids(), &[accepted.update()]);
+        assert_eq!(
+            currentness.resulting_element(),
+            RootElementHandle::from_raw(9481)
+        );
+        assert_eq!(
+            currentness.committed_element_after_consume(),
+            RootElementHandle::from_raw(9481)
+        );
+        assert_eq!(
+            currentness.root_current_after_consume(),
+            currentness.finished_work()
+        );
+        assert_eq!(currentness.root_finished_work_after_consume(), None);
+        assert_eq!(currentness.root_finished_lanes_after_consume(), Lanes::NO);
+        assert_eq!(currentness.root_pending_lanes_after_consume(), Lanes::NO);
+        assert_eq!(currentness.committed_root_child_count(), 1);
+        assert_eq!(
+            currentness.committed_root_children(),
+            &[completed.component()]
+        );
+        assert_eq!(
+            currentness.commit_mutation_record_count(),
+            execution.commit().unwrap().mutation_log().len()
+        );
+        assert!(currentness.commit_mutation_record_count() > 0);
+        assert_eq!(currentness.commit_deletion_list_count(), 0);
+        assert!(!currentness.public_root_compatibility_claimed());
+        assert!(!currentness.public_scheduler_timing_compatibility_claimed());
+        assert!(!currentness.public_act_compatibility_claimed());
+        assert!(!currentness.react_dom_compatibility_claimed());
+        assert!(!currentness.test_renderer_compatibility_claimed());
+        assert!(!currentness.executes_public_effects());
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            currentness.finished_work()
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_finished_work_queue_lane_commit_currentness_rejects_replay_and_caller_built_callback()
+     {
+        let (mut store, root_id, host) = root_store();
+        let (_accepted, handoff, queue_handoff) = sync_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9482),
+        );
+        let execution = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+        let consumed =
+            consume_finished_work_queue_lane_commit_currentness_for_canary(&mut store, &execution)
+                .unwrap();
+
+        let replay =
+            consume_finished_work_queue_lane_commit_currentness_for_canary(&mut store, &execution)
+                .unwrap_err();
+        assert_eq!(
+            replay,
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceAlreadyConsumed {
+                root: root_id,
+                finished_work: consumed.finished_work(),
+                commit_order: consumed.commit_order()
+            }
+        );
+
+        let mut caller_built = execution.clone();
+        caller_built.requested_callback_node = RootSchedulerCallbackHandle::from_raw(94820);
+        caller_built.current_callback_node = RootSchedulerCallbackHandle::from_raw(94820);
+        let caller_built_error = consume_finished_work_queue_lane_commit_currentness_for_canary(
+            &mut store,
+            &caller_built,
+        )
+        .unwrap_err();
+        assert_eq!(
+            caller_built_error,
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
+                root: root_id,
+                finished_work: consumed.finished_work(),
+                commit_order: consumed.commit_order()
+            }
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            consumed.finished_work()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_finished_work_queue_lane_commit_currentness_rejects_stale_live_root_state() {
+        let (mut store, root_id, host) = root_store();
+        let (_accepted, handoff, queue_handoff) = sync_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9483),
+        );
+        let execution = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+        let stale_finished_work = execution.commit().unwrap().finished_work();
+
+        update_container_sync(&mut store, root_id, RootElementHandle::from_raw(9484), None)
+            .unwrap();
+        let next_render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        let next_commit = commit_finished_host_root(&mut store, next_render).unwrap();
+
+        let error =
+            consume_finished_work_queue_lane_commit_currentness_for_canary(&mut store, &execution)
+                .unwrap_err();
+
+        assert_eq!(
+            error,
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::LiveRootStateMismatch {
+                root: root_id,
+                expected_current: stale_finished_work,
+                actual_current: next_commit.current(),
+                expected_finished_work: None,
+                actual_finished_work: None,
+                expected_finished_lanes: Lanes::NO,
+                actual_finished_lanes: Lanes::NO,
+                expected_pending_lanes: Lanes::NO,
+                actual_pending_lanes: Lanes::NO
+            }
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            next_commit.current()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_finished_work_queue_lane_commit_currentness_rejects_scheduler_only_and_skipped_lane_smuggling()
+     {
+        let (mut store, root_id, _host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (_accepted, handoff, _queue_handoff) = sync_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9485),
+        );
+        let scheduler_only = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            consume_finished_work_queue_lane_commit_currentness_for_canary(
+                &mut store,
+                &scheduler_only,
+            )
+            .unwrap_err(),
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::UnacceptedSchedulerContinuation
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let skipped_default =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(9486), None).unwrap();
+        let committed_sync =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(9487), None)
+                .unwrap();
+        ensure_root_is_scheduled(&mut store, committed_sync.schedule()).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        record_root_finished_work_for_scheduler_handoff_for_canary(&mut store, render).unwrap();
+        let handoff = root_sync_flush_record_for_canary(0, root_id, Lanes::SYNC, render);
+        let forged_handoff = HostRootUpdateQueueLaneHandoffRecordForCanary {
+            root: root_id,
+            current: render.current(),
+            finished_work: render.finished_work(),
+            current_update_queue: render.current_update_queue(),
+            work_in_progress_update_queue: render.work_in_progress_update_queue(),
+            pending_lanes_before_render: Lanes::SYNC.merge(Lanes::DEFAULT),
+            selected_next_lanes_before_render: Lanes::SYNC,
+            finished_lanes: Lanes::SYNC,
+            remaining_lanes: Lanes::DEFAULT,
+            pending_lanes_after_render: Lanes::SYNC.merge(Lanes::DEFAULT),
+            update_records: vec![
+                HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                    sequence: 0,
+                    update: skipped_default.update(),
+                    lane: skipped_default.lane(),
+                    source_lanes: Lanes::DEFAULT,
+                    pending_lanes_after_enqueue: skipped_default.pending_lanes_after_enqueue(),
+                    selected_next_lanes_after_enqueue: skipped_default.selected_next_lanes(),
+                },
+                HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                    sequence: 1,
+                    update: committed_sync.update(),
+                    lane: committed_sync.lane(),
+                    source_lanes: Lanes::SYNC,
+                    pending_lanes_after_enqueue: committed_sync.pending_lanes_after_enqueue(),
+                    selected_next_lanes_after_enqueue: committed_sync.selected_next_lanes(),
+                },
+            ],
+            current_queue_base_updates: vec![skipped_default.update(), committed_sync.update()],
+            applied_update_count: render.applied_update_count(),
+            skipped_update_count: render.skipped_update_count(),
+            resulting_element: render.resulting_element(),
+        };
+        let skipped = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+            Some(&forged_handoff),
+        )
+        .unwrap();
+
+        assert_eq!(
+            consume_finished_work_queue_lane_commit_currentness_for_canary(&mut store, &skipped)
+                .unwrap_err(),
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::UnacceptedSchedulerContinuation
+        );
+        assert!(skipped.blocked_by_queue_lane_handoff());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
