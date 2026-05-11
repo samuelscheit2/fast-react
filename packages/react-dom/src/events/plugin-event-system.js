@@ -365,6 +365,67 @@ const hydrationDehydratedTargetResolutionDiagnosticPayloads =
 const hydrationReplayTargetDispatchLinkDiagnosticPayloads =
   new WeakMap();
 const hydrationReplayClickDispatchDiagnosticPayloads = new WeakMap();
+const inputChangeExtractionPublicBehaviorClaimFields = Object.freeze([
+  'browserDomEventCompatibilityClaimed',
+  'browserInputMutated',
+  'browserListenerInstallation',
+  'browserSyntheticEventCompatibilityClaimed',
+  'compatibilityClaimed',
+  'controlledStateRestoreScheduled',
+  'eventDispatch',
+  'eventDispatchAllowed',
+  'hydrationReplayCompatibilityClaimed',
+  'listenerInstallation',
+  'packageCompatibilityClaimed',
+  'publicControlledBehaviorEnabled',
+  'publicDispatchEnabled',
+  'publicEventCompatibilityClaimed',
+  'publicHydrationReplayCompatibilityClaimed',
+  'publicListenerInstallation',
+  'publicPackageCompatibilityClaimed',
+  'publicRootBehaviorChanged',
+  'publicSyntheticEventCompatibilityClaimed',
+  'realDomMutationAllowed',
+  'restoreQueueFlushed',
+  'restoreQueueWritten',
+  'rootListenerInstallation',
+  'syntheticEventCompatibilityClaimed',
+  'syntheticEventCreated',
+  'syntheticEventDispatch',
+  'valueTrackerFieldWritten',
+  'willDispatchPublicEvent',
+  'willInvokePublicListeners'
+]);
+const inputChangeExtractionSourceAliasValueFields = Object.freeze([
+  '$$typeof',
+  'facadeCall',
+  'kind',
+  'operation',
+  'queueKind',
+  'requestType',
+  'source',
+  'sourceKind',
+  'status',
+  'targetKind'
+]);
+const inputChangeExtractionSourceAliasPresenceFields = Object.freeze([
+  'currentTarget',
+  'dispatchPayload',
+  'eventPayload',
+  'fakeDomTarget',
+  'formActionEvidence',
+  'formEvidence',
+  'formResetEvidence',
+  'hydrationReplayEvidence',
+  'liveDomTarget',
+  'nativeEvent',
+  'replayQueueEvidence',
+  'resourceEvidence',
+  'resourceFormEvidence',
+  'syntheticEvent',
+  'target',
+  'targetNode'
+]);
 
 function isObjectLike(value) {
   return (
@@ -502,6 +563,9 @@ function validateRootListenerCurrentnessGateForEvent(record, options) {
 function normalizeInputChangeEventExtractionPreflightOptions(options) {
   const normalizedOptions = isObjectLike(options) ? options : {};
   assertNoInputChangeExtractionPublicBehaviorClaims(normalizedOptions);
+  assertNoInputChangeExtractionTopLevelCurrentTargetAlias(
+    normalizedOptions
+  );
 
   const rootListenerCurrentnessGateRecord =
     normalizedOptions.rootListenerCurrentnessGateRecord ||
@@ -532,39 +596,13 @@ function normalizeInputChangeEventExtractionPreflightOptions(options) {
 }
 
 function assertNoInputChangeExtractionPublicBehaviorClaims(options) {
-  const blockedClaimFields = [
-    'browserDomEventCompatibilityClaimed',
-    'browserInputMutated',
-    'browserListenerInstallation',
-    'browserSyntheticEventCompatibilityClaimed',
-    'compatibilityClaimed',
-    'controlledStateRestoreScheduled',
-    'eventDispatch',
-    'eventDispatchAllowed',
-    'hydrationReplayCompatibilityClaimed',
-    'listenerInstallation',
-    'packageCompatibilityClaimed',
-    'publicControlledBehaviorEnabled',
-    'publicDispatchEnabled',
-    'publicEventCompatibilityClaimed',
-    'publicHydrationReplayCompatibilityClaimed',
-    'publicListenerInstallation',
-    'publicPackageCompatibilityClaimed',
-    'publicRootBehaviorChanged',
-    'publicSyntheticEventCompatibilityClaimed',
-    'realDomMutationAllowed',
-    'restoreQueueFlushed',
-    'restoreQueueWritten',
-    'rootListenerInstallation',
-    'syntheticEventCompatibilityClaimed',
-    'syntheticEventCreated',
-    'syntheticEventDispatch',
-    'valueTrackerFieldWritten',
-    'willDispatchPublicEvent',
-    'willInvokePublicListeners'
-  ];
+  if (containsInputChangeExtractionPublicBehaviorClaim(options)) {
+    throwInputChangeEventExtractionPreflightError(
+      'public-or-live-behavior-claimed'
+    );
+  }
 
-  for (const field of blockedClaimFields) {
+  for (const field of inputChangeExtractionPublicBehaviorClaimFields) {
     if (options[field] === true) {
       throwInputChangeEventExtractionPreflightError(
         'public-or-live-behavior-claimed'
@@ -579,6 +617,12 @@ function assertNoInputChangeExtractionPublicBehaviorClaims(options) {
     throwInputChangeEventExtractionPreflightError(
       'public-or-live-behavior-claimed'
     );
+  }
+}
+
+function assertNoInputChangeExtractionTopLevelCurrentTargetAlias(options) {
+  if (hasInputChangeExtractionSourceAliasPresence(options, 'currentTarget')) {
+    throwInputChangeEventExtractionPreflightError('source-record-alias');
   }
 }
 
@@ -607,42 +651,54 @@ function containsBlockedInputChangeExtractionSourceAliasImpl(
   }
   seen.add(source);
 
-  for (const key of [
-    '$$typeof',
-    'facadeCall',
-    'kind',
-    'operation',
-    'queueKind',
-    'requestType',
-    'source',
-    'sourceKind',
-    'status',
-    'targetKind'
-  ]) {
-    if (isBlockedInputChangeExtractionSourceAlias(source[key])) {
+  if (containsInputChangeExtractionPublicBehaviorClaim(source)) {
+    return true;
+  }
+
+  for (const key of inputChangeExtractionSourceAliasValueFields) {
+    if (getBlockedInputChangeExtractionSourceAliasValue(source, key)) {
       return true;
     }
   }
 
-  if (
-    source.resourceFormEvidence !== undefined ||
-    source.resourceEvidence !== undefined ||
-    source.formEvidence !== undefined ||
-    source.formActionEvidence !== undefined ||
-    source.formResetEvidence !== undefined ||
-    source.hydrationReplayEvidence !== undefined ||
-    source.replayQueueEvidence !== undefined
-  ) {
+  for (const key of inputChangeExtractionSourceAliasPresenceFields) {
+    if (hasInputChangeExtractionSourceAliasPresence(source, key)) {
+      return true;
+    }
+  }
+
+  const ownKeys = getInputChangeExtractionOwnKeys(source);
+  if (ownKeys === null) {
     return true;
   }
 
-  for (const key of Object.keys(source)) {
+  for (const key of ownKeys) {
+    const descriptor =
+      getInputChangeExtractionOwnPropertyDescriptor(source, key);
+    if (descriptor == null) {
+      return true;
+    }
+    if (isInputChangeExtractionSourceAliasPresenceKey(key)) {
+      return true;
+    }
+    if (isInputChangeExtractionSourceAliasValueKey(key)) {
+      if (
+        !Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
+        isBlockedInputChangeExtractionSourceAlias(descriptor.value)
+      ) {
+        return true;
+      }
+    }
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return true;
+    }
     if (isInputChangeExtractionAliasScanSkippedKey(key)) {
       continue;
     }
     if (
+      Object.prototype.hasOwnProperty.call(descriptor, 'value') &&
       containsBlockedInputChangeExtractionSourceAliasImpl(
-        source[key],
+        descriptor.value,
         seen
       )
     ) {
@@ -654,11 +710,12 @@ function containsBlockedInputChangeExtractionSourceAliasImpl(
 }
 
 function isInputChangeExtractionAliasScanSkippedKey(key) {
+  if (typeof key !== 'string') {
+    return false;
+  }
+
   return (
     key === 'container' ||
-    key === 'currentTarget' ||
-    key === 'fakeDomTarget' ||
-    key === 'liveDomTarget' ||
     key === 'nativeEvent' ||
     key === 'node' ||
     key === 'ownerDocument' ||
@@ -667,6 +724,186 @@ function isInputChangeExtractionAliasScanSkippedKey(key) {
     key === 'target' ||
     key === 'targetNode'
   );
+}
+
+function containsInputChangeExtractionPublicBehaviorClaim(source) {
+  return containsInputChangeExtractionPublicBehaviorClaimImpl(
+    source,
+    new WeakSet()
+  );
+}
+
+function containsInputChangeExtractionPublicBehaviorClaimImpl(source, seen) {
+  if (!isObjectLike(source)) {
+    return false;
+  }
+  if (seen.has(source)) {
+    return false;
+  }
+  seen.add(source);
+
+  for (const field of inputChangeExtractionPublicBehaviorClaimFields) {
+    if (hasBlockedInputChangeExtractionPublicClaimField(source, field)) {
+      return true;
+    }
+  }
+  if (
+    hasBlockedInputChangeExtractionPublicClaimField(
+      source,
+      'syntheticEventCount'
+    )
+  ) {
+    return true;
+  }
+
+  const ownKeys = getInputChangeExtractionOwnKeys(source);
+  if (ownKeys === null) {
+    return true;
+  }
+
+  for (const key of ownKeys) {
+    const descriptor =
+      getInputChangeExtractionOwnPropertyDescriptor(source, key);
+    if (descriptor == null) {
+      return true;
+    }
+    if (
+      isInputChangeExtractionPublicClaimKey(key) &&
+      descriptorContainsBlockedInputChangeExtractionClaim(key, descriptor)
+    ) {
+      return true;
+    }
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return true;
+    }
+    if (isInputChangeExtractionAliasScanSkippedKey(key)) {
+      continue;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(descriptor, 'value') &&
+      containsInputChangeExtractionPublicBehaviorClaimImpl(
+        descriptor.value,
+        seen
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function hasBlockedInputChangeExtractionPublicClaimField(source, field) {
+  const descriptor =
+    getInputChangeExtractionOwnPropertyDescriptor(source, field);
+  if (
+    descriptor !== undefined &&
+    descriptor !== null &&
+    descriptorContainsBlockedInputChangeExtractionClaim(field, descriptor)
+  ) {
+    return true;
+  }
+
+  try {
+    return isBlockedInputChangeExtractionPublicClaimValue(field, source[field]);
+  } catch (error) {
+    return true;
+  }
+}
+
+function descriptorContainsBlockedInputChangeExtractionClaim(key, descriptor) {
+  if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+    return true;
+  }
+
+  return isBlockedInputChangeExtractionPublicClaimValue(
+    key,
+    descriptor.value
+  );
+}
+
+function isBlockedInputChangeExtractionPublicClaimValue(key, value) {
+  const keyName = getInputChangeExtractionPropertyKeyName(key);
+  if (keyName === 'syntheticEventCount') {
+    return typeof value === 'number' && value > 0;
+  }
+
+  return value === true;
+}
+
+function getBlockedInputChangeExtractionSourceAliasValue(source, key) {
+  const descriptor =
+    getInputChangeExtractionOwnPropertyDescriptor(source, key);
+  if (descriptor !== undefined && descriptor !== null) {
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return true;
+    }
+    if (isBlockedInputChangeExtractionSourceAlias(descriptor.value)) {
+      return true;
+    }
+  }
+
+  try {
+    return isBlockedInputChangeExtractionSourceAlias(source[key]);
+  } catch (error) {
+    return true;
+  }
+}
+
+function hasInputChangeExtractionSourceAliasPresence(source, key) {
+  const descriptor =
+    getInputChangeExtractionOwnPropertyDescriptor(source, key);
+  if (descriptor !== undefined && descriptor !== null) {
+    return true;
+  }
+
+  try {
+    return source[key] !== undefined;
+  } catch (error) {
+    return true;
+  }
+}
+
+function getInputChangeExtractionOwnKeys(source) {
+  try {
+    return Reflect.ownKeys(source);
+  } catch (error) {
+    return null;
+  }
+}
+
+function getInputChangeExtractionOwnPropertyDescriptor(source, key) {
+  try {
+    return Object.getOwnPropertyDescriptor(source, key);
+  } catch (error) {
+    return null;
+  }
+}
+
+function isInputChangeExtractionPublicClaimKey(key) {
+  const keyName = getInputChangeExtractionPropertyKeyName(key);
+  return (
+    keyName === 'syntheticEventCount' ||
+    inputChangeExtractionPublicBehaviorClaimFields.includes(keyName)
+  );
+}
+
+function isInputChangeExtractionSourceAliasValueKey(key) {
+  const keyName = getInputChangeExtractionPropertyKeyName(key);
+  return inputChangeExtractionSourceAliasValueFields.includes(keyName);
+}
+
+function isInputChangeExtractionSourceAliasPresenceKey(key) {
+  const keyName = getInputChangeExtractionPropertyKeyName(key);
+  return inputChangeExtractionSourceAliasPresenceFields.includes(keyName);
+}
+
+function getInputChangeExtractionPropertyKeyName(key) {
+  if (typeof key === 'symbol') {
+    return key.description || String(key).slice(7, -1);
+  }
+
+  return key;
 }
 
 function isBlockedInputChangeExtractionSourceAlias(value) {
