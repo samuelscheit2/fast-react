@@ -2841,6 +2841,11 @@ fn sync_flush_root_record_after_commit<H: HostTypes>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::host_work::{
+        HostWorkError, HostWorkResult, SyncFlushHostMutationExecutionErrorForCanary,
+        execute_sync_flush_host_mutations_for_canary, mount_test_host_work,
+        sync_flush_host_mutation_execution_request_for_canary,
+    };
     use crate::root_callbacks::{
         ROOT_UPDATE_CALLBACK_INVOCATION_EXECUTION_GATE_BLOCKERS,
         RootUpdateCallbackInvocationErrorHandle, RootUpdateCallbackInvocationExecutionGateStatus,
@@ -2857,7 +2862,7 @@ mod tests {
         host_root_queued_callback_order_snapshot_for_canary, update_container_transition_for_canary,
     };
     use crate::scheduler_bridge::SchedulerActContinuationStatus;
-    use crate::test_support::{FakeContainer, RecordingHost};
+    use crate::test_support::{FakeContainer, RecordingHost, TestHostTree};
     use crate::{
         ExecutionContextState, RootElementHandle, RootErrorCallbackHandle, RootOptions,
         RootRecoverableErrorCallbackHandle, RootSyncFlushExitStatus, RootSyncFlushRecordStatus,
@@ -2955,6 +2960,48 @@ mod tests {
             SyncFlushError::FinishedWorkCommitHandoff(message)
                 if message == SYNC_FLUSH_FINISHED_WORK_HANDOFF_IDENTITY_MISMATCH_FOR_CANARY
         ));
+    }
+
+    struct SyncFlushHostMutationFixture {
+        store: FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        host: RecordingHost,
+        host_work: HostWorkResult,
+        committed: SyncFlushRootRecord,
+        diagnostics: SyncFlushRootHostOutputCommitDiagnosticsForCanary,
+        operations_before_opt_in: Vec<&'static str>,
+    }
+
+    fn sync_flush_host_mutation_fixture(label: &str) -> SyncFlushHostMutationFixture {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let element = source.insert_host_element_with_text("section", label);
+        schedule_sync_update(&mut store, root_id, element);
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        let host_work = mount_test_host_work(&mut store, &mut host, render_phase, &source).unwrap();
+        let operations_before_opt_in = host.operations();
+
+        let (committed, diagnostics) =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_diagnostics_for_canary(
+                &mut store,
+                rendered_record,
+            )
+            .unwrap();
+
+        assert_eq!(host.operations(), operations_before_opt_in);
+
+        SyncFlushHostMutationFixture {
+            store,
+            root_id,
+            host,
+            host_work,
+            committed,
+            diagnostics,
+            operations_before_opt_in,
+        }
     }
 
     fn root_callback_error(raw: u64) -> RootUpdateCallbackInvocationErrorHandle {
@@ -4176,6 +4223,281 @@ mod tests {
         assert_eq!(diagnostics.host_root_placement_apply_count(), 1);
         assert!(diagnostics.recorded_host_output_mutation_metadata());
         assert!(diagnostics.commit_handoff_state_consumed());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_private_host_mutation_execution_opt_in_applies_host_work_after_commit() {
+        let mut fixture = sync_flush_host_mutation_fixture("sync flush host mutation");
+
+        assert_eq!(fixture.committed.root(), fixture.root_id);
+        assert_eq!(fixture.committed.render_lanes(), Lanes::SYNC);
+        assert!(
+            fixture
+                .committed
+                .accepted_finished_work_handoff_for_canary()
+        );
+        assert!(fixture.diagnostics.accepted_finished_work_handoff());
+        assert_eq!(fixture.diagnostics.mutation_record_count(), 1);
+        assert_eq!(fixture.diagnostics.mutation_apply_record_count(), 1);
+        assert_eq!(fixture.diagnostics.host_root_placement_apply_count(), 1);
+        assert_eq!(
+            fixture.host_work.work_in_progress(),
+            fixture.committed.commit().finished_work()
+        );
+        assert_eq!(fixture.host.operations(), fixture.operations_before_opt_in);
+
+        let request = sync_flush_host_mutation_execution_request_for_canary(
+            &fixture.committed,
+            fixture.diagnostics,
+        )
+        .unwrap();
+
+        assert_eq!(request.root(), fixture.root_id);
+        assert_eq!(request.order(), fixture.committed.order());
+        assert_eq!(request.render_lanes(), Lanes::SYNC);
+        assert_eq!(request.finished_lanes(), Lanes::SYNC);
+        assert_eq!(request.mutation_record_count(), 1);
+        assert_eq!(request.mutation_apply_record_count(), 1);
+        assert_eq!(request.host_root_placement_apply_count(), 1);
+        assert!(request.private_opt_in_host_mutation_execution_requested());
+        assert!(request.public_renderer_mutation_blocked());
+        assert!(!request.public_flush_sync_compatibility_claimed());
+
+        let execution = execute_sync_flush_host_mutations_for_canary(
+            &mut fixture.store,
+            &mut fixture.host,
+            &fixture.committed,
+            request,
+            &mut fixture.host_work,
+        )
+        .unwrap();
+
+        assert_eq!(execution.request(), request);
+        assert_eq!(execution.root(), fixture.root_id);
+        assert_eq!(execution.order(), fixture.committed.order());
+        assert_eq!(
+            execution.finished_work(),
+            fixture.committed.commit().finished_work()
+        );
+        assert_eq!(execution.mutation_apply_record_count(), 1);
+        assert_eq!(execution.applied_host_call_count(), 1);
+        assert_eq!(execution.private_host_store_update_count(), 0);
+        assert_eq!(execution.recorded_only_count(), 0);
+        assert!(execution.private_opt_in_host_mutation_execution_requested());
+        assert!(execution.private_test_host_mutation_executed());
+        assert!(execution.public_renderer_mutation_blocked());
+        assert!(!execution.public_flush_sync_compatibility_claimed());
+        assert!(!execution.react_dom_compatibility_claimed());
+        assert!(!execution.test_renderer_compatibility_claimed());
+
+        let mut expected_operations = fixture.operations_before_opt_in.clone();
+        expected_operations.push("append_child_to_container");
+        assert_eq!(fixture.host.operations(), expected_operations);
+        assert_eq!(
+            fixture.store.root(fixture.root_id).unwrap().current(),
+            fixture.committed.commit().current()
+        );
+    }
+
+    #[test]
+    fn sync_flush_private_host_mutation_execution_rejects_stale_finished_work_evidence() {
+        let mut fixture = sync_flush_host_mutation_fixture("stale sync flush host mutation");
+        let mut stale_record = fixture.committed.clone();
+        stale_record.finished_work_handoff_identity = None;
+
+        let error = sync_flush_host_mutation_execution_request_for_canary(
+            &stale_record,
+            fixture.diagnostics,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            SyncFlushHostMutationExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root,
+                order,
+            } if root == fixture.root_id && order == fixture.committed.order()
+        ));
+        assert_eq!(fixture.host.operations(), fixture.operations_before_opt_in);
+
+        let request = sync_flush_host_mutation_execution_request_for_canary(
+            &fixture.committed,
+            fixture.diagnostics,
+        )
+        .unwrap();
+        let previous_current = fixture.committed.commit().previous_current();
+        fixture
+            .store
+            .root_mut(fixture.root_id)
+            .unwrap()
+            .set_current(previous_current);
+
+        let error = execute_sync_flush_host_mutations_for_canary(
+            &mut fixture.store,
+            &mut fixture.host,
+            &fixture.committed,
+            request,
+            &mut fixture.host_work,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            SyncFlushHostMutationExecutionErrorForCanary::HostWork(
+                HostWorkError::CommitCurrentMismatch {
+                    root,
+                    expected,
+                    actual,
+                }
+            ) if root == fixture.root_id
+                && expected == fixture.committed.commit().current()
+                && actual == previous_current
+        ));
+        assert_eq!(fixture.host.operations(), fixture.operations_before_opt_in);
+    }
+
+    #[test]
+    fn sync_flush_private_host_mutation_execution_rejects_root_and_lane_tampering() {
+        let mut fixture = sync_flush_host_mutation_fixture("tampered sync flush host mutation");
+        let foreign_root = fixture
+            .store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let mut foreign_root_record = fixture.committed.clone();
+        foreign_root_record.root = foreign_root;
+
+        let error = sync_flush_host_mutation_execution_request_for_canary(
+            &foreign_root_record,
+            fixture.diagnostics,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedRootOwnership {
+                expected_root,
+                actual_root,
+            } if expected_root == foreign_root && actual_root == fixture.root_id
+        ));
+
+        let mut missing_lanes_record = fixture.committed.clone();
+        missing_lanes_record.render_lanes = Lanes::NO;
+
+        let error = sync_flush_host_mutation_execution_request_for_canary(
+            &missing_lanes_record,
+            fixture.diagnostics,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedSyncFlushLanes {
+                root,
+                expected_render_lanes,
+                actual_render_lanes,
+                expected_finished_lanes,
+                actual_finished_lanes,
+            } if root == fixture.root_id
+                && expected_render_lanes == Lanes::NO
+                && actual_render_lanes == Lanes::SYNC
+                && expected_finished_lanes == Lanes::SYNC
+                && actual_finished_lanes == Lanes::SYNC
+        ));
+
+        let mut caller_built_lane_diagnostics = fixture.diagnostics;
+        caller_built_lane_diagnostics.remaining_lanes = Lanes::DEFAULT;
+        caller_built_lane_diagnostics.commit_pending_lanes = Lanes::DEFAULT;
+        caller_built_lane_diagnostics.root_pending_lanes_after_commit = Lanes::DEFAULT;
+
+        let error = sync_flush_host_mutation_execution_request_for_canary(
+            &fixture.committed,
+            caller_built_lane_diagnostics,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedSyncFlushLanes {
+                root,
+                expected_render_lanes,
+                actual_render_lanes,
+                expected_finished_lanes,
+                actual_finished_lanes,
+            } if root == fixture.root_id
+                && expected_render_lanes == Lanes::SYNC
+                && actual_render_lanes == Lanes::SYNC
+                && expected_finished_lanes == Lanes::SYNC
+                && actual_finished_lanes == Lanes::SYNC
+        ));
+
+        let request = sync_flush_host_mutation_execution_request_for_canary(
+            &fixture.committed,
+            fixture.diagnostics,
+        )
+        .unwrap();
+        let mut foreign_source = TestHostTree::new();
+        let foreign_element =
+            foreign_source.insert_host_element_with_text("article", "foreign host work");
+        schedule_sync_update(&mut fixture.store, foreign_root, foreign_element);
+        let foreign_rendered =
+            flush_sync_work_on_all_roots(&mut fixture.store, &ExecutionContextState::new())
+                .unwrap();
+        let mut foreign_host = RecordingHost::default();
+        let mut foreign_host_work = mount_test_host_work(
+            &mut fixture.store,
+            &mut foreign_host,
+            foreign_rendered.records()[0].render_phase(),
+            &foreign_source,
+        )
+        .unwrap();
+        let error = execute_sync_flush_host_mutations_for_canary(
+            &mut fixture.store,
+            &mut fixture.host,
+            &fixture.committed,
+            request,
+            &mut foreign_host_work,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedRootOwnership {
+                expected_root,
+                actual_root,
+            } if expected_root == fixture.root_id && actual_root == foreign_root
+        ));
+        assert_eq!(fixture.host.operations(), fixture.operations_before_opt_in);
+    }
+
+    #[test]
+    fn sync_flush_private_host_mutation_execution_requires_host_mutation_metadata() {
+        let (mut store, root_id, host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(806));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let (committed, diagnostics) =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_diagnostics_for_canary(
+                &mut store,
+                rendered.records()[0],
+            )
+            .unwrap();
+
+        assert!(committed.accepted_finished_work_handoff_for_canary());
+        assert!(diagnostics.accepted_finished_work_handoff());
+        assert_eq!(diagnostics.mutation_record_count(), 0);
+        assert_eq!(diagnostics.mutation_apply_record_count(), 0);
+
+        let error = sync_flush_host_mutation_execution_request_for_canary(&committed, diagnostics)
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            SyncFlushHostMutationExecutionErrorForCanary::MissingHostMutationMetadata {
+                root,
+                finished_work,
+            } if root == root_id && finished_work == committed.commit().finished_work()
+        ));
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
