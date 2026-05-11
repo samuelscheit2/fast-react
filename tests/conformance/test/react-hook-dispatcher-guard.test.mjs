@@ -49,6 +49,10 @@ const memoDefaultHooks = [
   ["useMemo", 2, [() => "memo", []]]
 ];
 
+const refDefaultHooks = [
+  ["useRef", 1, ["ref"]]
+];
+
 const contextDefaultHooks = [
   ["useContext", 1, [{ $$typeof: Symbol.for("react.context") }]]
 ];
@@ -240,6 +244,7 @@ const dispatcherForwardedDefaultHooks = selectedDefaultHooks.filter(
   ([hookName]) =>
     !hasHookName(callbackDefaultHooks, hookName) &&
     !hasHookName(memoDefaultHooks, hookName) &&
+    !hasHookName(refDefaultHooks, hookName) &&
     !hasHookName(statefulDefaultHooks, hookName) &&
     !hasHookName(contextDefaultHooks, hookName) &&
     !hasHookName(effectDefaultHooks, hookName)
@@ -511,6 +516,30 @@ test("useMemo fails closed without a marked private memo-hook dispatcher", () =>
   assert.deepEqual(calls, []);
   assert.equal(
     hookDispatcher.isPrivateMemoHookDispatcher(genericDispatcher),
+    false
+  );
+});
+
+test("useRef fails closed without a marked private ref-hook dispatcher", () => {
+  const calls = [];
+  const genericDispatcher = {
+    useRef(initialValue) {
+      calls.push(initialValue);
+      return { current: initialValue };
+    }
+  };
+
+  hookDispatcher.ReactCurrentDispatcher.current = genericDispatcher;
+
+  assertInvalidHookCall(() => React.useRef("ref"), "useRef");
+  assertInvalidHookCall(
+    () => hookDispatcher.markPrivateRefHookDispatcher(genericDispatcher),
+    "useRef"
+  );
+
+  assert.deepEqual(calls, []);
+  assert.equal(
+    hookDispatcher.isPrivateRefHookDispatcher(genericDispatcher),
     false
   );
 });
@@ -819,6 +848,329 @@ test("private memo-hook dispatcher metadata names match accepted useMemo diagnos
   assert.equal(React.markPrivateMemoHookDispatcher, undefined);
 });
 
+test("private ref-hook dispatcher metadata records source-owned blockers", () => {
+  const metadata = hookDispatcher.privateRefHookDispatcherMetadata;
+
+  assert.equal(metadata.capability, "fast-react.private.ref_hook_dispatcher");
+  assert.equal(metadata.compatibilityTarget, "react@19.2.6");
+  assert.equal(metadata.compatibilityClaimed, false);
+  assert.equal(metadata.publicCompatibilityClaimed, false);
+  assert.equal(metadata.publicHookCompatibility, false);
+  assert.equal(metadata.exposesPublicHookImplementation, false);
+  assert.equal(metadata.hookExecutionCompatibility, false);
+  assert.equal(metadata.refIdentityCompatibility, false);
+  assert.equal(metadata.refObjectCompatibility, false);
+  assert.equal(metadata.rendererIntegration, false);
+  assert.equal(metadata.rendererCompatibility, false);
+  assert.equal(metadata.publicActIntegration, false);
+  assert.equal(metadata.schedulerIntegration, false);
+  assert.equal(metadata.schedulerPrerequisitesReady, false);
+  assert.equal(metadata.rootLaneIntegration, false);
+  assert.equal(metadata.rootScheduling, false);
+  assert.equal(metadata.rootExecution, false);
+  assert.equal(metadata.callbackExecutionClaimed, false);
+  assert.equal(metadata.externalStoreSubscriptionClaimed, false);
+  assert.equal(metadata.externalStoreSnapshotReadClaimed, false);
+  assert.equal(metadata.idGenerationClaimed, false);
+  assert.equal(metadata.packageCompatibility, false);
+  assert.deepEqual(metadata.hookNames, ["useRef"]);
+  assert.deepEqual(metadata.publicShapeBlockerFields, [
+    "hookName",
+    "reactSourceFunction",
+    "reactDispatcherMethod",
+    "reactSourceLength",
+    "currentPublicExport",
+    "currentName",
+    "currentLength",
+    "blocker"
+  ]);
+  assert.deepEqual(metadata.publicShapeBlockers, [
+    {
+      hookName: "useRef",
+      reactSourceFunction: "ReactHooks.useRef",
+      reactDispatcherMethod: "dispatcher.useRef",
+      reactSourceLength: 1,
+      currentPublicExport: "react.useRef private-dispatcher guarded facade",
+      currentName: "",
+      currentLength: 1,
+      blocker:
+        "public export rejects generic dispatcher forwarding until a source-owned private useRef hook dispatcher is admitted"
+    }
+  ]);
+  assert.deepEqual(metadata.sourceReportFieldNames, [
+    "kind",
+    "version",
+    "status",
+    "reactSourceTag",
+    "reactSourceCommit",
+    "reactHooksSource",
+    "reactClientSource",
+    "reactServerSource",
+    "reactReconcilerSource",
+    "fastReactSource",
+    "reactMountFunction",
+    "reactUpdateFunction",
+    "dispatcherMethodCurrentInReactSource",
+    "publicRootExportCurrent",
+    "reactServerExportAbsentCurrent",
+    "compatibilityClaimed"
+  ]);
+  assert.deepEqual(metadata.sourceReport, {
+    kind: "fast-react.private.use_ref_hook_source_report",
+    version: 1,
+    status: "source-current-for-react-19.2.6-useRef-private-dispatcher",
+    reactSourceTag: "v19.2.6",
+    reactSourceCommit: "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401",
+    reactHooksSource: "packages/react/src/ReactHooks.js",
+    reactClientSource: "packages/react/src/ReactClient.js",
+    reactServerSource: "packages/react/src/ReactServer.js",
+    reactReconcilerSource: "packages/react-reconciler/src/ReactFiberHooks.js",
+    fastReactSource: "packages/react/hook-dispatcher.js",
+    reactMountFunction: "mountRef",
+    reactUpdateFunction: "updateRef",
+    dispatcherMethodCurrentInReactSource: true,
+    publicRootExportCurrent: true,
+    reactServerExportAbsentCurrent: true,
+    compatibilityClaimed: false
+  });
+  assert.deepEqual(metadata.blockerCurrentnessFieldNames, [
+    "status",
+    "compatibilityTarget",
+    "sourceReportCurrent",
+    "publicRootlessInvalidHookBlocked",
+    "genericDispatcherForwardingBlocked",
+    "privateDispatcherMarkerRequired",
+    "cjsSurfaceCurrentnessBlocked",
+    "reactServerSurfaceCurrentnessBlocked",
+    "schedulerPrerequisitesBlocked",
+    "rootLanePrerequisitesBlocked",
+    "rootSchedulingBlocked",
+    "rendererCompatibilityBlocked",
+    "callbackInvocationBlocked",
+    "externalStoreInvocationBlocked",
+    "idGenerationBlocked",
+    "refIdentityCompatibilityClaimed",
+    "publicCompatibilityClaimed",
+    "compatibilityClaimed"
+  ]);
+  assert.deepEqual(metadata.blockerCurrentness, {
+    status:
+      "blocked-until-private-useRef-dispatcher-root-and-renderer-currentness-admitted",
+    compatibilityTarget: "react@19.2.6",
+    sourceReportCurrent: true,
+    publicRootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherMarkerRequired: true,
+    cjsSurfaceCurrentnessBlocked: true,
+    reactServerSurfaceCurrentnessBlocked: true,
+    schedulerPrerequisitesBlocked: true,
+    rootLanePrerequisitesBlocked: true,
+    rootSchedulingBlocked: true,
+    rendererCompatibilityBlocked: true,
+    callbackInvocationBlocked: true,
+    externalStoreInvocationBlocked: true,
+    idGenerationBlocked: true,
+    refIdentityCompatibilityClaimed: false,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+  assert.deepEqual(metadata.surfaceCurrentnessFieldNames, [
+    "surfaceId",
+    "source",
+    "entrypoint",
+    "moduleShape",
+    "sameAsRootExport",
+    "hookName",
+    "useRefExportPolicy",
+    "hasUseRefExport",
+    "currentName",
+    "currentLength",
+    "expectedName",
+    "expectedLength",
+    "useRefPolicyCurrent",
+    "rootlessInvalidHookBlocked",
+    "genericDispatcherForwardingBlocked",
+    "privateDispatcherRequired",
+    "publicCompatibilityClaimed",
+    "compatibilityClaimed"
+  ]);
+  assert.deepEqual(metadata.surfaceCurrentnessRows, [
+    {
+      surfaceId: "react-root",
+      source: "packages/react/index.js",
+      entrypoint: "react",
+      moduleShape: "default-root",
+      sameAsRootExport: true,
+      hookName: "useRef",
+      useRefExportPolicy: "available-root-hook",
+      hasUseRefExport: true,
+      currentName: "",
+      currentLength: 1,
+      expectedName: "",
+      expectedLength: 1,
+      useRefPolicyCurrent: true,
+      rootlessInvalidHookBlocked: true,
+      genericDispatcherForwardingBlocked: true,
+      privateDispatcherRequired: true,
+      publicCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    },
+    {
+      surfaceId: "react-cjs-development",
+      source: "packages/react/cjs/react.development.js",
+      entrypoint: "react",
+      moduleShape: "cjs-root-alias",
+      sameAsRootExport: true,
+      hookName: "useRef",
+      useRefExportPolicy: "available-root-hook",
+      hasUseRefExport: true,
+      currentName: "",
+      currentLength: 1,
+      expectedName: "",
+      expectedLength: 1,
+      useRefPolicyCurrent: true,
+      rootlessInvalidHookBlocked: true,
+      genericDispatcherForwardingBlocked: true,
+      privateDispatcherRequired: true,
+      publicCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    },
+    {
+      surfaceId: "react-cjs-production",
+      source: "packages/react/cjs/react.production.js",
+      entrypoint: "react",
+      moduleShape: "cjs-root-alias",
+      sameAsRootExport: true,
+      hookName: "useRef",
+      useRefExportPolicy: "available-root-hook",
+      hasUseRefExport: true,
+      currentName: "",
+      currentLength: 1,
+      expectedName: "",
+      expectedLength: 1,
+      useRefPolicyCurrent: true,
+      rootlessInvalidHookBlocked: true,
+      genericDispatcherForwardingBlocked: true,
+      privateDispatcherRequired: true,
+      publicCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    },
+    {
+      surfaceId: "react-server",
+      source: "packages/react/react.react-server.js",
+      entrypoint: "react react-server",
+      moduleShape: "react-server-root",
+      sameAsRootExport: false,
+      hookName: "useRef",
+      useRefExportPolicy: "absent-react-server-hook",
+      hasUseRefExport: false,
+      currentName: null,
+      currentLength: null,
+      expectedName: null,
+      expectedLength: null,
+      useRefPolicyCurrent: true,
+      rootlessInvalidHookBlocked: true,
+      genericDispatcherForwardingBlocked: true,
+      privateDispatcherRequired: true,
+      publicCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    }
+  ]);
+  assert.equal(metadata.cjsSurfaceCurrentnessBlocked, true);
+  assert.equal(metadata.reactServerSurfaceCurrentnessBlocked, true);
+  assert.deepEqual(metadata.hookCallFields, ["initialValue"]);
+  assert.deepEqual(metadata.renderRequestFields, ["initialValue"]);
+  assert.deepEqual(metadata.hookRecordFields, [
+    "hook",
+    "refObject",
+    "initialValue"
+  ]);
+  assert.deepEqual(metadata.updateRecordFields, [
+    "hook",
+    "refObject",
+    "initialValue",
+    "ignoredInitialValue"
+  ]);
+  assert.deepEqual(metadata.hookRenderRecordFields, [
+    "phase",
+    "hook",
+    "refObject",
+    "initialValue"
+  ]);
+  assert.deepEqual(metadata.missingDispatcherPrerequisites, [
+    "dispatcher.useRef",
+    "private useRef hook dispatcher admission marker",
+    "FunctionComponentUseRefHookRenderRecord currentness handoff"
+  ]);
+  assert.deepEqual(metadata.missingSchedulerPrerequisites, [
+    "root scheduler render entry currentness",
+    "act/Scheduler timing integration remains blocked"
+  ]);
+  assert.deepEqual(metadata.missingRootLanePrerequisites, [
+    "public root renderWithHooks dispatcher installation",
+    "FunctionComponent current hook-list rebinding through commit",
+    "HostRoot render/update execution admission",
+    "renderer-owned hook dispatcher lifecycle"
+  ]);
+  assert.deepEqual(metadata.compatibilityFalseFlags, [
+    "compatibilityClaimed",
+    "publicCompatibilityClaimed",
+    "publicHookCompatibility",
+    "exposesPublicHookImplementation",
+    "hookExecutionCompatibility",
+    "refIdentityCompatibility",
+    "refObjectCompatibility",
+    "rendererIntegration",
+    "rendererCompatibility",
+    "publicActIntegration",
+    "schedulerIntegration",
+    "schedulerPrerequisitesReady",
+    "rootLaneIntegration",
+    "rootScheduling",
+    "rootExecution",
+    "callbackExecutionClaimed",
+    "externalStoreSubscriptionClaimed",
+    "externalStoreSnapshotReadClaimed",
+    "idGenerationClaimed",
+    "packageCompatibility"
+  ]);
+  assert.deepEqual(metadata.acceptedReconcilerRecords, [
+    "FunctionComponentRefObjectHandle",
+    "FunctionComponentRefHookRecord",
+    "FunctionComponentRefUpdateRecord",
+    "FunctionComponentUseRefHookRenderRecord",
+    "FunctionComponentUseMemoUseRefRenderRecord"
+  ]);
+
+  for (const flagName of metadata.compatibilityFalseFlags) {
+    assert.equal(metadata[flagName], false, flagName);
+  }
+
+  assert.deepEqual(hookDispatcher.useRefHookNames, ["useRef"]);
+  assert.equal(hookDispatcher.isPrivateRefHookDispatcherMetadata(metadata), true);
+  assert.equal(Object.isFrozen(metadata), true);
+
+  for (const value of Object.values(metadata)) {
+    if (Array.isArray(value)) {
+      assert.equal(Object.isFrozen(value), true);
+      for (const item of value) {
+        if (item !== null && typeof item === "object") {
+          assert.equal(Object.isFrozen(item), true);
+        }
+      }
+    } else if (value !== null && typeof value === "object") {
+      assert.equal(Object.isFrozen(value), true);
+    }
+  }
+
+  assert.equal(React.privateRefHookDispatcherMetadata, undefined);
+  assert.equal(React.markPrivateRefHookDispatcher, undefined);
+  assert.equal(React.createUseRefHookCurrentnessReport, undefined);
+  assert.equal(React.consumeUseRefHookCurrentnessReport, undefined);
+  assert.equal(ReactServer.privateRefHookDispatcherMetadata, undefined);
+  assert.equal(ReactServer.markPrivateRefHookDispatcher, undefined);
+});
+
 test("private context-hook dispatcher metadata names match accepted context diagnostics", () => {
   const metadata = hookDispatcher.privateContextHookDispatcherMetadata;
 
@@ -910,6 +1262,34 @@ test("private memo-hook dispatcher marker rejects diagnostic metadata drift", ()
     "useMemo"
   );
   assert.equal(hookDispatcher.isPrivateMemoHookDispatcher(dispatcher), false);
+});
+
+test("private ref-hook dispatcher marker rejects source and surface drift", () => {
+  const dispatcher = {
+    useRef() {
+      throw new Error("unreachable ref dispatch");
+    }
+  };
+  const driftedMetadata = {
+    ...hookDispatcher.privateRefHookDispatcherMetadata,
+    surfaceCurrentnessRows:
+      hookDispatcher.privateRefHookDispatcherMetadata.surfaceCurrentnessRows.map(
+        (row) =>
+          row.surfaceId === "react-server"
+            ? { ...row, hasUseRefExport: true }
+            : row
+      )
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateRefHookDispatcherMetadata(driftedMetadata),
+    false
+  );
+  assertInvalidHookCall(
+    () => hookDispatcher.markPrivateRefHookDispatcher(dispatcher, driftedMetadata),
+    "useRef"
+  );
+  assert.equal(hookDispatcher.isPrivateRefHookDispatcher(dispatcher), false);
 });
 
 test("private context-hook dispatcher marker rejects diagnostic metadata drift", () => {
@@ -1111,6 +1491,10 @@ test("accepted private hook methods stay public-blocked on an unmarked dispatche
       calls.push(["useMemo", args]);
       return "memo";
     },
+    useRef(...args) {
+      calls.push(["useRef", args]);
+      return { current: args[0] };
+    },
     useReducer(...args) {
       calls.push(["useReducer", args]);
       return ["reducer"];
@@ -1130,6 +1514,7 @@ test("accepted private hook methods stay public-blocked on an unmarked dispatche
   );
   assertInvalidHookCall(() => React.useCallback(callback, []), "useCallback");
   assertInvalidHookCall(() => React.useMemo(create, []), "useMemo");
+  assertInvalidHookCall(() => React.useRef("ref"), "useRef");
   assertInvalidHookCall(() => React.useContext(context), "useContext");
   assertInvalidHookCall(() => React.useEffect(create, []), "useEffect");
 
@@ -1266,6 +1651,44 @@ test("useMemo forwards only to a marked private memo-hook dispatcher", () => {
   assert.equal(hookDispatcher.isPrivateMemoHookDispatcher(dispatcher), true);
   assert.equal(
     hookDispatcher.getPrivateMemoHookDispatcherMetadata(dispatcher),
+    metadata
+  );
+});
+
+test("useRef forwards only to a marked private ref-hook dispatcher", () => {
+  const calls = [];
+  const metadata = hookDispatcher.privateRefHookDispatcherMetadata;
+  const refObject = { current: "private-ref" };
+  const dispatcher = hookDispatcher.markPrivateRefHookDispatcher(
+    {
+      useRef(initialValue, receivedMetadata) {
+        calls.push({
+          args: [initialValue],
+          hookName: "useRef",
+          metadata: receivedMetadata,
+          thisMatchesDispatcher: this === dispatcher
+        });
+        return refObject;
+      }
+    },
+    metadata
+  );
+
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  assert.equal(React.useRef("initial"), refObject);
+  assert.equal(ReactServer.useRef, undefined);
+  assert.deepEqual(calls, [
+    {
+      args: ["initial"],
+      hookName: "useRef",
+      metadata,
+      thisMatchesDispatcher: true
+    }
+  ]);
+  assert.equal(hookDispatcher.isPrivateRefHookDispatcher(dispatcher), true);
+  assert.equal(
+    hookDispatcher.getPrivateRefHookDispatcherMetadata(dispatcher),
     metadata
   );
 });
@@ -1504,6 +1927,7 @@ test("react-server hooks share the generic guard while memo and callback stay pr
     "useCallback"
   );
   assertInvalidHookCall(() => ReactServer.useMemo(create, ["dep"]), "useMemo");
+  assert.equal(ReactServer.useRef, undefined);
   assert.deepEqual(calls, [["use", "usable"]]);
 });
 
