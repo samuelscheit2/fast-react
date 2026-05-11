@@ -76,6 +76,31 @@ const hydrateRootAcceptedPrivateMetadataRowBlockedPublicFields = Object.freeze([
   "promotesHydration",
   "promotesRootRender"
 ]);
+const hydrateRootLifecycleBoundaryBlockedFields = Object.freeze([
+  "publicHydrateRootEnabled",
+  "publicHydrateRootSupported",
+  "publicRootCreated",
+  "publicRootExecution",
+  "publicRootObjectExposed",
+  "publicRootCompatibilitySurface",
+  "canHydrate",
+  "containerMarked",
+  "listenersAttached",
+  "domMutated",
+  "browserDomMutated",
+  "rootScheduled",
+  "suspenseHydrationScheduled",
+  "nativeExecution",
+  "reconcilerExecution",
+  "domMutation",
+  "markerWrites",
+  "listenerInstallation",
+  "hydration",
+  "eventDispatch",
+  "compatibilityClaimed",
+  "publicHydrationCompatibilityClaimed",
+  "publicHydrationReplayCompatibilityClaimed"
+]);
 
 test("React DOM public root facade gate blocks placeholders while oracle prerequisites remain accepted", () => {
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
@@ -1762,6 +1787,13 @@ test("React DOM client private hydrateRoot post-preflight execution applies fake
     rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(
       preflight
     );
+  const lifecycleRequestBoundary =
+    bridgeExecution.lifecycleRequestBoundary;
+  const lifecyclePayload =
+    rootBridge
+      .getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload(
+        lifecycleRequestBoundary
+      );
 
   assert.equal(Object.isFrozen(bridgeExecution), true);
   assert.equal(
@@ -1815,6 +1847,71 @@ test("React DOM client private hydrateRoot post-preflight execution applies fake
       "hydrate-root-text-node-claim-patch-state-unchanged"
     ]
   );
+  assert.equal(bridgeExecution.lifecycleRequestBoundaryAccepted, true);
+  assert.equal(bridgeExecution.lifecycleRequestBoundarySourceOwned, true);
+  assert.equal(bridgeExecution.lifecycleContainerSnapshotOwned, true);
+  assert.equal(
+    rootBridge
+      .isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(
+        lifecycleRequestBoundary
+      ),
+    true
+  );
+  assert.equal(bridgePayload.lifecycleRequestBoundary, lifecycleRequestBoundary);
+  assert.equal(
+    lifecycleRequestBoundary.boundaryStatus,
+    rootBridge
+      .ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_LIFECYCLE_BOUNDARY_ACCEPTED
+  );
+  assert.equal(lifecycleRequestBoundary.sourceOwned, true);
+  assert.equal(lifecycleRequestBoundary.active, true);
+  assert.equal(
+    lifecycleRequestBoundary.sourceTokenOwnership,
+    "weakmap-root-bridge-admission"
+  );
+  assert.equal(lifecycleRequestBoundary.requestId, hydrateRecord.requestId);
+  assert.equal(
+    lifecycleRequestBoundary.requestSequence,
+    hydrateRecord.requestSequence
+  );
+  assert.equal(
+    lifecycleRequestBoundary.requestType,
+    hydrateRecord.requestType
+  );
+  assert.equal(lifecycleRequestBoundary.hydrateId, hydrateRecord.hydrateId);
+  assert.equal(lifecycleRequestBoundary.rootId, hydrateRecord.rootId);
+  assert.equal(lifecycleRequestBoundary.rootKind, hydrateRecord.rootKind);
+  assert.equal(lifecycleRequestBoundary.rootTag, hydrateRecord.rootTag);
+  assert.equal(
+    lifecycleRequestBoundary.requestAdmission,
+    hydrateRecord.requestAdmission
+  );
+  assert.equal(
+    lifecycleRequestBoundary.requestAdmissionStatus,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+  );
+  assert.equal(
+    lifecycleRequestBoundary.hydrationBoundaryRecord,
+    hydrateRecord.hydrationBoundaryRecord
+  );
+  assert.equal(
+    lifecycleRequestBoundary.lifecycleContainerSnapshot,
+    bridgeExecution.lifecycleContainerSnapshot
+  );
+  assert.equal(
+    lifecyclePayload.lifecycleContainerSnapshot,
+    lifecycleRequestBoundary.lifecycleContainerSnapshot
+  );
+  assert.equal(lifecyclePayload.preflight, preflight);
+  assert.equal(lifecyclePayload.requestRecord, bridgePayload.requestRecord);
+  assert.equal(
+    lifecyclePayload.requestAdmission,
+    hydrateRecord.requestAdmission
+  );
+  assert.equal(lifecyclePayload.container, container);
+  for (const field of hydrateRootLifecycleBoundaryBlockedFields) {
+    assert.equal(lifecycleRequestBoundary[field], false, field);
+  }
   assert.equal(
     rootBridge.isPrivateHydrationTextNodeClaimPatchExecutionRecord(
       textPatchRecord
@@ -1845,6 +1942,11 @@ test("React DOM client private hydrateRoot post-preflight execution applies fake
     preflightPayload.textNodeClaimPatchExecutionRecords,
     [bridgeExecution]
   );
+  assert.deepEqual(
+    preflightPayload.lifecycleRequestBoundaryRecords,
+    [lifecycleRequestBoundary]
+  );
+  assert.equal(preflightPayload.lifecycleRequestBoundaryRecordCount, 1);
   assert.equal(preflightPayload.textNodeClaimPatchExecutionRecordCount, 1);
   assertHydrateRootPreflightEvidenceBlocked([
     eventReplayRecord.replayExecutionRecord,

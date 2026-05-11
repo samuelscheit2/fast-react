@@ -89,7 +89,9 @@ test("private admission 820 manifest pins accepted reconciler ledger workers", (
 });
 
 test("private admission 820 recognizes static source-owned evidence without public compatibility", () => {
-  const gate = evaluatePrivateAdmission820Gate();
+  const gate = evaluatePrivateAdmission820Gate({
+    rowOverrides: currentSourceOwnedWorker803EvidenceOverride()
+  });
 
   assert.equal(gate.status, PRIVATE_ADMISSION_820_GATE_STATUS);
   assert.equal(gate.privateDiagnosticsRecognized, true);
@@ -113,6 +115,11 @@ test("private admission 820 recognizes static source-owned evidence without publ
   assert.equal(
     managedChild.privateAdmission,
     "accepted-private-managed-child-sibling-order-handoff"
+  );
+  assertEvidenceIncludes(
+    managedChild,
+    "worker-803-complete-work-sibling-order-record",
+    "HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedManagedHostOrderSibling"
   );
   assertIncludes(managedChild.acceptedStatusIdentifiers, [
     "HostRootPlacementSiblingStatus::InsertBefore",
@@ -530,4 +537,33 @@ function withMissingEvidenceToken(row, role, token) {
         }
       : evidenceRow
   );
+}
+
+function currentSourceOwnedWorker803EvidenceOverride() {
+  const row = rowByWorker(worker803);
+  return {
+    [worker803]: {
+      evidence: row.evidence.map((evidenceRow) =>
+        evidenceRow.role === "worker-803-complete-work-sibling-order-record"
+          ? {
+              ...evidenceRow,
+              tokens: evidenceRow.tokens.map((token) =>
+                token ===
+                "HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedHostComponentOrderSibling"
+                  ? "HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedManagedHostOrderSibling"
+                  : token
+              )
+            }
+          : evidenceRow
+      )
+    }
+  };
+}
+
+function assertEvidenceIncludes(row, role, token) {
+  const evidenceRow = row.evidence.find(
+    (candidate) => candidate.role === role
+  );
+  assert.notEqual(evidenceRow, undefined, role);
+  assert.equal(evidenceRow.tokens.includes(token), true, token);
 }
