@@ -22,8 +22,9 @@ use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostType
 use crate::RootElementHandle;
 #[cfg(test)]
 use crate::complete_work::{
-    OffscreenRevealCommitMetadataRecord, OffscreenRevealCommitMetadataStatus,
-    OffscreenVisibilitySubtreeFlagBubblingIntent,
+    HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+    HostComponentDangerousHtmlTextResetPayloadKindForCanary, OffscreenRevealCommitMetadataRecord,
+    OffscreenRevealCommitMetadataStatus, OffscreenVisibilitySubtreeFlagBubblingIntent,
 };
 #[cfg(test)]
 use crate::context::{
@@ -2453,6 +2454,490 @@ impl Display for HostRootTextUpdateCommitExecutionErrorForCanary {
 
 #[cfg(test)]
 impl Error for HostRootTextUpdateCommitExecutionErrorForCanary {}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootDangerousHtmlTextResetCommitHandoffRecordForCanary {
+    complete_work: HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+    execution_request: HostRootDangerousHtmlTextResetCommitExecutionRequestForCanary,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "crate-private dangerousHTML/text reset handoff diagnostics expose fields for focused canaries"
+)]
+impl HostRootDangerousHtmlTextResetCommitHandoffRecordForCanary {
+    #[must_use]
+    pub(crate) const fn complete_work(
+        &self,
+    ) -> HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary {
+        self.complete_work
+    }
+
+    #[must_use]
+    pub(crate) const fn execution_request(
+        &self,
+    ) -> &HostRootDangerousHtmlTextResetCommitExecutionRequestForCanary {
+        &self.execution_request
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_handoff(
+        &self,
+    ) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        &self.finished_work_handoff
+    }
+
+    #[must_use]
+    pub(crate) const fn commit(&self) -> &HostRootCommitRecord {
+        self.finished_work_handoff.commit()
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.execution_request.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.execution_request.finished_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn source_handoff_order(&self) -> usize {
+        self.execution_request.source_handoff_order()
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_order(&self) -> usize {
+        self.execution_request.commit_order()
+    }
+
+    #[must_use]
+    pub(crate) const fn request_order(&self) -> usize {
+        self.execution_request.request_order()
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation(&self) -> HostRootMutationApplyRecord {
+        self.execution_request.mutation()
+    }
+
+    #[must_use]
+    pub(crate) const fn payload_kind(
+        &self,
+    ) -> HostComponentDangerousHtmlTextResetPayloadKindForCanary {
+        self.complete_work.payload_kind()
+    }
+
+    #[must_use]
+    pub(crate) const fn payload_kind_name(&self) -> &'static str {
+        self.complete_work.payload_kind_name()
+    }
+
+    #[must_use]
+    pub(crate) fn complete_metadata_matches_mutation(&self) -> bool {
+        dangerous_html_text_reset_metadata_matches_mutation(
+            self.complete_work,
+            self.execution_request.mutation,
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn private_test_host_mutation_allowed(&self) -> bool {
+        self.execution_request.private_test_host_mutation_allowed()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(&self) -> bool {
+        self.execution_request.public_root_rendering_blocked()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_renderer_mutation_blocked(&self) -> bool {
+        self.execution_request.public_renderer_mutation_blocked()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootDangerousHtmlTextResetCommitExecutionRequestForCanary {
+    root: FiberRootId,
+    root_token: StateNodeHandle,
+    previous_current: FiberId,
+    finished_work: FiberId,
+    committed_current: FiberId,
+    source_handoff_order: usize,
+    commit_order: usize,
+    request_order: usize,
+    mutation_index: usize,
+    mutation: HostRootMutationApplyRecord,
+    complete_work: HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+    status: HostRootDangerousHtmlTextResetCommitExecutionStatusForCanary,
+    blockers: [HostRootDangerousHtmlTextResetCommitExecutionBlockerForCanary; 5],
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "crate-private dangerousHTML/text reset execution request diagnostics expose fields for focused canaries"
+)]
+impl HostRootDangerousHtmlTextResetCommitExecutionRequestForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn root_token(self) -> StateNodeHandle {
+        self.root_token
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_current(self) -> FiberId {
+        self.committed_current
+    }
+
+    #[must_use]
+    pub(crate) const fn source_handoff_order(self) -> usize {
+        self.source_handoff_order
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_order(self) -> usize {
+        self.commit_order
+    }
+
+    #[must_use]
+    pub(crate) const fn request_order(self) -> usize {
+        self.request_order
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation_index(self) -> usize {
+        self.mutation_index
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation(self) -> HostRootMutationApplyRecord {
+        self.mutation
+    }
+
+    #[must_use]
+    pub(crate) const fn complete_work(
+        self,
+    ) -> HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary {
+        self.complete_work
+    }
+
+    #[must_use]
+    pub(crate) const fn payload_kind(
+        self,
+    ) -> HostComponentDangerousHtmlTextResetPayloadKindForCanary {
+        self.complete_work.payload_kind()
+    }
+
+    #[must_use]
+    pub(crate) const fn status(
+        self,
+    ) -> HostRootDangerousHtmlTextResetCommitExecutionStatusForCanary {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn blockers(
+        &self,
+    ) -> &[HostRootDangerousHtmlTextResetCommitExecutionBlockerForCanary; 5] {
+        &self.blockers
+    }
+
+    #[must_use]
+    pub(crate) const fn private_test_host_mutation_allowed(self) -> bool {
+        matches!(
+            self.status,
+            HostRootDangerousHtmlTextResetCommitExecutionStatusForCanary::ValidatedForTestHostMutation
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_renderer_mutation_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_dom_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootDangerousHtmlTextResetCommitExecutionStatusForCanary {
+    ValidatedForTestHostMutation,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootDangerousHtmlTextResetCommitExecutionBlockerForCanary {
+    PublicRootRendering,
+    PublicRendererHostMutation,
+    ReactDomDangerousHtmlTextResetCompatibilityClaim,
+    ReactTestRendererCompatibilityClaim,
+    PublicCompatibilityClaim,
+}
+
+#[cfg(test)]
+const HOST_ROOT_DANGEROUS_HTML_TEXT_RESET_COMMIT_EXECUTION_BLOCKERS:
+    [HostRootDangerousHtmlTextResetCommitExecutionBlockerForCanary; 5] = [
+    HostRootDangerousHtmlTextResetCommitExecutionBlockerForCanary::PublicRootRendering,
+    HostRootDangerousHtmlTextResetCommitExecutionBlockerForCanary::PublicRendererHostMutation,
+    HostRootDangerousHtmlTextResetCommitExecutionBlockerForCanary::ReactDomDangerousHtmlTextResetCompatibilityClaim,
+    HostRootDangerousHtmlTextResetCommitExecutionBlockerForCanary::ReactTestRendererCompatibilityClaim,
+    HostRootDangerousHtmlTextResetCommitExecutionBlockerForCanary::PublicCompatibilityClaim,
+];
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary {
+    FinishedWork(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
+    RootCommit(RootCommitError),
+    MissingMutationApplyRecord {
+        root: FiberRootId,
+        finished_work: FiberId,
+        mutation_index: usize,
+    },
+    UnexpectedMutationApplyKind {
+        root: FiberRootId,
+        fiber: FiberId,
+        expected: HostRootMutationApplyRecordKind,
+        actual: HostRootMutationApplyRecordKind,
+    },
+    MetadataRootMismatch {
+        expected_root: FiberRootId,
+        actual_root: FiberRootId,
+    },
+    MetadataFiberMismatch {
+        root: FiberRootId,
+        expected_fiber: FiberId,
+        actual_fiber: FiberId,
+    },
+    MetadataCurrentMismatch {
+        root: FiberRootId,
+        expected_current: FiberId,
+        actual_current: Option<FiberId>,
+    },
+    MetadataStateNodeMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        expected_state_node: StateNodeHandle,
+        actual_state_node: StateNodeHandle,
+    },
+    MetadataPropsMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        expected_old_props: PropsHandle,
+        actual_alternate_memoized_props: Option<PropsHandle>,
+        expected_new_props: PropsHandle,
+        actual_pending_props: PropsHandle,
+        actual_memoized_props: PropsHandle,
+    },
+    HostComponentUpdateFlagMissing {
+        root: FiberRootId,
+        fiber: FiberId,
+        effect_flag: FiberFlags,
+    },
+    PublicCompatibilityClaimed {
+        root: FiberRootId,
+        fiber: FiberId,
+        payload_kind: HostComponentDangerousHtmlTextResetPayloadKindForCanary,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FinishedWork(error) => Display::fmt(error, formatter),
+            Self::RootCommit(error) => Display::fmt(error, formatter),
+            Self::MissingMutationApplyRecord {
+                root,
+                finished_work,
+                mutation_index,
+            } => write!(
+                formatter,
+                "root {} finished work fiber slot {} has no dangerousHTML/text reset HostComponent mutation apply record at index {}",
+                root.raw(),
+                finished_work.slot().get(),
+                mutation_index
+            ),
+            Self::UnexpectedMutationApplyKind {
+                root,
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} dangerousHTML/text reset handoff expected {:?} for fiber slot {}, found {:?}",
+                root.raw(),
+                expected,
+                fiber.slot().get(),
+                actual
+            ),
+            Self::MetadataRootMismatch {
+                expected_root,
+                actual_root,
+            } => write!(
+                formatter,
+                "dangerousHTML/text reset complete-work metadata for root {} cannot commit on root {}",
+                actual_root.raw(),
+                expected_root.raw()
+            ),
+            Self::MetadataFiberMismatch {
+                root,
+                expected_fiber,
+                actual_fiber,
+            } => write!(
+                formatter,
+                "root {} dangerousHTML/text reset complete-work metadata expected HostComponent fiber slot {}, found mutation fiber slot {}",
+                root.raw(),
+                expected_fiber.slot().get(),
+                actual_fiber.slot().get()
+            ),
+            Self::MetadataCurrentMismatch {
+                root,
+                expected_current,
+                actual_current,
+            } => write!(
+                formatter,
+                "root {} dangerousHTML/text reset complete-work metadata expected current fiber slot {}, found {:?}",
+                root.raw(),
+                expected_current.slot().get(),
+                actual_current.map(|fiber| fiber.slot().get())
+            ),
+            Self::MetadataStateNodeMismatch {
+                root,
+                fiber,
+                expected_state_node,
+                actual_state_node,
+            } => write!(
+                formatter,
+                "root {} dangerousHTML/text reset HostComponent fiber slot {} expected state node {}, found {}",
+                root.raw(),
+                fiber.slot().get(),
+                expected_state_node.raw(),
+                actual_state_node.raw()
+            ),
+            Self::MetadataPropsMismatch {
+                root,
+                fiber,
+                expected_old_props,
+                actual_alternate_memoized_props,
+                expected_new_props,
+                actual_pending_props,
+                actual_memoized_props,
+            } => write!(
+                formatter,
+                "root {} dangerousHTML/text reset HostComponent fiber slot {} stale props: expected old {} new {}, found alternate {:?} pending {} memoized {}",
+                root.raw(),
+                fiber.slot().get(),
+                expected_old_props.raw(),
+                expected_new_props.raw(),
+                actual_alternate_memoized_props.map(PropsHandle::raw),
+                actual_pending_props.raw(),
+                actual_memoized_props.raw()
+            ),
+            Self::HostComponentUpdateFlagMissing {
+                root,
+                fiber,
+                effect_flag,
+            } => write!(
+                formatter,
+                "root {} dangerousHTML/text reset handoff expected UPDATE effect for HostComponent fiber slot {}, found {:?}",
+                root.raw(),
+                fiber.slot().get(),
+                effect_flag
+            ),
+            Self::PublicCompatibilityClaimed {
+                root,
+                fiber,
+                payload_kind,
+            } => write!(
+                formatter,
+                "root {} HostComponent fiber slot {} cannot claim public DOM compatibility for private {} handoff",
+                root.raw(),
+                fiber.slot().get(),
+                payload_kind
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FinishedWork(error) => Some(error.as_ref()),
+            Self::RootCommit(error) => Some(error),
+            Self::MissingMutationApplyRecord { .. }
+            | Self::UnexpectedMutationApplyKind { .. }
+            | Self::MetadataRootMismatch { .. }
+            | Self::MetadataFiberMismatch { .. }
+            | Self::MetadataCurrentMismatch { .. }
+            | Self::MetadataStateNodeMismatch { .. }
+            | Self::MetadataPropsMismatch { .. }
+            | Self::HostComponentUpdateFlagMissing { .. }
+            | Self::PublicCompatibilityClaimed { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::FinishedWork(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+impl From<RootCommitError> for HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary {
+    fn from(error: RootCommitError) -> Self {
+        Self::RootCommit(error)
+    }
+}
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8996,6 +9481,252 @@ fn validate_offscreen_reveal_commit_metadata_for_canary<H: HostTypes>(
         actual_child_flags: child_node.flags(),
         actual_child_subtree_flags: child_node.subtree_flags(),
     })
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private dangerousHTML/text reset canary diagnostics preserve finished-work and complete-work evidence"
+)]
+pub(crate) fn commit_dangerous_html_text_reset_complete_work_handoff_for_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    pending: Option<HostRootFinishedWorkPendingCommitRecordForCanary>,
+    complete_work: HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+    mutation_index: usize,
+    commit_order: usize,
+    request_order: usize,
+) -> Result<
+    HostRootDangerousHtmlTextResetCommitHandoffRecordForCanary,
+    HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary,
+> {
+    let Some(pending) = pending else {
+        return Err(
+            HostRootFinishedWorkCommitHandoffErrorForCanary::MissingFinishedWorkRecord {
+                root: render.root(),
+                finished_work: render.finished_work(),
+            }
+            .into(),
+        );
+    };
+
+    validate_host_root_finished_work_pending_commit_for_canary(store, render, pending)?;
+    let execution_request = validate_dangerous_html_text_reset_commit_metadata_for_canary(
+        store,
+        render,
+        pending,
+        complete_work,
+        mutation_index,
+        commit_order,
+        request_order,
+    )?;
+    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        Some(pending),
+        commit_order,
+    )?;
+
+    Ok(HostRootDangerousHtmlTextResetCommitHandoffRecordForCanary {
+        complete_work,
+        execution_request,
+        finished_work_handoff,
+    })
+}
+
+#[cfg(test)]
+fn validate_dangerous_html_text_reset_commit_metadata_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+    complete_work: HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+    mutation_index: usize,
+    commit_order: usize,
+    request_order: usize,
+) -> Result<
+    HostRootDangerousHtmlTextResetCommitExecutionRequestForCanary,
+    HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary,
+> {
+    validate_finished_host_root(store, render)?;
+
+    let root = render.root();
+    let finished_work = render.finished_work();
+    if complete_work.root() != root {
+        return Err(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::MetadataRootMismatch {
+                expected_root: root,
+                actual_root: complete_work.root(),
+            },
+        );
+    }
+    if complete_work.public_dom_compatibility_claimed()
+        || complete_work
+            .payload_kind()
+            .public_dom_property_compatibility_claimed()
+    {
+        return Err(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::PublicCompatibilityClaimed {
+                root,
+                fiber: complete_work.work_in_progress(),
+                payload_kind: complete_work.payload_kind(),
+            },
+        );
+    }
+
+    let mutation_log =
+        collect_host_root_mutation_phase_log(store, root, finished_work, render.render_lanes())?;
+    let deletion_lists = collect_deletion_list_metadata(store, finished_work)?;
+    let mutation_apply_log = collect_host_root_mutation_apply_log(
+        store,
+        root,
+        finished_work,
+        render.render_lanes(),
+        &mutation_log,
+        &deletion_lists,
+    )?;
+    let mutation = mutation_apply_log
+        .records()
+        .get(mutation_index)
+        .copied()
+        .ok_or(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::MissingMutationApplyRecord {
+                root,
+                finished_work,
+                mutation_index,
+            },
+        )?;
+
+    validate_dangerous_html_text_reset_mutation_record(
+        root,
+        finished_work,
+        complete_work,
+        mutation,
+    )?;
+
+    Ok(HostRootDangerousHtmlTextResetCommitExecutionRequestForCanary {
+        root,
+        root_token: pending.root_token(),
+        previous_current: pending.previous_current(),
+        finished_work,
+        committed_current: finished_work,
+        source_handoff_order: pending.handoff_order(),
+        commit_order,
+        request_order,
+        mutation_index,
+        mutation,
+        complete_work,
+        status:
+            HostRootDangerousHtmlTextResetCommitExecutionStatusForCanary::ValidatedForTestHostMutation,
+        blockers: HOST_ROOT_DANGEROUS_HTML_TEXT_RESET_COMMIT_EXECUTION_BLOCKERS,
+    })
+}
+
+#[cfg(test)]
+fn validate_dangerous_html_text_reset_mutation_record(
+    root: FiberRootId,
+    finished_work: FiberId,
+    complete_work: HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+    mutation: HostRootMutationApplyRecord,
+) -> Result<(), HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary> {
+    if mutation.root() != root || mutation.host_root() != finished_work {
+        return Err(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::MetadataRootMismatch {
+                expected_root: root,
+                actual_root: mutation.root(),
+            },
+        );
+    }
+    if mutation.kind() != HostRootMutationApplyRecordKind::CommitHostComponentUpdate {
+        return Err(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::UnexpectedMutationApplyKind {
+                root,
+                fiber: mutation.fiber(),
+                expected: HostRootMutationApplyRecordKind::CommitHostComponentUpdate,
+                actual: mutation.kind(),
+            },
+        );
+    }
+    if mutation.tag() != FiberTag::HostComponent {
+        return Err(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::UnexpectedMutationApplyKind {
+                root,
+                fiber: mutation.fiber(),
+                expected: HostRootMutationApplyRecordKind::CommitHostComponentUpdate,
+                actual: mutation.kind(),
+            },
+        );
+    }
+    if mutation.fiber() != complete_work.work_in_progress() {
+        return Err(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::MetadataFiberMismatch {
+                root,
+                expected_fiber: complete_work.work_in_progress(),
+                actual_fiber: mutation.fiber(),
+            },
+        );
+    }
+    if mutation.alternate_fiber() != Some(complete_work.current()) {
+        return Err(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::MetadataCurrentMismatch {
+                root,
+                expected_current: complete_work.current(),
+                actual_current: mutation.alternate_fiber(),
+            },
+        );
+    }
+    if mutation.state_node() != complete_work.state_node() {
+        return Err(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::MetadataStateNodeMismatch {
+                root,
+                fiber: mutation.fiber(),
+                expected_state_node: complete_work.state_node(),
+                actual_state_node: mutation.state_node(),
+            },
+        );
+    }
+    if mutation.pending_props() != complete_work.new_props()
+        || mutation.memoized_props() != complete_work.new_props()
+        || mutation.alternate_memoized_props() != Some(complete_work.old_props())
+    {
+        return Err(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::MetadataPropsMismatch {
+                root,
+                fiber: mutation.fiber(),
+                expected_old_props: complete_work.old_props(),
+                actual_alternate_memoized_props: mutation.alternate_memoized_props(),
+                expected_new_props: complete_work.new_props(),
+                actual_pending_props: mutation.pending_props(),
+                actual_memoized_props: mutation.memoized_props(),
+            },
+        );
+    }
+    if !mutation.effect_flag().contains_all(FiberFlags::UPDATE) {
+        return Err(
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::HostComponentUpdateFlagMissing {
+                root,
+                fiber: mutation.fiber(),
+                effect_flag: mutation.effect_flag(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn dangerous_html_text_reset_metadata_matches_mutation(
+    complete_work: HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+    mutation: HostRootMutationApplyRecord,
+) -> bool {
+    mutation.kind() == HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        && mutation.tag() == FiberTag::HostComponent
+        && mutation.fiber() == complete_work.work_in_progress()
+        && mutation.alternate_fiber() == Some(complete_work.current())
+        && mutation.state_node() == complete_work.state_node()
+        && mutation.pending_props() == complete_work.new_props()
+        && mutation.memoized_props() == complete_work.new_props()
+        && mutation.alternate_memoized_props() == Some(complete_work.old_props())
+        && mutation.effect_flag().contains_all(FiberFlags::UPDATE)
 }
 
 #[cfg(test)]
@@ -15626,7 +16357,9 @@ mod tests {
     use super::*;
     use crate::begin_work::{BeginWorkRequest, unsupported_offscreen_begin_work_record};
     use crate::complete_work::{
+        HostComponentDangerousHtmlTextResetPayloadKindForCanary,
         complete_offscreen_visibility_transition_blocker_for_test,
+        host_component_dangerous_html_text_reset_complete_work_record_for_canary,
         offscreen_reveal_commit_metadata_for_test,
     };
     use crate::function_component::{
@@ -16291,6 +17024,76 @@ mod tests {
             node.set_lanes(Lanes::NO);
         }
         work_in_progress
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct DangerousHtmlTextResetCommitFixture {
+        render: HostRootRenderPhaseRecord,
+        pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+        complete_work: HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+        current_component: FiberId,
+        work_in_progress_component: FiberId,
+        state_node: StateNodeHandle,
+        old_props: PropsHandle,
+        new_props: PropsHandle,
+    }
+
+    fn prepare_dangerous_html_text_reset_commit_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        payload_kind: HostComponentDangerousHtmlTextResetPayloadKindForCanary,
+        raw: u64,
+    ) -> DangerousHtmlTextResetCommitFixture {
+        let current_root = store.root(root_id).unwrap().current();
+        let state_node = StateNodeHandle::from_raw(raw + 1);
+        let old_props = PropsHandle::from_raw(raw + 2);
+        let new_props = PropsHandle::from_raw(raw + 3);
+        let current_component = attach_host_root_child(
+            store,
+            current_root,
+            FiberTag::HostComponent,
+            FiberFlags::NO,
+            state_node,
+            old_props,
+            old_props,
+        );
+
+        update_container(store, root_id, RootElementHandle::from_raw(raw + 4), None).unwrap();
+        let render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
+        let work_in_progress_component = prepare_host_component_update_wip(
+            store,
+            current_component,
+            state_node,
+            new_props,
+            new_props,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[work_in_progress_component])
+            .unwrap();
+        bubble_test_fiber(store, render.finished_work());
+
+        let complete_work =
+            host_component_dangerous_html_text_reset_complete_work_record_for_canary(
+                store.fiber_arena(),
+                root_id,
+                work_in_progress_component,
+                payload_kind,
+            )
+            .unwrap();
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(store, render, 91).unwrap();
+
+        DangerousHtmlTextResetCommitFixture {
+            render,
+            pending,
+            complete_work,
+            current_component,
+            work_in_progress_component,
+            state_node,
+            old_props,
+            new_props,
+        }
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23437,6 +24240,141 @@ mod tests {
         assert_eq!(
             store.root(root_id).unwrap().scheduling().work_in_progress(),
             None
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_dangerous_html_text_reset_handoff_validates_complete_work_before_commit() {
+        let (mut store, root_id, host) = root_store();
+        let fixture = prepare_dangerous_html_text_reset_commit_fixture(
+            &mut store,
+            root_id,
+            HostComponentDangerousHtmlTextResetPayloadKindForCanary::DangerousHtml,
+            9_880,
+        );
+
+        let handoff = commit_dangerous_html_text_reset_complete_work_handoff_for_canary(
+            &mut store,
+            fixture.render,
+            Some(fixture.pending),
+            fixture.complete_work,
+            0,
+            92,
+            93,
+        )
+        .unwrap();
+        let request = *handoff.execution_request();
+        let mutation = handoff.mutation();
+
+        assert_eq!(handoff.root(), root_id);
+        assert_eq!(handoff.finished_work(), fixture.render.finished_work());
+        assert_eq!(handoff.source_handoff_order(), 91);
+        assert_eq!(handoff.commit_order(), 92);
+        assert_eq!(handoff.request_order(), 93);
+        assert_eq!(
+            handoff.payload_kind(),
+            HostComponentDangerousHtmlTextResetPayloadKindForCanary::DangerousHtml
+        );
+        assert_eq!(handoff.payload_kind_name(), "dangerous-html");
+        assert_eq!(request.root(), root_id);
+        assert_eq!(request.root_token(), root_id.state_node_handle());
+        assert_eq!(request.previous_current(), fixture.render.current());
+        assert_eq!(request.finished_work(), fixture.render.finished_work());
+        assert_eq!(request.committed_current(), fixture.render.finished_work());
+        assert_eq!(request.mutation_index(), 0);
+        assert_eq!(request.mutation(), mutation);
+        assert_eq!(request.complete_work(), fixture.complete_work);
+        assert_eq!(
+            request.payload_kind(),
+            HostComponentDangerousHtmlTextResetPayloadKindForCanary::DangerousHtml
+        );
+        assert_eq!(
+            request.status(),
+            HostRootDangerousHtmlTextResetCommitExecutionStatusForCanary::ValidatedForTestHostMutation
+        );
+        assert_eq!(
+            request.blockers(),
+            &HOST_ROOT_DANGEROUS_HTML_TEXT_RESET_COMMIT_EXECUTION_BLOCKERS
+        );
+        assert!(request.private_test_host_mutation_allowed());
+        assert!(request.public_root_rendering_blocked());
+        assert!(request.public_renderer_mutation_blocked());
+        assert!(!request.public_dom_compatibility_claimed());
+        assert!(!request.test_renderer_compatibility_claimed());
+        assert!(handoff.complete_metadata_matches_mutation());
+        assert!(handoff.private_test_host_mutation_allowed());
+        assert!(handoff.public_root_rendering_blocked());
+        assert!(handoff.public_renderer_mutation_blocked());
+        assert!(!handoff.public_dom_compatibility_claimed());
+        assert!(!handoff.test_renderer_compatibility_claimed());
+        assert_eq!(mutation.root(), root_id);
+        assert_eq!(mutation.host_root(), fixture.render.finished_work());
+        assert_eq!(mutation.fiber(), fixture.work_in_progress_component);
+        assert_eq!(mutation.alternate_fiber(), Some(fixture.current_component));
+        assert_eq!(mutation.state_node(), fixture.state_node);
+        assert_eq!(mutation.pending_props(), fixture.new_props);
+        assert_eq!(mutation.memoized_props(), fixture.new_props);
+        assert_eq!(mutation.alternate_memoized_props(), Some(fixture.old_props));
+        assert_eq!(
+            mutation.kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        );
+        assert_eq!(handoff.commit().mutation_apply_log().len(), 1);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            fixture.render.finished_work()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_dangerous_html_text_reset_handoff_rejects_stale_complete_work_before_switching_current()
+     {
+        let (mut store, root_id, host) = root_store();
+        let fixture = prepare_dangerous_html_text_reset_commit_fixture(
+            &mut store,
+            root_id,
+            HostComponentDangerousHtmlTextResetPayloadKindForCanary::TextContentReset,
+            9_900,
+        );
+        let previous_current = store.root(root_id).unwrap().current();
+        let stale_complete_work = fixture
+            .complete_work
+            .with_new_props_for_canary(PropsHandle::from_raw(99_903));
+
+        let error = commit_dangerous_html_text_reset_complete_work_handoff_for_canary(
+            &mut store,
+            fixture.render,
+            Some(fixture.pending),
+            stale_complete_work,
+            0,
+            94,
+            95,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::MetadataPropsMismatch {
+                root,
+                fiber,
+                expected_old_props,
+                expected_new_props,
+                actual_pending_props,
+                actual_memoized_props,
+                ..
+            } if root == root_id
+                && fiber == fixture.work_in_progress_component
+                && expected_old_props == fixture.old_props
+                && expected_new_props == PropsHandle::from_raw(99_903)
+                && actual_pending_props == fixture.new_props
+                && actual_memoized_props == fixture.new_props
+        ));
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(fixture.render.finished_work())
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
