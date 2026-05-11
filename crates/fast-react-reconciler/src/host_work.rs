@@ -87,6 +87,10 @@ pub(crate) enum HostWorkError {
         fiber: FiberId,
         tag: FiberTag,
     },
+    MissingHostWorkRootChild {
+        root: FiberRootId,
+        work_in_progress: FiberId,
+    },
     FunctionComponentParentTopologyMismatch(Box<FunctionComponentParentTopologyMismatchRecord>),
     UnexpectedExistingChild {
         parent: FiberId,
@@ -171,6 +175,15 @@ impl Display for HostWorkError {
                 "{:?} fiber {} has no detached host state node",
                 tag,
                 fiber.slot().get()
+            ),
+            Self::MissingHostWorkRootChild {
+                root,
+                work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostWorkResult for HostRoot work-in-progress {} has no completed root child",
+                root.raw(),
+                work_in_progress.slot().get()
             ),
             Self::FunctionComponentParentTopologyMismatch(record) => write!(
                 formatter,
@@ -277,6 +290,7 @@ impl Error for HostWorkError {
             Self::MissingTestRootElement { .. }
             | Self::ExpectedFiberTag { .. }
             | Self::MissingStateNode { .. }
+            | Self::MissingHostWorkRootChild { .. }
             | Self::FunctionComponentParentTopologyMismatch(_)
             | Self::UnexpectedExistingChild { .. }
             | Self::ExpectedMultipleRootChildren { .. }
@@ -985,6 +999,20 @@ impl HostWorkResult {
     pub(crate) fn into_detached_hosts_for_canary(self) -> DetachedHostRecords {
         self.detached_hosts
     }
+
+    fn retarget_finished_work_for_canary(
+        &mut self,
+        render: HostRootRenderPhaseRecord,
+        completed_children: Vec<FiberId>,
+    ) {
+        let completed_child = completed_children.first().copied();
+        self.root = render.root();
+        self.work_in_progress = render.work_in_progress();
+        self.root_child = completed_child;
+        self.root_children = completed_children.clone();
+        self.completed_child = completed_child;
+        self.completed_children = completed_children;
+    }
 }
 
 const TEST_HOST_SAFE_PROPERTY_PROP_NAME: &str = "testHostProperty";
@@ -1528,6 +1556,7 @@ pub(crate) struct SyncFlushHostMutationExecutionDiagnosticForCanary {
     applied_host_call_count: usize,
     private_host_store_update_count: usize,
     recorded_only_count: usize,
+    deletion_cleanup_apply_count: usize,
 }
 
 impl SyncFlushHostMutationExecutionDiagnosticForCanary {
@@ -1572,6 +1601,11 @@ impl SyncFlushHostMutationExecutionDiagnosticForCanary {
     }
 
     #[must_use]
+    pub(crate) const fn deletion_cleanup_apply_count(&self) -> usize {
+        self.deletion_cleanup_apply_count
+    }
+
+    #[must_use]
     pub(crate) const fn private_opt_in_host_mutation_execution_requested(&self) -> bool {
         self.request
             .private_opt_in_host_mutation_execution_requested()
@@ -1579,7 +1613,10 @@ impl SyncFlushHostMutationExecutionDiagnosticForCanary {
 
     #[must_use]
     pub(crate) const fn private_test_host_mutation_executed(&self) -> bool {
-        self.applied_host_call_count + self.private_host_store_update_count > 0
+        self.applied_host_call_count
+            + self.private_host_store_update_count
+            + self.deletion_cleanup_apply_count
+            > 0
     }
 
     #[must_use]
@@ -2066,7 +2103,7 @@ pub(crate) enum TestHostRootDeletionCleanupStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TestHostRootDeletionCleanupApplyRecord {
+pub(crate) struct TestHostRootDeletionCleanupApplyRecord {
     cleanup: HostRootDeletionCleanupRecord,
     status: TestHostRootDeletionCleanupStatus,
     previous_metadata: Option<HostNodeMetadata>,
@@ -2074,23 +2111,23 @@ struct TestHostRootDeletionCleanupApplyRecord {
 
 impl TestHostRootDeletionCleanupApplyRecord {
     #[must_use]
-    const fn cleanup(self) -> HostRootDeletionCleanupRecord {
+    pub(crate) const fn cleanup(self) -> HostRootDeletionCleanupRecord {
         self.cleanup
     }
 
     #[must_use]
-    const fn status(self) -> TestHostRootDeletionCleanupStatus {
+    pub(crate) const fn status(self) -> TestHostRootDeletionCleanupStatus {
         self.status
     }
 
     #[must_use]
-    const fn previous_metadata(self) -> Option<HostNodeMetadata> {
+    pub(crate) const fn previous_metadata(self) -> Option<HostNodeMetadata> {
         self.previous_metadata
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct TestHostRootDeletionCleanupApplyResult {
+pub(crate) struct TestHostRootDeletionCleanupApplyResult {
     root: FiberRootId,
     finished_work: FiberId,
     records: Vec<TestHostRootDeletionCleanupApplyRecord>,
@@ -2098,22 +2135,22 @@ struct TestHostRootDeletionCleanupApplyResult {
 
 impl TestHostRootDeletionCleanupApplyResult {
     #[must_use]
-    const fn root(&self) -> FiberRootId {
+    pub(crate) const fn root(&self) -> FiberRootId {
         self.root
     }
 
     #[must_use]
-    const fn finished_work(&self) -> FiberId {
+    pub(crate) const fn finished_work(&self) -> FiberId {
         self.finished_work
     }
 
     #[must_use]
-    fn records(&self) -> &[TestHostRootDeletionCleanupApplyRecord] {
+    pub(crate) fn records(&self) -> &[TestHostRootDeletionCleanupApplyRecord] {
         &self.records
     }
 
     #[must_use]
-    fn applied_record_count(&self) -> usize {
+    pub(crate) fn applied_record_count(&self) -> usize {
         self.records
             .iter()
             .filter(|record| {
@@ -2126,13 +2163,26 @@ impl TestHostRootDeletionCleanupApplyResult {
     }
 
     #[must_use]
-    fn detached_instance_count(&self) -> usize {
+    pub(crate) fn detached_instance_count(&self) -> usize {
         self.records
             .iter()
             .filter(|record| {
                 record.status()
                     == TestHostRootDeletionCleanupStatus::Applied(
                         TestHostRootDeletionCleanupAction::DetachDeletedInstance,
+                    )
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn invalidated_text_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.status()
+                    == TestHostRootDeletionCleanupStatus::Applied(
+                        TestHostRootDeletionCleanupAction::InvalidateDeletedText,
                     )
             })
             .count()
@@ -3197,6 +3247,22 @@ pub(crate) fn execute_sync_flush_host_mutations_for_canary(
 
     let apply =
         apply_test_host_root_commit_mutations_for_canary(store, host, record.commit(), host_work)?;
+    let deletion_cleanup_apply_count = if record
+        .commit()
+        .host_node_deletion_cleanup_log()
+        .records()
+        .is_empty()
+    {
+        0
+    } else {
+        apply_test_host_root_deletion_cleanup(
+            store,
+            host,
+            record.commit(),
+            host_work.detached_hosts_mut(),
+        )?
+        .applied_record_count()
+    };
 
     if apply.root() != request.root() {
         return Err(
@@ -3222,6 +3288,7 @@ pub(crate) fn execute_sync_flush_host_mutations_for_canary(
         applied_host_call_count: apply.applied_host_call_count(),
         private_host_store_update_count: apply.private_host_store_update_count(),
         recorded_only_count: apply.recorded_only_count(),
+        deletion_cleanup_apply_count,
     })
 }
 
@@ -3866,6 +3933,108 @@ fn apply_test_host_root_deletion_cleanup(
         finished_work: commit.finished_work(),
         records,
     })
+}
+
+pub(crate) fn preflight_test_host_root_deletion_apply_and_cleanup_for_canary(
+    store: &FiberRootStore<RecordingHost>,
+    commit: &HostRootCommitRecord,
+    host_work: &HostWorkResult,
+) -> Result<(), HostWorkError> {
+    let root = store.root(commit.root())?;
+    if root.current() != commit.current() {
+        return Err(HostWorkError::CommitCurrentMismatch {
+            root: commit.root(),
+            expected: commit.current(),
+            actual: root.current(),
+        });
+    }
+
+    let detached_hosts = host_work.detached_hosts();
+    for &mutation in commit.mutation_apply_log().records() {
+        if matches!(
+            mutation.kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromContainer
+                | HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent
+        ) {
+            owned_detached_host_child_for_apply_record(store, detached_hosts, mutation)?;
+        }
+    }
+
+    for &cleanup in commit.host_node_deletion_cleanup_log().records() {
+        preflight_test_host_root_deletion_cleanup_record(store, cleanup, detached_hosts)?;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn apply_test_host_root_deletion_cleanup_for_canary(
+    store: &FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    commit: &HostRootCommitRecord,
+    host_work: &mut HostWorkResult,
+) -> Result<TestHostRootDeletionCleanupApplyResult, HostWorkError> {
+    apply_test_host_root_deletion_cleanup(store, host, commit, host_work.detached_hosts_mut())
+}
+
+fn preflight_test_host_root_deletion_cleanup_record(
+    store: &FiberRootStore<RecordingHost>,
+    cleanup: HostRootDeletionCleanupRecord,
+    detached_hosts: &DetachedHostRecords,
+) -> Result<(), HostWorkError> {
+    if cleanup.state_node().is_none() {
+        return Ok(());
+    }
+
+    store.host_tokens().validate(
+        cleanup.token(),
+        cleanup.root(),
+        cleanup.fiber(),
+        cleanup.token_phase(),
+        cleanup.token_target(),
+    )?;
+
+    match cleanup.token_target() {
+        HostFiberTokenTarget::Instance => {
+            let metadata = detached_hosts.instance_metadata(cleanup.state_node())?;
+            validate_deletion_cleanup_metadata(cleanup, metadata)
+        }
+        HostFiberTokenTarget::TextInstance => {
+            let metadata = detached_hosts.text_metadata(cleanup.state_node())?;
+            validate_deletion_cleanup_metadata(cleanup, metadata)
+        }
+        HostFiberTokenTarget::HydratableInstance
+        | HostFiberTokenTarget::ActivityBoundary
+        | HostFiberTokenTarget::SuspenseBoundary => Ok(()),
+    }
+}
+
+fn validate_deletion_cleanup_metadata(
+    cleanup: HostRootDeletionCleanupRecord,
+    metadata: HostNodeMetadata,
+) -> Result<(), HostWorkError> {
+    let violation = if metadata.target() != cleanup.token_target() {
+        Some(HostNodeViolation::WrongTarget)
+    } else if metadata.root_id() != cleanup.root() {
+        Some(HostNodeViolation::WrongRoot)
+    } else if metadata.fiber_id() != cleanup.fiber() {
+        Some(HostNodeViolation::WrongFiber)
+    } else if !metadata.is_active() {
+        Some(HostNodeViolation::Stale)
+    } else {
+        None
+    };
+
+    if let Some(violation) = violation {
+        return Err(HostNodeValidationError::new(
+            cleanup.state_node(),
+            HostFiberTokenPhase::Deletion,
+            cleanup.token_target(),
+            violation,
+        )
+        .into());
+    }
+
+    Ok(())
 }
 
 fn apply_test_host_root_deletion_subtree_host_detachment_for_canary(
@@ -5180,6 +5349,91 @@ pub(crate) fn mount_test_host_work(
         completed_children: root_child.into_iter().collect(),
         detached_hosts,
     })
+}
+
+pub(crate) fn update_test_host_work_root_text_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+    text: &TestHostText,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let current = host_work
+        .completed_child()
+        .ok_or(HostWorkError::MissingHostWorkRootChild {
+            root: host_work.root(),
+            work_in_progress: host_work.work_in_progress(),
+        })?;
+    expect_tag(store, current, FiberTag::HostText)?;
+
+    let diff = update_test_host_text_work(
+        store,
+        render.root(),
+        current,
+        text,
+        render.render_lanes(),
+        host_work.detached_hosts_mut(),
+    )?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[diff.work_in_progress()])?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, vec![diff.work_in_progress()]);
+    Ok(())
+}
+
+pub(crate) fn update_test_host_work_root_component_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+    element: &TestHostElement,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let current = host_work
+        .completed_child()
+        .ok_or(HostWorkError::MissingHostWorkRootChild {
+            root: host_work.root(),
+            work_in_progress: host_work.work_in_progress(),
+        })?;
+    expect_tag(store, current, FiberTag::HostComponent)?;
+
+    let payload = update_test_host_component_work(
+        store,
+        render.root(),
+        current,
+        element,
+        render.render_lanes(),
+        host_work.detached_hosts_mut(),
+    )?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[payload.work_in_progress()])?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, vec![payload.work_in_progress()]);
+    Ok(())
+}
+
+pub(crate) fn delete_test_host_work_root_child_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let deleted = host_work
+        .completed_child()
+        .ok_or(HostWorkError::MissingHostWorkRootChild {
+            root: host_work.root(),
+            work_in_progress: host_work.work_in_progress(),
+        })?;
+    store
+        .fiber_arena_mut()
+        .mark_child_for_deletion(render.work_in_progress(), deleted)?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[])?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, Vec::new());
+    Ok(())
 }
 
 pub(crate) fn mount_test_host_sibling_work(
