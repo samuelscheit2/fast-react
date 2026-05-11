@@ -85,6 +85,12 @@ const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey =
   Symbol.for(
     privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind
   );
+const privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind =
+  "fast-react.scheduler.mock-expired-act-root-work-source-validator-global-record";
+const privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey =
+  Symbol.for(
+    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind
+  );
 const privateSchedulerMockDelayedActRootWorkDiagnosticsKind =
   "fast-react.scheduler.mock-delayed-act-root-work-diagnostics";
 const privateSchedulerMockDelayedActRootWorkDiagnosticsBrand = Symbol.for(
@@ -111,6 +117,8 @@ const acceptedSchedulerMockExpiredActRootWorkRecords = [
   "HostRootFinishedWorkPendingCommitRecordForCanary",
   "HostRootFinishedWorkCommitHandoffRecordForCanary"
 ];
+
+installPreinstalledFakeSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecord();
 
 test("checked React.act oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -2715,6 +2723,12 @@ test("React act private Scheduler mock consumers reject stale and forged expired
       true,
       nodeEnv
     );
+    assertSchedulerMockExpiredConsumerRejected(
+      gate,
+      cloneExpiredActRootWorkReport(expiredReport),
+      "scheduler-expired-act-root-diagnostics-source-proof",
+      `${nodeEnv}:expired-clone-rejected-with-preinstalled-global-source-proof-record`
+    );
 
     const diagnostics =
       Scheduler.unstable_flushExpired[privateActQueueFlushDiagnosticsExport];
@@ -4173,6 +4187,48 @@ function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
     ),
     false,
     label
+  );
+}
+
+function installPreinstalledFakeSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecord() {
+  const existingDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey
+  );
+  if (existingDescriptor !== undefined) {
+    return;
+  }
+
+  let fakeSourceValidatorRecord = null;
+  const fakeGlobalRecord = Object.freeze({
+    status:
+      privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind,
+    getSchedulerMockExpiredActRootWorkSourceValidatorRecord() {
+      return fakeSourceValidatorRecord;
+    },
+    setSchedulerMockExpiredActRootWorkSourceValidatorRecord(nextRecord) {
+      const fakeDiagnostics = createFakeSchedulerPrivateDiagnostics(
+        nextRecord?.diagnostics
+      );
+      fakeSourceValidatorRecord = Object.freeze({
+        status:
+          privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind,
+        diagnostics: fakeDiagnostics,
+        schedulerMockExpiredActRootWorkSourceValidator:
+          fakeDiagnostics.schedulerMockExpiredActRootWorkSourceValidator
+      });
+    }
+  });
+
+  Object.defineProperty(
+    globalThis,
+    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey,
+    {
+      configurable: false,
+      enumerable: false,
+      value: fakeGlobalRecord,
+      writable: false
+    }
   );
 }
 

@@ -43,6 +43,17 @@ Complete; ready for handoff.
 - Strengthened the cache-slot regression to forge a CommonJS `Module`
   replacement with `paths`, a fake Scheduler mock CJS child module shape, fake
   exports, and a fake validator.
+- Final audit found the global current-validator record could be preinstalled
+  with a fake setter/getter before Scheduler loaded. Removed that global
+  handoff entirely.
+- React now captures the Scheduler-owned validator only from actual CommonJS
+  `.js` execution of `packages/scheduler/unstable_mock.js`, then keeps the
+  validator in the React gate closure. Cache hits, forged cache records,
+  CommonJS module-shape metadata, writable public helper replacements, and
+  preinstalled global records do not update the trusted validator.
+- Added a startup regression that preinstalls the rejected global
+  `Symbol.for(...)` record shape with a fake setter/getter/validator before any
+  Scheduler mock load in the React act oracle process.
 
 ## Verification So Far
 
@@ -86,12 +97,15 @@ Complete; ready for handoff.
 - Final re-audit coverage confirms the same rejection when the forged
   CommonJS `Module` also has `paths` plus a fake Scheduler mock CJS child
   module shape.
+- Final audit coverage confirms cloned expired act/root reports remain
+  rejected even with a preinstalled fake global source-proof record present
+  before Scheduler mock loads.
 
 ## Risks Or Blockers
 
 - No blocker remains in this worker scope.
-- The React gate now trusts the locked Scheduler-owned global current-validator
-  record installed by real Scheduler module execution. That keeps public
+- The React gate now trusts a closure-held validator captured from actual
+  CommonJS `.js` execution of the Scheduler mock entrypoint. That keeps public
   Scheduler exports oracle-compatible, but it remains a package-private
   CommonJS-era handoff and should be rerun if the Scheduler mock entrypoint is
   converted away from CommonJS module execution.

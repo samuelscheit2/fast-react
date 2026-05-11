@@ -56,18 +56,6 @@ const privateSchedulerMockExpiredActRootWorkDiagnosticsBrand = Symbol.for(
   privateSchedulerMockExpiredActRootWorkDiagnosticsKind
 );
 const privateSchedulerMockExpiredActRootWorkDiagnosticsVersion = 1;
-const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind =
-  'fast-react.scheduler.mock-expired-act-root-work-source-validator-module-record';
-const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey =
-  Symbol.for(
-    privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind
-  );
-const privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind =
-  'fast-react.scheduler.mock-expired-act-root-work-source-validator-global-record';
-const privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey =
-  Symbol.for(
-    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind
-  );
 const privateSchedulerMockDelayedActRootWorkMetadataKind =
   'fast-react.scheduler.mock-delayed-act-root-work-metadata';
 const privateSchedulerMockDelayedActRootWorkMetadataBrand = Symbol.for(
@@ -120,12 +108,6 @@ const scheduler =
     : require('./cjs/scheduler-unstable_mock.development.js');
 
 const wrappedScheduler = createPrivateSchedulerMockDiagnosticsWrapper(scheduler);
-installSchedulerMockExpiredActRootWorkSourceValidatorModuleRecord(
-  wrappedScheduler
-);
-installSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecord(
-  wrappedScheduler
-);
 
 module.exports = wrappedScheduler;
 
@@ -143,98 +125,6 @@ function isSchedulerMockExpiredActRootWorkSource(value) {
     isObjectLike(value) &&
     schedulerMockExpiredActRootWorkSources.has(value)
   );
-}
-
-function installSchedulerMockExpiredActRootWorkSourceValidatorModuleRecord(
-  targetScheduler
-) {
-  const diagnostics =
-    targetScheduler.unstable_flushExpired[
-      privateActQueueFlushDiagnosticsExport
-    ];
-  const moduleRecord = Object.freeze({
-    status: privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind,
-    diagnostics,
-    schedulerMockExpiredActRootWorkSourceValidator
-  });
-
-  Object.defineProperty(
-    module,
-    privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey,
-    {
-      configurable: false,
-      enumerable: false,
-      value: moduleRecord,
-      writable: false
-    }
-  );
-}
-
-function installSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecord(
-  targetScheduler
-) {
-  const sourceValidatorRecord =
-    createSchedulerMockExpiredActRootWorkSourceValidatorRecord(
-      targetScheduler
-    );
-  const globalRecordDescriptor = Object.getOwnPropertyDescriptor(
-    globalThis,
-    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey
-  );
-  if (
-    globalRecordDescriptor !== undefined &&
-    globalRecordDescriptor.configurable === false &&
-    globalRecordDescriptor.enumerable === false &&
-    globalRecordDescriptor.writable === false &&
-    isObjectLike(globalRecordDescriptor.value) &&
-    globalRecordDescriptor.value.status ===
-      privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind &&
-    typeof globalRecordDescriptor.value
-      .setSchedulerMockExpiredActRootWorkSourceValidatorRecord === 'function'
-  ) {
-    globalRecordDescriptor.value
-      .setSchedulerMockExpiredActRootWorkSourceValidatorRecord(
-        sourceValidatorRecord
-      );
-    return;
-  }
-
-  let currentSourceValidatorRecord = sourceValidatorRecord;
-  const globalRecord = Object.freeze({
-    status:
-      privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind,
-    getSchedulerMockExpiredActRootWorkSourceValidatorRecord() {
-      return currentSourceValidatorRecord;
-    },
-    setSchedulerMockExpiredActRootWorkSourceValidatorRecord(nextRecord) {
-      currentSourceValidatorRecord = nextRecord;
-    }
-  });
-
-  Object.defineProperty(
-    globalThis,
-    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey,
-    {
-      configurable: false,
-      enumerable: false,
-      value: globalRecord,
-      writable: false
-    }
-  );
-}
-
-function createSchedulerMockExpiredActRootWorkSourceValidatorRecord(
-  targetScheduler
-) {
-  const diagnostics =
-    targetScheduler.unstable_flushExpired[
-      privateActQueueFlushDiagnosticsExport
-    ];
-  return Object.freeze({
-    status: privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind,
-    diagnostics,
-    schedulerMockExpiredActRootWorkSourceValidator
-  });
 }
 
 function createPrivateSchedulerMockDiagnosticsWrapper(sourceScheduler) {

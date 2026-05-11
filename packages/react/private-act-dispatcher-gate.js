@@ -4,6 +4,7 @@ const {
   compatibilityTarget,
   createUnimplementedError
 } = require('./placeholder-utils.js');
+const CommonJsModule = require('node:module');
 
 const entrypoint = 'react';
 const privateActDispatcherGateExport =
@@ -84,18 +85,6 @@ const privateSchedulerMockExpiredActRootWorkDiagnosticsBrand = Symbol.for(
   privateSchedulerMockExpiredActRootWorkDiagnosticsKind
 );
 const privateSchedulerMockExpiredActRootWorkDiagnosticsVersion = 1;
-const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind =
-  'fast-react.scheduler.mock-expired-act-root-work-source-validator-module-record';
-const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey =
-  Symbol.for(
-    privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind
-  );
-const privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind =
-  'fast-react.scheduler.mock-expired-act-root-work-source-validator-global-record';
-const privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey =
-  Symbol.for(
-    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind
-  );
 const privateSchedulerMockExpiredActRootWorkMetadataKind =
   'fast-react.scheduler.mock-expired-act-root-work-metadata';
 const privateSchedulerMockExpiredActRootWorkMetadataVersion = 1;
@@ -334,6 +323,9 @@ const privateActQueueTestTaskBrand = Symbol.for(
 const privateActQueueTestCallbackBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-callback'
 );
+let currentSchedulerMockExpiredActRootWorkSourceValidator = null;
+
+installSchedulerMockSourceProofLoadHook();
 
 function isObjectLike(value) {
   return (
@@ -385,6 +377,29 @@ function includesString(value, expectedValues) {
   return typeof value === 'string' && expectedValues.includes(value);
 }
 
+function installSchedulerMockSourceProofLoadHook() {
+  const originalJavaScriptExtension = CommonJsModule._extensions['.js'];
+  CommonJsModule._extensions['.js'] =
+    function fastReactSchedulerMockSourceProofJavaScriptExtension(
+      moduleRecord,
+      filename
+    ) {
+      originalJavaScriptExtension.apply(this, arguments);
+
+      if (isSchedulerMockSourceProofPath(filename)) {
+        captureSchedulerMockExpiredActRootWorkSourceValidator(
+          moduleRecord.exports
+        );
+      }
+    };
+}
+
+function isSchedulerMockSourceProofPath(resolvedModulePath) {
+  return resolveSchedulerMockSourceProofPaths().includes(
+    resolvedModulePath
+  );
+}
+
 function refreshSchedulerMockExpiredActRootWorkSourceValidators() {
   for (const resolvedModulePath of resolveSchedulerMockSourceProofPaths()) {
     loadSchedulerMockForExpiredActRootWorkSourceProof(resolvedModulePath);
@@ -425,54 +440,50 @@ function loadSchedulerMockForExpiredActRootWorkSourceProof(
   }
 }
 
-function getSchedulerMockExpiredActRootWorkSourceValidatorFromGlobalRecord() {
-  const globalRecordDescriptor = Object.getOwnPropertyDescriptor(
-    globalThis,
-    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey
-  );
-  if (
-    globalRecordDescriptor === undefined ||
-    globalRecordDescriptor.configurable !== false ||
-    globalRecordDescriptor.enumerable !== false ||
-    globalRecordDescriptor.writable !== false
-  ) {
-    return null;
+function captureSchedulerMockExpiredActRootWorkSourceValidator(Scheduler) {
+  if (!isObjectLike(Scheduler)) {
+    return;
   }
 
-  const globalRecord = globalRecordDescriptor.value;
+  const flushExpiredDescriptor = Object.getOwnPropertyDescriptor(
+    Scheduler,
+    'unstable_flushExpired'
+  );
   if (
-    !isObjectLike(globalRecord) ||
-    !Object.isFrozen(globalRecord) ||
-    globalRecord.status !==
-      privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind ||
-    typeof globalRecord
-      .getSchedulerMockExpiredActRootWorkSourceValidatorRecord !== 'function'
+    flushExpiredDescriptor === undefined ||
+    flushExpiredDescriptor.enumerable !== true ||
+    typeof flushExpiredDescriptor.value !== 'function'
   ) {
-    return null;
+    return;
   }
 
-  return getSchedulerMockExpiredActRootWorkSourceValidatorFromSourceRecord(
-    globalRecord.getSchedulerMockExpiredActRootWorkSourceValidatorRecord()
+  const diagnosticsDescriptor = Object.getOwnPropertyDescriptor(
+    flushExpiredDescriptor.value,
+    privateActQueueFlushDiagnosticsExport
   );
+  if (
+    diagnosticsDescriptor === undefined ||
+    diagnosticsDescriptor.configurable !== false ||
+    diagnosticsDescriptor.enumerable !== false ||
+    diagnosticsDescriptor.writable !== false
+  ) {
+    return;
+  }
+
+  const validator =
+    getSchedulerMockExpiredActRootWorkSourceValidatorFromDiagnostics(
+      diagnosticsDescriptor.value
+    );
+  if (validator !== null) {
+    currentSchedulerMockExpiredActRootWorkSourceValidator = validator;
+  }
 }
 
-function getSchedulerMockExpiredActRootWorkSourceValidatorFromSourceRecord(
-  sourceRecord
+function getSchedulerMockExpiredActRootWorkSourceValidatorFromDiagnostics(
+  diagnostics
 ) {
   if (
-    !isObjectLike(sourceRecord) ||
-    !Object.isFrozen(sourceRecord) ||
-    sourceRecord.status !==
-      privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind ||
-    !isAcceptedSchedulerPrivateActQueueFlushDiagnostics(
-      sourceRecord.diagnostics
-    )
-  ) {
-    return null;
-  }
-
-  const diagnostics = sourceRecord.diagnostics;
-  if (
+    !isAcceptedSchedulerPrivateActQueueFlushDiagnostics(diagnostics) ||
     diagnostics.mockSchedulerExpiredActRootWorkDiagnosticsReady !== true ||
     diagnostics.providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics !==
       true
@@ -481,7 +492,7 @@ function getSchedulerMockExpiredActRootWorkSourceValidatorFromSourceRecord(
   }
 
   const validator =
-    sourceRecord.schedulerMockExpiredActRootWorkSourceValidator;
+    diagnostics.schedulerMockExpiredActRootWorkSourceValidator;
   if (
     !isObjectLike(validator) ||
     !Object.isFrozen(validator) ||
@@ -510,13 +521,20 @@ function getSchedulerMockExpiredActRootWorkSourceValidatorFromSourceRecord(
 function hasSchedulerMockExpiredActRootWorkSourceProof(value) {
   refreshSchedulerMockExpiredActRootWorkSourceValidators();
   const validator =
-    getSchedulerMockExpiredActRootWorkSourceValidatorFromGlobalRecord();
-  return (
-    isObjectLike(value) &&
-    Object.isFrozen(value) &&
-    validator !== null &&
-    validator.isSchedulerMockExpiredActRootWorkSource(value) === true
-  );
+    currentSchedulerMockExpiredActRootWorkSourceValidator;
+  if (
+    !isObjectLike(value) ||
+    !Object.isFrozen(value) ||
+    validator === null
+  ) {
+    return false;
+  }
+
+  try {
+    return validator.isSchedulerMockExpiredActRootWorkSource(value) === true;
+  } catch (error) {
+    return false;
+  }
 }
 
 function isAcceptedActQueueMetadata(metadata) {
