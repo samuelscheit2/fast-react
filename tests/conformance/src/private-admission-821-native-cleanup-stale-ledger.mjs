@@ -21,10 +21,12 @@ export const PRIVATE_ADMISSION_821_VIOLATION_STATUS =
 
 const worker815 = "worker-815-native-worker-thread-cleanup-stale-matrix";
 const worker908 = "worker-908-napi-cleanup-generation-currentness";
+const worker940 = "worker-940-napi-cleanup-reentry-currentness";
 
 export const PRIVATE_ADMISSION_821_WORKERS = freezeArray([
   worker815,
-  worker908
+  worker908,
+  worker940
 ]);
 
 export const PRIVATE_ADMISSION_821_REQUIRED_NATIVE_CLEANUP_EVIDENCE_IDS =
@@ -54,6 +56,16 @@ export const PRIVATE_ADMISSION_821_REQUIRED_NATIVE_CLEANUP_EVIDENCE_IDS =
       "cleanup-generation-currentness-missing-cleanup-hook-identity-rejected",
       "cleanup-generation-currentness-caller-built-metadata-rejected",
       "cleanup-generation-currentness-public-native-claim-rejected"
+    ]),
+    [worker940]: freezeArray([
+      "cleanup-generation-currentness-reentry-guard-consumed",
+      "cleanup-generation-currentness-duplicate-cleanup-rejected",
+      "cleanup-generation-currentness-stale-generation-reentry-rejected",
+      "cleanup-generation-currentness-cross-environment-reentry-rejected",
+      "cleanup-generation-currentness-reentry-after-retire-rejected",
+      "cleanup-generation-currentness-caller-built-reentry-rejected",
+      "cleanup-generation-currentness-missing-source-identity-rejected",
+      "cleanup-generation-currentness-public-native-package-claim-rejected"
     ])
   });
 
@@ -86,6 +98,15 @@ export const PRIVATE_ADMISSION_821_REQUIRED_CLEANUP_BLOCKER_IDS =
       "cleanup-generation-currentness-missing-cleanup-hook-identity-rejected",
       "cleanup-generation-currentness-caller-built-metadata-rejected",
       "cleanup-generation-currentness-public-native-claim-rejected"
+    ]),
+    [worker940]: freezeArray([
+      "cleanup-generation-currentness-duplicate-cleanup-rejected",
+      "cleanup-generation-currentness-stale-generation-reentry-rejected",
+      "cleanup-generation-currentness-cross-environment-reentry-rejected",
+      "cleanup-generation-currentness-reentry-after-retire-rejected",
+      "cleanup-generation-currentness-caller-built-reentry-rejected",
+      "cleanup-generation-currentness-missing-source-identity-rejected",
+      "cleanup-generation-currentness-public-native-package-claim-rejected"
     ])
   });
 
@@ -108,6 +129,17 @@ export const PRIVATE_ADMISSION_821_REQUIRED_STATUSES = freezeRecord({
     "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW",
     "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN",
     "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM"
+  ]),
+  [worker940]: freezeArray([
+    "accepted-native-root-bridge-cleanup-generation-currentness-canary",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_DUPLICATE_CLEANUP",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_REENTRY_AFTER_RETIRE",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_CROSS_WORKER_THREAD_HANDOFF",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN",
     "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY",
     "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA",
     "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM"
@@ -142,6 +174,19 @@ export const PRIVATE_ADMISSION_821_REQUIRED_FUNCTION_NAMES = freezeRecord({
     "assert_cleanup_generation_currentness_rejection",
     "assert_cleanup_generation_currentness_canary_inert",
     "assert_cleanup_generation_currentness_row_inert"
+  ]),
+  [worker940]: freezeArray([
+    "validate_native_root_bridge_cleanup_generation_currentness_rows",
+    "native_root_bridge_cleanup_generation_currentness_reentry_guard_key",
+    "consume_native_root_bridge_cleanup_generation_currentness_reentry_guard",
+    "native_root_bridge_cleanup_generation_currentness_row_for_handoff",
+    "native_root_bridge_cleanup_generation_currentness_validate_handle_fields",
+    "has_native_root_bridge_cleanup_generation_currentness_public_native_claim",
+    "native_root_bridge_cleanup_generation_currentness_canary_rejects_duplicate_cleanup_reentry",
+    "native_root_bridge_cleanup_generation_currentness_canary_rejects_stale_generation_after_new_native_step",
+    "native_root_bridge_cleanup_generation_currentness_canary_rejects_cross_environment_and_cross_table_rows",
+    "native_root_bridge_cleanup_generation_currentness_canary_rejects_replay_and_retired_lifecycle",
+    "native_root_bridge_cleanup_generation_currentness_canary_rejects_missing_identity_caller_metadata_and_public_claims"
   ])
 });
 
@@ -207,6 +252,28 @@ export const PRIVATE_ADMISSION_821_REQUIRED_FIELD_NAMES = freezeRecord({
     "reconciler_execution",
     "public_native_compatibility",
     "react_behavior_error"
+  ]),
+  [worker940]: freezeArray([
+    "cleanup_reentry_guard_consumed",
+    "source_currentness_monotonic",
+    "lifecycle_transition",
+    "root_handle_state_before",
+    "root_handle_state_after",
+    "current_executor_generation",
+    "cleanup_executor_generation",
+    "source_environment_id",
+    "source_root_handle",
+    "source_root_id",
+    "source_handle",
+    "handle_table_current_generation",
+    "cleanup_current_generation",
+    "cleanup_hook_source_worker_thread_id",
+    "cleanup_hook_source_environment_id",
+    "source_owned_cleanup_handoff",
+    "native_addon_loaded",
+    "native_execution",
+    "napi_cleanup_hook_execution",
+    "public_native_compatibility"
   ])
 });
 
@@ -242,6 +309,18 @@ export const PRIVATE_ADMISSION_821_REQUIRED_SOURCE_CONSTANTS = freezeRecord({
     "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE",
     "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE",
     "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE"
+  ]),
+  [worker940]: freezeArray([
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_DUPLICATE_CLEANUP_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_AFTER_RETIRE_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CROSS_WORKER_THREAD_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_EVIDENCE_IDS",
+    "CONSUMED_NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_GUARDS"
   ])
 });
 
@@ -258,6 +337,13 @@ export const PRIVATE_ADMISSION_821_REQUIRED_PRIOR_LEDGER_CONTEXT =
       PRIVATE_ADMISSION_807_GATE_STATUS,
       "worker-815-native-worker-thread-cleanup-stale-matrix",
       "worker-892-native-lifecycle-cleanup-generation-gate"
+    ]),
+    [worker940]: freezeArray([
+      PRIVATE_ADMISSION_807_GATE_ID,
+      PRIVATE_ADMISSION_807_GATE_STATUS,
+      "worker-908-napi-cleanup-generation-currentness",
+      "worker-923-native-cleanup-currentness-admission-ledger",
+      "worker-924-napi-worker-thread-cleanup-currentness"
     ])
   });
 
@@ -778,6 +864,134 @@ const privateAdmission821Rows = freezeArray([
           "renderer/reconciler",
           "change package exports",
           "compatibility."
+        ]
+      })
+    ]
+  }),
+  rowData({
+    workerId: worker940,
+    ledgerRole: "accepted-native-cleanup-reentry-currentness-evidence",
+    privateAdmission:
+      "accepted-private-native-cleanup-reentry-currentness-guard",
+    implementationPaths: freezeArray([fastReactNapiSourcePath]),
+    nativeCleanupEvidenceIds:
+      PRIVATE_ADMISSION_821_REQUIRED_NATIVE_CLEANUP_EVIDENCE_IDS[worker940],
+    cleanupBlockerIds:
+      PRIVATE_ADMISSION_821_REQUIRED_CLEANUP_BLOCKER_IDS[worker940],
+    requiredStatuses: PRIVATE_ADMISSION_821_REQUIRED_STATUSES[worker940],
+    requiredFunctionNames:
+      PRIVATE_ADMISSION_821_REQUIRED_FUNCTION_NAMES[worker940],
+    requiredFieldNames: PRIVATE_ADMISSION_821_REQUIRED_FIELD_NAMES[worker940],
+    requiredSourceConstants:
+      PRIVATE_ADMISSION_821_REQUIRED_SOURCE_CONSTANTS[worker940],
+    priorLedgerContext:
+      PRIVATE_ADMISSION_821_REQUIRED_PRIOR_LEDGER_CONTEXT[worker940],
+    evidence: [
+      evidenceData({
+        role: "worker-940-fast-react-napi-reentry-constants",
+        path: fastReactNapiSourcePath,
+        sliceStart:
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_DUPLICATE_CLEANUP_CODE",
+        sliceEnd: "pub(crate) enum NativeRootBridgeRequestKind",
+        tokens: [
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_DUPLICATE_CLEANUP_CODE",
+          "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_DUPLICATE_CLEANUP",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_AFTER_RETIRE_CODE",
+          "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_REENTRY_AFTER_RETIRE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_EVIDENCE_IDS",
+          "cleanup-generation-currentness-reentry-guard-consumed",
+          "cleanup-generation-currentness-duplicate-cleanup-rejected",
+          "cleanup-generation-currentness-stale-generation-reentry-rejected",
+          "cleanup-generation-currentness-cross-environment-reentry-rejected",
+          "cleanup-generation-currentness-reentry-after-retire-rejected",
+          "cleanup-generation-currentness-caller-built-reentry-rejected",
+          "cleanup-generation-currentness-missing-source-identity-rejected",
+          "cleanup-generation-currentness-public-native-package-claim-rejected",
+          "CONSUMED_NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_GUARDS"
+        ]
+      }),
+      evidenceData({
+        role: "worker-940-fast-react-napi-reentry-canary-model",
+        path: fastReactNapiSourcePath,
+        sliceStart:
+          "pub(crate) struct NativeRootBridgeCleanupGenerationCurrentnessCanary",
+        sliceEnd: "pub(crate) struct NativeRootBridgeBatchLifecycleConsumer",
+        tokens: [
+          "cleanup_reentry_guard_consumed",
+          "source_currentness_monotonic",
+          "lifecycle_transition",
+          "root_handle_state_before",
+          "root_handle_state_after",
+          "cleanup_hook_source_worker_thread_id",
+          "cleanup_hook_source_environment_id",
+          "native_addon_loaded: false",
+          "native_execution: false",
+          "napi_cleanup_hook_execution: false",
+          "public_native_compatibility: false"
+        ]
+      }),
+      evidenceData({
+        role: "worker-940-fast-react-napi-reentry-guard-validation",
+        path: fastReactNapiSourcePath,
+        sliceStart:
+          "validate_native_root_bridge_cleanup_generation_currentness_rows",
+        sliceEnd:
+          "fn native_root_bridge_cleanup_generation_currentness_row_for_handoff",
+        tokens: [
+          "native_root_bridge_cleanup_generation_currentness_reentry_guard_key",
+          "consume_native_root_bridge_cleanup_generation_currentness_reentry_guard",
+          "cleanup_hook_preflight.worker_thread_id() == 0",
+          "cleanup_hook_preflight.worker_environment_id().is_none()",
+          "NativeRootBridgeLifecycleTransition::ActiveToActive",
+          "NativeRootBridgeRootHandleState::Active",
+          "NativeRootBridgeRootHandleState::Retired",
+          "cleanup_hook_source_worker_thread_id() == 0",
+          "cleanup_hook_source_environment_id().is_none()",
+          "source_currentness_monotonic()",
+          "checked_add(1)",
+          "CONSUMED_NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_GUARDS",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_DUPLICATE_CLEANUP_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_AFTER_RETIRE_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE"
+        ],
+        forbiddenTokens: [
+          "rust_root_execution_boundary_called",
+          "publicSchedulerCompatibilityClaimed",
+          "publicReactActCompatibilityClaimed",
+          "publicRootRenderCompatibilityClaimed"
+        ]
+      }),
+      evidenceData({
+        role: "worker-940-fast-react-napi-reentry-tests",
+        path: fastReactNapiSourcePath,
+        sliceStart:
+          "native_root_bridge_cleanup_generation_currentness_canary_rejects_duplicate_cleanup_reentry",
+        sliceEnd:
+          "native_root_bridge_batch_lifecycle_json_roundtrip_link_rejects_forged_rows",
+        tokens: [
+          "native_root_bridge_cleanup_generation_currentness_canary_rejects_duplicate_cleanup_reentry",
+          "cleanup_reentry_guard_consumed()",
+          "source_currentness_monotonic()",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_DUPLICATE_CLEANUP_CODE",
+          "cleanup-generation-currentness-stale-generation-reentry-rejected",
+          "cleanup-generation-currentness-cross-environment-reentry-rejected",
+          "cleanup-generation-currentness-reentry-after-retire-rejected",
+          "cleanup-generation-currentness-missing-source-identity-rejected",
+          "cleanup-generation-currentness-caller-built-reentry-rejected",
+          "cleanup-generation-currentness-public-native-package-claim-rejected",
+          "with_cleanup_hook_source_worker_thread_id_for_test(0)",
+          "with_public_native_package_claim()",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_AFTER_RETIRE_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE"
+        ],
+        forbiddenTokens: [
+          "rust_root_execution_boundary_called",
+          "publicSchedulerCompatibilityClaimed",
+          "publicReactActCompatibilityClaimed",
+          "publicRootRenderCompatibilityClaimed"
         ]
       })
     ]

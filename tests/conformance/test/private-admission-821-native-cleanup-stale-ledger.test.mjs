@@ -19,7 +19,8 @@ import {
 
 const worker815 = "worker-815-native-worker-thread-cleanup-stale-matrix";
 const worker908 = "worker-908-napi-cleanup-generation-currentness";
-const expectedWorkers = [worker815, worker908];
+const worker940 = "worker-940-napi-cleanup-reentry-currentness";
+const expectedWorkers = [worker815, worker908, worker940];
 
 test("private-admission-821-manifest", () => {
   assert.deepEqual(PRIVATE_ADMISSION_821_WORKERS, expectedWorkers);
@@ -27,8 +28,8 @@ test("private-admission-821-manifest", () => {
     PRIVATE_ADMISSION_821_ROWS.map((row) => row.workerId),
     expectedWorkers
   );
-  assert.equal(PRIVATE_ADMISSION_821_ROWS.length, 2);
-  assert.equal(new Set(PRIVATE_ADMISSION_821_WORKERS).size, 2);
+  assert.equal(PRIVATE_ADMISSION_821_ROWS.length, 3);
+  assert.equal(new Set(PRIVATE_ADMISSION_821_WORKERS).size, 3);
   assertSubset(
     [
       "nativeAddonLoaded",
@@ -195,7 +196,52 @@ test("private-admission-821-accepted", () => {
   );
   assert.equal(currentnessProgressEvidence.recognized, true);
 
-  for (const recognizedRow of [row, currentnessRow]) {
+  const reentryRow = gate.rowsByWorker[worker940];
+  assert.equal(
+    reentryRow.privateAdmission,
+    "accepted-private-native-cleanup-reentry-currentness-guard"
+  );
+  assert.deepEqual(
+    reentryRow.nativeCleanupEvidenceIds,
+    PRIVATE_ADMISSION_821_REQUIRED_NATIVE_CLEANUP_EVIDENCE_IDS[worker940]
+  );
+  assert.deepEqual(
+    reentryRow.cleanupBlockerIds,
+    PRIVATE_ADMISSION_821_REQUIRED_CLEANUP_BLOCKER_IDS[worker940]
+  );
+  assert.deepEqual(
+    reentryRow.requiredStatuses,
+    PRIVATE_ADMISSION_821_REQUIRED_STATUSES[worker940]
+  );
+  assert.deepEqual(
+    reentryRow.requiredFunctionNames,
+    PRIVATE_ADMISSION_821_REQUIRED_FUNCTION_NAMES[worker940]
+  );
+  assert.deepEqual(
+    reentryRow.requiredFieldNames,
+    PRIVATE_ADMISSION_821_REQUIRED_FIELD_NAMES[worker940]
+  );
+  assert.deepEqual(
+    reentryRow.requiredSourceConstants,
+    PRIVATE_ADMISSION_821_REQUIRED_SOURCE_CONSTANTS[worker940]
+  );
+  assert.deepEqual(
+    reentryRow.priorLedgerContext,
+    PRIVATE_ADMISSION_821_REQUIRED_PRIOR_LEDGER_CONTEXT[worker940]
+  );
+  assert.equal(reentryRow.recognized, true);
+  assertAllFalse(reentryRow.publicBlockers, worker940);
+
+  const reentryEvidence = reentryRow.evidence.find(
+    (evidenceRow) =>
+      evidenceRow.role ===
+      "worker-940-fast-react-napi-reentry-guard-validation"
+  );
+  assert.notEqual(reentryEvidence, undefined);
+  assert.equal(reentryEvidence.path, "crates/fast-react-napi/src/lib.rs");
+  assert.equal(reentryEvidence.recognized, true);
+
+  for (const recognizedRow of [row, currentnessRow, reentryRow]) {
     for (const evidenceRow of recognizedRow.evidence) {
       assert.equal(evidenceRow.recognized, true, evidenceRow.role);
       assert.deepEqual(evidenceRow.missingTokens, [], evidenceRow.role);
@@ -429,6 +475,45 @@ test("private-admission-821-rejects-worker-908-stale-replay-and-shape-only-clean
   ]);
 });
 
+test("private-admission-821-rejects-worker-940-reentry-guard-drift", () => {
+  const sourceRow = rowByWorker(worker940);
+  const gate = evaluatePrivateAdmission821Gate({
+    rowOverrides: {
+      [worker940]: {
+        nativeCleanupEvidenceIds: sourceRow.nativeCleanupEvidenceIds.filter(
+          (id) =>
+            id !== "cleanup-generation-currentness-duplicate-cleanup-rejected"
+        ),
+        requiredFieldNames: sourceRow.requiredFieldNames.filter(
+          (fieldName) => fieldName !== "cleanup_reentry_guard_consumed"
+        ),
+        evidence: withMissingEvidenceToken(
+          sourceRow,
+          "worker-940-fast-react-napi-reentry-guard-validation",
+          "cleanup-generation-currentness-shape-only-reentry-guard-accepted"
+        )
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_821_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.evidenceRecognized, false);
+  assert.equal(gate.nativeCleanupEvidenceRecognized, false);
+  assert.equal(gate.fieldNamesRecognized, false);
+  assertViolationIds(gate, [
+    "native-cleanup-stale-evidence-token-missing",
+    "native-cleanup-stale-evidence-id-mismatch",
+    "native-cleanup-stale-field-name-mismatch"
+  ]);
+  assertEvidenceRoleRecognized(
+    gate,
+    worker940,
+    "worker-940-fast-react-napi-reentry-guard-validation",
+    false
+  );
+});
+
 test("private-admission-821-rejects-missing-cleanup-blockers", () => {
   const sourceRow = rowByWorker(worker815);
   const gate = evaluatePrivateAdmission821Gate({
@@ -493,6 +578,20 @@ test("private-admission-821-rejects-public-compatibility-claims", () => {
           "staleWorkerCleanupSourceAccepted",
           "staleCleanupBlockersRemoved"
         ])
+      },
+      [worker940]: {
+        publicBlockers: trueBlockers([
+          "nativeAddonLoaded",
+          "nodeWorkerThreadsExecution",
+          "napiCleanupHookExecution",
+          "rendererExecution",
+          "reconcilerExecution",
+          "publicNativeCompatibility",
+          "packageCompatibilityClaimed",
+          "packageExportCompatibilityClaimed",
+          "staleCleanupEvidenceAccepted",
+          "cleanupHookPublicExecutionClaimed"
+        ])
       }
     }
   });
@@ -514,7 +613,13 @@ test("private-admission-821-rejects-public-compatibility-claims", () => {
       `${worker908}.napiCleanupHookExecution`,
       `${worker908}.rendererExecution`,
       `${worker908}.reconcilerExecution`,
-      `${worker908}.publicNativeCompatibility`
+      `${worker908}.publicNativeCompatibility`,
+      `${worker940}.nativeAddonLoaded`,
+      `${worker940}.nodeWorkerThreadsExecution`,
+      `${worker940}.napiCleanupHookExecution`,
+      `${worker940}.rendererExecution`,
+      `${worker940}.reconcilerExecution`,
+      `${worker940}.publicNativeCompatibility`
     ],
     gate.nativeExecutionClaimIds
   );
@@ -523,7 +628,9 @@ test("private-admission-821-rejects-public-compatibility-claims", () => {
       `${worker815}.packageCompatibilityClaimed`,
       `${worker815}.packageExportCompatibilityClaimed`,
       `${worker908}.packageCompatibilityClaimed`,
-      `${worker908}.packageExportCompatibilityClaimed`
+      `${worker908}.packageExportCompatibilityClaimed`,
+      `${worker940}.packageCompatibilityClaimed`,
+      `${worker940}.packageExportCompatibilityClaimed`
     ],
     gate.packageCompatibilityClaimIds
   );
@@ -531,7 +638,9 @@ test("private-admission-821-rejects-public-compatibility-claims", () => {
     [
       `${worker908}.staleCleanupEvidenceAccepted`,
       `${worker908}.staleWorkerCleanupSourceAccepted`,
-      `${worker908}.staleCleanupBlockersRemoved`
+      `${worker908}.staleCleanupBlockersRemoved`,
+      `${worker940}.staleCleanupEvidenceAccepted`,
+      `${worker940}.cleanupHookPublicExecutionClaimed`
     ],
     gate.cleanupBlockerClaimIds
   );
@@ -554,6 +663,7 @@ test("private-admission-821-rejects-public-compatibility-claims", () => {
     [
       `${worker815}.publicNativeCompatibility`,
       `${worker908}.publicNativeCompatibility`,
+      `${worker940}.publicNativeCompatibility`,
       `${worker815}.jsCjsBridgeCompatibilityClaimed`,
       `${worker815}.publicRootRenderCompatibilityClaimed`,
       `${worker815}.publicReactActCompatibilityClaimed`,
