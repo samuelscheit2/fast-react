@@ -3,10 +3,13 @@
 const {
   REACT_ELEMENT_TYPE,
   cloneAndReplaceKey,
+  createElement,
   isValidElement
 } = require('./element-factory.js');
+const { createUnimplementedError } = require('./placeholder-utils.js');
 
 const REACT_PORTAL_TYPE = Symbol.for('react.portal');
+const REACT_LAZY_TYPE = Symbol.for('react.lazy');
 const MAYBE_ITERATOR_SYMBOL = Symbol.iterator;
 
 const isArray = Array.isArray;
@@ -14,6 +17,358 @@ const isDevelopment = process.env.NODE_ENV !== 'production';
 const userProvidedKeyEscapeRegex = /\/+/g;
 
 let didWarnAboutMaps = false;
+
+const childrenTraversalCurrentnessReports = new WeakSet();
+
+const childrenTraversalCurrentnessStatus =
+  'source-current-for-react-19.2.6-children-helper-traversal-private-blockers';
+const childrenTraversalCurrentnessConsumptionStatus =
+  'accepted-private-children-helper-traversal-currentness-public-blocked';
+
+const childrenTraversalSourceReportFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'reactSourceTag',
+  'reactSourceCommit',
+  'reactChildrenSource',
+  'reactClientSource',
+  'reactSymbolsSource',
+  'fastReactSource',
+  'fastReactDefaultRoot',
+  'fastReactServerRoot',
+  'packageOracle',
+  'reactSourceAnchorsCurrent',
+  'packageOracleCurrent',
+  'compatibilityClaimed'
+]);
+
+const childrenTraversalSourceReport = freezeRecord({
+  kind: 'fast-react.private.children_helper_traversal_source_report',
+  version: 1,
+  status: 'source-current-for-react-19.2.6-children-helper-traversal',
+  reactSourceTag: 'v19.2.6',
+  reactSourceCommit: 'eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401',
+  reactChildrenSource: 'packages/react/src/ReactChildren.js',
+  reactClientSource: 'packages/react/src/ReactClient.js',
+  reactSymbolsSource: 'packages/shared/ReactSymbols.js',
+  fastReactSource: 'packages/react/children-helper.js',
+  fastReactDefaultRoot: 'packages/react/index.js',
+  fastReactServerRoot: 'packages/react/react.react-server.js',
+  packageOracle:
+    'tests/conformance/oracles/react-19.2.6-children-helper-oracle.json',
+  reactSourceAnchorsCurrent: true,
+  packageOracleCurrent: true,
+  compatibilityClaimed: false
+});
+
+const childrenTraversalSourceAnchors = freezeRecordArray([
+  {
+    source: 'packages/react/src/ReactChildren.js',
+    symbols: freezeArray([
+      'escape',
+      'escapeUserProvidedKey',
+      'getElementKey',
+      'resolveThenable',
+      'mapIntoArray',
+      'mapChildren',
+      'countChildren',
+      'forEachChildren',
+      'toArray',
+      'onlyChild'
+    ]),
+    role: 'React 19.2.6 source anchors for direct Children traversal helpers',
+    current: true
+  },
+  {
+    source: 'packages/react/src/ReactClient.js',
+    symbols: freezeArray(['Children']),
+    role: 'React 19.2.6 root Children export object assembly',
+    current: true
+  },
+  {
+    source: 'packages/shared/ReactSymbols.js',
+    symbols: freezeArray([
+      'REACT_ELEMENT_TYPE',
+      'REACT_PORTAL_TYPE',
+      'REACT_LAZY_TYPE',
+      'getIteratorFn'
+    ]),
+    role: 'React 19.2.6 child object and iterable type tags',
+    current: true
+  }
+]);
+
+const childrenTraversalValidChildShapeFieldNames = freezeArray([
+  'id',
+  'reactSourceAnchor',
+  'oracleScenario',
+  'behavior',
+  'fastReactImplemented',
+  'compatibilityClaimed'
+]);
+
+const childrenTraversalValidChildShapeRows = freezeRecordArray([
+  {
+    id: 'nullish-and-boolean-children',
+    reactSourceAnchor: 'ReactChildren.mapIntoArray null/boolean branch',
+    oracleScenario: 'children-nullish-and-empty-values',
+    behavior:
+      'top-level null and undefined return unchanged from map, while booleans and holes are visited as null during traversal',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'scalar-leaf-children',
+    reactSourceAnchor: 'ReactChildren.mapIntoArray scalar switch',
+    oracleScenario: 'children-scalar-values',
+    behavior: 'string, number, and bigint values are traversed as leaves',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'element-fragment-and-portal-leaves',
+    reactSourceAnchor: 'ReactChildren.mapIntoArray element/portal switch',
+    oracleScenario: 'children-element-and-fragment-leaves',
+    behavior:
+      'React elements, fragment elements, and portal-shaped objects are direct leaf values for helper traversal',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'arrays-and-nested-arrays',
+    reactSourceAnchor: 'ReactChildren.mapIntoArray array branch',
+    oracleScenario: 'children-array-and-nested-traversal',
+    behavior:
+      'arrays, sparse slots, and nested arrays are traversed depth-first with React callback indexes',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'function-and-symbol-children',
+    reactSourceAnchor: 'ReactChildren.mapIntoArray ignored default branch',
+    oracleScenario: 'children-nullish-and-empty-values',
+    behavior: 'function and symbol children are ignored by direct helpers',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'direct-thenable-children',
+    reactSourceAnchor: 'ReactChildren.resolveThenable',
+    oracleScenario: 'children-thenable-values',
+    behavior:
+      'fulfilled thenables unwrap, synchronously fulfilled thenables mutate status, rejected thenables throw, and pending thenables are thrown',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  }
+]);
+
+const childrenTraversalKeyPathEscapingRows = freezeRecordArray([
+  {
+    id: 'explicit-key-escaping',
+    reactSourceAnchor: 'ReactChildren.escape',
+    sourceTokens: freezeArray(['= -> =0', ': -> =2']),
+    oracleScenario: 'children-to-array-key-synthesis',
+    oracleExampleKeys: freezeArray(['.$a=2b=0c']),
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'path-separator-synthesis',
+    reactSourceAnchor: 'ReactChildren SEPARATOR/SUBSEPARATOR',
+    sourceTokens: freezeArray(['.', ':']),
+    oracleScenario: 'children-to-array-key-synthesis',
+    oracleExampleKeys: freezeArray(['.1:0', '.3:0:$slash/key']),
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'user-provided-slash-escaping',
+    reactSourceAnchor: 'ReactChildren.escapeUserProvidedKey',
+    sourceTokens: freezeArray(['/+ -> $&/']),
+    oracleScenario: 'children-map-return-handling-and-keys',
+    oracleExampleKeys: freezeArray([
+      'mapped//key0/.$orig',
+      '.$orig/.$inner/key'
+    ]),
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  }
+]);
+
+const childrenTraversalIterableHandlingRows = freezeRecordArray([
+  {
+    id: 'set-and-generator-iterables',
+    reactSourceAnchor: 'ReactChildren.getIteratorFn traversal branch',
+    oracleScenario: 'children-iterable-values',
+    behavior: 'Set and generator children traverse in iterator order',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'map-entry-iterables',
+    reactSourceAnchor: 'ReactChildren iterableChildren.entries warning branch',
+    oracleScenario: 'children-iterable-values',
+    behavior:
+      'Map entries traverse as entry arrays and development warns once per helper module',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  }
+]);
+
+const childrenTraversalThrownErrorRows = freezeRecordArray([
+  {
+    id: 'plain-object-child-error',
+    reactSourceAnchor: 'ReactChildren invalid object error branch',
+    oracleScenario: 'children-error-behavior',
+    behavior:
+      'plain object children throw the React invalid object child message, with react-server production minified as #31',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'only-child-error',
+    reactSourceAnchor: 'ReactChildren.onlyChild',
+    oracleScenario: 'children-error-behavior',
+    behavior:
+      'Children.only rejects non-elements, with react-server production minified as #143',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'missing-callback-and-user-errors',
+    reactSourceAnchor: 'ReactChildren.mapChildren callback invocation',
+    oracleScenario: 'children-error-behavior',
+    behavior:
+      'missing map callbacks throw TypeError, and callback or iterator errors propagate without remapping',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
+  }
+]);
+
+const childrenTraversalUnsupportedEdgeCaseRows = freezeRecordArray([
+  {
+    id: 'lazy-child-traversal',
+    reactSourceAnchor: 'ReactChildren.mapIntoArray REACT_LAZY_TYPE branch',
+    oracleScenario: null,
+    behavior:
+      'React source resolves lazy child payloads during helper traversal, but Fast React keeps this blocked until lazy behavior is separately oracle-backed',
+    fastReactImplemented: false,
+    blocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'renderer-traversal-and-fragment-rendering',
+    reactSourceAnchor: 'ReactChildren direct helper traversal only',
+    oracleScenario: null,
+    behavior:
+      'direct Children helpers do not prove renderer traversal, fragment rendering into children, owner stacks, refs, or root scheduling',
+    fastReactImplemented: false,
+    blocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    id: 'real-portal-creation',
+    reactSourceAnchor: 'ReactChildren REACT_PORTAL_TYPE leaf recognition',
+    oracleScenario: null,
+    behavior:
+      'portal-shaped objects are leaves, but real renderer portal creation and DOM/native behavior remain blocked',
+    fastReactImplemented: false,
+    blocked: true,
+    compatibilityClaimed: false
+  }
+]);
+
+const childrenTraversalBehaviorCurrentnessFieldNames = freezeArray([
+  'nullishTopLevelCurrent',
+  'booleanChildrenCoerceToNull',
+  'ignoredFunctionAndSymbolChildren',
+  'scalarLeavesCurrent',
+  'arrayHolesAndNestedTraversalCurrent',
+  'elementAndFragmentLeavesCurrent',
+  'portalShapeLeafCurrent',
+  'keyPathEscapingCurrent',
+  'arrayReturnKeyEscapingCurrent',
+  'setAndGeneratorIterablesCurrent',
+  'mapEntryIterableCurrent',
+  'thenableUnwrapAndThrowCurrent',
+  'invalidObjectErrorShapeCurrent',
+  'onlyErrorShapeCurrent',
+  'missingCallbackTypeErrorCurrent',
+  'callbackAndIteratorErrorPropagationCurrent',
+  'lazyTraversalSupported',
+  'lazyTraversalBlocked',
+  'rendererTraversalBlocked',
+  'ownerDispatcherRootPrerequisitesBlocked',
+  'compatibilityClaimed'
+]);
+
+const childrenTraversalPublicCompatibilityFalseFlags = freezeArray([
+  'compatibilityClaimed',
+  'publicCompatibilityClaimed',
+  'packageCompatibilityClaimed',
+  'fullReactChildrenParityClaimed',
+  'fastReactBehaviorCompatible',
+  'publicPackageCompatibilityClaimed'
+]);
+
+const childrenTraversalPrerequisiteFalseFlags = freezeArray([
+  'ownerStackCompatibilityClaimed',
+  'dispatcherPrerequisitesReady',
+  'rootPrerequisitesReady',
+  'reactDomRootPrerequisitesReady',
+  'schedulerPrerequisitesReady',
+  'publicRootCompatibilityClaimed',
+  'publicRendererCompatibilityClaimed'
+]);
+
+const childrenTraversalUnsupportedClaimFalseFlags = freezeArray([
+  'rendererTraversalClaimed',
+  'fragmentRenderTraversalClaimed',
+  'portalCreationClaimed',
+  'lazyTraversalClaimed',
+  'ownerTraversalClaimed',
+  'refLifecycleClaimed'
+]);
+
+const childrenTraversalCurrentnessReportFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'compatibilityTarget',
+  'sourceReport',
+  'sourceAnchors',
+  'validChildShapeRows',
+  'keyPathEscapingRows',
+  'iterableHandlingRows',
+  'thrownErrorRows',
+  'unsupportedEdgeCaseRows',
+  'behaviorCurrentness',
+  ...childrenTraversalPublicCompatibilityFalseFlags,
+  ...childrenTraversalPrerequisiteFalseFlags,
+  ...childrenTraversalUnsupportedClaimFalseFlags
+]);
+
+const privateChildrenTraversalCurrentnessMetadata = freezeRecord({
+  capability: 'fast-react.private.children_helper_traversal_currentness',
+  compatibilityTarget: 'react@19.2.6',
+  currentnessStatus: childrenTraversalCurrentnessStatus,
+  currentnessConsumptionStatus: childrenTraversalCurrentnessConsumptionStatus,
+  sourceReportFieldNames: childrenTraversalSourceReportFieldNames,
+  sourceReport: childrenTraversalSourceReport,
+  sourceAnchors: childrenTraversalSourceAnchors,
+  validChildShapeFieldNames: childrenTraversalValidChildShapeFieldNames,
+  validChildShapeRows: childrenTraversalValidChildShapeRows,
+  keyPathEscapingRows: childrenTraversalKeyPathEscapingRows,
+  iterableHandlingRows: childrenTraversalIterableHandlingRows,
+  thrownErrorRows: childrenTraversalThrownErrorRows,
+  unsupportedEdgeCaseRows: childrenTraversalUnsupportedEdgeCaseRows,
+  behaviorCurrentnessFieldNames: childrenTraversalBehaviorCurrentnessFieldNames,
+  publicCompatibilityFalseFlags: childrenTraversalPublicCompatibilityFalseFlags,
+  prerequisiteFalseFlags: childrenTraversalPrerequisiteFalseFlags,
+  unsupportedClaimFalseFlags: childrenTraversalUnsupportedClaimFalseFlags,
+  compatibilityClaimed: false
+});
 
 function createChildrenHelpers(options = {}) {
   const reactServer = options.reactServer === true;
@@ -381,6 +736,516 @@ function getUnsupportedKeyTypeName(value) {
   );
 }
 
+function createChildrenTraversalCurrentnessReport(overrides = {}) {
+  const defaults = {
+    kind: 'fast-react.private.children_helper_traversal_currentness',
+    version: 1,
+    status: childrenTraversalCurrentnessStatus,
+    compatibilityTarget: 'react@19.2.6',
+    sourceReport: childrenTraversalSourceReport,
+    sourceAnchors: childrenTraversalSourceAnchors,
+    validChildShapeRows: childrenTraversalValidChildShapeRows,
+    keyPathEscapingRows: childrenTraversalKeyPathEscapingRows,
+    iterableHandlingRows: childrenTraversalIterableHandlingRows,
+    thrownErrorRows: childrenTraversalThrownErrorRows,
+    unsupportedEdgeCaseRows: childrenTraversalUnsupportedEdgeCaseRows,
+    behaviorCurrentness: createChildrenTraversalBehaviorCurrentness()
+  };
+
+  for (const flagName of childrenTraversalPublicCompatibilityFalseFlags) {
+    defaults[flagName] = false;
+  }
+  for (const flagName of childrenTraversalPrerequisiteFalseFlags) {
+    defaults[flagName] = false;
+  }
+  for (const flagName of childrenTraversalUnsupportedClaimFalseFlags) {
+    defaults[flagName] = false;
+  }
+
+  const report = {
+    ...defaults,
+    ...overrides
+  };
+
+  if (
+    Object.hasOwn(overrides, 'sourceReport') &&
+    overrides.sourceReport !== childrenTraversalSourceReport
+  ) {
+    report.sourceReport = freezeRecord({
+      ...childrenTraversalSourceReport,
+      ...overrides.sourceReport
+    });
+  }
+
+  if (
+    Object.hasOwn(overrides, 'behaviorCurrentness') &&
+    overrides.behaviorCurrentness !== defaults.behaviorCurrentness
+  ) {
+    report.behaviorCurrentness = freezeRecord({
+      ...defaults.behaviorCurrentness,
+      ...overrides.behaviorCurrentness
+    });
+  }
+
+  const frozenReport = freezeRecord(report);
+  childrenTraversalCurrentnessReports.add(frozenReport);
+  return frozenReport;
+}
+
+function consumeChildrenTraversalCurrentnessReport(report) {
+  const rejectionReason = validateChildrenTraversalCurrentnessReport(report);
+  if (rejectionReason !== null) {
+    throw createChildrenTraversalCurrentnessGateError(rejectionReason);
+  }
+
+  return freezeRecord({
+    status: childrenTraversalCurrentnessConsumptionStatus,
+    accepted: true,
+    compatibilityTarget: 'react@19.2.6',
+    evidenceAreas: freezeArray([
+      'valid-child-shapes',
+      'key-path-escaping',
+      'iterable-handling',
+      'thrown-error-shapes',
+      'unsupported-edge-blockers'
+    ]),
+    sourceReport: report.sourceReport,
+    behaviorCurrentness: report.behaviorCurrentness,
+    lazyTraversalBlocked: true,
+    rendererTraversalBlocked: true,
+    ownerDispatcherRootPrerequisitesBlocked: true,
+    publicCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function isChildrenTraversalCurrentnessReport(report) {
+  return validateChildrenTraversalCurrentnessReport(report) === null;
+}
+
+function validateChildrenTraversalCurrentnessReport(report) {
+  if (
+    report === null ||
+    typeof report !== 'object' ||
+    !childrenTraversalCurrentnessReports.has(report)
+  ) {
+    return 'children-traversal-currentness-source-proof';
+  }
+
+  if (
+    report.kind !==
+      'fast-react.private.children_helper_traversal_currentness' ||
+    report.version !== 1 ||
+    report.status !== childrenTraversalCurrentnessStatus ||
+    report.compatibilityTarget !== 'react@19.2.6'
+  ) {
+    return 'children-traversal-currentness-source-proof';
+  }
+
+  if (
+    !arraysEqual(
+      Object.keys(report),
+      childrenTraversalCurrentnessReportFieldNames
+    )
+  ) {
+    return 'children-traversal-currentness-report-shape';
+  }
+
+  if (report.sourceReport !== childrenTraversalSourceReport) {
+    return 'children-traversal-currentness-source-report';
+  }
+
+  if (report.sourceAnchors !== childrenTraversalSourceAnchors) {
+    return 'children-traversal-currentness-source-anchors';
+  }
+
+  if (report.validChildShapeRows !== childrenTraversalValidChildShapeRows) {
+    return 'children-traversal-currentness-valid-child-shapes';
+  }
+
+  if (report.keyPathEscapingRows !== childrenTraversalKeyPathEscapingRows) {
+    return 'children-traversal-currentness-key-path-escaping';
+  }
+
+  if (report.iterableHandlingRows !== childrenTraversalIterableHandlingRows) {
+    return 'children-traversal-currentness-iterable-handling';
+  }
+
+  if (report.thrownErrorRows !== childrenTraversalThrownErrorRows) {
+    return 'children-traversal-currentness-thrown-error-shapes';
+  }
+
+  if (
+    report.unsupportedEdgeCaseRows !== childrenTraversalUnsupportedEdgeCaseRows
+  ) {
+    return 'children-traversal-currentness-unsupported-edge-blockers';
+  }
+
+  if (
+    !isAcceptedChildrenTraversalBehaviorCurrentness(
+      report.behaviorCurrentness
+    )
+  ) {
+    return 'children-traversal-currentness-behavior-probes';
+  }
+
+  for (const flagName of childrenTraversalPublicCompatibilityFalseFlags) {
+    if (report[flagName] !== false) {
+      return 'children-traversal-currentness-public-compatibility-claim';
+    }
+  }
+
+  for (const flagName of childrenTraversalPrerequisiteFalseFlags) {
+    if (report[flagName] !== false) {
+      return 'children-traversal-currentness-prerequisite-smuggling';
+    }
+  }
+
+  for (const flagName of childrenTraversalUnsupportedClaimFalseFlags) {
+    if (report[flagName] !== false) {
+      return 'children-traversal-currentness-unsupported-edge-claim';
+    }
+  }
+
+  return null;
+}
+
+function isAcceptedChildrenTraversalBehaviorCurrentness(currentness) {
+  if (currentness === null || typeof currentness !== 'object') {
+    return false;
+  }
+
+  if (
+    !arraysEqual(
+      Object.keys(currentness),
+      childrenTraversalBehaviorCurrentnessFieldNames
+    )
+  ) {
+    return false;
+  }
+
+  for (const fieldName of childrenTraversalBehaviorCurrentnessFieldNames) {
+    const expected =
+      fieldName === 'lazyTraversalSupported' ||
+      fieldName === 'compatibilityClaimed'
+        ? false
+        : true;
+    if (currentness[fieldName] !== expected) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function createChildrenTraversalBehaviorCurrentness() {
+  const previousDidWarnAboutMaps = didWarnAboutMaps;
+  const helpers = createChildrenHelpers();
+
+  try {
+    let falseChildValue = 'not-called';
+    helpers.map(false, function (child) {
+      falseChildValue = child;
+      return child;
+    });
+
+    const scalarMap = helpers.map(
+      ['text-child', 42, 9007199254740993n],
+      function (child) {
+        return child;
+      }
+    );
+
+    const nested = ['first', [false, , 'last'], null, [['deep']]];
+    const element = createElement('span', { key: 'leaf' });
+    const fragment = createElement(
+      Symbol.for('react.fragment'),
+      null,
+      createElement('i', null, 'inside-fragment')
+    );
+    const portal = {
+      $$typeof: REACT_PORTAL_TYPE,
+      key: 'portal-key',
+      children: 'portal-child'
+    };
+
+    const keyPathChildren = [
+      createElement('span', { key: 'a:b=c' }),
+      [createElement('span', null), 'text'],
+      false,
+      [[createElement('span', { key: 'slash/key' })]]
+    ];
+    const keyPathKeys = childKeys(helpers.toArray(keyPathChildren));
+    const arrayReturnKeys = childKeys(
+      helpers.map([createElement('span', { key: 'orig' })], function () {
+        return [
+          createElement('i', { key: 'inner/key' }),
+          createElement('i', null)
+        ];
+      })
+    );
+
+    const setKeys = childKeys(
+      helpers.toArray(
+        new Set([createElement('span', { key: 'set-key' }), 'plain', false])
+      )
+    );
+    const generatorKeys = childKeys(
+      helpers.toArray(
+        (function* childrenGenerator() {
+          yield createElement('strong', null);
+          yield ['nested-generator'];
+        })()
+      )
+    );
+    const mapKeys = childKeys(
+      withoutConsoleWarn(function () {
+        return helpers.toArray(
+          new Map([
+            ['first-key', createElement('span', { key: 'map-key' })],
+            ['second-key', 'map-value']
+          ])
+        );
+      })
+    );
+
+    const fulfilled = {
+      status: 'fulfilled',
+      value: [createElement('span', { key: 'fulfilled' }), 'ready'],
+      then: noop
+    };
+    const syncFulfilled = {
+      then: function then(resolve) {
+        resolve([createElement('span', { key: 'sync' }), 'sync-ready']);
+      }
+    };
+    const rejected = {
+      status: 'rejected',
+      reason: new Error('rejected child'),
+      then: noop
+    };
+    const pending = {
+      then: noop
+    };
+    const fulfilledKeys = childKeys(helpers.toArray(fulfilled));
+    helpers.toArray(syncFulfilled);
+    const rejectedAttempt = captureOperation(function () {
+      return helpers.toArray(rejected);
+    });
+    const pendingAttempt = captureOperation(function () {
+      return helpers.toArray(pending);
+    });
+
+    const invalidObjectAttempt = captureOperation(function () {
+      return helpers.count({ a: 1, b: 2 });
+    });
+    const onlyStringAttempt = captureOperation(function () {
+      return helpers.only('x');
+    });
+    const missingCallbackAttempt = captureOperation(function () {
+      return helpers.map(['x'], undefined);
+    });
+    const callbackThrowsAttempt = captureOperation(function () {
+      return helpers.map(['x'], function () {
+        throw new Error('callback exploded');
+      });
+    });
+    const iteratorThrowsAttempt = captureOperation(function () {
+      return helpers.toArray({
+        [MAYBE_ITERATOR_SYMBOL]: function iterator() {
+          return {
+            next: function next() {
+              throw new Error('iterator exploded');
+            }
+          };
+        }
+      });
+    });
+
+    let lazyInitCalled = false;
+    const lazyAttempt = captureOperation(function () {
+      return helpers.toArray({
+        $$typeof: REACT_LAZY_TYPE,
+        _payload: 'lazy-payload',
+        _init: function initLazy() {
+          lazyInitCalled = true;
+          return 'lazy-value';
+        }
+      });
+    });
+
+    return freezeRecord({
+      nullishTopLevelCurrent:
+        helpers.map(null, noop) === null &&
+        helpers.map(undefined, noop) === undefined &&
+        helpers.count(null) === 0 &&
+        helpers.toArray(undefined).length === 0,
+      booleanChildrenCoerceToNull:
+        falseChildValue === null && helpers.count(false) === 1,
+      ignoredFunctionAndSymbolChildren:
+        helpers.count(Symbol('child-symbol')) === 0 &&
+        helpers.count(function childFunction() {}) === 0,
+      scalarLeavesCurrent:
+        scalarMap.length === 3 &&
+        scalarMap[0] === 'text-child' &&
+        scalarMap[1] === 42 &&
+        scalarMap[2] === 9007199254740993n,
+      arrayHolesAndNestedTraversalCurrent: helpers.count(nested) === 6,
+      elementAndFragmentLeavesCurrent:
+        helpers.count([element, fragment]) === 2 &&
+        helpers.only(fragment) === fragment,
+      portalShapeLeafCurrent:
+        helpers.count([portal]) === 1 &&
+        helpers.toArray([portal])[0] === portal,
+      keyPathEscapingCurrent: arraysEqual(keyPathKeys, [
+        '.$a=2b=0c',
+        '.1:0',
+        null,
+        '.3:0:$slash/key'
+      ]),
+      arrayReturnKeyEscapingCurrent: arraysEqual(arrayReturnKeys, [
+        '.$orig/.$inner/key',
+        '.$orig/.1'
+      ]),
+      setAndGeneratorIterablesCurrent:
+        arraysEqual(setKeys, ['.$set-key', null]) &&
+        arraysEqual(generatorKeys, ['.0', null]),
+      mapEntryIterableCurrent: arraysEqual(mapKeys, [
+        null,
+        '.0:$map-key',
+        null,
+        null
+      ]),
+      thenableUnwrapAndThrowCurrent:
+        arraysEqual(fulfilledKeys, ['.$fulfilled', null]) &&
+        syncFulfilled.status === 'fulfilled' &&
+        rejectedAttempt.status === 'throws' &&
+        rejectedAttempt.errorMessage === 'rejected child' &&
+        pendingAttempt.status === 'throws' &&
+        pendingAttempt.thrownValue === pending &&
+        pending.status === 'pending',
+      invalidObjectErrorShapeCurrent:
+        invalidObjectAttempt.status === 'throws' &&
+        invalidObjectAttempt.errorMessage.includes(
+          'Objects are not valid as a React child'
+        ) &&
+        invalidObjectAttempt.errorMessage.includes('object with keys {a, b}'),
+      onlyErrorShapeCurrent:
+        onlyStringAttempt.status === 'throws' &&
+        onlyStringAttempt.errorMessage ===
+          'React.Children.only expected to receive a single React element child.',
+      missingCallbackTypeErrorCurrent:
+        missingCallbackAttempt.status === 'throws' &&
+        missingCallbackAttempt.errorName === 'TypeError',
+      callbackAndIteratorErrorPropagationCurrent:
+        callbackThrowsAttempt.status === 'throws' &&
+        callbackThrowsAttempt.errorMessage === 'callback exploded' &&
+        iteratorThrowsAttempt.status === 'throws' &&
+        iteratorThrowsAttempt.errorMessage === 'iterator exploded',
+      lazyTraversalSupported: false,
+      lazyTraversalBlocked:
+        lazyAttempt.status === 'throws' && lazyInitCalled === false,
+      rendererTraversalBlocked: true,
+      ownerDispatcherRootPrerequisitesBlocked: true,
+      compatibilityClaimed: false
+    });
+  } finally {
+    didWarnAboutMaps = previousDidWarnAboutMaps;
+  }
+}
+
+function createChildrenTraversalCurrentnessGateError(reason) {
+  const error = createUnimplementedError(
+    'react',
+    '__FAST_REACT_PRIVATE_CHILDREN_TRAVERSAL_CURRENTNESS__.consumeChildrenTraversalCurrentnessReport',
+    'rejected private Children traversal currentness evidence',
+    `Reason: ${reason}.`
+  );
+  error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.packageCompatibilityClaimed = false;
+  error.fullReactChildrenParityClaimed = false;
+  error.rendererTraversalClaimed = false;
+  error.lazyTraversalClaimed = false;
+  error.dispatcherPrerequisitesReady = false;
+  error.rootPrerequisitesReady = false;
+  return error;
+}
+
+function captureOperation(fn) {
+  try {
+    return {
+      status: 'ok',
+      value: fn()
+    };
+  } catch (error) {
+    return {
+      status: 'throws',
+      thrownValue: error,
+      errorName:
+        error && typeof error === 'object' ? error.name : typeof error,
+      errorMessage:
+        error && typeof error === 'object' && 'message' in error
+          ? error.message
+          : String(error)
+    };
+  }
+}
+
+function childKeys(children) {
+  return children.map(function (child) {
+    return isValidElement(child) ? child.key : null;
+  });
+}
+
+function withoutConsoleWarn(fn) {
+  const originalConsoleWarn = console.warn;
+  console.warn = noop;
+  try {
+    return fn();
+  } finally {
+    console.warn = originalConsoleWarn;
+  }
+}
+
+function arraysEqual(left, right) {
+  if (!isArray(left) || !isArray(right) || left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function freezeArray(values) {
+  return Object.freeze(values.slice());
+}
+
+function freezeRecord(record) {
+  return Object.freeze(record);
+}
+
+function freezeRecordArray(records) {
+  return freezeArray(
+    records.map(function (record) {
+      return freezeRecord(record);
+    })
+  );
+}
+
 module.exports = {
-  createChildrenHelpers
+  childrenTraversalCurrentnessConsumptionStatus,
+  childrenTraversalCurrentnessStatus,
+  consumeChildrenTraversalCurrentnessReport,
+  createChildrenHelpers,
+  createChildrenTraversalCurrentnessReport,
+  isChildrenTraversalCurrentnessReport,
+  privateChildrenTraversalCurrentnessMetadata,
+  validateChildrenTraversalCurrentnessReport
 };
