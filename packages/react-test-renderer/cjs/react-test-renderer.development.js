@@ -2871,8 +2871,12 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   privateSiblingTextJSAdmissionStatus:
     privateToJSONSiblingTextJSAdmissionStatus,
   siblingTextJSAdmissionConsumesDedicatedIdentity: true,
+  siblingTextJSAdmissionConsumesRootFinishedLanesHandoff: true,
+  siblingTextJSAdmissionConsumesCommittedFiberInspection: true,
   rejectsGenericSiblingTextFinishedWorkIdentity: true,
   rejectsBroadMultichildFinishedWorkIdentity: true,
+  rejectsMissingSiblingTextCommittedFiberInspection: true,
+  rejectsInvalidSiblingTextCommittedFiberInspection: true,
   privateRootFinishedLanesHandoffGateAvailable: true,
   privateRootFinishedLanesHandoffDiagnosticName,
   privateRootFinishedLanesHandoffStatus,
@@ -14643,8 +14647,12 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     privateSiblingTextJSAdmissionStatus:
       privateToJSONSiblingTextJSAdmissionStatus,
     siblingTextJSAdmissionConsumesDedicatedIdentity: true,
+    siblingTextJSAdmissionConsumesRootFinishedLanesHandoff: true,
+    siblingTextJSAdmissionConsumesCommittedFiberInspection: true,
     rejectsGenericSiblingTextFinishedWorkIdentity: true,
     rejectsBroadMultichildFinishedWorkIdentity: true,
+    rejectsMissingSiblingTextCommittedFiberInspection: true,
+    rejectsInvalidSiblingTextCommittedFiberInspection: true,
     privateRootFinishedLanesHandoffGateAvailable: true,
     privateRootFinishedLanesHandoffDiagnosticName,
     privateRootFinishedLanesHandoffStatus,
@@ -16965,7 +16973,10 @@ function createPrivateToJSONSiblingTextJSAdmissionDiagnosticResult(
       rootRequest,
       siblingTextFinishedWorkIdentityEvidence,
       report,
-      sourceRootRequest
+      sourceRootRequest,
+      {
+        requireRootFinishedLanesHandoff: true
+      }
     );
   const diagnostic = validatePrivateToJSONSiblingTextHostOutputDiagnostic(
     report
@@ -16998,6 +17009,13 @@ function createPrivateToJSONSiblingTextJSAdmissionDiagnosticResult(
     rootRequestSequence: finishedWorkIdentity.rootRequestSequence,
     rootRequestOperation: 'update',
     rootId: finishedWorkIdentity.rootId,
+    rootFinishedLanesHandoff: finishedWorkIdentity.rootFinishedLanesHandoff,
+    rootFinishedLanesHandoffDiagnosticName:
+      finishedWorkIdentity.rootFinishedLanesHandoffDiagnosticName,
+    rootFinishedLanesHandoffStatus:
+      finishedWorkIdentity.rootFinishedLanesHandoffStatus,
+    rootFinishedLanesHandoffAccepted: true,
+    consumesPrivateRootFinishedLanesHandoffGate: true,
     hostOutputUpdateKind: 'Update',
     hostOutputShape: 'SiblingText',
     rootNodeKind: finishedWorkIdentity.rootNodeKind,
@@ -17006,11 +17024,14 @@ function createPrivateToJSONSiblingTextJSAdmissionDiagnosticResult(
     hostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
     hostOutputRow: diagnostic.hostOutputRow,
     result: diagnostic.result,
+    committedFiberInspection: diagnostic.committedFiberInspection,
     finishedWorkIdentity,
     consumesPrivateSiblingTextFinishedWorkIdentityGate: true,
+    consumesCommittedFiberInspection: true,
     consumesWorker738ReportRow: true,
     consumesPrivateToJSONEvidence: true,
     consumesAcceptedHostOutputRow: true,
+    committedFiberInspectionCurrentMatchesCommit: true,
     hostOutputSnapshotCurrent: true,
     siblingTextJSAdmissionAvailable: true,
     genericFinishedWorkIdentityGateAccepted: false,
@@ -19372,6 +19393,8 @@ function validatePrivateToJSONSiblingTextHostOutputDiagnostic(report) {
   assertPrivateToJSONSiblingTextGateIfPresent(
     readPrivateToJSONField(report, 'gate')
   );
+  const committedFiberInspection =
+    validatePrivateToJSONSiblingTextCommittedFiberInspectionDiagnostic(report);
 
   const nodes = readPrivateToJSONArrayField(report, 'nodes');
   const diagnosticNodes = validatePrivateToJSONDiagnosticNodes(nodes);
@@ -19416,6 +19439,7 @@ function validatePrivateToJSONSiblingTextHostOutputDiagnostic(report) {
     hostOutputRow,
     result,
     rootChildCount,
+    committedFiberInspection,
     sourceNodeCount: diagnosticNodes.length
   };
   if (!isSiblingTextToJSONNativeExecutionShape(diagnostic)) {
@@ -19506,6 +19530,121 @@ function validatePrivateToJSONSiblingTextHostOutputRow(
     hostOutputShape: 'SiblingText',
     dependencyMetadata
   });
+}
+
+function validatePrivateToJSONSiblingTextCommittedFiberInspectionDiagnostic(report) {
+  const record = readPrivateToJSONRecordField(
+    report,
+    'committedFiberInspection',
+    'committed_fiber_inspection'
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'diagnosticName',
+    'diagnostic_name',
+    privateToTreeCommittedFiberInspectionDiagnosticName
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'sourceJsonDiagnosticName',
+    'source_json_diagnostic_name',
+    privateToJSONAcceptedDiagnosticName
+  );
+  assertPrivateToJSONSiblingTextStringArrayField(
+    record,
+    'fiberShape',
+    'fiber_shape',
+    privateToTreeMultiChildAcceptedFiberShape
+  );
+  assertPrivateToJSONSiblingTextStringArrayField(
+    record,
+    'rootChildFiberTags',
+    'root_child_fiber_tags',
+    ['HostText', 'HostComponent']
+  );
+  assertPrivateToJSONSiblingTextStringArrayField(
+    record,
+    'hostChildFiberTags',
+    'host_child_fiber_tags',
+    ['HostText', 'HostComponent']
+  );
+  assertPrivateToJSONNumberField(record, 'rootChildCount', 'root_child_count', 2);
+  assertPrivateToJSONNumberField(record, 'hostChildCount', 'host_child_count', 2);
+  assertPrivateToJSONNumberField(
+    record,
+    'hostComponentCount',
+    'host_component_count',
+    1
+  );
+  assertPrivateToJSONNumberField(record, 'hostTextCount', 'host_text_count', 2);
+  assertPrivateToJSONBooleanField(
+    record,
+    'functionComponentPresent',
+    'function_component_present',
+    false
+  );
+  const functionTag = readPrivateToJSONField(
+    record,
+    'functionComponentFiberTag',
+    'function_component_fiber_tag'
+  );
+  if (functionTag !== undefined && functionTag !== null) {
+    throwPrivateToJSONSerializationError(
+      'Expected private JSON sibling-text committedFiberInspection to omit FunctionComponent metadata.'
+    );
+  }
+  assertPrivateToJSONBooleanField(
+    record,
+    'wrapsCommittedHostOutput',
+    'wraps_committed_host_output',
+    false
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'compatibilityClaimed',
+    'compatibility_claimed',
+    false
+  );
+
+  return freezeRecord({
+    diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+    sourceJsonDiagnosticName: privateToJSONAcceptedDiagnosticName,
+    fiberShape: freezeArray(privateToTreeMultiChildAcceptedFiberShape),
+    rootChildFiberTags: freezeArray(['HostText', 'HostComponent']),
+    hostChildFiberTags: freezeArray(['HostText', 'HostComponent']),
+    rootChildCount: 2,
+    hostChildCount: 2,
+    hostComponentCount: 1,
+    hostTextCount: 2,
+    functionComponentFiberTag: null,
+    functionComponentPresent: false,
+    wrapsCommittedHostOutput: false,
+    publicTreeObjectAvailable: false,
+    compatibilityClaimed: false
+  });
+}
+
+function assertPrivateToJSONSiblingTextStringArrayField(
+  record,
+  camelName,
+  snakeName,
+  expected
+) {
+  const actual = readPrivateToJSONArrayField(record, camelName, snakeName);
+  if (
+    actual.length !== expected.length ||
+    actual.some((value, index) => value !== expected[index])
+  ) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON sibling-text committedFiberInspection ${camelName} to be ${expected.join(', ')}.`
+    );
+  }
 }
 
 function validatePrivateToJSONSiblingTextIdentitySourceReport(
