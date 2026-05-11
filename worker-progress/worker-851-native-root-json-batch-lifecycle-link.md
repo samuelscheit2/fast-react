@@ -6,6 +6,10 @@ Completed the private JS diagnostic link from the accepted native root batch
 lifecycle consumer to the existing JSON batch response sequence and JSON stream
 batch roundtrip diagnostics.
 
+Audit follow-up completed: hardened the private validator so it rejects
+self-consistent foreign batch/stream rows, swapped metadata/payload chunk kinds,
+forged cleanup evidence identity fields, and forged handle-admission fields.
+
 ## Summary
 
 - Added `jsonBatchRoundtripLink` under
@@ -37,6 +41,10 @@ batch roundtrip diagnostics.
 - Negative validator coverage rejects mismatched consumer row IDs, reordered
   rows, wrong kind/action/transition evidence, wrong cleanup status,
   stale/foreign JSON batch or stream rows, and public/native execution claims.
+- Audit follow-up negative coverage also rejects a fully self-consistent foreign
+  batch/stream set, metadata rows reporting `payload`, payload rows reporting
+  `metadata`, forged cleanup row/source IDs, forged cleanup source handle kind,
+  forged value action/current generation, and forged retired-root source error.
 
 ## Verification
 

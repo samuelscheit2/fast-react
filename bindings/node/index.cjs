@@ -1562,13 +1562,8 @@ function createNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink({
   const normalizedSmokeRecords = Array.from(
     smokeRecords ?? rustHandleTableAdmissionSmoke?.smokeRecords ?? []
   );
-  const batchId =
-    responseSequenceGate?.batchId ??
-    normalizedResponseRows[0]?.batchId ??
-    nativeRootBridgeJsonTransportBatchResponseSequenceBatchId;
+  const batchId = nativeRootBridgeJsonTransportBatchResponseSequenceBatchId;
   const streamId =
-    responseSequenceGate?.streamRoundtripGate?.streamId ??
-    normalizedStreamRows[0]?.streamId ??
     nativeRootBridgeJsonTransportStreamBatchRoundtripStreamId;
   const rowCount = Math.max(
     normalizedConsumerRows.length,
@@ -1806,6 +1801,8 @@ function getNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectio
       nativeRootBridgeJsonTransportBatchResponseErrorRowStatusNotError ||
     responseRow.responseStatus !==
       nativeRootBridgeJsonTransportBatchLifecycleStatusAccepted ||
+    streamMetadataRow.chunkKind !== 'metadata' ||
+    streamPayloadRow.chunkKind !== 'payload' ||
     streamMetadataRow.chunkStatus !== 'accepted' ||
     streamPayloadRow.chunkStatus !== 'accepted' ||
     streamPayloadRow.assembledResponse !== true ||
@@ -1821,9 +1818,14 @@ function getNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectio
     getNativeRootBridgeBatchLifecycleConsumerExpectedRootHandleAction(
       expectedKind
     );
+  const expectedHandleAdmissionEvidence =
+    getNativeRootBridgeBatchLifecycleConsumerExpectedHandleAdmissionEvidence(
+      expectedKind
+    );
 
   if (
     !nativeRootBridgeRequestKinds.includes(expectedKind) ||
+    expectedHandleAdmissionEvidence === null ||
     lifecycleRow.kind !== expectedKind ||
     responseRow.kind !== expectedKind ||
     smokeRecord.kind !== expectedKind ||
@@ -1839,23 +1841,55 @@ function getNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectio
     consumerRow.lifecycleTransition !== expectedLifecycleTransition ||
     smokeRecord.lifecycleTransition !== expectedLifecycleTransition ||
     consumerRow.rootHandleAction !== smokeRecord.rootHandleAction ||
-    consumerRow.rootHandleAction !== expectedRootHandleAction
+    consumerRow.rootHandleAction !== expectedRootHandleAction ||
+    smokeRecord.rootHandleAction !== expectedRootHandleAction ||
+    consumerRow.rootHandleStateBefore !==
+      expectedHandleAdmissionEvidence.rootHandleStateBefore ||
+    smokeRecord.rootHandleStateBefore !==
+      expectedHandleAdmissionEvidence.rootHandleStateBefore ||
+    consumerRow.rootHandleStateAfter !==
+      expectedHandleAdmissionEvidence.rootHandleStateAfter ||
+    smokeRecord.rootHandleStateAfter !==
+      expectedHandleAdmissionEvidence.rootHandleStateAfter ||
+    consumerRow.rootHandleCurrentGeneration !==
+      expectedHandleAdmissionEvidence.rootHandleCurrentGeneration ||
+    smokeRecord.rootHandleCurrentGeneration !==
+      expectedHandleAdmissionEvidence.rootHandleCurrentGeneration ||
+    consumerRow.valueHandleAction !==
+      expectedHandleAdmissionEvidence.valueHandleAction ||
+    smokeRecord.valueHandleAction !==
+      expectedHandleAdmissionEvidence.valueHandleAction ||
+    consumerRow.valueHandleCurrentGeneration !==
+      expectedHandleAdmissionEvidence.valueHandleCurrentGeneration ||
+    smokeRecord.valueHandleCurrentGeneration !==
+      expectedHandleAdmissionEvidence.valueHandleCurrentGeneration ||
+    consumerRow.retiredRootSourceErrorCode !==
+      expectedHandleAdmissionEvidence.retiredRootSourceErrorCode ||
+    smokeRecord.retiredRootSourceErrorCode !==
+      expectedHandleAdmissionEvidence.retiredRootSourceErrorCode
   ) {
     return nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
       .kindTransitionMismatch;
   }
 
+  const expectedCleanupEvidence =
+    getNativeRootBridgeBatchLifecycleConsumerExpectedCleanupHookEvidence(
+      expectedKind
+    );
   if (
+    expectedCleanupEvidence === null ||
     consumerRow.cleanupHookEvidenceStatus !==
-      getNativeRootBridgeBatchLifecycleConsumerExpectedCleanupHookEvidenceStatus(
-        expectedKind
-      ) ||
+      expectedCleanupEvidence.cleanupHookEvidenceStatus ||
     consumerRow.cleanupHookEvidenceRequired !==
-      (expectedKind !== nativeRootBridgeRequestKindCreate) ||
-    (expectedKind === nativeRootBridgeRequestKindCreate &&
-      consumerRow.cleanupHookCanonicalExecutableEvidence !== null) ||
-    (expectedKind !== nativeRootBridgeRequestKindCreate &&
-      consumerRow.cleanupHookCanonicalExecutableEvidence !== true)
+      expectedCleanupEvidence.cleanupHookEvidenceRequired ||
+    consumerRow.cleanupHookEvidenceRowId !==
+      expectedCleanupEvidence.cleanupHookEvidenceRowId ||
+    consumerRow.cleanupHookSourceRowId !==
+      expectedCleanupEvidence.cleanupHookSourceRowId ||
+    consumerRow.cleanupHookSourceHandleKind !==
+      expectedCleanupEvidence.cleanupHookSourceHandleKind ||
+    consumerRow.cleanupHookCanonicalExecutableEvidence !==
+      expectedCleanupEvidence.cleanupHookCanonicalExecutableEvidence
   ) {
     return nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
       .cleanupHookStatusMismatch;
@@ -1895,13 +1929,92 @@ function getNativeRootBridgeBatchLifecycleConsumerExpectedRootHandleAction(
   return 'retire-root-handle';
 }
 
-function getNativeRootBridgeBatchLifecycleConsumerExpectedCleanupHookEvidenceStatus(
+function getNativeRootBridgeBatchLifecycleConsumerExpectedHandleAdmissionEvidence(
   kind
 ) {
   if (kind === nativeRootBridgeRequestKindCreate) {
-    return nativeRootBridgeBatchLifecycleConsumerCleanupHookNotRequiredStatus;
+    return {
+      rootHandleAction: 'admit-root-handle',
+      rootHandleStateBefore: null,
+      rootHandleStateAfter: nativeRootBridgeRootHandleStateActive,
+      rootHandleCurrentGeneration: 1,
+      valueHandleAction: 'admit-value-handle',
+      valueHandleCurrentGeneration: 1,
+      retiredRootSourceErrorCode: null
+    };
   }
-  return nativeRootBridgeBatchLifecycleConsumerCleanupHookAcceptedStatus;
+
+  if (kind === nativeRootBridgeRequestKindRender) {
+    return {
+      rootHandleAction: 'validate-active-root-handle',
+      rootHandleStateBefore: nativeRootBridgeRootHandleStateActive,
+      rootHandleStateAfter: nativeRootBridgeRootHandleStateActive,
+      rootHandleCurrentGeneration: 1,
+      valueHandleAction: 'admit-value-handle',
+      valueHandleCurrentGeneration: 1,
+      retiredRootSourceErrorCode: null
+    };
+  }
+
+  if (kind === nativeRootBridgeRequestKindUnmount) {
+    return {
+      rootHandleAction: 'retire-root-handle',
+      rootHandleStateBefore: nativeRootBridgeRootHandleStateActive,
+      rootHandleStateAfter: nativeRootBridgeRootHandleStateRetired,
+      rootHandleCurrentGeneration: 2,
+      valueHandleAction: null,
+      valueHandleCurrentGeneration: null,
+      retiredRootSourceErrorCode: nativeRootBridgeValidationErrorCodes.staleHandle
+    };
+  }
+
+  return null;
+}
+
+function getNativeRootBridgeBatchLifecycleConsumerExpectedCleanupHookEvidence(
+  kind
+) {
+  if (kind === nativeRootBridgeRequestKindCreate) {
+    return {
+      cleanupHookEvidenceRequired: false,
+      cleanupHookEvidenceStatus:
+        nativeRootBridgeBatchLifecycleConsumerCleanupHookNotRequiredStatus,
+      cleanupHookEvidenceRowId: null,
+      cleanupHookSourceRowId: null,
+      cleanupHookSourceHandleKind: null,
+      cleanupHookCanonicalExecutableEvidence: null
+    };
+  }
+
+  if (kind === nativeRootBridgeRequestKindRender) {
+    return {
+      cleanupHookEvidenceRequired: true,
+      cleanupHookEvidenceStatus:
+        nativeRootBridgeBatchLifecycleConsumerCleanupHookAcceptedStatus,
+      cleanupHookEvidenceRowId:
+        'cleanup-hook-worker-value-after-root-release',
+      cleanupHookSourceRowId:
+        nativeRootBridgeWorkerThreadCleanupHookValueSourceRowId,
+      cleanupHookSourceHandleKind: nativeRootBridgeHandleKindValue,
+      cleanupHookCanonicalExecutableEvidence: true
+    };
+  }
+
+  if (kind === nativeRootBridgeRequestKindUnmount) {
+    return {
+      cleanupHookEvidenceRequired: true,
+      cleanupHookEvidenceStatus:
+        nativeRootBridgeBatchLifecycleConsumerCleanupHookAcceptedStatus,
+      cleanupHookEvidenceRowId:
+        'cleanup-hook-worker-root-before-value-release',
+      cleanupHookSourceRowId:
+        nativeRootBridgeWorkerThreadCleanupHookRootSourceRowId,
+      cleanupHookSourceHandleKind: nativeRootBridgeHandleKindRoot,
+      cleanupHookCanonicalExecutableEvidence: true
+    };
+  }
+
+  return null;
 }
 
 function createNativeRootBridgeBatchLifecycleConsumer({
