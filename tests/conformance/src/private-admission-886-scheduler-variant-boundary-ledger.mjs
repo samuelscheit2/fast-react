@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -285,6 +286,62 @@ const schedulerCjsNativeDevelopmentPath =
   "packages/scheduler/cjs/scheduler.native.development.js";
 const schedulerCjsNativeProductionPath =
   "packages/scheduler/cjs/scheduler.native.production.js";
+const schedulerPackageJsonPath = "packages/scheduler/package.json";
+const schedulerPackageName = "scheduler";
+const schedulerPackageVersion = "0.27.0";
+
+const mockRootPrivateDiagnosticSourceIds = freezeArray([
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__",
+  "fast-react.scheduler.mock-delayed-act-root-work-diagnostics",
+  "fast-react.scheduler.mock-delayed-act-root-work-metadata",
+  "fast-react.scheduler.mock-delayed-renderer-root-work-metadata",
+  "fast-react.scheduler.mock-expired-act-root-work-diagnostics",
+  "fast-react.scheduler.mock-expired-act-root-work-metadata",
+  "fast-react.scheduler.mock-expired-act-root-work-source-validator",
+  "fast-react.scheduler.mock-expired-lane-flush-diagnostics",
+  "fast-react.scheduler.mock-expired-lane-priority-root-metadata",
+  "fast-react.scheduler.mock-expired-work-diagnostics",
+  "fast-react.scheduler.mock-frame-budget-diagnostics"
+]);
+
+const mockRootPrivateDiagnosticSourceStatuses = freezeArray([
+  "accepted-private-delayed-renderer-root-work-metadata-for-diagnostics",
+  "described-expired-mock-scheduler-work-for-diagnostics",
+  "described-mock-scheduler-frame-budget-for-diagnostics",
+  "drained-delayed-mock-scheduler-work-with-act-root-metadata-for-diagnostics",
+  "drained-expired-mock-scheduler-work-with-act-root-metadata-for-diagnostics",
+  "drained-expired-mock-scheduler-work-with-lane-metadata-for-diagnostics",
+  "private-mock-yield-and-paint-state",
+  "private-scheduler-act-queue-flush-diagnostics",
+  "produced-private-delayed-act-root-work-metadata-from-accepted-renderer-root-metadata",
+  "produced-private-delayed-act-root-work-metadata-from-accepted-root-metadata",
+  "produced-private-delayed-renderer-root-work-metadata-for-private-act-root-handoff"
+]);
+
+const mockCjsPrivateDiagnosticSourceIds = freezeArray([
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+]);
+
+const mockCjsPrivateDiagnosticSourceStatuses = freezeArray([
+  "drained-accepted-internal-test-queue",
+  "drained-expired-mock-scheduler-work-for-diagnostics",
+  "private-scheduler-act-queue-flush-diagnostics"
+]);
+
+const postTaskPrivateDiagnosticSourceIds = freezeArray([
+  "__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__",
+  "fast-react.scheduler.post_task.private-act-root-work-handoff",
+  "fast-react.scheduler.unstable_post_task.priority-diagnostics"
+]);
+
+const postTaskPrivateDiagnosticSourceStatuses = freezeArray([
+  "accepted-private-scheduler-post-task-act-queue-handoff",
+  "accepted-private-scheduler-post-task-act-root-work-handoff",
+  "pending-private-root-continuation-execution-route",
+  "private-scheduler-post-task-priority-diagnostics",
+  "private-scheduler-post-task-root-continuation-execution-route",
+  "scheduler-post-task-private-priority-timeout-diagnostics"
+]);
 
 const privateAdmission886Rows = freezeArray([
   ledgerRow({
@@ -294,6 +351,20 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerIndexWrapperPath,
     physicalEntrypoint: "index.js",
     runtimeMode: "node-env-wrapper",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerIndexWrapperPath,
+      physicalEntrypoint: "index.js",
+      canonicalEntrypoint: "scheduler",
+      variantFamily: "index",
+      runtimeMode: "node-env-wrapper",
+      sourceKind: "node-env-wrapper",
+      sourceSha256:
+        "145965504d60007bc25486ab930b0367867dcd5d579ccd343c148d69349a7cfb",
+      wrapperTargets: [
+        "cjs/scheduler.production.js",
+        "cjs/scheduler.development.js"
+      ]
+    }),
     acceptedDiagnosticIds: noPrivateDiagnostics,
     acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
     acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
@@ -313,6 +384,17 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerCjsIndexDevelopmentPath,
     physicalEntrypoint: "cjs/scheduler.development.js",
     runtimeMode: "development",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerCjsIndexDevelopmentPath,
+      physicalEntrypoint: "cjs/scheduler.development.js",
+      canonicalEntrypoint: "scheduler/cjs/scheduler.development.js",
+      variantFamily: "index",
+      runtimeMode: "development",
+      sourceKind: "cjs-development-guarded",
+      sourceSha256:
+        "646eb671c8585382baff16daf92fe16a4cdd10dcf1a363c58b2ae1f6bf3a2b8d",
+      declaredLicenseFile: "scheduler.development.js"
+    }),
     acceptedDiagnosticIds: noPrivateDiagnostics,
     acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
     acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
@@ -332,6 +414,17 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerCjsIndexProductionPath,
     physicalEntrypoint: "cjs/scheduler.production.js",
     runtimeMode: "production",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerCjsIndexProductionPath,
+      physicalEntrypoint: "cjs/scheduler.production.js",
+      canonicalEntrypoint: "scheduler/cjs/scheduler.production.js",
+      variantFamily: "index",
+      runtimeMode: "production",
+      sourceKind: "cjs-production",
+      sourceSha256:
+        "679adff761d31e9426604f80c0e99be44a3e6f4c6834b0218ecf0312a67c171f",
+      declaredLicenseFile: "scheduler.production.js"
+    }),
     acceptedDiagnosticIds: noPrivateDiagnostics,
     acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
     acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
@@ -351,6 +444,24 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerMockPath,
     physicalEntrypoint: "unstable_mock.js",
     runtimeMode: "package-root-source",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerMockPath,
+      physicalEntrypoint: "unstable_mock.js",
+      canonicalEntrypoint: "scheduler/unstable_mock",
+      variantFamily: "unstable_mock",
+      runtimeMode: "package-root-source",
+      sourceKind: "package-root-private-mock-wrapper",
+      sourceSha256:
+        "5de8b249891e244b1350be48bf7b31288ee50ee90ed30d916c34750e3a531b3b",
+      wrapperTargets: [
+        "cjs/scheduler-unstable_mock.production.js",
+        "cjs/scheduler-unstable_mock.development.js"
+      ],
+      diagnosticEntrypoints: ["scheduler/unstable_mock"],
+      diagnosticCompatibilityTargets: [schedulerPackageVersionTarget()],
+      privateDiagnosticSourceIds: mockRootPrivateDiagnosticSourceIds,
+      privateDiagnosticSourceStatuses: mockRootPrivateDiagnosticSourceStatuses
+    }),
     acceptedDiagnosticIds: mockRootDiagnosticIds,
     acceptedDiagnosticStatuses: mockRootDiagnosticStatuses,
     acceptedDiagnosticRoles: mockRootDiagnosticRoles,
@@ -389,6 +500,21 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerCjsMockDevelopmentPath,
     physicalEntrypoint: "cjs/scheduler-unstable_mock.development.js",
     runtimeMode: "development",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerCjsMockDevelopmentPath,
+      physicalEntrypoint: "cjs/scheduler-unstable_mock.development.js",
+      canonicalEntrypoint:
+        "scheduler/cjs/scheduler-unstable_mock.development.js",
+      variantFamily: "unstable_mock",
+      runtimeMode: "development",
+      sourceKind: "cjs-development",
+      sourceSha256:
+        "ed9e45f83cff393243d81449ef21bf652ff23a6b30cd61308eb7cec4e1d13fb9",
+      diagnosticEntrypoints: ["scheduler/unstable_mock"],
+      diagnosticCompatibilityTargets: [schedulerPackageVersionTarget()],
+      privateDiagnosticSourceIds: mockCjsPrivateDiagnosticSourceIds,
+      privateDiagnosticSourceStatuses: mockCjsPrivateDiagnosticSourceStatuses
+    }),
     acceptedDiagnosticIds: mockCjsDiagnosticIds,
     acceptedDiagnosticStatuses: mockCjsDiagnosticStatuses,
     acceptedDiagnosticRoles: mockCjsDiagnosticRoles,
@@ -406,6 +532,21 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerCjsMockProductionPath,
     physicalEntrypoint: "cjs/scheduler-unstable_mock.production.js",
     runtimeMode: "production",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerCjsMockProductionPath,
+      physicalEntrypoint: "cjs/scheduler-unstable_mock.production.js",
+      canonicalEntrypoint:
+        "scheduler/cjs/scheduler-unstable_mock.production.js",
+      variantFamily: "unstable_mock",
+      runtimeMode: "production",
+      sourceKind: "cjs-production",
+      sourceSha256:
+        "ed9e45f83cff393243d81449ef21bf652ff23a6b30cd61308eb7cec4e1d13fb9",
+      diagnosticEntrypoints: ["scheduler/unstable_mock"],
+      diagnosticCompatibilityTargets: [schedulerPackageVersionTarget()],
+      privateDiagnosticSourceIds: mockCjsPrivateDiagnosticSourceIds,
+      privateDiagnosticSourceStatuses: mockCjsPrivateDiagnosticSourceStatuses
+    }),
     acceptedDiagnosticIds: mockCjsDiagnosticIds,
     acceptedDiagnosticStatuses: mockCjsDiagnosticStatuses,
     acceptedDiagnosticRoles: mockCjsDiagnosticRoles,
@@ -423,6 +564,20 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerPostTaskWrapperPath,
     physicalEntrypoint: "unstable_post_task.js",
     runtimeMode: "node-env-wrapper",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerPostTaskWrapperPath,
+      physicalEntrypoint: "unstable_post_task.js",
+      canonicalEntrypoint: "scheduler/unstable_post_task",
+      variantFamily: "unstable_post_task",
+      runtimeMode: "node-env-wrapper",
+      sourceKind: "node-env-wrapper",
+      sourceSha256:
+        "2aa725364b0efa1772c01cd978ac888b655711645768bdcf5e885a0c4e435ef2",
+      wrapperTargets: [
+        "cjs/scheduler-unstable_post_task.production.js",
+        "cjs/scheduler-unstable_post_task.development.js"
+      ]
+    }),
     acceptedDiagnosticIds: noPrivateDiagnostics,
     acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
     acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
@@ -445,6 +600,22 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerCjsPostTaskDevelopmentPath,
     physicalEntrypoint: "cjs/scheduler-unstable_post_task.development.js",
     runtimeMode: "development",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerCjsPostTaskDevelopmentPath,
+      physicalEntrypoint: "cjs/scheduler-unstable_post_task.development.js",
+      canonicalEntrypoint:
+        "scheduler/cjs/scheduler-unstable_post_task.development.js",
+      variantFamily: "unstable_post_task",
+      runtimeMode: "development",
+      sourceKind: "cjs-development-guarded",
+      sourceSha256:
+        "d05654ade272adfcc73486f31125a0d5b8b5781d0a0cf94aea78a48dc1ee1f93",
+      declaredLicenseFile: "scheduler-unstable_post_task.development.js",
+      diagnosticEntrypoints: ["scheduler/unstable_post_task"],
+      diagnosticCompatibilityTargets: [schedulerPackageVersionTarget()],
+      privateDiagnosticSourceIds: postTaskPrivateDiagnosticSourceIds,
+      privateDiagnosticSourceStatuses: postTaskPrivateDiagnosticSourceStatuses
+    }),
     acceptedDiagnosticIds: postTaskDiagnosticIds,
     acceptedDiagnosticStatuses: postTaskDiagnosticStatuses,
     acceptedDiagnosticRoles: postTaskDiagnosticRoles,
@@ -462,6 +633,22 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerCjsPostTaskProductionPath,
     physicalEntrypoint: "cjs/scheduler-unstable_post_task.production.js",
     runtimeMode: "production",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerCjsPostTaskProductionPath,
+      physicalEntrypoint: "cjs/scheduler-unstable_post_task.production.js",
+      canonicalEntrypoint:
+        "scheduler/cjs/scheduler-unstable_post_task.production.js",
+      variantFamily: "unstable_post_task",
+      runtimeMode: "production",
+      sourceKind: "cjs-production",
+      sourceSha256:
+        "9ffc921ccb13a0a58dbc0c951c248129ff4790b7c4890cde1fbc1dd97cd5aac1",
+      declaredLicenseFile: "scheduler-unstable_post_task.production.js",
+      diagnosticEntrypoints: ["scheduler/unstable_post_task"],
+      diagnosticCompatibilityTargets: [schedulerPackageVersionTarget()],
+      privateDiagnosticSourceIds: postTaskPrivateDiagnosticSourceIds,
+      privateDiagnosticSourceStatuses: postTaskPrivateDiagnosticSourceStatuses
+    }),
     acceptedDiagnosticIds: postTaskDiagnosticIds,
     acceptedDiagnosticStatuses: postTaskDiagnosticStatuses,
     acceptedDiagnosticRoles: postTaskDiagnosticRoles,
@@ -479,6 +666,20 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerNativeWrapperPath,
     physicalEntrypoint: "index.native.js",
     runtimeMode: "node-env-wrapper",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerNativeWrapperPath,
+      physicalEntrypoint: "index.native.js",
+      canonicalEntrypoint: "scheduler/index.native.js",
+      variantFamily: "native",
+      runtimeMode: "node-env-wrapper",
+      sourceKind: "node-env-wrapper",
+      sourceSha256:
+        "f1c2fea33a9252ccba1f7c7a9310ea7c0e82f3cff1bc7c693ff153bd54175b25",
+      wrapperTargets: [
+        "cjs/scheduler.native.production.js",
+        "cjs/scheduler.native.development.js"
+      ]
+    }),
     acceptedDiagnosticIds: noPrivateDiagnostics,
     acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
     acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
@@ -501,6 +702,16 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerCjsNativeDevelopmentPath,
     physicalEntrypoint: "cjs/scheduler.native.development.js",
     runtimeMode: "development",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerCjsNativeDevelopmentPath,
+      physicalEntrypoint: "cjs/scheduler.native.development.js",
+      canonicalEntrypoint: "scheduler/cjs/scheduler.native.development.js",
+      variantFamily: "native",
+      runtimeMode: "development",
+      sourceKind: "cjs-development-guarded",
+      sourceSha256:
+        "003f02f0ac053d5f215feff0e9c8a34550059a489a8f31ec1cdbaf671baf6444"
+    }),
     acceptedDiagnosticIds: noPrivateDiagnostics,
     acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
     acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
@@ -520,6 +731,16 @@ const privateAdmission886Rows = freezeArray([
     sourceFile: schedulerCjsNativeProductionPath,
     physicalEntrypoint: "cjs/scheduler.native.production.js",
     runtimeMode: "production",
+    sourceCurrentness: sourceCurrentnessData({
+      sourceFile: schedulerCjsNativeProductionPath,
+      physicalEntrypoint: "cjs/scheduler.native.production.js",
+      canonicalEntrypoint: "scheduler/cjs/scheduler.native.production.js",
+      variantFamily: "native",
+      runtimeMode: "production",
+      sourceKind: "cjs-production",
+      sourceSha256:
+        "0dcfdb13779a22a71a60427d8396c7b8b9cf752cec23715eaea016897e5b69ab"
+    }),
     acceptedDiagnosticIds: noPrivateDiagnostics,
     acceptedDiagnosticStatuses: noPrivateDiagnosticStatuses,
     acceptedDiagnosticRoles: noPrivateDiagnosticRoles,
@@ -539,6 +760,15 @@ export const PRIVATE_ADMISSION_886_REQUIRED_SOURCE_BOUNDARIES = freezeRecord(
     privateAdmission886Rows.map((row) => [
       row.variantId,
       freezeRecord(row.sourceBoundary)
+    ])
+  )
+);
+
+export const PRIVATE_ADMISSION_886_REQUIRED_SOURCE_CURRENTNESS = freezeRecord(
+  Object.fromEntries(
+    privateAdmission886Rows.map((row) => [
+      row.variantId,
+      freezeSourceCurrentness(row.sourceCurrentness)
     ])
   )
 );
@@ -724,6 +954,31 @@ export function evaluatePrivateAdmission886Gate({
       })
     ];
   });
+  const sourceCurrentnessMismatches = evaluatedRows.flatMap((row) => {
+    const expected =
+      PRIVATE_ADMISSION_886_REQUIRED_SOURCE_CURRENTNESS[row.variantId];
+    const declaredMatches =
+      expected !== undefined &&
+      sameSourceCurrentness(row.sourceCurrentness, expected);
+    const actualMatches =
+      expected !== undefined &&
+      sameSourceCurrentness(row.actualSourceCurrentness, expected);
+
+    if (declaredMatches && actualMatches) {
+      return [];
+    }
+
+    return [
+      freezeRecord({
+        variantId: row.variantId,
+        expectedSourceCurrentness: expected ?? null,
+        declaredSourceCurrentness: row.sourceCurrentness,
+        actualSourceCurrentness: row.actualSourceCurrentness,
+        declaredSourceCurrentnessMatches: declaredMatches,
+        actualSourceCurrentnessMatches: actualMatches
+      })
+    ];
+  });
   const diagnosticMismatches = compareRequiredArrayByVariant({
     rows: evaluatedRows,
     requiredByVariant: PRIVATE_ADMISSION_886_REQUIRED_DIAGNOSTIC_IDS,
@@ -900,6 +1155,11 @@ export function evaluatePrivateAdmission886Gate({
   );
   pushRowsViolation(
     violations,
+    "scheduler-variant-source-currentness-mismatch",
+    sourceCurrentnessMismatches
+  );
+  pushRowsViolation(
+    violations,
     "scheduler-variant-private-diagnostic-id-mismatch",
     diagnosticMismatches
   );
@@ -969,8 +1229,11 @@ export function evaluatePrivateAdmission886Gate({
   const durableEvidenceTokensRecognized =
     nonDurableEvidenceTokenMismatches.length === 0;
   const evidenceRolesRecognized = evidenceRoleMismatches.length === 0;
+  const sourceCurrentnessRecognized =
+    sourceCurrentnessMismatches.length === 0;
   const sourceOwnedPackageEntrypointsRecognized =
     sourceBoundaryMismatches.length === 0 &&
+    sourceCurrentnessRecognized &&
     sourceOwnedBoundaryViolationIds.length === 0;
   const privateDiagnosticIdsRecognized = diagnosticMismatches.length === 0;
   const privateDiagnosticStatusesRecognized = statusMismatches.length === 0;
@@ -995,6 +1258,7 @@ export function evaluatePrivateAdmission886Gate({
     manifest.duplicateVariantIds.length === 0 &&
     evidenceRecognized &&
     durableEvidenceTokensRecognized &&
+    sourceCurrentnessRecognized &&
     sourceOwnedPackageEntrypointsRecognized &&
     privateDiagnosticIdsRecognized &&
     privateDiagnosticStatusesRecognized &&
@@ -1017,6 +1281,7 @@ export function evaluatePrivateAdmission886Gate({
     evidenceRecognized,
     evidenceRolesRecognized,
     durableEvidenceTokensRecognized,
+    sourceCurrentnessRecognized,
     sourceOwnedPackageEntrypointsRecognized,
     privateDiagnosticIdsRecognized,
     privateDiagnosticStatusesRecognized,
@@ -1052,6 +1317,9 @@ export function evaluatePrivateAdmission886Gate({
     sourceBoundaryViolationIds: freezeArray(
       sourceBoundaryMismatches.map((mismatch) => mismatch.variantId)
     ),
+    sourceCurrentnessViolationIds: freezeArray(
+      sourceCurrentnessMismatches.map((mismatch) => mismatch.variantId)
+    ),
     requirementFieldViolationIds: freezeArray(
       requirementFieldMismatches.map((mismatch) => mismatch.variantId)
     ),
@@ -1076,6 +1344,7 @@ function ledgerRow({
   sourceFile,
   physicalEntrypoint,
   runtimeMode,
+  sourceCurrentness,
   acceptedDiagnosticIds,
   acceptedDiagnosticStatuses,
   acceptedDiagnosticRoles,
@@ -1092,6 +1361,7 @@ function ledgerRow({
       physicalEntrypoint,
       runtimeMode
     }),
+    sourceCurrentness: freezeSourceCurrentness(sourceCurrentness),
     privateAdmission:
       acceptedDiagnosticIds.length === 0
         ? "scheduler-variant-boundary-no-private-diagnostic-admission"
@@ -1129,6 +1399,45 @@ function ledgerRow({
     }),
     publicBlockerClaims: falseRecord(PRIVATE_ADMISSION_886_PUBLIC_BLOCKER_FIELDS)
   });
+}
+
+function sourceCurrentnessData({
+  sourceFile,
+  physicalEntrypoint,
+  canonicalEntrypoint,
+  variantFamily,
+  runtimeMode,
+  sourceKind,
+  sourceSha256,
+  declaredLicenseFile = null,
+  wrapperTargets = [],
+  diagnosticEntrypoints = [],
+  diagnosticCompatibilityTargets = [],
+  privateDiagnosticSourceIds = [],
+  privateDiagnosticSourceStatuses = []
+}) {
+  return freezeSourceCurrentness({
+    packageName: schedulerPackageName,
+    packageVersion: schedulerPackageVersion,
+    sourceFile,
+    physicalEntrypoint,
+    canonicalEntrypoint,
+    variantFamily,
+    runtimeMode,
+    sourceKind,
+    sourceSha256,
+    declaredLicenseFile,
+    wrapperTargets,
+    diagnosticEntrypoints,
+    diagnosticCompatibilityTargets,
+    privateDiagnosticSourceIds,
+    privateDiagnosticSourceStatuses,
+    readError: null
+  });
+}
+
+function schedulerPackageVersionTarget() {
+  return `${schedulerPackageName}@${schedulerPackageVersion}`;
 }
 
 function cjsMockEvidence(role, path) {
@@ -1181,6 +1490,7 @@ function freezeLedgerRow(row) {
   return freezeRecord({
     ...row,
     sourceBoundary: freezeRecord(row.sourceBoundary),
+    sourceCurrentness: freezeSourceCurrentness(row.sourceCurrentness),
     acceptedDiagnosticIds: freezeArray(row.acceptedDiagnosticIds),
     acceptedDiagnosticStatuses: freezeArray(row.acceptedDiagnosticStatuses),
     acceptedDiagnosticRoles: freezeArray(row.acceptedDiagnosticRoles),
@@ -1191,6 +1501,9 @@ function freezeLedgerRow(row) {
 }
 
 function mergeRowOverride(row, override) {
+  const sourceCurrentness = Object.hasOwn(override, "sourceCurrentness")
+    ? override.sourceCurrentness
+    : row.sourceCurrentness;
   return freezeLedgerRow({
     ...row,
     ...override,
@@ -1198,6 +1511,7 @@ function mergeRowOverride(row, override) {
       ...row.sourceBoundary,
       ...(override.sourceBoundary ?? {})
     }),
+    sourceCurrentness: freezeSourceCurrentness(sourceCurrentness),
     acceptedDiagnosticIds: freezeArray(
       override.acceptedDiagnosticIds ?? row.acceptedDiagnosticIds
     ),
@@ -1227,8 +1541,14 @@ function evaluateLedgerRow({ fileCache, row, workspaceRoot }) {
   const evidence = row.evidence.map((evidenceRow) =>
     evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot })
   );
+  const actualSourceCurrentness = inspectSourceCurrentness({
+    fileCache,
+    row,
+    workspaceRoot
+  });
   return freezeRecord({
     ...row,
+    actualSourceCurrentness,
     evidence: freezeArray(evidence),
     evidenceRecognized: evidence.every((evidenceRow) => evidenceRow.recognized)
   });
@@ -1289,6 +1609,242 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
       forbiddenTokensPresent.length === 0 &&
       nonDurableTokens.length === 0
   });
+}
+
+function inspectSourceCurrentness({ fileCache, row, workspaceRoot }) {
+  let packageName = null;
+  let packageVersion = null;
+  let text = "";
+  const readErrors = [];
+  const sourceFile = row.sourceBoundary?.sourceFile ?? null;
+  const physicalEntrypoint = physicalEntrypointFromSourceFile(sourceFile);
+
+  try {
+    const packageJson = JSON.parse(
+      readCachedFile(fileCache, workspaceRoot, schedulerPackageJsonPath)
+    );
+    packageName = packageJson.name ?? null;
+    packageVersion = packageJson.version ?? null;
+  } catch (error) {
+    readErrors.push(`package.json: ${errorMessage(error)}`);
+  }
+
+  try {
+    text = readCachedFile(fileCache, workspaceRoot, sourceFile);
+  } catch (error) {
+    readErrors.push(`${sourceFile}: ${errorMessage(error)}`);
+  }
+
+  const wrapperTargets = readErrors.length === 0 ? extractWrapperTargets(text) : [];
+  const runtimeMode = deriveRuntimeMode(physicalEntrypoint, wrapperTargets);
+  const sourceKind =
+    readErrors.length === 0
+      ? deriveSourceKind({
+          physicalEntrypoint,
+          runtimeMode,
+          text,
+          wrapperTargets
+        })
+      : null;
+
+  return freezeSourceCurrentness({
+    packageName,
+    packageVersion,
+    sourceFile,
+    physicalEntrypoint,
+    canonicalEntrypoint: canonicalEntrypointFromPhysical(physicalEntrypoint),
+    variantFamily: variantFamilyFromPhysical(physicalEntrypoint),
+    runtimeMode,
+    sourceKind,
+    sourceSha256:
+      readErrors.length === 0
+        ? createHash("sha256").update(text, "utf8").digest("hex")
+        : null,
+    declaredLicenseFile:
+      readErrors.length === 0 ? extractDeclaredLicenseFile(text) : null,
+    wrapperTargets,
+    diagnosticEntrypoints:
+      readErrors.length === 0 ? extractDiagnosticEntrypoints(text) : [],
+    diagnosticCompatibilityTargets:
+      readErrors.length === 0
+        ? extractSchedulerCompatibilityTargets(text)
+        : [],
+    privateDiagnosticSourceIds:
+      readErrors.length === 0 ? extractPrivateDiagnosticSourceIds(text) : [],
+    privateDiagnosticSourceStatuses:
+      readErrors.length === 0
+        ? extractPrivateDiagnosticSourceStatuses(text)
+        : [],
+    readError: readErrors.length === 0 ? null : readErrors.join("; ")
+  });
+}
+
+function physicalEntrypointFromSourceFile(sourceFile) {
+  const prefix = "packages/scheduler/";
+  return typeof sourceFile === "string" && sourceFile.startsWith(prefix)
+    ? sourceFile.slice(prefix.length)
+    : null;
+}
+
+function canonicalEntrypointFromPhysical(physicalEntrypoint) {
+  if (physicalEntrypoint === null) {
+    return null;
+  }
+  if (physicalEntrypoint === "index.js") {
+    return "scheduler";
+  }
+  if (physicalEntrypoint === "unstable_mock.js") {
+    return "scheduler/unstable_mock";
+  }
+  if (physicalEntrypoint === "unstable_post_task.js") {
+    return "scheduler/unstable_post_task";
+  }
+  return `scheduler/${physicalEntrypoint}`;
+}
+
+function variantFamilyFromPhysical(physicalEntrypoint) {
+  if (physicalEntrypoint === null) {
+    return null;
+  }
+  if (physicalEntrypoint.includes("unstable_mock")) {
+    return "unstable_mock";
+  }
+  if (physicalEntrypoint.includes("unstable_post_task")) {
+    return "unstable_post_task";
+  }
+  if (physicalEntrypoint.includes("native")) {
+    return "native";
+  }
+  return "index";
+}
+
+function deriveRuntimeMode(physicalEntrypoint, wrapperTargets) {
+  if (physicalEntrypoint === null) {
+    return null;
+  }
+  if (physicalEntrypoint === "unstable_mock.js") {
+    return "package-root-source";
+  }
+  if (!physicalEntrypoint.startsWith("cjs/") && wrapperTargets.length > 0) {
+    return "node-env-wrapper";
+  }
+  if (physicalEntrypoint.endsWith(".development.js")) {
+    return "development";
+  }
+  if (physicalEntrypoint.endsWith(".production.js")) {
+    return "production";
+  }
+  return null;
+}
+
+function deriveSourceKind({
+  physicalEntrypoint,
+  runtimeMode,
+  text,
+  wrapperTargets
+}) {
+  if (physicalEntrypoint === "unstable_mock.js") {
+    return "package-root-private-mock-wrapper";
+  }
+  if (
+    physicalEntrypoint !== null &&
+    !physicalEntrypoint.startsWith("cjs/") &&
+    wrapperTargets.length > 0
+  ) {
+    return "node-env-wrapper";
+  }
+  if (runtimeMode === "development" && hasDevelopmentModeGuard(text)) {
+    return "cjs-development-guarded";
+  }
+  if (runtimeMode === "development") {
+    return "cjs-development";
+  }
+  if (runtimeMode === "production") {
+    return "cjs-production";
+  }
+  return null;
+}
+
+function hasDevelopmentModeGuard(text) {
+  return (
+    /"production"\s*!==\s*process\.env\.NODE_ENV/u.test(text) ||
+    /process\.env\.NODE_ENV\s*!==\s*['"]production['"]/u.test(text)
+  );
+}
+
+function extractWrapperTargets(text) {
+  return uniqueInOrder(
+    [...text.matchAll(/require\(['"]\.\/(cjs\/[^'"]+)['"]\)/gu)].map(
+      (match) => match[1]
+    )
+  );
+}
+
+function extractDeclaredLicenseFile(text) {
+  return text.match(/^\s*\*\s+(scheduler[^\n]*\.js)\s*$/mu)?.[1] ?? null;
+}
+
+function extractDiagnosticEntrypoints(text) {
+  return uniqueSorted(
+    [...text.matchAll(/(?:\bentrypoint:\s*['"]([^'"]+)['"]|\.entrypoint\s*=\s*['"]([^'"]+)['"])/gu)]
+      .map((match) => match[1] ?? match[2])
+      .filter((value) => value.startsWith("scheduler/"))
+  );
+}
+
+function extractSchedulerCompatibilityTargets(text) {
+  return uniqueSorted(
+    extractStringLiterals(text).filter((value) =>
+      /^scheduler@\d+\.\d+\.\d+$/u.test(value)
+    )
+  );
+}
+
+function extractPrivateDiagnosticSourceIds(text) {
+  return uniqueSorted(
+    extractStringLiterals(text).filter(
+      (value) =>
+        value.startsWith("__FAST_REACT_PRIVATE") ||
+        /^fast-react\.scheduler\.(?:mock|unstable_post_task|post_task)/u.test(
+          value
+        )
+    )
+  );
+}
+
+function extractPrivateDiagnosticSourceStatuses(text) {
+  return uniqueSorted(
+    extractStringLiterals(text).filter((value) =>
+      /(?:^private-|^described-|^drained-|^accepted-private|^produced-private|^pending-private|^scheduler-post-task-private)/u.test(
+        value
+      )
+    )
+  );
+}
+
+function extractStringLiterals(text) {
+  return [...text.matchAll(/['"]([^'"\n]+)['"]/gu)].map((match) => match[1]);
+}
+
+function uniqueInOrder(values) {
+  const seen = new Set();
+  return freezeArray(
+    values.filter((value) => {
+      if (seen.has(value)) {
+        return false;
+      }
+      seen.add(value);
+      return true;
+    })
+  );
+}
+
+function uniqueSorted(values) {
+  return freezeArray([...new Set(values)].sort());
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function classifyNonDurableEvidenceToken(token, approvedTokens) {
@@ -1418,6 +1974,41 @@ function sameStringRecord(actual, expected, keys) {
   return keys.every((key) => actual?.[key] === expected?.[key]);
 }
 
+function sameSourceCurrentness(actual, expected) {
+  return (
+    sameStringRecord(actual, expected, [
+      "packageName",
+      "packageVersion",
+      "sourceFile",
+      "physicalEntrypoint",
+      "canonicalEntrypoint",
+      "variantFamily",
+      "runtimeMode",
+      "sourceKind",
+      "sourceSha256",
+      "declaredLicenseFile",
+      "readError"
+    ]) &&
+    sameStringArray(actual?.wrapperTargets ?? [], expected.wrapperTargets) &&
+    sameStringArray(
+      actual?.diagnosticEntrypoints ?? [],
+      expected.diagnosticEntrypoints
+    ) &&
+    sameStringArray(
+      actual?.diagnosticCompatibilityTargets ?? [],
+      expected.diagnosticCompatibilityTargets
+    ) &&
+    sameStringArray(
+      actual?.privateDiagnosticSourceIds ?? [],
+      expected.privateDiagnosticSourceIds
+    ) &&
+    sameStringArray(
+      actual?.privateDiagnosticSourceStatuses ?? [],
+      expected.privateDiagnosticSourceStatuses
+    )
+  );
+}
+
 function indexRowsByVariant(rows) {
   return freezeRecord(
     Object.fromEntries(rows.map((row) => [row.variantId, row]))
@@ -1445,6 +2036,34 @@ function pushIdsViolation(violations, id, ids) {
 
 function falseRecord(keys) {
   return freezeRecord(Object.fromEntries(keys.map((key) => [key, false])));
+}
+
+function freezeSourceCurrentness(sourceCurrentness = {}) {
+  const value = sourceCurrentness ?? {};
+  return freezeRecord({
+    packageName: value.packageName ?? null,
+    packageVersion: value.packageVersion ?? null,
+    sourceFile: value.sourceFile ?? null,
+    physicalEntrypoint: value.physicalEntrypoint ?? null,
+    canonicalEntrypoint: value.canonicalEntrypoint ?? null,
+    variantFamily: value.variantFamily ?? null,
+    runtimeMode: value.runtimeMode ?? null,
+    sourceKind: value.sourceKind ?? null,
+    sourceSha256: value.sourceSha256 ?? null,
+    declaredLicenseFile: value.declaredLicenseFile ?? null,
+    wrapperTargets: freezeArray(value.wrapperTargets ?? []),
+    diagnosticEntrypoints: freezeArray(value.diagnosticEntrypoints ?? []),
+    diagnosticCompatibilityTargets: freezeArray(
+      value.diagnosticCompatibilityTargets ?? []
+    ),
+    privateDiagnosticSourceIds: freezeArray(
+      value.privateDiagnosticSourceIds ?? []
+    ),
+    privateDiagnosticSourceStatuses: freezeArray(
+      value.privateDiagnosticSourceStatuses ?? []
+    ),
+    readError: value.readError ?? null
+  });
 }
 
 function freezeArray(values) {
