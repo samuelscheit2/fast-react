@@ -14,6 +14,8 @@ function isForbiddenLoad(request) {
     specifier.startsWith('@fast-react/native-') ||
     specifier === 'child_process' ||
     specifier === 'node:child_process' ||
+    specifier === 'worker_threads' ||
+    specifier === 'node:worker_threads' ||
     specifier === 'http' ||
     specifier === 'node:http' ||
     specifier === 'https' ||
@@ -381,7 +383,7 @@ async function main() {
   assert.deepEqual(
     forbiddenLoads,
     [],
-    'placeholder imports and loadNativeBinding() must not load native artifacts, platform packages, child_process, or network modules'
+    'placeholder imports and loadNativeBinding() must not load native artifacts, platform packages, child_process, worker_threads, or network modules'
   );
 
   console.log('Fast React native no-load guard checks passed.');
