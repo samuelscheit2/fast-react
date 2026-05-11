@@ -2960,6 +2960,7 @@ const rootPublicFacadeHostOutputUpdatePayloads = new WeakMap();
 const rootPublicFacadeNestedHostOutputUpdatePayloads = new WeakMap();
 const rootPublicFacadeHostOutputUnmountCleanupPayloads = new WeakMap();
 const rootPublicFacadeLifecycleContainerSnapshotPayloads = new WeakMap();
+const rootPublicFacadeLifecycleContainerSnapshotCaptures = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -6304,12 +6305,21 @@ function createPrivateRootPublicFacadeRoot(
         const callback = arguments.length > 0 ? arguments[0] : undefined;
         const activeHostOutput =
           getActivePrivateRootPublicFacadeHostOutputRender(payload);
+        const lifecycleRequestBoundary =
+          createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
         const record = adapterState.bridge.unmountContainer(
           createRecord.handle,
           callback
         );
         payload.requestRecords.push(record);
         payload.unmountRecords.push(record);
+        assertPrivateRootPublicFacadeLifecycleNewSourceRecord(
+          payload,
+          createRecord,
+          'unmount',
+          record,
+          lifecycleRequestBoundary
+        );
         if (activeHostOutput !== null && !record.noOp) {
           unmountPrivateRootPublicFacadeActiveHostOutputFromPayload(
             payload,
@@ -7210,6 +7220,7 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
   assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputRender(
     createRecord
   );
+  assertPublicFacadeLifecycleSourceRecordOverrides(payload, options, 'render');
   const normalizedInitial = normalizeInitialHostOutputElement(element);
   const rootWorkLoopMetadataOption =
     getPublicFacadeRootWorkLoopFinishedWorkMetadataOption(options);
@@ -7224,7 +7235,6 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
       }
     );
   }
-  assertPublicFacadeLifecycleSourceRecordOverrides(payload, options, 'render');
 
   let sideEffectRecord = null;
   let renderRecord = null;
@@ -7233,10 +7243,17 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
   let hostOutputPayload = null;
   let rootWorkLoopFinishedWorkRecord = null;
   let sideEffectCleanup = null;
+  const lifecycleRequestBoundary =
+    createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
   const sourceContainerSnapshotBefore =
     capturePrivateRootPublicFacadeLifecycleContainerSnapshot(
       createPayload.container
     );
+  assertPrivateRootPublicFacadeLifecycleContainerSnapshotCapture(
+    'render',
+    createPayload.container,
+    sourceContainerSnapshotBefore
+  );
   const callback = getPublicFacadeHostOutputRenderCallback(options);
   const sideEffectOptions =
     getPublicFacadeHostOutputRenderSideEffectOptions(options);
@@ -7250,6 +7267,13 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
       payload,
       element,
       callback
+    );
+    assertPrivateRootPublicFacadeLifecycleNewSourceRecord(
+      payload,
+      createRecord,
+      'render',
+      renderRecord,
+      lifecycleRequestBoundary
     );
     if (rootWorkLoopMetadataOption.found) {
       normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
@@ -7742,15 +7766,29 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     activeRender.renderPayload.hostOutputHandoff
   );
   assertPublicFacadeLifecycleSourceRecordOverrides(payload, options, 'update');
+  const lifecycleRequestBoundary =
+    createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
   const sourceContainerSnapshotBefore =
     capturePrivateRootPublicFacadeLifecycleContainerSnapshot(
       createPayload.container
     );
+  assertPrivateRootPublicFacadeLifecycleContainerSnapshotCapture(
+    'update',
+    createPayload.container,
+    sourceContainerSnapshotBefore
+  );
   const callback = getPublicFacadeHostOutputUpdateCallback(options);
   const updateRecord = appendPrivateRootPublicFacadeRenderRecord(
     payload,
     element,
     callback
+  );
+  assertPrivateRootPublicFacadeLifecycleNewSourceRecord(
+    payload,
+    createRecord,
+    'update',
+    updateRecord,
+    lifecycleRequestBoundary
   );
   const hostOutputUpdateHandoff = payload.bridge.applyHostOutputUpdate(
     updateRecord,
@@ -7966,10 +8004,19 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
       createRecord,
       sideEffectOptions
     );
+    const renderLifecycleRequestBoundary =
+      createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
     renderRecord = appendPrivateRootPublicFacadeRenderRecord(
       payload,
       initialElement,
       renderCallback
+    );
+    assertPrivateRootPublicFacadeLifecycleNewSourceRecord(
+      payload,
+      createRecord,
+      'render',
+      renderRecord,
+      renderLifecycleRequestBoundary
     );
     admissionRecord = payload.bridge.admitCreateRenderPath(
       createRecord,
@@ -7985,10 +8032,19 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     });
     sideEffectCleanup =
       payload.bridge.revertCreateRootSideEffects(sideEffectRecord);
+    const updateLifecycleRequestBoundary =
+      createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
     updateRecord = appendPrivateRootPublicFacadeRenderRecord(
       payload,
       nextElement,
       updateCallback
+    );
+    assertPrivateRootPublicFacadeLifecycleNewSourceRecord(
+      payload,
+      createRecord,
+      'update',
+      updateRecord,
+      updateLifecycleRequestBoundary
     );
     hostOutputUpdateHandoff = payload.bridge.applyHostOutputUpdate(
       updateRecord,
@@ -8944,6 +9000,11 @@ function unmountPrivateRootPublicFacadeHostOutputFromPayload(
     capturePrivateRootPublicFacadeLifecycleContainerSnapshot(
       createPayload.container
     );
+  assertPrivateRootPublicFacadeLifecycleContainerSnapshotCapture(
+    'unmount',
+    createPayload.container,
+    sourceContainerSnapshotBefore
+  );
 
   let sideEffectRecord = null;
   let renderRecord = null;
@@ -8964,10 +9025,19 @@ function unmountPrivateRootPublicFacadeHostOutputFromPayload(
       createRecord,
       sideEffectOptions
     );
+    const renderLifecycleRequestBoundary =
+      createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
     renderRecord = appendPrivateRootPublicFacadeRenderRecord(
       payload,
       element,
       renderCallback
+    );
+    assertPrivateRootPublicFacadeLifecycleNewSourceRecord(
+      payload,
+      createRecord,
+      'render',
+      renderRecord,
+      renderLifecycleRequestBoundary
     );
     admissionRecord = payload.bridge.admitCreateRenderPath(
       createRecord,
@@ -9067,6 +9137,11 @@ function unmountPrivateRootPublicFacadeActiveHostOutputFromPayload(
     capturePrivateRootPublicFacadeLifecycleContainerSnapshot(
       createPayload.container
     );
+  assertPrivateRootPublicFacadeLifecycleContainerSnapshotCapture(
+    'unmount',
+    createPayload.container,
+    sourceContainerSnapshotBefore
+  );
 
   try {
     sideEffectRecord = payload.bridge.applyCreateRootSideEffects(
@@ -21339,7 +21414,7 @@ function markerListenerGuardStateMatches(left, right) {
 }
 
 function capturePrivateRootPublicFacadeLifecycleContainerSnapshot(container) {
-  return freezeRecord({
+  const snapshot = freezeRecord({
     childCount: getChildNodeCount(container),
     markerListenerState:
       inspectPublicFacadeMarkerListenerPreflightState(container),
@@ -21349,10 +21424,41 @@ function capturePrivateRootPublicFacadeLifecycleContainerSnapshot(container) {
         ? ''
         : String(container.textContent)
   });
+  rootPublicFacadeLifecycleContainerSnapshotCaptures.set(
+    snapshot,
+    freezeRecord({
+      container
+    })
+  );
+  return snapshot;
 }
 
 function getChildNodeCountFromLifecycleSnapshot(snapshot) {
   return snapshot == null ? null : snapshot.childCount;
+}
+
+function assertPrivateRootPublicFacadeLifecycleContainerSnapshotCapture(
+  phase,
+  container,
+  snapshot
+) {
+  if (snapshot == null || snapshot.markerListenerState == null) {
+    throwInvalidRootPublicFacadeLifecycleSourceRecord(
+      phase,
+      'Private public-facade lifecycle execution requires a source-owned container snapshot before mutation.'
+    );
+  }
+  const snapshotPayload =
+    rootPublicFacadeLifecycleContainerSnapshotCaptures.get(snapshot);
+  if (
+    snapshotPayload === undefined ||
+    snapshotPayload.container !== container
+  ) {
+    throwInvalidRootPublicFacadeLifecycleSourceRecord(
+      phase,
+      'Private public-facade lifecycle execution rejected a stale, cloned, cross-root, or caller-built container snapshot.'
+    );
+  }
 }
 
 function createPrivateRootPublicFacadeLifecycleContainerSnapshotRecord({
@@ -21365,12 +21471,11 @@ function createPrivateRootPublicFacadeLifecycleContainerSnapshotRecord({
   phase,
   sourceRecord
 }) {
-  if (before == null || before.markerListenerState == null) {
-    throwInvalidRootPublicFacadeLifecycleSourceRecord(
-      phase,
-      'Private public-facade lifecycle execution requires a source-owned container snapshot before mutation.'
-    );
-  }
+  assertPrivateRootPublicFacadeLifecycleContainerSnapshotCapture(
+    phase,
+    container,
+    before
+  );
   assertPrivateRootPublicFacadeLifecycleSourceRecord(
     payload,
     createRecord,
@@ -21513,6 +21618,53 @@ function assertPublicFacadeLifecycleSourceRecordOverrides(
       phase,
       options[sourceRecordField]
     );
+    throwInvalidRootPublicFacadeLifecycleSourceRecord(
+      phase,
+      'Private public-facade lifecycle execution rejected a stale source record snapshot; render, update, and unmount records must be created inside the active lifecycle boundary.'
+    );
+  }
+}
+
+function createPrivateRootPublicFacadeLifecycleRequestBoundary(payload) {
+  return freezeRecord({
+    renderRecordCount: payload.renderRecords.length,
+    requestRecordCount: payload.requestRecords.length,
+    unmountRecordCount: payload.unmountRecords.length
+  });
+}
+
+function assertPrivateRootPublicFacadeLifecycleNewSourceRecord(
+  payload,
+  createRecord,
+  phase,
+  sourceRecord,
+  boundary
+) {
+  assertPrivateRootPublicFacadeLifecycleSourceRecord(
+    payload,
+    createRecord,
+    phase,
+    sourceRecord
+  );
+
+  const phaseRecords =
+    phase === 'unmount' ? payload.unmountRecords : payload.renderRecords;
+  const previousPhaseRecordCount =
+    phase === 'unmount'
+      ? boundary.unmountRecordCount
+      : boundary.renderRecordCount;
+
+  if (
+    payload.requestRecords.length !== boundary.requestRecordCount + 1 ||
+    payload.requestRecords[payload.requestRecords.length - 1] !==
+      sourceRecord ||
+    phaseRecords.length !== previousPhaseRecordCount + 1 ||
+    phaseRecords[phaseRecords.length - 1] !== sourceRecord
+  ) {
+    throwInvalidRootPublicFacadeLifecycleSourceRecord(
+      phase,
+      'Private public-facade lifecycle execution rejected a stale, cloned, cross-root, or caller-built source record snapshot.'
+    );
   }
 }
 
@@ -21529,7 +21681,7 @@ function assertPrivateRootPublicFacadeLifecycleCreateRecord(
   ) {
     throwInvalidRootPublicFacadeLifecycleSourceRecord(
       phase,
-      'Private public-facade lifecycle execution rejected a cloned or caller-built createRoot source record.'
+      'Private public-facade lifecycle execution rejected a stale, cross-root, cloned or caller-built createRoot source record.'
     );
   }
 }
