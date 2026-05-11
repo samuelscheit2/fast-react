@@ -542,6 +542,21 @@ const privateAdmission810Rows = freezeArray([
   })
 ]);
 
+export const PRIVATE_ADMISSION_810_APPROVED_EVIDENCE_CONTEXTS_BY_ROLE =
+  freezeRecord(
+    Object.fromEntries(
+      privateAdmission810Rows.flatMap((row) =>
+        row.evidence.map((evidenceRow) => [
+          evidenceRow.role,
+          freezeRecord({
+            path: evidenceRow.path,
+            tokens: freezeArray(evidenceRow.tokens)
+          })
+        ])
+      )
+    )
+  );
+
 export const PRIVATE_ADMISSION_810_ROWS = freezeArray(
   privateAdmission810Rows.map((row) =>
     freezeRecord({
@@ -1193,7 +1208,7 @@ function evaluateLedgerRow({ fileCache, row, workspaceRoot }) {
 }
 
 function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
-  const nonDurableTokens = collectNonDurableEvidenceTokens(evidenceRow.tokens);
+  const nonDurableTokens = collectNonDurableEvidenceTokens(evidenceRow);
   let text;
   try {
     text = readWorkspaceFile({ fileCache, workspaceRoot, path: evidenceRow.path });
@@ -1228,14 +1243,19 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
   });
 }
 
-function collectNonDurableEvidenceTokens(tokens) {
+function collectNonDurableEvidenceTokens({ path, role, tokens }) {
+  const approvedContext =
+    PRIVATE_ADMISSION_810_APPROVED_EVIDENCE_CONTEXTS_BY_ROLE[role];
+  const approvedTokens =
+    approvedContext?.path === path ? approvedContext.tokens : [];
+
   return freezeArray(
     tokens.flatMap((token) => {
       const durableClass =
         PRIVATE_ADMISSION_810_DURABLE_EVIDENCE_TOKEN_CLASSES.find(
           (candidate) => candidate.pattern.test(token)
         );
-      if (durableClass !== undefined) {
+      if (approvedTokens.includes(token)) {
         return [];
       }
       const shape =
@@ -1245,8 +1265,10 @@ function collectNonDurableEvidenceTokens(tokens) {
       return [
         freezeRecord({
           token,
-          durableClassId: null,
-          shapeId: shape?.id ?? "not-allowed-durable-token-class"
+          durableClassId: durableClass?.id ?? null,
+          shapeId: shape?.id ?? "not-allowed-durable-token-class",
+          approvedEvidencePath: approvedContext?.path ?? null,
+          actualEvidencePath: path
         })
       ];
     })

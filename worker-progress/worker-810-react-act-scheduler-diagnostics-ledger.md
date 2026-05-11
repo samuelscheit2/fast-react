@@ -35,6 +35,13 @@
 - Focused regressions now confirm the evidence allowlist rejects snippet/member
   shapes including `Scheduler,`, string-literal snippets, member expressions,
   and member-call expressions.
+- Final re-audit follow-up replaces broad regex-only durable classification
+  with an exact approved evidence context per role and path. Identifier-shaped
+  words no longer pass unless they are listed in the approved ledger evidence
+  for that context.
+- Focused regressions now reject single-word prose/error/test-title fragments
+  including `Only`, `accepted`, and `unsafe` even though those words appear in
+  checked source or test files.
 
 ## Changed Files
 
@@ -77,6 +84,14 @@
 - Second re-audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
 - Second re-audit follow-up: `git diff --check` - passed.
 - Second re-audit follow-up: `git diff --cached --check` - passed.
+- Final re-audit follow-up: `node --check tests/conformance/src/private-admission-810-react-act-scheduler-diagnostics-ledger.mjs` - passed.
+- Final re-audit follow-up: `node --check tests/conformance/test/private-admission-810-react-act-scheduler-diagnostics-ledger.test.mjs` - passed.
+- Final re-audit follow-up: `node --test tests/conformance/test/private-admission-810-react-act-scheduler-diagnostics-ledger.test.mjs` - passed, 11 tests.
+- Final re-audit follow-up: `node --test tests/conformance/test/react-act-oracle.test.mjs tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs tests/conformance/test/scheduler-mock-oracle.test.mjs tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs tests/conformance/test/scheduler-native-entry-oracle.test.mjs tests/conformance/test/scheduler-mock-expired-lane-flush.test.mjs` - passed, 82 tests.
+- Final re-audit follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
+- Final re-audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
+- Final re-audit follow-up: `git diff --check` - passed.
+- Final re-audit follow-up: `git diff --cached --check` - passed.
 
 ## Evidence Gathered
 
@@ -111,6 +126,12 @@
 - Second re-audit coverage now injects `Scheduler,`, string-literal source
   snippets, member expressions, and member-call expressions, and verifies all
   are rejected by positive durable-token classification.
+- Final re-audit coverage now derives an exact approved evidence context
+  manifest from the ledger rows and requires evidence tokens to match that
+  role/path manifest before they are treated as durable.
+- Final re-audit coverage now injects the audit's single-word fragments
+  `Only`, `accepted`, and `unsafe`, verifies they are present in source/test
+  text, and confirms the gate reports them as non-durable evidence tokens.
 
 ## Risks Or Blockers
 

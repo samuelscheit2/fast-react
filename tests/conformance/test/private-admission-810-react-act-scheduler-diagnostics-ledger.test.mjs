@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  PRIVATE_ADMISSION_810_APPROVED_EVIDENCE_CONTEXTS_BY_ROLE,
   PRIVATE_ADMISSION_810_DURABLE_EVIDENCE_TOKEN_CLASSES,
   PRIVATE_ADMISSION_810_GATE_STATUS,
   PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES,
@@ -86,6 +87,18 @@ test("private admission 810 manifest pins accepted React act and Scheduler hando
       PRIVATE_ADMISSION_810_REQUIRED_EVIDENCE_ROLES[row.workerId],
       row.workerId
     );
+    for (const evidenceRow of row.evidence) {
+      assert.deepEqual(
+        PRIVATE_ADMISSION_810_APPROVED_EVIDENCE_CONTEXTS_BY_ROLE[
+          evidenceRow.role
+        ],
+        {
+          path: evidenceRow.path,
+          tokens: evidenceRow.tokens
+        },
+        evidenceRow.role
+      );
+    }
     assert.deepEqual(
       Object.keys(row.requirements).sort(),
       [...PRIVATE_ADMISSION_810_REQUIRED_REQUIREMENT_FIELDS].sort(),
@@ -446,6 +459,69 @@ test("private admission 810 gate rejects prose, test-title, and error-message ev
   assert.deepEqual(
     reactActSourceEvidence.nonDurableTokens.map((entry) => entry.shapeId),
     ["not-allowed-durable-token-class"]
+  );
+});
+
+test("private admission 810 gate rejects single-word prose evidence fragments", () => {
+  const gate = evaluatePrivateAdmission810Gate({
+    rowOverrides: {
+      [worker772]: {
+        evidence: withAdditionalEvidenceTokens(
+          rowByWorker(worker772),
+          "worker-772-delayed-test-fields",
+          ["unsafe"]
+        )
+      },
+      [worker775]: {
+        evidence: withAdditionalEvidenceTokens(
+          rowByWorker(worker775),
+          "worker-775-react-act-source",
+          ["Only", "accepted"]
+        )
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_810_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.evidenceRecognized, true);
+  assert.equal(gate.durableEvidenceTokensRecognized, false);
+  assert.deepEqual(gate.nonDurableEvidenceTokenViolationIds, [
+    `${worker772}.worker-772-delayed-test-fields`,
+    `${worker775}.worker-775-react-act-source`
+  ]);
+  assertViolationIds(gate, ["non-durable-evidence-token-shape"]);
+
+  const delayedTestEvidence = gate.rowsByWorker[worker772].evidence.find(
+    (row) => row.role === "worker-772-delayed-test-fields"
+  );
+  const reactActSourceEvidence = gate.rowsByWorker[worker775].evidence.find(
+    (row) => row.role === "worker-775-react-act-source"
+  );
+  assert.notEqual(delayedTestEvidence, undefined);
+  assert.notEqual(reactActSourceEvidence, undefined);
+  assert.equal(delayedTestEvidence.recognized, false);
+  assert.equal(reactActSourceEvidence.recognized, false);
+  assert.deepEqual(delayedTestEvidence.missingTokens, []);
+  assert.deepEqual(reactActSourceEvidence.missingTokens, []);
+  assert.deepEqual(
+    delayedTestEvidence.nonDurableTokens.map((entry) => entry.token),
+    ["unsafe"]
+  );
+  assert.deepEqual(
+    reactActSourceEvidence.nonDurableTokens.map((entry) => entry.token),
+    ["Only", "accepted"]
+  );
+  assert.deepEqual(
+    delayedTestEvidence.nonDurableTokens.map((entry) => entry.shapeId),
+    ["not-allowed-durable-token-class"]
+  );
+  assert.deepEqual(
+    reactActSourceEvidence.nonDurableTokens.map((entry) => entry.shapeId),
+    [
+      "not-allowed-durable-token-class",
+      "not-allowed-durable-token-class"
+    ]
   );
 });
 
