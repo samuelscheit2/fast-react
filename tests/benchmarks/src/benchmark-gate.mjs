@@ -126,6 +126,13 @@ const ACCEPTED_CARGO_ALL_FEATURES_PACKAGES = Object.freeze(new Set([
   "fast-react-test-renderer"
 ]));
 
+const REJECTED_ZERO_TEST_CARGO_FILTERS = Object.freeze(new Map([
+  [
+    "fast-react-reconciler",
+    new Set(["deleted_subtree_passive", "root_commit_finished_host_root"])
+  ]
+]));
+
 const ACCEPTED_CARGO_TEST_FILTERS = Object.freeze(new Map([
   [
     "fast-react-napi",
@@ -144,17 +151,16 @@ const ACCEPTED_CARGO_TEST_FILTERS = Object.freeze(new Map([
       "complete_work",
       "context",
       "context_provider_update_lane",
-      "deleted_subtree_passive",
       "function_component",
       "lane_priority",
       "layout_effect",
       "offscreen",
       "offscreen_visibility",
       "passive_effects_",
+      "passive_effects_deleted_subtree",
       "passive_effects_callback_executor_errors_preserve_cross_phase_order_and_block_root_errors",
       "root_commit_deletion_subtree_traversal_gate",
       "root_commit_effect_list",
-      "root_commit_finished_host_root",
       "root_commit_finished_work",
       "root_scheduler",
       "root_updates",
@@ -1214,6 +1220,11 @@ function validateCargoTestCommandSegment(segment, tokens, { label, repoRoot }) {
   }
 
   const filters = args.filter((arg) => arg !== "--all-features");
+  if (filters.length > 1) {
+    errors.push(
+      `${segmentLabel} must include at most one Cargo TESTNAME filter`
+    );
+  }
   if (
     filters.length === 0 &&
     !ACCEPTED_CARGO_ALL_FEATURES_PACKAGES.has(packageName)
@@ -1225,12 +1236,22 @@ function validateCargoTestCommandSegment(segment, tokens, { label, repoRoot }) {
 
   const acceptedFilters =
     ACCEPTED_CARGO_TEST_FILTERS.get(packageName) ?? new Set();
+  const rejectedZeroTestFilters =
+    REJECTED_ZERO_TEST_CARGO_FILTERS.get(packageName) ?? new Set();
   for (const arg of args) {
     if (arg === "--all-features") {
       continue;
     }
     if (arg.startsWith("-")) {
       errors.push(`${segmentLabel} has unsupported cargo flag ${arg}`);
+      continue;
+    }
+    if (rejectedZeroTestFilters.has(arg)) {
+      errors.push(
+        `${segmentLabel} test filter ${JSON.stringify(
+          arg
+        )} selects zero tests for ${packageName}`
+      );
       continue;
     }
     if (!acceptedFilters.has(arg)) {

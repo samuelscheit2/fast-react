@@ -24,6 +24,16 @@ performance proof.
   - Validates accepted-gate command segments against known accepted npm command
     segments, accepted Node gate test targets, real Cargo crate names,
     `--all-features`, and accepted Cargo gate filters.
+  - Rejects Cargo command segments with more than one positional TESTNAME and
+    explicitly rejects known zero-test filters.
+- `tests/benchmarks/manifests/private-503-533-diagnostic-canaries.json`
+- `tests/benchmarks/manifests/private-534-564-diagnostic-canaries.json`
+- `tests/benchmarks/manifests/private-565-594-diagnostic-canaries.json`
+  - Split accepted Cargo commands into runnable single-filter segments.
+  - Replaced zero-test `root_commit_finished_host_root` with
+    `root_commit_finished_work`.
+  - Replaced zero-test `deleted_subtree_passive` with
+    `passive_effects_deleted_subtree`.
 - `tests/benchmarks/schema/benchmark-result.schema.json`
   - Makes `scenarioResults` non-empty when a result artifact exists.
   - Sets `scenarioResult.additionalProperties` to `false`.
@@ -36,6 +46,8 @@ performance proof.
     `node --test this benchmark passed`, and `cargo test it passed`.
   - Adds repair coverage for the fake benchmark-gate source-module command and
     the nonexistent `this_benchmark_passed` Cargo filter.
+  - Adds repair coverage for multi-filter Cargo command syntax and the
+    zero-test `root_commit_finished_host_root` filter.
 
 ## Commands Run
 
@@ -43,6 +55,11 @@ performance proof.
 - `node tests/benchmarks/scripts/check-benchmark-manifests.mjs`
 - `node --check tests/benchmarks/src/benchmark-gate.mjs`
 - `node --check tests/benchmarks/test/benchmark-gate.test.mjs`
+- `cargo test -p fast-react-reconciler --all-features -- --list`
+- `cargo test -p fast-react-test-renderer --all-features -- --list`
+- `cargo test -p fast-react-napi --all-features -- --list`
+- Cargo manifest-filter proof script using `cargo test -p <pkg>
+  --all-features -- --list`
 - `git diff --check`
 - `npm run check:benchmarks`
 
@@ -56,6 +73,10 @@ performance proof.
 - Accepted-gate command validation rejects prefix-only prose, source modules,
   and invented Cargo filters while verifying existing manifest commands against
   accepted npm segments, Node gate targets, and Cargo crate/filter sets.
+- Cargo proof confirmed every manifest-referenced Cargo filter selects at
+  least one test, including replacement filters `root_commit_finished_work` and
+  `passive_effects_deleted_subtree`.
+- Manifest Cargo commands have zero multi-filter command segments.
 
 ## Risks Or Blockers
 

@@ -543,6 +543,17 @@ test("benchmark accepted gates reject decorative non-runnable commands", () => {
         "cargo test -p fast-react-reconciler --all-features this_benchmark_passed",
       pattern:
         /test filter "this_benchmark_passed" is not an accepted benchmark gate filter for fast-react-reconciler/
+    },
+    {
+      command:
+        "cargo test -p fast-react-reconciler --all-features root_commit_finished_work root_scheduler root_updates",
+      pattern: /must include at most one Cargo TESTNAME filter/
+    },
+    {
+      command:
+        "cargo test -p fast-react-reconciler --all-features root_commit_finished_host_root",
+      pattern:
+        /test filter "root_commit_finished_host_root" selects zero tests for fast-react-reconciler/
     }
   ];
 

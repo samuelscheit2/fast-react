@@ -33,7 +33,7 @@
       "acceptedGate": {
         "id": "reconciler-deleted-subtree-passive-fragment-portal-private-diagnostic-gate",
         "status": "accepted-private-partial",
-        "command": "cargo test -p fast-react-reconciler --all-features root_commit_deletion_subtree_traversal_gate deleted_subtree_passive",
+        "command": "cargo test -p fast-react-reconciler --all-features root_commit_deletion_subtree_traversal_gate && cargo test -p fast-react-reconciler --all-features passive_effects_deleted_subtree",
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Workers 503 and 504 admit private deleted-subtree passive destroy flush and Fragment/Portal deletion traversal metadata while public passive execution, broad deletion traversal, DOM mutation, and unmount compatibility remain blocked."
@@ -135,7 +135,7 @@
       "acceptedGate": {
         "id": "react-test-renderer-query-committed-fiber-private-diagnostic-gate",
         "status": "accepted-private-partial",
-        "command": "cargo test -p fast-react-test-renderer --all-features private_test_instance root_private_tree_committed_fiber_inspection && npm run test:react-test-renderer:serialization --workspace @fast-react/conformance",
+        "command": "cargo test -p fast-react-test-renderer --all-features private_test_instance && cargo test -p fast-react-test-renderer --all-features root_private_tree_committed_fiber_inspection && npm run test:react-test-renderer:serialization --workspace @fast-react/conformance",
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Workers 515 and 516 admit private TestInstance query bridge preflight and committed-fiber inspection metadata for multi-child and FunctionComponent shapes while public .root, TestInstance queries, toTree, native bridge execution, and serialization compatibility remain blocked."
@@ -169,7 +169,7 @@
       "acceptedGate": {
         "id": "reconciler-suspenselist-activity-blocker-private-diagnostic-gate",
         "status": "accepted-private-partial",
-        "command": "cargo test -p fast-react-reconciler --all-features begin_work_fails_closed_with_suspense_list_and_activity_child_shape_diagnostics root_work_loop_preflight_and_complete_handoff_report_suspense_list_activity_child_shapes",
+        "command": "cargo test -p fast-react-reconciler --all-features begin_work_fails_closed_with_suspense_list_and_activity_child_shape_diagnostics && cargo test -p fast-react-reconciler --all-features root_work_loop_preflight_and_complete_handoff_report_suspense_list_activity_child_shapes",
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Worker 522 admits private fail-closed SuspenseList and Activity child-shape diagnostics before generic unsupported-feature markers while reveal, hydration, hidden subtree work, host mutation, and public behavior remain blocked."

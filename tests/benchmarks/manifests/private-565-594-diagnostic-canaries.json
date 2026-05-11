@@ -30,7 +30,7 @@
       "acceptedGate": {
         "id": "reconciler-root-commit-scheduler-queue-private-diagnostic-gate",
         "status": "accepted-private-partial",
-        "command": "cargo test -p fast-react-reconciler --all-features root_commit_finished_work root_scheduler root_updates",
+        "command": "cargo test -p fast-react-reconciler --all-features root_commit_finished_work && cargo test -p fast-react-reconciler --all-features root_scheduler && cargo test -p fast-react-reconciler --all-features root_updates",
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Workers 565, 566, and 567 admit private finished-work commit execution, transition-lane scheduler routing, and HostRoot callback-order diagnostics while public root rendering, update scheduling, callback execution, host mutation, and comparable timing remain blocked."
@@ -47,7 +47,7 @@
       "acceptedGate": {
         "id": "react-function-context-effect-private-diagnostic-gate",
         "status": "accepted-private-partial",
-        "command": "cargo test -p fast-react-reconciler --all-features function_component root_commit_effect_list context",
+        "command": "cargo test -p fast-react-reconciler --all-features function_component && cargo test -p fast-react-reconciler --all-features root_commit_effect_list && cargo test -p fast-react-reconciler --all-features context",
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Workers 568, 569, and 570 admit private reducer dispatch queue, effect-list commit phase order, and multi-provider context lane diagnostics while public hook, effect, context, render, and compatibility claims remain blocked."
@@ -64,7 +64,7 @@
       "acceptedGate": {
         "id": "reconciler-suspense-offscreen-scheduler-private-diagnostic-gate",
         "status": "accepted-private-partial",
-        "command": "cargo test -p fast-react-reconciler --all-features begin_work root_scheduler complete_work offscreen",
+        "command": "cargo test -p fast-react-reconciler --all-features begin_work && cargo test -p fast-react-reconciler --all-features root_scheduler && cargo test -p fast-react-reconciler --all-features complete_work && cargo test -p fast-react-reconciler --all-features offscreen",
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Workers 571 and 572 admit private Suspense retry root-scheduler metadata and Offscreen complete-work visibility bubbling diagnostics while wakeable subscription, fallback traversal, visibility effects, host mutation, public Suspense/Offscreen compatibility, and comparable timing remain blocked."
