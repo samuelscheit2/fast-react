@@ -28234,7 +28234,7 @@ function isWeakMapKey(value) {
   );
 }
 
-module.exports = Object.freeze({
+const rootBridgeExports = Object.freeze({
   CLIENT_ROOT_KIND,
   CONCURRENT_ROOT_TAG,
   ROOT_BRIDGE_BLOCKED_CAPABILITIES,
@@ -28614,3 +28614,13 @@ module.exports = Object.freeze({
   unmountPrivateRootPublicFacadeHostOutput,
   revertPrivateCreateRootSideEffects
 });
+
+module.exports = rootBridgeExports;
+
+require('./hydrate-root-source-ledger.js')
+  .installPrivateHydrateRootSourceLedgerPayloadReaders({
+    getPrivateHydrateRootPublicFacadePreflightRecordPayload,
+    getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload,
+    getPrivateHydrateRootPublicFacadeExecutionPreflightPayload,
+    getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload
+  });

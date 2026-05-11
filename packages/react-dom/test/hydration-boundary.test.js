@@ -2061,11 +2061,28 @@ test('private hydration recoverable error boundary admission rejects stale clone
     hydrateRootSourceLedger.registerPrivateHydrateRootSourceLedgerRecord,
     undefined
   );
-  assert.notEqual(
-    hydrateRootSourceLedger.getPrivateHydrateRootSourceLedgerRecordPayload(
-      scenario.hydrateRecord
+  assert.equal(
+    Object.prototype.propertyIsEnumerable.call(
+      hydrateRootSourceLedger,
+      'installPrivateHydrateRootSourceLedgerPayloadReaders'
     ),
-    null
+    false
+  );
+  assert.throws(
+    () =>
+      hydrateRootSourceLedger.installPrivateHydrateRootSourceLedgerPayloadReaders(
+        Object.fromEntries(
+          [
+            'getPrivateHydrateRootPublicFacadePreflightRecordPayload',
+            'getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload',
+            'getPrivateHydrateRootPublicFacadeExecutionPreflightPayload',
+            'getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload'
+          ].map((getterName) => [getterName, () => null])
+        )
+      ),
+    {
+      code: 'FAST_REACT_DOM_INVALID_HYDRATE_ROOT_SOURCE_LEDGER_INSTALL'
+    }
   );
   const clonedLifecycleRequestBoundary = Object.freeze({
     ...scenario.lifecycleRequestBoundary
@@ -2133,31 +2150,59 @@ test('private hydration recoverable error boundary admission rejects stale clone
       TypeError
     );
   }
-  for (const clonedSourceLedgerRecord of [
-    clonedHydrateRootPreflightRecord,
-    clonedEventReplayPreflightRecord,
-    clonedExecutionPreflightRecord,
-    clonedLifecycleRequestBoundary
-  ]) {
-    assert.equal(
+  const rootBridgePath = path.join(
+    packageRoot,
+    'src/client/root-bridge.js'
+  );
+  const rootBridgeCacheKey = require.resolve(rootBridgePath);
+  const rootBridgeCacheEntry = require.cache[rootBridgeCacheKey];
+  const originalRootBridgeCacheExports = rootBridgeCacheEntry.exports;
+  const fakeRootBridgeCacheExports = Object.freeze(
+    Object.fromEntries(
+      sourceLedgerGetterNames.map((getterName) => [
+        getterName,
+        () => sourceLedgerFakePayloads.get(getterName)
+      ])
+    )
+  );
+  rootBridgeCacheEntry.exports = fakeRootBridgeCacheExports;
+  try {
+    assert.equal(require(rootBridgePath), fakeRootBridgeCacheExports);
+    assert.notEqual(
       hydrateRootSourceLedger.getPrivateHydrateRootSourceLedgerRecordPayload(
-        clonedSourceLedgerRecord
+        scenario.hydrateRecord
       ),
       null
     );
+    for (const clonedSourceLedgerRecord of [
+      clonedHydrateRootPreflightRecord,
+      clonedEventReplayPreflightRecord,
+      clonedExecutionPreflightRecord,
+      clonedLifecycleRequestBoundary
+    ]) {
+      assert.equal(
+        hydrateRootSourceLedger.getPrivateHydrateRootSourceLedgerRecordPayload(
+          clonedSourceLedgerRecord
+        ),
+        null
+      );
+    }
+    assert.throws(
+      () =>
+        createHydrationRecoverableBoundaryAdmission(scenario, {
+          options: {
+            eventReplayPreflightRecord: clonedEventReplayPreflightRecord,
+            executionPreflightRecord: clonedExecutionPreflightRecord,
+            hydrateRootPreflightRecord: clonedHydrateRootPreflightRecord,
+            lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+          }
+        }),
+      invalidAdmission
+    );
+  } finally {
+    rootBridgeCacheEntry.exports = originalRootBridgeCacheExports;
   }
-  assert.throws(
-    () =>
-      createHydrationRecoverableBoundaryAdmission(scenario, {
-        options: {
-          eventReplayPreflightRecord: clonedEventReplayPreflightRecord,
-          executionPreflightRecord: clonedExecutionPreflightRecord,
-          hydrateRootPreflightRecord: clonedHydrateRootPreflightRecord,
-          lifecycleRequestBoundary: clonedLifecycleRequestBoundary
-        }
-      }),
-    invalidAdmission
-  );
+  assert.equal(require(rootBridgePath), rootBridge);
   assert.throws(
     () =>
       createHydrationRecoverableBoundaryAdmission(scenario, {

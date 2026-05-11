@@ -1,14 +1,19 @@
 'use strict';
 
-let rootBridgeModule = null;
+let getHydrateRootPublicFacadePreflightRecordPayload = returnNullPayload;
+let getHydrateRootPublicFacadeEventReplayPreflightPayload =
+  returnNullPayload;
+let getHydrateRootPublicFacadeExecutionPreflightPayload =
+  returnNullPayload;
+let getHydrateRootPublicFacadeLifecycleRequestBoundaryPayload =
+  returnNullPayload;
 
 function getPrivateHydrateRootSourceLedgerRecordPayload(record) {
-  const rootBridge = getRootBridgeModule();
   return (
-    getHydrateRootPreflightRecordPayload(rootBridge, record) ||
-    getHydrateRootEventReplayPreflightPayload(rootBridge, record) ||
-    getHydrateRootExecutionPreflightPayload(rootBridge, record) ||
-    getHydrateRootLifecycleRequestBoundaryPayload(rootBridge, record)
+    getHydrateRootPreflightRecordPayload(record) ||
+    getHydrateRootEventReplayPreflightPayload(record) ||
+    getHydrateRootExecutionPreflightPayload(record) ||
+    getHydrateRootLifecycleRequestBoundaryPayload(record)
   );
 }
 
@@ -16,13 +21,28 @@ function isPrivateHydrateRootSourceLedgerRecord(value) {
   return getPrivateHydrateRootSourceLedgerRecordPayload(value) !== null;
 }
 
-function getHydrateRootPreflightRecordPayload(rootBridge, record) {
-  const getPayload =
-    rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload;
-  if (typeof getPayload !== 'function') {
-    return null;
-  }
-  const payload = getPayload(record);
+function installPrivateHydrateRootSourceLedgerPayloadReaders(readers) {
+  assertRootBridgeInstaller();
+  getHydrateRootPublicFacadePreflightRecordPayload = assertReader(
+    readers,
+    'getPrivateHydrateRootPublicFacadePreflightRecordPayload'
+  );
+  getHydrateRootPublicFacadeEventReplayPreflightPayload = assertReader(
+    readers,
+    'getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload'
+  );
+  getHydrateRootPublicFacadeExecutionPreflightPayload = assertReader(
+    readers,
+    'getPrivateHydrateRootPublicFacadeExecutionPreflightPayload'
+  );
+  getHydrateRootPublicFacadeLifecycleRequestBoundaryPayload = assertReader(
+    readers,
+    'getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload'
+  );
+}
+
+function getHydrateRootPreflightRecordPayload(record) {
+  const payload = getHydrateRootPublicFacadePreflightRecordPayload(record);
   if (payload === null) {
     return null;
   }
@@ -34,13 +54,9 @@ function getHydrateRootPreflightRecordPayload(rootBridge, record) {
   );
 }
 
-function getHydrateRootEventReplayPreflightPayload(rootBridge, record) {
-  const getPayload =
-    rootBridge.getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload;
-  if (typeof getPayload !== 'function') {
-    return null;
-  }
-  const payload = getPayload(record);
+function getHydrateRootEventReplayPreflightPayload(record) {
+  const payload =
+    getHydrateRootPublicFacadeEventReplayPreflightPayload(record);
   if (payload === null) {
     return null;
   }
@@ -52,13 +68,9 @@ function getHydrateRootEventReplayPreflightPayload(rootBridge, record) {
   );
 }
 
-function getHydrateRootExecutionPreflightPayload(rootBridge, record) {
-  const getPayload =
-    rootBridge.getPrivateHydrateRootPublicFacadeExecutionPreflightPayload;
-  if (typeof getPayload !== 'function') {
-    return null;
-  }
-  const payload = getPayload(record);
+function getHydrateRootExecutionPreflightPayload(record) {
+  const payload =
+    getHydrateRootPublicFacadeExecutionPreflightPayload(record);
   if (payload === null) {
     return null;
   }
@@ -70,13 +82,9 @@ function getHydrateRootExecutionPreflightPayload(rootBridge, record) {
   );
 }
 
-function getHydrateRootLifecycleRequestBoundaryPayload(rootBridge, record) {
-  const getPayload =
-    rootBridge.getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload;
-  if (typeof getPayload !== 'function') {
-    return null;
-  }
-  const payload = getPayload(record);
+function getHydrateRootLifecycleRequestBoundaryPayload(record) {
+  const payload =
+    getHydrateRootPublicFacadeLifecycleRequestBoundaryPayload(record);
   if (payload === null) {
     return null;
   }
@@ -99,14 +107,65 @@ function createSourceLedgerPayload(record, payload, ledgerKind) {
   });
 }
 
-function getRootBridgeModule() {
-  if (rootBridgeModule === null) {
-    rootBridgeModule = require('./root-bridge.js');
+function assertReader(readers, name) {
+  if (
+    readers === null ||
+    typeof readers !== 'object' ||
+    typeof readers[name] !== 'function'
+  ) {
+    throwInvalidHydrateRootSourceLedgerInstall(
+      'HydrateRoot source-ledger reader installation requires root-bridge payload readers.'
+    );
   }
-  return rootBridgeModule;
+  return readers[name];
 }
 
-module.exports = {
+function assertRootBridgeInstaller() {
+  const stack = getNativeErrorStack();
+  if (
+    typeof stack !== 'string' ||
+    !/[\\/]root-bridge\.js:\d+:\d+/.test(stack)
+  ) {
+    throwInvalidHydrateRootSourceLedgerInstall(
+      'HydrateRoot source-ledger readers can only be installed by root-bridge initialization.'
+    );
+  }
+}
+
+function getNativeErrorStack() {
+  const prepareStackTrace = Error.prepareStackTrace;
+  try {
+    Error.prepareStackTrace = undefined;
+    return new Error().stack;
+  } finally {
+    Error.prepareStackTrace = prepareStackTrace;
+  }
+}
+
+function throwInvalidHydrateRootSourceLedgerInstall(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_HYDRATE_ROOT_SOURCE_LEDGER_INSTALL';
+  throw error;
+}
+
+function returnNullPayload() {
+  return null;
+}
+
+const exported = {
   getPrivateHydrateRootSourceLedgerRecordPayload,
   isPrivateHydrateRootSourceLedgerRecord
 };
+
+Object.defineProperty(
+  exported,
+  'installPrivateHydrateRootSourceLedgerPayloadReaders',
+  {
+    configurable: false,
+    enumerable: false,
+    value: installPrivateHydrateRootSourceLedgerPayloadReaders,
+    writable: false
+  }
+);
+
+module.exports = Object.freeze(exported);
