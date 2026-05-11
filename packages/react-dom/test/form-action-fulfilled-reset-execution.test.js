@@ -592,6 +592,18 @@ test('private fulfilled form action reset execution rejects stale foreign cloned
   const foreignRootContext = createPrivateRootBridgeAdmission(
     'fulfilled-reset-negative-foreign-root'
   );
+  const unmountRootContext = createPrivateRootBridgeAdmission(
+    'fulfilled-reset-negative-unmount-root'
+  );
+  const unmount = unmountRootContext.bridge.unmountContainer(
+    unmountRootContext.create.handle
+  );
+  const unmountAdmission =
+    unmountRootContext.bridge.admitRequest(unmount);
+  const unmountLifecycleBoundary =
+    rootBridge.createPrivateRootLifecycleRequestBoundary(
+      unmountAdmission
+    );
   assert.throws(
     () =>
       gate.recordFulfilledResetExecution(
@@ -613,6 +625,27 @@ test('private fulfilled form action reset execution rejects stale foreign cloned
       compatibilityTarget,
       reason:
         'root lifecycle binding for fulfilled reset execution must be source-owned active and current'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordFulfilledResetExecution(
+        scenario.asyncExecution,
+        scenario.execution,
+        {
+          explicitFormActionFulfilledResetExecution: true
+        },
+        {
+          rootBridgeAdmission: unmountAdmission,
+          rootLifecycleRequestBoundary: unmountLifecycleBoundary
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionFulfilledResetExecutionInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'root lifecycle binding for fulfilled reset execution must come from a render operation'
     }
   );
   assert.throws(

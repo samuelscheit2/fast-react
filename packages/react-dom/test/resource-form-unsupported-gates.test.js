@@ -19313,6 +19313,12 @@ test('private resource/form root execution consumer links accepted fake evidence
     true
   );
   assert.equal(
+    summary.requiresExactCurrentPrivateRootExecutionContext,
+    true
+  );
+  assert.equal(summary.requiresSharedRootLifecyclePayload, true);
+  assert.equal(summary.requiresSharedRootContainerIdentity, true);
+  assert.equal(
     summary.requiresResourceRootMapStorageRootLifecycleIdentity,
     true
   );
@@ -19335,6 +19341,11 @@ test('private resource/form root execution consumer links accepted fake evidence
     summary.rejectsFormFulfilledResetReplayAfterGenerationAdvance,
     true
   );
+  assert.equal(
+    summary.rejectsMalformedRootExecutionCurrentnessShapes,
+    true
+  );
+  assert.equal(summary.rejectsReplayedRootExecutionEvidence, true);
   assert.equal(summary.rejectsCallerBuiltLifecycleSourceRecords, true);
   assert.equal(summary.rejectsRootlessFormFulfilledResetRecords, true);
   assert.equal(
@@ -19357,6 +19368,68 @@ test('private resource/form root execution consumer links accepted fake evidence
     'worker-942-resource-form-reset-currentness',
     'worker-850-resource-form-execution-admission-ledger'
   ]);
+  assert.equal(
+    consumer.rootExecutionCurrentnessBoundary.sourceWorkerId,
+    resourceFormGate.privateResourceFormRootExecutionCurrentnessWorkerId
+  );
+  assert.equal(
+    consumer.rootExecutionCurrentnessBoundary
+      .exactCurrentPrivateRootLifecycleBoundary,
+    true
+  );
+  assert.equal(
+    consumer.rootExecutionCurrentnessBoundary.sharedRootLifecyclePayload,
+    true
+  );
+  assert.equal(
+    consumer.rootExecutionCurrentnessBoundary.sharedContainer,
+    true
+  );
+  assert.equal(
+    consumer.rootExecutionCurrentnessBoundary
+      .resourceRootExecutionBoundaryId,
+    resourceExecution.rootExecutionBoundary.boundaryId
+  );
+  assert.equal(
+    consumer.rootExecutionCurrentnessBoundary.formRootExecutionBoundaryId,
+    fulfilledResetExecution.rootExecutionBoundary.boundaryId
+  );
+  assert.equal(
+    consumer.rootExecutionCurrentnessBoundary.publicRootExecution,
+    false
+  );
+  assert.equal(
+    consumer.rootExecutionCurrentnessBoundary.nativeExecution,
+    false
+  );
+  assert.equal(
+    consumer.rootExecutionCurrentnessBoundary.domMutation,
+    false
+  );
+  assert.deepEqual(
+    consumer.rootExecutionCurrentnessBoundary.sourceOwnedTokens,
+    [
+      resourceFormGate.privateResourceFormRootExecutionCurrentnessWorkerId,
+      rootBridge.privateRootAdmissionRecordType,
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+      rootBridge.privateRootLifecycleRequestBoundaryRecordType,
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
+      admission.rootId,
+      lifecycleBoundary.boundaryId,
+      lifecycleBoundary.lifecycleTransition,
+      resourceExecution.rootExecutionBoundary.boundaryId,
+      fulfilledResetExecution.rootExecutionBoundary.boundaryId
+    ]
+  );
+  assert.deepEqual(
+    consumer.sourceOwnedEvidence.rootExecutionCurrentnessTokens,
+    consumer.rootExecutionCurrentnessBoundary.sourceOwnedTokens
+  );
+  assert.equal(
+    consumer.sourceOwnedEvidence
+      .currentPrivateRootLifecycleBoundaryConsumed,
+    true
+  );
 
   assert.equal(
     consumer.resourceRootMapStorageBoundary.rootMapStorageExecutionId,
@@ -19706,6 +19779,15 @@ test('private resource/form root execution consumer rejects stale cross-root mis
       lifecycleBoundary: staleResourceRoot.lifecycleBoundary
     }
   );
+  const {
+    fulfilledResetExecution: staleBoundaryFulfilledResetExecution
+  } = await createPrivateFulfilledResetExecutionRecord(
+    'root-execution-consumer-stale-boundary-form',
+    {
+      admission: staleResourceRoot.admission,
+      lifecycleBoundary: staleResourceRoot.lifecycleBoundary
+    }
+  );
   const staleResourceLaterRender =
     staleResourceRoot.bridge.renderContainer(
       staleResourceRoot.create.handle,
@@ -19802,6 +19884,13 @@ test('private resource/form root execution consumer rejects stale cross-root mis
     rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
       freshAdmission,
       lifecycleBoundary
+    ),
+    false
+  );
+  assert.equal(
+    rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      staleResourceRoot.admission,
+      staleResourceRoot.lifecycleBoundary
     ),
     false
   );
@@ -19967,6 +20056,26 @@ test('private resource/form root execution consumer rejects stale cross-root mis
   assert.throws(
     () =>
       gate.recordRootExecutionConsumer(
+        staleResourceRoot.admission,
+        staleResourceRoot.lifecycleBoundary,
+        staleResourceExecution,
+        staleBoundaryFulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'root lifecycle request boundary must be source-owned active and match root bridge admission'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
         staleResourceLaterAdmission,
         staleResourceLaterLifecycleBoundary,
         staleResourceExecution,
@@ -19994,6 +20103,35 @@ test('private resource/form root execution consumer rejects stale cross-root mis
           rootMapStorageExecutionRows:
             resourceExecution.rootMapStorageExecutionRows.slice(1)
         },
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'resource root-map storage execution record must be source-owned'
+    }
+  );
+  const clonedResourceExecution = {
+    ...resourceExecution
+  };
+  assert.equal(
+    resourceFormGate.getPrivateResourceHintRootMapStorageRootIdentityPayload(
+      clonedResourceExecution
+    ),
+    null
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        freshAdmission,
+        freshLifecycleBoundary,
+        clonedResourceExecution,
         fulfilledResetExecution,
         {
           explicitResourceFormRootExecutionConsumer: true
@@ -20053,6 +20191,36 @@ test('private resource/form root execution consumer rejects stale cross-root mis
           ...fulfilledResetExecution,
           fakeResetStateQueueExecution: undefined
         },
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'form fulfilled reset execution record must be source-owned'
+    }
+  );
+  const clonedFulfilledResetExecution = {
+    ...fulfilledResetExecution
+  };
+  assert.equal(
+    formActions
+      .getPrivateFormActionFulfilledResetExecutionRootIdentityPayload(
+        clonedFulfilledResetExecution
+      ),
+    null
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        freshAdmission,
+        freshLifecycleBoundary,
+        resourceExecution,
+        clonedFulfilledResetExecution,
         {
           explicitResourceFormRootExecutionConsumer: true
         }

@@ -20,6 +20,8 @@ const privateResourceFormRootExecutionConsumerStatus =
   'consumed-private-resource-form-root-execution-evidence';
 const privateResourceFormRootExecutionConsumerCompatibilityBlockedStatus =
   'blocked-private-resource-form-root-execution-consumer-compatibility';
+const privateResourceFormRootExecutionCurrentnessWorkerId =
+  'worker-981-resource-form-root-execution-currentness';
 const resourceFormRootBoundaryRecordType =
   'fast.react_dom.resource_form_root_boundary_record';
 const resourceFormRootExecutionConsumerRecordType =
@@ -405,6 +407,15 @@ function recordResourceFormRootExecutionConsumerWithGate(
       rootBridgeAdmission,
       lifecycleBoundary
     );
+  const rootExecutionCurrentness =
+    assertResourceFormRootExecutionCurrentnessForRootConsumer(
+      rootBridgeAdmission,
+      lifecycleBoundary,
+      resourceRootMapStorageExecutionRecord,
+      resourceExecution,
+      formFulfilledResetExecutionRecord,
+      fulfilledResetExecution
+    );
 
   if (
     consumedRootMapStorageExecutionRecords.has(
@@ -461,6 +472,7 @@ function recordResourceFormRootExecutionConsumerWithGate(
     rootLifecycleBoundary,
     publicRootBoundary: describePublicRootBoundary(),
     ledgerBoundary: createResourceFormExecutionAdmissionLedgerBoundary(),
+    rootExecutionCurrentnessBoundary: rootExecutionCurrentness,
     resourceRootMapStorageBoundary: resourceBoundary,
     formFulfilledResetBoundary: formBoundary,
     sourceOwnedEvidence: freezeRecord({
@@ -472,6 +484,9 @@ function recordResourceFormRootExecutionConsumerWithGate(
       formFulfilledResetExecutionTokens: formBoundary.sourceOwnedTokens,
       rootLifecycleRequestBoundaryTokens:
         rootLifecycleBoundary.sourceOwnedTokens,
+      rootExecutionCurrentnessTokens:
+        rootExecutionCurrentness.sourceOwnedTokens,
+      currentPrivateRootLifecycleBoundaryConsumed: true,
       callerSuppliedAliasesAccepted: false,
       clonedEvidenceAccepted: false,
       testTitleEvidenceAccepted: false,
@@ -1299,6 +1314,192 @@ function assertFormFulfilledResetExecutionPlanForRootConsumer(
       'form fulfilled reset execution must remain fake and public-blocked'
     );
   }
+}
+
+function assertResourceFormRootExecutionCurrentnessForRootConsumer(
+  rootBridgeAdmission,
+  lifecycleBoundary,
+  resourceRootMapStorageExecutionRecord,
+  resourceExecution,
+  formFulfilledResetExecutionRecord,
+  fulfilledResetExecution
+) {
+  const lifecyclePayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      lifecycleBoundary
+    );
+  const resourceIdentity =
+    internalsGate
+      .getPrivateResourceHintRootMapStorageRootIdentityPayload(
+        resourceRootMapStorageExecutionRecord
+      );
+  const formIdentity =
+    formActions
+      .getPrivateFormActionFulfilledResetExecutionRootIdentityPayload(
+        formFulfilledResetExecutionRecord
+      );
+  const resourceRootExecutionBoundary =
+    resourceExecution.rootExecutionBoundary;
+  const formRootExecutionBoundary =
+    fulfilledResetExecution.rootExecutionBoundary;
+
+  if (
+    lifecyclePayload === null ||
+    resourceIdentity === null ||
+    formIdentity === null ||
+    resourceRootExecutionBoundary == null ||
+    formRootExecutionBoundary == null
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource/form root execution evidence must be bound to the current private root lifecycle boundary'
+    );
+  }
+
+  if (
+    !rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      rootBridgeAdmission,
+      lifecycleBoundary
+    ) ||
+    lifecyclePayload.admissionRecord !== rootBridgeAdmission ||
+    lifecyclePayload.rootHandleState == null ||
+    lifecyclePayload.sourceRecord == null ||
+    lifecyclePayload.rootHandleState.latestLifecycleRequestRecord !==
+      lifecyclePayload.sourceRecord ||
+    lifecyclePayload.rootHandleState.lifecycleRequestVersion !==
+      lifecyclePayload.lifecycleRequestVersion
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource/form root execution evidence must use the current source-owned root lifecycle boundary'
+    );
+  }
+
+  if (
+    resourceIdentity.rootBridgeAdmission !== rootBridgeAdmission ||
+    formIdentity.rootBridgeAdmission !== rootBridgeAdmission ||
+    resourceIdentity.rootLifecycleRequestBoundary !== lifecycleBoundary ||
+    formIdentity.rootLifecycleRequestBoundary !== lifecycleBoundary ||
+    resourceIdentity.rootLifecyclePayload !== lifecyclePayload ||
+    formIdentity.rootLifecyclePayload !== lifecyclePayload ||
+    resourceIdentity.bridgeState !== lifecyclePayload.bridgeState ||
+    formIdentity.bridgeState !== lifecyclePayload.bridgeState ||
+    resourceIdentity.rootHandleState !== lifecyclePayload.rootHandleState ||
+    formIdentity.rootHandleState !== lifecyclePayload.rootHandleState ||
+    resourceIdentity.sourceRecord !== lifecyclePayload.sourceRecord ||
+    formIdentity.sourceRecord !== lifecyclePayload.sourceRecord ||
+    resourceIdentity.container !== lifecyclePayload.rootHandleState.container ||
+    formIdentity.container !== lifecyclePayload.rootHandleState.container ||
+    resourceIdentity.containerInfo !==
+      lifecyclePayload.rootHandleState.containerInfo ||
+    formIdentity.containerInfo !==
+      lifecyclePayload.rootHandleState.containerInfo ||
+    resourceIdentity.container !== formIdentity.container ||
+    resourceIdentity.containerInfo !== formIdentity.containerInfo ||
+    resourceIdentity.rootExecutionBoundary !==
+      resourceRootExecutionBoundary ||
+    formIdentity.rootExecutionBoundary !== formRootExecutionBoundary
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource/form root execution context must match the exact current private root lifecycle boundary'
+    );
+  }
+
+  if (
+    resourceRootExecutionBoundary.sourceRootLifecycleBoundaryId !==
+      lifecycleBoundary.boundaryId ||
+    formRootExecutionBoundary.sourceRootLifecycleBoundaryId !==
+      lifecycleBoundary.boundaryId ||
+    resourceRootExecutionBoundary.sourceRootBridgeAdmissionId !==
+      rootBridgeAdmission.requestId ||
+    formRootExecutionBoundary.sourceRootBridgeAdmissionId !==
+      rootBridgeAdmission.requestId ||
+    resourceRootExecutionBoundary.lifecycleRequestVersion !==
+      lifecycleBoundary.lifecycleRequestVersion ||
+    formRootExecutionBoundary.lifecycleRequestVersion !==
+      lifecycleBoundary.lifecycleRequestVersion ||
+    resourceRootExecutionBoundary.rootContainerInfo !==
+      lifecyclePayload.rootHandleState.containerInfo ||
+    formRootExecutionBoundary.rootContainerInfo !==
+      lifecyclePayload.rootHandleState.containerInfo
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource/form root execution boundary currentness must match the current lifecycle boundary'
+    );
+  }
+
+  return createResourceFormRootExecutionCurrentnessBoundary(
+    rootBridgeAdmission,
+    lifecycleBoundary,
+    lifecyclePayload,
+    resourceRootExecutionBoundary,
+    formRootExecutionBoundary
+  );
+}
+
+function createResourceFormRootExecutionCurrentnessBoundary(
+  rootBridgeAdmission,
+  lifecycleBoundary,
+  lifecyclePayload,
+  resourceRootExecutionBoundary,
+  formRootExecutionBoundary
+) {
+  return freezeRecord({
+    status: privateResourceFormRootExecutionConsumerStatus,
+    sourceWorkerId: privateResourceFormRootExecutionCurrentnessWorkerId,
+    sourceRootBridgeAdmissionId: rootBridgeAdmission.requestId,
+    sourceRootBridgeAdmissionStatus: rootBridgeAdmission.admissionStatus,
+    sourceRootLifecycleBoundaryId: lifecycleBoundary.boundaryId,
+    sourceRootLifecycleBoundaryStatus: lifecycleBoundary.boundaryStatus,
+    sourceRootRequestId: lifecycleBoundary.sourceRequestId,
+    sourceRootRequestSequence: lifecycleBoundary.sourceRequestSequence,
+    sourceRootRequestType: lifecycleBoundary.sourceRequestType,
+    sourceRootOperation: lifecycleBoundary.sourceOperation,
+    rootId: rootBridgeAdmission.rootId,
+    rootKind: rootBridgeAdmission.rootKind,
+    rootTag: rootBridgeAdmission.rootTag,
+    rootContainerInfo: lifecyclePayload.rootHandleState.containerInfo,
+    lifecycleTransition: lifecycleBoundary.lifecycleTransition,
+    lifecycleRequestVersion: lifecycleBoundary.lifecycleRequestVersion,
+    resourceRootExecutionBoundaryId:
+      resourceRootExecutionBoundary.boundaryId,
+    formRootExecutionBoundaryId: formRootExecutionBoundary.boundaryId,
+    resourceRootExecutionContextCurrent: true,
+    formFulfilledResetRootExecutionContextCurrent: true,
+    sharedRootLifecyclePayload: true,
+    sharedBridgeState: true,
+    sharedRootHandleState: true,
+    sharedSourceRecord: true,
+    sharedContainer: true,
+    sharedContainerInfo: true,
+    exactCurrentPrivateRootLifecycleBoundary: true,
+    staleBoundaryRecordsRejected: true,
+    crossRootBoundaryRecordsRejected: true,
+    replayedBoundaryRecordsRejected: true,
+    clonedEvidenceRejected: true,
+    callerShapedEvidenceRejected: true,
+    malformedCurrentnessShapesRejected: true,
+    publicRootAliasesRejected: true,
+    publicRootExecution: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
+    sourceOwnedTokens: freezeArray([
+      privateResourceFormRootExecutionCurrentnessWorkerId,
+      rootBridge.privateRootAdmissionRecordType,
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+      rootBridge.privateRootLifecycleRequestBoundaryRecordType,
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
+      rootBridgeAdmission.rootId,
+      lifecycleBoundary.boundaryId,
+      lifecycleBoundary.lifecycleTransition,
+      resourceRootExecutionBoundary.boundaryId,
+      formRootExecutionBoundary.boundaryId
+    ])
+  });
 }
 
 function assertFormFulfilledResetQueueCommitRootLifecycleForRootConsumer(
@@ -2475,6 +2676,9 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
     consumesFormFulfilledResetCurrentness: true,
     requiresSourceOwnedActiveRootLifecycleRequestBoundary: true,
     requiresCurrentRenderRootLifecycleRequestBoundary: true,
+    requiresExactCurrentPrivateRootExecutionContext: true,
+    requiresSharedRootLifecyclePayload: true,
+    requiresSharedRootContainerIdentity: true,
     requiresResourceRootMapStorageRootLifecycleIdentity: true,
     requiresFormFulfilledResetRootLifecycleIdentity: true,
     requiresSourceOwnedPrivateRecords: true,
@@ -2492,6 +2696,8 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
     rejectsFormFulfilledResetReplayAfterGenerationAdvance: true,
     rejectsCrossRootFormFulfilledResetRecords: true,
     rejectsCrossContainerFormFulfilledResetRecords: true,
+    rejectsMalformedRootExecutionCurrentnessShapes: true,
+    rejectsReplayedRootExecutionEvidence: true,
     rejectsClonedRecords: true,
     rejectsCallerSuppliedSourceTokens: true,
     rejectsPublicCompatibilityAliases: true,
@@ -3044,6 +3250,7 @@ module.exports = Object.assign({}, internalsGate, {
   privateResourceFormExecutionAdmissionSourceTokenPolicy,
   privateResourceFormExecutionAdmissionWorkerIds,
   privateResourceFormRootExecutionConsumerCompatibilityBlockedStatus,
+  privateResourceFormRootExecutionCurrentnessWorkerId,
   privateResourceFormRootExecutionConsumerGateId,
   privateResourceFormRootExecutionConsumerStatus,
   privatePortalCommitResourceBlockedStatus,
