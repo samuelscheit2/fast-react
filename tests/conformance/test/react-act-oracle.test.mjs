@@ -978,7 +978,30 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
       drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics: false
     }),
     gate.createActQueueMetadata({
+      schedulerMockDelayedActRootWorkDiagnosticsReady: false
+    }),
+    gate.createActQueueMetadata({
+      preflightsSchedulerMockDelayedActRootWorkDiagnostics: false
+    }),
+    gate.createActQueueMetadata({
+      schedulerMockDelayedActRootWorkDiagnosticKind:
+        "forged-delayed-act-root-work-diagnostics"
+    }),
+    gate.createActQueueMetadata({
+      schedulerMockDelayedActRootWorkDiagnosticVersion: 2
+    }),
+    gate.createActQueueMetadata({
+      acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics:
+        false
+    }),
+    gate.createActQueueMetadata({
       publicSchedulerTimingCompatibilityClaimed: true
+    }),
+    gate.createActQueueMetadata({
+      publicSchedulerFlushHelperCompatibilityClaimed: true
+    }),
+    gate.createActQueueMetadata({
+      packageCompatibilityClaimed: true
     }),
     gate.createActQueueMetadata({
       publicRootSchedulerCompatibilityClaimed: true
@@ -991,6 +1014,12 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
     }),
     gate.createActQueueMetadata({
       executesRendererRoots: true
+    }),
+    gate.createActQueueMetadata({
+      invokesPublicSchedulerFlushHelper: true
+    }),
+    gate.createActQueueMetadata({
+      publicSchedulerFlushBehaviorExecuted: true
     }),
     gate.createActQueueMetadata({
       passiveEffectsReady: true
@@ -2641,6 +2670,378 @@ test("package-private React act gate preflights delayed Scheduler mock diagnosti
   }
 });
 
+test("React act private Scheduler mock consumers reject stale and forged expired/delayed evidence", () => {
+  const gate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+  const React = loadFreshWorkspaceModule(publicReactEntrypoints[0]);
+
+  for (const nodeEnv of ["development", "production"]) {
+    let Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const staleExpiredReport = createPrivateExpiredActRootWorkReport(
+      gate,
+      Scheduler,
+      {
+        rootId: 814,
+        rootLabel: "stale-scheduler-root-814"
+      }
+    ).report;
+
+    Scheduler = loadFreshSchedulerMock(nodeEnv);
+    assertSchedulerMockExpiredConsumerRejected(
+      gate,
+      staleExpiredReport,
+      "scheduler-expired-act-root-diagnostics-metadata",
+      `${nodeEnv}:stale-expired-report-from-previous-scheduler`
+    );
+
+    const { report: expiredReport } = createPrivateExpiredActRootWorkReport(
+      gate,
+      Scheduler,
+      {
+        rootId: 815,
+        rootLabel: "current-expired-root-815"
+      }
+    );
+    assert.equal(
+      gate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(expiredReport),
+      true,
+      nodeEnv
+    );
+
+    const diagnostics =
+      Scheduler.unstable_flushExpired[privateActQueueFlushDiagnosticsExport];
+    const sourceValidator =
+      diagnostics.schedulerMockExpiredActRootWorkSourceValidator;
+    const clonedValidator = Object.freeze({ ...sourceValidator });
+    assert.notEqual(clonedValidator, sourceValidator, nodeEnv);
+    assert.equal(
+      sourceValidator.isSchedulerMockExpiredActRootWorkSource(expiredReport),
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      clonedValidator.isSchedulerMockExpiredActRootWorkSource(expiredReport),
+      true,
+      nodeEnv
+    );
+    assertSchedulerMockExpiredConsumerRejected(
+      gate,
+      cloneExpiredActRootWorkReport(expiredReport, {
+        schedulerMockExpiredActRootWorkSourceValidator: clonedValidator
+      }),
+      "scheduler-expired-act-root-diagnostics-source-proof",
+      `${nodeEnv}:expired-cloned-validator-does-not-confer-source-proof`
+    );
+
+    assert.equal(
+      createInheritedDiagnosticsAlias(expiredReport)[
+        privateSchedulerMockExpiredActRootWorkDiagnosticsBrand
+      ],
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      Object.hasOwn(
+        createInheritedDiagnosticsAlias(expiredReport),
+        privateSchedulerMockExpiredActRootWorkDiagnosticsBrand
+      ),
+      false,
+      nodeEnv
+    );
+
+    for (const { label, diagnostics: rejectedDiagnostics, reason } of [
+      {
+        label: "expired-inherited-private-symbol-alias",
+        diagnostics: createInheritedDiagnosticsAlias(expiredReport),
+        reason: "scheduler-expired-act-root-diagnostics-brand"
+      },
+      {
+        label: "expired-private-symbol-lookalike",
+        diagnostics:
+          cloneExpiredActRootWorkReportWithPrivateSymbolAlias(expiredReport),
+        reason: "scheduler-expired-act-root-diagnostics-brand"
+      },
+      {
+        label: "expired-package-compatibility-claim",
+        diagnostics: cloneExpiredActRootWorkReport(expiredReport, {
+          packageCompatibilityClaimed: true
+        }),
+        reason: "scheduler-expired-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "expired-public-package-compatibility-claim",
+        diagnostics: cloneExpiredActRootWorkReport(expiredReport, {
+          publicPackageCompatibilityClaimed: true
+        }),
+        reason: "scheduler-expired-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "expired-public-scheduler-flush-helper-claim",
+        diagnostics: cloneExpiredActRootWorkReport(expiredReport, {
+          publicSchedulerFlushHelperCompatibilityClaimed: true
+        }),
+        reason: "scheduler-expired-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "expired-public-root-claim",
+        diagnostics: cloneExpiredActRootWorkReport(expiredReport, {
+          publicRootSchedulerCompatibilityClaimed: true
+        }),
+        reason: "scheduler-expired-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "expired-public-renderer-claim",
+        diagnostics: cloneExpiredActRootWorkReport(expiredReport, {
+          publicRendererCompatibilityClaimed: true
+        }),
+        reason: "scheduler-expired-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "expired-effect-execution-claim",
+        diagnostics: cloneExpiredActRootWorkReport(expiredReport, {
+          executesEffects: true
+        }),
+        reason: "scheduler-expired-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "expired-renderer-root-execution-claim",
+        diagnostics: cloneExpiredActRootWorkReport(expiredReport, {
+          executesRendererRoots: true
+        }),
+        reason: "scheduler-expired-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "expired-public-scheduler-flush-helper-execution",
+        diagnostics: cloneExpiredActRootWorkReport(expiredReport, {
+          invokesPublicSchedulerFlushHelper: true
+        }),
+        reason: "scheduler-expired-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "expired-public-scheduler-flush-behavior",
+        diagnostics: cloneExpiredActRootWorkReport(expiredReport, {
+          publicSchedulerFlushBehaviorExecuted: true
+        }),
+        reason: "scheduler-expired-act-root-diagnostics-public-claim"
+      }
+    ]) {
+      assertSchedulerMockExpiredConsumerRejected(
+        gate,
+        rejectedDiagnostics,
+        reason,
+        `${nodeEnv}:${label}`
+      );
+    }
+
+    const delayedCurrent = createPrivateDelayedRendererRootWorkReport(
+      gate,
+      Scheduler,
+      {
+        rootId: 816,
+        rootLabel: "current-delayed-renderer-root-816",
+        rootRequestId: "current-delayed-renderer-root-request-816",
+        rootRequestSequence: 1
+      }
+    );
+    const delayedReport = delayedCurrent.report;
+    assert.equal(delayedCurrent.publicSchedulerCallbackRan(), false, nodeEnv);
+    assert.equal(
+      gate.isAcceptedSchedulerMockDelayedActRootWorkDiagnostics(delayedReport),
+      true,
+      nodeEnv
+    );
+    const delayedPreflight =
+      gate.preflightSchedulerMockDelayedActRootWorkDiagnostics(delayedReport);
+    assert.equal(
+      delayedPreflight.status,
+      gate.schedulerMockDelayedActRootWorkPreflightStatus,
+      nodeEnv
+    );
+    assert.equal(delayedPreflight.publicCompatibilityClaimed, false, nodeEnv);
+    assert.equal(
+      delayedPreflight.publicSchedulerFlushBehaviorExecuted,
+      false,
+      nodeEnv
+    );
+    assert.equal(delayedPreflight.executesEffects, false, nodeEnv);
+    assert.equal(delayedPreflight.executesRendererRoots, false, nodeEnv);
+
+    const staleRequestRendererRoot = cloneFrozenObject(
+      delayedReport.delayedRendererRootMetadata,
+      {
+        rootRequestId: "stale-delayed-renderer-root-request"
+      }
+    );
+    const staleSequenceRendererRoot = cloneFrozenObject(
+      delayedReport.delayedRendererRootMetadata,
+      {
+        rootRequestSequence: 99
+      }
+    );
+    const staleRootRendererRoot = cloneFrozenObject(
+      delayedReport.delayedRendererRootMetadata,
+      {
+        rootId: 999,
+        rootLabel: "stale-delayed-renderer-root-999"
+      }
+    );
+    const foreignRendererRoot = cloneFrozenObject(
+      delayedReport.delayedRendererRootMetadata,
+      {
+        rootId: 817,
+        rootLabel: "foreign-delayed-renderer-root-817",
+        rootRequestId: "foreign-delayed-renderer-root-request-817",
+        rootRequestSequence: 2
+      }
+    );
+
+    for (const { label, diagnostics: rejectedDiagnostics, reason } of [
+      {
+        label: "delayed-inherited-private-symbol-alias",
+        diagnostics: createInheritedDiagnosticsAlias(delayedReport),
+        reason: "scheduler-delayed-act-root-diagnostics-brand"
+      },
+      {
+        label: "delayed-private-symbol-lookalike",
+        diagnostics:
+          cloneDelayedActRootWorkReportWithPrivateSymbolAlias(delayedReport),
+        reason: "scheduler-delayed-act-root-diagnostics-brand"
+      },
+      {
+        label: "delayed-stale-renderer-root-request-id",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          delayedRendererRootMetadata: staleRequestRendererRoot,
+          delayedActRootWorkMetadata: cloneFrozenObject(
+            delayedReport.delayedActRootWorkMetadata,
+            {
+              rendererRootMetadata: staleRequestRendererRoot
+            }
+          )
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-source-proof"
+      },
+      {
+        label: "delayed-stale-renderer-root-request-sequence",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          delayedRendererRootMetadata: staleSequenceRendererRoot,
+          delayedActRootWorkMetadata: cloneFrozenObject(
+            delayedReport.delayedActRootWorkMetadata,
+            {
+              rendererRootMetadata: staleSequenceRendererRoot
+            }
+          )
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-source-proof"
+      },
+      {
+        label: "delayed-stale-renderer-root-id",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          delayedRendererRootMetadata: staleRootRendererRoot,
+          delayedActRootWorkMetadata: cloneFrozenObject(
+            delayedReport.delayedActRootWorkMetadata,
+            {
+              rootId: staleRootRendererRoot.rootId,
+              rootLabel: staleRootRendererRoot.rootLabel,
+              rendererRootMetadata: staleRootRendererRoot
+            }
+          )
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-metadata"
+      },
+      {
+        label: "delayed-foreign-renderer-root-row",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          delayedRendererRootMetadata: foreignRendererRoot
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-renderer-root-source"
+      },
+      {
+        label: "delayed-mixed-expired-report",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          expiredActRootWorkDrainReport: expiredReport
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-nested-expired"
+      },
+      {
+        label: "delayed-package-compatibility-claim",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          packageCompatibilityClaimed: true
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "delayed-public-scheduler-flush-helper-claim",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          publicSchedulerFlushHelperCompatibilityClaimed: true
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "delayed-public-root-claim",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          publicRootSchedulerCompatibilityClaimed: true
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "delayed-public-renderer-claim",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          publicRendererCompatibilityClaimed: true
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "delayed-effect-execution-claim",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          executesEffects: true
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "delayed-renderer-root-execution-claim",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          executesRendererRoots: true
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "delayed-public-scheduler-flush-helper-execution",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          invokesPublicSchedulerFlushHelper: true
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-public-claim"
+      },
+      {
+        label: "delayed-public-scheduler-flush-behavior",
+        diagnostics: cloneDelayedActRootWorkReport(delayedReport, {
+          publicSchedulerFlushBehaviorExecuted: true
+        }),
+        reason: "scheduler-delayed-act-root-diagnostics-public-claim"
+      }
+    ]) {
+      assertSchedulerMockDelayedPreflightRejected(
+        gate,
+        rejectedDiagnostics,
+        reason,
+        `${nodeEnv}:${label}`
+      );
+    }
+
+    let publicActCallbackInvoked = false;
+    assertReactActPlaceholderError(
+      captureThrown(() =>
+        React.act(() => {
+          publicActCallbackInvoked = true;
+        })
+      )
+    );
+    assert.equal(publicActCallbackInvoked, false, nodeEnv);
+    assert.equal(delayedCurrent.publicSchedulerCallbackRan(), false, nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
+
+    Scheduler.reset();
+  }
+});
+
 test("React DOM test-utils act private routing gate tracks React act metadata without opening public act", () => {
   const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
   const domGateModule = loadFreshWorkspaceModule(
@@ -3239,6 +3640,47 @@ function assertSchedulerMockDelayedPreflightRejected(
   );
 }
 
+function assertSchedulerMockExpiredConsumerRejected(
+  gate,
+  diagnostics,
+  reason,
+  label
+) {
+  assert.equal(
+    gate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(diagnostics),
+    false,
+    label
+  );
+  assert.throws(
+    () => gate.consumeSchedulerMockExpiredActRootWorkDiagnostics(diagnostics),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", label);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", label);
+      assert.equal(error.entrypoint, "react", label);
+      assert.equal(
+        error.exportName,
+        `${privateActDispatcherGateExport}.consumeSchedulerMockExpiredActRootWorkDiagnostics`,
+        label
+      );
+      assert.equal(error.compatibilityTarget, "react@19.2.6", label);
+      assert.equal(error.reason, reason, label);
+      assert.equal(error.publicCompatibilityClaimed, false, label);
+      assert.equal(error.publicSchedulerTimingCompatibilityClaimed, false, label);
+      assert.equal(error.publicReactActCompatibilityClaimed, false, label);
+      assert.equal(error.publicRootSchedulerCompatibilityClaimed, false, label);
+      assert.equal(error.publicRendererCompatibilityClaimed, false, label);
+      assert.equal(error.drainsPublicSchedulerTaskQueue, false, label);
+      assert.equal(error.drainsPublicReactActQueue, false, label);
+      assert.equal(error.executesQueuedWork, false, label);
+      assert.equal(error.executesEffects, false, label);
+      assert.equal(error.executesRendererWork, false, label);
+      assert.equal(error.executesRendererRoots, false, label);
+      return true;
+    },
+    label
+  );
+}
+
 function createExpiredActRootWorkMetadata(
   Scheduler,
   callbackHandle,
@@ -3320,6 +3762,157 @@ function createAcceptedExpiredActRootWorkRecord(recordKind, overrides = {}) {
   });
 }
 
+function createPrivateExpiredActRootWorkReport(
+  gate,
+  Scheduler,
+  { rootId, rootLabel }
+) {
+  Scheduler.reset();
+  const events = [];
+  const createCallback = (label) =>
+    gate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        events.push([
+          label,
+          didTimeout,
+          Scheduler.unstable_getCurrentPriorityLevel(),
+          Scheduler.unstable_now()
+        ]);
+        Scheduler.log(label);
+      },
+      { label }
+    );
+  const expiredHandle = Scheduler.unstable_scheduleCallback(
+    Scheduler.unstable_UserBlockingPriority,
+    createCallback(`${rootLabel}:expired-callback`)
+  );
+  const actQueue = gate.createInternalActQueueTestQueue([
+    gate.createInternalActQueueTestTask({
+      label: `${rootLabel}:act-task`,
+      recordKind: "SchedulerActQueueRequest",
+      taskKind: "RootSchedule",
+      continuationStatus: "NoContinuation",
+      callback: createCallback(`${rootLabel}:act-task`)
+    })
+  ]);
+  const rootWorkRecords = [
+    createAcceptedExpiredActRootWorkRecord("RootLaneSchedulingSnapshot", {
+      rootId,
+      rootLabel
+    }),
+    createAcceptedExpiredActRootWorkRecord("RootTaskScheduleRecord", {
+      rootId,
+      rootLabel
+    })
+  ];
+  const metadata = createExpiredActRootWorkMetadata(
+    Scheduler,
+    expiredHandle,
+    actQueue,
+    {
+      rootId,
+      rootLabel,
+      rootWorkRecords
+    }
+  );
+
+  Scheduler.unstable_advanceTime(251);
+  return {
+    report: Scheduler.unstable_flushExpired(metadata),
+    events,
+    metadata,
+    actQueue
+  };
+}
+
+function createPrivateDelayedRendererRootWorkReport(
+  gate,
+  Scheduler,
+  { rootId, rootLabel, rootRequestId, rootRequestSequence }
+) {
+  Scheduler.reset();
+  const diagnostics =
+    Scheduler.unstable_flushExpired[privateActQueueFlushDiagnosticsExport];
+  const events = [];
+  let publicSchedulerCallbackRan = false;
+  const createCallback = (label) =>
+    gate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        events.push([
+          label,
+          didTimeout,
+          Scheduler.unstable_getCurrentPriorityLevel(),
+          Scheduler.unstable_now()
+        ]);
+        Scheduler.log(label);
+      },
+      { label }
+    );
+  const delayedHandle = Scheduler.unstable_scheduleCallback(
+    Scheduler.unstable_UserBlockingPriority,
+    createCallback(`${rootLabel}:delayed-callback`),
+    { delay: 10 }
+  );
+  const scheduledVirtualTime = Scheduler.unstable_now();
+  Scheduler.unstable_scheduleCallback(
+    Scheduler.unstable_NormalPriority,
+    () => {
+      publicSchedulerCallbackRan = true;
+      Scheduler.log(`${rootLabel}:public-scheduler-work`);
+    }
+  );
+  const actQueue = gate.createInternalActQueueTestQueue([
+    gate.createInternalActQueueTestTask({
+      label: `${rootLabel}:act-task`,
+      recordKind: "SchedulerActQueueRequest",
+      taskKind: "RootSchedule",
+      continuationStatus: "NoContinuation",
+      callback: createCallback(`${rootLabel}:act-task`)
+    })
+  ]);
+  const rootWorkRecords = [
+    createAcceptedExpiredActRootWorkRecord("RootLaneSchedulingSnapshot", {
+      rootId,
+      rootLabel
+    }),
+    createAcceptedExpiredActRootWorkRecord(
+      "HostRootFinishedWorkPendingCommitRecordForCanary",
+      {
+        rootId,
+        rootLabel
+      }
+    )
+  ];
+  const rendererRootMetadata =
+    diagnostics.createDelayedRendererRootWorkMetadataForDiagnostics({
+      callbackHandle: delayedHandle,
+      actQueue,
+      rootWorkRecords,
+      rootId,
+      rootLabel,
+      rootRequestId,
+      rootRequestSequence,
+      rootOperation: "create",
+      scheduledVirtualTime,
+      delayMs: delayedHandle.startTime - scheduledVirtualTime,
+      schedulerPriority: "UserBlocking"
+    });
+  const delayedMetadata =
+    diagnostics.createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics(
+      rendererRootMetadata
+    );
+
+  return {
+    report: Scheduler.unstable_flushExpired(delayedMetadata),
+    events,
+    rendererRootMetadata,
+    delayedMetadata,
+    actQueue,
+    rootWorkRecords,
+    publicSchedulerCallbackRan: () => publicSchedulerCallbackRan
+  };
+}
+
 function cloneExpiredActRootWorkReport(
   report,
   overrides = {},
@@ -3347,6 +3940,21 @@ function cloneExpiredActRootWorkReport(
     return freezeWithOldGlobalSchedulerSourceProof(cloned);
   }
 
+  return Object.freeze(cloned);
+}
+
+function cloneExpiredActRootWorkReportWithPrivateSymbolAlias(report) {
+  const cloned = { ...report };
+  Object.defineProperty(
+    cloned,
+    Symbol(privateSchedulerMockExpiredActRootWorkDiagnosticsKind),
+    {
+      configurable: false,
+      enumerable: false,
+      value: true,
+      writable: false
+    }
+  );
   return Object.freeze(cloned);
 }
 
@@ -3378,6 +3986,25 @@ function cloneDelayedActRootWorkReport(
   }
 
   return Object.freeze(cloned);
+}
+
+function cloneDelayedActRootWorkReportWithPrivateSymbolAlias(report) {
+  const cloned = { ...report };
+  Object.defineProperty(
+    cloned,
+    Symbol(privateSchedulerMockDelayedActRootWorkDiagnosticsKind),
+    {
+      configurable: false,
+      enumerable: false,
+      value: true,
+      writable: false
+    }
+  );
+  return Object.freeze(cloned);
+}
+
+function createInheritedDiagnosticsAlias(report) {
+  return Object.freeze(Object.create(report));
 }
 
 function cloneFrozenObject(value, overrides = {}) {
