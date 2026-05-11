@@ -90,8 +90,9 @@ The orchestrator goal is continuous. Do not call
   audit for false greens, caller-shaped evidence, stale source/currentness,
   hidden/proxy aliases, and compatibility broadening; and one
   regression-command audit that reruns claimed checks and targeted hostile
-  probes. Merge only after audit results and local post-rebase checks support
-  the acceptance decision.
+  probes. Add more focused audits in parallel when they would produce
+  independent acceptance evidence. Merge only after audit results and local
+  post-rebase checks support the acceptance decision.
 - Accept only scoped, intentional changes. Do not revert user changes.
 - Regenerable artifacts such as `node_modules/`, `target/`, and root
   `Cargo.lock` do not need removal merely because they exist. Remove or
