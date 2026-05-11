@@ -22,6 +22,17 @@ import {
 
 const oracle = readCheckedReactDomTestUtilsActOracle();
 const require = createRequire(import.meta.url);
+const {
+  createReactDomLifecycleBoundaryOptions,
+  createSourceOwnedReactDomLifecycleBoundary
+} = require(
+  fileURLToPath(
+    new URL(
+      "../src/react-dom-source-owned-lifecycle-boundary.cjs",
+      import.meta.url
+    )
+  )
+);
 const fastReactDomTestUtilsPath = fileURLToPath(
   new URL("../../../packages/react-dom/test-utils.js", import.meta.url)
 );
@@ -639,6 +650,16 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
       "PassiveEffectFlushRecord",
       "PassiveEffectDestroyCallbackExecutionRecord",
       "PassiveEffectMountCreateCallbackExecutionRecord"
+    ],
+    requiresSourceOwnedActiveLifecycleRequestBoundary: true,
+    schedulerDrivenPassiveLifecycleBoundaryStatus:
+      "accepted-private-root-public-facade-lifecycle-container-snapshot",
+    schedulerDrivenPassiveLifecycleBoundaryKind:
+      "FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord",
+    acceptedSchedulerDrivenPassiveLifecycleBoundaryRecords: [
+      "FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord",
+      "FastReactDomPrivateRootCreateRecord",
+      "FastReactDomPrivateRootUpdateRecord"
     ],
     privateSchedulerDrivenPassiveExecution: true,
     schedulerDrivenPassiveExecution: false,
@@ -1441,6 +1462,27 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     true
   );
   assert.equal(
+    schedulerDrivenPassiveDiagnostic.requiresSourceOwnedActiveLifecycleRequestBoundary,
+    true
+  );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.consumesRootLifecycleRequestBoundary,
+    true
+  );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.validatesLifecycleRequestEntrypoint,
+    true
+  );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.lifecycleBoundaryWorkerId,
+    "worker-874-react-dom-lifecycle-boundary-hardening"
+  );
+  assert.deepEqual(schedulerDrivenPassiveDiagnostic.lifecycleBoundaryRecords, [
+    "FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord",
+    "FastReactDomPrivateRootCreateRecord",
+    "FastReactDomPrivateRootUpdateRecord"
+  ]);
+  assert.equal(
     schedulerDrivenPassiveDiagnostic.linksRootCommitPassiveExecutionToActFlushDiagnostics,
     true
   );
@@ -2192,13 +2234,21 @@ test("Fast React test-utils private act route consumes Scheduler mock expired ac
 
 test("Fast React test-utils private act route consumes source-owned scheduler-driven passive diagnostics only", () => {
   for (const nodeEnv of ["development", "production"]) {
+    const lifecycle =
+      createSourceOwnedReactDomLifecycleBoundary(
+        `dom-test-utils-act-${nodeEnv}`
+      );
     const { reactGate, report } =
-      createSchedulerMockExpiredActRootWorkDiagnostics(nodeEnv);
+      createSchedulerMockExpiredActRootWorkDiagnostics(nodeEnv, {
+        rootId: lifecycle.rootId,
+        rootLabel: lifecycle.rootLabel
+      });
     const gateModule = loadFreshCjs(fastReactDomTestUtilsActGatePath);
     const diagnostics =
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         report,
         {
+          ...lifecycle.boundaryOptions,
           finishedWorkId: `dom-test-utils-passive-${nodeEnv}`
         }
       );
@@ -2241,7 +2291,7 @@ test("Fast React test-utils private act route consumes source-owned scheduler-dr
       reactGate.schedulerDrivenPassiveEffectConsumptionStatus,
       nodeEnv
     );
-    assert.equal(consumption.rootLabel, "mock-root-747", nodeEnv);
+    assert.equal(consumption.rootLabel, lifecycle.rootLabel, nodeEnv);
     assert.equal(
       consumption.finishedWorkId,
       `dom-test-utils-passive-${nodeEnv}`,
@@ -2259,6 +2309,36 @@ test("Fast React test-utils private act route consumes source-owned scheduler-dr
     );
     assert.equal(consumption.requiresSchedulerOwnedSourceProof, true, nodeEnv);
     assert.equal(consumption.requiresSourceOwnedPassiveEvidence, true, nodeEnv);
+    assert.equal(
+      consumption.requiresSourceOwnedActiveLifecycleRequestBoundary,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.consumesRootLifecycleRequestBoundary,
+      true,
+      nodeEnv
+    );
+    assert.equal(consumption.validatesLifecycleRequestRootIdentity, true, nodeEnv);
+    assert.equal(consumption.validatesLifecycleRequestOrdering, true, nodeEnv);
+    assert.equal(consumption.validatesLifecycleRequestEntrypoint, true, nodeEnv);
+    assert.equal(consumption.currentRootBoundWork, true, nodeEnv);
+    assert.equal(Object.isFrozen(consumption.lifecycleRequestBoundary), true, nodeEnv);
+    assert.equal(
+      consumption.lifecycleRequestBoundary.snapshotStatus,
+      gateModule.privateSchedulerDrivenPassiveLifecycleBoundaryStatus,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.lifecycleRequestBoundary.kind,
+      gateModule.privateSchedulerDrivenPassiveLifecycleBoundaryKind,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.lifecycleRequestBoundary.sourceRequestId,
+      lifecycle.boundary.sourceRequestId,
+      nodeEnv
+    );
     assert.equal(
       consumption.linksRootCommitPassiveExecutionToActFlushDiagnostics,
       true,
@@ -2313,7 +2393,8 @@ test("Fast React test-utils private act route consumes source-owned scheduler-dr
     const clonedScheduler = cloneExpiredActRootWorkReport(report);
     const missingSchedulerSource =
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
-        clonedScheduler
+        clonedScheduler,
+        lifecycle.boundaryOptions
       );
     assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
       gateModule,
@@ -2326,6 +2407,7 @@ test("Fast React test-utils private act route consumes source-owned scheduler-dr
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         report,
         {
+          ...lifecycle.boundaryOptions,
           schedulerGateOverrides: {
             rootId: 999,
             rootLabel: "foreign-passive-root"
@@ -2340,6 +2422,7 @@ test("Fast React test-utils private act route consumes source-owned scheduler-dr
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         report,
         {
+          ...lifecycle.boundaryOptions,
           pendingPassiveHandoffOverrides: {
             finishedWorkId: "stale-dom-test-utils-passive"
           }
@@ -2350,12 +2433,93 @@ test("Fast React test-utils private act route consumes source-owned scheduler-dr
     );
     assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
       gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          ...lifecycle.boundaryOptions,
+          diagnosticsOverrides: {
+            lifecycleRequestBoundary: {
+              ...diagnostics.lifecycleRequestBoundary
+            }
+          }
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership",
+      `${nodeEnv}:caller-built-lifecycle-boundary`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          ...lifecycle.boundaryOptions,
+          lifecycleRequestId: `${lifecycle.rootId}:foreign-request`
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership",
+      `${nodeEnv}:stale-lifecycle-request-id`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          ...lifecycle.boundaryOptions,
+          lifecycleRequestSequence:
+            lifecycle.boundary.sourceRequestSequence + 1000
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership",
+      `${nodeEnv}:replayed-lifecycle-request-sequence`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          ...createReactDomLifecycleBoundaryOptions(
+            lifecycle.initialDiagnostic.sourceContainerSnapshot
+          )
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary",
+      `${nodeEnv}:stale-same-root-render-lifecycle-boundary`
+    );
+    const crossRootLifecycle =
+      createSourceOwnedReactDomLifecycleBoundary(
+        `dom-test-utils-act-cross-root-${nodeEnv}`
+      );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          ...crossRootLifecycle.boundaryOptions
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary",
+      `${nodeEnv}:cross-root-lifecycle-boundary`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          finishedWorkId: diagnostics.finishedWorkId
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership",
+      `${nodeEnv}:missing-lifecycle-boundary`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
       cloneSchedulerDrivenPassiveEffectDiagnostics(diagnostics),
       "scheduler-driven-passive-diagnostics-passive-ownership",
       `${nodeEnv}:missing-passive-ownership`
     );
     const callerBuiltNestedDiagnostics =
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(report, {
+        ...lifecycle.boundaryOptions,
         finishedWorkId: diagnostics.finishedWorkId,
         diagnosticsOverrides:
           createCallerBuiltSchedulerDrivenPassiveEffectNestedRecords(diagnostics)
@@ -2951,6 +3115,8 @@ function createSchedulerMockExpiredActRootWorkDiagnostics(
 ) {
   const { Scheduler, reactGate } =
     loadSchedulerMockAndReactGateForSourceProof(nodeEnv, options);
+  const rootId = options.rootId ?? 747;
+  const rootLabel = options.rootLabel ?? "mock-root-747";
 
   Scheduler.reset();
   const diagnostics =
@@ -3013,8 +3179,14 @@ function createSchedulerMockExpiredActRootWorkDiagnostics(
     expiredHandle,
     actQueue,
     {
+      rootId,
+      rootLabel,
       rootWorkRecords: acceptedSchedulerMockExpiredActRootWorkRecords.map(
-        (recordKind) => createAcceptedExpiredActRootWorkRecord(recordKind)
+        (recordKind) =>
+          createAcceptedExpiredActRootWorkRecord(recordKind, {
+            rootId,
+            rootLabel
+          })
       )
     }
   );

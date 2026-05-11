@@ -5,6 +5,7 @@ const {
   createUnsupportedError,
   createUnsupportedFunction
 } = require('../placeholder-utils.js');
+const rootBridge = require('./client/root-bridge.js');
 
 const entrypoint = 'react-dom/test-utils';
 const privateTestUtilsActGateExport =
@@ -91,6 +92,19 @@ const privateSchedulerDrivenPassiveEffectConsumptionStatus =
   'consumed-private-test-utils-act-scheduler-driven-passive-effect-diagnostics';
 const reactActSchedulerDrivenPassiveEffectConsumptionStatus =
   'consumed-accepted-private-scheduler-driven-passive-effect-execution-diagnostics';
+const privateSchedulerDrivenPassiveLifecycleBoundaryStatus =
+  'accepted-private-root-public-facade-lifecycle-container-snapshot';
+const privateSchedulerDrivenPassiveLifecycleBoundaryKind =
+  'FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord';
+const privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId =
+  'worker-874-react-dom-lifecycle-boundary-hardening';
+const privateSchedulerDrivenPassiveLifecycleBoundarySource =
+  'packages/react-dom/src/client/root-bridge.js';
+const privateSchedulerDrivenPassiveLifecycleBoundaryRecords = freezeArray([
+  'FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord',
+  'FastReactDomPrivateRootCreateRecord',
+  'FastReactDomPrivateRootUpdateRecord'
+]);
 const privateRootHostOutputDiagnosticGateId =
   'root-render-private-host-output-diagnostic-gate-1';
 const privateRootHostOutputDiagnosticStatus =
@@ -958,6 +972,7 @@ const privateSchedulerDrivenPassiveEffectEvidence = freezeArray([
   'worker-837-scheduler-driven-passive-effect-execution',
   'source-owned-private-passive-effect-diagnostics',
   'scheduler-owned-expired-act-root-source-proof-required',
+  'source-owned-active-root-lifecycle-request-boundary-required',
   'root-commit-passive-handoff-linked-to-act-flush-diagnostics',
   'scheduler-passive-flush-request-consumed',
   'private-destroy-create-callback-executors-observed',
@@ -972,16 +987,33 @@ const privateSchedulerDrivenPassiveEffectDiagnosticSummary = freezeRecord({
   consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
   requiresSchedulerOwnedSourceProof: true,
   requiresSourceOwnedPassiveEvidence: true,
+  requiresSourceOwnedActiveLifecycleRequestBoundary: true,
+  lifecycleBoundaryStatus: privateSchedulerDrivenPassiveLifecycleBoundaryStatus,
+  lifecycleBoundaryKind: privateSchedulerDrivenPassiveLifecycleBoundaryKind,
+  lifecycleBoundaryWorkerId:
+    privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId,
+  lifecycleBoundarySource: privateSchedulerDrivenPassiveLifecycleBoundarySource,
+  lifecycleBoundaryRecords: privateSchedulerDrivenPassiveLifecycleBoundaryRecords,
   linksRootCommitPassiveExecutionToActFlushDiagnostics: true,
   consumesRootCommitPassiveExecution: true,
   consumesSchedulerPassiveFlushRequest: true,
   consumesPendingPassiveHandoff: true,
+  consumesRootLifecycleRequestBoundary: true,
+  validatesLifecycleRequestRootIdentity: true,
+  validatesLifecycleRequestOrdering: true,
+  validatesLifecycleRequestEntrypoint: true,
   privateSchedulerDrivenPassiveExecution: true,
   didExecutePrivateCallbackExecutors: true,
   rejectsStaleDiagnostics: true,
   rejectsCrossRootDiagnostics: true,
+  rejectsStaleLifecycleRequestBoundary: true,
+  rejectsReplayLifecycleRequestBoundary: true,
+  rejectsCrossEntrypointLifecycleRequestBoundary: true,
+  rejectsCallerBuiltLifecycleRequestBoundary: true,
   rejectsMissingSchedulerSourceProof: true,
   rejectsMissingPassiveOwnership: true,
+  rejectsMissingLifecycleBoundaryOwnership: true,
+  currentRootBoundWork: true,
   schedulerDrivenPassiveExecution: false,
   queueFlushingReady: false,
   rendererRootsReady: false,
@@ -1004,6 +1036,56 @@ const privateSchedulerDrivenPassiveEffectDiagnosticSummary = freezeRecord({
   executesRendererRoots: false,
   compatibilityClaimed: false
 });
+const privateSchedulerDrivenPassiveEffectRequiredTrueFields = freezeArray([
+  'consumesReactActPrivateSchedulerDrivenPassiveDiagnostics',
+  'consumesSchedulerMockExpiredActRootWorkDiagnostics',
+  'requiresSchedulerOwnedSourceProof',
+  'requiresSourceOwnedPassiveEvidence',
+  'requiresSourceOwnedActiveLifecycleRequestBoundary',
+  'linksRootCommitPassiveExecutionToActFlushDiagnostics',
+  'consumesRootCommitPassiveExecution',
+  'consumesSchedulerPassiveFlushRequest',
+  'consumesPendingPassiveHandoff',
+  'consumesRootLifecycleRequestBoundary',
+  'validatesLifecycleRequestRootIdentity',
+  'validatesLifecycleRequestOrdering',
+  'validatesLifecycleRequestEntrypoint',
+  'privateSchedulerDrivenPassiveExecution',
+  'didExecutePrivateCallbackExecutors',
+  'rejectsStaleDiagnostics',
+  'rejectsCrossRootDiagnostics',
+  'rejectsStaleLifecycleRequestBoundary',
+  'rejectsReplayLifecycleRequestBoundary',
+  'rejectsCrossEntrypointLifecycleRequestBoundary',
+  'rejectsCallerBuiltLifecycleRequestBoundary',
+  'rejectsMissingSchedulerSourceProof',
+  'rejectsMissingPassiveOwnership',
+  'rejectsMissingLifecycleBoundaryOwnership',
+  'currentRootBoundWork'
+]);
+const privateSchedulerDrivenPassiveEffectRequiredFalseFields = freezeArray([
+  'schedulerDrivenPassiveExecution',
+  'queueFlushingReady',
+  'rendererRootsReady',
+  'passiveEffectsReady',
+  'continuationFlushingReady',
+  'publicActExecution',
+  'publicRootExecution',
+  'publicEffectExecution',
+  'publicActPassiveDrain',
+  'publicSchedulerTimingCompatibilityClaimed',
+  'publicReactActCompatibilityClaimed',
+  'publicRootSchedulerCompatibilityClaimed',
+  'publicRendererCompatibilityClaimed',
+  'drainsPublicSchedulerTaskQueue',
+  'drainsPublicReactActQueue',
+  'executesQueuedWork',
+  'executesEffects',
+  'executesPassiveEffects',
+  'executesRendererWork',
+  'executesRendererRoots',
+  'compatibilityClaimed'
+]);
 const passiveEffectDeletedSubtreeRefPassiveOrderingRecords = freezeArray([
   'HostRootDeletionCleanupOrderGateSnapshot',
   'HostRootDeletionCleanupOrderPhase::RefCleanupReturn',
@@ -1647,6 +1729,13 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
         reactActSchedulerDrivenPassiveEffectConsumptionStatus,
       acceptedSchedulerDrivenPassiveEffectRecords:
         privateSchedulerDrivenPassiveEffectRecords,
+      requiresSourceOwnedActiveLifecycleRequestBoundary: true,
+      schedulerDrivenPassiveLifecycleBoundaryStatus:
+        privateSchedulerDrivenPassiveLifecycleBoundaryStatus,
+      schedulerDrivenPassiveLifecycleBoundaryKind:
+        privateSchedulerDrivenPassiveLifecycleBoundaryKind,
+      acceptedSchedulerDrivenPassiveLifecycleBoundaryRecords:
+        privateSchedulerDrivenPassiveLifecycleBoundaryRecords,
       privateSchedulerDrivenPassiveExecution: true,
       schedulerDrivenPassiveExecution: false,
       executesQueuedWork: false,
@@ -1906,16 +1995,36 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
       requiresSchedulerOwnedSourceProof: true,
       requiresSourceOwnedPassiveEvidence: true,
+      requiresSourceOwnedActiveLifecycleRequestBoundary: true,
+      lifecycleBoundaryStatus:
+        privateSchedulerDrivenPassiveLifecycleBoundaryStatus,
+      lifecycleBoundaryKind: privateSchedulerDrivenPassiveLifecycleBoundaryKind,
+      lifecycleBoundaryWorkerId:
+        privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId,
+      lifecycleBoundarySource:
+        privateSchedulerDrivenPassiveLifecycleBoundarySource,
+      lifecycleBoundaryRecords:
+        privateSchedulerDrivenPassiveLifecycleBoundaryRecords,
       linksRootCommitPassiveExecutionToActFlushDiagnostics: true,
       consumesRootCommitPassiveExecution: true,
       consumesSchedulerPassiveFlushRequest: true,
       consumesPendingPassiveHandoff: true,
+      consumesRootLifecycleRequestBoundary: true,
+      validatesLifecycleRequestRootIdentity: true,
+      validatesLifecycleRequestOrdering: true,
+      validatesLifecycleRequestEntrypoint: true,
       privateSchedulerDrivenPassiveExecution: true,
       didExecutePrivateCallbackExecutors: true,
       rejectsStaleDiagnostics: true,
       rejectsCrossRootDiagnostics: true,
+      rejectsStaleLifecycleRequestBoundary: true,
+      rejectsReplayLifecycleRequestBoundary: true,
+      rejectsCrossEntrypointLifecycleRequestBoundary: true,
+      rejectsCallerBuiltLifecycleRequestBoundary: true,
       rejectsMissingSchedulerSourceProof: true,
       rejectsMissingPassiveOwnership: true,
+      rejectsMissingLifecycleBoundaryOwnership: true,
+      currentRootBoundWork: true,
       schedulerDrivenPassiveExecution: false,
       queueFlushingReady: false,
       rendererRootsReady: false,
@@ -2505,6 +2614,108 @@ function preflightSchedulerMockDelayedActRootWorkDiagnostics(report) {
   });
 }
 
+function isAcceptedReactSchedulerDrivenPassiveLifecycleBoundary(
+  boundary,
+  consumption
+) {
+  const snapshotPayload =
+    isObjectLike(boundary)
+      ? rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
+          boundary
+        )
+      : null;
+  const rootPayload =
+    isObjectLike(snapshotPayload) && isObjectLike(snapshotPayload.payload)
+      ? snapshotPayload.payload
+      : null;
+  const createRecord =
+    isObjectLike(snapshotPayload) ? snapshotPayload.createRecord : null;
+  const sourceRecord =
+    isObjectLike(snapshotPayload) ? snapshotPayload.sourceRecord : null;
+
+  return (
+    rootBridge.isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord(
+      boundary
+    ) &&
+    snapshotPayload !== null &&
+    Object.isFrozen(boundary) &&
+    boundary.$$typeof ===
+      rootBridge.privateRootPublicFacadeLifecycleContainerSnapshotRecordType &&
+    boundary.kind === privateSchedulerDrivenPassiveLifecycleBoundaryKind &&
+    boundary.snapshotStatus ===
+      privateSchedulerDrivenPassiveLifecycleBoundaryStatus &&
+    consumption.lifecycleRequestBoundaryStatus === boundary.snapshotStatus &&
+    consumption.lifecycleRequestBoundaryKind === boundary.kind &&
+    boundary.rootId === consumption.rootId &&
+    (boundary.phase === 'render' || boundary.phase === 'update') &&
+    boundary.sourceOwned === true &&
+    boundary.sourceRequestType === 'root.render' &&
+    boundary.sourceOperation === 'render' &&
+    typeof boundary.sourceRequestId === 'string' &&
+    boundary.sourceRequestId.length > 0 &&
+    boundary.sourceRequestSequence > 0 &&
+    boundary.markerListenerStatePreserved === true &&
+    (boundary.publicActPassiveDrain === undefined ||
+      boundary.publicActPassiveDrain === false) &&
+    boundary.publicRootExecution === false &&
+    boundary.publicRootCompatibilitySurface === false &&
+    boundary.nativeExecution === false &&
+    boundary.reconcilerExecution === false &&
+    boundary.browserDomMutation === false &&
+    boundary.markerWrites === false &&
+    boundary.listenerInstallation === false &&
+    boundary.hydration === false &&
+    boundary.eventDispatch === false &&
+    boundary.compatibilityClaimed === false &&
+    isObjectLike(createRecord) &&
+    createRecord.$$typeof === rootBridge.privateRootCreateRecordType &&
+    createRecord.kind === 'FastReactDomPrivateRootCreateRecord' &&
+    createRecord.requestType === 'createRoot' &&
+    createRecord.requestId === boundary.createRequestId &&
+    createRecord.rootId === boundary.rootId &&
+    createRecord.rootKind === boundary.rootKind &&
+    createRecord.rootTag === boundary.rootTag &&
+    isObjectLike(sourceRecord) &&
+    sourceRecord.$$typeof === rootBridge.privateRootUpdateRecordType &&
+    sourceRecord.kind === 'FastReactDomPrivateRootUpdateRecord' &&
+    sourceRecord.requestId === boundary.sourceRequestId &&
+    sourceRecord.requestSequence === boundary.sourceRequestSequence &&
+    sourceRecord.requestType === boundary.sourceRequestType &&
+    sourceRecord.operation === boundary.sourceOperation &&
+    sourceRecord.rootId === boundary.rootId &&
+    sourceRecord.rootKind === boundary.rootKind &&
+    sourceRecord.rootTag === boundary.rootTag &&
+    sourceRecord.requestSequence > createRecord.requestSequence &&
+    rootPayload !== null &&
+    rootPayload.createRecord === createRecord &&
+    Array.isArray(rootPayload.requestRecords) &&
+    Array.isArray(rootPayload.renderRecords) &&
+    rootPayload.requestRecords.includes(createRecord) &&
+    rootPayload.requestRecords.includes(sourceRecord) &&
+    rootPayload.renderRecords.includes(sourceRecord) &&
+    isCurrentReactSchedulerDrivenPassiveLifecycleBoundarySourceRecord(
+      rootPayload,
+      sourceRecord
+    )
+  );
+}
+
+function isCurrentReactSchedulerDrivenPassiveLifecycleBoundarySourceRecord(
+  rootPayload,
+  sourceRecord
+) {
+  return (
+    Array.isArray(rootPayload.requestRecords) &&
+    Array.isArray(rootPayload.renderRecords) &&
+    rootPayload.requestRecords.length > 0 &&
+    rootPayload.renderRecords.length > 0 &&
+    rootPayload.requestRecords[rootPayload.requestRecords.length - 1] ===
+      sourceRecord &&
+    rootPayload.renderRecords[rootPayload.renderRecords.length - 1] ===
+      sourceRecord
+  );
+}
+
 function isAcceptedReactSchedulerDrivenPassiveEffectConsumption(
   consumption
 ) {
@@ -2518,13 +2729,28 @@ function isAcceptedReactSchedulerDrivenPassiveEffectConsumption(
       true &&
     consumption.requiresSchedulerOwnedSourceProof === true &&
     consumption.requiresSourceOwnedPassiveEvidence === true &&
+    consumption.requiresSourceOwnedActiveLifecycleRequestBoundary ===
+      true &&
     consumption.linksRootCommitPassiveExecutionToActFlushDiagnostics ===
       true &&
     consumption.consumesRootCommitPassiveExecution === true &&
     consumption.consumesSchedulerPassiveFlushRequest === true &&
     consumption.consumesPendingPassiveHandoff === true &&
+    consumption.consumesRootLifecycleRequestBoundary === true &&
+    consumption.validatesLifecycleRequestRootIdentity === true &&
+    consumption.validatesLifecycleRequestOrdering === true &&
+    consumption.validatesLifecycleRequestEntrypoint === true &&
+    consumption.lifecycleRequestBoundaryStatus ===
+      privateSchedulerDrivenPassiveLifecycleBoundaryStatus &&
+    consumption.lifecycleRequestBoundaryKind ===
+      privateSchedulerDrivenPassiveLifecycleBoundaryKind &&
+    isAcceptedReactSchedulerDrivenPassiveLifecycleBoundary(
+      consumption.lifecycleRequestBoundary,
+      consumption
+    ) &&
     consumption.privateSchedulerDrivenPassiveExecution === true &&
     consumption.didExecutePrivateCallbackExecutors === true &&
+    consumption.currentRootBoundWork === true &&
     consumption.schedulerDrivenPassiveExecution === false &&
     consumption.queueFlushingReady === false &&
     consumption.rendererRootsReady === false &&
@@ -2621,20 +2847,37 @@ function consumeSchedulerDrivenPassiveEffectDiagnostics(diagnostics) {
     schedulerGate: reactActConsumptionReport.schedulerGate,
     schedulerExecution: reactActConsumptionReport.schedulerExecution,
     passiveEffects: reactActConsumptionReport.passiveEffects,
+    lifecycleRequestBoundary:
+      reactActConsumptionReport.lifecycleRequestBoundary,
+    lifecycleRequestBoundaryStatus:
+      reactActConsumptionReport.lifecycleRequestBoundaryStatus,
+    lifecycleRequestBoundaryKind:
+      reactActConsumptionReport.lifecycleRequestBoundaryKind,
     consumesReactActPrivateSchedulerDrivenPassiveDiagnostics: true,
     consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
     requiresSchedulerOwnedSourceProof: true,
     requiresSourceOwnedPassiveEvidence: true,
+    requiresSourceOwnedActiveLifecycleRequestBoundary: true,
     linksRootCommitPassiveExecutionToActFlushDiagnostics: true,
     consumesRootCommitPassiveExecution: true,
     consumesSchedulerPassiveFlushRequest: true,
     consumesPendingPassiveHandoff: true,
+    consumesRootLifecycleRequestBoundary: true,
+    validatesLifecycleRequestRootIdentity: true,
+    validatesLifecycleRequestOrdering: true,
+    validatesLifecycleRequestEntrypoint: true,
     privateSchedulerDrivenPassiveExecution: true,
     didExecutePrivateCallbackExecutors: true,
     rejectsStaleDiagnostics: true,
     rejectsCrossRootDiagnostics: true,
+    rejectsStaleLifecycleRequestBoundary: true,
+    rejectsReplayLifecycleRequestBoundary: true,
+    rejectsCrossEntrypointLifecycleRequestBoundary: true,
+    rejectsCallerBuiltLifecycleRequestBoundary: true,
     rejectsMissingSchedulerSourceProof: true,
     rejectsMissingPassiveOwnership: true,
+    rejectsMissingLifecycleBoundaryOwnership: true,
+    currentRootBoundWork: true,
     schedulerDrivenPassiveExecution: false,
     privateRoutingReady: false,
     publicReactActReady: false,
@@ -2745,7 +2988,7 @@ function createSchedulerDrivenPassiveEffectDiagnosticsGateError(reason) {
     entrypoint,
     `${privateTestUtilsActGateExport}.consumeSchedulerDrivenPassiveEffectDiagnostics`,
     'rejected scheduler-driven passive effect diagnostics',
-    'Only React-owned private scheduler-driven passive effect diagnostics linked to accepted Scheduler act/root evidence can pass this package-private React DOM test-utils act route.'
+    'Only React-owned private scheduler-driven passive effect diagnostics linked to accepted Scheduler act/root evidence and source-owned lifecycle request-boundary evidence can pass this package-private React DOM test-utils act route.'
   );
   error.reason = reason;
   error.publicCompatibilityClaimed = false;
@@ -2841,6 +3084,24 @@ function collectStaleAcceptedPrivatePrerequisites(prerequisites) {
         freezeRecord({
           prerequisiteId:
             privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+          reasons
+        })
+      );
+    }
+  }
+
+  const schedulerDrivenPassivePrerequisite = prerequisitesById.get(
+    privateSchedulerDrivenPassiveEffectPrerequisiteId
+  );
+  if (schedulerDrivenPassivePrerequisite) {
+    const reasons =
+      collectSchedulerDrivenPassiveEffectStaleReasons(
+        schedulerDrivenPassivePrerequisite
+      );
+    if (reasons.length > 0) {
+      stalePrerequisites.push(
+        freezeRecord({
+          prerequisiteId: privateSchedulerDrivenPassiveEffectPrerequisiteId,
           reasons
         })
       );
@@ -2974,6 +3235,130 @@ function collectSchedulerMockDelayedActRootWorkRecordReasons({
     }
   }
   for (const field of privateSchedulerMockDelayedActRootWorkRequiredFalseFields) {
+    if (record[field] !== false) {
+      reasons.push(`${prefix}${field}-not-false`);
+    }
+  }
+
+  return reasons;
+}
+
+function collectSchedulerDrivenPassiveEffectStaleReasons(prerequisite) {
+  const reasons = collectSchedulerDrivenPassiveEffectRecordReasons({
+    record: prerequisite,
+    prefix: '',
+    validatePrerequisiteRow: true
+  });
+
+  if (!isObjectLike(prerequisite.summary)) {
+    reasons.push('summary-missing');
+  } else {
+    reasons.push(
+      ...collectSchedulerDrivenPassiveEffectRecordReasons({
+        record: prerequisite.summary,
+        prefix: 'summary.',
+        validatePrerequisiteRow: false
+      })
+    );
+  }
+
+  return freezeArray(reasons);
+}
+
+function collectSchedulerDrivenPassiveEffectRecordReasons({
+  record,
+  prefix,
+  validatePrerequisiteRow
+}) {
+  const reasons = [];
+
+  if (record.gateId !== privateSchedulerDrivenPassiveEffectDiagnosticGateId) {
+    reasons.push(`${prefix}gate-id-mismatch`);
+  }
+  if (record.status !== privateSchedulerDrivenPassiveEffectDiagnosticStatus) {
+    reasons.push(`${prefix}status-mismatch`);
+  }
+  if (
+    record.prerequisiteId !== privateSchedulerDrivenPassiveEffectPrerequisiteId
+  ) {
+    reasons.push(`${prefix}prerequisite-id-mismatch`);
+  }
+  if (
+    record.lifecycleBoundaryStatus !==
+    privateSchedulerDrivenPassiveLifecycleBoundaryStatus
+  ) {
+    reasons.push(`${prefix}lifecycle-boundary-status-mismatch`);
+  }
+  if (
+    record.lifecycleBoundaryKind !==
+    privateSchedulerDrivenPassiveLifecycleBoundaryKind
+  ) {
+    reasons.push(`${prefix}lifecycle-boundary-kind-mismatch`);
+  }
+  if (
+    record.lifecycleBoundaryWorkerId !==
+    privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId
+  ) {
+    reasons.push(`${prefix}lifecycle-boundary-worker-id-mismatch`);
+  }
+  if (
+    record.lifecycleBoundarySource !==
+    privateSchedulerDrivenPassiveLifecycleBoundarySource
+  ) {
+    reasons.push(`${prefix}lifecycle-boundary-source-mismatch`);
+  }
+  if (
+    !sameStringArray(
+      record.lifecycleBoundaryRecords,
+      privateSchedulerDrivenPassiveLifecycleBoundaryRecords
+    )
+  ) {
+    reasons.push(`${prefix}lifecycle-boundary-records-mismatch`);
+  }
+
+  if (validatePrerequisiteRow) {
+    if (record.source !== 'packages/react/private-act-dispatcher-gate.js') {
+      reasons.push(`${prefix}source-mismatch`);
+    }
+    if (record.recordOnly !== false) {
+      reasons.push(`${prefix}recordOnly-not-false`);
+    }
+    if (record.privateDiagnostic !== true) {
+      reasons.push(`${prefix}privateDiagnostic-not-true`);
+    }
+    if (
+      record.diagnosticGateId !==
+      privateSchedulerDrivenPassiveEffectDiagnosticGateId
+    ) {
+      reasons.push(`${prefix}diagnostic-gate-id-mismatch`);
+    }
+    if (
+      record.diagnosticStatus !==
+      privateSchedulerDrivenPassiveEffectDiagnosticStatus
+    ) {
+      reasons.push(`${prefix}diagnostic-status-mismatch`);
+    }
+    if (
+      !sameStringArray(record.records, privateSchedulerDrivenPassiveEffectRecords)
+    ) {
+      reasons.push(`${prefix}records-mismatch`);
+    }
+    if (
+      !sameStringArray(
+        record.evidence,
+        privateSchedulerDrivenPassiveEffectEvidence
+      )
+    ) {
+      reasons.push(`${prefix}evidence-mismatch`);
+    }
+  }
+
+  for (const field of privateSchedulerDrivenPassiveEffectRequiredTrueFields) {
+    if (record[field] !== true) {
+      reasons.push(`${prefix}${field}-not-true`);
+    }
+  }
+  for (const field of privateSchedulerDrivenPassiveEffectRequiredFalseFields) {
     if (record[field] !== false) {
       reasons.push(`${prefix}${field}-not-false`);
     }
@@ -3276,6 +3661,10 @@ module.exports = {
   privateSchedulerDrivenPassiveEffectDiagnosticGateId,
   privateSchedulerDrivenPassiveEffectDiagnosticStatus,
   privateSchedulerDrivenPassiveEffectPrerequisiteId,
+  privateSchedulerDrivenPassiveLifecycleBoundaryKind,
+  privateSchedulerDrivenPassiveLifecycleBoundaryRecords,
+  privateSchedulerDrivenPassiveLifecycleBoundaryStatus,
+  privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId,
   privateRoutingGateId,
   privateRoutingGateStatus,
   privateTestUtilsActGateExport,
