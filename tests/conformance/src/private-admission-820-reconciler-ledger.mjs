@@ -123,6 +123,70 @@ export const PRIVATE_ADMISSION_820_PUBLIC_BLOCKER_FIELDS = freezeArray([
   "compatibilityClaimed"
 ]);
 
+export const PRIVATE_ADMISSION_820_TOP_LEVEL_PUBLIC_CLAIM_FIELDS =
+  freezeArray([
+    "publicRootRenderingClaimed",
+    "publicRootRenderingAvailable",
+    "publicRootCompatibilityClaimed",
+    "rootFacadeCompatibilityClaimed",
+    "rootCommitPublicCompatibilityClaimed",
+    "rootCommitCompatibilityClaimed",
+    "publicRendererHostMutationClaimed",
+    "publicRendererHostMutationAvailable",
+    "publicRendererCompatibilityClaimed",
+    "reactDomCompatibilityClaimed",
+    "reactTestRendererCompatibilityClaimed",
+    "broadReconcilerTraversalClaimed",
+    "publicActCompatibilityClaimed",
+    "publicReactActCompatibilityClaimed",
+    "publicReactDomTestUtilsActCompatibilityClaimed",
+    "publicAsyncActCompatibilityClaimed",
+    "publicSchedulerCompatibilityClaimed",
+    "publicSchedulerTaskCompatibilityClaimed",
+    "publicRootSchedulerCompatibilityClaimed",
+    "publicSchedulerTimingCompatibilityClaimed",
+    "publicSchedulerFlushCompatibilityClaimed",
+    "publicSchedulerFlushHelperCompatibilityClaimed",
+    "publicSchedulerContinuationClaimed",
+    "schedulerCompatibilityClaimed",
+    "schedulerDelayedActRootAdmissionClaimed",
+    "schedulerDelayedRendererRootAdmissionClaimed",
+    "packageCompatibilityClaimed",
+    "packageSurfaceCompatibilityClaimed",
+    "publicPackageCompatibilityClaimed",
+    "nativeCompatibilityClaimed",
+    "nativePackageCompatibilityClaimed",
+    "rootCompatibilityClaimed",
+    "actCompatibilityClaimed",
+    "publicCompatibilityClaimed",
+    "compatibilityClaimed"
+  ]);
+
+export const PRIVATE_ADMISSION_820_TOP_LEVEL_RUNTIME_CLAIM_FIELDS =
+  freezeArray([
+    "runtimeExecutionClaimed",
+    "rustExecutionClaimed",
+    "rootRuntimeExecuted",
+    "rootRuntimeExecutionClaimed",
+    "rootCommitRuntimeExecutionClaimed",
+    "actRuntimeExecuted",
+    "actRuntimeExecutionClaimed",
+    "schedulerRuntimeExecuted",
+    "schedulerRuntimeExecutionClaimed",
+    "publicSchedulerFlushBehaviorExecuted",
+    "publicSchedulerFlushExecutionAvailable",
+    "schedulerRuntimeClaimed",
+    "drainsPublicReactActQueue",
+    "drainsPublicSchedulerTaskQueue",
+    "executesQueuedWork",
+    "executesEffects",
+    "executesRendererWork",
+    "executesRendererRoots",
+    "packageSurfaceChanged",
+    "packageCodeExecuted",
+    "nativeBridgeExecuted"
+  ]);
+
 const privateAdmission820Rows = freezeArray([
   row({
     workerId: worker803,
@@ -405,20 +469,17 @@ export function evaluatePrivateAdmission820Gate({
     ];
   });
   const publicClaimViolationIds = evaluatedRows.flatMap((rowData) =>
-    Object.entries(rowData.publicBlockerClaims ?? {})
-      .filter(([, claimed]) => claimed !== false)
-      .map(([claimId]) => `${rowData.workerId}.${claimId}`)
+    [
+      ...Object.entries(rowData.publicBlockerClaims ?? {})
+        .filter(([, claimed]) => claimed !== false)
+        .map(([claimId]) => `${rowData.workerId}.${claimId}`),
+      ...PRIVATE_ADMISSION_820_TOP_LEVEL_PUBLIC_CLAIM_FIELDS.filter(
+        (field) => rowData[field] !== false
+      ).map((field) => `${rowData.workerId}.${field}`)
+    ]
   );
   const runtimeExecutionClaimViolationIds = evaluatedRows.flatMap((rowData) =>
-    [
-      "runtimeExecutionClaimed",
-      "rustExecutionClaimed",
-      "rootRuntimeExecuted",
-      "actRuntimeExecuted",
-      "schedulerRuntimeExecuted",
-      "packageCodeExecuted",
-      "nativeBridgeExecuted"
-    ]
+    PRIVATE_ADMISSION_820_TOP_LEVEL_RUNTIME_CLAIM_FIELDS
       .filter((field) => rowData[field] !== false)
       .map((field) => `${rowData.workerId}.${field}`)
   );
@@ -428,26 +489,14 @@ export function evaluatePrivateAdmission820Gate({
         rowData.privateEvidenceOnly !== true ||
         rowData.sourceTokenChecksOnly !== true ||
         rowData.manifestEvaluationOnly !== true ||
-        rowData.runtimeExecutionClaimed !== false ||
-        rowData.rustExecutionClaimed !== false ||
-        rowData.rootRuntimeExecuted !== false ||
-        rowData.actRuntimeExecuted !== false ||
-        rowData.schedulerRuntimeExecuted !== false ||
-        rowData.packageCodeExecuted !== false ||
-        rowData.nativeBridgeExecuted !== false ||
+        PRIVATE_ADMISSION_820_TOP_LEVEL_RUNTIME_CLAIM_FIELDS.some(
+          (field) => rowData[field] !== false
+        ) ||
         rowData.ledgerEvaluationMode !== "source-token-checks-and-manifest-only"
     )
     .map((rowData) => rowData.workerId);
   const publicCompatibilityClaimIds = evaluatedRows.flatMap((rowData) =>
-    [
-      "compatibilityClaimed",
-      "publicCompatibilityClaimed",
-      "packageCompatibilityClaimed",
-      "nativeCompatibilityClaimed",
-      "rootCompatibilityClaimed",
-      "actCompatibilityClaimed",
-      "schedulerCompatibilityClaimed"
-    ]
+    PRIVATE_ADMISSION_820_TOP_LEVEL_PUBLIC_CLAIM_FIELDS
       .filter((field) => rowData[field] !== false)
       .map((field) => `${rowData.workerId}.${field}`)
   );
@@ -591,20 +640,8 @@ function row({
     privateEvidenceOnly: true,
     sourceTokenChecksOnly: true,
     manifestEvaluationOnly: true,
-    runtimeExecutionClaimed: false,
-    rustExecutionClaimed: false,
-    rootRuntimeExecuted: false,
-    actRuntimeExecuted: false,
-    schedulerRuntimeExecuted: false,
-    packageCodeExecuted: false,
-    nativeBridgeExecuted: false,
-    compatibilityClaimed: false,
-    publicCompatibilityClaimed: false,
-    packageCompatibilityClaimed: false,
-    nativeCompatibilityClaimed: false,
-    rootCompatibilityClaimed: false,
-    actCompatibilityClaimed: false,
-    schedulerCompatibilityClaimed: false,
+    ...falseRecord(PRIVATE_ADMISSION_820_TOP_LEVEL_RUNTIME_CLAIM_FIELDS),
+    ...falseRecord(PRIVATE_ADMISSION_820_TOP_LEVEL_PUBLIC_CLAIM_FIELDS),
     ledgerEvaluationMode: "source-token-checks-and-manifest-only"
   });
 }

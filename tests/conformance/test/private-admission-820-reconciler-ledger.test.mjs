@@ -8,6 +8,8 @@ import {
   PRIVATE_ADMISSION_820_REQUIRED_EVIDENCE_ROLES,
   PRIVATE_ADMISSION_820_REQUIRED_STATUS_IDENTIFIERS,
   PRIVATE_ADMISSION_820_ROWS,
+  PRIVATE_ADMISSION_820_TOP_LEVEL_PUBLIC_CLAIM_FIELDS,
+  PRIVATE_ADMISSION_820_TOP_LEVEL_RUNTIME_CLAIM_FIELDS,
   PRIVATE_ADMISSION_820_VIOLATION_STATUS,
   PRIVATE_ADMISSION_820_WORKERS,
   evaluatePrivateAdmission820Gate
@@ -39,6 +41,12 @@ test("private admission 820 manifest pins accepted reconciler ledger workers", (
     assert.equal(row.packageCodeExecuted, false, row.workerId);
     assert.equal(row.nativeBridgeExecuted, false, row.workerId);
     assert.equal(row.compatibilityClaimed, false, row.workerId);
+    for (const field of PRIVATE_ADMISSION_820_TOP_LEVEL_PUBLIC_CLAIM_FIELDS) {
+      assert.equal(row[field], false, `${row.workerId}.${field}`);
+    }
+    for (const field of PRIVATE_ADMISSION_820_TOP_LEVEL_RUNTIME_CLAIM_FIELDS) {
+      assert.equal(row[field], false, `${row.workerId}.${field}`);
+    }
     assert.equal(
       row.ledgerEvaluationMode,
       "source-token-checks-and-manifest-only",
@@ -238,6 +246,82 @@ test("private admission 820 rejects missing evidence and unstable progress or sn
   assert.deepEqual(missingTokenMismatch.missingTokens, [
     "MissingSourceOwnedFinishedLanesIdentifierForCanary"
   ]);
+});
+
+test("private admission 820 rejects top-level public and runtime alias claims", () => {
+  const gate = evaluatePrivateAdmission820Gate({
+    rowOverrides: {
+      [worker803]: {
+        reactDomCompatibilityClaimed: true,
+        reactTestRendererCompatibilityClaimed: true,
+        broadReconcilerTraversalClaimed: true,
+        rootCommitPublicCompatibilityClaimed: true,
+        publicRendererHostMutationClaimed: true,
+        publicPackageCompatibilityClaimed: true,
+        nativePackageCompatibilityClaimed: true,
+        actRuntimeExecutionClaimed: true,
+        schedulerRuntimeExecutionClaimed: true,
+        publicReactActCompatibilityClaimed: true,
+        publicRootSchedulerCompatibilityClaimed: true,
+        publicSchedulerCompatibilityClaimed: true,
+        publicSchedulerFlushHelperCompatibilityClaimed: true,
+        rootRuntimeExecutionClaimed: true,
+        rootCommitRuntimeExecutionClaimed: true,
+        packageSurfaceChanged: true
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_820_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.blockedPublicClaimsRecognized, false);
+  assert.equal(gate.staticReadOnlyRecognized, false);
+  assert.equal(gate.compatibilityClaimed, true);
+  assert.deepEqual(gate.staticReadOnlyViolationIds, [worker803]);
+  assertViolationIds(gate, [
+    "private-admission-820-public-claim-detected",
+    "private-admission-820-runtime-execution-claim",
+    "private-admission-820-static-ledger-mode-mismatch",
+    "private-admission-820-public-compatibility-claim-detected"
+  ]);
+  assertSubset(
+    [
+      `${worker803}.reactDomCompatibilityClaimed`,
+      `${worker803}.reactTestRendererCompatibilityClaimed`,
+      `${worker803}.broadReconcilerTraversalClaimed`,
+      `${worker803}.rootCommitPublicCompatibilityClaimed`,
+      `${worker803}.publicRendererHostMutationClaimed`,
+      `${worker803}.publicPackageCompatibilityClaimed`,
+      `${worker803}.nativePackageCompatibilityClaimed`,
+      `${worker803}.publicReactActCompatibilityClaimed`,
+      `${worker803}.publicRootSchedulerCompatibilityClaimed`,
+      `${worker803}.publicSchedulerCompatibilityClaimed`,
+      `${worker803}.publicSchedulerFlushHelperCompatibilityClaimed`
+    ],
+    gate.publicClaimViolationIds
+  );
+  assertSubset(
+    [
+      `${worker803}.actRuntimeExecutionClaimed`,
+      `${worker803}.schedulerRuntimeExecutionClaimed`,
+      `${worker803}.rootRuntimeExecutionClaimed`,
+      `${worker803}.rootCommitRuntimeExecutionClaimed`,
+      `${worker803}.packageSurfaceChanged`
+    ],
+    gate.runtimeExecutionClaimViolationIds
+  );
+  assertSubset(
+    [
+      `${worker803}.reactDomCompatibilityClaimed`,
+      `${worker803}.reactTestRendererCompatibilityClaimed`,
+      `${worker803}.broadReconcilerTraversalClaimed`,
+      `${worker803}.rootCommitPublicCompatibilityClaimed`,
+      `${worker803}.publicRendererHostMutationClaimed`,
+      `${worker803}.publicPackageCompatibilityClaimed`,
+      `${worker803}.nativePackageCompatibilityClaimed`
+    ],
+    gate.publicCompatibilityClaimIds
+  );
 });
 
 test("private admission 820 rejects root, act, Scheduler, package, native, runtime, and public compatibility claims", () => {

@@ -14,6 +14,9 @@
   rejection, fabricated continuation rejection, and foreign callback rejection.
 - The ledger reads source files only. It does not execute Rust, package,
   native, root, act, or Scheduler code.
+- Audit follow-up added explicit top-level alias blockers for public/root/act/
+  Scheduler/package/native compatibility and runtime claim fields so rows cannot
+  bypass the gate by setting claim aliases outside `publicBlockerClaims`.
 
 ## Changed Files
 
@@ -49,12 +52,20 @@
 - `node --test tests/conformance/test/private-admission-820-reconciler-ledger.test.mjs`
 - `git add --intent-to-add tests/conformance/src/private-admission-820-reconciler-ledger.mjs tests/conformance/test/private-admission-820-reconciler-ledger.test.mjs worker-progress/worker-820-private-admission-803-817-reconciler-ledger.md`
 - `git diff --check`
+- Audit follow-up rerun:
+  - `node --check tests/conformance/src/private-admission-820-reconciler-ledger.mjs`
+  - `node --check tests/conformance/test/private-admission-820-reconciler-ledger.test.mjs`
+  - `node --test tests/conformance/test/private-admission-820-reconciler-ledger.test.mjs`
+  - `git diff --check`
 
 ## Verification Result
 
 - Syntax checks passed.
 - Focused Node test passed: 6 tests, 6 pass.
 - `git diff --check` passed.
+- Audit follow-up syntax checks passed.
+- Audit follow-up focused Node test passed: 7 tests, 7 pass.
+- Audit follow-up `git diff --check` passed.
 
 ## Risks Or Blockers
 
@@ -63,6 +74,8 @@
 - This ledger is intentionally private and source-token-only. It does not claim
   public DOM, react-test-renderer, package/native, public root, public act, or
   public Scheduler compatibility.
+- Top-level compatibility/runtime claim aliases now fail closed; future aliases
+  should be added to the exported top-level public or runtime claim field lists.
 - Future refactors that rename the source-owned canary identifiers will need to
   update this ledger.
 
