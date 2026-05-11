@@ -684,6 +684,174 @@ const expectedUseRefRendererLifecycleReportFieldNames = [
   "packageCompatibilityBlocked",
   ...expectedUseRefRendererLifecycleCompatibilityFalseFlags
 ];
+const expectedContextHookNames = ["useContext"];
+const expectedContextRendererReadinessSourceReportFieldNames = [
+  "kind",
+  "version",
+  "status",
+  "reactSourceTag",
+  "reactSourceCommit",
+  "reactHooksSource",
+  "reactClientSource",
+  "reactReconcilerSource",
+  "fastReactSource",
+  "fastReactContextObjectSource",
+  "privateDispatcherMetadataCapability",
+  "createContextDirectObjectBehaviorAdmitted",
+  "privateUseContextProviderReadinessAccepted",
+  "publicUseContextCompatibilityAdmitted",
+  "compatibilityClaimed"
+];
+const expectedContextRendererReadinessSourceReport = {
+  kind: "fast-react.private.context_hook_renderer_readiness_source_report",
+  version: 1,
+  status:
+    "source-current-for-react-19.2.6-useContext-provider-renderer-blockers",
+  reactSourceTag: "v19.2.6",
+  reactSourceCommit: "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401",
+  reactHooksSource: "packages/react/src/ReactHooks.js",
+  reactClientSource: "packages/react/src/ReactClient.js",
+  reactReconcilerSource:
+    "packages/react-reconciler/src/ReactFiberNewContext.js",
+  fastReactSource: "packages/react/hook-dispatcher.js",
+  fastReactContextObjectSource: "packages/react/context-object.js",
+  privateDispatcherMetadataCapability:
+    "fast-react.private.context_hook_dispatcher",
+  createContextDirectObjectBehaviorAdmitted: true,
+  privateUseContextProviderReadinessAccepted: false,
+  publicUseContextCompatibilityAdmitted: false,
+  compatibilityClaimed: false
+};
+const expectedContextRendererReadinessRowFieldNames = [
+  "rowId",
+  "acceptedPrivateEvidence",
+  "sourceOwnedEvidence",
+  "missingRendererProviderPrerequisite",
+  "requiredPublicEvidence",
+  "currentBlocked",
+  "compatibilityClaimed"
+];
+const expectedContextRendererReadinessRows = [
+  {
+    rowId: "context-object-consumption-not-source-owned-renderer-read",
+    acceptedPrivateEvidence: "React.createContext direct object oracle",
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      "source-owned context object consumption through renderer-owned Provider state",
+    requiredPublicEvidence:
+      "useContext reads the nearest Provider value through a renderer root",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    rowId: "private-dispatcher-not-root-render-backed",
+    acceptedPrivateEvidence: "private context hook dispatcher marker",
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      "renderer-owned dispatcher installation during function component render",
+    requiredPublicEvidence:
+      "renderWithHooks installs and tears down the context dispatcher for the current fiber",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    rowId: "provider-begin-work-not-default-renderer-integrated",
+    acceptedPrivateEvidence: "private ContextProvider begin-work handoffs",
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      "default begin-work ContextProvider traversal for public Provider elements",
+    requiredPublicEvidence:
+      "Provider fibers push values, reconcile children, and unwind in broad renderer trees",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    rowId: "context-dependencies-not-renderer-visible",
+    acceptedPrivateEvidence: "private context dependency metadata",
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      "fiber-owned context dependency list and propagation lanes",
+    requiredPublicEvidence:
+      "changed Provider values mark dependent consumers under renderer-visible dependencies",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    rowId: "suspense-nested-provider-propagation-not-admitted",
+    acceptedPrivateEvidence: "private exact nested-provider canaries",
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      "Suspense, Offscreen, sibling, array, and nested-provider propagation",
+    requiredPublicEvidence:
+      "broad context propagation remains current across interrupted and nested renderer work",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    rowId: "root-scheduler-package-compatibility-not-admitted",
+    acceptedPrivateEvidence: "blocked package-private context diagnostics",
+    sourceOwnedEvidence: true,
+    missingRendererProviderPrerequisite:
+      "root scheduling, Scheduler timing, act, and package compatibility evidence",
+    requiredPublicEvidence:
+      "published React surfaces prove useContext/provider compatibility under public roots",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  }
+];
+const expectedContextRendererReadinessCompatibilityFalseFlags = [
+  "compatibilityClaimed",
+  "publicCompatibilityClaimed",
+  "publicHookCompatibility",
+  "exposesPublicHookImplementation",
+  "hookExecutionCompatibility",
+  "contextObjectConsumptionCompatibility",
+  "providerRenderCompatibility",
+  "runtimeProviderPropagation",
+  "rendererVisiblePropagation",
+  "rendererIntegration",
+  "rendererCompatibility",
+  "publicActIntegration",
+  "schedulerIntegration",
+  "schedulerPrerequisitesReady",
+  "schedulerTimingCompatibility",
+  "rootLaneIntegration",
+  "rootScheduling",
+  "rootExecution",
+  "suspenseContextPropagation",
+  "packageCompatibility",
+  "publicPackageCompatibility"
+];
+const expectedContextRendererReadinessReportFieldNames = [
+  "kind",
+  "version",
+  "status",
+  "compatibilityTarget",
+  "hookNames",
+  "sourceReport",
+  "privateDispatcherMetadata",
+  "readinessRowFieldNames",
+  "readinessRows",
+  "contextObjectRecord",
+  "rootUseContextSourceFunctionCurrent",
+  "sourceOwnedContextObject",
+  "sourceOwnedContextObjectConsumed",
+  "callerSuppliedContextObjectAccepted",
+  "privateDispatcherMarked",
+  "privateDispatcherMetadataIdentityCurrent",
+  "sourceOwnedPrivateDispatcher",
+  "callerSuppliedDispatcherAccepted",
+  "publicUseContextCompatibilityBlocked",
+  "contextObjectConsumptionBlocked",
+  "providerRendererLifecycleBlocked",
+  "contextDependencyPropagationBlocked",
+  "rootRendererSchedulingBlocked",
+  "schedulerTimingBlocked",
+  "actIntegrationBlocked",
+  "suspenseContextPropagationBlocked",
+  "packageCompatibilityBlocked",
+  ...expectedContextRendererReadinessCompatibilityFalseFlags
+];
 const expectedUnsupportedPlaceholderHookNames = [
   "useActionState",
   "useOptimistic",
@@ -2218,6 +2386,368 @@ test("private useRef renderer lifecycle blockers reject same-shaped fake root us
   }
 });
 
+test("private context renderer readiness blockers separate useContext/provider evidence from compatibility", () => {
+  const report = hookDispatcher.createContextHookRendererReadinessReport();
+
+  assert.equal(
+    report.kind,
+    "fast-react.private.context_hook_renderer_readiness_blockers"
+  );
+  assert.equal(report.version, 1);
+  assert.equal(
+    report.status,
+    hookDispatcher.contextHookRendererReadinessStatus
+  );
+  assert.equal(report.compatibilityTarget, "react@19.2.6");
+  assert.deepEqual(
+    Object.keys(report),
+    expectedContextRendererReadinessReportFieldNames
+  );
+  assert.deepEqual(report.hookNames, expectedContextHookNames);
+  assert.deepEqual(
+    report.sourceReport,
+    expectedContextRendererReadinessSourceReport
+  );
+  assert.equal(
+    report.privateDispatcherMetadata,
+    hookDispatcher.privateContextHookDispatcherMetadata
+  );
+  assert.deepEqual(
+    report.readinessRowFieldNames,
+    expectedContextRendererReadinessRowFieldNames
+  );
+  assert.deepEqual(
+    report.readinessRows,
+    expectedContextRendererReadinessRows
+  );
+  assert.equal(report.rootUseContextSourceFunctionCurrent, true);
+  assert.equal(report.sourceOwnedContextObject, true);
+  assert.equal(report.sourceOwnedContextObjectConsumed, true);
+  assert.equal(report.callerSuppliedContextObjectAccepted, false);
+  assert.equal(report.privateDispatcherMarked, true);
+  assert.equal(report.privateDispatcherMetadataIdentityCurrent, true);
+  assert.equal(report.sourceOwnedPrivateDispatcher, true);
+  assert.equal(report.callerSuppliedDispatcherAccepted, false);
+  assert.equal(report.contextObjectRecord.sourceOwnedContextObject, true);
+  assert.equal(report.contextObjectRecord.providerEqualsContext, true);
+  assert.equal(report.contextObjectRecord.consumerContextMatchesContext, true);
+  assert.equal(report.contextObjectRecord.contextTypeMatchesReactContextSymbol, true);
+  assert.equal(
+    report.contextObjectRecord.consumedContextObject,
+    report.contextObjectRecord.contextObject
+  );
+  assert.equal(report.contextObjectRecord.consumedSourceOwnedContextObject, true);
+  assert.equal(
+    report.contextObjectRecord.readValue,
+    "fast-react-private-context-default"
+  );
+  assert.equal(report.contextObjectRecord.readErrorCode, null);
+  assert.equal(report.contextObjectRecord.callerSuppliedContextObjectAccepted, false);
+  assert.equal(report.publicUseContextCompatibilityBlocked, true);
+  assert.equal(report.contextObjectConsumptionBlocked, true);
+  assert.equal(report.providerRendererLifecycleBlocked, true);
+  assert.equal(report.contextDependencyPropagationBlocked, true);
+  assert.equal(report.rootRendererSchedulingBlocked, true);
+  assert.equal(report.schedulerTimingBlocked, true);
+  assert.equal(report.actIntegrationBlocked, true);
+  assert.equal(report.suspenseContextPropagationBlocked, true);
+  assert.equal(report.packageCompatibilityBlocked, true);
+
+  for (const flagName of expectedContextRendererReadinessCompatibilityFalseFlags) {
+    assert.equal(report[flagName], false, flagName);
+  }
+
+  assert.equal(Object.isFrozen(report), true);
+  assert.equal(Object.isFrozen(report.hookNames), true);
+  assert.equal(Object.isFrozen(report.sourceReport), true);
+  assert.equal(Object.isFrozen(report.readinessRows), true);
+  assert.equal(Object.isFrozen(report.contextObjectRecord), true);
+  for (const row of report.readinessRows) {
+    assert.equal(Object.isFrozen(row), true, row.rowId);
+  }
+
+  assert.equal(
+    hookDispatcher.validateContextHookRendererReadinessReport(report),
+    null
+  );
+  assert.equal(
+    hookDispatcher.isContextHookRendererReadinessReport(report),
+    true
+  );
+
+  const consumption =
+    hookDispatcher.consumeContextHookRendererReadinessReport(report);
+  assert.equal(
+    consumption.status,
+    hookDispatcher.contextHookRendererReadinessConsumptionStatus
+  );
+  assert.equal(consumption.accepted, true);
+  assert.deepEqual(
+    consumption.readinessRows,
+    expectedContextRendererReadinessRows
+  );
+  assert.equal(consumption.sourceOwnedContextObject, true);
+  assert.equal(consumption.sourceOwnedContextObjectConsumed, true);
+  assert.equal(consumption.sourceOwnedPrivateDispatcher, true);
+  assert.equal(consumption.publicUseContextCompatibilityBlocked, true);
+  assert.equal(consumption.contextObjectConsumptionBlocked, true);
+  assert.equal(consumption.providerRendererLifecycleBlocked, true);
+  assert.equal(consumption.contextDependencyPropagationBlocked, true);
+  assert.equal(consumption.rootRendererSchedulingBlocked, true);
+  assert.equal(consumption.schedulerTimingBlocked, true);
+  assert.equal(consumption.actIntegrationBlocked, true);
+  assert.equal(consumption.suspenseContextPropagationBlocked, true);
+  assert.equal(consumption.packageCompatibilityBlocked, true);
+  assert.equal(consumption.publicCompatibilityClaimed, false);
+  assert.equal(consumption.publicPackageCompatibility, false);
+  assert.equal(consumption.compatibilityClaimed, false);
+
+  assert.equal(React.createContextHookRendererReadinessReport, undefined);
+  assert.equal(
+    ReactCjsDevelopment.createContextHookRendererReadinessReport,
+    undefined
+  );
+  assert.equal(
+    ReactCjsProduction.createContextHookRendererReadinessReport,
+    undefined
+  );
+  assert.equal(ReactServer.createContextHookRendererReadinessReport, undefined);
+  assert.equal(React.consumeContextHookRendererReadinessReport, undefined);
+  assert.equal(
+    ReactCjsDevelopment.consumeContextHookRendererReadinessReport,
+    undefined
+  );
+  assert.equal(
+    ReactCjsProduction.consumeContextHookRendererReadinessReport,
+    undefined
+  );
+  assert.equal(ReactServer.consumeContextHookRendererReadinessReport, undefined);
+});
+
+test("private context renderer readiness rejects forged context and provider claims", () => {
+  const report = hookDispatcher.createContextHookRendererReadinessReport();
+
+  assertContextRendererReadinessRejected(
+    Object.freeze({ ...report }),
+    "context-hook-renderer-readiness-source-proof"
+  );
+  assertContextRendererReadinessRejected(
+    hookDispatcher.createContextHookRendererReadinessReport({
+      sourceReport: {
+        reactSourceCommit: "forged"
+      }
+    }),
+    "context-hook-renderer-readiness-source-report"
+  );
+  assertContextRendererReadinessRejected(
+    hookDispatcher.createContextHookRendererReadinessReport({
+      privateDispatcherMetadata: {
+        ...hookDispatcher.privateContextHookDispatcherMetadata
+      }
+    }),
+    "context-hook-renderer-readiness-dispatcher-source-identity"
+  );
+  assertContextRendererReadinessRejected(
+    hookDispatcher.createContextHookRendererReadinessReport({
+      readinessRows: expectedContextRendererReadinessRows.map((row) => ({
+        ...row
+      }))
+    }),
+    "context-hook-renderer-readiness-provider-rows-source-proof"
+  );
+  assertContextRendererReadinessRejected(
+    hookDispatcher.createContextHookRendererReadinessReport({
+      readinessRowOverrides: {
+        "provider-begin-work-not-default-renderer-integrated": {
+          currentBlocked: false
+        }
+      }
+    }),
+    "context-hook-renderer-readiness-provider-rows-source-proof"
+  );
+  assertContextRendererReadinessRejected(
+    hookDispatcher.createContextHookRendererReadinessReport({
+      contextObject: {
+        $$typeof: Symbol.for("react.context"),
+        _currentValue: "fast-react-private-context-default",
+        Provider: null,
+        Consumer: null
+      }
+    }),
+    "context-hook-renderer-readiness-caller-context-object"
+  );
+  assertContextRendererReadinessRejected(
+    hookDispatcher.createContextHookRendererReadinessReport({
+      dispatcher: {
+        useContext(context) {
+          return context._currentValue;
+        }
+      }
+    }),
+    "context-hook-renderer-readiness-caller-dispatcher"
+  );
+
+  for (const prerequisiteSmuggling of [
+    { rootRendererSchedulingBlocked: false },
+    { schedulerTimingBlocked: false },
+    { actIntegrationBlocked: false },
+    { runtimeProviderPropagation: true },
+    { rendererVisiblePropagation: true },
+    { schedulerIntegration: true },
+    { rootExecution: true },
+    { suspenseContextPropagation: true }
+  ]) {
+    assertContextRendererReadinessRejected(
+      hookDispatcher.createContextHookRendererReadinessReport(
+        prerequisiteSmuggling
+      ),
+      "context-hook-renderer-readiness-prerequisite-smuggling"
+    );
+  }
+
+  for (const flagName of [
+    "publicCompatibilityClaimed",
+    "publicHookCompatibility",
+    "hookExecutionCompatibility",
+    "packageCompatibility",
+    "publicPackageCompatibility"
+  ]) {
+    assertContextRendererReadinessRejected(
+      hookDispatcher.createContextHookRendererReadinessReport({
+        [flagName]: true
+      }),
+      "context-hook-renderer-readiness-public-compatibility-claim"
+    );
+  }
+});
+
+test("private context renderer readiness rejects stale root useContext reports", () => {
+  const report = hookDispatcher.createContextHookRendererReadinessReport();
+  const originalUseContext = React.useContext;
+
+  try {
+    React.useContext = function replacedUseContext() {
+      return "stale-root-use-context";
+    };
+
+    assertContextRendererReadinessRejected(
+      report,
+      "context-hook-renderer-readiness-dispatcher-source-identity"
+    );
+  } finally {
+    React.useContext = originalUseContext;
+  }
+});
+
+test("private context renderer readiness rejects stale context object mutations", () => {
+  for (const [fieldName, mutateContextObject] of [
+    [
+      "Provider",
+      (contextObject) => {
+        contextObject.Provider = {
+          $$typeof: Symbol.for("react.context"),
+          _context: contextObject
+        };
+      }
+    ],
+    [
+      "Consumer",
+      (contextObject) => {
+        contextObject.Consumer = {
+          $$typeof: Symbol.for("react.consumer"),
+          _context: contextObject
+        };
+      }
+    ],
+    [
+      "$$typeof",
+      (contextObject) => {
+        contextObject.$$typeof = Symbol.for("react.memo");
+      }
+    ],
+    [
+      "_currentValue",
+      (contextObject) => {
+        contextObject._currentValue = "stale-context-value";
+      }
+    ]
+  ]) {
+    const report = hookDispatcher.createContextHookRendererReadinessReport();
+
+    mutateContextObject(report.contextObjectRecord.contextObject);
+
+    assertContextRendererReadinessRejected(
+      report,
+      "context-hook-renderer-readiness-context-object-source-identity",
+      fieldName
+    );
+  }
+});
+
+test("private context renderer readiness rejects hidden caller compatibility aliases", () => {
+  let accessorRead = false;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, "publicCompatibilityClaimed", {
+    enumerable: true,
+    get() {
+      accessorRead = true;
+      return true;
+    }
+  });
+
+  assertContextRendererReadinessRejected(
+    hookDispatcher.createContextHookRendererReadinessReport(accessorOptions),
+    "context-hook-renderer-readiness-caller-overrides"
+  );
+  assert.equal(accessorRead, false);
+
+  const symbolClaim = Symbol("publicPackageCompatibility");
+  assertContextRendererReadinessRejected(
+    hookDispatcher.createContextHookRendererReadinessReport({
+      [symbolClaim]: true
+    }),
+    "context-hook-renderer-readiness-caller-overrides"
+  );
+
+  const nonEnumerableOptions = {};
+  Object.defineProperty(nonEnumerableOptions, "publicPackageCompatibility", {
+    enumerable: false,
+    value: true
+  });
+  assertContextRendererReadinessRejected(
+    hookDispatcher.createContextHookRendererReadinessReport(
+      nonEnumerableOptions
+    ),
+    "context-hook-renderer-readiness-public-compatibility-claim"
+  );
+
+  const proxyHiddenOptions = new Proxy(
+    {},
+    {
+      ownKeys() {
+        return [];
+      },
+      getOwnPropertyDescriptor(_target, key) {
+        if (key === "publicPackageCompatibility") {
+          return {
+            configurable: true,
+            enumerable: true,
+            value: true
+          };
+        }
+
+        return undefined;
+      }
+    }
+  );
+  assertContextRendererReadinessRejected(
+    hookDispatcher.createContextHookRendererReadinessReport(
+      proxyHiddenOptions
+    ),
+    "context-hook-renderer-readiness-caller-overrides"
+  );
+});
+
 test("private unsupported placeholder hook blockers record source and currentness reports", () => {
   const metadata =
     hookDispatcher.privateUnsupportedPlaceholderHookBlockerMetadata;
@@ -3193,6 +3723,64 @@ test("private startTransition routing records action identity and blocked lane e
   assert.equal(record.compatibilityClaimed, false);
   assert.deepEqual(calls, []);
 });
+
+function assertContextRendererReadinessRejected(
+  report,
+  reason,
+  message = reason
+) {
+  assert.equal(
+    hookDispatcher.validateContextHookRendererReadinessReport(report),
+    reason,
+    message
+  );
+  assert.equal(
+    hookDispatcher.isContextHookRendererReadinessReport(report),
+    false,
+    message
+  );
+  assert.throws(
+    () => hookDispatcher.consumeContextHookRendererReadinessReport(report),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", reason);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", reason);
+      assert.equal(error.entrypoint, "react", reason);
+      assert.equal(error.exportName, "contextHookRendererReadiness", reason);
+      assert.equal(error.compatibilityTarget, "react@19.2.6", reason);
+      assert.equal(error.reason, reason);
+      assert.equal(error.publicUseContextCompatibilityBlocked, true, reason);
+      assert.equal(error.contextObjectConsumptionBlocked, true, reason);
+      assert.equal(error.providerRendererLifecycleBlocked, true, reason);
+      assert.equal(error.contextDependencyPropagationBlocked, true, reason);
+      assert.equal(error.rootRendererSchedulingBlocked, true, reason);
+      assert.equal(error.schedulerTimingBlocked, true, reason);
+      assert.equal(error.actIntegrationBlocked, true, reason);
+      assert.equal(error.suspenseContextPropagationBlocked, true, reason);
+      assert.equal(error.packageCompatibilityBlocked, true, reason);
+      assert.equal(error.publicCompatibilityClaimed, false, reason);
+      assert.equal(error.publicHookCompatibility, false, reason);
+      assert.equal(error.exposesPublicHookImplementation, false, reason);
+      assert.equal(error.hookExecutionCompatibility, false, reason);
+      assert.equal(error.contextObjectConsumptionCompatibility, false, reason);
+      assert.equal(error.providerRenderCompatibility, false, reason);
+      assert.equal(error.runtimeProviderPropagation, false, reason);
+      assert.equal(error.rendererVisiblePropagation, false, reason);
+      assert.equal(error.rendererCompatibility, false, reason);
+      assert.equal(error.schedulerIntegration, false, reason);
+      assert.equal(error.schedulerPrerequisitesReady, false, reason);
+      assert.equal(error.schedulerTimingCompatibility, false, reason);
+      assert.equal(error.rootLaneIntegration, false, reason);
+      assert.equal(error.rootScheduling, false, reason);
+      assert.equal(error.rootExecution, false, reason);
+      assert.equal(error.suspenseContextPropagation, false, reason);
+      assert.equal(error.packageCompatibility, false, reason);
+      assert.equal(error.publicPackageCompatibility, false, reason);
+      assert.equal(error.compatibilityClaimed, false, reason);
+      return true;
+    },
+    reason
+  );
+}
 
 function assertUseRefExecutionEvidenceRejected(report, reason) {
   assert.equal(

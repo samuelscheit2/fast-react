@@ -1223,6 +1223,38 @@ test("private context-hook dispatcher metadata names match accepted context diag
     contextPropagationRecordFieldNames
   );
   assert.deepEqual(
+    metadata.rendererReadinessSourceReportFieldNames,
+    hookDispatcher.contextHookRendererReadinessSourceReportFieldNames
+  );
+  assert.deepEqual(
+    metadata.rendererReadinessSourceReport,
+    hookDispatcher.contextHookRendererReadinessSourceReport
+  );
+  assert.deepEqual(
+    metadata.rendererReadinessRowFieldNames,
+    hookDispatcher.contextHookRendererReadinessRowFieldNames
+  );
+  assert.deepEqual(
+    metadata.rendererReadinessRows,
+    hookDispatcher.contextHookRendererReadinessRows
+  );
+  assert.deepEqual(
+    metadata.rendererReadinessReportFieldNames,
+    hookDispatcher.contextHookRendererReadinessReportFieldNames
+  );
+  assert.equal(
+    metadata.rendererReadinessStatus,
+    hookDispatcher.contextHookRendererReadinessStatus
+  );
+  assert.deepEqual(
+    metadata.rendererReadinessCompatibilityFalseFlags,
+    hookDispatcher.contextHookRendererReadinessCompatibilityFalseFlags
+  );
+  assert.equal(metadata.sourceOwnedContextObjectRequired, true);
+  assert.equal(metadata.callerSuppliedContextObjectsAccepted, false);
+  assert.equal(metadata.callerSuppliedDispatchersAccepted, false);
+  assert.equal(metadata.providerRowOverridesAccepted, false);
+  assert.deepEqual(
     metadata.acceptedReconcilerRecords,
     acceptedContextReconcilerRecords
   );
@@ -1240,6 +1272,10 @@ test("private context-hook dispatcher metadata names match accepted context diag
 
   assert.equal(React.privateContextHookDispatcherMetadata, undefined);
   assert.equal(React.markPrivateContextHookDispatcher, undefined);
+  assert.equal(React.createContextHookRendererReadinessReport, undefined);
+  assert.equal(React.consumeContextHookRendererReadinessReport, undefined);
+  assert.equal(ReactServer.createContextHookRendererReadinessReport, undefined);
+  assert.equal(ReactServer.consumeContextHookRendererReadinessReport, undefined);
 });
 
 test("private callback-hook dispatcher marker rejects diagnostic metadata drift", () => {
@@ -1360,6 +1396,31 @@ test("private context-hook dispatcher marker rejects diagnostic metadata drift",
       hookDispatcher.markPrivateContextHookDispatcher(
         dispatcher,
         driftedMetadata
+      ),
+    "useContext"
+  );
+  assert.equal(hookDispatcher.isPrivateContextHookDispatcher(dispatcher), false);
+});
+
+test("private context-hook dispatcher marker rejects shallow-cloned metadata", () => {
+  const dispatcher = {
+    useContext() {
+      throw new Error("unreachable context dispatch");
+    }
+  };
+  const clonedMetadata = {
+    ...hookDispatcher.privateContextHookDispatcherMetadata
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateContextHookDispatcherMetadata(clonedMetadata),
+    false
+  );
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.markPrivateContextHookDispatcher(
+        dispatcher,
+        clonedMetadata
       ),
     "useContext"
   );

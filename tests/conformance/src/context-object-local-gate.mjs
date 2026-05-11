@@ -110,6 +110,57 @@ export const CONTEXT_OBJECT_ACCEPTED_PRIVATE_PROGRESS_REQUIREMENTS = [
   }
 ];
 
+export const CONTEXT_OBJECT_USE_CONTEXT_PROVIDER_RENDERER_BLOCKER_ROWS = [
+  {
+    id: "context-object-consumption-not-source-owned-renderer-read",
+    sourceOwnedCheck: "privateContextSourceOwnedObjectProvenancePresent",
+    blockerCheck: "privateContextHookRendererReadinessReportPresent",
+    requiredBeforePrivateReadiness: true,
+    reason:
+      "Private context readiness must consume a source-owned createContext object before any Provider/useContext renderer claim is accepted."
+  },
+  {
+    id: "private-dispatcher-not-root-render-backed",
+    sourceOwnedCheck: "privateContextHookRendererReadinessReportPresent",
+    blockerCheck: "useContextStillDispatcherOnly",
+    requiredBeforePrivateReadiness: true,
+    reason:
+      "A marked private useContext dispatcher is still separate from renderer-owned dispatcher installation during root render."
+  },
+  {
+    id: "provider-begin-work-not-default-renderer-integrated",
+    sourceOwnedCheck: "privateContextHookRendererReadinessReportPresent",
+    blockerCheck: "beginWorkRejectsContextProvider",
+    requiredBeforePrivateReadiness: true,
+    reason:
+      "Private Provider handoffs do not admit default begin-work traversal for public Provider elements."
+  },
+  {
+    id: "context-dependencies-not-renderer-visible",
+    sourceOwnedCheck: "privateContextHookRendererReadinessReportPresent",
+    blockerCheck: "functionComponentContextUnsupported",
+    requiredBeforePrivateReadiness: true,
+    reason:
+      "Private dependency metadata remains separate from renderer-visible fiber dependency propagation."
+  },
+  {
+    id: "suspense-nested-provider-propagation-not-admitted",
+    sourceOwnedCheck: "privateContextHookRendererReadinessReportPresent",
+    blockerCheck: "runtimeContextPropagationPresent",
+    requiredBeforePrivateReadiness: true,
+    reason:
+      "Suspense, broad nested providers, siblings, arrays, and interrupted work need separate renderer evidence."
+  },
+  {
+    id: "root-scheduler-package-compatibility-not-admitted",
+    sourceOwnedCheck: "privateContextHookRendererReadinessReportPresent",
+    blockerCheck: "requiredRuntimeTargetsReady",
+    requiredBeforePrivateReadiness: true,
+    reason:
+      "Root scheduling, Scheduler timing, act, and published package compatibility remain blocked."
+  }
+];
+
 export function evaluateContextObjectLocalGate({
   oracle,
   workspaceRoot = DEFAULT_WORKSPACE_ROOT
@@ -147,6 +198,16 @@ export function evaluateContextObjectLocalGate({
     .map((row) => row.id);
   const requiredRuntimeTargetsReady =
     runtimeCompatibilityBlockers.length === 0;
+  const useContextProviderRendererBlockerRows =
+    CONTEXT_OBJECT_USE_CONTEXT_PROVIDER_RENDERER_BLOCKER_ROWS.map((row) => ({
+      id: row.id,
+      sourceOwned: isContextObjectBlockerSourceOwned(row, localChecks),
+      currentBlocked: isContextObjectRendererBlockerCurrent(row, {
+        localChecks,
+        requiredRuntimeTargetsReady
+      }),
+      requiredBeforePrivateReadiness: row.requiredBeforePrivateReadiness
+    }));
   const localComparisonRows = CONTEXT_OBJECT_LOCAL_GATE_ROWS.map((row) =>
     compareLocalRowToOracle({
       modeId: row.modeId,
@@ -210,6 +271,7 @@ export function evaluateContextObjectLocalGate({
     acceptedPrivateProgressReady,
     acceptedPrivateProgressRows,
     acceptedPrivateProgressBlockers,
+    useContextProviderRendererBlockerRows,
     publicCompatibilityClaimed,
     localChecks,
     localComparisonRows,
@@ -252,10 +314,46 @@ export function inspectContextObjectRuntimeLocalTargets({
       contextObjectSource,
       /\bcontext\.Consumer\s*=\s*\{\s*\$\$typeof:\s*REACT_CONSUMER_TYPE,\s*_context:\s*context\s*\}/u
     );
+  const privateContextSourceOwnedObjectProvenancePresent =
+    hasSourcePattern(contextObjectSource, /\bsourceOwnedContextObjects\b/u) &&
+    hasSourcePattern(
+      contextObjectSource,
+      /\bsourceOwnedContextObjects\.add\(context\)/u
+    ) &&
+    hasSourcePattern(contextObjectSource, /\bisSourceOwnedContextObject\b/u) &&
+    hasSourcePattern(
+      contextObjectSource,
+      /\buseContextConsumptionCompatibility:\s*false\b/u
+    );
   const useContextStillDispatcherOnly = hasSourcePattern(
     hookDispatcherSource,
     /\bcall(?:PrivateContext)?DispatcherHook\('useContext',\s*arguments\)/u
   );
+  const privateContextHookRendererReadinessReportPresent =
+    hasSourcePattern(
+      hookDispatcherSource,
+      /\bcreateContextHookRendererReadinessReport\b/u
+    ) &&
+    hasSourcePattern(
+      hookDispatcherSource,
+      /\bcontextHookRendererReadinessRowsByReport\b/u
+    ) &&
+    hasSourcePattern(
+      hookDispatcherSource,
+      /\bcontext-object-consumption-not-source-owned-renderer-read\b/u
+    ) &&
+    hasSourcePattern(
+      hookDispatcherSource,
+      /\bcontext-hook-renderer-readiness-caller-context-object\b/u
+    ) &&
+    hasSourcePattern(
+      hookDispatcherSource,
+      /\bcontext-hook-renderer-readiness-prerequisite-smuggling\b/u
+    ) &&
+    hasSourcePattern(
+      hookDispatcherSource,
+      /\bcontext-hook-renderer-readiness-public-compatibility-claim\b/u
+    );
   const beginWorkRejectsContextProvider =
     hasSourcePattern(beginWorkSource, /\bFiberTag::ContextProvider\b/u) &&
     hasSourcePattern(beginWorkSource, /\bBeginWorkError::UnsupportedFiberTag\b/u);
@@ -352,7 +450,9 @@ export function inspectContextObjectRuntimeLocalTargets({
 
   return {
     jsCreateContextDirectObjectPresent,
+    privateContextSourceOwnedObjectProvenancePresent,
     useContextStillDispatcherOnly,
+    privateContextHookRendererReadinessReportPresent,
     beginWorkRejectsContextProvider,
     functionComponentContextUnsupported,
     runtimeContextPropagationPresent,
@@ -394,6 +494,29 @@ function isContextObjectAcceptedPrivateProgressReady(id, localChecks) {
     return localChecks.privateRootWorkLoopContextProviderHandoffPresent;
   }
   throw new Error(`Unknown context-object private progress requirement: ${id}`);
+}
+
+function isContextObjectBlockerSourceOwned(row, localChecks) {
+  if (row.sourceOwnedCheck === "requiredRuntimeTargetsReady") {
+    return false;
+  }
+
+  return localChecks[row.sourceOwnedCheck] === true;
+}
+
+function isContextObjectRendererBlockerCurrent(
+  row,
+  { localChecks, requiredRuntimeTargetsReady }
+) {
+  if (row.blockerCheck === "requiredRuntimeTargetsReady") {
+    return requiredRuntimeTargetsReady === false;
+  }
+
+  if (row.blockerCheck === "runtimeContextPropagationPresent") {
+    return localChecks.runtimeContextPropagationPresent === false;
+  }
+
+  return localChecks[row.blockerCheck] === true;
 }
 
 function compareLocalRowToOracle({

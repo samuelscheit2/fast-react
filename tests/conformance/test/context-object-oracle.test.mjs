@@ -17,6 +17,7 @@ import {
   CONTEXT_OBJECT_LOCAL_GATE_ROWS,
   CONTEXT_OBJECT_LOCAL_GATE_STATUS,
   CONTEXT_OBJECT_RUNTIME_BLOCKING_REQUIREMENTS,
+  CONTEXT_OBJECT_USE_CONTEXT_PROVIDER_RENDERER_BLOCKER_ROWS,
   evaluateContextObjectLocalGate
 } from "../src/context-object-local-gate.mjs";
 import {
@@ -134,6 +135,44 @@ test("context-object local gate compares live provider object shape to the accep
       ready: true
     }
   ]);
+  assert.deepEqual(gate.useContextProviderRendererBlockerRows, [
+    {
+      id: "context-object-consumption-not-source-owned-renderer-read",
+      sourceOwned: true,
+      currentBlocked: true,
+      requiredBeforePrivateReadiness: true
+    },
+    {
+      id: "private-dispatcher-not-root-render-backed",
+      sourceOwned: true,
+      currentBlocked: true,
+      requiredBeforePrivateReadiness: true
+    },
+    {
+      id: "provider-begin-work-not-default-renderer-integrated",
+      sourceOwned: true,
+      currentBlocked: true,
+      requiredBeforePrivateReadiness: true
+    },
+    {
+      id: "context-dependencies-not-renderer-visible",
+      sourceOwned: true,
+      currentBlocked: true,
+      requiredBeforePrivateReadiness: true
+    },
+    {
+      id: "suspense-nested-provider-propagation-not-admitted",
+      sourceOwned: true,
+      currentBlocked: true,
+      requiredBeforePrivateReadiness: true
+    },
+    {
+      id: "root-scheduler-package-compatibility-not-admitted",
+      sourceOwned: true,
+      currentBlocked: true,
+      requiredBeforePrivateReadiness: true
+    }
+  ]);
   assert.equal(gate.publicCompatibilityClaimed, false);
   assert.deepEqual(gate.violations, []);
   assert.deepEqual(
@@ -149,7 +188,15 @@ test("context-object local gate compares live provider object shape to the accep
     }))
   );
   assert.ok(gate.localChecks.jsCreateContextDirectObjectPresent);
+  assert.equal(
+    gate.localChecks.privateContextSourceOwnedObjectProvenancePresent,
+    true
+  );
   assert.equal(gate.localChecks.useContextStillDispatcherOnly, true);
+  assert.equal(
+    gate.localChecks.privateContextHookRendererReadinessReportPresent,
+    true
+  );
   assert.equal(gate.localChecks.beginWorkRejectsContextProvider, true);
   assert.equal(gate.localChecks.functionComponentContextUnsupported, true);
   assert.equal(gate.localChecks.runtimeContextPropagationPresent, false);
@@ -252,6 +299,40 @@ test("context-object local gate keeps runtime unblock requirements explicit", ()
       {
         id: "private-root-work-loop-context-provider-handoff",
         readyCheck: "privateRootWorkLoopContextProviderHandoffPresent"
+      }
+    ]
+  );
+  assert.deepEqual(
+    CONTEXT_OBJECT_USE_CONTEXT_PROVIDER_RENDERER_BLOCKER_ROWS.map(
+      ({ id, requiredBeforePrivateReadiness }) => ({
+        id,
+        requiredBeforePrivateReadiness
+      })
+    ),
+    [
+      {
+        id: "context-object-consumption-not-source-owned-renderer-read",
+        requiredBeforePrivateReadiness: true
+      },
+      {
+        id: "private-dispatcher-not-root-render-backed",
+        requiredBeforePrivateReadiness: true
+      },
+      {
+        id: "provider-begin-work-not-default-renderer-integrated",
+        requiredBeforePrivateReadiness: true
+      },
+      {
+        id: "context-dependencies-not-renderer-visible",
+        requiredBeforePrivateReadiness: true
+      },
+      {
+        id: "suspense-nested-provider-propagation-not-admitted",
+        requiredBeforePrivateReadiness: true
+      },
+      {
+        id: "root-scheduler-package-compatibility-not-admitted",
+        requiredBeforePrivateReadiness: true
       }
     ]
   );
