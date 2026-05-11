@@ -54,3 +54,19 @@
   mismatch.
 - Added focused package-root nested and sibling-text native update coverage in
   both serialization and create-routing conformance gates.
+
+## Read-only Audit Follow-up
+
+- Made accepted native execution records source-owned through the private root
+  bridge and rejected cloned/plain caller-built records.
+- Narrowed package-root native `toJSON` update execution claims to the committed
+  single-host-text and unmount rows while keeping nested/sibling private row
+  serialization and JS admission coverage.
+- Required exact native execution `kind`/`status` for `toJSON` and `toTree`, and
+  kept create records stale after a later package-root native update.
+- Required identity-only direct row ids to match embedded `hostOutputRow.id` and
+  required explicit `hostOutputShape` on update/unmount rows.
+- Verified with `node --check packages/react-test-renderer/index.js`,
+  `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`,
+  `node --test tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`,
+  and pending final diff checks before commit.
