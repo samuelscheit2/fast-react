@@ -441,21 +441,44 @@ function createLifecycleFactorySpyScript(packageRootPath) {
 
 const path = require('node:path');
 const packageRoot = ${JSON.stringify(packageRootPath)};
-const rootBridge = require(path.join(
-  packageRoot,
-  'src/client/root-bridge.js'
-));
+const rootBridgePath = path.join(packageRoot, 'src/client/root-bridge.js');
+const rootBridgeCacheKey = require.resolve(rootBridgePath);
 const factoryCalls = [];
 
-for (const key of [
-  'createPrivateRootPublicFacadeAdapter',
-  'createPrivateRootPublicFacadePreflight',
-  'createPrivateHydrateRootPublicFacadePreflight'
-]) {
-  const original = rootBridge[key];
-  rootBridge[key] = function privateLifecycleFacadeFactorySpy(...args) {
+const rootBridge = Object.freeze({
+  privateRootPublicFacadeAdapterSymbol: Symbol.for(
+    'fast.react_dom.client.private_root_public_facade_adapter'
+  ),
+  privateRootPublicFacadePreflightSymbol: Symbol.for(
+    'fast.react_dom.client.private_root_public_facade_preflight'
+  ),
+  privateHydrateRootPublicFacadePreflightSymbol: Symbol.for(
+    'fast.react_dom.client.private_hydrate_root_public_facade_preflight'
+  ),
+  createPrivateRootPublicFacadeAdapter: createPrivateLifecycleFacadeFactorySpy(
+    'createPrivateRootPublicFacadeAdapter'
+  ),
+  createPrivateRootPublicFacadePreflight:
+    createPrivateLifecycleFacadeFactorySpy(
+      'createPrivateRootPublicFacadePreflight'
+    ),
+  createPrivateHydrateRootPublicFacadePreflight:
+    createPrivateLifecycleFacadeFactorySpy(
+      'createPrivateHydrateRootPublicFacadePreflight'
+    )
+});
+
+require.cache[rootBridgeCacheKey] = {
+  id: rootBridgeCacheKey,
+  filename: rootBridgeCacheKey,
+  loaded: true,
+  exports: rootBridge
+};
+
+function createPrivateLifecycleFacadeFactorySpy(key) {
+  return function privateLifecycleFacadeFactorySpy(...args) {
     factoryCalls.push(key);
-    return original.apply(this, args);
+    return {args, key};
   };
 }
 

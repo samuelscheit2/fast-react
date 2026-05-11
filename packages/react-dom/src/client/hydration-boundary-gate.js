@@ -53,6 +53,8 @@ const HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_RECORD_KIND =
   'FastReactDomHydrationTextMismatchRecoverableErrorPreflightRecord';
 const HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_RECORD_KIND =
   'FastReactDomHydrationTextMismatchRecoverableErrorRoutingExecutionRecord';
+const HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_RECORD_KIND =
+  'FastReactDomHydrationRecoverableErrorBoundaryAdmissionRecord';
 const HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND =
   'FastReactDomHydrationTextNodeClaimPatchExecutionRecord';
 const HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND =
@@ -79,6 +81,8 @@ const INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_CODE =
   'FAST_REACT_DOM_INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION';
 const INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_CODE =
   'FAST_REACT_DOM_INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT';
+const INVALID_HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_CODE =
+  'FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION';
 const INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_CODE =
   'FAST_REACT_DOM_INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION';
 const privateHydrationReplayOwnershipGateId =
@@ -107,13 +111,18 @@ const privateHydrationTextMismatchRecoverableErrorPreflightStatus =
   'preflighted-private-hydration-text-mismatch-recoverable-error-metadata';
 const privateHydrationTextMismatchRecoverableErrorPreflightMetadataId =
   'hydration-text-mismatch-recoverable-error-preflight';
+const privateHydrationRecoverableErrorBoundaryAdmissionGateId =
+  'hydration-recoverable-error-boundary-admission-private-gate-1';
+const privateHydrationRecoverableErrorBoundaryAdmissionStatus =
+  'accepted-private-hydration-recoverable-error-boundary-admission';
+const privateHydrationRecoverableErrorBoundaryAdmissionMetadataId =
+  'hydration-recoverable-error-boundary-admission';
 const privateHydrationTextNodeClaimPatchExecutionGateId =
   'hydration-text-node-claim-patch-execution-private-gate-1';
 const privateHydrationTextNodeClaimPatchExecutionStatus =
   'executed-private-hydration-text-node-claim-patch';
 const privateHydrationTextNodeClaimPatchMetadataId =
   'hydration-text-node-claim-patch';
-
 const privateHydrationBoundaryRecordType =
   'fast.react_dom.unsupported_hydration_boundary_record';
 
@@ -422,6 +431,15 @@ const acceptedHydrationBoundaryMetadataContracts = freezeArray([
     'Hydration text mismatch recoverable-error rows require the explicit private routing execution gate before invoking root options.'
   ),
   acceptedMetadataContract(
+    privateHydrationRecoverableErrorBoundaryAdmissionMetadataId,
+    'hydration',
+    privateHydrationRecoverableErrorBoundaryAdmissionGateId,
+    HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_RECORD_KIND,
+    privateHydrationRecoverableErrorBoundaryAdmissionStatus,
+    HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON,
+    'Hydration recoverable-error boundary rows require source-owned marker, target, replay, lifecycle, and recoverable-error preflight evidence.'
+  ),
+  acceptedMetadataContract(
     'resource-map-commit',
     'resource',
     resourceFormInternalsGate.privateResourceHintResourceMapCommitGateId,
@@ -515,7 +533,11 @@ const hydrationTextMismatchRecoverableErrorPreflightPayloads =
   new WeakMap();
 const hydrationTextMismatchRecoverableErrorRoutingExecutionPayloads =
   new WeakMap();
+const hydrationRecoverableErrorBoundaryAdmissionPayloads = new WeakMap();
 const hydrationTextNodeClaimPatchExecutionPayloads = new WeakMap();
+let hydrateRootSourceLedgerRootBridgeModule = null;
+const hydrateRootSourceLedgerRootBridgeModules = new WeakSet();
+const hydrateRootSourceLedgerRootBridgeAuthorityTokens = new WeakMap();
 const defaultHydrationBoundaryGate = createHydrationBoundaryGate();
 
 function createHydrationBoundaryGate(options) {
@@ -578,6 +600,23 @@ function createHydrationBoundaryGate(options) {
         hydrationBoundaryRecord,
         acceptedBoundaryMetadataDiagnostics,
         recoverableErrorMetadata,
+        options
+      );
+    },
+    createHydrationRecoverableErrorBoundaryAdmissionRecord(
+      hydrationBoundaryRecord,
+      acceptedBoundaryMetadataDiagnostics,
+      recoverableErrorPreflightRecord,
+      targetClaimingDiagnostic,
+      replayExecutionRecord,
+      options
+    ) {
+      return createHydrationRecoverableErrorBoundaryAdmissionRecord(
+        hydrationBoundaryRecord,
+        acceptedBoundaryMetadataDiagnostics,
+        recoverableErrorPreflightRecord,
+        targetClaimingDiagnostic,
+        replayExecutionRecord,
         options
       );
     },
@@ -1456,6 +1495,12 @@ function createHydrationTextMismatchRecoverableErrorPreflightRecord(
       recoverableErrorMetadata,
       preflightOptions
     );
+  if (
+    preflightOptions.source ===
+    'private-hydrate-root-public-facade-recoverable-error-preflight'
+  ) {
+    rememberPrivateHydrateRootSourceLedgerRootBridgeModule();
+  }
   const preflightId =
     preflightOptions.preflightId ||
     `${validation.hydrationBoundaryRecord.recordId}:recoverable-error-preflight`;
@@ -1813,6 +1858,260 @@ function isPrivateHydrationTextMismatchRecoverableErrorRoutingExecutionRecord(
   return hydrationTextMismatchRecoverableErrorRoutingExecutionPayloads.has(
     value
   );
+}
+
+function createHydrationRecoverableErrorBoundaryAdmissionRecord(
+  hydrationBoundaryRecord,
+  acceptedBoundaryMetadataDiagnostics,
+  recoverableErrorPreflightRecord,
+  targetClaimingDiagnostic,
+  replayExecutionRecord,
+  options
+) {
+  const admissionOptions =
+    normalizeHydrationRecoverableErrorBoundaryAdmissionOptions(options);
+  const validation = validateHydrationRecoverableErrorBoundaryAdmission(
+    hydrationBoundaryRecord,
+    acceptedBoundaryMetadataDiagnostics,
+    recoverableErrorPreflightRecord,
+    targetClaimingDiagnostic,
+    replayExecutionRecord,
+    admissionOptions
+  );
+  const row = freezeRecord({
+    kind: 'FastReactDomHydrationRecoverableErrorBoundaryAdmissionRow',
+    status: privateHydrationRecoverableErrorBoundaryAdmissionStatus,
+    metadataId: privateHydrationRecoverableErrorBoundaryAdmissionMetadataId,
+    rootRecordId: validation.hydrationBoundaryRecord.recordId,
+    markerId: validation.targetClaimingDiagnostic.markerId,
+    markerPath: validation.targetClaimingDiagnostic.markerPath,
+    markerContractId: validation.targetClaimingDiagnostic.markerContractId,
+    targetPath: validation.targetClaimingDiagnostic.targetPath,
+    targetPathStatus: validation.targetClaimingDiagnostic.targetPathStatus,
+    targetPathCurrent: validation.currentness.targetPathCurrent,
+    markerPathCurrent: validation.currentness.markerPathCurrent,
+    sourceRecoverableErrorMetadataKind:
+      validation.recoverableErrorMetadata.kind,
+    sourceRecoverableErrorMetadataStatus:
+      validation.recoverableErrorMetadata.status,
+    recoverableErrorMetadataAccepted: true,
+    recoverableErrorMetadataCount:
+      validation.recoverableErrorRows.length,
+    queuedRecoverableErrorCount:
+      validation.recoverableErrorMetadata.queuedRecoverableErrorCount,
+    wouldQueueRecoverableErrorCount:
+      validation.recoverableErrorMetadata.wouldQueueRecoverableErrorCount,
+    queuedRecoverableError: false,
+    recoverableErrorsQueued: false,
+    onRecoverableErrorInvoked: false,
+    publicOnRecoverableErrorInvoked: false,
+    targetClaimAccepted: true,
+    targetClaimExecuted: false,
+    replayExecutionAccepted: true,
+    replayTargetDispatchExecutionBlocked: true,
+    replayQueueDrained: false,
+    eventsReplayed: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+  const record = freezeRecord({
+    kind: HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_RECORD_KIND,
+    gateId: privateHydrationRecoverableErrorBoundaryAdmissionGateId,
+    metadataId: privateHydrationRecoverableErrorBoundaryAdmissionMetadataId,
+    status: privateHydrationRecoverableErrorBoundaryAdmissionStatus,
+    admissionStatus: privateHydrationRecoverableErrorBoundaryAdmissionStatus,
+    source: admissionOptions.source,
+    operation: 'hydration-recoverable-error-boundary-admission',
+    privateAdmission: true,
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicHydrationReplayCompatibilityClaimed: false,
+    publicHydrateRootSupported: false,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    publicRootCreated: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    rootErrorUpdatesScheduled: false,
+    hydrationRequested: true,
+    hydration: false,
+    canHydrate: false,
+    hydrationCompatibilityClaimed: false,
+    hostInstanceHydrationAttempted: false,
+    hydrateTextInstanceCalled: false,
+    textPatched: false,
+    boundaryCleared: false,
+    suspenseHydrationScheduled: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    eventDispatch: false,
+    eventReplayInstalled: false,
+    eventReplaySupported: false,
+    hydrationReplaySupported: false,
+    eventsReplayed: false,
+    replayQueuesDrained: false,
+    recoverableErrorsQueued: false,
+    willQueueRecoverableErrors: false,
+    reportGlobalErrorInvoked: false,
+    rootErrorsReported: false,
+    exposesErrorValue: false,
+    exposesHydrationTarget: false,
+    exposesRootOptionCallback: false,
+    blockedReason: HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON,
+    rootRecordId: validation.hydrationBoundaryRecord.recordId,
+    rootKind: validation.hydrationBoundaryRecord.rootKind,
+    rootTag: validation.hydrationBoundaryRecord.rootTag,
+    acceptedBoundaryMetadataConsumed: true,
+    acceptedBoundaryMetadataDiagnostics:
+      validation.acceptedBoundaryMetadataDiagnostics,
+    acceptedBoundaryMetadataGateId:
+      validation.acceptedBoundaryMetadataDiagnostics.gateId,
+    acceptedBoundaryMetadataStatus:
+      validation.acceptedBoundaryMetadataDiagnostics.status,
+    acceptedBoundaryMetadataId:
+      validation.acceptedBoundaryMetadataRow.metadataId,
+    acceptedBoundaryMetadataRow: validation.acceptedBoundaryMetadataRow,
+    recoverableErrorPreflightRecord:
+      validation.recoverableErrorPreflightRecord,
+    recoverableErrorPreflightStatus:
+      validation.recoverableErrorPreflightRecord.preflightStatus,
+    recoverableErrorPreflightAccepted: true,
+    targetClaimingDiagnostic: validation.targetClaimingDiagnostic,
+    targetClaimingStatus: validation.targetClaimingDiagnostic.status,
+    targetClaimAccepted: true,
+    targetClaimExecuted: false,
+    targetDispatchLinkDiagnostic:
+      validation.replayExecutionPayload.targetDispatchLinkDiagnostic,
+    targetDispatchLinkStatus:
+      validation.replayExecutionPayload.targetDispatchLinkDiagnostic.status,
+    replayExecutionRecord: validation.replayExecutionRecord,
+    replayExecutionStatus: validation.replayExecutionRecord.status,
+    replayExecutionAccepted: true,
+    replayTargetDispatchExecutionRecorded: true,
+    replayTargetDispatchExecutionBlocked: true,
+    replayQueueDrained: false,
+    sourceHydrateRootPreflightKind:
+      validation.sourceLedger.hydrateRootPreflightRecord.kind,
+    sourceHydrateRootPreflightStatus:
+      validation.sourceLedger.hydrateRootPreflightRecord.preflightStatus,
+    sourceEventReplayPreflightKind:
+      validation.sourceLedger.eventReplayPreflightRecord.kind,
+    sourceEventReplayPreflightStatus:
+      validation.sourceLedger.eventReplayPreflightRecord.preflightStatus,
+    sourceExecutionPreflightKind:
+      validation.sourceLedger.executionPreflightRecord.kind,
+    sourceExecutionPreflightStatus:
+      validation.sourceLedger.executionPreflightRecord.preflightStatus,
+    sourceLifecycleRequestBoundaryKind:
+      validation.sourceLedger.lifecycleRequestBoundary.kind,
+    sourceLifecycleRequestBoundaryStatus:
+      validation.sourceLedger.lifecycleRequestBoundary.boundaryStatus,
+    sourceLifecycleRequestBoundaryId:
+      validation.sourceLedger.lifecycleRequestBoundary
+        .lifecycleRequestBoundaryId,
+    sourceLifecycleBoundarySourceOwned: true,
+    sourceLifecycleBoundaryActive: true,
+    sourceLifecycleBoundaryCurrent: true,
+    sourceLifecycleContainerSnapshotOwned: true,
+    sourceLifecycleContainerSnapshotCurrent:
+      validation.sourceLedger.lifecycleContainerSnapshotCurrent,
+    markerPathCurrent: validation.currentness.markerPathCurrent,
+    markerPathCurrentStatus: validation.currentness.markerPathCurrentStatus,
+    markerCurrentContractId: validation.currentness.markerContractId,
+    targetPathCurrent: validation.currentness.targetPathCurrent,
+    targetPathCurrentStatus: validation.currentness.targetPathCurrentStatus,
+    targetPathResolvedToDispatchTarget:
+      validation.currentness.targetPathResolvedToDispatchTarget,
+    targetPathUniqueInContainer:
+      validation.currentness.targetPathUniqueInContainer,
+    targetPathParentChainRetained:
+      validation.currentness.targetPathParentChainRetained,
+    targetContainerMatchesBoundaryRecord:
+      validation.currentness.targetContainerMatchesBoundaryRecord,
+    hydratableLookupTargetPathRetained:
+      validation.currentness.hydratableLookupTargetPathRetained,
+    markerId: validation.targetClaimingDiagnostic.markerId,
+    markerPath: validation.targetClaimingDiagnostic.markerPath,
+    markerContractId: validation.targetClaimingDiagnostic.markerContractId,
+    targetPath: validation.targetClaimingDiagnostic.targetPath,
+    targetPathStatus: validation.targetClaimingDiagnostic.targetPathStatus,
+    domEventName: validation.targetClaimingDiagnostic.domEventName,
+    queueName: validation.targetClaimingDiagnostic.queueName,
+    recoverableErrorMetadata: validation.recoverableErrorMetadata,
+    recoverableErrorMetadataAccepted: true,
+    recoverableErrorMetadataStatus:
+      validation.recoverableErrorMetadata.status,
+    recoverableErrorMetadataCount:
+      validation.recoverableErrorRows.length,
+    queuedRecoverableErrorCount:
+      validation.recoverableErrorMetadata.queuedRecoverableErrorCount,
+    wouldQueueRecoverableErrorCount:
+      validation.recoverableErrorMetadata.wouldQueueRecoverableErrorCount,
+    rootOptionCallbackKey: 'onRecoverableError',
+    rootOptionCallbackConfigured:
+      validation.recoverableErrorPreflightRecord
+        .rootOptionCallbackConfigured,
+    onRecoverableErrorConfigured:
+      validation.recoverableErrorPreflightRecord
+        .onRecoverableErrorConfigured,
+    onRecoverableErrorInvoked: false,
+    publicOnRecoverableErrorInvoked: false,
+    callbackInvocationGateEnabled: false,
+    callbackInvocationRecordCount: 0,
+    rootErrorCallbackInvocationCount: 0,
+    recoverableErrorBoundaryRow: row,
+    recoverableErrorBoundaryRows: freezeArray([row]),
+    recoverableErrorBoundaryRowCount: 1
+  });
+
+  hydrationRecoverableErrorBoundaryAdmissionPayloads.set(
+    record,
+    freezeRecord({
+      acceptedBoundaryMetadataDiagnostics:
+        validation.acceptedBoundaryMetadataDiagnostics,
+      acceptedBoundaryMetadataRow: validation.acceptedBoundaryMetadataRow,
+      container: validation.container,
+      currentMarkerDiagnostics: validation.currentness.markerDiagnostics,
+      currentTargetPathEvidence: validation.currentness.targetPathEvidence,
+      hydrationBoundaryRecord: validation.hydrationBoundaryRecord,
+      hydrationOptions: validation.hydrationOptions,
+      initialChildren: validation.initialChildren,
+      options: admissionOptions.rawOptions,
+      recoverableErrorBoundaryRow: row,
+      recoverableErrorMetadata: validation.recoverableErrorMetadata,
+      recoverableErrorPreflightPayload:
+        validation.recoverableErrorPreflightPayload,
+      recoverableErrorPreflightRecord:
+        validation.recoverableErrorPreflightRecord,
+      recoverableErrorRows: validation.recoverableErrorRows,
+      replayExecutionPayload: validation.replayExecutionPayload,
+      replayExecutionRecord: validation.replayExecutionRecord,
+      sourceLedger: validation.sourceLedger,
+      targetClaimingDiagnostic: validation.targetClaimingDiagnostic,
+      targetClaimingPayload: validation.targetClaimingPayload
+    })
+  );
+
+  return record;
+}
+
+function getPrivateHydrationRecoverableErrorBoundaryAdmissionPayload(
+  record
+) {
+  return (
+    hydrationRecoverableErrorBoundaryAdmissionPayloads.get(record) ||
+    null
+  );
+}
+
+function isPrivateHydrationRecoverableErrorBoundaryAdmissionRecord(value) {
+  return hydrationRecoverableErrorBoundaryAdmissionPayloads.has(value);
 }
 
 function createHydrationTextNodeClaimPatchExecutionRecord(
@@ -3813,6 +4112,1391 @@ function throwInvalidHydrationTextMismatchRecoverableErrorRoutingExecution(
   throw error;
 }
 
+function normalizeHydrationRecoverableErrorBoundaryAdmissionOptions(
+  options
+) {
+  const normalizedOptions =
+    options !== null &&
+    (typeof options === 'object' || typeof options === 'function')
+      ? options
+      : {};
+  const hasHydrationOptions = Object.prototype.hasOwnProperty.call(
+    normalizedOptions,
+    'hydrationOptions'
+  );
+  const aliasKey = findHydrationRecoverableErrorBoundaryAdmissionAliasKey(
+    normalizedOptions
+  );
+
+  return freezeRecord({
+    aliasKey,
+    enableRecoverableErrorBoundaryAdmission:
+      normalizedOptions.enableRecoverableErrorBoundaryAdmission === true,
+    eventReplayPreflightRecord:
+      normalizedOptions.eventReplayPreflightRecord,
+    executionPreflightRecord: normalizedOptions.executionPreflightRecord,
+    hasHydrationOptions,
+    hydrationOptions: hasHydrationOptions
+      ? normalizedOptions.hydrationOptions
+      : undefined,
+    hydrateRootPreflightRecord:
+      normalizedOptions.hydrateRootPreflightRecord,
+    lifecycleRequestBoundary: normalizedOptions.lifecycleRequestBoundary,
+    rawOptions: options,
+    source:
+      typeof normalizedOptions.source === 'string'
+        ? normalizedOptions.source
+        : 'private-hydration-recoverable-error-boundary-admission'
+  });
+}
+
+function findHydrationRecoverableErrorBoundaryAdmissionAliasKey(options) {
+  for (const key of [
+    'callback',
+    'error',
+    'errorInfo',
+    'onRecoverableError',
+    'recoverableError',
+    'recoverableErrorCallback',
+    'rootOptions'
+  ]) {
+    if (Object.prototype.hasOwnProperty.call(options, key)) {
+      return key;
+    }
+  }
+  return null;
+}
+
+function validateHydrationRecoverableErrorBoundaryAdmission(
+  hydrationBoundaryRecord,
+  acceptedBoundaryMetadataDiagnostics,
+  recoverableErrorPreflightRecord,
+  targetClaimingDiagnostic,
+  replayExecutionRecord,
+  admissionOptions
+) {
+  const record = assertPrivateHydrationBoundaryRecord(
+    hydrationBoundaryRecord
+  );
+  const payload = getPrivateHydrationBoundaryRecordPayload(record);
+  if (admissionOptions.enableRecoverableErrorBoundaryAdmission !== true) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires the explicit private admission gate.'
+    );
+  }
+  if (admissionOptions.aliasKey !== null) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission rejects callback or value alias options.'
+    );
+  }
+  if (
+    admissionOptions.hasHydrationOptions === true &&
+    admissionOptions.hydrationOptions !== payload.hydrationOptions
+  ) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires the current hydrateRoot options object.'
+    );
+  }
+
+  const acceptedBoundaryMetadataRow =
+    validateHydrationRecoverableErrorBoundaryAdmissionAcceptedBoundaryMetadata(
+      record,
+      acceptedBoundaryMetadataDiagnostics
+    );
+  const recoverablePreflight =
+    validateHydrationRecoverableErrorBoundaryAdmissionPreflight(
+      record,
+      payload,
+      recoverableErrorPreflightRecord
+    );
+  let targetClaimingPayload;
+  try {
+    targetClaimingPayload =
+      assertCanonicalPrivateHydrationTargetClaimingDiagnostic(
+        targetClaimingDiagnostic,
+        {
+          hydrationBoundaryRecord: record
+        }
+      );
+  } catch (error) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires canonical private target-claiming evidence.'
+    );
+  }
+
+  let replayExecutionPayload;
+  try {
+    replayExecutionPayload =
+      assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+        replayExecutionRecord,
+        {
+          dispatchRecord:
+            targetClaimingPayload.targetDispatchLinkPayload.dispatchRecord,
+          hydrationBoundaryRecord: record,
+          targetClaimingDiagnostic,
+          targetDispatchLinkDiagnostic:
+            targetClaimingPayload.targetDispatchLinkDiagnostic
+        }
+      );
+  } catch (error) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires canonical private blocked replay execution evidence.'
+    );
+  }
+  validateHydrationRecoverableErrorBoundaryAdmissionReplayExecution(
+    record,
+    recoverablePreflight.recoverableErrorMetadata,
+    replayExecutionRecord,
+    replayExecutionPayload
+  );
+  const currentness =
+    validateHydrationRecoverableErrorBoundaryAdmissionCurrentness(
+      payload,
+      targetClaimingDiagnostic,
+      targetClaimingPayload,
+      replayExecutionRecord,
+      replayExecutionPayload
+    );
+  const sourceLedger =
+    validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
+      record,
+      payload,
+      recoverableErrorPreflightRecord,
+      targetClaimingDiagnostic,
+      replayExecutionRecord,
+      targetClaimingPayload,
+      replayExecutionPayload,
+      admissionOptions,
+      currentness
+    );
+
+  return {
+    acceptedBoundaryMetadataDiagnostics,
+    acceptedBoundaryMetadataRow,
+    container: payload.container,
+    currentness,
+    hydrationBoundaryRecord: record,
+    hydrationOptions: payload.hydrationOptions,
+    initialChildren: payload.initialChildren,
+    recoverableErrorMetadata: recoverablePreflight.recoverableErrorMetadata,
+    recoverableErrorPreflightPayload: recoverablePreflight.preflightPayload,
+    recoverableErrorPreflightRecord,
+    recoverableErrorRows: recoverablePreflight.recoverableErrorRows,
+    replayExecutionPayload,
+    replayExecutionRecord,
+    sourceLedger,
+    targetClaimingDiagnostic,
+    targetClaimingPayload
+  };
+}
+
+function validateHydrationRecoverableErrorBoundaryAdmissionAcceptedBoundaryMetadata(
+  hydrationBoundaryRecord,
+  acceptedBoundaryMetadataDiagnostics
+) {
+  if (
+    acceptedBoundaryMetadataDiagnostics !==
+      hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics ||
+    !acceptedBoundaryMetadataDiagnostics ||
+    typeof acceptedBoundaryMetadataDiagnostics !== 'object' ||
+    acceptedBoundaryMetadataDiagnostics.kind !==
+      HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND ||
+    acceptedBoundaryMetadataDiagnostics.gateId !==
+      privateHydrationBoundaryAcceptedMetadataGateId ||
+    acceptedBoundaryMetadataDiagnostics.status !==
+      privateHydrationBoundaryAcceptedMetadataStatus ||
+    acceptedBoundaryMetadataDiagnostics.rootRecordId !==
+      hydrationBoundaryRecord.recordId ||
+    acceptedBoundaryMetadataDiagnostics.compatibilityClaimed !== false ||
+    acceptedBoundaryMetadataDiagnostics.publicHydrationCompatibilityClaimed !==
+      false ||
+    acceptedBoundaryMetadataDiagnostics
+      .publicHydrationReplayCompatibilityClaimed !== false ||
+    acceptedBoundaryMetadataDiagnostics.publicRootRenderCompatibilityClaimed !==
+      false
+  ) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires accepted boundary metadata for the same hydration record.'
+    );
+  }
+
+  const metadataRows = Array.isArray(
+    acceptedBoundaryMetadataDiagnostics.metadataRows
+  )
+    ? acceptedBoundaryMetadataDiagnostics.metadataRows
+    : [];
+  const acceptedBoundaryMetadataRow =
+    metadataRows.find(
+      (row) =>
+        row.metadataId ===
+        privateHydrationRecoverableErrorBoundaryAdmissionMetadataId
+    ) || null;
+
+  if (
+    acceptedBoundaryMetadataRow === null ||
+    acceptedBoundaryMetadataRow.category !== 'hydration' ||
+    acceptedBoundaryMetadataRow.gateId !==
+      privateHydrationRecoverableErrorBoundaryAdmissionGateId ||
+    acceptedBoundaryMetadataRow.recordType !==
+      HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_RECORD_KIND ||
+    acceptedBoundaryMetadataRow.acceptedStatus !==
+      privateHydrationRecoverableErrorBoundaryAdmissionStatus ||
+    acceptedBoundaryMetadataRow.blockedReason !==
+      HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON ||
+    acceptedBoundaryMetadataRow.metadataRecognized !== true ||
+    acceptedBoundaryMetadataRow.compatibilityClaimed !== false ||
+    acceptedBoundaryMetadataRow.publicHydrationCompatibilityClaimed !==
+      false ||
+    acceptedBoundaryMetadataRow.promotesHydration !== false ||
+    acceptedBoundaryMetadataRow.promotesRootRender !== false
+  ) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires accepted private boundary-admission metadata.'
+    );
+  }
+
+  return acceptedBoundaryMetadataRow;
+}
+
+function validateHydrationRecoverableErrorBoundaryAdmissionPreflight(
+  hydrationBoundaryRecord,
+  hydrationBoundaryPayload,
+  recoverableErrorPreflightRecord
+) {
+  const preflightPayload =
+    getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload(
+      recoverableErrorPreflightRecord
+    );
+  if (
+    preflightPayload === null ||
+    !recoverableErrorPreflightRecord ||
+    typeof recoverableErrorPreflightRecord !== 'object' ||
+    !Object.isFrozen(recoverableErrorPreflightRecord) ||
+    recoverableErrorPreflightRecord.kind !==
+      HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_RECORD_KIND ||
+    recoverableErrorPreflightRecord.gateId !==
+      privateHydrationTextMismatchRecoverableErrorPreflightGateId ||
+    recoverableErrorPreflightRecord.status !==
+      privateHydrationTextMismatchRecoverableErrorPreflightStatus ||
+    recoverableErrorPreflightRecord.privatePreflight !== true ||
+    recoverableErrorPreflightRecord.diagnosticOnly !== true ||
+    recoverableErrorPreflightRecord.readOnly !== true ||
+    recoverableErrorPreflightRecord.compatibilityClaimed !== false ||
+    recoverableErrorPreflightRecord.publicHydrationCompatibilityClaimed !==
+      false ||
+    recoverableErrorPreflightRecord.publicHydrationReplayCompatibilityClaimed !==
+      false ||
+    recoverableErrorPreflightRecord.publicHydrateRootSupported !== false ||
+    recoverableErrorPreflightRecord.publicRootExecution !== false ||
+    recoverableErrorPreflightRecord.nativeExecution !== false ||
+    recoverableErrorPreflightRecord.reconcilerExecution !== false ||
+    recoverableErrorPreflightRecord.domMutation !== false ||
+    recoverableErrorPreflightRecord.eventDispatch !== false ||
+    recoverableErrorPreflightRecord.eventReplayInstalled !== false ||
+    recoverableErrorPreflightRecord.replayQueuesDrained !== false ||
+    recoverableErrorPreflightRecord.recoverableErrorsQueued !== false ||
+    recoverableErrorPreflightRecord.willQueueRecoverableErrors !== false ||
+    recoverableErrorPreflightRecord.onRecoverableErrorInvoked !== false ||
+    recoverableErrorPreflightRecord.publicOnRecoverableErrorInvoked !==
+      false ||
+    recoverableErrorPreflightRecord.callbackInvocationGateEnabled !== false ||
+    recoverableErrorPreflightRecord.callbackInvocationRecordCount !== 0 ||
+    recoverableErrorPreflightRecord.rootErrorCallbackInvocationCount !== 0 ||
+    recoverableErrorPreflightRecord.rootRecordId !==
+      hydrationBoundaryRecord.recordId ||
+    recoverableErrorPreflightRecord.acceptedBoundaryMetadataDiagnostics !==
+      hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics ||
+    recoverableErrorPreflightRecord.recoverableErrorMetadata !==
+      hydrationBoundaryRecord.recoverableErrorMetadata ||
+    preflightPayload.hydrationBoundaryRecord !== hydrationBoundaryRecord ||
+    preflightPayload.container !== hydrationBoundaryPayload.container ||
+    preflightPayload.initialChildren !==
+      hydrationBoundaryPayload.initialChildren ||
+    preflightPayload.hydrationOptions !==
+      hydrationBoundaryPayload.hydrationOptions ||
+    preflightPayload.recoverableErrorMetadata !==
+      hydrationBoundaryRecord.recoverableErrorMetadata ||
+    preflightPayload.textMismatchDiagnostics !==
+      hydrationBoundaryRecord.textMismatchDiagnostics
+  ) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires canonical private recoverable-error preflight evidence.'
+    );
+  }
+
+  const textMismatchDiagnostics =
+    hydrationBoundaryRecord.textMismatchDiagnostics;
+  const recoverableErrorMetadata =
+    hydrationBoundaryRecord.recoverableErrorMetadata;
+  validateHydrationRecoverableErrorBoundaryAdmissionRecoverableMetadata(
+    hydrationBoundaryRecord,
+    textMismatchDiagnostics,
+    recoverableErrorMetadata
+  );
+  const recoverableErrorRows = Array.isArray(
+    recoverableErrorMetadata.recoverableErrorRows
+  )
+    ? recoverableErrorMetadata.recoverableErrorRows
+    : [];
+  if (
+    recoverableErrorRows.length === 0 ||
+    recoverableErrorRows.length !==
+      recoverableErrorMetadata.recoverableErrorMetadataCount ||
+    recoverableErrorPreflightRecord.recoverableErrorMetadataCount !==
+      recoverableErrorRows.length ||
+    recoverableErrorPreflightRecord.recoverableErrorRows !==
+      preflightPayload.recoverableErrorRows
+  ) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires recorded recoverable-error rows.'
+    );
+  }
+
+  return {
+    preflightPayload,
+    recoverableErrorMetadata,
+    recoverableErrorRows: freezeArray(recoverableErrorRows)
+  };
+}
+
+function validateHydrationRecoverableErrorBoundaryAdmissionRecoverableMetadata(
+  hydrationBoundaryRecord,
+  textMismatchDiagnostics,
+  recoverableErrorMetadata
+) {
+  if (
+    !textMismatchDiagnostics ||
+    typeof textMismatchDiagnostics !== 'object' ||
+    textMismatchDiagnostics.kind !== HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND ||
+    textMismatchDiagnostics.status !==
+      'blocked-hydration-text-mismatches-recorded' ||
+    textMismatchDiagnostics.blockedReason !==
+      HYDRATION_TEXT_MISMATCH_BLOCKED_REASON ||
+    textMismatchDiagnostics.recoverableErrorsQueued !== false ||
+    textMismatchDiagnostics.onRecoverableErrorInvoked !== false ||
+    textMismatchDiagnostics.publicRootCreated !== false ||
+    textMismatchDiagnostics.domMutated !== false ||
+    textMismatchDiagnostics.textPatched !== false ||
+    textMismatchDiagnostics.boundaryCleared !== false ||
+    !recoverableErrorMetadata ||
+    typeof recoverableErrorMetadata !== 'object' ||
+    recoverableErrorMetadata.kind !==
+      HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND ||
+    recoverableErrorMetadata.status !==
+      'blocked-hydration-text-mismatch-recoverable-error-metadata-recorded' ||
+    recoverableErrorMetadata.blockedReason !==
+      HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON ||
+    recoverableErrorMetadata.recoverableErrorsQueued !== false ||
+    recoverableErrorMetadata.onRecoverableErrorInvoked !== false ||
+    recoverableErrorMetadata.publicRootCreated !== false ||
+    recoverableErrorMetadata.hydratingPublicRoot !== false ||
+    recoverableErrorMetadata.domMutated !== false ||
+    recoverableErrorMetadata.source !==
+      'ReactFiberHydrationContext.throwOnHydrationMismatch/queueRecoverableErrors'
+  ) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires accepted blocked recoverable-error diagnostics.'
+    );
+  }
+  if (
+    recoverableErrorMetadata !==
+      hydrationBoundaryRecord.recoverableErrorMetadata ||
+    textMismatchDiagnostics !==
+      hydrationBoundaryRecord.textMismatchDiagnostics ||
+    textMismatchDiagnostics.recoverableErrorMetadata !==
+      recoverableErrorMetadata ||
+    recoverableErrorMetadata.rootRecordId !==
+      hydrationBoundaryRecord.recordId ||
+    textMismatchDiagnostics.rootRecordId !== hydrationBoundaryRecord.recordId
+  ) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission metadata must match the hydration boundary record.'
+    );
+  }
+}
+
+function validateHydrationRecoverableErrorBoundaryAdmissionReplayExecution(
+  hydrationBoundaryRecord,
+  recoverableErrorMetadata,
+  replayExecutionRecord,
+  replayExecutionPayload
+) {
+  if (
+    replayExecutionRecord.recoverableErrorMetadata !==
+      recoverableErrorMetadata ||
+    replayExecutionPayload.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    replayExecutionPayload.recoverableErrorMetadata !==
+      recoverableErrorMetadata ||
+    replayExecutionRecord.replayTargetDispatchExecutionRecorded !== true ||
+    replayExecutionRecord.replayTargetDispatchExecutionBlocked !== true ||
+    replayExecutionRecord.dispatchExecutionBlocked !== true ||
+    replayExecutionRecord.eventReplayDispatchAttempted !== false ||
+    replayExecutionRecord.targetDispatchExecuted !== false ||
+    replayExecutionRecord.eventsReplayed !== false ||
+    replayExecutionRecord.replayQueuesDrained !== false ||
+    replayExecutionRecord.replayQueueDrained !== false ||
+    replayExecutionRecord.recoverableErrorsQueued !== false ||
+    replayExecutionRecord.onRecoverableErrorInvoked !== false ||
+    replayExecutionRecord.publicOnRecoverableErrorInvoked !== false
+  ) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires blocked replay execution evidence for the same boundary.'
+    );
+  }
+}
+
+function validateHydrationRecoverableErrorBoundaryAdmissionCurrentness(
+  hydrationBoundaryPayload,
+  targetClaimingDiagnostic,
+  targetClaimingPayload,
+  replayExecutionRecord,
+  replayExecutionPayload
+) {
+  const markerDiagnostics = inspectHydrationContainerMarkers(
+    hydrationBoundaryPayload.container
+  );
+  const markerRow = targetClaimingPayload.markerRow;
+  const currentMarkerRow = findHydrationRecoverableErrorBoundaryCurrentMarkerRow(
+    markerDiagnostics,
+    markerRow
+  );
+  if (currentMarkerRow === null) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission rejected stale marker evidence.'
+    );
+  }
+
+  let targetPathEvidence;
+  try {
+    const targetPathRecord = resolveSupportedHydrationTargetClaimingPath(
+      replayExecutionRecord.targetPath
+    );
+    targetPathEvidence = resolveHydrationTargetClaimingPathEvidence(
+      hydrationBoundaryPayload,
+      replayExecutionPayload.targetDispatchLinkDiagnostic,
+      replayExecutionPayload.targetDispatchLinkPayload,
+      targetPathRecord
+    );
+  } catch (error) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission rejected stale target-claiming evidence.'
+    );
+  }
+
+  return freezeRecord({
+    hydratableLookupTargetPathRetained:
+      targetPathEvidence.hydratableLookupTargetPathRetained,
+    markerContractId: currentMarkerRow.contractId,
+    markerDiagnostics,
+    markerPathCurrent: true,
+    markerPathCurrentStatus: 'current-marker-row-retained',
+    targetContainerMatchesBoundaryRecord:
+      targetPathEvidence.containerMatchesBoundaryRecord,
+    targetPathCurrent: true,
+    targetPathCurrentStatus: 'current-target-path-retained',
+    targetPathEvidence,
+    targetPathParentChainRetained: targetPathEvidence.parentChainRetained,
+    targetPathResolvedToDispatchTarget:
+      targetPathEvidence.resolvedToDispatchTarget,
+    targetPathUniqueInContainer: targetPathEvidence.uniqueInContainer
+  });
+}
+
+function findHydrationRecoverableErrorBoundaryCurrentMarkerRow(
+  markerDiagnostics,
+  markerRow
+) {
+  const rows = Array.isArray(markerDiagnostics.markers)
+    ? markerDiagnostics.markers
+    : [];
+  return (
+    rows.find(
+      (row) =>
+        row.path === markerRow.path &&
+        row.contractId === markerRow.contractId &&
+        row.kind === markerRow.kind &&
+        row.markerId === markerRow.markerId
+    ) || null
+  );
+}
+
+function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
+  hydrationBoundaryRecord,
+  hydrationBoundaryPayload,
+  recoverableErrorPreflightRecord,
+  targetClaimingDiagnostic,
+  replayExecutionRecord,
+  targetClaimingPayload,
+  replayExecutionPayload,
+  admissionOptions,
+  currentness
+) {
+  const hydrateRootPreflightRecord =
+    admissionOptions.hydrateRootPreflightRecord;
+  const eventReplayPreflightRecord =
+    admissionOptions.eventReplayPreflightRecord;
+  const executionPreflightRecord =
+    admissionOptions.executionPreflightRecord;
+  const lifecycleRequestBoundary =
+    admissionOptions.lifecycleRequestBoundary;
+  const hydrateRootSourceLedgerPayload =
+    getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+      hydrationBoundaryRecord,
+      hydrateRootPreflightRecord,
+      'hydrate-root-public-facade-preflight-record',
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
+    );
+  const eventReplaySourceLedgerPayload =
+    getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+      hydrationBoundaryRecord,
+      eventReplayPreflightRecord,
+      'hydrate-root-public-facade-event-replay-preflight-record',
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
+    );
+  const executionSourceLedgerPayload =
+    getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+      hydrationBoundaryRecord,
+      executionPreflightRecord,
+      'hydrate-root-public-facade-execution-preflight-record',
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
+    );
+  const lifecycleSourceLedgerPayload =
+    getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+      hydrationBoundaryRecord,
+      lifecycleRequestBoundary,
+      'hydrate-root-public-facade-lifecycle-request-boundary',
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
+    );
+
+  if (
+    !isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+      hydrateRootSourceLedgerPayload,
+      hydrateRootPreflightRecord,
+      'hydrate-root-public-facade-preflight-record'
+    ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+      eventReplaySourceLedgerPayload,
+      eventReplayPreflightRecord,
+      'hydrate-root-public-facade-event-replay-preflight-record'
+    ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+      executionSourceLedgerPayload,
+      executionPreflightRecord,
+      'hydrate-root-public-facade-execution-preflight-record'
+    ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+      lifecycleSourceLedgerPayload,
+      lifecycleRequestBoundary,
+      'hydrate-root-public-facade-lifecycle-request-boundary'
+    ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionHydrateRootPreflight(
+      hydrateRootPreflightRecord
+    ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionEventReplayPreflight(
+      eventReplayPreflightRecord
+    ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionExecutionPreflight(
+      executionPreflightRecord
+    ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionLifecycleBoundary(
+      lifecycleRequestBoundary
+    ) ||
+    hydrateRootPreflightRecord.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    hydrateRootSourceLedgerPayload.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    eventReplaySourceLedgerPayload.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    executionSourceLedgerPayload.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    lifecycleSourceLedgerPayload.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    hydrateRootSourceLedgerPayload.preflight !==
+      eventReplaySourceLedgerPayload.preflight ||
+    hydrateRootSourceLedgerPayload.preflight !==
+      executionSourceLedgerPayload.preflight ||
+    hydrateRootSourceLedgerPayload.preflight !==
+      lifecycleSourceLedgerPayload.preflight ||
+    hydrateRootSourceLedgerPayload.bridge !==
+      eventReplaySourceLedgerPayload.bridge ||
+    hydrateRootSourceLedgerPayload.bridge !==
+      executionSourceLedgerPayload.bridge ||
+    hydrateRootSourceLedgerPayload.bridge !==
+      lifecycleSourceLedgerPayload.bridge ||
+    hydrateRootSourceLedgerPayload.requestRecord !==
+      eventReplaySourceLedgerPayload.requestRecord ||
+    hydrateRootSourceLedgerPayload.requestRecord !==
+      executionSourceLedgerPayload.requestRecord ||
+    hydrateRootSourceLedgerPayload.requestRecord !==
+      lifecycleSourceLedgerPayload.requestRecord ||
+    hydrateRootSourceLedgerPayload.requestAdmission !==
+      lifecycleSourceLedgerPayload.requestAdmission ||
+    hydrateRootPreflightRecord.recoverableErrorPreflight !==
+      recoverableErrorPreflightRecord ||
+    hydrateRootSourceLedgerPayload.recoverableErrorPreflight !==
+      recoverableErrorPreflightRecord ||
+    hydrateRootPreflightRecord.acceptedPrivateMetadataDiagnostics !==
+      hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics ||
+    hydrateRootPreflightRecord.recoverableErrorMetadata !==
+      hydrationBoundaryRecord.recoverableErrorMetadata ||
+    hydrateRootPreflightRecord.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
+    hydrateRootSourceLedgerPayload.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
+    hydrateRootPreflightRecord.requestAdmission !==
+      lifecycleRequestBoundary.requestAdmission ||
+    eventReplayPreflightRecord.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
+    eventReplaySourceLedgerPayload.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
+    eventReplayPreflightRecord.targetClaimingDiagnostic !==
+      targetClaimingDiagnostic ||
+    !eventReplaySourceLedgerPayload.targetClaimingPayload ||
+    eventReplaySourceLedgerPayload.targetClaimingPayload
+      .targetClaimingDiagnostic !== targetClaimingDiagnostic ||
+    eventReplayPreflightRecord.replayExecutionRecord !==
+      replayExecutionRecord ||
+    eventReplaySourceLedgerPayload.replayExecutionRecord !==
+      replayExecutionRecord ||
+    executionPreflightRecord.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
+    executionSourceLedgerPayload.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
+    executionPreflightRecord.eventReplayPreflight !==
+      eventReplayPreflightRecord ||
+    executionSourceLedgerPayload.eventReplayPreflight !==
+      eventReplayPreflightRecord ||
+    executionPreflightRecord.replayExecutionRecord !==
+      replayExecutionRecord ||
+    executionSourceLedgerPayload.replayExecutionRecord !==
+      replayExecutionRecord ||
+    executionPreflightRecord.recoverableErrorMetadata !==
+      hydrationBoundaryRecord.recoverableErrorMetadata ||
+    lifecycleRequestBoundary.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    lifecycleRequestBoundary.acceptedPrivateMetadataDiagnostics !==
+      hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics ||
+    lifecycleRequestBoundary.markerGuard !==
+      hydrationBoundaryRecord.markerGuard ||
+    lifecycleRequestBoundary.listenerGuard !==
+      hydrationBoundaryRecord.listenerGuard ||
+    lifecycleRequestBoundary.rootRecordId !==
+      hydrationBoundaryRecord.recordId ||
+    lifecycleRequestBoundary.requestAdmission !==
+      hydrateRootPreflightRecord.requestAdmission ||
+    lifecycleSourceLedgerPayload.requestAdmission !==
+      hydrateRootPreflightRecord.requestAdmission ||
+    lifecycleSourceLedgerPayload.lifecycleContainerSnapshot !==
+      lifecycleRequestBoundary.lifecycleContainerSnapshot ||
+    lifecycleSourceLedgerPayload.container !==
+      hydrationBoundaryPayload.container ||
+    lifecycleRequestBoundary.lifecycleContainerSnapshot.childCount !==
+      getHydrationRecoverableErrorBoundaryAdmissionChildCount(
+        hydrationBoundaryPayload.container
+      ) ||
+    currentness.markerPathCurrent !== true ||
+    currentness.targetPathCurrent !== true
+  ) {
+    throwInvalidHydrationRecoverableErrorBoundaryAdmission(
+      'Hydration recoverable-error boundary admission requires source-owned current hydrateRoot lifecycle and replay source-ledger evidence.'
+    );
+  }
+
+  return freezeRecord({
+    eventReplayPreflightRecord,
+    eventReplaySourceLedgerPayload,
+    executionPreflightRecord,
+    executionSourceLedgerPayload,
+    hydrateRootPreflightRecord,
+    hydrateRootSourceLedgerPayload,
+    lifecycleContainerSnapshotCurrent: true,
+    lifecycleRequestBoundary,
+    lifecycleSourceLedgerPayload,
+    sourceOwnedLedgerPayloads: true
+  });
+}
+
+function isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+  payload,
+  record,
+  ledgerKind
+) {
+  return (
+    payload &&
+    typeof payload === 'object' &&
+    payload.record === record &&
+    payload.ledgerKind === ledgerKind
+  );
+}
+
+function getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+  hydrationBoundaryRecord,
+  record,
+  ledgerKind,
+  targetClaimingPayload,
+  replayExecutionPayload,
+  replayExecutionRecord
+) {
+  if (!record || typeof record !== 'object') {
+    return null;
+  }
+
+  if (ledgerKind === 'hydrate-root-public-facade-preflight-record') {
+    return createHydrateRootPreflightSourceLedgerPayload(
+      hydrationBoundaryRecord,
+      record,
+      ledgerKind
+    );
+  }
+  if (
+    ledgerKind ===
+    'hydrate-root-public-facade-event-replay-preflight-record'
+  ) {
+    return createHydrateRootEventReplaySourceLedgerPayload(
+      hydrationBoundaryRecord,
+      record,
+      ledgerKind,
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
+    );
+  }
+  if (
+    ledgerKind === 'hydrate-root-public-facade-execution-preflight-record'
+  ) {
+    return createHydrateRootExecutionSourceLedgerPayload(
+      hydrationBoundaryRecord,
+      record,
+      ledgerKind,
+      replayExecutionPayload,
+      replayExecutionRecord
+    );
+  }
+  if (
+    ledgerKind === 'hydrate-root-public-facade-lifecycle-request-boundary'
+  ) {
+    return createHydrateRootLifecycleSourceLedgerPayload(
+      hydrationBoundaryRecord,
+      record,
+      ledgerKind
+    );
+  }
+
+  return null;
+}
+
+function createHydrateRootPreflightSourceLedgerPayload(
+  hydrationBoundaryRecord,
+  record,
+  ledgerKind
+) {
+  const sourceLedgerPayload =
+    readPrivateHydrateRootSourceLedgerPayload(
+      hydrationBoundaryRecord,
+      record,
+      ledgerKind
+    );
+  if (
+    sourceLedgerPayload === null ||
+    record.requestAdmission !== sourceLedgerPayload.requestAdmission ||
+    record.lifecycleRequestBoundary !==
+      sourceLedgerPayload.lifecycleRequestBoundary
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: sourceLedgerPayload.bridge,
+    hydrationBoundaryRecord: sourceLedgerPayload.hydrationBoundaryRecord,
+    ledgerKind,
+    lifecycleRequestBoundary: record.lifecycleRequestBoundary,
+    markerListenerPreflight: record.markerListenerPreflight,
+    nativeHandoffRecord: record.nativeHandoffRecord,
+    preflight: sourceLedgerPayload.preflight,
+    recoverableErrorPreflight: record.recoverableErrorPreflight,
+    requestAdmission: sourceLedgerPayload.requestAdmission,
+    requestRecord: sourceLedgerPayload.requestRecord,
+    record
+  });
+}
+
+function createHydrateRootEventReplaySourceLedgerPayload(
+  hydrationBoundaryRecord,
+  record,
+  ledgerKind,
+  targetClaimingPayload,
+  replayExecutionPayload,
+  replayExecutionRecord
+) {
+  const sourceLedgerPayload =
+    readPrivateHydrateRootSourceLedgerPayload(
+      hydrationBoundaryRecord,
+      record,
+      ledgerKind
+    );
+  if (
+    sourceLedgerPayload === null ||
+    record.lifecycleRequestBoundary !==
+      sourceLedgerPayload.lifecycleRequestBoundary ||
+    record.targetClaimingDiagnostic !==
+      replayExecutionPayload.targetClaimingDiagnostic ||
+    record.replayExecutionRecord !== replayExecutionRecord
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: sourceLedgerPayload.bridge,
+    hydrationBoundaryRecord: sourceLedgerPayload.hydrationBoundaryRecord,
+    ledgerKind,
+    lifecycleRequestBoundary: record.lifecycleRequestBoundary,
+    preflight: sourceLedgerPayload.preflight,
+    replayExecutionPayload,
+    replayExecutionRecord: record.replayExecutionRecord,
+    requestRecord: sourceLedgerPayload.requestRecord,
+    targetClaimingPayload: freezeRecord({
+      ...targetClaimingPayload,
+      targetClaimingDiagnostic: replayExecutionPayload.targetClaimingDiagnostic
+    }),
+    targetClaimingPreflight: record.targetClaimingPreflight,
+    record
+  });
+}
+
+function createHydrateRootExecutionSourceLedgerPayload(
+  hydrationBoundaryRecord,
+  record,
+  ledgerKind,
+  replayExecutionPayload,
+  replayExecutionRecord
+) {
+  const sourceLedgerPayload =
+    readPrivateHydrateRootSourceLedgerPayload(
+      hydrationBoundaryRecord,
+      record,
+      ledgerKind
+    );
+  if (
+    sourceLedgerPayload === null ||
+    record.lifecycleRequestBoundary !==
+      sourceLedgerPayload.lifecycleRequestBoundary ||
+    record.replayExecutionRecord !== replayExecutionRecord
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: sourceLedgerPayload.bridge,
+    eventReplayPreflight: record.eventReplayPreflight,
+    hydrationBoundaryRecord: sourceLedgerPayload.hydrationBoundaryRecord,
+    ledgerKind,
+    lifecycleRequestBoundary: record.lifecycleRequestBoundary,
+    preflight: sourceLedgerPayload.preflight,
+    replayExecutionPayload,
+    replayExecutionRecord: record.replayExecutionRecord,
+    requestRecord: sourceLedgerPayload.requestRecord,
+    record
+  });
+}
+
+function createHydrateRootLifecycleSourceLedgerPayload(
+  hydrationBoundaryRecord,
+  record,
+  ledgerKind
+) {
+  const sourceLedgerPayload =
+    readPrivateHydrateRootSourceLedgerPayload(
+      hydrationBoundaryRecord,
+      record,
+      ledgerKind
+    );
+  if (
+    sourceLedgerPayload === null ||
+    record.requestAdmission !== sourceLedgerPayload.requestAdmission
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: sourceLedgerPayload.bridge,
+    container: sourceLedgerPayload.container,
+    hydrationBoundaryRecord: sourceLedgerPayload.hydrationBoundaryRecord,
+    ledgerKind,
+    lifecycleContainerSnapshot: record.lifecycleContainerSnapshot,
+    preflight: sourceLedgerPayload.preflight,
+    requestAdmission: sourceLedgerPayload.requestAdmission,
+    requestPayload: sourceLedgerPayload.requestPayload,
+    requestRecord: sourceLedgerPayload.requestRecord,
+    record
+  });
+}
+
+function readPrivateHydrateRootSourceLedgerPayload(
+  hydrationBoundaryRecord,
+  record,
+  ledgerKind
+) {
+  const rootBridge = getPrivateHydrateRootSourceLedgerRootBridgeModule();
+  const payload = getPrivateHydrateRootSourceLedgerRootBridgePayload(
+    rootBridge,
+    record,
+    ledgerKind
+  );
+  const sourceHydrationBoundaryRecord =
+    payload &&
+    typeof payload === 'object' &&
+    payload.hydrationBoundaryRecord
+      ? payload.hydrationBoundaryRecord
+      : payload &&
+          typeof payload === 'object' &&
+          payload.requestRecord &&
+          typeof payload.requestRecord === 'object'
+        ? payload.requestRecord.hydrationBoundaryRecord
+        : null;
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    payload.ledgerKind !== ledgerKind ||
+    sourceHydrationBoundaryRecord !== hydrationBoundaryRecord ||
+    !payload.requestRecord ||
+    typeof payload.requestRecord !== 'object' ||
+    payload.requestRecord.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    ...payload,
+    hydrationBoundaryRecord,
+    ledgerKind,
+    record
+  });
+}
+
+function getPrivateHydrateRootSourceLedgerRootBridgeModule() {
+  if (hydrateRootSourceLedgerRootBridgeModule !== null) {
+    return hydrateRootSourceLedgerRootBridgeModule;
+  }
+  try {
+    return rememberPrivateHydrateRootSourceLedgerRootBridgeModule();
+  } catch (error) {
+    return null;
+  }
+}
+
+function rememberPrivateHydrateRootSourceLedgerRootBridgeModule() {
+  if (hydrateRootSourceLedgerRootBridgeModule !== null) {
+    return hydrateRootSourceLedgerRootBridgeModule;
+  }
+  const rootBridgePath = require.resolve('./root-bridge.js');
+  const cacheEntry = require.cache[rootBridgePath];
+  if (
+    cacheEntry &&
+    isTrustedPrivateHydrateRootSourceLedgerRootBridgeModule(
+      cacheEntry.exports
+    ) &&
+    isPrivateHydrateRootSourceLedgerRootBridgeCacheEntry(
+      rootBridgePath,
+      cacheEntry.exports
+    )
+  ) {
+    hydrateRootSourceLedgerRootBridgeModule = cacheEntry.exports;
+    return hydrateRootSourceLedgerRootBridgeModule;
+  }
+
+  delete require.cache[rootBridgePath];
+  const rootBridge = require(rootBridgePath);
+  requestPrivateHydrateRootSourceLedgerRootBridgeModuleRegistration(
+    rootBridge
+  );
+  if (
+    !isTrustedPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) ||
+    !isPrivateHydrateRootSourceLedgerRootBridgeCacheEntry(
+      rootBridgePath,
+      rootBridge
+    )
+  ) {
+    delete require.cache[rootBridgePath];
+    return null;
+  }
+  hydrateRootSourceLedgerRootBridgeModule = rootBridge;
+  return hydrateRootSourceLedgerRootBridgeModule;
+}
+
+function isPrivateHydrateRootSourceLedgerRootBridgeCacheEntry(
+  rootBridgePath,
+  rootBridge
+) {
+  const cacheEntry = require.cache[rootBridgePath];
+  const path = require('node:path');
+  if (
+    !cacheEntry ||
+    !(cacheEntry instanceof module.constructor) ||
+    cacheEntry.filename !== rootBridgePath ||
+    cacheEntry.loaded !== true ||
+    cacheEntry.path !== path.dirname(rootBridgePath)
+  ) {
+    return false;
+  }
+  const exportsDescriptor = Object.getOwnPropertyDescriptor(
+    cacheEntry,
+    'exports'
+  );
+  return (
+    exportsDescriptor !== undefined &&
+    exportsDescriptor.value === rootBridge &&
+    exportsDescriptor.writable === false &&
+    exportsDescriptor.configurable === false
+  );
+}
+
+function isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) {
+  return (
+    rootBridge &&
+    typeof rootBridge === 'object' &&
+    Object.isFrozen(rootBridge) &&
+    rootBridge.ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES !==
+      undefined &&
+    rootBridge.ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES !==
+      undefined &&
+    typeof rootBridge.createPrivateHydrateRootPublicFacadePreflight ===
+      'function' &&
+    typeof rootBridge.createPrivateRootBridgeShell === 'function' &&
+    typeof rootBridge.isPrivateHydrateRootPublicFacadePreflightRecord ===
+      'function' &&
+    typeof rootBridge
+      .getPrivateHydrateRootPublicFacadePreflightRecordPayload ===
+      'function' &&
+    typeof rootBridge
+      .isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord ===
+      'function' &&
+    typeof rootBridge
+      .getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload ===
+      'function' &&
+    typeof rootBridge
+      .isPrivateHydrateRootPublicFacadeExecutionPreflightRecord ===
+      'function' &&
+    typeof rootBridge
+      .getPrivateHydrateRootPublicFacadeExecutionPreflightPayload ===
+      'function' &&
+    typeof rootBridge
+      .isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord ===
+      'function' &&
+    typeof rootBridge
+      .getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload ===
+      'function' &&
+    typeof rootBridge.readPrivateHydrateRootPublicFacadeSourceLedgerPayload ===
+      'function'
+  );
+}
+
+function registerPrivateHydrateRootSourceLedgerRootBridgeModule(
+  rootBridge,
+  authorityToken
+) {
+  if (
+    !rootBridge ||
+    (typeof rootBridge !== 'object' && typeof rootBridge !== 'function') ||
+    !authorityToken ||
+    (typeof authorityToken !== 'object' &&
+      typeof authorityToken !== 'function') ||
+    !isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
+  ) {
+    return false;
+  }
+  trustPrivateHydrateRootSourceLedgerRootBridgeModule(
+    rootBridge,
+    authorityToken
+  );
+  return true;
+}
+
+function requestPrivateHydrateRootSourceLedgerRootBridgeModuleRegistration(
+  rootBridge
+) {
+  if (
+    !isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) ||
+    typeof rootBridge
+      .registerPrivateHydrateRootSourceLedgerRootBridgeModule !== 'function'
+  ) {
+    return false;
+  }
+  return (
+    rootBridge.registerPrivateHydrateRootSourceLedgerRootBridgeModule(
+      registerPrivateHydrateRootSourceLedgerRootBridgeModule
+    ) === true &&
+    isTrustedPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
+  );
+}
+
+function trustPrivateHydrateRootSourceLedgerRootBridgeModule(
+  rootBridge,
+  authorityToken
+) {
+  if (
+    rootBridge &&
+    (typeof rootBridge === 'object' || typeof rootBridge === 'function') &&
+    authorityToken &&
+    (typeof authorityToken === 'object' ||
+      typeof authorityToken === 'function') &&
+    isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
+  ) {
+    hydrateRootSourceLedgerRootBridgeModules.add(rootBridge);
+    hydrateRootSourceLedgerRootBridgeAuthorityTokens.set(
+      rootBridge,
+      authorityToken
+    );
+  }
+}
+
+function isTrustedPrivateHydrateRootSourceLedgerRootBridgeModule(
+  rootBridge
+) {
+  return (
+    rootBridge &&
+    (typeof rootBridge === 'object' || typeof rootBridge === 'function') &&
+    hydrateRootSourceLedgerRootBridgeModules.has(rootBridge) &&
+    isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge)
+  );
+}
+
+function getPrivateHydrateRootSourceLedgerRootBridgePayload(
+  rootBridge,
+  record,
+  ledgerKind
+) {
+  if (
+    !rootBridge ||
+    typeof rootBridge !== 'object' ||
+    !isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) ||
+    !record ||
+    typeof record !== 'object' ||
+    !Object.isFrozen(record) ||
+    typeof ledgerKind !== 'string'
+  ) {
+    return null;
+  }
+
+  try {
+    const payload =
+      rootBridge.readPrivateHydrateRootPublicFacadeSourceLedgerPayload(
+        record,
+        ledgerKind
+      );
+    const authorityToken =
+      hydrateRootSourceLedgerRootBridgeAuthorityTokens.get(rootBridge);
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      authorityToken === undefined ||
+      payload.sourceLedgerAuthorityToken !== authorityToken
+    ) {
+      return null;
+    }
+    const {sourceLedgerAuthorityToken, ...trustedPayload} = payload;
+    return trustedPayload;
+  } catch (error) {
+    return null;
+  }
+}
+
+function isHydrationRecoverableErrorBoundaryAdmissionHydrateRootPreflight(
+  record
+) {
+  return (
+    record &&
+    typeof record === 'object' &&
+    Object.isFrozen(record) &&
+    record.kind ===
+      'FastReactDomPrivateHydrateRootPublicFacadePreflightRecord' &&
+    record.facadeCall === 'hydrateRoot' &&
+    record.requestType === 'hydrateRoot' &&
+    record.preflightStatus ===
+      'accepted-private-react-dom-client-root-public-facade-preflight' &&
+    record.executionStatus === 'blocked-private-root-bridge-execution' &&
+    record.compatibilityStatus ===
+      'blocked-private-root-bridge-compatibility' &&
+    record.recoverableErrorPreflightAccepted === true &&
+    record.markerListenerPreconditionsAccepted === true &&
+    record.markerListenerStateUnchanged === true &&
+    record.lifecycleRequestBoundaryAccepted === true &&
+    record.lifecycleRequestBoundarySourceOwned === true &&
+    record.lifecycleContainerSnapshotOwned === true &&
+    record.requestAdmissionStatus ===
+      'admitted-private-root-bridge-request-record' &&
+    record.publicHydrateRootEnabled === false &&
+    record.publicRootCreated === false &&
+    record.nativeExecution === false &&
+    record.reconcilerExecution === false &&
+    record.domMutation === false &&
+    record.markerWrites === false &&
+    record.listenerInstallation === false &&
+    record.hydration === false &&
+    record.eventDispatch === false &&
+    record.compatibilityClaimed === false
+  );
+}
+
+function isHydrationRecoverableErrorBoundaryAdmissionEventReplayPreflight(
+  record
+) {
+  return (
+    record &&
+    typeof record === 'object' &&
+    Object.isFrozen(record) &&
+    record.kind ===
+      'FastReactDomPrivateHydrateRootPublicFacadeEventReplayPreflightRecord' &&
+    record.facadeCall === 'hydrateRoot' &&
+    record.requestType === 'hydrateRoot' &&
+    record.preflightStatus ===
+      'preflighted-private-hydrate-root-public-facade-event-replay-gate' &&
+    record.executionStatus === 'blocked-private-root-bridge-execution' &&
+    record.compatibilityStatus ===
+      'blocked-private-root-bridge-compatibility' &&
+    record.preconditions &&
+    record.preconditions.accepted === true &&
+    record.preconditions.stateUnchanged === true &&
+    record.replayExecutionPayloadAccepted === true &&
+    record.lifecycleRequestBoundaryAccepted === true &&
+    record.lifecycleRequestBoundarySourceOwned === true &&
+    record.lifecycleContainerSnapshotOwned === true &&
+    record.targetClaimAccepted === true &&
+    record.targetClaimExecuted === false &&
+    record.replayTargetDispatchExecutionBlocked === true &&
+    record.eventReplaySupported === false &&
+    record.hydrationReplaySupported === false &&
+    record.eventReplayInstalled === false &&
+    record.replayQueuesDrained === false &&
+    record.eventsReplayed === false &&
+    record.eventDispatch === false &&
+    record.compatibilityClaimed === false
+  );
+}
+
+function isHydrationRecoverableErrorBoundaryAdmissionExecutionPreflight(
+  record
+) {
+  return (
+    record &&
+    typeof record === 'object' &&
+    Object.isFrozen(record) &&
+    record.kind ===
+      'FastReactDomPrivateHydrateRootPublicFacadeExecutionPreflightRecord' &&
+    record.facadeCall === 'hydrateRoot' &&
+    record.requestType === 'hydrateRoot' &&
+    record.preflightStatus ===
+      'preflighted-private-hydrate-root-public-facade-execution-gate' &&
+    record.executionStatus === 'blocked-private-root-bridge-execution' &&
+    record.compatibilityStatus ===
+      'blocked-private-root-bridge-compatibility' &&
+    record.executionPreflightAccepted === true &&
+    record.eventReplayPreconditionsAccepted === true &&
+    record.eventReplayStateUnchanged === true &&
+    record.replayExecutionPayloadAccepted === true &&
+    record.lifecycleRequestBoundaryAccepted === true &&
+    record.lifecycleRequestBoundarySourceOwned === true &&
+    record.lifecycleContainerSnapshotOwned === true &&
+    record.targetClaimAccepted === true &&
+    record.targetClaimExecuted === false &&
+    record.replayTargetDispatchExecutionBlocked === true &&
+    record.eventReplayInstalled === false &&
+    record.replayQueuesDrained === false &&
+    record.eventsReplayed === false &&
+    record.eventDispatch === false &&
+    record.recoverableErrorsQueued === false &&
+    record.onRecoverableErrorInvoked === false &&
+    record.publicOnRecoverableErrorInvoked === false &&
+    record.rootErrorCallbackInvocationCount === 0 &&
+    record.publicHydrateRootSupported === false &&
+    record.publicRootExecution === false &&
+    record.publicRootCreated === false &&
+    record.nativeExecution === false &&
+    record.reconcilerExecution === false &&
+    record.domMutation === false &&
+    record.hydration === false &&
+    record.compatibilityClaimed === false
+  );
+}
+
+function isHydrationRecoverableErrorBoundaryAdmissionLifecycleBoundary(
+  record
+) {
+  return (
+    record &&
+    typeof record === 'object' &&
+    Object.isFrozen(record) &&
+    record.kind ===
+      'FastReactDomPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord' &&
+    record.facadeCall === 'hydrateRoot' &&
+    record.requestType === 'hydrateRoot' &&
+    record.boundaryStatus ===
+      'accepted-private-hydrate-root-public-facade-lifecycle-request-boundary' &&
+    record.sourceOwned === true &&
+    record.active === true &&
+    record.sourceTokenOwnership === 'weakmap-root-bridge-admission' &&
+    record.requestAdmissionStatus ===
+      'admitted-private-root-bridge-request-record' &&
+    record.lifecyclePrerequisitesAccepted === true &&
+    record.lifecycleStatusBefore === null &&
+    record.lifecycleStatusAfter === UNSUPPORTED_HYDRATION_ROOT_KIND &&
+    record.lifecycleTransition === 'none->unsupported-hydration' &&
+    record.lifecycleContainerSnapshotOwned === true &&
+    record.publicHydrateRootEnabled === false &&
+    record.publicHydrateRootSupported === false &&
+    record.publicRootCreated === false &&
+    record.publicRootExecution === false &&
+    record.nativeExecution === false &&
+    record.reconcilerExecution === false &&
+    record.domMutation === false &&
+    record.markerWrites === false &&
+    record.listenerInstallation === false &&
+    record.hydration === false &&
+    record.eventDispatch === false &&
+    record.compatibilityClaimed === false &&
+    record.publicHydrationCompatibilityClaimed === false &&
+    record.publicHydrationReplayCompatibilityClaimed === false &&
+    record.lifecycleContainerSnapshot &&
+    typeof record.lifecycleContainerSnapshot === 'object'
+  );
+}
+
+function getHydrationRecoverableErrorBoundaryAdmissionChildCount(
+  container
+) {
+  if (!container || typeof container !== 'object') {
+    return 0;
+  }
+  const childNodes = container.childNodes;
+  if (Array.isArray(childNodes)) {
+    return childNodes.length;
+  }
+  if (
+    childNodes &&
+    typeof childNodes === 'object' &&
+    Number.isSafeInteger(childNodes.length) &&
+    childNodes.length >= 0
+  ) {
+    return childNodes.length;
+  }
+  return 0;
+}
+
+function throwInvalidHydrationRecoverableErrorBoundaryAdmission(message) {
+  const error = new Error(message);
+  error.code = INVALID_HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_CODE;
+  throw error;
+}
+
 function inspectHydrationContainerMarkers(container, options) {
   return inspectHydrationContainerMarkersWithContracts(container, {
     markerContracts: acceptedHydrationMarkerContracts,
@@ -5273,12 +6957,14 @@ module.exports = {
   HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND,
   HYDRATION_TEXT_MISMATCH_BLOCKED_REASON,
   HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND,
+  HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_RECORD_KIND,
   HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
   HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_RECORD_KIND,
   HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_RECORD_KIND,
   HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND,
   INVALID_HYDRATION_BOUNDARY_RECORD_CODE,
   INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE,
+  INVALID_HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_CODE,
   INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE,
   INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_CODE,
   INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_CODE,
@@ -5292,6 +6978,7 @@ module.exports = {
   createHydrationClaimedReplayTargetDispatchExecutionRecord,
   createHydrationReplayOwnershipGateDiagnostic,
   createHydrationReplayTargetDispatchLinkDiagnostic,
+  createHydrationRecoverableErrorBoundaryAdmissionRecord,
   createHydrationTextMismatchRecoverableErrorPreflightRecord,
   createHydrationTextMismatchRecoverableErrorRoutingExecutionRecord,
   createHydrationTextNodeClaimPatchExecutionRecord,
@@ -5300,6 +6987,7 @@ module.exports = {
   createUnsupportedHydrateRootRecord,
   getPrivateHydrationBoundaryRecordPayload,
   getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload,
+  getPrivateHydrationRecoverableErrorBoundaryAdmissionPayload,
   getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload,
   getPrivateHydrationTextMismatchRecoverableErrorRoutingExecutionPayload,
   getPrivateHydrationTextNodeClaimPatchExecutionPayload,
@@ -5310,6 +6998,7 @@ module.exports = {
   inspectHydrationContainerMarkers,
   isPrivateHydrationBoundaryRecord,
   isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
+  isPrivateHydrationRecoverableErrorBoundaryAdmissionRecord,
   isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord,
   isPrivateHydrationTextMismatchRecoverableErrorRoutingExecutionRecord,
   isPrivateHydrationTextNodeClaimPatchExecutionRecord,
@@ -5319,6 +7008,9 @@ module.exports = {
   privateHydrationBoundaryRecordType,
   privateHydrationClaimedReplayTargetDispatchExecutionGateId,
   privateHydrationClaimedReplayTargetDispatchExecutionStatus,
+  privateHydrationRecoverableErrorBoundaryAdmissionGateId,
+  privateHydrationRecoverableErrorBoundaryAdmissionMetadataId,
+  privateHydrationRecoverableErrorBoundaryAdmissionStatus,
   privateHydrationReplayOwnershipGateId,
   privateHydrationTargetClaimingGateId,
   privateHydrationTargetClaimingMetadataStatus,
@@ -5331,5 +7023,6 @@ module.exports = {
   privateHydrationTextNodeClaimPatchExecutionGateId,
   privateHydrationTextNodeClaimPatchExecutionStatus,
   privateHydrationTextNodeClaimPatchMetadataId,
+  requestPrivateHydrateRootSourceLedgerRootBridgeModuleRegistration,
   unsupportedHydrationPrerequisites
 };
