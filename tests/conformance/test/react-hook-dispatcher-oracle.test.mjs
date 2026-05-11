@@ -210,6 +210,236 @@ const expectedAcceptedTransitionReconcilerRecords = [
   "RootTransitionEntanglementRecord",
   "UpdateContainerResult"
 ];
+const expectedUseRefHookNames = ["useRef"];
+const expectedUseRefPublicShapeBlockerFields = [
+  "hookName",
+  "reactSourceFunction",
+  "reactDispatcherMethod",
+  "reactSourceLength",
+  "currentPublicExport",
+  "currentName",
+  "currentLength",
+  "blocker"
+];
+const expectedUseRefPublicShapeBlockers = [
+  {
+    hookName: "useRef",
+    reactSourceFunction: "ReactHooks.useRef",
+    reactDispatcherMethod: "dispatcher.useRef",
+    reactSourceLength: 1,
+    currentPublicExport: "react.useRef private-dispatcher guarded facade",
+    currentName: "",
+    currentLength: 1,
+    blocker:
+      "public export rejects generic dispatcher forwarding until a source-owned private useRef hook dispatcher is admitted"
+  }
+];
+const expectedUseRefSourceReportFieldNames = [
+  "kind",
+  "version",
+  "status",
+  "reactSourceTag",
+  "reactSourceCommit",
+  "reactHooksSource",
+  "reactClientSource",
+  "reactServerSource",
+  "reactReconcilerSource",
+  "fastReactSource",
+  "reactMountFunction",
+  "reactUpdateFunction",
+  "dispatcherMethodCurrentInReactSource",
+  "publicRootExportCurrent",
+  "reactServerExportAbsentCurrent",
+  "compatibilityClaimed"
+];
+const expectedUseRefSourceReport = {
+  kind: "fast-react.private.use_ref_hook_source_report",
+  version: 1,
+  status: "source-current-for-react-19.2.6-useRef-private-dispatcher",
+  reactSourceTag: "v19.2.6",
+  reactSourceCommit: "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401",
+  reactHooksSource: "packages/react/src/ReactHooks.js",
+  reactClientSource: "packages/react/src/ReactClient.js",
+  reactServerSource: "packages/react/src/ReactServer.js",
+  reactReconcilerSource: "packages/react-reconciler/src/ReactFiberHooks.js",
+  fastReactSource: "packages/react/hook-dispatcher.js",
+  reactMountFunction: "mountRef",
+  reactUpdateFunction: "updateRef",
+  dispatcherMethodCurrentInReactSource: true,
+  publicRootExportCurrent: true,
+  reactServerExportAbsentCurrent: true,
+  compatibilityClaimed: false
+};
+const expectedUseRefBlockerCurrentnessFieldNames = [
+  "status",
+  "compatibilityTarget",
+  "sourceReportCurrent",
+  "publicRootlessInvalidHookBlocked",
+  "genericDispatcherForwardingBlocked",
+  "privateDispatcherMarkerRequired",
+  "cjsSurfaceCurrentnessBlocked",
+  "reactServerSurfaceCurrentnessBlocked",
+  "schedulerPrerequisitesBlocked",
+  "rootLanePrerequisitesBlocked",
+  "rootSchedulingBlocked",
+  "rendererCompatibilityBlocked",
+  "callbackInvocationBlocked",
+  "externalStoreInvocationBlocked",
+  "idGenerationBlocked",
+  "refIdentityCompatibilityClaimed",
+  "publicCompatibilityClaimed",
+  "compatibilityClaimed"
+];
+const expectedUseRefBlockerCurrentness = {
+  status:
+    "blocked-until-private-useRef-dispatcher-root-and-renderer-currentness-admitted",
+  compatibilityTarget: "react@19.2.6",
+  sourceReportCurrent: true,
+  publicRootlessInvalidHookBlocked: true,
+  genericDispatcherForwardingBlocked: true,
+  privateDispatcherMarkerRequired: true,
+  cjsSurfaceCurrentnessBlocked: true,
+  reactServerSurfaceCurrentnessBlocked: true,
+  schedulerPrerequisitesBlocked: true,
+  rootLanePrerequisitesBlocked: true,
+  rootSchedulingBlocked: true,
+  rendererCompatibilityBlocked: true,
+  callbackInvocationBlocked: true,
+  externalStoreInvocationBlocked: true,
+  idGenerationBlocked: true,
+  refIdentityCompatibilityClaimed: false,
+  publicCompatibilityClaimed: false,
+  compatibilityClaimed: false
+};
+const expectedUseRefSurfaceCurrentnessFieldNames = [
+  "surfaceId",
+  "source",
+  "entrypoint",
+  "moduleShape",
+  "sameAsRootExport",
+  "hookName",
+  "useRefExportPolicy",
+  "sourceFunctionCurrent",
+  "hasUseRefExport",
+  "currentName",
+  "currentLength",
+  "expectedName",
+  "expectedLength",
+  "useRefPolicyCurrent",
+  "rootlessInvalidHookBlocked",
+  "genericDispatcherForwardingBlocked",
+  "privateDispatcherRequired",
+  "publicCompatibilityClaimed",
+  "compatibilityClaimed"
+];
+const expectedUseRefSurfaceCurrentnessRows = [
+  {
+    surfaceId: "react-root",
+    source: "packages/react/index.js",
+    entrypoint: "react",
+    moduleShape: "default-root",
+    sameAsRootExport: true,
+    hookName: "useRef",
+    useRefExportPolicy: "available-root-hook",
+    sourceFunctionCurrent: true,
+    hasUseRefExport: true,
+    currentName: "",
+    currentLength: 1,
+    expectedName: "",
+    expectedLength: 1,
+    useRefPolicyCurrent: true,
+    rootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherRequired: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: "react-cjs-development",
+    source: "packages/react/cjs/react.development.js",
+    entrypoint: "react",
+    moduleShape: "cjs-root-alias",
+    sameAsRootExport: true,
+    hookName: "useRef",
+    useRefExportPolicy: "available-root-hook",
+    sourceFunctionCurrent: true,
+    hasUseRefExport: true,
+    currentName: "",
+    currentLength: 1,
+    expectedName: "",
+    expectedLength: 1,
+    useRefPolicyCurrent: true,
+    rootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherRequired: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: "react-cjs-production",
+    source: "packages/react/cjs/react.production.js",
+    entrypoint: "react",
+    moduleShape: "cjs-root-alias",
+    sameAsRootExport: true,
+    hookName: "useRef",
+    useRefExportPolicy: "available-root-hook",
+    sourceFunctionCurrent: true,
+    hasUseRefExport: true,
+    currentName: "",
+    currentLength: 1,
+    expectedName: "",
+    expectedLength: 1,
+    useRefPolicyCurrent: true,
+    rootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherRequired: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: "react-server",
+    source: "packages/react/react.react-server.js",
+    entrypoint: "react react-server",
+    moduleShape: "react-server-root",
+    sameAsRootExport: false,
+    hookName: "useRef",
+    useRefExportPolicy: "absent-react-server-hook",
+    sourceFunctionCurrent: true,
+    hasUseRefExport: false,
+    currentName: null,
+    currentLength: null,
+    expectedName: null,
+    expectedLength: null,
+    useRefPolicyCurrent: true,
+    rootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherRequired: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  }
+];
+const expectedUseRefCompatibilityFalseFlags = [
+  "compatibilityClaimed",
+  "publicCompatibilityClaimed",
+  "publicHookCompatibility",
+  "exposesPublicHookImplementation",
+  "hookExecutionCompatibility",
+  "refIdentityCompatibility",
+  "refObjectCompatibility",
+  "rendererIntegration",
+  "rendererCompatibility",
+  "publicActIntegration",
+  "schedulerIntegration",
+  "schedulerPrerequisitesReady",
+  "rootLaneIntegration",
+  "rootScheduling",
+  "rootExecution",
+  "callbackExecutionClaimed",
+  "externalStoreSubscriptionClaimed",
+  "externalStoreSnapshotReadClaimed",
+  "idGenerationClaimed",
+  "packageCompatibility"
+];
 const expectedUnsupportedPlaceholderHookNames = [
   "useActionState",
   "useOptimistic",
@@ -746,6 +976,326 @@ test("private transition-hook dispatcher blockers record public shape and lane p
     React.recordPrivateStartTransitionDispatcherRouting,
     undefined
   );
+});
+
+test("private useRef hook blockers record source and surface currentness", () => {
+  const metadata = hookDispatcher.privateRefHookDispatcherMetadata;
+
+  assert.equal(metadata.capability, "fast-react.private.ref_hook_dispatcher");
+  assert.equal(metadata.compatibilityTarget, "react@19.2.6");
+  assert.deepEqual(metadata.hookNames, expectedUseRefHookNames);
+  assert.deepEqual(
+    metadata.publicShapeBlockerFields,
+    expectedUseRefPublicShapeBlockerFields
+  );
+  assert.deepEqual(
+    metadata.publicShapeBlockers,
+    expectedUseRefPublicShapeBlockers
+  );
+  assert.deepEqual(
+    metadata.sourceReportFieldNames,
+    expectedUseRefSourceReportFieldNames
+  );
+  assert.deepEqual(metadata.sourceReport, expectedUseRefSourceReport);
+  assert.deepEqual(
+    metadata.blockerCurrentnessFieldNames,
+    expectedUseRefBlockerCurrentnessFieldNames
+  );
+  assert.deepEqual(
+    metadata.blockerCurrentness,
+    expectedUseRefBlockerCurrentness
+  );
+  assert.deepEqual(
+    metadata.surfaceCurrentnessFieldNames,
+    expectedUseRefSurfaceCurrentnessFieldNames
+  );
+  assert.deepEqual(
+    metadata.surfaceCurrentnessRows,
+    expectedUseRefSurfaceCurrentnessRows
+  );
+  assert.equal(metadata.cjsSurfaceCurrentnessBlocked, true);
+  assert.equal(metadata.reactServerSurfaceCurrentnessBlocked, true);
+  assert.deepEqual(
+    metadata.compatibilityFalseFlags,
+    expectedUseRefCompatibilityFalseFlags
+  );
+
+  for (const flagName of expectedUseRefCompatibilityFalseFlags) {
+    assert.equal(metadata[flagName], false, flagName);
+    assert.equal(
+      hookDispatcher.isPrivateRefHookDispatcherMetadata({
+        ...metadata,
+        [flagName]: true
+      }),
+      false,
+      flagName
+    );
+  }
+
+  assert.deepEqual(hookDispatcher.useRefHookNames, expectedUseRefHookNames);
+  assert.deepEqual(
+    hookDispatcher.useRefHookSurfaceCurrentnessFieldNames,
+    expectedUseRefSurfaceCurrentnessFieldNames
+  );
+  assert.deepEqual(
+    hookDispatcher.useRefHookSurfaceCurrentnessRows,
+    expectedUseRefSurfaceCurrentnessRows
+  );
+  assert.equal(
+    hookDispatcher.isPrivateRefHookDispatcherMetadata(metadata),
+    true
+  );
+  assert.equal(Object.isFrozen(metadata), true);
+  assert.equal(React.privateRefHookDispatcherMetadata, undefined);
+  assert.equal(ReactCjsDevelopment.privateRefHookDispatcherMetadata, undefined);
+  assert.equal(ReactCjsProduction.privateRefHookDispatcherMetadata, undefined);
+  assert.equal(ReactServer.privateRefHookDispatcherMetadata, undefined);
+  assert.equal(React.createUseRefHookCurrentnessReport, undefined);
+  assert.equal(ReactCjsDevelopment.createUseRefHookCurrentnessReport, undefined);
+  assert.equal(ReactCjsProduction.createUseRefHookCurrentnessReport, undefined);
+  assert.equal(ReactServer.createUseRefHookCurrentnessReport, undefined);
+});
+
+test("useRef hook currentness rejects stale source, surface drift, and forged claims", () => {
+  const report = hookDispatcher.createUseRefHookCurrentnessReport();
+
+  assert.equal(
+    report.kind,
+    "fast-react.private.use_ref_hook_currentness"
+  );
+  assert.equal(report.version, 1);
+  assert.equal(report.status, hookDispatcher.useRefHookCurrentnessStatus);
+  assert.deepEqual(report.hookNames, expectedUseRefHookNames);
+  assert.deepEqual(
+    report.publicShapeBlockers,
+    expectedUseRefPublicShapeBlockers
+  );
+  assert.deepEqual(report.sourceReport, expectedUseRefSourceReport);
+  assert.deepEqual(
+    report.blockerCurrentness,
+    expectedUseRefBlockerCurrentness
+  );
+  assert.deepEqual(
+    report.surfaceCurrentnessFieldNames,
+    expectedUseRefSurfaceCurrentnessFieldNames
+  );
+  assert.deepEqual(
+    report.surfaceCurrentnessRows,
+    expectedUseRefSurfaceCurrentnessRows
+  );
+  assert.equal(report.cjsSurfaceCurrentnessBlocked, true);
+  assert.equal(report.reactServerSurfaceCurrentnessBlocked, true);
+  assert.equal(report.publicRootlessInvalidHookBlocked, true);
+  assert.equal(report.genericDispatcherForwardingBlocked, true);
+  assert.equal(report.privateDispatcherRequired, true);
+  assert.equal(Object.isFrozen(report), true);
+  assert.equal(Object.isFrozen(report.hookNames), true);
+  assert.equal(Object.isFrozen(report.publicShapeBlockers), true);
+  assert.equal(Object.isFrozen(report.sourceReport), true);
+  assert.equal(Object.isFrozen(report.blockerCurrentness), true);
+  assert.equal(Object.isFrozen(report.surfaceCurrentnessFieldNames), true);
+  assert.equal(Object.isFrozen(report.surfaceCurrentnessRows), true);
+  for (const row of report.surfaceCurrentnessRows) {
+    assert.equal(Object.isFrozen(row), true, row.surfaceId);
+  }
+  assert.equal(
+    hookDispatcher.validateUseRefHookCurrentnessReport(report),
+    null
+  );
+  assert.equal(hookDispatcher.isUseRefHookCurrentnessReport(report), true);
+
+  const consumption = hookDispatcher.consumeUseRefHookCurrentnessReport(report);
+  assert.equal(
+    consumption.status,
+    hookDispatcher.useRefHookCurrentnessConsumptionStatus
+  );
+  assert.equal(consumption.accepted, true);
+  assert.deepEqual(
+    consumption.surfaceCurrentnessRows,
+    expectedUseRefSurfaceCurrentnessRows
+  );
+  assert.equal(consumption.cjsSurfaceCurrentnessBlocked, true);
+  assert.equal(consumption.reactServerSurfaceCurrentnessBlocked, true);
+  assert.equal(consumption.publicRootlessInvalidHookBlocked, true);
+  assert.equal(consumption.genericDispatcherForwardingBlocked, true);
+  assert.equal(consumption.privateDispatcherRequired, true);
+  assert.equal(consumption.dispatcherPrerequisitesReady, false);
+  assert.equal(consumption.schedulerPrerequisitesReady, false);
+  assert.equal(consumption.rootLaneIntegration, false);
+  assert.equal(consumption.rootScheduling, false);
+  assert.equal(consumption.rootExecution, false);
+  assert.equal(consumption.rendererCompatibility, false);
+  assert.equal(consumption.refIdentityCompatibilityClaimed, false);
+  assert.equal(consumption.callbackInvocationBlocked, true);
+  assert.equal(consumption.externalStoreInvocationBlocked, true);
+  assert.equal(consumption.idGenerationBlocked, true);
+  assert.equal(consumption.publicCompatibilityClaimed, false);
+  assert.equal(consumption.compatibilityClaimed, false);
+
+  assertUseRefCurrentnessRejected(
+    Object.freeze({ ...report }),
+    "useRef-hook-currentness-source-proof"
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport({
+      publicShapeBlockers: [
+        {
+          ...expectedUseRefPublicShapeBlockers[0],
+          currentLength: 2
+        }
+      ]
+    }),
+    "useRef-hook-currentness-public-shape"
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport({
+      sourceReport: {
+        reactSourceCommit: "forged"
+      }
+    }),
+    "useRef-hook-currentness-source-report"
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport({
+      blockerCurrentness: {
+        genericDispatcherForwardingBlocked: false
+      }
+    }),
+    "useRef-hook-currentness-blocker-currentness"
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport({
+      surfaceCurrentnessRowOverrides: {
+        "react-server": {
+          hasUseRefExport: true
+        }
+      }
+    }),
+    "useRef-hook-currentness-surface-currentness-source-proof"
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport({
+      surfaceCurrentnessRowOverrides: {
+        "react-cjs-development": {
+          sameAsRootExport: false
+        }
+      }
+    }),
+    "useRef-hook-currentness-surface-currentness-source-proof"
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport({
+      surfaceCurrentnessRows: report.surfaceCurrentnessRows
+    }),
+    "useRef-hook-currentness-surface-currentness-source-proof"
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport({
+      surfaceCurrentnessRows: expectedUseRefSurfaceCurrentnessRows.map(
+        (row) => ({ ...row })
+      )
+    }),
+    "useRef-hook-currentness-surface-currentness-source-proof"
+  );
+  let accessorRead = false;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, "surfaceCurrentnessRows", {
+    enumerable: true,
+    get() {
+      accessorRead = true;
+      return report.surfaceCurrentnessRows;
+    }
+  });
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport(accessorOptions),
+    "useRef-hook-currentness-source-proof"
+  );
+  assert.equal(accessorRead, false);
+  const ambiguousProxyOptions = new Proxy(
+    {},
+    {
+      ownKeys() {
+        throw new Error("ambiguous useRef options");
+      }
+    }
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport(ambiguousProxyOptions),
+    "useRef-hook-currentness-source-proof"
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport({
+      publicRootlessInvalidHookBlocked: false
+    }),
+    "useRef-hook-currentness-shape"
+  );
+
+  for (const flagName of expectedUseRefCompatibilityFalseFlags) {
+    assertUseRefCurrentnessRejected(
+      hookDispatcher.createUseRefHookCurrentnessReport({
+        [flagName]: true
+      }),
+      "useRef-hook-currentness-compatibility-or-prerequisite-claim"
+    );
+  }
+});
+
+test("useRef hook currentness rejects same-shaped fake root useRef", () => {
+  const originalUseRef = React.useRef;
+  const fakeUseRef = function (initialValue) {
+    return { current: initialValue };
+  };
+
+  Object.defineProperties(fakeUseRef, {
+    length: {
+      configurable: true,
+      value: 1
+    },
+    name: {
+      configurable: true,
+      value: ""
+    }
+  });
+
+  React.useRef = fakeUseRef;
+
+  try {
+    assert.equal(React.useRef.name, "");
+    assert.equal(React.useRef.length, 1);
+    assert.equal(ReactCjsDevelopment.useRef, fakeUseRef);
+    assert.equal(ReactCjsProduction.useRef, fakeUseRef);
+
+    const report = hookDispatcher.createUseRefHookCurrentnessReport();
+    const rootRow = report.surfaceCurrentnessRows.find(
+      (row) => row.surfaceId === "react-root"
+    );
+    assert.equal(rootRow.sourceFunctionCurrent, false);
+    assert.equal(rootRow.rootlessInvalidHookBlocked, false);
+    assert.equal(rootRow.genericDispatcherForwardingBlocked, false);
+    assert.equal(rootRow.privateDispatcherRequired, false);
+
+    assertUseRefCurrentnessRejected(
+      report,
+      "useRef-hook-currentness-surface-currentness"
+    );
+
+    const inheritedOverrideOptions = Object.create({
+      surfaceCurrentnessRowOverrides: Object.fromEntries(
+        expectedUseRefSurfaceCurrentnessRows.map((row) => [
+          row.surfaceId,
+          { ...row }
+        ])
+      )
+    });
+    assertUseRefCurrentnessRejected(
+      hookDispatcher.createUseRefHookCurrentnessReport(
+        inheritedOverrideOptions
+      ),
+      "useRef-hook-currentness-source-proof"
+    );
+  } finally {
+    React.useRef = originalUseRef;
+  }
 });
 
 test("private unsupported placeholder hook blockers record source and currentness reports", () => {
@@ -1656,6 +2206,42 @@ test("private startTransition routing records action identity and blocked lane e
   assert.equal(record.compatibilityClaimed, false);
   assert.deepEqual(calls, []);
 });
+
+function assertUseRefCurrentnessRejected(report, reason) {
+  assert.equal(
+    hookDispatcher.validateUseRefHookCurrentnessReport(report),
+    reason
+  );
+  assert.equal(hookDispatcher.isUseRefHookCurrentnessReport(report), false);
+  assert.throws(
+    () => hookDispatcher.consumeUseRefHookCurrentnessReport(report),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", reason);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", reason);
+      assert.equal(error.entrypoint, "react", reason);
+      assert.equal(error.exportName, "useRefHookCurrentness", reason);
+      assert.equal(error.compatibilityTarget, "react@19.2.6", reason);
+      assert.equal(error.reason, reason);
+      assert.equal(error.publicCompatibilityClaimed, false, reason);
+      assert.equal(error.publicHookCompatibility, false, reason);
+      assert.equal(error.exposesPublicHookImplementation, false, reason);
+      assert.equal(error.hookExecutionCompatibility, false, reason);
+      assert.equal(error.refIdentityCompatibility, false, reason);
+      assert.equal(error.rendererCompatibility, false, reason);
+      assert.equal(error.schedulerIntegration, false, reason);
+      assert.equal(error.rootLaneIntegration, false, reason);
+      assert.equal(error.rootScheduling, false, reason);
+      assert.equal(error.callbackExecutionClaimed, false, reason);
+      assert.equal(error.externalStoreSubscriptionClaimed, false, reason);
+      assert.equal(error.externalStoreSnapshotReadClaimed, false, reason);
+      assert.equal(error.idGenerationClaimed, false, reason);
+      assert.equal(error.packageCompatibility, false, reason);
+      assert.equal(error.compatibilityClaimed, false, reason);
+      return true;
+    },
+    reason
+  );
+}
 
 function assertUnsupportedCurrentnessRejected(report, reason) {
   assert.equal(

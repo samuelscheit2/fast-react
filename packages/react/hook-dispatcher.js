@@ -24,10 +24,14 @@ const privateCallbackHookDispatchers = new WeakSet();
 const privateCallbackHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateMemoHookDispatchers = new WeakSet();
 const privateMemoHookDispatcherMetadataByDispatcher = new WeakMap();
+const privateRefHookDispatchers = new WeakSet();
+const privateRefHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateContextHookDispatchers = new WeakSet();
 const privateContextHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateTransitionHookDispatchers = new WeakSet();
 const privateTransitionHookDispatcherMetadataByDispatcher = new WeakMap();
+const useRefHookCurrentnessReports = new WeakSet();
+const useRefHookSurfaceCurrentnessRowsByReport = new WeakMap();
 const unsupportedPlaceholderHookCurrentnessReports = new WeakSet();
 const unsupportedPlaceholderHookSurfaceCurrentnessRowsByReport = new WeakMap();
 
@@ -1020,6 +1024,348 @@ const privateTransitionHookDispatcherMetadataArrayKeys = freezeArray([
   'acceptedReconcilerRecords'
 ]);
 
+const useRefHookNames = freezeArray(['useRef']);
+const useRefHookPublicShapeBlockerFields = freezeArray([
+  'hookName',
+  'reactSourceFunction',
+  'reactDispatcherMethod',
+  'reactSourceLength',
+  'currentPublicExport',
+  'currentName',
+  'currentLength',
+  'blocker'
+]);
+const useRefHookPublicShapeBlockers = freezeRecordArray([
+  {
+    hookName: 'useRef',
+    reactSourceFunction: 'ReactHooks.useRef',
+    reactDispatcherMethod: 'dispatcher.useRef',
+    reactSourceLength: 1,
+    currentPublicExport: 'react.useRef private-dispatcher guarded facade',
+    currentName: '',
+    currentLength: 1,
+    blocker:
+      'public export rejects generic dispatcher forwarding until a source-owned private useRef hook dispatcher is admitted'
+  }
+]);
+const useRefHookSourceReportFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'reactSourceTag',
+  'reactSourceCommit',
+  'reactHooksSource',
+  'reactClientSource',
+  'reactServerSource',
+  'reactReconcilerSource',
+  'fastReactSource',
+  'reactMountFunction',
+  'reactUpdateFunction',
+  'dispatcherMethodCurrentInReactSource',
+  'publicRootExportCurrent',
+  'reactServerExportAbsentCurrent',
+  'compatibilityClaimed'
+]);
+const useRefHookSourceReport = freezeRecord({
+  kind: 'fast-react.private.use_ref_hook_source_report',
+  version: 1,
+  status: 'source-current-for-react-19.2.6-useRef-private-dispatcher',
+  reactSourceTag: 'v19.2.6',
+  reactSourceCommit: 'eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401',
+  reactHooksSource: 'packages/react/src/ReactHooks.js',
+  reactClientSource: 'packages/react/src/ReactClient.js',
+  reactServerSource: 'packages/react/src/ReactServer.js',
+  reactReconcilerSource: 'packages/react-reconciler/src/ReactFiberHooks.js',
+  fastReactSource: 'packages/react/hook-dispatcher.js',
+  reactMountFunction: 'mountRef',
+  reactUpdateFunction: 'updateRef',
+  dispatcherMethodCurrentInReactSource: true,
+  publicRootExportCurrent: true,
+  reactServerExportAbsentCurrent: true,
+  compatibilityClaimed: false
+});
+const useRefHookBlockerCurrentnessFieldNames = freezeArray([
+  'status',
+  'compatibilityTarget',
+  'sourceReportCurrent',
+  'publicRootlessInvalidHookBlocked',
+  'genericDispatcherForwardingBlocked',
+  'privateDispatcherMarkerRequired',
+  'cjsSurfaceCurrentnessBlocked',
+  'reactServerSurfaceCurrentnessBlocked',
+  'schedulerPrerequisitesBlocked',
+  'rootLanePrerequisitesBlocked',
+  'rootSchedulingBlocked',
+  'rendererCompatibilityBlocked',
+  'callbackInvocationBlocked',
+  'externalStoreInvocationBlocked',
+  'idGenerationBlocked',
+  'refIdentityCompatibilityClaimed',
+  'publicCompatibilityClaimed',
+  'compatibilityClaimed'
+]);
+const useRefHookBlockerCurrentness = freezeRecord({
+  status:
+    'blocked-until-private-useRef-dispatcher-root-and-renderer-currentness-admitted',
+  compatibilityTarget: 'react@19.2.6',
+  sourceReportCurrent: true,
+  publicRootlessInvalidHookBlocked: true,
+  genericDispatcherForwardingBlocked: true,
+  privateDispatcherMarkerRequired: true,
+  cjsSurfaceCurrentnessBlocked: true,
+  reactServerSurfaceCurrentnessBlocked: true,
+  schedulerPrerequisitesBlocked: true,
+  rootLanePrerequisitesBlocked: true,
+  rootSchedulingBlocked: true,
+  rendererCompatibilityBlocked: true,
+  callbackInvocationBlocked: true,
+  externalStoreInvocationBlocked: true,
+  idGenerationBlocked: true,
+  refIdentityCompatibilityClaimed: false,
+  publicCompatibilityClaimed: false,
+  compatibilityClaimed: false
+});
+const useRefHookSurfaceCurrentnessFieldNames = freezeArray([
+  'surfaceId',
+  'source',
+  'entrypoint',
+  'moduleShape',
+  'sameAsRootExport',
+  'hookName',
+  'useRefExportPolicy',
+  'sourceFunctionCurrent',
+  'hasUseRefExport',
+  'currentName',
+  'currentLength',
+  'expectedName',
+  'expectedLength',
+  'useRefPolicyCurrent',
+  'rootlessInvalidHookBlocked',
+  'genericDispatcherForwardingBlocked',
+  'privateDispatcherRequired',
+  'publicCompatibilityClaimed',
+  'compatibilityClaimed'
+]);
+const useRefHookSurfaceCurrentnessRows = freezeUseRefSurfaceCurrentnessRows([
+  {
+    surfaceId: 'react-root',
+    source: 'packages/react/index.js',
+    entrypoint: 'react',
+    moduleShape: 'default-root',
+    sameAsRootExport: true,
+    hookName: 'useRef',
+    useRefExportPolicy: 'available-root-hook',
+    sourceFunctionCurrent: true,
+    hasUseRefExport: true,
+    currentName: '',
+    currentLength: 1,
+    expectedName: '',
+    expectedLength: 1,
+    useRefPolicyCurrent: true,
+    rootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherRequired: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: 'react-cjs-development',
+    source: 'packages/react/cjs/react.development.js',
+    entrypoint: 'react',
+    moduleShape: 'cjs-root-alias',
+    sameAsRootExport: true,
+    hookName: 'useRef',
+    useRefExportPolicy: 'available-root-hook',
+    sourceFunctionCurrent: true,
+    hasUseRefExport: true,
+    currentName: '',
+    currentLength: 1,
+    expectedName: '',
+    expectedLength: 1,
+    useRefPolicyCurrent: true,
+    rootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherRequired: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: 'react-cjs-production',
+    source: 'packages/react/cjs/react.production.js',
+    entrypoint: 'react',
+    moduleShape: 'cjs-root-alias',
+    sameAsRootExport: true,
+    hookName: 'useRef',
+    useRefExportPolicy: 'available-root-hook',
+    sourceFunctionCurrent: true,
+    hasUseRefExport: true,
+    currentName: '',
+    currentLength: 1,
+    expectedName: '',
+    expectedLength: 1,
+    useRefPolicyCurrent: true,
+    rootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherRequired: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: 'react-server',
+    source: 'packages/react/react.react-server.js',
+    entrypoint: 'react react-server',
+    moduleShape: 'react-server-root',
+    sameAsRootExport: false,
+    hookName: 'useRef',
+    useRefExportPolicy: 'absent-react-server-hook',
+    sourceFunctionCurrent: true,
+    hasUseRefExport: false,
+    currentName: null,
+    currentLength: null,
+    expectedName: null,
+    expectedLength: null,
+    useRefPolicyCurrent: true,
+    rootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherRequired: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  }
+]);
+const useRefHookMissingDispatcherPrerequisites = freezeArray([
+  'dispatcher.useRef',
+  'private useRef hook dispatcher admission marker',
+  'FunctionComponentUseRefHookRenderRecord currentness handoff'
+]);
+const useRefHookMissingSchedulerPrerequisites = freezeArray([
+  'root scheduler render entry currentness',
+  'act/Scheduler timing integration remains blocked'
+]);
+const useRefHookMissingRootLanePrerequisites = freezeArray([
+  'public root renderWithHooks dispatcher installation',
+  'FunctionComponent current hook-list rebinding through commit',
+  'HostRoot render/update execution admission',
+  'renderer-owned hook dispatcher lifecycle'
+]);
+const useRefHookCompatibilityFalseFlags = freezeArray([
+  'compatibilityClaimed',
+  'publicCompatibilityClaimed',
+  'publicHookCompatibility',
+  'exposesPublicHookImplementation',
+  'hookExecutionCompatibility',
+  'refIdentityCompatibility',
+  'refObjectCompatibility',
+  'rendererIntegration',
+  'rendererCompatibility',
+  'publicActIntegration',
+  'schedulerIntegration',
+  'schedulerPrerequisitesReady',
+  'rootLaneIntegration',
+  'rootScheduling',
+  'rootExecution',
+  'callbackExecutionClaimed',
+  'externalStoreSubscriptionClaimed',
+  'externalStoreSnapshotReadClaimed',
+  'idGenerationClaimed',
+  'packageCompatibility'
+]);
+const useRefHookCurrentnessReportOptionNames = freezeArray([
+  'hookNames',
+  'publicShapeBlockers',
+  'sourceReport',
+  'blockerCurrentness',
+  'surfaceCurrentnessFieldNames',
+  'surfaceCurrentnessRows',
+  'surfaceCurrentnessRowOverrides',
+  'cjsSurfaceCurrentnessBlocked',
+  'reactServerSurfaceCurrentnessBlocked',
+  'publicRootlessInvalidHookBlocked',
+  'genericDispatcherForwardingBlocked',
+  'privateDispatcherRequired',
+  ...useRefHookCompatibilityFalseFlags
+]);
+const useRefHookCurrentnessReportKind =
+  'fast-react.private.use_ref_hook_currentness';
+const useRefHookCurrentnessReportVersion = 1;
+const useRefHookCurrentnessStatus =
+  'blocked-private-useRef-hook-currentness';
+const useRefHookCurrentnessConsumptionStatus =
+  'accepted-blocked-private-useRef-hook-currentness';
+const privateRefHookDispatcherMetadata = freezeRecord({
+  capability: 'fast-react.private.ref_hook_dispatcher',
+  compatibilityTarget: 'react@19.2.6',
+  compatibilityClaimed: false,
+  publicCompatibilityClaimed: false,
+  publicHookCompatibility: false,
+  exposesPublicHookImplementation: false,
+  hookExecutionCompatibility: false,
+  refIdentityCompatibility: false,
+  refObjectCompatibility: false,
+  rendererIntegration: false,
+  rendererCompatibility: false,
+  publicActIntegration: false,
+  schedulerIntegration: false,
+  schedulerPrerequisitesReady: false,
+  rootLaneIntegration: false,
+  rootScheduling: false,
+  rootExecution: false,
+  callbackExecutionClaimed: false,
+  externalStoreSubscriptionClaimed: false,
+  externalStoreSnapshotReadClaimed: false,
+  idGenerationClaimed: false,
+  packageCompatibility: false,
+  hookNames: useRefHookNames,
+  publicShapeBlockerFields: useRefHookPublicShapeBlockerFields,
+  publicShapeBlockers: useRefHookPublicShapeBlockers,
+  sourceReportFieldNames: useRefHookSourceReportFieldNames,
+  sourceReport: useRefHookSourceReport,
+  blockerCurrentnessFieldNames: useRefHookBlockerCurrentnessFieldNames,
+  blockerCurrentness: useRefHookBlockerCurrentness,
+  surfaceCurrentnessFieldNames: useRefHookSurfaceCurrentnessFieldNames,
+  surfaceCurrentnessRows: useRefHookSurfaceCurrentnessRows,
+  cjsSurfaceCurrentnessBlocked: true,
+  reactServerSurfaceCurrentnessBlocked: true,
+  hookCallFields: freezeArray(['initialValue']),
+  renderRequestFields: freezeArray(['initialValue']),
+  hookRecordFields: freezeArray(['hook', 'refObject', 'initialValue']),
+  updateRecordFields: freezeArray([
+    'hook',
+    'refObject',
+    'initialValue',
+    'ignoredInitialValue'
+  ]),
+  hookRenderRecordFields: freezeArray(['phase', 'hook', 'refObject', 'initialValue']),
+  missingDispatcherPrerequisites: useRefHookMissingDispatcherPrerequisites,
+  missingSchedulerPrerequisites: useRefHookMissingSchedulerPrerequisites,
+  missingRootLanePrerequisites: useRefHookMissingRootLanePrerequisites,
+  compatibilityFalseFlags: useRefHookCompatibilityFalseFlags,
+  acceptedReconcilerRecords: freezeArray([
+    'FunctionComponentRefObjectHandle',
+    'FunctionComponentRefHookRecord',
+    'FunctionComponentRefUpdateRecord',
+    'FunctionComponentUseRefHookRenderRecord',
+    'FunctionComponentUseMemoUseRefRenderRecord'
+  ])
+});
+
+const privateRefHookDispatcherMetadataArrayKeys = freezeArray([
+  'hookNames',
+  'publicShapeBlockerFields',
+  'sourceReportFieldNames',
+  'blockerCurrentnessFieldNames',
+  'surfaceCurrentnessFieldNames',
+  'hookCallFields',
+  'renderRequestFields',
+  'hookRecordFields',
+  'updateRecordFields',
+  'hookRenderRecordFields',
+  'missingDispatcherPrerequisites',
+  'missingSchedulerPrerequisites',
+  'missingRootLanePrerequisites',
+  'compatibilityFalseFlags',
+  'acceptedReconcilerRecords'
+]);
+
 const privateStateHookDispatcherMetadata = freezeRecord({
   capability: 'fast-react.private.state_hook_dispatcher',
   compatibilityTarget: 'react@19.2.6',
@@ -1342,6 +1688,32 @@ function createUnsupportedPrivateTransitionCallbackError() {
   return error;
 }
 
+function createUseRefHookCurrentnessGateError(reason) {
+  const error = createUnimplementedError(
+    'react',
+    'useRefHookCurrentness',
+    'rejected source/currentness report',
+    'Only current source-owned useRef hook blocker reports can pass this package-private gate.'
+  );
+  error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.publicHookCompatibility = false;
+  error.exposesPublicHookImplementation = false;
+  error.hookExecutionCompatibility = false;
+  error.refIdentityCompatibility = false;
+  error.rendererCompatibility = false;
+  error.schedulerIntegration = false;
+  error.rootLaneIntegration = false;
+  error.rootScheduling = false;
+  error.callbackExecutionClaimed = false;
+  error.externalStoreSubscriptionClaimed = false;
+  error.externalStoreSnapshotReadClaimed = false;
+  error.idGenerationClaimed = false;
+  error.packageCompatibility = false;
+  error.compatibilityClaimed = false;
+  return error;
+}
+
 function createUnsupportedPlaceholderHookCurrentnessGateError(reason) {
   const error = createUnimplementedError(
     'react',
@@ -1457,6 +1829,14 @@ function isPrivateMemoHookDispatcher(dispatcher) {
   );
 }
 
+function isPrivateRefHookDispatcher(dispatcher) {
+  return (
+    isObjectLike(dispatcher) &&
+    privateRefHookDispatchers.has(dispatcher) &&
+    privateRefHookDispatcherMetadataByDispatcher.has(dispatcher)
+  );
+}
+
 function isPrivateContextHookDispatcher(dispatcher) {
   return (
     isObjectLike(dispatcher) &&
@@ -1509,6 +1889,14 @@ function validatePrivateMemoHookDispatcher(dispatcher, metadata) {
   }
 
   validatePrivateMemoHookDispatcherMetadata(metadata);
+}
+
+function validatePrivateRefHookDispatcher(dispatcher, metadata) {
+  if (!isObjectLike(dispatcher) || typeof dispatcher.useRef !== 'function') {
+    throw createInvalidHookCallError('useRef');
+  }
+
+  validatePrivateRefHookDispatcherMetadata(metadata);
 }
 
 function validatePrivateContextHookDispatcher(dispatcher, metadata) {
@@ -1573,6 +1961,16 @@ function markPrivateMemoHookDispatcher(dispatcher, metadata) {
   privateMemoHookDispatcherMetadataByDispatcher.set(
     dispatcher,
     privateMemoHookDispatcherMetadata
+  );
+  return dispatcher;
+}
+
+function markPrivateRefHookDispatcher(dispatcher, metadata) {
+  validatePrivateRefHookDispatcher(dispatcher, metadata);
+  privateRefHookDispatchers.add(dispatcher);
+  privateRefHookDispatcherMetadataByDispatcher.set(
+    dispatcher,
+    privateRefHookDispatcherMetadata
   );
   return dispatcher;
 }
@@ -1686,6 +2084,20 @@ function getPrivateMemoDispatcherHook(dispatcher, hookName) {
   return hook;
 }
 
+function getPrivateRefDispatcherHook(dispatcher, hookName) {
+  if (hookName !== 'useRef' || !isPrivateRefHookDispatcher(dispatcher)) {
+    throw createInvalidHookCallError(hookName);
+  }
+
+  const hook = dispatcher[hookName];
+
+  if (typeof hook !== 'function') {
+    throw createInvalidHookCallError(hookName);
+  }
+
+  return hook;
+}
+
 function getPrivateContextDispatcherHook(dispatcher, hookName) {
   if (!isPrivateContextHookDispatcher(dispatcher)) {
     throw createInvalidHookCallError(hookName);
@@ -1707,6 +2119,10 @@ function callDispatcherHook(hookName, args) {
 
   if (hookName === 'useMemo') {
     return callPrivateMemoDispatcherHook(hookName, args);
+  }
+
+  if (hookName === 'useRef') {
+    return callPrivateRefDispatcherHook(hookName, args);
   }
 
   if (hookName === 'useReducer' || hookName === 'useState') {
@@ -1750,6 +2166,15 @@ function callPrivateMemoDispatcherHook(hookName, args) {
   );
 }
 
+function callPrivateRefDispatcherHook(hookName, args) {
+  const dispatcher = resolveDispatcher(hookName);
+  const hook = getPrivateRefDispatcherHook(dispatcher, hookName);
+  return hook.apply(
+    dispatcher,
+    createPrivateRefHookArgs(args, privateRefHookDispatcherMetadata)
+  );
+}
+
 function callPrivateEffectDispatcherHook(hookName, args) {
   const dispatcher = resolveDispatcher(hookName);
   const hook = getPrivateEffectDispatcherHook(dispatcher, hookName);
@@ -1790,6 +2215,405 @@ function recordPrivateStartTransitionDispatcherRouting(callback, metadata) {
     rootExecutionBlocked: true,
     callbackExecutionBlocked: true,
     publicStartTransitionDispatcherRouting: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createUseRefHookSurfaceCurrentnessRows(rowOverridesBySurfaceId) {
+  const rootReact = require('./index.js');
+  const cjsDevelopmentReact = require('./cjs/react.development.js');
+  const cjsProductionReact = require('./cjs/react.production.js');
+  const reactServer = require('./react.react-server.js');
+  const rowOverrides = rowOverridesBySurfaceId ?? {};
+  const previousDispatcher = ReactSharedInternals.H;
+
+  ReactSharedInternals.H = null;
+
+  try {
+    return freezeUseRefSurfaceCurrentnessRows(
+      [
+        describeUseRefHookSurfaceCurrentness({
+          surfaceId: 'react-root',
+          source: 'packages/react/index.js',
+          entrypoint: 'react',
+          moduleShape: 'default-root',
+          moduleExports: rootReact,
+          rootExports: rootReact,
+          expectsUseRefExport: true
+        }),
+        describeUseRefHookSurfaceCurrentness({
+          surfaceId: 'react-cjs-development',
+          source: 'packages/react/cjs/react.development.js',
+          entrypoint: 'react',
+          moduleShape: 'cjs-root-alias',
+          moduleExports: cjsDevelopmentReact,
+          rootExports: rootReact,
+          expectsUseRefExport: true
+        }),
+        describeUseRefHookSurfaceCurrentness({
+          surfaceId: 'react-cjs-production',
+          source: 'packages/react/cjs/react.production.js',
+          entrypoint: 'react',
+          moduleShape: 'cjs-root-alias',
+          moduleExports: cjsProductionReact,
+          rootExports: rootReact,
+          expectsUseRefExport: true
+        }),
+        describeUseRefHookSurfaceCurrentness({
+          surfaceId: 'react-server',
+          source: 'packages/react/react.react-server.js',
+          entrypoint: 'react react-server',
+          moduleShape: 'react-server-root',
+          moduleExports: reactServer,
+          rootExports: rootReact,
+          expectsUseRefExport: false
+        })
+      ].map((row) =>
+        Object.prototype.hasOwnProperty.call(rowOverrides, row.surfaceId)
+          ? { ...row, ...rowOverrides[row.surfaceId] }
+          : row
+      )
+    );
+  } finally {
+    ReactSharedInternals.H = previousDispatcher;
+  }
+}
+
+function describeUseRefHookSurfaceCurrentness({
+  surfaceId,
+  source,
+  entrypoint,
+  moduleShape,
+  moduleExports,
+  rootExports,
+  expectsUseRefExport
+}) {
+  const hasUseRefExport = Object.prototype.hasOwnProperty.call(
+    moduleExports,
+    'useRef'
+  );
+  const currentUseRef = hasUseRefExport ? moduleExports.useRef : null;
+  const expectedName = expectsUseRefExport ? '' : null;
+  const expectedLength = expectsUseRefExport ? 1 : null;
+  const currentName =
+    typeof currentUseRef === 'function' ? currentUseRef.name : null;
+  const currentLength =
+    typeof currentUseRef === 'function' ? currentUseRef.length : null;
+  const sourceFunctionCurrent = expectsUseRefExport
+    ? currentUseRef === useRef
+    : !hasUseRefExport;
+  const rootlessInvalidHookBlocked = expectsUseRefExport
+    ? probeUseRefRootlessInvalidHookBlocked(currentUseRef)
+    : true;
+  const genericDispatcherForwardingBlocked = expectsUseRefExport
+    ? probeUseRefGenericDispatcherForwardingBlocked(currentUseRef)
+    : true;
+  const privateDispatcherRequired =
+    sourceFunctionCurrent &&
+    rootlessInvalidHookBlocked &&
+    genericDispatcherForwardingBlocked;
+  const useRefPolicyCurrent = expectsUseRefExport
+    ? typeof currentUseRef === 'function' &&
+      currentName === expectedName &&
+      currentLength === expectedLength &&
+      sourceFunctionCurrent &&
+      privateDispatcherRequired
+    : !hasUseRefExport;
+
+  return {
+    surfaceId,
+    source,
+    entrypoint: moduleExports.__FAST_REACT_ENTRYPOINT__ ?? entrypoint,
+    moduleShape,
+    sameAsRootExport: moduleExports === rootExports,
+    hookName: 'useRef',
+    useRefExportPolicy: expectsUseRefExport
+      ? 'available-root-hook'
+      : 'absent-react-server-hook',
+    sourceFunctionCurrent,
+    hasUseRefExport,
+    currentName,
+    currentLength,
+    expectedName,
+    expectedLength,
+    useRefPolicyCurrent,
+    rootlessInvalidHookBlocked,
+    genericDispatcherForwardingBlocked,
+    privateDispatcherRequired,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function probeUseRefRootlessInvalidHookBlocked(currentUseRef) {
+  if (typeof currentUseRef !== 'function') {
+    return false;
+  }
+
+  const previousDispatcher = ReactSharedInternals.H;
+  ReactSharedInternals.H = null;
+
+  try {
+    currentUseRef('rootless-useRef-probe');
+    return false;
+  } catch (error) {
+    return isUseRefInvalidHookCallError(error);
+  } finally {
+    ReactSharedInternals.H = previousDispatcher;
+  }
+}
+
+function probeUseRefGenericDispatcherForwardingBlocked(currentUseRef) {
+  if (typeof currentUseRef !== 'function') {
+    return false;
+  }
+
+  const calls = [];
+  const previousDispatcher = ReactSharedInternals.H;
+  ReactSharedInternals.H = {
+    useRef(initialValue) {
+      calls.push(initialValue);
+      return { current: initialValue };
+    }
+  };
+
+  try {
+    currentUseRef('generic-dispatcher-useRef-probe');
+    return false;
+  } catch (error) {
+    return isUseRefInvalidHookCallError(error) && calls.length === 0;
+  } finally {
+    ReactSharedInternals.H = previousDispatcher;
+  }
+}
+
+function isUseRefInvalidHookCallError(error) {
+  return (
+    isObjectLike(error) &&
+    error.code === invalidHookCallErrorCode &&
+    error.hookName === 'useRef'
+  );
+}
+
+function sanitizeUseRefHookCurrentnessReportOptions(overrides) {
+  if (overrides == null) {
+    return {
+      options: {},
+      sourceOwnedOptions: true
+    };
+  }
+
+  if (!isObjectLike(overrides) || typeof overrides === 'function') {
+    return {
+      options: {},
+      sourceOwnedOptions: false
+    };
+  }
+
+  let prototype;
+  let ownKeys;
+
+  try {
+    prototype = Object.getPrototypeOf(overrides);
+    ownKeys = Reflect.ownKeys(overrides);
+  } catch {
+    return {
+      options: {},
+      sourceOwnedOptions: false
+    };
+  }
+
+  if (prototype !== Object.prototype && prototype !== null) {
+    return {
+      options: {},
+      sourceOwnedOptions: false
+    };
+  }
+
+  const ownStringKeys = new Set();
+  const options = {};
+
+  for (const key of ownKeys) {
+    if (
+      typeof key !== 'string' ||
+      !useRefHookCurrentnessReportOptionNames.includes(key)
+    ) {
+      return {
+        options: {},
+        sourceOwnedOptions: false
+      };
+    }
+
+    let descriptor;
+
+    try {
+      descriptor = Object.getOwnPropertyDescriptor(overrides, key);
+    } catch {
+      return {
+        options: {},
+        sourceOwnedOptions: false
+      };
+    }
+
+    if (
+      descriptor == null ||
+      !Object.prototype.hasOwnProperty.call(descriptor, 'value')
+    ) {
+      return {
+        options: {},
+        sourceOwnedOptions: false
+      };
+    }
+
+    ownStringKeys.add(key);
+    options[key] = descriptor.value;
+  }
+
+  try {
+    for (const key in overrides) {
+      if (!ownStringKeys.has(key)) {
+        return {
+          options: {},
+          sourceOwnedOptions: false
+        };
+      }
+    }
+  } catch {
+    return {
+      options: {},
+      sourceOwnedOptions: false
+    };
+  }
+
+  return {
+    options,
+    sourceOwnedOptions: true
+  };
+}
+
+function createUseRefHookCurrentnessReport(overrides = {}) {
+  const { options: normalized, sourceOwnedOptions } =
+    sanitizeUseRefHookCurrentnessReportOptions(overrides);
+  const hasSurfaceCurrentnessRowsOverride =
+    Object.prototype.hasOwnProperty.call(normalized, 'surfaceCurrentnessRows');
+  const hasSurfaceCurrentnessRowOverrides =
+    Object.prototype.hasOwnProperty.call(
+      normalized,
+      'surfaceCurrentnessRowOverrides'
+    );
+  const surfaceCurrentnessRows = hasSurfaceCurrentnessRowsOverride
+    ? freezeUseRefSurfaceCurrentnessRows(normalized.surfaceCurrentnessRows)
+    : createUseRefHookSurfaceCurrentnessRows(
+        normalized.surfaceCurrentnessRowOverrides
+      );
+  const report = freezeRecord({
+    kind: useRefHookCurrentnessReportKind,
+    version: useRefHookCurrentnessReportVersion,
+    status: useRefHookCurrentnessStatus,
+    compatibilityTarget: 'react@19.2.6',
+    hookNames: freezeArray(normalized.hookNames ?? useRefHookNames),
+    publicShapeBlockers: freezeRecordArray(
+      normalized.publicShapeBlockers ?? useRefHookPublicShapeBlockers
+    ),
+    sourceReport: freezeRecord({
+      ...useRefHookSourceReport,
+      ...(normalized.sourceReport ?? {})
+    }),
+    blockerCurrentness: freezeRecord({
+      ...useRefHookBlockerCurrentness,
+      ...(normalized.blockerCurrentness ?? {})
+    }),
+    surfaceCurrentnessFieldNames: freezeArray(
+      normalized.surfaceCurrentnessFieldNames ??
+        useRefHookSurfaceCurrentnessFieldNames
+    ),
+    surfaceCurrentnessRows,
+    cjsSurfaceCurrentnessBlocked:
+      normalized.cjsSurfaceCurrentnessBlocked ?? true,
+    reactServerSurfaceCurrentnessBlocked:
+      normalized.reactServerSurfaceCurrentnessBlocked ?? true,
+    publicRootlessInvalidHookBlocked:
+      normalized.publicRootlessInvalidHookBlocked ?? true,
+    genericDispatcherForwardingBlocked:
+      normalized.genericDispatcherForwardingBlocked ?? true,
+    privateDispatcherRequired: normalized.privateDispatcherRequired ?? true,
+    compatibilityClaimed: normalized.compatibilityClaimed ?? false,
+    publicCompatibilityClaimed:
+      normalized.publicCompatibilityClaimed ?? false,
+    publicHookCompatibility: normalized.publicHookCompatibility ?? false,
+    exposesPublicHookImplementation:
+      normalized.exposesPublicHookImplementation ?? false,
+    hookExecutionCompatibility:
+      normalized.hookExecutionCompatibility ?? false,
+    refIdentityCompatibility:
+      normalized.refIdentityCompatibility ?? false,
+    refObjectCompatibility: normalized.refObjectCompatibility ?? false,
+    rendererIntegration: normalized.rendererIntegration ?? false,
+    rendererCompatibility: normalized.rendererCompatibility ?? false,
+    publicActIntegration: normalized.publicActIntegration ?? false,
+    schedulerIntegration: normalized.schedulerIntegration ?? false,
+    schedulerPrerequisitesReady:
+      normalized.schedulerPrerequisitesReady ?? false,
+    rootLaneIntegration: normalized.rootLaneIntegration ?? false,
+    rootScheduling: normalized.rootScheduling ?? false,
+    rootExecution: normalized.rootExecution ?? false,
+    callbackExecutionClaimed:
+      normalized.callbackExecutionClaimed ?? false,
+    externalStoreSubscriptionClaimed:
+      normalized.externalStoreSubscriptionClaimed ?? false,
+    externalStoreSnapshotReadClaimed:
+      normalized.externalStoreSnapshotReadClaimed ?? false,
+    idGenerationClaimed: normalized.idGenerationClaimed ?? false,
+    packageCompatibility: normalized.packageCompatibility ?? false
+  });
+
+  if (
+    sourceOwnedOptions &&
+    !hasSurfaceCurrentnessRowsOverride &&
+    !hasSurfaceCurrentnessRowOverrides
+  ) {
+    useRefHookSurfaceCurrentnessRowsByReport.set(
+      report,
+      surfaceCurrentnessRows
+    );
+  }
+
+  if (sourceOwnedOptions) {
+    useRefHookCurrentnessReports.add(report);
+  }
+  return report;
+}
+
+function consumeUseRefHookCurrentnessReport(report) {
+  const rejectionReason = validateUseRefHookCurrentnessReport(report);
+
+  if (rejectionReason !== null) {
+    throw createUseRefHookCurrentnessGateError(rejectionReason);
+  }
+
+  return freezeRecord({
+    status: useRefHookCurrentnessConsumptionStatus,
+    accepted: true,
+    currentnessStatus: report.status,
+    compatibilityTarget: 'react@19.2.6',
+    hookNames: report.hookNames,
+    surfaceCurrentnessRows: report.surfaceCurrentnessRows,
+    cjsSurfaceCurrentnessBlocked: true,
+    reactServerSurfaceCurrentnessBlocked: true,
+    publicRootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherRequired: true,
+    dispatcherPrerequisitesReady: false,
+    schedulerPrerequisitesReady: false,
+    rootLaneIntegration: false,
+    rootScheduling: false,
+    rootExecution: false,
+    rendererCompatibility: false,
+    refIdentityCompatibilityClaimed: false,
+    callbackInvocationBlocked: true,
+    externalStoreInvocationBlocked: true,
+    idGenerationBlocked: true,
+    publicCompatibilityClaimed: false,
     compatibilityClaimed: false
   });
 }
@@ -2137,6 +2961,12 @@ function createPrivateMemoHookArgs(args, metadata) {
   return privateArgs;
 }
 
+function createPrivateRefHookArgs(args, metadata) {
+  const privateArgs = Array.prototype.slice.call(args);
+  privateArgs.push(metadata);
+  return privateArgs;
+}
+
 function getPrivateCallbackHookDispatcherMetadata(dispatcher) {
   if (!isPrivateCallbackHookDispatcher(dispatcher)) {
     return null;
@@ -2151,6 +2981,14 @@ function getPrivateMemoHookDispatcherMetadata(dispatcher) {
   }
 
   return privateMemoHookDispatcherMetadataByDispatcher.get(dispatcher);
+}
+
+function getPrivateRefHookDispatcherMetadata(dispatcher) {
+  if (!isPrivateRefHookDispatcher(dispatcher)) {
+    return null;
+  }
+
+  return privateRefHookDispatcherMetadataByDispatcher.get(dispatcher);
 }
 
 function getPrivateContextHookDispatcherMetadata(dispatcher) {
@@ -2266,6 +3104,59 @@ function isPrivateMemoHookDispatcherMetadata(metadata) {
   }
 
   return true;
+}
+
+function isPrivateRefHookDispatcherMetadata(metadata) {
+  if (metadata !== privateRefHookDispatcherMetadata) {
+    return false;
+  }
+
+  if (
+    !isObjectLike(metadata) ||
+    metadata.capability !== privateRefHookDispatcherMetadata.capability ||
+    metadata.compatibilityTarget !==
+      privateRefHookDispatcherMetadata.compatibilityTarget ||
+    metadata.cjsSurfaceCurrentnessBlocked !== true ||
+    metadata.reactServerSurfaceCurrentnessBlocked !== true
+  ) {
+    return false;
+  }
+
+  for (const flagName of useRefHookCompatibilityFalseFlags) {
+    if (metadata[flagName] !== false) {
+      return false;
+    }
+  }
+
+  for (const key of privateRefHookDispatcherMetadataArrayKeys) {
+    if (
+      !hasSameStringArray(metadata[key], privateRefHookDispatcherMetadata[key])
+    ) {
+      return false;
+    }
+  }
+
+  return (
+    hasSameRecordArrayFields(
+      metadata.publicShapeBlockers,
+      privateRefHookDispatcherMetadata.publicShapeBlockers,
+      useRefHookPublicShapeBlockerFields
+    ) &&
+    hasSameRecordFields(
+      metadata.sourceReport,
+      privateRefHookDispatcherMetadata.sourceReport,
+      useRefHookSourceReportFieldNames
+    ) &&
+    hasSameRecordFields(
+      metadata.blockerCurrentness,
+      privateRefHookDispatcherMetadata.blockerCurrentness,
+      useRefHookBlockerCurrentnessFieldNames
+    ) &&
+    hasSameUseRefSurfaceCurrentnessRows(
+      metadata.surfaceCurrentnessRows,
+      privateRefHookDispatcherMetadata.surfaceCurrentnessRows
+    )
+  );
 }
 
 function isPrivateContextHookDispatcherMetadata(metadata) {
@@ -2451,6 +3342,93 @@ function isPrivateUnsupportedPlaceholderHookBlockerMetadata(metadata) {
   );
 }
 
+function isUseRefHookCurrentnessReport(report) {
+  return validateUseRefHookCurrentnessReport(report) === null;
+}
+
+function validateUseRefHookCurrentnessReport(report) {
+  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+    return 'useRef-hook-currentness-not-frozen';
+  }
+
+  if (!useRefHookCurrentnessReports.has(report)) {
+    return 'useRef-hook-currentness-source-proof';
+  }
+
+  if (
+    report.kind !== useRefHookCurrentnessReportKind ||
+    report.version !== useRefHookCurrentnessReportVersion ||
+    report.status !== useRefHookCurrentnessStatus ||
+    report.compatibilityTarget !== 'react@19.2.6' ||
+    !hasSameStringArray(report.hookNames, useRefHookNames) ||
+    !hasSameStringArray(
+      report.surfaceCurrentnessFieldNames,
+      useRefHookSurfaceCurrentnessFieldNames
+    ) ||
+    report.cjsSurfaceCurrentnessBlocked !== true ||
+    report.reactServerSurfaceCurrentnessBlocked !== true ||
+    report.publicRootlessInvalidHookBlocked !== true ||
+    report.genericDispatcherForwardingBlocked !== true ||
+    report.privateDispatcherRequired !== true
+  ) {
+    return 'useRef-hook-currentness-shape';
+  }
+
+  if (
+    !hasSameRecordArrayFields(
+      report.publicShapeBlockers,
+      useRefHookPublicShapeBlockers,
+      useRefHookPublicShapeBlockerFields
+    )
+  ) {
+    return 'useRef-hook-currentness-public-shape';
+  }
+
+  if (
+    !hasSameRecordFields(
+      report.sourceReport,
+      useRefHookSourceReport,
+      useRefHookSourceReportFieldNames
+    )
+  ) {
+    return 'useRef-hook-currentness-source-report';
+  }
+
+  if (
+    !hasSameRecordFields(
+      report.blockerCurrentness,
+      useRefHookBlockerCurrentness,
+      useRefHookBlockerCurrentnessFieldNames
+    )
+  ) {
+    return 'useRef-hook-currentness-blocker-currentness';
+  }
+
+  if (
+    useRefHookSurfaceCurrentnessRowsByReport.get(report) !==
+    report.surfaceCurrentnessRows
+  ) {
+    return 'useRef-hook-currentness-surface-currentness-source-proof';
+  }
+
+  if (
+    !hasSameUseRefSurfaceCurrentnessRows(
+      report.surfaceCurrentnessRows,
+      useRefHookSurfaceCurrentnessRows
+    )
+  ) {
+    return 'useRef-hook-currentness-surface-currentness';
+  }
+
+  for (const flagName of useRefHookCompatibilityFalseFlags) {
+    if (report[flagName] !== false) {
+      return 'useRef-hook-currentness-compatibility-or-prerequisite-claim';
+    }
+  }
+
+  return null;
+}
+
 function isUnsupportedPlaceholderHookCurrentnessReport(report) {
   return validateUnsupportedPlaceholderHookCurrentnessReport(report) === null;
 }
@@ -2568,6 +3546,12 @@ function validatePrivateMemoHookDispatcherMetadata(metadata) {
   }
 }
 
+function validatePrivateRefHookDispatcherMetadata(metadata) {
+  if (!isPrivateRefHookDispatcherMetadata(metadata)) {
+    throw createInvalidHookCallError('useRef');
+  }
+}
+
 function validatePrivateContextHookDispatcherMetadata(metadata) {
   if (!isPrivateContextHookDispatcherMetadata(metadata)) {
     throw createInvalidHookCallError('useContext');
@@ -2644,6 +3628,34 @@ function hasSameRecordArrayFields(actual, expected, fieldNames) {
 
   for (let index = 0; index < expected.length; index += 1) {
     if (!hasSameRecordFields(actual[index], expected[index], fieldNames)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasSameUseRefSurfaceCurrentnessRows(actual, expected) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) {
+    return false;
+  }
+
+  for (let index = 0; index < expected.length; index += 1) {
+    if (!hasSameUseRefSurfaceCurrentnessRow(actual[index], expected[index])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasSameUseRefSurfaceCurrentnessRow(actual, expected) {
+  if (!isObjectLike(actual) || !Object.isFrozen(actual)) {
+    return false;
+  }
+
+  for (const fieldName of useRefHookSurfaceCurrentnessFieldNames) {
+    if (actual[fieldName] !== expected[fieldName]) {
       return false;
     }
   }
@@ -2763,6 +3775,20 @@ function freezeRecord(record) {
   return Object.freeze(record);
 }
 
+function freezeUseRefSurfaceCurrentnessRow(row) {
+  const surfaceRow = {};
+
+  for (const fieldName of useRefHookSurfaceCurrentnessFieldNames) {
+    surfaceRow[fieldName] = row[fieldName];
+  }
+
+  return freezeRecord(surfaceRow);
+}
+
+function freezeUseRefSurfaceCurrentnessRows(rows) {
+  return freezeArray((rows ?? []).map(freezeUseRefSurfaceCurrentnessRow));
+}
+
 function freezeSurfaceCurrentnessRow(row) {
   const surfaceRow = {};
 
@@ -2841,7 +3867,7 @@ const useReducer = defineHookFunctionShape(function (reducer, initialArg, init) 
 }, 3);
 
 const useRef = defineHookFunctionShape(function (initialValue) {
-  return callDispatcherHook('useRef', arguments);
+  return callPrivateRefDispatcherHook('useRef', arguments);
 }, 1);
 
 const useState = defineHookFunctionShape(function (initialState) {
@@ -2856,10 +3882,13 @@ module.exports = {
   callPrivateContextDispatcherHook,
   callPrivateEffectDispatcherHook,
   callPrivateMemoDispatcherHook,
+  callPrivateRefDispatcherHook,
   callPrivateStateDispatcherHook,
+  consumeUseRefHookCurrentnessReport,
   consumeUnsupportedPlaceholderHookCurrentnessReport,
   createInvalidHookCallError,
   createMissingPrivateStateHookDispatcherError,
+  createUseRefHookCurrentnessReport,
   createUnsupportedPlaceholderHookCurrentnessReport,
   createUnsupportedPrivateTransitionCallbackError,
   effectHookMetadataByHookName,
@@ -2869,6 +3898,7 @@ module.exports = {
   getPrivateContextHookDispatcherMetadata,
   getPrivateEffectHookDispatcherMetadata,
   getPrivateMemoHookDispatcherMetadata,
+  getPrivateRefHookDispatcherMetadata,
   getPrivateStateHookDispatcherMetadata,
   getPrivateTransitionHookDispatcherMetadata,
   invalidHookCallErrorCode,
@@ -2882,15 +3912,19 @@ module.exports = {
   isPrivateEffectHookDispatcherMetadata,
   isPrivateMemoHookDispatcher,
   isPrivateMemoHookDispatcherMetadata,
+  isPrivateRefHookDispatcher,
+  isPrivateRefHookDispatcherMetadata,
   isPrivateStateHookDispatcher,
   isPrivateStateHookDispatcherMetadata,
   isPrivateTransitionHookDispatcher,
   isPrivateTransitionHookDispatcherMetadata,
+  isUseRefHookCurrentnessReport,
   isUnsupportedPlaceholderHookCurrentnessReport,
   markPrivateCallbackHookDispatcher,
   markPrivateContextHookDispatcher,
   markPrivateEffectHookDispatcher,
   markPrivateMemoHookDispatcher,
+  markPrivateRefHookDispatcher,
   markPrivateStateHookDispatcher,
   markPrivateTransitionHookDispatcher,
   privateUnsupportedPlaceholderHookBlockerMetadata,
@@ -2898,16 +3932,23 @@ module.exports = {
   privateContextHookDispatcherMetadata,
   privateEffectHookDispatcherMetadata,
   privateMemoHookDispatcherMetadata,
+  privateRefHookDispatcherMetadata,
   privateStateHookDispatcherMetadata,
   privateTransitionHookDispatcherMetadata,
   recordPrivateStartTransitionDispatcherRouting,
   resolveDispatcher,
   transitionHookNames,
+  useRefHookCurrentnessConsumptionStatus,
+  useRefHookCurrentnessStatus,
+  useRefHookNames,
+  useRefHookSurfaceCurrentnessFieldNames,
+  useRefHookSurfaceCurrentnessRows,
   unsupportedPlaceholderHookSurfaceCurrentnessFieldNames,
   unsupportedPlaceholderHookSurfaceCurrentnessRows,
   unsupportedPlaceholderHookCurrentnessConsumptionStatus,
   unsupportedPlaceholderHookCurrentnessStatus,
   unsupportedPlaceholderHookNames,
+  validateUseRefHookCurrentnessReport,
   validateUnsupportedPlaceholderHookCurrentnessReport,
   use,
   useCallback,
