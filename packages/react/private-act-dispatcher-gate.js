@@ -530,6 +530,8 @@ function isAcceptedActQueueMetadata(metadata) {
     metadata.executesEffects === false &&
     metadata.executesRendererWork === false &&
     metadata.executesRendererRoots === false &&
+    hasBlockedPublicCompatibilityClaims(metadata) &&
+    hasBlockedPublicQueueAndExecutionClaims(metadata) &&
     hasExactStringSet(metadata.acceptedRecords, acceptedActQueueRecordKinds) &&
     hasExactStringSet(metadata.acceptedTaskKinds, acceptedActQueueTaskKinds) &&
     hasExactStringSet(
@@ -1849,6 +1851,18 @@ function hasBlockedPublicCompatibilityClaims(value) {
       value.publicRendererCompatibilityClaimed === false) &&
     (value.publicCompatibilityClaimed === undefined ||
       value.publicCompatibilityClaimed === false) &&
+    (value.packageCompatibilityClaimed === undefined ||
+      value.packageCompatibilityClaimed === false) &&
+    (value.publicPackageCompatibilityClaimed === undefined ||
+      value.publicPackageCompatibilityClaimed === false) &&
+    (value.publicSchedulerFlushHelperCompatibilityClaimed === undefined ||
+      value.publicSchedulerFlushHelperCompatibilityClaimed === false) &&
+    (value.schedulerTimingAdmissionClaimed === undefined ||
+      value.schedulerTimingAdmissionClaimed === false) &&
+    (value.schedulerDelayedActRootAdmissionClaimed === undefined ||
+      value.schedulerDelayedActRootAdmissionClaimed === false) &&
+    (value.schedulerDelayedRendererRootAdmissionClaimed === undefined ||
+      value.schedulerDelayedRendererRootAdmissionClaimed === false) &&
     (value.compatibilityClaimed === undefined ||
       value.compatibilityClaimed === false)
   );
@@ -1866,7 +1880,15 @@ function hasBlockedPublicQueueAndExecutionClaims(value) {
     (value.executesRendererWork === undefined ||
       value.executesRendererWork === false) &&
     (value.executesRendererRoots === undefined ||
-      value.executesRendererRoots === false)
+      value.executesRendererRoots === false) &&
+    (value.invokesPublicSchedulerFlushHelper === undefined ||
+      value.invokesPublicSchedulerFlushHelper === false) &&
+    (value.publicSchedulerFlushBehaviorExecuted === undefined ||
+      value.publicSchedulerFlushBehaviorExecuted === false) &&
+    (value.publicSchedulerFlushExecutionAvailable === undefined ||
+      value.publicSchedulerFlushExecutionAvailable === false) &&
+    (value.routesAcceptedMockSchedulerFlushHelperMetadata === undefined ||
+      value.routesAcceptedMockSchedulerFlushHelperMetadata === false)
   );
 }
 
@@ -2363,6 +2385,10 @@ function getRejectedSchedulerMockExpiredActRootWorkDiagnosticsReason(
     return 'scheduler-expired-act-root-diagnostics-not-frozen';
   }
   if (
+    !Object.hasOwn(
+      report,
+      privateSchedulerMockExpiredActRootWorkDiagnosticsBrand
+    ) ||
     report[privateSchedulerMockExpiredActRootWorkDiagnosticsBrand] !== true
   ) {
     return 'scheduler-expired-act-root-diagnostics-brand';
@@ -2699,6 +2725,10 @@ function isAcceptedSchedulerMockDelayedActRootWorkMetadataSummary(
     isAcceptedSchedulerMockExpiredActRootWorkMetadataSummary(
       metadata.expiredActRootWorkMetadata
     ) &&
+    metadata.rootId === metadata.expiredActRootWorkMetadata.rootId &&
+    metadata.rootLabel === metadata.expiredActRootWorkMetadata.rootLabel &&
+    metadata.lane === metadata.expiredActRootWorkMetadata.lane &&
+    metadata.laneLabel === metadata.expiredActRootWorkMetadata.laneLabel &&
     metadata.rendererWorkExecutionBlocked === true &&
     metadata.rootWorkMetadataOnly === true &&
     metadata.actQueueHandoffOnly === true &&
@@ -2842,6 +2872,10 @@ function getRejectedSchedulerMockDelayedActRootWorkDiagnosticsReason(
     return 'scheduler-delayed-act-root-diagnostics-not-frozen';
   }
   if (
+    !Object.hasOwn(
+      report,
+      privateSchedulerMockDelayedActRootWorkDiagnosticsBrand
+    ) ||
     report[privateSchedulerMockDelayedActRootWorkDiagnosticsBrand] !== true
   ) {
     return 'scheduler-delayed-act-root-diagnostics-brand';
