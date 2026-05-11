@@ -152,6 +152,32 @@ test("private admission 733-736 bridge ledger recognizes Rust identifiers withou
   }
 });
 
+test("private admission 733-736 bridge ledger rejects unexpected worker ids through manifest violations", () => {
+  const staleWorkerId = "worker-733-stale-unmount-bridge-ledger";
+  let ledger;
+
+  assert.doesNotThrow(() => {
+    ledger = evaluatePrivateAdmission733736BridgeLedger({
+      rowOverrides: {
+        [worker733]: {
+          workerId: staleWorkerId
+        }
+      }
+    });
+  });
+
+  assert.equal(
+    ledger.status,
+    PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_VIOLATION_STATUS
+  );
+  assert.equal(ledger.privateBridgePrerequisitesRecognized, false);
+  assert.equal(ledger.bridgeBindingsRecognized, true);
+  assert.deepEqual(ledger.manifest.missingWorkerIds, [worker733]);
+  assert.deepEqual(ledger.manifest.unexpectedWorkerIds, [staleWorkerId]);
+  assert.deepEqual(ledger.manifest.duplicateWorkerIds, []);
+  assertViolationIds(ledger, ["bridge-worker-manifest-mismatch"]);
+});
+
 test("private admission 733-736 bridge ledger rejects corrupted Worker 733 cleanup handoff metadata", () => {
   const workspace = createWorkspaceWithMutatedEvidenceFile({
     evidencePath: testRendererRustSource,

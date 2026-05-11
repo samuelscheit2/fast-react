@@ -514,6 +514,14 @@ export function evaluatePrivateAdmission733736BridgeLedger({
       )
   );
   const bridgeBindingMismatches = evaluatedRows.flatMap((row) => {
+    if (
+      !Object.hasOwn(
+        PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_BINDINGS,
+        row.workerId
+      )
+    ) {
+      return [];
+    }
     const expected =
       PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_BINDINGS[row.workerId];
     if (sameBooleanRecord(expected, row.binding)) {

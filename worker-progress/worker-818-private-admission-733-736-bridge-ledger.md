@@ -41,6 +41,9 @@ ledger. Evidence reads source text slices only.
 - The focused test asserts evidence paths are Rust source files only and that
   evidence tokens do not rely on progress-report paths, test paths, panic
   strings, or `reason:` error-string tokens.
+- Audit follow-up: unexpected `workerId` tampering now fails closed through the
+  `bridge-worker-manifest-mismatch` violation path instead of attempting a
+  binding comparison without expected worker data.
 
 ## Commands Run
 
@@ -48,9 +51,11 @@ ledger. Evidence reads source text slices only.
 - `node --check tests/conformance/test/private-admission-733-736-bridge-ledger.test.mjs`
 - `node --test tests/conformance/test/private-admission-733-736-bridge-ledger.test.mjs`
 - `node -e "import('./tests/conformance/src/private-admission-733-736-bridge-ledger.mjs').then((m) => { if (m.PRIVATE_ADMISSION_733_736_BRIDGE_WORKERS.length !== 2) process.exit(1); })"`
+- `node -e "import('./tests/conformance/src/private-admission-733-736-bridge-ledger.mjs').then((m) => { if (m.evaluatePrivateAdmission733736BridgeLedger().status !== m.PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_STATUS) process.exit(1); })"`
 - `git diff --check`
 - `git diff --cached --check`
 - `git commit -m "Add private admission 733-736 bridge ledger"`
+- `git commit -m "Fix bridge ledger unexpected worker handling"`
 
 ## Risks Or Blockers
 
