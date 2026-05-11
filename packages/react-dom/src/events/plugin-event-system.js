@@ -489,6 +489,16 @@ function getRootListenerCurrentnessGatePayload(record) {
   return typeof getPayload === 'function' ? getPayload(record) : null;
 }
 
+function validateRootListenerCurrentnessGateForEvent(record, options) {
+  if (rootListenersModule === null) {
+    rootListenersModule = require('./root-listeners.js');
+  }
+
+  const validate =
+    rootListenersModule.validatePrivateRootListenerCurrentnessGateForEvent;
+  return typeof validate === 'function' ? validate(record, options) : null;
+}
+
 function normalizeInputChangeEventExtractionPreflightOptions(options) {
   const normalizedOptions = isObjectLike(options) ? options : {};
   assertNoInputChangeExtractionPublicBehaviorClaims(normalizedOptions);
@@ -579,9 +589,23 @@ function assertNoInputChangeExtractionSourceAlias(source, reason) {
 }
 
 function containsBlockedInputChangeExtractionSourceAlias(source) {
+  return containsBlockedInputChangeExtractionSourceAliasImpl(
+    source,
+    new WeakSet()
+  );
+}
+
+function containsBlockedInputChangeExtractionSourceAliasImpl(
+  source,
+  seen
+) {
   if (!isObjectLike(source)) {
     return false;
   }
+  if (seen.has(source)) {
+    return false;
+  }
+  seen.add(source);
 
   for (const key of [
     '$$typeof',
@@ -600,7 +624,7 @@ function containsBlockedInputChangeExtractionSourceAlias(source) {
     }
   }
 
-  return (
+  if (
     source.resourceFormEvidence !== undefined ||
     source.resourceEvidence !== undefined ||
     source.formEvidence !== undefined ||
@@ -608,6 +632,40 @@ function containsBlockedInputChangeExtractionSourceAlias(source) {
     source.formResetEvidence !== undefined ||
     source.hydrationReplayEvidence !== undefined ||
     source.replayQueueEvidence !== undefined
+  ) {
+    return true;
+  }
+
+  for (const key of Object.keys(source)) {
+    if (isInputChangeExtractionAliasScanSkippedKey(key)) {
+      continue;
+    }
+    if (
+      containsBlockedInputChangeExtractionSourceAliasImpl(
+        source[key],
+        seen
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isInputChangeExtractionAliasScanSkippedKey(key) {
+  return (
+    key === 'container' ||
+    key === 'currentTarget' ||
+    key === 'fakeDomTarget' ||
+    key === 'liveDomTarget' ||
+    key === 'nativeEvent' ||
+    key === 'node' ||
+    key === 'ownerDocument' ||
+    key === 'parentNode' ||
+    key === 'syntheticEvent' ||
+    key === 'target' ||
+    key === 'targetNode'
   );
 }
 
@@ -1503,6 +1561,27 @@ function createInputChangeEventPreflightRootListenerCurrentness(
   }
 
   const targetContainerInfo = describeContainer(dispatchRecord.targetContainer);
+  const phase = dispatchRecord.inCapturePhase ? 'capture' : 'bubble';
+  const rootListenerCurrentnessValidation =
+    validateRootListenerCurrentnessGateForEvent(
+      rootListenerCurrentnessGateRecord,
+      {
+        domEventName: dispatchRecord.domEventName,
+        phase,
+        targetContainer: dispatchRecord.targetContainer
+      }
+    );
+  if (
+    !isObjectLike(rootListenerCurrentnessValidation) ||
+    rootListenerCurrentnessValidation.accepted !== true
+  ) {
+    throwInputChangeEventExtractionPreflightError(
+      isObjectLike(rootListenerCurrentnessValidation) &&
+        typeof rootListenerCurrentnessValidation.reason === 'string'
+        ? rootListenerCurrentnessValidation.reason
+        : 'root-listener-currentness-not-current'
+    );
+  }
   const rootContainerRows =
     rootListenerCurrentnessGateRecord.targetRows.filter(
       (row) =>
@@ -1513,10 +1592,8 @@ function createInputChangeEventPreflightRootListenerCurrentness(
         row.browserDomEventCompatibilityClaimed === false &&
         row.compatibilityClaimed === false
     );
-  const rootContainerMatchesDispatchTarget = rootContainerRows.some((row) =>
-    containerInfoMatches(row.targetInfo, targetContainerInfo)
-  );
-  const phase = dispatchRecord.inCapturePhase ? 'capture' : 'bubble';
+  const rootContainerMatchesDispatchTarget =
+    rootListenerCurrentnessValidation.exactRootContainerMatch === true;
   const eventListenerRows =
     rootListenerCurrentnessGateRecord.listenerRows.filter(
       (row) =>
@@ -1567,6 +1644,8 @@ function createInputChangeEventPreflightRootListenerCurrentness(
     currentListenerRowCount:
       rootListenerCurrentnessGateRecord.currentListenerRowCount,
     matchedEventListenerRowCount: eventListenerRows.length,
+    exactMatchedEventListenerRowCount:
+      rootListenerCurrentnessValidation.matchedEventListenerRowCount,
     targetRowCount: rootListenerCurrentnessGateRecord.targetRowCount,
     eventDispatch: false,
     syntheticEventDispatch: false,

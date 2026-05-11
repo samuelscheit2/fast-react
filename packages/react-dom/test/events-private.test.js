@@ -3325,9 +3325,56 @@ test('private input/change controlled restore execution rejects stale latest pro
     }
   );
 
+  const bridgeSource = createPrivateInputChangeRestoreExecutionSources(gate, {
+    domEventName: 'input',
+    inputType: 'text',
+    latestProps: {
+      onChange() {},
+      onInput() {},
+      type: 'text',
+      value: 'alpha'
+    },
+    targetKind: 'text-input'
+  });
+  const swappedPreflightSource =
+    createPrivateInputChangeRestoreExecutionSources(gate, {
+      domEventName: 'input',
+      inputType: 'text',
+      latestProps: {
+        onChange() {},
+        onInput() {},
+        type: 'text',
+        value: 'beta'
+      },
+      targetKind: 'text-input'
+    });
+  const swappedFakeTarget = createPrivateControlledRestoreFakeDomTarget({
+    value: 'browser-mutated'
+  });
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        swappedPreflightSource.inputPreflight,
+        bridgeSource.bridge,
+        bridgeSource.writeExecution,
+        bridgeSource.flushBlocker,
+        bridgeSource.wrapperIntent,
+        createPrivateInputChangeExecutionAdmission(swappedFakeTarget)
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      reason: 'input-change-execution-preflight-source-mismatch'
+    }
+  );
+  assert.equal(swappedFakeTarget.value, 'browser-mutated');
+
   componentTree.detachHostInstanceToken(staleSources.token);
   componentTree.detachHostInstanceToken(liveSources.token);
   componentTree.detachHostInstanceToken(publicClaimSources.token);
+  componentTree.detachHostInstanceToken(bridgeSource.token);
+  componentTree.detachHostInstanceToken(swappedPreflightSource.token);
 });
 
 test('private input/change controlled restore execution rejects radio group ambiguity before mutation', () => {
@@ -3516,6 +3563,27 @@ test('private input/change extraction preflight rejects stale currentness and pu
       reason: 'source-record-alias'
     }
   );
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            source.rootListenerCurrentnessGateRecord,
+          sourceRecord: {
+            nested: {
+              resourceFormEvidence: {kind: 'form-action-event-plugin'}
+            }
+          }
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'source-record-alias'
+    }
+  );
 
   const wrongNativeEventType = createPrivateInputChangeDispatch({
     domEventName: 'input',
@@ -3566,9 +3634,61 @@ test('private input/change extraction preflight rejects stale currentness and pu
     }
   );
 
+  const sameShapeForeignRoot = createPrivateInputChangeDispatch({
+    domEventName: 'input',
+    inputType: 'text',
+    latestProps: {
+      onChange() {},
+      type: 'text',
+      value: 'alpha'
+    },
+    targetKind: 'input-change-same-shape-foreign-root'
+  });
+  assert.throws(
+    () =>
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        source.dispatchRecord,
+        {
+          rootListenerCurrentnessGateRecord:
+            sameShapeForeignRoot.rootListenerCurrentnessGateRecord
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'root-listener-currentness-container-mismatch'
+    }
+  );
+
+  const cleanedUpCurrentness = createPrivateInputChangeDispatch({
+    domEventName: 'input',
+    inputType: 'text',
+    latestProps: {
+      onChange() {},
+      type: 'text',
+      value: 'alpha'
+    },
+    targetKind: 'input-change-cleaned-up-currentness'
+  });
+  rootListeners.revertRootListenersForPrivateRoot(
+    cleanedUpCurrentness.rootRegistration
+  );
+  assert.throws(
+    () => createPrivateInputChangePreflight(cleanedUpCurrentness),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_CODE,
+      reason: 'root-listener-currentness-not-current'
+    }
+  );
+
   componentTree.detachHostInstanceToken(source.token);
   componentTree.detachHostInstanceToken(wrongNativeEventType.token);
   componentTree.detachHostInstanceToken(foreignRoot.token);
+  componentTree.detachHostInstanceToken(sameShapeForeignRoot.token);
+  componentTree.detachHostInstanceToken(cleanedUpCurrentness.token);
 });
 
 test('private input/change controlled restore bridge rejects cloned and foreign evidence', () => {
@@ -3627,6 +3747,32 @@ test('private input/change controlled restore bridge rejects cloned and foreign 
             'deterministic-input-change-event-controlled-restore-bridge',
           queueId: 'event-private-input-change-bridge-smuggling',
           resourceFormEvidence: {operation: 'form-action-event-plugin'},
+          targetKind: 'controlled-input-change-event-restore-queue-bridge'
+        }
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+      reason: 'resource-form-or-hydration-replay-source-alias'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreBridge(
+        inputPreflight,
+        restoreIntent,
+        writePreflight,
+        {
+          explicitAdmission: true,
+          queueKind:
+            'deterministic-input-change-event-controlled-restore-bridge',
+          queueId: 'event-private-input-change-bridge-nested-smuggling',
+          sourceRecord: {
+            nested: {
+              resourceFormEvidence: {operation: 'form-action-event-plugin'}
+            }
+          },
           targetKind: 'controlled-input-change-event-restore-queue-bridge'
         }
       ),

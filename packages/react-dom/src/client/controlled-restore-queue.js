@@ -29,7 +29,8 @@ const {
   getInputChangeEventExtractionPreflightRecordPayload
 } = require('../events/plugin-event-system.js');
 const {
-  getPrivateRootListenerCurrentnessGatePayload
+  getPrivateRootListenerCurrentnessGatePayload,
+  validatePrivateRootListenerCurrentnessGateForEvent
 } = require('../events/root-listeners.js');
 
 const controlledInputPostEventRestoreQueueGateSchemaVersion = 1;
@@ -1118,6 +1119,16 @@ function recordControlledInputChangeEventRestoreQueueBridgeWithGate(
     payload
   );
   bindControlledRestoreRecordToGate(payload, gateState);
+  controlledInputPostEventRestoreQueueSourcePayloads.set(
+    payload,
+    freezeRecord({
+      inputPreflightPayload:
+        getInputChangeEventExtractionPreflightRecordPayload(inputPreflight),
+      inputPreflightRecord: inputPreflight,
+      restoreRecord: sourceRestoreRecord,
+      writePreflightRecord: sourceWritePreflight
+    })
+  );
   return payload;
 }
 
@@ -1143,6 +1154,10 @@ function recordControlledInputChangeEventRestoreQueueExecutionWithGate(
     gateState,
     throwInputChangeEventRestoreQueueExecutionError,
     'foreign-controlled-restore-queue-record'
+  );
+  assertInputChangeEventRestoreQueueExecutionPreflightMatchesBridge(
+    inputPreflight,
+    sourceBridge
   );
   const sourceWriteExecution =
     assertInputChangeEventRestoreQueueExecutionWriteExecutionRecord(
@@ -8074,6 +8089,28 @@ function assertInputChangeEventExtractionPreflightForRestoreQueueBridge(
   return record;
 }
 
+function assertInputChangeEventRestoreQueueExecutionPreflightMatchesBridge(
+  inputPreflight,
+  bridgeRecord
+) {
+  const bridgeSourcePayload =
+    controlledInputPostEventRestoreQueueSourcePayloads.get(bridgeRecord) ||
+    null;
+  const inputPreflightPayload =
+    getInputChangeEventExtractionPreflightRecordPayload(inputPreflight);
+
+  if (
+    bridgeSourcePayload === null ||
+    bridgeSourcePayload.inputPreflightRecord !== inputPreflight ||
+    bridgeSourcePayload.inputPreflightPayload !== inputPreflightPayload
+  ) {
+    throwInputChangeEventRestoreQueueExecutionError(
+      'input-change-execution-preflight-source-mismatch',
+      inputPreflight
+    );
+  }
+}
+
 function getInputChangeEventExtractionPreflightBridgeRejectionReason(record) {
   const payload = getInputChangeEventExtractionPreflightRecordPayload(record);
   const currentnessRejectionReason =
@@ -8179,6 +8216,24 @@ function getInputChangeEventExtractionPreflightCurrentnessRejectionReason(
     )
   ) {
     return 'root-listener-currentness-source-alias';
+  }
+  const rootListenerCurrentnessValidation =
+    validatePrivateRootListenerCurrentnessGateForEvent(
+      rootListenerCurrentnessGateRecord,
+      {
+        domEventName: record.domEventName,
+        phase: record.inCapturePhase ? 'capture' : 'bubble',
+        targetContainer: payload.eventDispatchPayload.targetContainer
+      }
+    );
+  if (
+    !isObjectLike(rootListenerCurrentnessValidation) ||
+    rootListenerCurrentnessValidation.accepted !== true
+  ) {
+    return isObjectLike(rootListenerCurrentnessValidation) &&
+      typeof rootListenerCurrentnessValidation.reason === 'string'
+      ? rootListenerCurrentnessValidation.reason
+      : 'root-listener-currentness-not-current';
   }
 
   const rootListenerCurrentness = record.rootListenerCurrentness;
@@ -9471,9 +9526,17 @@ function bridgeArraysEqual(left, right) {
 }
 
 function containsBlockedInputChangeSourceAlias(source) {
+  return containsBlockedInputChangeSourceAliasImpl(source, new WeakSet());
+}
+
+function containsBlockedInputChangeSourceAliasImpl(source, seen) {
   if (!isObjectLike(source)) {
     return false;
   }
+  if (seen.has(source)) {
+    return false;
+  }
+  seen.add(source);
 
   for (const key of [
     '$$typeof',
@@ -9506,7 +9569,32 @@ function containsBlockedInputChangeSourceAlias(source) {
     }
   }
 
+  for (const key of Object.keys(source)) {
+    if (isInputChangeSourceAliasScanSkippedKey(key)) {
+      continue;
+    }
+    if (containsBlockedInputChangeSourceAliasImpl(source[key], seen)) {
+      return true;
+    }
+  }
+
   return false;
+}
+
+function isInputChangeSourceAliasScanSkippedKey(key) {
+  return (
+    key === 'container' ||
+    key === 'currentTarget' ||
+    key === 'fakeDomTarget' ||
+    key === 'liveDomTarget' ||
+    key === 'nativeEvent' ||
+    key === 'node' ||
+    key === 'ownerDocument' ||
+    key === 'parentNode' ||
+    key === 'syntheticEvent' ||
+    key === 'target' ||
+    key === 'targetNode'
+  );
 }
 
 function isBlockedInputChangeSourceAliasValue(value) {

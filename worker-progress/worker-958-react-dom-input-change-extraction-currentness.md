@@ -8,6 +8,10 @@
 - Bound controlled restore queue bridge/execution records to source-owned
   dispatch payloads, root listener currentness, and controlled restore gate
   identity.
+- Follow-up audit repair binds currentness to exact root listener registration
+  identity, revalidates current listener state, binds execution to the exact
+  bridge preflight, and recursively rejects nested resource/form smuggling
+  without touching live-like targets.
 - Added focused private and conformance coverage for missing, cloned, stale,
   cross-root, cross-dispatch, hydration/resource/form alias, browser/public
   claim, and foreign restore-gate rejection paths.
@@ -18,6 +22,7 @@
 ## Changed Files
 
 - `packages/react-dom/src/events/plugin-event-system.js`
+- `packages/react-dom/src/events/root-listeners.js`
 - `packages/react-dom/src/client/controlled-restore-queue.js`
 - `packages/react-dom/test/events-private.test.js`
 - `tests/conformance/test/dom-controlled-input-oracle.test.mjs`
@@ -29,15 +34,19 @@
 
 1. Private root listener registration mints
    `createPrivateRootListenerCurrentnessGateRecord(...)` evidence.
-2. `createInputChangeEventExtractionPreflightRecord` now requires that
-   evidence, rejects cloned or aliased currentness records, verifies the
-   dispatch target container and event listener row are current, and stores the
-   source-owned dispatch payload in a hidden WeakMap payload.
-3. Controlled restore intent, bridge, write execution, flush blocker, wrapper
+2. `validatePrivateRootListenerCurrentnessGateForEvent` resolves the hidden
+   listener registration payload, requires the exact dispatch root container,
+   re-snapshots listener state, and rejects cleanup or post-capture mutation.
+3. `createInputChangeEventExtractionPreflightRecord` requires that evidence,
+   rejects cloned or aliased currentness records, verifies the dispatch event
+   listener row is current on the exact root, and stores the source-owned
+   dispatch payload in a hidden WeakMap payload.
+4. Controlled restore intent, bridge, write execution, flush blocker, wrapper
    intent, and input/change execution records validate source dispatch payloads
    and controlled restore queue identity before accepting the row.
-4. Input/change controlled restore execution revalidates the root listener
-   currentness payload before mutating only an admitted fake-DOM target.
+5. Input/change controlled restore execution revalidates the root listener
+   currentness payload and the exact bridge preflight before mutating only an
+   admitted fake-DOM target.
 
 ## Evidence Gathered
 
@@ -49,6 +58,9 @@
   event type, public/browser/SyntheticEvent claims, hydration replay aliases,
   resource/form aliases, cross-dispatch restore sources, foreign restore queue
   gates, and live DOM targets before mutation.
+- Audit repair coverage rejects same-shape foreign roots, currentness after
+  listener cleanup, swapped execution preflights after bridge creation, and
+  nested resource/form evidence in bridge admission.
 - The resource/form unsupported gate test was updated because the package
   workspace check exercises its private input/change helper paths; those paths
   now provide the same root listener currentness evidence and expect the new
@@ -57,6 +69,7 @@
 ## Commands Run
 
 - `node --check packages/react-dom/src/events/plugin-event-system.js`
+- `node --check packages/react-dom/src/events/root-listeners.js`
 - `node --check packages/react-dom/src/client/controlled-restore-queue.js`
 - `node --check packages/react-dom/test/events-private.test.js`
 - `node --check packages/react-dom/test/resource-form-unsupported-gates.test.js`
