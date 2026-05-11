@@ -1205,6 +1205,92 @@ export async function assertPrivateFormActionAsyncCallbackExecutionGate() {
     rejected.sideEffects,
     formActions.formActionAsyncCallbackExecutionRejectedSideEffects
   );
+  const synchronousThrow = await formActions
+    .createFormActionAsyncCallbackExecutionDiagnosticGate({
+      requestIdPrefix: "conformance-async-callback-sync-throw"
+    })
+    .recordAsyncCallbackExecution(preflight, {
+      explicitFormActionAsyncCallbackExecution: true,
+      asyncActionCallback() {
+        throw new Error("conformance async callback sync throw");
+      }
+    });
+  assert.equal(
+    synchronousThrow.callbackExecution.status,
+    "failed-private-form-action-async-callback-threw"
+  );
+  assert.equal(
+    synchronousThrow.callbackExecution.callbackOutcome,
+    "threw"
+  );
+  assert.equal(synchronousThrow.callbackExecution.thenableObserved, false);
+  assert.equal(
+    synchronousThrow.callbackExecution.initialThenableStatus,
+    "not-created"
+  );
+  assert.equal(
+    synchronousThrow.callbackExecution.finalThenableStatus,
+    "threw"
+  );
+  assert.equal(synchronousThrow.callbackExecution.synchronousThrow, true);
+  assert.equal(synchronousThrow.callbackExecution.rejected, false);
+  assert.equal(synchronousThrow.callbackExecution.failClosed, true);
+  assert.equal(
+    synchronousThrow.callbackExecution.errorInfo.message,
+    "conformance async callback sync throw"
+  );
+  assert.deepEqual(
+    synchronousThrow.sideEffects,
+    formActions.formActionAsyncCallbackExecutionSynchronousThrowSideEffects
+  );
+  assert.equal(
+    synchronousThrow.sideEffects.asyncCallbackSynchronousThrowCaptured,
+    true
+  );
+  assert.equal(synchronousThrow.sideEffects.actionInvoked, false);
+  assert.equal(synchronousThrow.sideEffects.realFormReset, false);
+
+  const nonThenable = await formActions
+    .createFormActionAsyncCallbackExecutionDiagnosticGate({
+      requestIdPrefix: "conformance-async-callback-non-thenable"
+    })
+    .recordAsyncCallbackExecution(preflight, {
+      explicitFormActionAsyncCallbackExecution: true,
+      asyncActionCallback() {
+        return "sync-result";
+      }
+    });
+  assert.equal(
+    nonThenable.callbackExecution.status,
+    "failed-private-form-action-async-callback-non-thenable"
+  );
+  assert.equal(
+    nonThenable.callbackExecution.callbackOutcome,
+    "non-thenable"
+  );
+  assert.equal(nonThenable.callbackExecution.thenableObserved, false);
+  assert.equal(nonThenable.callbackExecution.nonThenable, true);
+  assert.equal(nonThenable.callbackExecution.rejected, false);
+  assert.equal(nonThenable.callbackExecution.failClosed, true);
+  assert.equal(
+    nonThenable.callbackExecution.finalThenableStatus,
+    "not-thenable"
+  );
+  assert.deepEqual(nonThenable.callbackExecution.valueInfo, {
+    type: "string",
+    length: "sync-result".length
+  });
+  assert.deepEqual(
+    nonThenable.sideEffects,
+    formActions.formActionAsyncCallbackExecutionNonThenableSideEffects
+  );
+  assert.equal(
+    nonThenable.sideEffects.asyncCallbackNonThenableReturned,
+    true
+  );
+  assert.equal(nonThenable.sideEffects.actionInvoked, false);
+  assert.equal(nonThenable.sideEffects.realFormReset, false);
+
   await assert.rejects(
     () =>
       asyncExecutionGate.recordAsyncCallbackExecution(preflight, {
@@ -1524,6 +1610,74 @@ export async function assertPrivateFormActionRejectedErrorPreflightGate() {
       formActions
         .createFormActionRejectedErrorPreflightDiagnosticGate()
         .recordRejectedErrorPreflight(fulfilledExecution, {
+          explicitFormActionRejectedErrorPreflight: true
+        }),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "source async callback execution must be an accepted rejected fake callback execution"
+    }
+  );
+  const synchronousThrowExecution =
+    await formActions
+      .createFormActionAsyncCallbackExecutionDiagnosticGate({
+        requestIdPrefix: "conformance-rejected-error-sync-throw"
+      })
+      .recordAsyncCallbackExecution(callbackPreflight, {
+        explicitFormActionAsyncCallbackExecution: true,
+        asyncActionCallback() {
+          throw new Error("conformance rejected sync throw");
+        }
+      });
+  assert.equal(
+    synchronousThrowExecution.callbackExecution.synchronousThrow,
+    true
+  );
+  assert.equal(
+    synchronousThrowExecution.callbackExecution.rejected,
+    false
+  );
+  assert.equal(
+    synchronousThrowExecution.callbackExecution.failClosed,
+    true
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(synchronousThrowExecution, {
+          explicitFormActionRejectedErrorPreflight: true
+        }),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "source async callback execution must be an accepted rejected fake callback execution"
+    }
+  );
+
+  const nonThenableExecution =
+    await formActions
+      .createFormActionAsyncCallbackExecutionDiagnosticGate({
+        requestIdPrefix: "conformance-rejected-error-non-thenable"
+      })
+      .recordAsyncCallbackExecution(callbackPreflight, {
+        explicitFormActionAsyncCallbackExecution: true,
+        asyncActionCallback() {
+          return "sync-result";
+        }
+      });
+  assert.equal(nonThenableExecution.callbackExecution.nonThenable, true);
+  assert.equal(nonThenableExecution.callbackExecution.rejected, false);
+  assert.equal(nonThenableExecution.callbackExecution.failClosed, true);
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(nonThenableExecution, {
           explicitFormActionRejectedErrorPreflight: true
         }),
     {
