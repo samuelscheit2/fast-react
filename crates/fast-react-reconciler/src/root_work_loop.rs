@@ -7093,7 +7093,8 @@ mod tests {
     };
     use crate::function_component::{
         FunctionComponentContextReadRecord, FunctionComponentContextRenderReader,
-        FunctionComponentContextRenderStore, FunctionComponentInvocationError,
+        FunctionComponentContextRenderStore, FunctionComponentEffectPhase,
+        FunctionComponentHookRenderStore, FunctionComponentInvocationError,
         FunctionComponentInvocationRequest, FunctionComponentOutputHandle,
         FunctionComponentRenderError, FunctionComponentSingleChildOutput,
         FunctionComponentSingleChildOutputResolver,
@@ -7103,6 +7104,8 @@ mod tests {
     use crate::host_work::{
         DetachedHostRecords, TestHostRootDeletionCleanupAction,
         TestHostRootDeletionCleanupApplyResult, TestHostRootDeletionCleanupStatus,
+        TestHostRootDeletionRefPassiveCleanupExecutionPhase,
+        TestHostRootDeletionTeardownExecutionErrorForCanary,
         TestHostRootManagedChildExecutionDiagnosticForCanary,
         TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary,
         TestHostRootMutationApplyResult, TestHostRootMutationApplyStatus,
@@ -7112,10 +7115,18 @@ mod tests {
         apply_test_host_root_deletion_cleanup_for_canary,
         create_detached_test_host_component_for_existing_fiber_for_canary,
         create_detached_test_host_text_for_existing_fiber_for_canary,
+        execute_test_host_root_deletion_teardown_after_commit_for_canary,
         mount_test_host_sibling_work_with_detached_hosts_for_canary,
         preflight_test_host_root_deletion_apply_and_cleanup_for_canary,
+        test_host_root_deletion_teardown_execution_request_for_canary,
+    };
+    use crate::passive_effects::{
+        DeletedSubtreeRefCleanupReturnExecutionRequest, DeletedSubtreeRefCleanupReturnExecutor,
+        PassiveEffectDestroyCallbackErrorHandle, PassiveEffectDestroyCallbackExecutionRequest,
+        PassiveEffectDestroyCallbackExecutor,
     };
     use crate::root_commit::{
+        FunctionComponentDeletedSubtreePendingPassiveCommitHandoff,
         HostRootManagedChildCommitExecutionBlockerForCanary,
         HostRootManagedChildCommitExecutionStatusForCanary,
         HostRootManagedChildCommitHandoffRecordForCanary,
@@ -7124,6 +7135,7 @@ mod tests {
         HostRootMutationPhaseRecordKind, HostRootPlacementSiblingStatus,
         commit_managed_child_complete_work_handoff_for_canary,
         commit_managed_child_sibling_order_complete_work_handoff_for_canary,
+        queue_function_component_deleted_subtree_pending_passive_effects,
     };
     use crate::root_updates::validate_update_container_lane_diagnostics_for_canary;
     use crate::test_support::{FakeContainer, RecordingHost, TestHostNode, TestHostTree};
@@ -7145,9 +7157,9 @@ mod tests {
     };
     use fast_react_core::{
         ContextHandle, ContextValueHandle, DeletionListId, DependenciesHandle, ElementTypeHandle,
-        EventPriority, FiberFlags, FiberMode, FiberTag, FiberTypeHandle, HookUpdateLane, Lane,
-        Lanes, PropsHandle, ReactKey, RootFinishedLanes, StateHandle, StateNodeHandle,
-        UpdateQueueHandle,
+        EventPriority, FiberFlags, FiberMode, FiberTag, FiberTypeHandle, HookEffectCallbackHandle,
+        HookEffectDependencies, HookUpdateLane, Lane, Lanes, PropsHandle, ReactKey, RefHandle,
+        RootFinishedLanes, StateHandle, StateNodeHandle, UpdateQueueHandle,
     };
 
     const ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_PLACEMENT_SOURCE_ORDER: usize = 826_001;
@@ -7159,6 +7171,9 @@ mod tests {
     const ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_SOURCE_ORDER: usize = 826_021;
     const ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_COMMIT_ORDER: usize = 826_022;
     const ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_REQUEST_ORDER: usize = 826_023;
+    const ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_SOURCE_ORDER: usize = 867_001;
+    const ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_COMMIT_ORDER: usize = 867_002;
+    const ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_REQUEST_ORDER: usize = 867_003;
     const ROOT_WORK_LOOP_ROOT_UNMOUNT_SOURCE_ORDER: usize = 862_001;
     const ROOT_WORK_LOOP_ROOT_UNMOUNT_COMMIT_ORDER: usize = 862_002;
 
@@ -7507,6 +7522,70 @@ mod tests {
         token_count_before_apply: usize,
     }
 
+    struct DeletedSubtreeRootWorkLoopTeardownFixture {
+        delete_render: HostRootRenderPhaseRecord,
+        pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+        previous_current: FiberId,
+        work_parent: FiberId,
+        deletion_list: DeletionListId,
+        host_parent_state_node: StateNodeHandle,
+        deleted_host: FiberId,
+        deleted_host_state_node: StateNodeHandle,
+        deleted_host_ref: RefHandle,
+        deleted_function: FiberId,
+        deleted_text: FiberId,
+        deleted_text_state_node: StateNodeHandle,
+        passive_create: HookEffectCallbackHandle,
+        passive_destroy: HookEffectCallbackHandle,
+        passive_dependencies: HookEffectDependencies,
+        deleted_passive_handoff: FunctionComponentDeletedSubtreePendingPassiveCommitHandoff,
+        detached_hosts: DetachedHostRecords,
+        operations_before_teardown: Vec<&'static str>,
+    }
+
+    #[derive(Default)]
+    struct RecordingDeletedSubtreeTeardownExecutor {
+        ref_cleanup_calls: Vec<DeletedSubtreeRefCleanupReturnExecutionRequest>,
+        destroy_calls: Vec<PassiveEffectDestroyCallbackExecutionRequest>,
+    }
+
+    impl RecordingDeletedSubtreeTeardownExecutor {
+        fn ref_cleanup_calls(&self) -> &[DeletedSubtreeRefCleanupReturnExecutionRequest] {
+            &self.ref_cleanup_calls
+        }
+
+        fn destroy_calls(&self) -> &[PassiveEffectDestroyCallbackExecutionRequest] {
+            &self.destroy_calls
+        }
+    }
+
+    impl DeletedSubtreeRefCleanupReturnExecutor for RecordingDeletedSubtreeTeardownExecutor {
+        fn execute_deleted_ref_cleanup_return(
+            &mut self,
+            request: DeletedSubtreeRefCleanupReturnExecutionRequest,
+        ) {
+            self.ref_cleanup_calls.push(request);
+        }
+    }
+
+    impl PassiveEffectDestroyCallbackExecutor for RecordingDeletedSubtreeTeardownExecutor {
+        fn execute_destroy_callback(
+            &mut self,
+            request: PassiveEffectDestroyCallbackExecutionRequest,
+        ) -> Result<(), PassiveEffectDestroyCallbackErrorHandle> {
+            self.destroy_calls.push(request);
+            Ok(())
+        }
+    }
+
+    fn root_work_loop_hook_callback(raw: u64) -> HookEffectCallbackHandle {
+        HookEffectCallbackHandle::from_raw(raw)
+    }
+
+    fn root_work_loop_hook_dependencies(raw: u64) -> HookEffectDependencies {
+        HookEffectDependencies::array(DependenciesHandle::from_raw(raw))
+    }
+
     fn attach_managed_child_sibling_order_host_root_child(
         store: &mut FiberRootStore<RecordingHost>,
         host_root: FiberId,
@@ -7554,6 +7633,193 @@ mod tests {
             .record_finished_work_for_canary(render.finished_work(), render.render_lanes());
         record_host_root_finished_work_pending_commit_for_canary(store, render, handoff_order)
             .unwrap()
+    }
+
+    fn prepare_root_work_loop_deleted_subtree_teardown_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        host: &mut RecordingHost,
+        root_id: FiberRootId,
+        raw: u64,
+    ) -> DeletedSubtreeRootWorkLoopTeardownFixture {
+        let mut detached_hosts = DetachedHostRecords::new_for_canary();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+
+        update_container(store, root_id, RootElementHandle::from_raw(raw), None).unwrap();
+        let create_render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
+        let host_root = create_render.finished_work();
+        let mode = store.fiber_arena().get(host_root).unwrap().mode();
+
+        let text_props = PropsHandle::from_raw(raw + 1);
+        let deleted_text =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::HostText, None, text_props, mode);
+        let deleted_text_state_node = create_detached_test_host_text_for_existing_fiber_for_canary(
+            store,
+            host,
+            &mut detached_hosts,
+            root_id,
+            deleted_text,
+            "root work loop deleted passive text",
+            text_props,
+        )
+        .unwrap();
+
+        let function_props = PropsHandle::from_raw(raw + 2);
+        let deleted_function = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            function_props,
+            mode,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(deleted_function).unwrap();
+            node.set_fiber_type(FiberTypeHandle::from_raw(raw + 3));
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(deleted_function, &[deleted_text])
+            .unwrap();
+        let passive_create = root_work_loop_hook_callback(raw + 4);
+        let passive_destroy = root_work_loop_hook_callback(raw + 5);
+        let passive_dependencies = root_work_loop_hook_dependencies(raw + 6);
+        hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                deleted_function,
+                FunctionComponentEffectPhase::Passive,
+                passive_create,
+                passive_dependencies,
+                Some(passive_destroy),
+            )
+            .unwrap();
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, deleted_function);
+
+        let deleted_host_props = PropsHandle::from_raw(raw + 7);
+        let deleted_host = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            deleted_host_props,
+            mode,
+        );
+        let deleted_host_ref = RefHandle::from_raw(raw + 8);
+        {
+            let node = store.fiber_arena_mut().get_mut(deleted_host).unwrap();
+            node.set_ref_handle(deleted_host_ref);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(deleted_host, &[deleted_function])
+            .unwrap();
+        let deleted_host_state_node =
+            create_detached_test_host_component_for_existing_fiber_for_canary(
+                store,
+                host,
+                &mut detached_hosts,
+                root_id,
+                deleted_host,
+                "article",
+                deleted_host_props,
+                &[deleted_text],
+            )
+            .unwrap();
+
+        let host_parent_props = PropsHandle::from_raw(raw + 9);
+        let host_parent = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            host_parent_props,
+            mode,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(host_parent).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(host_parent, &[deleted_host])
+            .unwrap();
+        let host_parent_state_node =
+            create_detached_test_host_component_for_existing_fiber_for_canary(
+                store,
+                host,
+                &mut detached_hosts,
+                root_id,
+                host_parent,
+                "section",
+                host_parent_props,
+                &[deleted_host],
+            )
+            .unwrap();
+
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[host_parent])
+            .unwrap();
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, host_root);
+        commit_finished_host_root(store, create_render).unwrap();
+
+        update_container(store, root_id, RootElementHandle::from_raw(raw + 10), None).unwrap();
+        let delete_render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
+        let previous_current = delete_render.current();
+        let work_parent = store
+            .fiber_arena_mut()
+            .create_work_in_progress(host_parent, host_parent_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_parent).unwrap();
+            node.set_lanes(Lanes::NO);
+            node.set_memoized_props(host_parent_props);
+        }
+        let deletion_list = store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(work_parent, deleted_host)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(delete_render.finished_work(), &[work_parent])
+            .unwrap();
+        bubble_managed_child_sibling_order_root_work_loop_fiber(
+            store,
+            delete_render.finished_work(),
+        );
+        let deleted_passive_handoff =
+            queue_function_component_deleted_subtree_pending_passive_effects(
+                store,
+                root_id,
+                &hook_store,
+                work_parent,
+                deleted_host,
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+        let pending = prepare_root_work_loop_managed_child_pending_commit(
+            store,
+            delete_render,
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_SOURCE_ORDER,
+        );
+        let operations_before_teardown = host.operations();
+
+        DeletedSubtreeRootWorkLoopTeardownFixture {
+            delete_render,
+            pending,
+            previous_current,
+            work_parent,
+            deletion_list,
+            host_parent_state_node,
+            deleted_host,
+            deleted_host_state_node,
+            deleted_host_ref,
+            deleted_function,
+            deleted_text,
+            deleted_text_state_node,
+            passive_create,
+            passive_destroy,
+            passive_dependencies,
+            deleted_passive_handoff,
+            detached_hosts,
+            operations_before_teardown,
+        }
     }
 
     fn prepare_root_work_loop_managed_child_append_execution_fixture(
@@ -15787,6 +16053,415 @@ mod tests {
         let mut expected_operations = fixture.operations_before_apply.clone();
         expected_operations.push("remove_child");
         assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn root_work_loop_deleted_subtree_teardown_executes_ref_passive_host_detach_and_cleanup_in_order()
+     {
+        let (mut store, root_id, mut host) = root_store();
+        let mut fixture = prepare_root_work_loop_deleted_subtree_teardown_fixture(
+            &mut store, &mut host, root_id, 86_700,
+        );
+        let queued_passive = fixture.deleted_passive_handoff.records()[0];
+
+        let mut handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            fixture.delete_render,
+            Some(fixture.pending),
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_COMMIT_ORDER,
+        )
+        .unwrap();
+        handoff
+            .record_function_component_deleted_subtree_passive_effects_for_canary(&[fixture
+                .deleted_passive_handoff
+                .clone()])
+            .unwrap();
+        let source_request = test_host_root_deletion_teardown_execution_request_for_canary(
+            &handoff,
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_REQUEST_ORDER,
+        )
+        .unwrap();
+        let mut executor = RecordingDeletedSubtreeTeardownExecutor::default();
+
+        let diagnostic = execute_test_host_root_deletion_teardown_after_commit_for_canary(
+            &mut store,
+            &mut host,
+            &handoff,
+            source_request,
+            source_request,
+            &mut fixture.detached_hosts,
+            &mut executor,
+        )
+        .unwrap();
+
+        assert_eq!(
+            fixture.previous_current,
+            handoff.commit().previous_current()
+        );
+        assert_eq!(fixture.pending.root(), root_id);
+        assert_eq!(
+            fixture.pending.handoff_order(),
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_SOURCE_ORDER
+        );
+        assert_eq!(source_request.root(), root_id);
+        assert_eq!(
+            source_request.source_handoff_order(),
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_SOURCE_ORDER
+        );
+        assert_eq!(
+            source_request.commit_order(),
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_COMMIT_ORDER
+        );
+        assert_eq!(
+            source_request.request_order(),
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_REQUEST_ORDER
+        );
+        assert_eq!(source_request.previous_current(), fixture.previous_current);
+        assert_eq!(
+            source_request.finished_work(),
+            fixture.delete_render.finished_work()
+        );
+        assert_eq!(
+            source_request.committed_current(),
+            fixture.delete_render.finished_work()
+        );
+        assert_eq!(source_request.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(source_request.remaining_lanes(), Lanes::NO);
+        assert_eq!(source_request.pending_lanes(), Lanes::NO);
+        assert_eq!(source_request.deletion_list_count(), 1);
+        assert_eq!(source_request.deleted_root_count(), 1);
+        assert_eq!(source_request.ref_cleanup_return_count(), 1);
+        assert_eq!(source_request.passive_destroy_count(), 1);
+        assert_eq!(source_request.host_node_cleanup_count(), 2);
+        assert!(source_request.private_test_control_execution_requested());
+        assert!(!source_request.public_unmount_compatibility_claimed());
+        assert!(!source_request.public_ref_or_effect_compatibility_claimed());
+
+        let plan = source_request.host_detachment_plan();
+        assert_eq!(plan.root(), root_id);
+        assert_eq!(plan.finished_work(), fixture.delete_render.finished_work());
+        assert_eq!(plan.deletion_list(), fixture.deletion_list);
+        assert_eq!(plan.deleted_root(), fixture.deleted_host);
+        assert_eq!(plan.host_parent(), fixture.work_parent);
+        assert_eq!(
+            plan.host_parent_state_node(),
+            fixture.host_parent_state_node
+        );
+        assert_eq!(plan.host_child(), fixture.deleted_host);
+        assert_eq!(
+            plan.host_child_state_node(),
+            fixture.deleted_host_state_node
+        );
+        assert_eq!(plan.cleanup_sequence(), 1);
+        assert_eq!(plan.cleanup_order_sequence(), 3);
+        assert!(!plan.public_unmount_compatibility_claimed());
+        assert!(!plan.broad_host_teardown_enabled());
+
+        assert_eq!(diagnostic.root(), root_id);
+        assert_eq!(
+            diagnostic.finished_work(),
+            fixture.delete_render.finished_work()
+        );
+        assert_eq!(diagnostic.request(), source_request);
+        assert_eq!(
+            diagnostic.host_detachment_status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+        );
+        assert!(diagnostic.ref_cleanup_return_callbacks_invoked());
+        assert!(diagnostic.passive_destroy_callbacks_invoked());
+        assert!(diagnostic.private_host_subtree_detachment_applied());
+        assert!(!diagnostic.public_unmount_compatibility_claimed());
+        assert!(!diagnostic.public_ref_or_effect_compatibility_claimed());
+
+        let ref_passive = diagnostic.ref_passive_cleanup();
+        assert_eq!(ref_passive.root(), root_id);
+        assert_eq!(
+            ref_passive.finished_work(),
+            fixture.delete_render.finished_work()
+        );
+        assert_eq!(ref_passive.records().len(), 4);
+        assert_eq!(ref_passive.ref_cleanup_return_executions().len(), 1);
+        assert_eq!(executor.ref_cleanup_calls().len(), 1);
+        assert_eq!(executor.destroy_calls().len(), 1);
+        let ref_cleanup = ref_passive.ref_cleanup_return_executions()[0];
+        assert_eq!(ref_cleanup.fiber(), fixture.deleted_host);
+        assert_eq!(ref_cleanup.state_node(), fixture.deleted_host_state_node);
+        assert_eq!(ref_cleanup.ref_handle(), fixture.deleted_host_ref);
+        assert_eq!(executor.ref_cleanup_calls()[0], ref_cleanup.request());
+        assert_eq!(
+            executor.destroy_calls()[0].fiber(),
+            fixture.deleted_function
+        );
+        assert_eq!(
+            executor.destroy_calls()[0].destroy_callback(),
+            fixture.passive_destroy
+        );
+
+        let snapshot = diagnostic.execution_snapshot();
+        assert_eq!(snapshot.len(), 5);
+        assert_eq!(snapshot.ref_cleanup_return_gate_count(), 1);
+        assert_eq!(snapshot.passive_destroy_execution_count(), 1);
+        assert_eq!(snapshot.host_subtree_detachment_count(), 1);
+        assert_eq!(snapshot.host_cleanup_apply_count(), 2);
+        assert!(snapshot.private_passive_destroy_callbacks_invoked());
+        assert!(snapshot.private_host_subtree_detachment_applied());
+        assert!(!snapshot.public_unmount_compatibility_claimed());
+        assert!(!snapshot.public_ref_or_effect_compatibility_claimed());
+        assert_eq!(
+            snapshot
+                .records()
+                .iter()
+                .map(|record| record.phase())
+                .collect::<Vec<_>>(),
+            vec![
+                TestHostRootDeletionRefPassiveCleanupExecutionPhase::RefCleanupReturnGate,
+                TestHostRootDeletionRefPassiveCleanupExecutionPhase::PassiveDestroyCallback,
+                TestHostRootDeletionRefPassiveCleanupExecutionPhase::HostSubtreeDetach,
+                TestHostRootDeletionRefPassiveCleanupExecutionPhase::HostNodeCleanup,
+                TestHostRootDeletionRefPassiveCleanupExecutionPhase::HostNodeCleanup,
+            ]
+        );
+        assert_eq!(snapshot.records()[0].fiber(), fixture.deleted_host);
+        assert_eq!(snapshot.records()[0].deleted_root(), fixture.deleted_host);
+        assert_eq!(snapshot.records()[0].ref_cleanup_return_sequence(), Some(0));
+        assert_eq!(snapshot.records()[1].fiber(), fixture.deleted_function);
+        assert_eq!(
+            snapshot.records()[1].passive_destroy_execution_order(),
+            Some(0)
+        );
+        assert_eq!(snapshot.records()[2].fiber(), fixture.deleted_host);
+        assert_eq!(
+            snapshot.records()[2].host_detachment_cleanup_order_sequence(),
+            Some(3)
+        );
+        assert_eq!(snapshot.records()[3].fiber(), fixture.deleted_text);
+        assert_eq!(snapshot.records()[3].host_cleanup_sequence(), Some(0));
+        assert_eq!(snapshot.records()[4].fiber(), fixture.deleted_host);
+        assert_eq!(snapshot.records()[4].host_cleanup_sequence(), Some(1));
+
+        assert!(
+            !fixture
+                .detached_hosts
+                .text_metadata(fixture.deleted_text_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert!(
+            !fixture
+                .detached_hosts
+                .instance_metadata(fixture.deleted_host_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(queued_passive.create(), fixture.passive_create);
+        assert_eq!(queued_passive.destroy(), Some(fixture.passive_destroy));
+        assert_eq!(queued_passive.dependencies(), fixture.passive_dependencies);
+
+        let mut expected_operations = fixture.operations_before_teardown;
+        expected_operations.push("remove_child");
+        expected_operations.push("detach_deleted_instance");
+        assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn root_work_loop_deleted_subtree_teardown_rejects_missing_ref_and_passive_evidence_before_host_calls()
+     {
+        let (mut store, root_id, mut host) = root_store();
+        let fixture = prepare_root_work_loop_deleted_subtree_teardown_fixture(
+            &mut store, &mut host, root_id, 86_750,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(fixture.deleted_host)
+            .unwrap()
+            .set_ref_handle(RefHandle::NONE);
+
+        let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            fixture.delete_render,
+            Some(fixture.pending),
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_COMMIT_ORDER,
+        )
+        .unwrap();
+        let order_gate = handoff.commit().deletion_cleanup_order_gate_for_canary();
+        let executor = RecordingDeletedSubtreeTeardownExecutor::default();
+
+        let error = test_host_root_deletion_teardown_execution_request_for_canary(
+            &handoff,
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_REQUEST_ORDER,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootDeletionTeardownExecutionErrorForCanary::MissingDeletionTeardownMetadata {
+                root,
+                finished_work,
+            } if root == root_id && finished_work == fixture.delete_render.finished_work()
+        ));
+        assert_eq!(handoff.commit().deletion_lists().len(), 1);
+        assert_eq!(
+            handoff.commit().deletion_lists()[0].deleted(),
+            &[fixture.deleted_host]
+        );
+        assert_eq!(
+            handoff
+                .commit()
+                .host_node_deletion_cleanup_log()
+                .records()
+                .len(),
+            2
+        );
+        assert_eq!(order_gate.ref_cleanup_return_count(), 0);
+        assert_eq!(order_gate.passive_destroy_count(), 0);
+        assert_eq!(order_gate.host_node_cleanup_count(), 2);
+        assert!(executor.ref_cleanup_calls().is_empty());
+        assert!(executor.destroy_calls().is_empty());
+        assert_eq!(host.operations(), fixture.operations_before_teardown);
+        assert!(
+            fixture
+                .detached_hosts
+                .text_metadata(fixture.deleted_text_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert!(
+            fixture
+                .detached_hosts
+                .instance_metadata(fixture.deleted_host_state_node)
+                .unwrap()
+                .is_active()
+        );
+    }
+
+    #[test]
+    fn root_work_loop_deleted_subtree_teardown_rejects_cross_root_source_evidence() {
+        let (mut store, root_id, mut host) = root_store();
+        let foreign_root = store
+            .create_client_root(FakeContainer::new(867), RootOptions::new())
+            .unwrap();
+        let fixture = prepare_root_work_loop_deleted_subtree_teardown_fixture(
+            &mut store, &mut host, root_id, 86_800,
+        );
+        let mut foreign_fixture = prepare_root_work_loop_deleted_subtree_teardown_fixture(
+            &mut store,
+            &mut host,
+            foreign_root,
+            86_900,
+        );
+        let mut handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            fixture.delete_render,
+            Some(fixture.pending),
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_COMMIT_ORDER,
+        )
+        .unwrap();
+        handoff
+            .record_function_component_deleted_subtree_passive_effects_for_canary(&[fixture
+                .deleted_passive_handoff
+                .clone()])
+            .unwrap();
+        let source_request = test_host_root_deletion_teardown_execution_request_for_canary(
+            &handoff,
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_REQUEST_ORDER,
+        )
+        .unwrap();
+        let mut foreign_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            foreign_fixture.delete_render,
+            Some(foreign_fixture.pending),
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_COMMIT_ORDER + 10,
+        )
+        .unwrap();
+        foreign_handoff
+            .record_function_component_deleted_subtree_passive_effects_for_canary(&[
+                foreign_fixture.deleted_passive_handoff.clone(),
+            ])
+            .unwrap();
+        let mut executor = RecordingDeletedSubtreeTeardownExecutor::default();
+
+        let error = execute_test_host_root_deletion_teardown_after_commit_for_canary(
+            &mut store,
+            &mut host,
+            &foreign_handoff,
+            source_request,
+            source_request,
+            &mut foreign_fixture.detached_hosts,
+            &mut executor,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootDeletionTeardownExecutionErrorForCanary::MismatchedRootOwnership {
+                expected_root,
+                actual_root,
+            } if expected_root == root_id && actual_root == foreign_root
+        ));
+        assert!(executor.ref_cleanup_calls().is_empty());
+        assert!(executor.destroy_calls().is_empty());
+        assert_eq!(
+            host.operations(),
+            foreign_fixture.operations_before_teardown
+        );
+    }
+
+    #[test]
+    fn root_work_loop_deleted_subtree_teardown_rejects_caller_built_stale_evidence() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut fixture = prepare_root_work_loop_deleted_subtree_teardown_fixture(
+            &mut store, &mut host, root_id, 87_000,
+        );
+        let mut handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            fixture.delete_render,
+            Some(fixture.pending),
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_COMMIT_ORDER,
+        )
+        .unwrap();
+        handoff
+            .record_function_component_deleted_subtree_passive_effects_for_canary(&[fixture
+                .deleted_passive_handoff
+                .clone()])
+            .unwrap();
+        let source_request = test_host_root_deletion_teardown_execution_request_for_canary(
+            &handoff,
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_REQUEST_ORDER,
+        )
+        .unwrap();
+        let caller_built_request = source_request.with_host_node_cleanup_count_for_canary(0);
+        let mut executor = RecordingDeletedSubtreeTeardownExecutor::default();
+
+        let error = execute_test_host_root_deletion_teardown_after_commit_for_canary(
+            &mut store,
+            &mut host,
+            &handoff,
+            source_request,
+            caller_built_request,
+            &mut fixture.detached_hosts,
+            &mut executor,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootDeletionTeardownExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root,
+                commit_order: ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_COMMIT_ORDER,
+                request_order: ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_REQUEST_ORDER,
+            } if root == root_id
+        ));
+        assert!(executor.ref_cleanup_calls().is_empty());
+        assert!(executor.destroy_calls().is_empty());
+        assert_eq!(host.operations(), fixture.operations_before_teardown);
     }
 
     #[test]

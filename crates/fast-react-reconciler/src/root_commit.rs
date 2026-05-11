@@ -945,6 +945,15 @@ impl HostRootFinishedWorkCommitHandoffRecordForCanary {
     }
 
     #[must_use]
+    pub(crate) fn record_function_component_deleted_subtree_passive_effects_for_canary(
+        &mut self,
+        handoffs: &[FunctionComponentDeletedSubtreePendingPassiveCommitHandoff],
+    ) -> Result<&FunctionComponentDeletedSubtreePassiveEffectsSnapshot, RootCommitError> {
+        self.commit
+            .record_function_component_deleted_subtree_passive_effects_for_canary(handoffs)
+    }
+
+    #[must_use]
     pub(crate) const fn current_after_commit(&self) -> FiberId {
         self.current_after_commit
     }
