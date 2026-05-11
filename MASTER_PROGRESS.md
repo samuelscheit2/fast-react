@@ -29,6 +29,58 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 960 Docs Refresh and Workers 948, 955, and 952
+
+- Worker 960 refreshed coordination docs for the `c155d301` baseline after
+  Workers 946, 951, and 950 were accepted. It was accepted at `472b8499`
+  (`Merge worker 960 docs refresh after workers 946 951 950`) with no runtime
+  compatibility claim change.
+- Worker 948 added a private, test-only finished-work commit queue-lane
+  currentness consumer in the root scheduler. The accepted path binds
+  source-owned execution evidence to root/current/finished-work identity,
+  selected/finished/remaining lanes, scheduler callback identity, queue
+  handoff, commit order, update sequence IDs, committed HostRoot state, and
+  committed child topology.
+- Worker 948 also repaired the pre-consume clone hole by minting a private
+  source token for the canonical queue-lane execution record and clearing that
+  token from cloned execution records. Replay, caller-built callback identity
+  drift, stale live roots, scheduler-only evidence, and skipped-lane smuggling
+  remain rejected before consumption. Public React DOM, test renderer,
+  `flushSync`, `act`, Scheduler timing, native host execution, and public
+  effect compatibility remain blocked.
+- Worker 955 added a fail-closed conformance test discovery gate that scans
+  executable conformance gate files and ensures they are covered by the
+  workspace conformance test script, either directly or through covered wrapper
+  imports. Its repaired wrapper detection uses a conservative static-import
+  lexer so commented-out imports and import-looking strings/templates do not
+  count as coverage.
+- Worker 955 updated `tests/conformance/package.json` so
+  `npm run test:conformance` directly runs the public React `act` blocked gate,
+  while recognizing the React DOM root render e2e gate as covered through its
+  script-covered wrapper test. The focused discovery gate, syntax check,
+  package-surface check, import-smoke check, and `git diff --check` passed;
+  full conformance workspace execution still reports pre-existing
+  react-test-renderer serialization and private-admission baseline failures.
+- Worker 952 added a source-owned root lifecycle identity boundary for private
+  resource root-map storage execution records when they are consumed by root
+  paths. Root execution consumers now require current render root lifecycle
+  evidence matching root bridge admission, lifecycle boundary, container
+  identity, visible boundary tokens, and hidden WeakMap payloads before
+  accepting resource root-map evidence.
+- Worker 952 also extended the private-admission 850 resource/form ledger with
+  resource root lifecycle boundary tokens and source-owned currentness fields.
+  Negative coverage rejects omitted bindings, stale lifecycle evidence,
+  cross-root or cross-container reuse, wrong operations, caller-built source
+  tokens, Worker 910 evidence aliases, public compatibility claims, and
+  native/Rust execution claims. Public resource hints, forms, roots, native,
+  Rust, and package compatibility remain blocked.
+- The accepted state for this batch is current main `a34f8c76`
+  (`Merge worker 952 resource hints currentness`) after merge commits
+  `472b8499`, `f3144c8c`, `7e8fb146`, and `a34f8c76`, with focused
+  root-scheduler, conformance discovery, resource/form, resource hints,
+  package-surface/import-smoke, formatting, and `git diff --check` evidence
+  recorded in worker reports and git history.
+
 ### Worker 959 Docs Refresh and Workers 946, 951, and 950
 
 - Worker 959 refreshed coordination docs for the `39e695e1` baseline after
