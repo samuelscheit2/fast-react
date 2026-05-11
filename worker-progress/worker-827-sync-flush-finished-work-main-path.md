@@ -21,8 +21,26 @@
   `sync_flush_all_roots_commit_diagnostics_verify_finished_work_handoff_identity`
   and tightened the existing host-output diagnostics test to assert the new
   handoff identity fields.
+- Restart audit fix: narrowed the test-only direct sync-flush repair in
+  `ensure_sync_flush_finished_work_handoff_identity_for_canary` so it only
+  synthesizes root finished-work metadata when both root metadata fields are
+  truly empty: `(root.finished_work == None, root.finished_lanes == Lanes::NO)`.
+- Added direct-commit negative coverage proving stale `root.finished_work` and
+  mismatched `root.finished_lanes` metadata are rejected with the sync-flush
+  identity mismatch instead of being overwritten before verification.
 
 ## Verification
+
+- `cargo test -p fast-react-reconciler --all-features sync_flush_direct_commit_rejects -- --nocapture` - passed, 2 tests.
+- `cargo test -p fast-react-reconciler --all-features sync_flush -- --nocapture` - passed, 58 tests.
+- `cargo test -p fast-react-reconciler --all-features root_scheduler -- --nocapture` - passed, 74 tests.
+- `cargo test -p fast-react-reconciler --all-features root_work_loop -- --nocapture` - passed, 71 tests.
+- `cargo fmt --all` - run.
+- `cargo check -p fast-react-reconciler --all-features` - passed.
+- `cargo fmt --all --check` - passed.
+- `git diff --check` - passed.
+
+Earlier verification retained from the original branch commit:
 
 - `cargo test -p fast-react-reconciler sync_flush_all_roots_commit_diagnostics_verify_finished_work_handoff_identity --all-targets --all-features` - passed.
 - `cargo test -p fast-react-reconciler sync_flush_handoff_commits_already_renderable_host_output_canary_with_diagnostics --all-targets --all-features` - passed.
@@ -47,3 +65,6 @@
   the new `SYNC_FLUSH_FINISHED_WORK_HANDOFF_IDENTITY_MISMATCH_FOR_CANARY`
   constant and the diagnostics methods that prove the normal all-roots path
   accepted the finished-work/root-finished-lanes handoff.
+- Main has since merged Workers 826, 836, and 837, so future merge conflict
+  review should preserve the narrowed direct-path `(None, Lanes::NO)` synthesis
+  condition and the direct stale/mismatched metadata rejection tests.

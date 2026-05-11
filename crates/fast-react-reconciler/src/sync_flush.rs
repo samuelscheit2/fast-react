@@ -2407,7 +2407,7 @@ fn ensure_sync_flush_finished_work_handoff_identity_for_canary<H: HostTypes>(
     let pending =
         record_host_root_finished_work_pending_commit_for_canary(store, render_phase, order)?;
 
-    if !pending.records_root_finished_work() {
+    if pending.root_finished_work().is_none() && pending.root_finished_lanes() == Lanes::NO {
         store
             .root_mut(render_phase.root())?
             .record_finished_work_for_canary(
@@ -2949,6 +2949,14 @@ mod tests {
         assert_eq!(diagnostics.current_before_commit(), Some(previous_current));
     }
 
+    fn assert_sync_flush_finished_work_handoff_identity_mismatch(error: SyncFlushError) {
+        assert!(matches!(
+            error,
+            SyncFlushError::FinishedWorkCommitHandoff(message)
+                if message == SYNC_FLUSH_FINISHED_WORK_HANDOFF_IDENTITY_MISMATCH_FOR_CANARY
+        ));
+    }
+
     fn root_callback_error(raw: u64) -> RootUpdateCallbackInvocationErrorHandle {
         RootUpdateCallbackInvocationErrorHandle::from_raw(raw)
     }
@@ -3136,6 +3144,76 @@ mod tests {
         assert!(callbacks.hidden().is_empty());
         assert!(callbacks.deferred_hidden().is_empty());
         assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_direct_commit_rejects_stale_root_finished_work_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(66_080));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .record_finished_work_for_canary(previous_current, Lanes::SYNC);
+
+        let error =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record(&mut store, rendered_record)
+                .unwrap_err();
+
+        assert_sync_flush_finished_work_handoff_identity_mismatch(error);
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render_phase.finished_work())
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().finished_work(),
+            Some(previous_current)
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::SYNC);
+        assert!(store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_direct_commit_rejects_root_finished_lanes_metadata_mismatch() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(66_081));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        let mismatched_lanes = Lanes::from(Lane::SYNC_HYDRATION);
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .record_finished_work_for_canary(render_phase.finished_work(), mismatched_lanes);
+
+        let error =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record(&mut store, rendered_record)
+                .unwrap_err();
+
+        assert_sync_flush_finished_work_handoff_identity_mismatch(error);
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render_phase.finished_work())
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().finished_work(),
+            Some(render_phase.finished_work())
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().finished_lanes(),
+            mismatched_lanes
+        );
+        assert!(store.root_scheduler().might_have_pending_sync_work());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
