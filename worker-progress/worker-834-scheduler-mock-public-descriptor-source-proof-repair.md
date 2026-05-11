@@ -22,6 +22,13 @@ Complete; ready for handoff.
   descriptor immutability as proof.
 - Added focused coverage for oracle-compatible public flush helper descriptors
   and for fake validator/replaced helper source-proof rejection.
+- Audit follow-up: hardened React source-validator discovery so a plain fake
+  `require.cache` slot replacement cannot supply a fake module record or fake
+  validator. React now trusts only real loaded CommonJS `Module` records and
+  reuses their Scheduler-owned validators.
+- Added focused cache-slot replacement coverage proving a cloned expired
+  act/root report stays rejected after `require.cache` is replaced with a fake
+  module record containing a fake validator.
 
 ## Verification So Far
 
@@ -56,14 +63,19 @@ Complete; ready for handoff.
   `unstable_flushExpired` helper with a fake diagnostics-bearing helper does
   not let a cloned expired act/root report satisfy Scheduler-owned source
   proof.
+- Audit follow-up coverage confirms replacing
+  `require.cache[packages/scheduler/unstable_mock.js]` with a fake module
+  record and fake validator does not let the same cloned report satisfy source
+  proof.
 
 ## Risks Or Blockers
 
 - No blocker remains in this worker scope.
-- The React gate now reads a Scheduler-owned module-cache record. That keeps
-  public Scheduler exports oracle-compatible, but it remains a package-private
-  CommonJS contract and should be rerun if the Scheduler mock entrypoint is
-  converted away from CommonJS module records.
+- The React gate now trusts Scheduler-owned source-validator records only from
+  real loaded CommonJS `Module` records. That keeps public Scheduler exports
+  oracle-compatible, but it remains a package-private CommonJS contract and
+  should be rerun if the Scheduler mock entrypoint is converted away from
+  CommonJS module records.
 
 ## Recommended Next Tasks
 
