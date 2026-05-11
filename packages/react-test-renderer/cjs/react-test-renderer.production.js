@@ -2663,6 +2663,8 @@ const privateToTreeNativeExecutionStatus =
   'private-totree-native-execution-records-consumed-public-totree-blocked';
 const privateToTreeAcceptedDiagnosticName =
   'fast-react-test-renderer.serialization.private-tree-canary';
+const privateToTreeCommittedFiberInspectionDiagnosticName =
+  'fast-react-test-renderer.serialization.private-tree-committed-fiber-inspection-canary';
 const privateToTreeAcceptedFiberShape = Object.freeze([
   'HostRoot',
   'HostComponent',
@@ -11291,11 +11293,14 @@ function validatePrivateToTreeSiblingTextHostOutputDiagnostic(report) {
       'public_tree_object_available',
       false
     );
+    const committedFiberInspection =
+      validatePrivateToTreeSiblingTextCommittedFiberInspectionDiagnostic(report);
 
     return {
       hostOutputUpdateKind: 'Update',
       rootChildCount: 2,
       sourceFiberCount: privateToTreeCompositeMultiChildAcceptedFiberShape.length,
+      committedFiberInspection,
       result: freezeRecord({
         nodeType: 'component',
         type: privateToTreeFunctionComponentType,
@@ -11329,6 +11334,100 @@ function validatePrivateToTreeSiblingTextHostOutputDiagnostic(report) {
         : 'sibling-text-report-row-or-shape-mismatch';
     throwPrivateToTreeMetadataError(message);
   }
+}
+
+function validatePrivateToTreeSiblingTextCommittedFiberInspectionDiagnostic(report) {
+  const record = readPrivateToJSONRecordField(
+    report,
+    'committedFiberInspection',
+    'committed_fiber_inspection'
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'diagnosticName',
+    'diagnostic_name',
+    privateToTreeCommittedFiberInspectionDiagnosticName
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'sourceTreeDiagnosticName',
+    'source_tree_diagnostic_name',
+    privateToTreeAcceptedDiagnosticName
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'fiberShape',
+    'fiber_shape',
+    privateToTreeCompositeMultiChildAcceptedFiberShape
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'rootChildFiberTags',
+    'root_child_fiber_tags',
+    ['FunctionComponent']
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'hostChildFiberTags',
+    'host_child_fiber_tags',
+    ['HostText', 'HostComponent']
+  );
+  assertPrivateToJSONNumberField(record, 'rootChildCount', 'root_child_count', 1);
+  assertPrivateToJSONNumberField(record, 'hostChildCount', 'host_child_count', 2);
+  assertPrivateToJSONNumberField(
+    record,
+    'hostComponentCount',
+    'host_component_count',
+    1
+  );
+  assertPrivateToJSONNumberField(record, 'hostTextCount', 'host_text_count', 2);
+  assertPrivateToJSONBooleanField(
+    record,
+    'functionComponentPresent',
+    'function_component_present',
+    true
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'functionComponentFiberTag',
+    'function_component_fiber_tag',
+    'FunctionComponent'
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'wrapsCommittedHostOutput',
+    'wraps_committed_host_output',
+    true
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'compatibilityClaimed',
+    'compatibility_claimed',
+    false
+  );
+
+  return freezeRecord({
+    diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+    sourceTreeDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    fiberShape: freezeArray(privateToTreeCompositeMultiChildAcceptedFiberShape),
+    rootChildFiberTags: freezeArray(['FunctionComponent']),
+    hostChildFiberTags: freezeArray(['HostText', 'HostComponent']),
+    rootChildCount: 1,
+    hostChildCount: 2,
+    hostComponentCount: 1,
+    hostTextCount: 2,
+    functionComponentFiberTag: 'FunctionComponent',
+    functionComponentPresent: true,
+    wrapsCommittedHostOutput: true,
+    publicTreeObjectAvailable: false,
+    compatibilityClaimed: false
+  });
 }
 
 function readPrivateToTreeSiblingTextChild(record) {

@@ -9,6 +9,7 @@ Added private CJS-only sibling-text `toTree` admission for `react-test-renderer`
 - The sibling-text identity must carry canonical `rootFinishedLanesHandoff` evidence; alias-only handoff keys remain rejected.
 - Generic sibling-text and broad multichild finished-work identity evidence remains fail-closed for `toTree`.
 - Production CJS uses a narrow sibling-text `toTree` report validator for this private admission without broadening generic production multichild `toTree` serialization.
+- Acceptance-audit follow-up: production CJS now requires the same composite sibling-text `committedFiberInspection` report evidence that development already required before accepting private `toTree` sibling-text admission.
 - Package-root `react-test-renderer` behavior was intentionally left unchanged.
 
 ## Changed Files
@@ -35,19 +36,19 @@ Added private CJS-only sibling-text `toTree` admission for `react-test-renderer`
 
 ## Evidence Gathered
 
-- Focused serialization local gate passed: 10 tests, 10 pass.
+- Focused serialization local gate passed: 11 tests, 11 pass.
 - Focused create-routing gate passed: 32 tests, 32 pass.
-- The touched conformance files also passed in a full-file targeted review run after the final assertion cleanup.
+- Full serialization local gate passed: 11 tests, 11 pass.
 - Workspace react-test-renderer check passed through the smoke import entrypoint inventory.
 - Package surface guard passed; no new public exports or package-root surface changes were introduced.
 - Import smoke passed for accepted entrypoints.
-- `git diff --check` passed after the final cleanup.
+- `git diff --check` passed after the audit fix.
 
 ## Risks Or Blockers
 
 - No blocker found.
 - The new helper methods are private CJS facade properties only; public `toTree`, `toJSON`, `root`, `ReactTestInstance`, native bridge loading, and compatibility claims remain blocked in assertions.
-- CJS production intentionally has a narrow sibling-text validator because generic production `serializeAcceptedTreeMetadata` still does not accept broad multichild reports.
+- CJS production intentionally has a narrow sibling-text validator because generic production `serializeAcceptedTreeMetadata` still does not accept broad multichild reports. That narrow validator now also fails closed on missing or invalid committed-fiber inspection evidence.
 
 ## Recommended Next Tasks
 

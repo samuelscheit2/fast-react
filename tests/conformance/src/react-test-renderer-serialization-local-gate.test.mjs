@@ -2712,6 +2712,24 @@ test("react-test-renderer JS private serialization finished-work identity valida
       );
       assertToTreeSiblingTextAdmissionRejection(
         treeFacade,
+        withSiblingTextReportChange(siblingTreeReport, (report) => {
+          delete report.committedFiberInspection;
+        }),
+        siblingTextIdentity,
+        updateError.rootRequest,
+        /committedFiberInspection/u
+      );
+      assertToTreeSiblingTextAdmissionRejection(
+        treeFacade,
+        withSiblingTextReportChange(siblingTreeReport, (report) => {
+          report.committedFiberInspection.compatibilityClaimed = true;
+        }),
+        siblingTextIdentity,
+        updateError.rootRequest,
+        /compatibilityClaimed/u
+      );
+      assertToTreeSiblingTextAdmissionRejection(
+        treeFacade,
         siblingTreeReport,
         withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
           delete evidence.rootFinishedLanesHandoff;
@@ -2936,6 +2954,76 @@ test("react-test-renderer JS private serialization finished-work identity valida
       }),
       treeReport,
       "FastReactTestRendererPrivateToTreeMetadataError"
+    );
+  }
+});
+
+test("react-test-renderer CJS dev/prod private toTree sibling text admission requires committed fiber inspection", () => {
+  const cjsEntries = jsEntrypoints.filter((entry) =>
+    entry.entrypoint.includes("/cjs/")
+  );
+  assert.deepEqual(
+    cjsEntries.map((entry) => entry.entrypoint),
+    [
+      "react-test-renderer/cjs/react-test-renderer.development",
+      "react-test-renderer/cjs/react-test-renderer.production"
+    ]
+  );
+
+  for (const entry of cjsEntries) {
+    const moduleExports = loadFresh(entry.specifier);
+    const renderer = moduleExports.create({
+      type: "span",
+      props: {},
+      children: ["hello"]
+    });
+    const updateError = captureThrown(() =>
+      renderer.update({
+        type: "span",
+        props: {},
+        children: ["goodbye"]
+      })
+    );
+    captureThrown(() => renderer.toTree());
+    const treeFacade = Object.getOwnPropertyDescriptor(
+      renderer.toTree,
+      privateToTreeFacadeSymbol
+    ).value;
+    const siblingTreeReport = createAcceptedMultiChildTreeMetadataDiagnostic({
+      composite: true,
+      hostOutputUpdateKind: "Update"
+    });
+    const siblingTextIdentity =
+      createAcceptedSiblingTextFinishedWorkIdentityEvidence({
+        rootRequest: updateError.rootRequest
+      });
+
+    assert.equal(
+      treeFacade.canCreateAcceptedSiblingTextDiagnosticResult(
+        siblingTreeReport,
+        siblingTextIdentity,
+        updateError.rootRequest
+      ),
+      true,
+      entry.entrypoint
+    );
+    assertToTreeSiblingTextAdmissionRejection(
+      treeFacade,
+      withSiblingTextReportChange(siblingTreeReport, (report) => {
+        delete report.committedFiberInspection;
+      }),
+      siblingTextIdentity,
+      updateError.rootRequest,
+      /committedFiberInspection/u
+    );
+    assertToTreeSiblingTextAdmissionRejection(
+      treeFacade,
+      withSiblingTextReportChange(siblingTreeReport, (report) => {
+        report.committedFiberInspection.compatibilityClaimed = true;
+      }),
+      siblingTextIdentity,
+      updateError.rootRequest,
+      /compatibilityClaimed/u
     );
   }
 });
