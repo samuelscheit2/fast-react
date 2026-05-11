@@ -1,40 +1,112 @@
 'use strict';
 
-const privateHydrateRootSourceLedgerPayloads = new WeakMap();
-
-function registerPrivateHydrateRootSourceLedgerRecord(record, payload) {
-  if (!isObjectOrFunction(record) || !isObjectOrFunction(payload)) {
-    throw new Error(
-      'Private hydrateRoot source ledger records require object WeakMap keys and payloads.'
-    );
-  }
-
-  privateHydrateRootSourceLedgerPayloads.set(
-    record,
-    Object.freeze({
-      ...payload,
-      record
-    })
-  );
-  return record;
-}
+let rootBridgeModule = null;
 
 function getPrivateHydrateRootSourceLedgerRecordPayload(record) {
-  return privateHydrateRootSourceLedgerPayloads.get(record) || null;
+  const rootBridge = getRootBridgeModule();
+  return (
+    getHydrateRootPreflightRecordPayload(rootBridge, record) ||
+    getHydrateRootEventReplayPreflightPayload(rootBridge, record) ||
+    getHydrateRootExecutionPreflightPayload(rootBridge, record) ||
+    getHydrateRootLifecycleRequestBoundaryPayload(rootBridge, record)
+  );
 }
 
 function isPrivateHydrateRootSourceLedgerRecord(value) {
-  return privateHydrateRootSourceLedgerPayloads.has(value);
+  return getPrivateHydrateRootSourceLedgerRecordPayload(value) !== null;
 }
 
-function isObjectOrFunction(value) {
-  return (
-    value !== null && (typeof value === 'object' || typeof value === 'function')
+function getHydrateRootPreflightRecordPayload(rootBridge, record) {
+  const getPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload;
+  if (typeof getPayload !== 'function') {
+    return null;
+  }
+  const payload = getPayload(record);
+  if (payload === null) {
+    return null;
+  }
+
+  return createSourceLedgerPayload(
+    record,
+    payload,
+    'hydrate-root-public-facade-preflight-record'
   );
+}
+
+function getHydrateRootEventReplayPreflightPayload(rootBridge, record) {
+  const getPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload;
+  if (typeof getPayload !== 'function') {
+    return null;
+  }
+  const payload = getPayload(record);
+  if (payload === null) {
+    return null;
+  }
+
+  return createSourceLedgerPayload(
+    record,
+    payload,
+    'hydrate-root-public-facade-event-replay-preflight-record'
+  );
+}
+
+function getHydrateRootExecutionPreflightPayload(rootBridge, record) {
+  const getPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeExecutionPreflightPayload;
+  if (typeof getPayload !== 'function') {
+    return null;
+  }
+  const payload = getPayload(record);
+  if (payload === null) {
+    return null;
+  }
+
+  return createSourceLedgerPayload(
+    record,
+    payload,
+    'hydrate-root-public-facade-execution-preflight-record'
+  );
+}
+
+function getHydrateRootLifecycleRequestBoundaryPayload(rootBridge, record) {
+  const getPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload;
+  if (typeof getPayload !== 'function') {
+    return null;
+  }
+  const payload = getPayload(record);
+  if (payload === null) {
+    return null;
+  }
+
+  return createSourceLedgerPayload(
+    record,
+    payload,
+    'hydrate-root-public-facade-lifecycle-request-boundary'
+  );
+}
+
+function createSourceLedgerPayload(record, payload, ledgerKind) {
+  const requestRecord = payload.requestRecord;
+  return Object.freeze({
+    ...payload,
+    hydrationBoundaryRecord:
+      requestRecord == null ? null : requestRecord.hydrationBoundaryRecord,
+    ledgerKind,
+    record
+  });
+}
+
+function getRootBridgeModule() {
+  if (rootBridgeModule === null) {
+    rootBridgeModule = require('./root-bridge.js');
+  }
+  return rootBridgeModule;
 }
 
 module.exports = {
   getPrivateHydrateRootSourceLedgerRecordPayload,
-  isPrivateHydrateRootSourceLedgerRecord,
-  registerPrivateHydrateRootSourceLedgerRecord
+  isPrivateHydrateRootSourceLedgerRecord
 };

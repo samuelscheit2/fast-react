@@ -5,7 +5,7 @@
 - Added a private/test-only `FastReactDomHydrationRecoverableErrorBoundaryAdmissionRecord`.
 - Extended accepted hydration boundary metadata with `hydration-recoverable-error-boundary-admission`.
 - The new admission requires canonical WeakMap-backed hydration boundary, recoverable-error preflight, target-claiming, and blocked replay execution records.
-- The admission also requires hydrateRoot public-facade source-ledger evidence: current hydrateRoot preflight, event replay preflight, execution preflight, and source-owned active lifecycle request boundary with shared WeakMap payload ownership.
+- The admission also requires hydrateRoot public-facade source-ledger evidence: current hydrateRoot preflight, event replay preflight, execution preflight, and source-owned active lifecycle request boundary derived from root-bridge WeakMap payload ownership.
 - Rechecks marker and target currentness at admission time so replay is rejected after marker or target state changes.
 - Rejects cloned/caller-built rows, cloned or rewired source-ledger records, cross-root source ledgers, missing lifecycle/source ledger evidence, stale marker/target evidence, and recoverable-error callback/value alias options.
 
@@ -24,8 +24,8 @@
 1. `recordUnsupportedHydrateRoot` creates the private hydration boundary record and accepted metadata ledger.
 2. hydrateRoot public facade preflight creates the recoverable-error preflight plus lifecycle request-boundary ledger.
 3. target claiming and event replay preflight create canonical target-claiming and blocked replay execution records.
-4. Root bridge registers each hydrateRoot public-facade source-ledger record in `hydrate-root-source-ledger.js`, keyed by the exact record object.
-5. `createHydrationRecoverableErrorBoundaryAdmissionRecord` accepts only when all identities match the same boundary/options/source ledger and all ledger rows have source-owned WeakMap payloads.
+4. `hydrate-root-source-ledger.js` lazily reads root-bridge WeakMap-backed hydrateRoot public-facade payloads and exposes no caller registrar.
+5. `createHydrationRecoverableErrorBoundaryAdmissionRecord` accepts only when all identities match the same boundary/options/source ledger and all ledger rows resolve to root-bridge source-owned WeakMap payloads.
 6. The admission re-inspects current markers and re-resolves the target path against the original dispatch target before recording the boundary row.
 
 ## Commands Run
@@ -50,13 +50,13 @@ All commands passed.
 ## Evidence Gathered
 
 - Positive hydration boundary test proves a current hydrateRoot lifecycle/replay/recoverable-error source chain admits exactly one private recoverable-error boundary row without invoking callbacks or mutating DOM/listeners.
-- Negative hydration boundary test proves cloned preflight/claim/replay records, cloned/rewired source-ledger rows, missing lifecycle ledger, cross-root source ledger, callback/root-options aliases, stale marker rows, and stale target rows fail closed.
+- Negative hydration boundary test proves cloned preflight/claim/replay records, cloned/rewired source-ledger rows, caller registrar import abuse, one-at-a-time mixed source-ledger swaps, missing lifecycle ledger, cross-root source ledger, callback/root-options aliases, stale marker rows, and stale target rows fail closed.
 - Adjacent private hydration/root-bridge tests pass with the added accepted metadata row.
 
 ## Risks Or Blockers
 
 - This remains diagnostic/private evidence only; no public `hydrateRoot`, real replay, real hydration, root scheduling, or DOM mutation behavior is opened.
-- Source-ledger validation uses the shared `hydrate-root-source-ledger.js` WeakMap payload path so `hydration-boundary-gate.js` does not import `root-bridge.js` or accept caller-shaped ledger clones.
+- Source-ledger validation uses shared `hydrate-root-source-ledger.js` readers over root-bridge WeakMap payloads. The module exports no write/registration capability, so caller-shaped clones cannot become source-owned by importing it.
 - Worker 901 is concurrently changing React DOM root bridge lifecycle evidence. If its lifecycle record field names/status strings change, this admission canary may need a small alignment patch.
 
 ## Recommended Next Tasks

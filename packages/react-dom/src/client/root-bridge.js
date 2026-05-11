@@ -108,9 +108,6 @@ const {
     isPluginPortalEventOwnerRootGateRecord
 } = require('../events/plugin-event-system.js');
 const {
-  registerPrivateHydrateRootSourceLedgerRecord
-} = require('./hydrate-root-source-ledger.js');
-const {
   appendChild,
   appendChildToContainer,
   appendInitialChild,
@@ -3830,11 +3827,6 @@ function createPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(
     record,
     lifecycleRequestBoundaryPayload
   );
-  registerPrivateHydrateRootSourceLedgerRecord(record, {
-    ...lifecycleRequestBoundaryPayload,
-    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
-    ledgerKind: 'hydrate-root-public-facade-lifecycle-request-boundary'
-  });
   return record;
 }
 
@@ -4032,11 +4024,6 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     record,
     preflightRecordPayload
   );
-  registerPrivateHydrateRootSourceLedgerRecord(record, {
-    ...preflightRecordPayload,
-    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
-    ledgerKind: 'hydrate-root-public-facade-preflight-record'
-  });
   return record;
 }
 
@@ -5046,11 +5033,6 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     record,
     eventReplayPreflightPayload
   );
-  registerPrivateHydrateRootSourceLedgerRecord(record, {
-    ...eventReplayPreflightPayload,
-    hydrationBoundaryRecord,
-    ledgerKind: 'hydrate-root-public-facade-event-replay-preflight-record'
-  });
   return record;
 }
 
@@ -5494,11 +5476,6 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     record,
     executionPreflightPayload
   );
-  registerPrivateHydrateRootSourceLedgerRecord(record, {
-    ...executionPreflightPayload,
-    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
-    ledgerKind: 'hydrate-root-public-facade-execution-preflight-record'
-  });
   return record;
 }
 

@@ -17,6 +17,10 @@ const rootBridge = require(path.join(
   packageRoot,
   'src/client/root-bridge.js'
 ));
+const hydrateRootSourceLedger = require(path.join(
+  packageRoot,
+  'src/client/hydrate-root-source-ledger.js'
+));
 const domContainer = require(path.join(
   packageRoot,
   'src/client/dom-container.js'
@@ -2031,6 +2035,38 @@ test('private hydration recoverable error boundary admission rejects stale clone
       }),
     invalidAdmission
   );
+  for (const mixedSourceLedgerOptions of [
+    {
+      eventReplayPreflightRecord: other.eventReplayPreflightRecord
+    },
+    {
+      executionPreflightRecord: other.executionPreflightRecord
+    },
+    {
+      hydrateRootPreflightRecord: other.hydrateRecord
+    },
+    {
+      lifecycleRequestBoundary: other.lifecycleRequestBoundary
+    }
+  ]) {
+    assert.throws(
+      () =>
+        createHydrationRecoverableBoundaryAdmission(scenario, {
+          options: mixedSourceLedgerOptions
+        }),
+      invalidAdmission
+    );
+  }
+  assert.equal(
+    hydrateRootSourceLedger.registerPrivateHydrateRootSourceLedgerRecord,
+    undefined
+  );
+  assert.notEqual(
+    hydrateRootSourceLedger.getPrivateHydrateRootSourceLedgerRecordPayload(
+      scenario.hydrateRecord
+    ),
+    null
+  );
   const clonedLifecycleRequestBoundary = Object.freeze({
     ...scenario.lifecycleRequestBoundary
   });
@@ -2047,6 +2083,19 @@ test('private hydration recoverable error boundary admission rejects stale clone
     eventReplayPreflight: clonedEventReplayPreflightRecord,
     lifecycleRequestBoundary: clonedLifecycleRequestBoundary
   });
+  for (const clonedSourceLedgerRecord of [
+    clonedHydrateRootPreflightRecord,
+    clonedEventReplayPreflightRecord,
+    clonedExecutionPreflightRecord,
+    clonedLifecycleRequestBoundary
+  ]) {
+    assert.equal(
+      hydrateRootSourceLedger.getPrivateHydrateRootSourceLedgerRecordPayload(
+        clonedSourceLedgerRecord
+      ),
+      null
+    );
+  }
   assert.throws(
     () =>
       createHydrationRecoverableBoundaryAdmission(scenario, {
