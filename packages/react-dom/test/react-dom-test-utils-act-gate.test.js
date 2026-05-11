@@ -411,6 +411,29 @@ test('private act gate preflights delayed Scheduler diagnostics through nested e
   }
 });
 
+test('private act gate rejects Scheduler-first delayed diagnostics that only hit require cache', () => {
+  for (const nodeEnv of ['development', 'production']) {
+    const { Scheduler, report } =
+      createSchedulerMockDelayedActRootWorkDiagnostics(nodeEnv, {
+        schedulerFirstCacheHit: true
+      });
+
+    assert.equal(
+      report[privateSchedulerMockDelayedActRootWorkDiagnosticsBrand],
+      true,
+      nodeEnv
+    );
+    assertReactDomDelayedSchedulerDiagnosticsRejected(
+      gateModule,
+      report,
+      'scheduler-delayed-act-root-diagnostics-metadata',
+      `${nodeEnv}:scheduler-first-cache-hit`
+    );
+
+    Scheduler.reset();
+  }
+});
+
 test('private act gate validates delayed Scheduler prerequisite manifest and public claims', () => {
   const gate = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate();
   const baseline = gate.acceptedPrivatePrerequisites.find(
@@ -793,9 +816,12 @@ test('private act gate prevents gateOverride tampering of Worker 810 ledger surf
   assert.equal(evaluated.sideEffectPolicy.executesRendererRoots, false);
 });
 
-function createSchedulerMockDelayedActRootWorkDiagnostics(nodeEnv) {
-  const Scheduler = loadFreshSchedulerMock(nodeEnv);
-  const reactGate = loadFreshReactActDispatcherGate();
+function createSchedulerMockDelayedActRootWorkDiagnostics(
+  nodeEnv,
+  options = {}
+) {
+  const { Scheduler, reactGate } =
+    loadSchedulerMockAndReactGateForSourceProof(nodeEnv, options);
   const diagnostics =
     Scheduler.unstable_flushExpired[privateActQueueFlushDiagnosticsExport];
 
@@ -885,6 +911,21 @@ function createSchedulerMockDelayedActRootWorkDiagnostics(nodeEnv) {
     reactGate,
     report: Scheduler.unstable_flushExpired(delayedMetadata)
   };
+}
+
+function loadSchedulerMockAndReactGateForSourceProof(
+  nodeEnv,
+  { schedulerFirstCacheHit = false } = {}
+) {
+  if (schedulerFirstCacheHit) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const reactGate = loadFreshReactActDispatcherGate();
+    return { Scheduler, reactGate };
+  }
+
+  const reactGate = loadFreshReactActDispatcherGate();
+  const Scheduler = loadFreshSchedulerMock(nodeEnv);
+  return { Scheduler, reactGate };
 }
 
 function createExpiredActRootWorkMetadata(
