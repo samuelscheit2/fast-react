@@ -45,27 +45,18 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Workers 803-825 have been accepted, verified,
-merged, and cleaned up. Workers 826-837 are active in isolated worktrees.
-Accepted private evidence still keeps public root, act, Scheduler timing,
-hydration, serialization, native execution, package compatibility, and broad
-renderer compatibility blocked.
+Top-level cap: 30 workers. Accepted/merged baseline includes Workers 803-837,
+842, 843, 845, 846, and 849-852. Accepted private evidence still keeps public
+root, act, Scheduler timing, hydration, serialization, native execution,
+package compatibility, and broad renderer compatibility blocked.
 
-Active workers:
+Current audit queue:
 
-- Worker 826: root-work-loop managed-child sibling-order handoff.
-- Worker 827: sync-flush finished-work/root-finished-lanes main-path handoff.
-- Worker 828: hydrateRoot text-claim patch bridge execution after the private
-  execution-preflight boundary.
-- Worker 829: resource root-map storage private execution.
-- Worker 830: form action fulfilled-callback reset fake commit.
-- Worker 831: package-root `toTree` sibling-text private admission.
-- Worker 832: Rust test-renderer unmount/nested native execution consumer.
-- Worker 833: native cleanup-hook callable private preflight.
-- Worker 834: Scheduler mock public descriptor/source-proof repair.
-- Worker 835: React DOM test-utils act delayed Scheduler handoff.
-- Worker 836: reconciler private act queue execution path.
-- Worker 837: scheduler-driven passive effect execution.
+- Workers 844 and 853: competing test-renderer package-root native execution
+  candidates under audit.
+- Worker 848: React DOM nested facade native handoff under audit.
+- Future workers may be spawned after these audit decisions. Do not treat
+  Workers 844, 848, or 853 as accepted until a reviewed result is merged.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -73,10 +64,8 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Audit and merge Workers 826-837 as they complete. Expect intentional overlap
-   in reconciler sync-flush/root-scheduler paths, React DOM act/hydration/
-   resource/form tests, Scheduler mock source proof, and test-renderer private
-   serialization/native evidence.
+1. Finish audit decisions for competing Workers 844/853 and pending Worker 848
+   before spawning dependent native/package-root or nested facade follow-ups.
 2. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
@@ -86,29 +75,33 @@ canonical evidence requirements.
 ## Next Queue Candidates
 
 - Scheduler work can move beyond the accepted delayed renderer-root producer and
-  React delayed mock preflight only after public Scheduler timing, public
+  React delayed mock preflight, descriptor/source-proof repair, and test-utils
+  gate-first source route only after public Scheduler timing, public
   `act`/root semantics, renderer/effect execution, public flush helper
   behavior, and compatibility are proven together.
 - Native worker-thread teardown can move beyond Worker 740's inert package
-  mirror only after executable native addon loading, cleanup hooks, scheduling,
-  renderer/reconciler output, and no-stale-value behavior are proven together.
+  mirror, cleanup callable preflights, native root batch lifecycle diagnostics,
+  and JSON batch lifecycle links only after executable native addon loading,
+  cleanup hooks, scheduling, renderer/reconciler output, and no-stale-value
+  behavior are proven together.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
-  target-claiming, recoverable-error, and replay-target preflights. Future
+  target-claiming, recoverable-error, replay-target preflights, private
+  text-claim patch execution, and the text-patch admission ledger. Future
   hydration work must prove real root creation, marker/listener behavior,
   recoverable error routing, event replay, and DOM mutation semantics against
   React 19.2.6.
-- Future sibling-text native execution or JS/CJS serialization work should
-  consume the dedicated private sibling-text identity gates explicitly. Public
-  sibling-text serialization, package compatibility, native bridge
-  loading/execution, and broad multichild identity remain blocked.
+- Future sibling-text or package-root native execution work should consume the
+  dedicated private sibling-text identity/admission gates and only the audited
+  Worker 844/853 result if one is accepted. Public sibling-text serialization,
+  package compatibility, native bridge loading/execution, and broad multichild
+  identity remain blocked.
 - Resource and form work remains private/fake after accepted root-map storage
-  and rejected-error preflights. Workers 829 and 830 may advance private
-  execution records, but public resources, forms, reset/action invocation,
-  DOM/head mutation, and package compatibility remain blocked.
-- Worker 736's nested `toJSON` source-report identity and Worker 733's unmount
-  identity gates are now connected by an accepted static bridge ledger and are
-  active input for Workers 831 and 832. JS/CJS, public serialization, native
-  bridge loading/execution, and package compatibility remain blocked.
+  execution, fulfilled-reset fake execution, and the resource/form execution
+  admission ledger. Public resources, forms, reset/action invocation, DOM/head
+  mutation, and package compatibility remain blocked.
+- React DOM facade/native handoffs remain private diagnostics after accepted
+  update/unmount native handoff metadata. Worker 848's nested facade native
+  handoff is still under audit and must not be used as accepted input yet.
 - Additional private root/test-renderer bridge gates that require accepted
   `finished_work` / `finished_lanes` handoff before any wider serialization or
   native bridge execution.
