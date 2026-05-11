@@ -29,6 +29,100 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 917 and 920
+
+- Worker 917 added reconciler-owned private direct committed-fiber inspection
+  for `HostRoot -> HostComponent -> [HostText, HostText]`, including actual
+  `StateNodeHandle` identity and source/currentness rows for current root,
+  previous/committed/store current, finished-work and finished-lanes,
+  parent/child/sibling order, props/text identity, node lanes, and live
+  `FiberArena` topology. Its audit fix restores the generic
+  `inspect_test_renderer_committed_fiber_tree` boundary so the direct
+  multi-child shape remains blocked outside the private reconciler canary.
+  Public serialization, react-test-renderer compatibility, React DOM
+  compatibility, native execution, broad renderer behavior, act, Scheduler, and
+  package compatibility remain blocked.
+- Worker 920 strengthened private `HostNodeStore` update payloads with
+  source-owned currentness and monotonic replay rejection. Applied property
+  updates, text updates, and latest-props rows now bind source sequence,
+  handle, root, fiber, token, phase, and target identity, with real host-work
+  component property and text update commit paths threading scoped currentness
+  before store application. Stale invalidated/removed handles, wrong
+  root/fiber/token/phase/target payloads, replayed property/text updates,
+  cross-target application, sequence-only currentness, and public DOM
+  compatibility claims are rejected. Public DOM/test-renderer/native execution,
+  renderer compatibility, root public behavior, and package compatibility
+  remain blocked.
+- The accepted state for this batch is current main `da842580`
+  (`Merge worker 920 host node store update payload currentness`) after the
+  focused reconciler/host-node/host-work checks, formatting, and
+  `git diff --check` verification recorded in worker reports and git history.
+
+### Workers 902, 906-909, 912-916, 918-919, and 921
+
+- Worker 902 added private package-root/CJS test-renderer act/update lifecycle
+  boundary evidence requiring source-owned create/latest-update/unmount
+  lifecycle rows, same-root update native bridge admission, and package-created
+  finished-work/current host-output identity before accepting the private
+  passive-drain diagnostic. Public act, Scheduler flushing, update behavior,
+  serialization, native bridge loading/execution, and package compatibility
+  remain blocked.
+- Workers 906 and 907 hardened the private HostRoot queue/lane scheduler
+  continuation path. Worker 907 requires requested scheduler callback identity
+  to remain current and adds stale-callback, selected-lane mismatch, and replay
+  negative canaries. Worker 906 adds an expired Default+Sync continuation that
+  delegates through Worker 904's accepted queue/lane handoff without
+  re-recording caller-provided handoff evidence. Public Scheduler timing,
+  public roots, React DOM/test-renderer roots, hooks, act, `flushSync`, and
+  package compatibility remain blocked.
+- Worker 908 added a Rust test-only N-API cleanup-generation currentness gate
+  that composes accepted native generation/replay rows, cleanup-generation
+  handoff rows, and cleanup-hook identity evidence while rejecting stale,
+  cloned, cross-environment, replayed, retired, caller-built, and public native
+  execution claims. Native addon loading, real cleanup-hook execution,
+  worker-thread teardown, package exports, and public native compatibility
+  remain blocked.
+- Workers 909 and 914 added Scheduler currentness coverage. Worker 909 seals
+  the private Scheduler variant ledger against live package/source identity,
+  physical entrypoints, wrapper targets, private diagnostic statuses, and
+  source digests. Worker 914 re-runs safe public root-entry observations
+  against the checked Scheduler oracle for export shape, priority ordering,
+  FIFO, delay/cancellation/continuation, yield/frame-rate, and Node host
+  transport rows. Public Scheduler timing, root/act/native/postTask/mock
+  behavior, package compatibility, and native runtime execution remain blocked.
+- Workers 912, 915, 916, and 913 added current public-surface blockers.
+  Worker 912 records WeakMap-backed React DOM root-listener currentness for
+  root, owner-document `selectionchange`, same-container, and same-document
+  dedupe rows. Worker 915 forces private React DOM client facade hooks behind
+  non-enumerable, non-configurable, non-writable symbol descriptors while
+  public `createRoot`/`hydrateRoot` still throw before creating roots,
+  callbacks, markers, listeners, or fake-DOM mutation. Worker 916 records
+  transition blocker currentness for rootless `startTransition` and placeholder
+  `useTransition`/`useDeferredValue`. Worker 913 records public `React.act`
+  blocked currentness for rootless sync, async, error, and thenable callback
+  shapes while React Server keeps `act` absent. Public roots, hydration, event
+  dispatch, transition hooks, act execution, Scheduler timing, renderer
+  behavior, warnings/thenables, and package compatibility remain blocked.
+- Workers 918, 919, and 921 added private reconciler gates around
+  function/complete/begin work. Worker 918 records render-phase update
+  current-rendering fiber/queue ownership, rerender-limit, queue processing,
+  cleanup, eager-state mismatch, stale dispatch, and scheduler non-escape
+  evidence for `useState`/`useReducer`. Worker 919 records
+  `appendAllChildren`-style terminal HostComponent/HostText descendant
+  collection through FunctionComponent/Fragment wrappers while rejecting portal,
+  Suspense/Offscreen, missing-node, order, duplicate, stale/clone, and public
+  compatibility claims. Worker 921 records the begin-work FunctionComponent
+  bailout blocker for same-props/no relevant lanes/no context child traversal
+  and rejects props, scheduled lane, context, child-lane, and memo-tag cases.
+  Public hook dispatchers, root scheduling, effects, renderer mutation, DOM,
+  native, test-renderer, act, Scheduler, and package compatibility remain
+  blocked.
+- The accepted state for this batch is the assigned baseline at
+  `6d2dafad` (`Merge worker 921 begin work function component bailout blocker`)
+  after the focused Rust/JS/package checks, import-smoke checks where
+  applicable, formatting, and `git diff --check` verification recorded in
+  worker reports and git history.
+
 ### Workers 904, 901, and 899
 
 - Worker 904 added a private Rust test-only HostRoot queue/lane scheduler
