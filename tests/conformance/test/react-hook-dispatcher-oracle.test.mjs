@@ -196,6 +196,302 @@ const expectedAcceptedTransitionReconcilerRecords = [
   "RootTransitionEntanglementRecord",
   "UpdateContainerResult"
 ];
+const expectedUnsupportedPlaceholderHookNames = [
+  "useActionState",
+  "useOptimistic",
+  "useSyncExternalStore",
+  "useEffectEvent",
+  "useId",
+  "useDebugValue"
+];
+const expectedUnsupportedPublicShapeBlockerFields = [
+  "hookName",
+  "reactSourceFunction",
+  "reactDispatcherMethod",
+  "reactSourceLength",
+  "currentPublicExport",
+  "currentName",
+  "currentLength",
+  "blocker"
+];
+const expectedUnsupportedPublicShapeBlockers = [
+  {
+    hookName: "useActionState",
+    reactSourceFunction: "ReactHooks.useActionState",
+    reactDispatcherMethod: "dispatcher.useActionState",
+    reactSourceLength: 3,
+    currentPublicExport: "react.useActionState placeholder",
+    currentName: "useActionState",
+    currentLength: 0,
+    blocker:
+      "public export remains a createUnimplementedFunction placeholder until action state queues, async action lifecycle, scheduler lanes, and renderer compatibility are admitted"
+  },
+  {
+    hookName: "useOptimistic",
+    reactSourceFunction: "ReactHooks.useOptimistic",
+    reactDispatcherMethod: "dispatcher.useOptimistic",
+    reactSourceLength: 2,
+    currentPublicExport: "react.useOptimistic placeholder",
+    currentName: "useOptimistic",
+    currentLength: 0,
+    blocker:
+      "public export remains a createUnimplementedFunction placeholder until optimistic state queues, revert lanes, and renderer scheduling are admitted"
+  },
+  {
+    hookName: "useSyncExternalStore",
+    reactSourceFunction: "ReactHooks.useSyncExternalStore",
+    reactDispatcherMethod: "dispatcher.useSyncExternalStore",
+    reactSourceLength: 3,
+    currentPublicExport: "react.useSyncExternalStore placeholder",
+    currentName: "useSyncExternalStore",
+    currentLength: 0,
+    blocker:
+      "public export remains a createUnimplementedFunction placeholder until external store subscription, snapshot consistency, hydration, and renderer scheduling are admitted"
+  },
+  {
+    hookName: "useEffectEvent",
+    reactSourceFunction: "ReactHooks.useEffectEvent",
+    reactDispatcherMethod: "dispatcher.useEffectEvent",
+    reactSourceLength: 1,
+    currentPublicExport: "react.useEffectEvent placeholder",
+    currentName: "useEffectEvent",
+    currentLength: 0,
+    blocker:
+      "public export remains a createUnimplementedFunction placeholder until effect-event callback identity and commit-time invocation rules are admitted"
+  },
+  {
+    hookName: "useId",
+    reactSourceFunction: "ReactHooks.useId",
+    reactDispatcherMethod: "dispatcher.useId",
+    reactSourceLength: 0,
+    currentPublicExport: "react.useId placeholder",
+    currentName: "useId",
+    currentLength: 0,
+    blocker:
+      "public export remains a createUnimplementedFunction placeholder until root tree-id allocation, hydration id prefixes, and renderer output compatibility are admitted"
+  },
+  {
+    hookName: "useDebugValue",
+    reactSourceFunction: "ReactHooks.useDebugValue",
+    reactDispatcherMethod: "dispatcher.useDebugValue",
+    reactSourceLength: 2,
+    currentPublicExport: "react.useDebugValue placeholder",
+    currentName: "useDebugValue",
+    currentLength: 0,
+    blocker:
+      "public export remains a createUnimplementedFunction placeholder until devtools debug-value formatting and renderer instrumentation are admitted"
+  }
+];
+const expectedUnsupportedSourceReportFieldNames = [
+  "kind",
+  "version",
+  "status",
+  "reactSourceTag",
+  "reactSourceCommit",
+  "reactHooksSource",
+  "reactClientSource",
+  "reactReconcilerSource",
+  "fastReactSource",
+  "hookCount",
+  "dispatcherMethodsCurrentInReactSource",
+  "publicExportsPlaceholderBlocked",
+  "compatibilityClaimed"
+];
+const expectedUnsupportedSourceReport = {
+  kind: "fast-react.private.unsupported_placeholder_hook_source_report",
+  version: 1,
+  status: "source-current-for-react-19.2.6-unsupported-placeholder-hooks",
+  reactSourceTag: "v19.2.6",
+  reactSourceCommit: "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401",
+  reactHooksSource: "packages/react/src/ReactHooks.js",
+  reactClientSource: "packages/react/src/ReactClient.js",
+  reactReconcilerSource: "packages/react-reconciler/src/ReactFiberHooks.js",
+  fastReactSource: "packages/react/index.js",
+  hookCount: 6,
+  dispatcherMethodsCurrentInReactSource: true,
+  publicExportsPlaceholderBlocked: true,
+  compatibilityClaimed: false
+};
+const expectedUnsupportedBlockerCurrentnessFieldNames = [
+  "status",
+  "compatibilityTarget",
+  "sourceReportCurrent",
+  "publicExportsPlaceholderBlocked",
+  "dispatcherRoutingBlocked",
+  "dispatcherPrerequisitesBlocked",
+  "schedulerPrerequisitesBlocked",
+  "rootLanePrerequisitesBlocked",
+  "rootSchedulingBlocked",
+  "rendererCompatibilityBlocked",
+  "callbackInvocationBlocked",
+  "externalStoreInvocationBlocked",
+  "idGenerationBlocked",
+  "debugValueInstrumentationBlocked",
+  "publicCompatibilityClaimed",
+  "compatibilityClaimed"
+];
+const expectedUnsupportedBlockerCurrentness = {
+  status:
+    "blocked-until-dispatcher-scheduler-root-renderer-and-hook-semantics-admitted",
+  compatibilityTarget: "react@19.2.6",
+  sourceReportCurrent: true,
+  publicExportsPlaceholderBlocked: true,
+  dispatcherRoutingBlocked: true,
+  dispatcherPrerequisitesBlocked: true,
+  schedulerPrerequisitesBlocked: true,
+  rootLanePrerequisitesBlocked: true,
+  rootSchedulingBlocked: true,
+  rendererCompatibilityBlocked: true,
+  callbackInvocationBlocked: true,
+  externalStoreInvocationBlocked: true,
+  idGenerationBlocked: true,
+  debugValueInstrumentationBlocked: true,
+  publicCompatibilityClaimed: false,
+  compatibilityClaimed: false
+};
+const expectedUnsupportedCallbackInvocationReportFieldNames = [
+  "useActionStateActionInvocationBlocked",
+  "useOptimisticReducerInvocationBlocked",
+  "useEffectEventCallbackInvocationBlocked",
+  "useDebugValueFormatterInvocationBlocked",
+  "invokesActionStateAction",
+  "invokesOptimisticReducer",
+  "invokesEffectEventCallback",
+  "invokesDebugValueFormatter",
+  "callbackExecutionClaimed",
+  "compatibilityClaimed"
+];
+const expectedUnsupportedCallbackInvocationReport = {
+  useActionStateActionInvocationBlocked: true,
+  useOptimisticReducerInvocationBlocked: true,
+  useEffectEventCallbackInvocationBlocked: true,
+  useDebugValueFormatterInvocationBlocked: true,
+  invokesActionStateAction: false,
+  invokesOptimisticReducer: false,
+  invokesEffectEventCallback: false,
+  invokesDebugValueFormatter: false,
+  callbackExecutionClaimed: false,
+  compatibilityClaimed: false
+};
+const expectedUnsupportedExternalStoreInvocationReportFieldNames = [
+  "subscribeInvocationBlocked",
+  "getSnapshotInvocationBlocked",
+  "getServerSnapshotInvocationBlocked",
+  "invokesSubscribe",
+  "invokesGetSnapshot",
+  "invokesGetServerSnapshot",
+  "externalStoreSubscriptionClaimed",
+  "externalStoreSnapshotReadClaimed",
+  "compatibilityClaimed"
+];
+const expectedUnsupportedExternalStoreInvocationReport = {
+  subscribeInvocationBlocked: true,
+  getSnapshotInvocationBlocked: true,
+  getServerSnapshotInvocationBlocked: true,
+  invokesSubscribe: false,
+  invokesGetSnapshot: false,
+  invokesGetServerSnapshot: false,
+  externalStoreSubscriptionClaimed: false,
+  externalStoreSnapshotReadClaimed: false,
+  compatibilityClaimed: false
+};
+const expectedUnsupportedIdGenerationReportFieldNames = [
+  "idGenerationBlocked",
+  "treeIdAllocationBlocked",
+  "hydrationPrefixBlocked",
+  "generatesIds",
+  "allocatesTreeIds",
+  "claimsHydrationIdPrefix",
+  "compatibilityClaimed"
+];
+const expectedUnsupportedIdGenerationReport = {
+  idGenerationBlocked: true,
+  treeIdAllocationBlocked: true,
+  hydrationPrefixBlocked: true,
+  generatesIds: false,
+  allocatesTreeIds: false,
+  claimsHydrationIdPrefix: false,
+  compatibilityClaimed: false
+};
+const expectedUnsupportedMissingDispatcherPrerequisites = [
+  "dispatcher.useActionState",
+  "dispatcher.useOptimistic",
+  "dispatcher.useSyncExternalStore",
+  "dispatcher.useEffectEvent",
+  "dispatcher.useId",
+  "dispatcher.useDebugValue",
+  "private unsupported-placeholder hook dispatcher admission marker"
+];
+const expectedUnsupportedMissingSchedulerPrerequisites = [
+  "mountActionState",
+  "updateActionState",
+  "rerenderActionState",
+  "mountOptimistic",
+  "updateOptimistic",
+  "rerenderOptimistic",
+  "mountSyncExternalStore",
+  "updateSyncExternalStore",
+  "mountEvent",
+  "updateEvent",
+  "mountId",
+  "updateId",
+  "mountDebugValue",
+  "updateDebugValue"
+];
+const expectedUnsupportedMissingRootLanePrerequisites = [
+  "requestUpdateLane",
+  "dispatchOptimisticSetState",
+  "dispatchActionState",
+  "enqueueConcurrentHookUpdate",
+  "scheduleUpdateOnFiber",
+  "entangleTransitionUpdate",
+  "markSkippedUpdateLanes",
+  "getWorkInProgressRoot",
+  "pushTreeId"
+];
+const expectedUnsupportedPublicCompatibilityFalseFlags = [
+  "compatibilityClaimed",
+  "publicCompatibilityClaimed",
+  "publicHookCompatibility",
+  "exposesPublicHookImplementation"
+];
+const expectedUnsupportedPrerequisiteFalseFlags = [
+  "dispatcherRouting",
+  "dispatcherPrerequisitesReady",
+  "schedulerIntegration",
+  "schedulerPrerequisitesReady",
+  "rootLaneIntegration",
+  "rootScheduling",
+  "rendererIntegration",
+  "rendererCompatibility"
+];
+const expectedUnsupportedCallbackInvocationFalseFlags = [
+  "invokesCallbacks",
+  "invokesActionStateAction",
+  "invokesOptimisticReducer",
+  "invokesEffectEventCallback",
+  "invokesDebugValueFormatter",
+  "callbackExecutionClaimed"
+];
+const expectedUnsupportedExternalStoreInvocationFalseFlags = [
+  "invokesExternalStoreSubscribe",
+  "invokesExternalStoreGetSnapshot",
+  "invokesExternalStoreGetServerSnapshot",
+  "externalStoreSubscriptionClaimed",
+  "externalStoreSnapshotReadClaimed"
+];
+const expectedUnsupportedIdGenerationFalseFlags = [
+  "generatesIds",
+  "allocatesTreeIds",
+  "claimsHydrationIdPrefix"
+];
+const expectedUnsupportedCompatibilityFalseFlags = [
+  ...expectedUnsupportedPublicCompatibilityFalseFlags,
+  ...expectedUnsupportedPrerequisiteFalseFlags,
+  ...expectedUnsupportedCallbackInvocationFalseFlags,
+  ...expectedUnsupportedExternalStoreInvocationFalseFlags,
+  ...expectedUnsupportedIdGenerationFalseFlags
+];
 
 test.afterEach(() => {
   hookDispatcher.ReactCurrentDispatcher.current = null;
@@ -304,6 +600,383 @@ test("private transition-hook dispatcher blockers record public shape and lane p
     React.recordPrivateStartTransitionDispatcherRouting,
     undefined
   );
+});
+
+test("private unsupported placeholder hook blockers record source and currentness reports", () => {
+  const metadata =
+    hookDispatcher.privateUnsupportedPlaceholderHookBlockerMetadata;
+
+  assert.equal(
+    metadata.capability,
+    "fast-react.private.unsupported_placeholder_hook_blockers"
+  );
+  assert.equal(metadata.compatibilityTarget, "react@19.2.6");
+  assert.deepEqual(metadata.hookNames, expectedUnsupportedPlaceholderHookNames);
+  assert.deepEqual(
+    metadata.publicShapeBlockerFields,
+    expectedUnsupportedPublicShapeBlockerFields
+  );
+  assert.deepEqual(
+    metadata.publicShapeBlockers,
+    expectedUnsupportedPublicShapeBlockers
+  );
+  assert.deepEqual(
+    metadata.sourceReportFieldNames,
+    expectedUnsupportedSourceReportFieldNames
+  );
+  assert.deepEqual(metadata.sourceReport, expectedUnsupportedSourceReport);
+  assert.deepEqual(
+    metadata.blockerCurrentnessFieldNames,
+    expectedUnsupportedBlockerCurrentnessFieldNames
+  );
+  assert.deepEqual(
+    metadata.blockerCurrentness,
+    expectedUnsupportedBlockerCurrentness
+  );
+  assert.deepEqual(
+    metadata.callbackInvocationReportFieldNames,
+    expectedUnsupportedCallbackInvocationReportFieldNames
+  );
+  assert.deepEqual(
+    metadata.callbackInvocationReport,
+    expectedUnsupportedCallbackInvocationReport
+  );
+  assert.deepEqual(
+    metadata.externalStoreInvocationReportFieldNames,
+    expectedUnsupportedExternalStoreInvocationReportFieldNames
+  );
+  assert.deepEqual(
+    metadata.externalStoreInvocationReport,
+    expectedUnsupportedExternalStoreInvocationReport
+  );
+  assert.deepEqual(
+    metadata.idGenerationReportFieldNames,
+    expectedUnsupportedIdGenerationReportFieldNames
+  );
+  assert.deepEqual(
+    metadata.idGenerationReport,
+    expectedUnsupportedIdGenerationReport
+  );
+  assert.deepEqual(
+    metadata.missingDispatcherPrerequisites,
+    expectedUnsupportedMissingDispatcherPrerequisites
+  );
+  assert.deepEqual(
+    metadata.missingSchedulerPrerequisites,
+    expectedUnsupportedMissingSchedulerPrerequisites
+  );
+  assert.deepEqual(
+    metadata.missingRootLanePrerequisites,
+    expectedUnsupportedMissingRootLanePrerequisites
+  );
+  assert.deepEqual(
+    metadata.publicCompatibilityFalseFlags,
+    expectedUnsupportedPublicCompatibilityFalseFlags
+  );
+  assert.deepEqual(
+    metadata.prerequisiteFalseFlags,
+    expectedUnsupportedPrerequisiteFalseFlags
+  );
+  assert.deepEqual(
+    metadata.callbackInvocationFalseFlags,
+    expectedUnsupportedCallbackInvocationFalseFlags
+  );
+  assert.deepEqual(
+    metadata.externalStoreInvocationFalseFlags,
+    expectedUnsupportedExternalStoreInvocationFalseFlags
+  );
+  assert.deepEqual(
+    metadata.idGenerationFalseFlags,
+    expectedUnsupportedIdGenerationFalseFlags
+  );
+  assert.deepEqual(
+    metadata.compatibilityFalseFlags,
+    expectedUnsupportedCompatibilityFalseFlags
+  );
+
+  for (const flagName of expectedUnsupportedCompatibilityFalseFlags) {
+    assert.equal(metadata[flagName], false, flagName);
+    assert.equal(
+      hookDispatcher.isPrivateUnsupportedPlaceholderHookBlockerMetadata({
+        ...metadata,
+        [flagName]: true
+      }),
+      false,
+      flagName
+    );
+  }
+
+  assert.deepEqual(
+    hookDispatcher.unsupportedPlaceholderHookNames,
+    expectedUnsupportedPlaceholderHookNames
+  );
+  assert.equal(
+    hookDispatcher.isPrivateUnsupportedPlaceholderHookBlockerMetadata(
+      metadata
+    ),
+    true
+  );
+  assert.equal(Object.isFrozen(metadata), true);
+
+  for (const value of Object.values(metadata)) {
+    if (Array.isArray(value)) {
+      assert.equal(Object.isFrozen(value), true);
+      for (const item of value) {
+        if (item !== null && typeof item === "object") {
+          assert.equal(Object.isFrozen(item), true);
+        }
+      }
+    } else if (value !== null && typeof value === "object") {
+      assert.equal(Object.isFrozen(value), true);
+    }
+  }
+
+  assert.equal(
+    React.privateUnsupportedPlaceholderHookBlockerMetadata,
+    undefined
+  );
+  assert.equal(
+    React.createUnsupportedPlaceholderHookCurrentnessReport,
+    undefined
+  );
+  assert.equal(
+    React.consumeUnsupportedPlaceholderHookCurrentnessReport,
+    undefined
+  );
+});
+
+test("unsupported placeholder hook currentness rejects stale source and forged claims", () => {
+  const report =
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport();
+
+  assert.equal(
+    report.kind,
+    "fast-react.private.unsupported_placeholder_hook_currentness"
+  );
+  assert.equal(report.version, 1);
+  assert.equal(report.status, hookDispatcher.unsupportedPlaceholderHookCurrentnessStatus);
+  assert.deepEqual(report.hookNames, expectedUnsupportedPlaceholderHookNames);
+  assert.deepEqual(
+    report.publicShapeBlockers,
+    expectedUnsupportedPublicShapeBlockers
+  );
+  assert.deepEqual(report.sourceReport, expectedUnsupportedSourceReport);
+  assert.deepEqual(
+    report.blockerCurrentness,
+    expectedUnsupportedBlockerCurrentness
+  );
+  assert.deepEqual(
+    report.callbackInvocationReport,
+    expectedUnsupportedCallbackInvocationReport
+  );
+  assert.deepEqual(
+    report.externalStoreInvocationReport,
+    expectedUnsupportedExternalStoreInvocationReport
+  );
+  assert.deepEqual(
+    report.idGenerationReport,
+    expectedUnsupportedIdGenerationReport
+  );
+  assert.equal(Object.isFrozen(report), true);
+  assert.equal(Object.isFrozen(report.hookNames), true);
+  assert.equal(Object.isFrozen(report.publicShapeBlockers), true);
+  assert.equal(Object.isFrozen(report.sourceReport), true);
+  assert.equal(Object.isFrozen(report.blockerCurrentness), true);
+  assert.equal(Object.isFrozen(report.callbackInvocationReport), true);
+  assert.equal(Object.isFrozen(report.externalStoreInvocationReport), true);
+  assert.equal(Object.isFrozen(report.idGenerationReport), true);
+  assert.equal(
+    hookDispatcher.validateUnsupportedPlaceholderHookCurrentnessReport(report),
+    null
+  );
+  assert.equal(
+    hookDispatcher.isUnsupportedPlaceholderHookCurrentnessReport(report),
+    true
+  );
+
+  const consumption =
+    hookDispatcher.consumeUnsupportedPlaceholderHookCurrentnessReport(report);
+  assert.equal(
+    consumption.status,
+    hookDispatcher.unsupportedPlaceholderHookCurrentnessConsumptionStatus
+  );
+  assert.equal(consumption.accepted, true);
+  assert.equal(consumption.publicExportsPlaceholderBlocked, true);
+  assert.equal(consumption.callbackInvocationBlocked, true);
+  assert.equal(consumption.externalStoreInvocationBlocked, true);
+  assert.equal(consumption.idGenerationBlocked, true);
+  assert.equal(consumption.debugValueInstrumentationBlocked, true);
+  assert.equal(consumption.dispatcherPrerequisitesReady, false);
+  assert.equal(consumption.schedulerPrerequisitesReady, false);
+  assert.equal(consumption.rootLaneIntegration, false);
+  assert.equal(consumption.rootScheduling, false);
+  assert.equal(consumption.rendererCompatibility, false);
+  assert.equal(consumption.publicCompatibilityClaimed, false);
+  assert.equal(consumption.compatibilityClaimed, false);
+
+  assertUnsupportedCurrentnessRejected(
+    Object.freeze({ ...report }),
+    "unsupported-placeholder-hook-currentness-source-proof"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      publicShapeBlockers: [
+        {
+          ...expectedUnsupportedPublicShapeBlockers[0],
+          currentLength: 3
+        },
+        ...expectedUnsupportedPublicShapeBlockers.slice(1)
+      ]
+    }),
+    "unsupported-placeholder-hook-currentness-public-shape"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      sourceReport: {
+        reactSourceCommit: "forged"
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-source-report"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      blockerCurrentness: {
+        schedulerPrerequisitesBlocked: false
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-blocker-currentness"
+  );
+
+  for (const flagName of expectedUnsupportedPublicCompatibilityFalseFlags) {
+    assertUnsupportedCurrentnessRejected(
+      hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+        [flagName]: true
+      }),
+      "unsupported-placeholder-hook-currentness-public-compatibility-claim"
+    );
+  }
+
+  for (const flagName of [
+    "dispatcherRouting",
+    "schedulerIntegration",
+    "rootLaneIntegration",
+    "rootScheduling"
+  ]) {
+    assertUnsupportedCurrentnessRejected(
+      hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+        [flagName]: true
+      }),
+      "unsupported-placeholder-hook-currentness-prerequisite-smuggling"
+    );
+  }
+
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      callbackInvocationReport: {
+        invokesEffectEventCallback: true
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-callback-invocation-claim"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      invokesActionStateAction: true
+    }),
+    "unsupported-placeholder-hook-currentness-callback-invocation-claim"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      externalStoreInvocationReport: {
+        invokesGetSnapshot: true
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-external-store-claim"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      invokesExternalStoreSubscribe: true
+    }),
+    "unsupported-placeholder-hook-currentness-external-store-claim"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      idGenerationReport: {
+        generatesIds: true
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-id-generation-claim"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      claimsHydrationIdPrefix: true
+    }),
+    "unsupported-placeholder-hook-currentness-id-generation-claim"
+  );
+});
+
+test("unsupported public placeholder hooks do not call dispatcher methods or user callbacks", () => {
+  const calls = [];
+  const sideEffects = [];
+  const dispatcher = Object.fromEntries(
+    expectedUnsupportedPlaceholderHookNames.map((hookName) => [
+      hookName,
+      function (...args) {
+        calls.push([hookName, args]);
+        return `return:${hookName}`;
+      }
+    ])
+  );
+  const action = () => {
+    sideEffects.push("action");
+    return "action";
+  };
+  const reducer = () => {
+    sideEffects.push("reducer");
+    return "reduced";
+  };
+  const subscribe = () => {
+    sideEffects.push("subscribe");
+    return () => sideEffects.push("unsubscribe");
+  };
+  const getSnapshot = () => {
+    sideEffects.push("getSnapshot");
+    return "snapshot";
+  };
+  const getServerSnapshot = () => {
+    sideEffects.push("getServerSnapshot");
+    return "serverSnapshot";
+  };
+  const eventCallback = () => {
+    sideEffects.push("effectEvent");
+  };
+  const debugFormatter = () => {
+    sideEffects.push("debugFormatter");
+    return "debug";
+  };
+  const scenarios = [
+    ["useActionState", [action, "initial", "/permalink"]],
+    ["useOptimistic", ["passthrough", reducer]],
+    [
+      "useSyncExternalStore",
+      [subscribe, getSnapshot, getServerSnapshot]
+    ],
+    ["useEffectEvent", [eventCallback]],
+    ["useId", []],
+    ["useDebugValue", ["debug-value", debugFormatter]]
+  ];
+
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  for (const [hookName, args] of scenarios) {
+    assert.equal(React[hookName].name, hookName);
+    assert.equal(React[hookName].length, 0);
+    assertUnimplemented(() => React[hookName](...args), {
+      exportName: hookName
+    });
+  }
+
+  assert.deepEqual(calls, []);
+  assert.deepEqual(sideEffects, []);
 });
 
 test("public transition hooks remain placeholder-blocked and do not call an installed dispatcher", () => {
@@ -623,6 +1296,49 @@ test("private startTransition routing records action identity and blocked lane e
   assert.equal(record.compatibilityClaimed, false);
   assert.deepEqual(calls, []);
 });
+
+function assertUnsupportedCurrentnessRejected(report, reason) {
+  assert.equal(
+    hookDispatcher.validateUnsupportedPlaceholderHookCurrentnessReport(report),
+    reason
+  );
+  assert.equal(
+    hookDispatcher.isUnsupportedPlaceholderHookCurrentnessReport(report),
+    false
+  );
+  assert.throws(
+    () =>
+      hookDispatcher.consumeUnsupportedPlaceholderHookCurrentnessReport(report),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", reason);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", reason);
+      assert.equal(error.entrypoint, "react", reason);
+      assert.equal(
+        error.exportName,
+        "unsupportedPlaceholderHookCurrentness",
+        reason
+      );
+      assert.equal(error.compatibilityTarget, "react@19.2.6", reason);
+      assert.equal(error.reason, reason);
+      assert.equal(error.publicCompatibilityClaimed, false, reason);
+      assert.equal(error.publicHookCompatibility, false, reason);
+      assert.equal(error.exposesPublicHookImplementation, false, reason);
+      assert.equal(error.dispatcherRouting, false, reason);
+      assert.equal(error.schedulerIntegration, false, reason);
+      assert.equal(error.rootLaneIntegration, false, reason);
+      assert.equal(error.rootScheduling, false, reason);
+      assert.equal(error.rendererCompatibility, false, reason);
+      assert.equal(error.invokesCallbacks, false, reason);
+      assert.equal(error.invokesExternalStoreSubscribe, false, reason);
+      assert.equal(error.invokesExternalStoreGetSnapshot, false, reason);
+      assert.equal(error.invokesExternalStoreGetServerSnapshot, false, reason);
+      assert.equal(error.generatesIds, false, reason);
+      assert.equal(error.compatibilityClaimed, false, reason);
+      return true;
+    },
+    reason
+  );
+}
 
 function assertUnimplemented(callback, { exportName }) {
   assert.throws(
