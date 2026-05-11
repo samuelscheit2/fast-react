@@ -32,9 +32,10 @@ for published package behavior and exact runtime output.
   internally coherent and document overlap risks for the orchestrator.
 - Record progress in `worker-progress/<worker-id>.md`.
 - You are running as a managed Codex subagent launched by the orchestrator.
-- Use the assigned git worktree path from your prompt for all reads (except for the react repo), edits, and
-  verification commands. Do not edit the root checkout or another worker's
-  worktree unless the prompt explicitly assigns that location.
+- Use the assigned git worktree path from your prompt for all reads, edits, and
+  verification commands, except for explicitly allowed reference repositories.
+  Do not edit the root checkout or another worker's worktree unless the prompt
+  explicitly assigns that location.
 - The orchestrator monitors your lifecycle through subagent status, progress
   messages, and your `worker-progress/<worker-id>.md` report. There is no tmux
   pane, `.codex.log`, `.exitcode`, or numeric process status for subagent
@@ -48,6 +49,14 @@ for published package behavior and exact runtime output.
 - Find root causes; do not patch symptoms.
 - Breaking changes are allowed when necessary, but document the reason and
   tradeoff.
+- If your work touches contract gates, external source authority, durable
+  evidence, one-shot credentials or tokens, public API/package surfaces,
+  security-sensitive paths, or a prior blocker area, include hostile or negative
+  verification that proves the change fails closed.
+- If an audit or review sends a blocker back, treat it as the next acceptance
+  criterion. Repair the root cause, add or update focused verification for that
+  failure class, and record the old blocker plus the new evidence in your
+  report.
 - Regenerable artifacts such as `node_modules/`, `target/`, and root
   `Cargo.lock` do not need cleanup merely because they exist. Remove or
   document them only if stale, ambiguous, or diff-polluting.
@@ -67,5 +76,6 @@ Your final report must include:
 - Changed files
 - Commands run
 - Evidence gathered
+- Audit, review, or nested-agent findings that affected the work
 - Risks or blockers
 - Recommended next tasks

@@ -33,6 +33,10 @@ The orchestrator goal is continuous. Do not call
 - Read-only explorers and research-only subagents may inspect the main checkout
   when no writes or generated artifacts are expected.
 - Keep at most 30 concurrent top-level worker subagents.
+- Treat the numeric cap as a safety limit, not a throughput target. Keep the
+  active mix balanced across implementation, audit, repair, merge-prep, docs,
+  and exploration so completed work does not pile up faster than it can be
+  accepted.
 - Workers may spawn their own managed subagents, explorers, or nested agents.
   Nested agents do not count against the 30 top-level worker limit.
 - Workers read `WORKER_BRIEF.md`, not this file.
@@ -41,7 +45,10 @@ The orchestrator goal is continuous. Do not call
   expected overlap boundaries.
 - Prefer useful parallelism over avoiding every merge conflict. Slight file
   overlap is acceptable when the tasks are independently valuable and the
-  conflict can be resolved by preserving accepted private evidence and blockers.
+  conflict can be resolved by preserving accepted evidence, tests, and blockers.
+- Avoid duplicate or ambiguous spawns. Before spawning or restarting a worker,
+  reconcile the active agent list, worktrees, branches, and progress reports;
+  reuse the existing task when possible and make any restart explicit.
 - Use `task_name` as the stable subagent id. It must use lowercase letters,
   digits, and underscores; map it to the hyphenated
   `worker-progress/<worker-id>.md` filename in the worker prompt when needed.
@@ -54,6 +61,33 @@ The orchestrator goal is continuous. Do not call
 - There is no numeric process exit code or tmux pane for subagents. Treat the
   agent status, final report, worktree status, changed files, and verification
   evidence as the acceptance record.
+
+## Scheduling And Parallelism
+
+- Keep a compact live state board in the current planning document or progress
+  report system. Each active item should have an id, objective, state, owner or
+  agent path, branch/worktree, touched surface, required verification, audit
+  status, latest blocker, merge readiness, and cleanup status.
+- After compaction, interruption, or a long gap, rebuild the live state from
+  actual evidence before acting: `list_agents`, worktrees, branches, root
+  status, recent commits, worker reports, and latest audit outputs.
+- Prefer independent lanes by touched surface, risk class, and verification
+  gate. When a task is blocked on audit or a long-running command, use the
+  wait time for useful scouts, repairs, pre-audits, or merge-prep work.
+- Run research, audit, repair, and verification work in parallel when their
+  inputs are independent. Serialize only the operations that must be serialized:
+  accepting evidence, resolving conflicts, merging to the root branch, and
+  updating canonical coordination docs.
+- Use pre-audits for risky or repetitive failure classes. A scout can define
+  hostile cases, source anchors, oracle commands, and known false-green probes
+  before implementation so the worker starts with sharper acceptance criteria.
+- Do not keep completed agents open as a substitute for durable state. Record
+  their useful output in worker reports, coordination docs, or followup prompts,
+  then close them once no more interaction is needed.
+- When throughput drops, identify the actual bottleneck before spawning more
+  workers. Common bottlenecks are serial merge bandwidth, stale state, missing
+  audit evidence, flaky or overly broad verification, unclear ownership, and
+  repair loops caused by weak initial prompts.
 
 ## Planning And Progress Docs
 
@@ -83,19 +117,26 @@ The orchestrator goal is continuous. Do not call
 - Before accepting a worker, inspect its subagent status, worktree status,
   changed files, report, verification commands, and risks.
 - Treat worker self-reports as inputs, not acceptance evidence. For
-  implementation workers, spawn independent read-only audit subagents before
-  merge when the change is non-trivial, touches compatibility gates, source
-  currentness, one-shot tokens, package surfaces, or prior blocker areas.
-  Decide the number and focus of audit subagents case by case from the
-  worker's blast radius, prior blockers, touched surfaces, and uncertainty.
-  Useful audit surfaces may include hostile/source review for false greens,
-  caller-shaped evidence, stale source/currentness, hidden/proxy aliases, and
-  compatibility broadening; regression-command reruns with targeted hostile
-  probes; package-surface checks; source-currentness checks; or other focused
-  reviews that produce independent acceptance evidence. Small, low-risk
-  changes may need fewer audits; risky or cross-surface changes may need
-  several in parallel. Merge only after audit results and local post-rebase
-  checks support the acceptance decision.
+  implementation workers, use independent read-only audit subagents before
+  merge when the change is non-trivial or touches contract gates, external
+  source authority, durable evidence, one-shot credentials or tokens, public
+  API/package surfaces, security-sensitive paths, or prior blocker areas.
+  Decide the number and focus of audit subagents case by case from blast
+  radius, prior blockers, touched surfaces, and uncertainty. Useful audit
+  surfaces may include hostile/source review for false greens, caller-shaped
+  evidence, stale source or authority claims, hidden/proxy aliases,
+  compatibility or contract broadening, regression-command reruns with targeted
+  hostile probes, package/API-surface checks, source-authority checks, security
+  review, or other focused reviews that produce independent acceptance
+  evidence. Small, low-risk changes may need fewer audits; risky or
+  cross-surface changes may need several in parallel.
+- For merge-ready candidates, use a merge train: rebase and run focused checks
+  in the worker worktree where possible, merge one candidate at a time into the
+  root branch, rerun the acceptance checks that cover the changed behavior, and
+  batch broader full-suite checks when that still covers the risk.
+- When an audit fails, convert the finding into a precise repair prompt. Keep
+  the original worker or repair branch alive only while it is useful; otherwise
+  close it after durable blocker evidence is recorded.
 - Accept only scoped, intentional changes. Do not revert user changes.
 - Regenerable artifacts such as `node_modules/`, `target/`, and root
   `Cargo.lock` do not need removal merely because they exist. Remove or
