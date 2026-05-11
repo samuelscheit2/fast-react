@@ -400,12 +400,36 @@ test("Fast React test-utils act currentness stays blocked like public React.act"
   assertReactDomTestUtilsCurrentnessRejected(
     gateModule,
     gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      publicTestUtilsActCompatibilityClaimed: "yes"
+    }),
+    "public-react-dom-test-utils-act-currentness-public-claim",
+    "string-public-claim"
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule,
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      packageCompatibilityClaimed: "yes"
+    }),
+    "public-react-dom-test-utils-act-currentness-package-compatibility-claim",
+    "string-package-claim"
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule,
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
       publicRootExecution: true,
       publicActPassiveDrain: true,
       drainsPublicSchedulerTaskQueue: true
     }),
     "public-react-dom-test-utils-act-currentness-prerequisite-smuggling",
     "scheduler-root-passive-smuggling"
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule,
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      drainsPublicSchedulerTaskQueue: "yes"
+    }),
+    "public-react-dom-test-utils-act-currentness-prerequisite-smuggling",
+    "string-scheduler-smuggling"
   );
   assertReactDomTestUtilsCurrentnessRejected(
     gateModule,
@@ -417,6 +441,17 @@ test("Fast React test-utils act currentness stays blocked like public React.act"
     }),
     "public-react-dom-test-utils-act-currentness-private-prerequisite-boundary",
     "worker-910-excluded"
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule,
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      privatePrerequisites: {
+        ...report.privatePrerequisites,
+        drainsPublicSchedulerTaskQueue: "yes"
+      }
+    }),
+    "public-react-dom-test-utils-act-currentness-private-prerequisite-boundary",
+    "private-prerequisite-string-scheduler-smuggling"
   );
 });
 

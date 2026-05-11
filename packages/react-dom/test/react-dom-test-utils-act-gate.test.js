@@ -284,7 +284,19 @@ test('public test-utils act blocked currentness rejects compatibility drift', ()
   );
   assertReactDomTestUtilsCurrentnessRejected(
     gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      publicTestUtilsActCompatibilityClaimed: 'yes'
+    }),
+    'public-react-dom-test-utils-act-currentness-public-claim'
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
       packageCompatibilityClaimed: true
+    }),
+    'public-react-dom-test-utils-act-currentness-package-compatibility-claim'
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      packageCompatibilityClaimed: 'yes'
     }),
     'public-react-dom-test-utils-act-currentness-package-compatibility-claim'
   );
@@ -327,9 +339,24 @@ test('public test-utils act blocked currentness rejects compatibility drift', ()
   );
   assertReactDomTestUtilsCurrentnessRejected(
     gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      drainsPublicSchedulerTaskQueue: 'yes'
+    }),
+    'public-react-dom-test-utils-act-currentness-prerequisite-smuggling'
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
       privatePrerequisites: {
         ...report.privatePrerequisites,
         consumesWorker910Evidence: true
+      }
+    }),
+    'public-react-dom-test-utils-act-currentness-private-prerequisite-boundary'
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
+    gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
+      privatePrerequisites: {
+        ...report.privatePrerequisites,
+        drainsPublicSchedulerTaskQueue: 'yes'
       }
     }),
     'public-react-dom-test-utils-act-currentness-private-prerequisite-boundary'

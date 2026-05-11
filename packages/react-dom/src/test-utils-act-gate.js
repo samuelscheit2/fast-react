@@ -2899,10 +2899,20 @@ function validatePublicReactDomTestUtilsActBlockedCurrentnessReport(report) {
   ) {
     return 'public-react-dom-test-utils-act-currentness-warning-compatibility-claim';
   }
-  if (hasAnyTrueField(report, publicTestUtilsActBlockedCurrentnessPackageClaimFields)) {
+  if (
+    hasAnyNonFalseField(
+      report,
+      publicTestUtilsActBlockedCurrentnessPackageClaimFields
+    )
+  ) {
     return 'public-react-dom-test-utils-act-currentness-package-compatibility-claim';
   }
-  if (hasAnyTrueField(report, publicTestUtilsActBlockedCurrentnessPublicClaimFields)) {
+  if (
+    hasAnyNonFalseField(
+      report,
+      publicTestUtilsActBlockedCurrentnessPublicClaimFields
+    )
+  ) {
     return 'public-react-dom-test-utils-act-currentness-public-claim';
   }
   if (
@@ -2921,7 +2931,10 @@ function validatePublicReactDomTestUtilsActBlockedCurrentnessReport(report) {
     report.publicReactActReady !== false ||
     report.publicTestUtilsActReady !== false ||
     report.privateRoutingReady !== false ||
-    hasAnyTrueField(report, publicTestUtilsActBlockedCurrentnessExecutionClaimFields)
+    hasAnyNonFalseField(
+      report,
+      publicTestUtilsActBlockedCurrentnessExecutionClaimFields
+    )
   ) {
     return 'public-react-dom-test-utils-act-currentness-prerequisite-smuggling';
   }
@@ -3021,15 +3034,15 @@ function isAcceptedPublicTestUtilsActBlockedCurrentnessPrivatePrerequisites(
     prerequisites.publicReactActReady === false &&
     prerequisites.publicTestUtilsActReady === false &&
     prerequisites.privateRoutingReady === false &&
-    !hasAnyTrueField(
+    !hasAnyNonFalseField(
       prerequisites,
       publicTestUtilsActBlockedCurrentnessPackageClaimFields
     ) &&
-    !hasAnyTrueField(
+    !hasAnyNonFalseField(
       prerequisites,
       publicTestUtilsActBlockedCurrentnessPublicClaimFields
     ) &&
-    !hasAnyTrueField(
+    !hasAnyNonFalseField(
       prerequisites,
       publicTestUtilsActBlockedCurrentnessExecutionClaimFields
     )
@@ -4535,8 +4548,8 @@ function freezeRecords(records) {
   return freezeArray(records.map((record) => freezeRecord(record)));
 }
 
-function hasAnyTrueField(record, fields) {
-  return fields.some((field) => record[field] === true);
+function hasAnyNonFalseField(record, fields) {
+  return fields.some((field) => record[field] !== false);
 }
 
 function sameStringArray(actual, expected) {

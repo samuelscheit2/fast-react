@@ -36,6 +36,9 @@
   callback invocation, thenable return, warning compatibility claims,
   Scheduler/root/passive prerequisite smuggling, Worker 910 evidence, and
   package compatibility claims.
+- Audit follow-up: stricter claim validation now rejects any non-`false`
+  public/package/Scheduler/root/passive claim value, including truthy strings
+  such as `"yes"` on top-level reports and private prerequisite records.
 - Public blockers remain false: public React act readiness, test-utils act
   readiness, private routing, Scheduler queue draining, React act queue
   draining, passive drain/effect execution, public root execution, renderer
@@ -54,6 +57,11 @@
 - `npm run check:package-surface`
 - `node tests/smoke/import-entrypoints.mjs`
 - `git diff --check`
+- Audit follow-up repro:
+  `packageCompatibilityClaimed: "yes"`,
+  `publicTestUtilsActCompatibilityClaimed: "yes"`,
+  `drainsPublicSchedulerTaskQueue: "yes"`, and private prerequisite
+  `drainsPublicSchedulerTaskQueue: "yes"` are rejected.
 
 ## Risks Or Blockers
 
