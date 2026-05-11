@@ -1203,6 +1203,220 @@ test('private hydration claimed replay target-dispatch execution rejects stale l
   assert.deepEqual(otherFixture.document.__registrations, []);
 });
 
+test('private hydration replay target matrix rejects stale roots and public replay claims', () => {
+  const fixture = createHydrationReplayTargetDispatchFixture(
+    'target-negative-matrix',
+    {
+      hydrationOptions: {
+        onRecoverableError() {}
+      }
+    }
+  );
+  const dispatchRecord = createDispatchRecord(
+    fixture.container,
+    'click',
+    eventSystemFlags.IS_CAPTURE_PHASE,
+    fixture.boundaryTarget
+  );
+  const targetDispatchLink =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      fixture.record,
+      dispatchRecord,
+      {
+        source: 'hydration-private-target-negative-link'
+      }
+    );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      fixture.record,
+      dispatchRecord,
+      {
+        source: 'hydration-private-target-negative-ownership'
+      }
+    );
+  const claim = hydrationGate.createHydrationTargetClaimingDiagnostic(
+    fixture.record,
+    ownershipDiagnostics,
+    targetDispatchLink,
+    {
+      source: 'hydration-private-target-negative-claim'
+    }
+  );
+  const execution =
+    hydrationGate.createHydrationClaimedReplayTargetDispatchExecutionRecord(
+      claim,
+      targetDispatchLink,
+      {
+        source: 'hydration-private-target-negative-execution'
+      }
+    );
+  const executionPayload =
+    hydrationGate
+      .assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+        execution,
+        {
+          dispatchRecord,
+          hydrationBoundaryRecord: fixture.record,
+          targetClaimingDiagnostic: claim,
+          targetDispatchLinkDiagnostic: targetDispatchLink
+        }
+      );
+
+  assert.equal(executionPayload.dispatchRecord, dispatchRecord);
+  assert.equal(execution.targetDispatchExecuted, false);
+  assert.equal(execution.eventReplayDispatchAttempted, false);
+  assert.equal(execution.eventsReplayed, false);
+  assert.equal(execution.replayQueuesDrained, false);
+  assert.equal(execution.listenerInvocationCount, 0);
+  assert.equal(execution.publicHydrateRootSupported, false);
+
+  const foreignFixture = createHydrationReplayTargetDispatchFixture(
+    'target-negative-matrix-foreign'
+  );
+  const foreignDispatchRecord = createDispatchRecord(
+    foreignFixture.container,
+    'click',
+    eventSystemFlags.IS_CAPTURE_PHASE,
+    foreignFixture.boundaryTarget
+  );
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+        fixture.record,
+        foreignDispatchRecord,
+        {
+          source: 'hydration-private-target-negative-foreign-dispatch'
+        }
+      ),
+    {
+      code:
+        pluginEventSystem.INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    }
+  );
+
+  const unownedFixture = createHydrationReplayTargetDispatchFixture(
+    'target-negative-matrix-unowned',
+    {
+      targetInsideBoundary: false
+    }
+  );
+  const unownedDispatchRecord = createDispatchRecord(
+    unownedFixture.container,
+    'click',
+    eventSystemFlags.IS_CAPTURE_PHASE,
+    unownedFixture.boundaryTarget
+  );
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+        unownedFixture.record,
+        unownedDispatchRecord,
+        {
+          source: 'hydration-private-target-negative-unowned'
+        }
+      ),
+    {
+      code:
+        pluginEventSystem.INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    }
+  );
+
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationTargetClaimingDiagnostic(
+        fixture.record,
+        ownershipDiagnostics,
+        Object.freeze({
+          ...targetDispatchLink,
+          compatibilityClaimed: true,
+          publicDispatchEnabled: true
+        }),
+        {
+          source: 'hydration-private-target-negative-public-link'
+        }
+      ),
+    {
+      code:
+        hydrationGate.INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE
+    }
+  );
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationTargetClaimingDiagnostic(
+        fixture.record,
+        Object.freeze({
+          ...ownershipDiagnostics,
+          eventsReplayed: true,
+          replayQueuesDrained: true
+        }),
+        targetDispatchLink,
+        {
+          source: 'hydration-private-target-negative-replayed-ownership'
+        }
+      ),
+    {
+      code:
+        hydrationGate.INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE
+    }
+  );
+  assert.throws(
+    () =>
+      pluginEventSystem.createHydrationReplayClickDispatchDiagnostic(
+        targetDispatchLink,
+        {
+          source: 'hydration-private-target-negative-claimed-public',
+          targetClaimingDiagnostic: Object.freeze({
+            ...claim,
+            publicHydrationTargetClaimed: true,
+            targetClaimExecuted: true
+          })
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_HYDRATION_REPLAY_CLICK_DISPATCH_DIAGNOSTIC_CODE
+    }
+  );
+
+  for (const tamperedExecution of [
+    Object.freeze({...execution, eventDispatch: true}),
+    Object.freeze({...execution, eventsReplayed: true}),
+    Object.freeze({...execution, replayQueuesDrained: true}),
+    Object.freeze({...execution, listenerInvocationCount: 1}),
+    Object.freeze({...execution, publicHydrateRootSupported: true})
+  ]) {
+    assert.throws(
+      () =>
+        hydrationGate
+          .assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+            tamperedExecution,
+            {
+              dispatchRecord,
+              hydrationBoundaryRecord: fixture.record,
+              targetClaimingDiagnostic: claim,
+              targetDispatchLinkDiagnostic: targetDispatchLink
+            }
+          ),
+      {
+        code:
+          hydrationGate
+            .INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE
+      }
+    );
+  }
+
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.equal(foreignDispatchRecord.hydrationReplay.queued, false);
+  assert.equal(unownedDispatchRecord.hydrationReplay.queued, false);
+  assert.deepEqual(fixture.container.__registrations, []);
+  assert.deepEqual(fixture.document.__registrations, []);
+  assert.deepEqual(foreignFixture.container.__registrations, []);
+  assert.deepEqual(foreignFixture.document.__registrations, []);
+  assert.deepEqual(unownedFixture.container.__registrations, []);
+  assert.deepEqual(unownedFixture.document.__registrations, []);
+});
+
 test('private hydration text mismatch recoverable-error routing execution consumes accepted boundary metadata', () => {
   const recoverableErrorCalls = [];
   const fixture = createHydrationReplayTargetDispatchFixture(
@@ -1416,6 +1630,56 @@ test('private hydration text mismatch recoverable-error routing execution consum
           fixture.record.acceptedPrivateMetadataDiagnostics,
           {
             hydrationOptions: fixture.hydrationOptions
+          }
+        ),
+    {
+      code:
+        hydrationGate
+          .INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_CODE
+    }
+  );
+
+  assert.throws(
+    () =>
+      hydrationGate
+        .createHydrationTextMismatchRecoverableErrorRoutingExecutionRecord(
+          fixture.record,
+          Object.freeze({
+            ...fixture.record.acceptedPrivateMetadataDiagnostics,
+            metadataRows:
+              fixture.record.acceptedPrivateMetadataDiagnostics.metadataRows.map(
+                (row) =>
+                  Object.freeze({
+                    ...row,
+                    metadataId: 'wrong-recoverable-error-route',
+                    publicHydrationCompatibilityClaimed: true
+                  })
+              )
+          }),
+          {
+            enableRecoverableErrorRoutingExecution: true,
+            hydrationOptions: fixture.hydrationOptions,
+            source: 'hydration-private-text-mismatch-wrong-route-metadata'
+          }
+        ),
+    {
+      code:
+        hydrationGate
+          .INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_CODE
+    }
+  );
+  assert.throws(
+    () =>
+      hydrationGate
+        .createHydrationTextMismatchRecoverableErrorRoutingExecutionRecord(
+          fixture.record,
+          fixture.record.acceptedPrivateMetadataDiagnostics,
+          {
+            enableRecoverableErrorRoutingExecution: true,
+            hydrationOptions: {
+              ...fixture.hydrationOptions
+            },
+            source: 'hydration-private-text-mismatch-foreign-options'
           }
         ),
     {
