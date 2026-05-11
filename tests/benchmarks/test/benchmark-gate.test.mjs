@@ -532,6 +532,17 @@ test("benchmark accepted gates reject decorative non-runnable commands", () => {
       command: "cargo test it passed",
       pattern:
         /command segment "cargo test it passed" must include `-p <crate>`/
+    },
+    {
+      command: "node --test tests/benchmarks/src/benchmark-gate.mjs",
+      pattern:
+        /test target "tests\/benchmarks\/src\/benchmark-gate\.mjs" is not an accepted benchmark gate test target/
+    },
+    {
+      command:
+        "cargo test -p fast-react-reconciler --all-features this_benchmark_passed",
+      pattern:
+        /test filter "this_benchmark_passed" is not an accepted benchmark gate filter for fast-react-reconciler/
     }
   ];
 

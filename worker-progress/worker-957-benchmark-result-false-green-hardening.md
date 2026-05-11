@@ -21,9 +21,9 @@ performance proof.
     `green-admitted` accepted gate metadata.
   - Rejects accepted-gate command prose, including prose hidden behind
     `npm run`, `node --test`, or `cargo test` prefixes.
-  - Validates accepted-gate command segments against repo-shaped npm scripts,
-    real Node test file paths, real Cargo crate names, `--all-features`, and
-    benchmark-style Cargo test filters.
+  - Validates accepted-gate command segments against known accepted npm command
+    segments, accepted Node gate test targets, real Cargo crate names,
+    `--all-features`, and accepted Cargo gate filters.
 - `tests/benchmarks/schema/benchmark-result.schema.json`
   - Makes `scenarioResults` non-empty when a result artifact exists.
   - Sets `scenarioResult.additionalProperties` to `false`.
@@ -34,6 +34,8 @@ performance proof.
     diagnostic proof, and non-runnable accepted-gate command metadata.
   - Adds repair coverage for `npm run Worker 957 says this benchmark passed`,
     `node --test this benchmark passed`, and `cargo test it passed`.
+  - Adds repair coverage for the fake benchmark-gate source-module command and
+    the nonexistent `this_benchmark_passed` Cargo filter.
 
 ## Commands Run
 
@@ -51,8 +53,9 @@ performance proof.
 - The focused benchmark gate test passes with 24/24 tests.
 - The full benchmark check passes with 64/64 benchmark tests.
 - No result artifacts were created.
-- Accepted-gate command validation rejects prefix-only prose and verifies
-  existing manifest commands against package scripts, test paths, and crates.
+- Accepted-gate command validation rejects prefix-only prose, source modules,
+  and invented Cargo filters while verifying existing manifest commands against
+  accepted npm segments, Node gate targets, and Cargo crate/filter sets.
 
 ## Risks Or Blockers
 
@@ -62,6 +65,8 @@ performance proof.
 - Result row uniqueness is intentionally scenario/lane based, matching the
   current benchmark vocabulary. A future multi-implementation result format
   would need an explicit schema change rather than relying on duplicate rows.
+- Future benchmark manifests that add new conformance gate commands will need
+  explicit command-target allowlist updates in the same change.
 
 ## Recommended Next Tasks
 

@@ -72,8 +72,112 @@ const NPM_WORKSPACE_NAME_PATTERN =
 const NODE_TEST_PATH_PATTERN =
   /^(?:packages|tests)\/[A-Za-z0-9._/-]+\.(?:js|mjs)$/;
 const CARGO_PACKAGE_PATTERN = /^fast-react-[a-z0-9-]+$/;
-const CARGO_TEST_FILTER_PATTERN = /^[a-z][a-z0-9_]*$/;
-const CARGO_SINGLE_WORD_TEST_FILTERS = Object.freeze(["context", "offscreen"]);
+
+const ACCEPTED_NPM_COMMAND_SEGMENTS = Object.freeze(new Set([
+  "npm run check --workspace @fast-react/native",
+  "npm run check --workspace scheduler",
+  "npm run dom-text-content:conformance --workspace @fast-react/conformance",
+  "npm run root-public-facade:conformance --workspace @fast-react/conformance",
+  "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+  "npm run test:react-test-renderer:serialization --workspace @fast-react/conformance"
+]));
+
+const ACCEPTED_NODE_TEST_TARGETS = Object.freeze(new Set([
+  "packages/react-dom/test/dom-property-operations-private.test.js",
+  "packages/react-dom/test/events-private.test.js",
+  "packages/react-dom/test/hydration-boundary.test.js",
+  "packages/react-dom/test/hydration-private.test.js",
+  "packages/react-dom/test/react-dom-private-root-bridge-shell.test.js",
+  "packages/react-dom/test/resource-form-unsupported-gates.test.js",
+  "tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs",
+  "tests/conformance/test/act-passive-local-gate.test.mjs",
+  "tests/conformance/test/dom-controlled-input-oracle.test.mjs",
+  "tests/conformance/test/dom-event-delegation-oracle.test.mjs",
+  "tests/conformance/test/dom-property-payload-helper.test.mjs",
+  "tests/conformance/test/dom-style-dangerous-html-oracle.test.mjs",
+  "tests/conformance/test/element-object-oracle.test.mjs",
+  "tests/conformance/test/react-act-oracle.test.mjs",
+  "tests/conformance/test/react-dom-client-root-oracle.test.mjs",
+  "tests/conformance/test/react-dom-container-root-markers-oracle.test.mjs",
+  "tests/conformance/test/react-dom-create-portal-local-gate.test.mjs",
+  "tests/conformance/test/react-dom-event-dispatch-plugin-skeleton.test.mjs",
+  "tests/conformance/test/react-dom-flush-sync-batching-oracle.test.mjs",
+  "tests/conformance/test/react-dom-form-actions-oracle.test.mjs",
+  "tests/conformance/test/react-dom-hydration-boundary-gate.test.mjs",
+  "tests/conformance/test/react-dom-resource-hints-oracle.test.mjs",
+  "tests/conformance/test/react-dom-root-listener-installation-oracle.test.mjs",
+  "tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs",
+  "tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs",
+  "tests/conformance/test/react-hook-dispatcher-guard.test.mjs",
+  "tests/conformance/test/react-hook-dispatcher-oracle.test.mjs",
+  "tests/conformance/test/react-test-renderer-act-oracle.test.mjs",
+  "tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs",
+  "tests/conformance/test/react-test-renderer-error-surface-oracle.test.mjs",
+  "tests/conformance/test/react-test-renderer-root-lifecycle-oracle.test.mjs",
+  "tests/conformance/test/scheduler-mock-expired-lane-flush.test.mjs",
+  "tests/conformance/test/scheduler-mock-oracle.test.mjs",
+  "tests/conformance/test/scheduler-native-entry-oracle.test.mjs",
+  "tests/conformance/test/scheduler-post-task-oracle.test.mjs",
+  "tests/conformance/test/scheduler-post-task-root-continuation.test.mjs"
+]));
+
+const ACCEPTED_CARGO_ALL_FEATURES_PACKAGES = Object.freeze(new Set([
+  "fast-react-reconciler",
+  "fast-react-test-renderer"
+]));
+
+const ACCEPTED_CARGO_TEST_FILTERS = Object.freeze(new Map([
+  [
+    "fast-react-napi",
+    new Set([
+      "batch_response_sequence",
+      "native_root_bridge",
+      "stream_batch_roundtrip",
+      "worker_thread_teardown"
+    ])
+  ],
+  [
+    "fast-react-reconciler",
+    new Set([
+      "begin_work",
+      "begin_work_fails_closed_with_suspense_list_and_activity_child_shape_diagnostics",
+      "complete_work",
+      "context",
+      "context_provider_update_lane",
+      "deleted_subtree_passive",
+      "function_component",
+      "lane_priority",
+      "layout_effect",
+      "offscreen",
+      "offscreen_visibility",
+      "passive_effects_",
+      "passive_effects_callback_executor_errors_preserve_cross_phase_order_and_block_root_errors",
+      "root_commit_deletion_subtree_traversal_gate",
+      "root_commit_effect_list",
+      "root_commit_finished_host_root",
+      "root_commit_finished_work",
+      "root_scheduler",
+      "root_updates",
+      "root_work_loop_finished_work",
+      "root_work_loop_lane_priority",
+      "root_work_loop_preflight_and_complete_handoff_report_suspense_list_activity_child_shapes",
+      "thenable_ping",
+      "unsupported_feature",
+      "use_callback"
+    ])
+  ],
+  [
+    "fast-react-test-renderer",
+    new Set([
+      "private_error_boundary",
+      "private_test_instance",
+      "root_create_preflight",
+      "root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics",
+      "root_private_tree_committed_fiber_inspection",
+      "to_json"
+    ])
+  ]
+]));
 
 const DEFAULT_BENCHMARK_ROOT = path.resolve(
   fileURLToPath(new URL("..", import.meta.url))
@@ -1030,6 +1134,9 @@ function validateNpmRunCommandSegment(segment, tokens, { label, repoRoot }) {
       `${segmentLabel} references missing package script ${scriptName}`
     );
   }
+  if (!ACCEPTED_NPM_COMMAND_SEGMENTS.has(segment)) {
+    errors.push(`${segmentLabel} is not an accepted benchmark gate npm command`);
+  }
 
   return errors;
 }
@@ -1061,6 +1168,14 @@ function validateNodeTestCommandSegment(segment, tokens, { label, repoRoot }) {
     }
     if (!statSync(resolvedTestPath).isFile()) {
       errors.push(`${segmentLabel} test target is not a file: ${testPath}`);
+      continue;
+    }
+    if (!ACCEPTED_NODE_TEST_TARGETS.has(testPath)) {
+      errors.push(
+        `${segmentLabel} test target ${JSON.stringify(
+          testPath
+        )} is not an accepted benchmark gate test target`
+      );
     }
   }
 
@@ -1098,6 +1213,18 @@ function validateCargoTestCommandSegment(segment, tokens, { label, repoRoot }) {
     errors.push(`${segmentLabel} must include --all-features`);
   }
 
+  const filters = args.filter((arg) => arg !== "--all-features");
+  if (
+    filters.length === 0 &&
+    !ACCEPTED_CARGO_ALL_FEATURES_PACKAGES.has(packageName)
+  ) {
+    errors.push(
+      `${segmentLabel} all-features cargo command is not accepted for ${packageName}`
+    );
+  }
+
+  const acceptedFilters =
+    ACCEPTED_CARGO_TEST_FILTERS.get(packageName) ?? new Set();
   for (const arg of args) {
     if (arg === "--all-features") {
       continue;
@@ -1106,23 +1233,16 @@ function validateCargoTestCommandSegment(segment, tokens, { label, repoRoot }) {
       errors.push(`${segmentLabel} has unsupported cargo flag ${arg}`);
       continue;
     }
-    if (!isAcceptedCargoTestFilter(arg)) {
+    if (!acceptedFilters.has(arg)) {
       errors.push(
         `${segmentLabel} test filter ${JSON.stringify(
           arg
-        )} must be a snake_case benchmark gate filter`
+        )} is not an accepted benchmark gate filter for ${packageName}`
       );
     }
   }
 
   return errors;
-}
-
-function isAcceptedCargoTestFilter(value) {
-  return (
-    CARGO_TEST_FILTER_PATTERN.test(value) &&
-    (value.includes("_") || CARGO_SINGLE_WORD_TEST_FILTERS.includes(value))
-  );
 }
 
 function validateGateCompatibilityClaims(gates, label, errors) {
