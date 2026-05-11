@@ -379,29 +379,54 @@ function getSchedulerMockExpiredActRootWorkSourceValidator() {
   }
 
   const flushExpired = flushExpiredDescriptor.value;
-  for (const key of Reflect.ownKeys(flushExpired)) {
-    if (typeof key !== 'symbol') {
-      continue;
-    }
-
-    const descriptor = Object.getOwnPropertyDescriptor(flushExpired, key);
-    const value = descriptor === undefined ? null : descriptor.value;
-    if (
-      descriptor !== undefined &&
-      descriptor.configurable === false &&
-      descriptor.enumerable === false &&
-      descriptor.writable === false &&
-      isObjectLike(value) &&
-      Object.isFrozen(value) &&
-      value.status ===
-        'fast-react.scheduler.mock-expired-act-root-work-source-validator' &&
-      typeof value.isSchedulerMockExpiredActRootWorkSource === 'function'
-    ) {
-      return value;
-    }
+  const diagnosticsDescriptor = Object.getOwnPropertyDescriptor(
+    flushExpired,
+    privateActQueueFlushDiagnosticsExport
+  );
+  if (
+    diagnosticsDescriptor === undefined ||
+    diagnosticsDescriptor.configurable !== false ||
+    diagnosticsDescriptor.enumerable !== false ||
+    diagnosticsDescriptor.writable !== false ||
+    !isAcceptedSchedulerPrivateActQueueFlushDiagnostics(
+      diagnosticsDescriptor.value
+    )
+  ) {
+    return null;
   }
 
-  return null;
+  const diagnostics = diagnosticsDescriptor.value;
+  if (
+    diagnostics.mockSchedulerExpiredActRootWorkDiagnosticsReady !== true ||
+    diagnostics.providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics !==
+      true
+  ) {
+    return null;
+  }
+
+  const validator =
+    diagnostics.schedulerMockExpiredActRootWorkSourceValidator;
+  if (
+    !isObjectLike(validator) ||
+    !Object.isFrozen(validator) ||
+    validator.status !==
+      'fast-react.scheduler.mock-expired-act-root-work-source-validator' ||
+    typeof validator.isSchedulerMockExpiredActRootWorkSource !== 'function'
+  ) {
+    return null;
+  }
+
+  try {
+    if (
+      validator.isSchedulerMockExpiredActRootWorkSource(diagnostics) !== true
+    ) {
+      return null;
+    }
+  } catch (error) {
+    return null;
+  }
+
+  return validator;
 }
 
 function loadSchedulerMockForExpiredActRootWorkSourceProof() {

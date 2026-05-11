@@ -76,9 +76,6 @@ const privateSchedulerMockDelayedRendererRootWorkMetadataBrand = Symbol.for(
 const privateSchedulerMockDelayedRendererRootWorkMetadataVersion = 1;
 const delayedActRootWorkMetadataSources = new WeakMap();
 const delayedRendererRootWorkMetadataSources = new WeakMap();
-const privateSchedulerMockExpiredActRootWorkSourceValidator = Symbol(
-  'fast-react.scheduler.mock-expired-act-root-work-source-validator'
-);
 const schedulerMockExpiredActRootWorkSources = new WeakSet();
 const schedulerMockExpiredActRootWorkSourceValidator = Object.freeze({
   status: 'fast-react.scheduler.mock-expired-act-root-work-source-validator',
@@ -197,6 +194,8 @@ function createPrivateActQueueFlushDiagnostics(
     rejectsStaleExpiredCallbackHandles: true,
     mockSchedulerExpiredActRootWorkDiagnosticsReady: true,
     recognizesExpiredActRootWorkMetadata: true,
+    providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics: true,
+    schedulerMockExpiredActRootWorkSourceValidator,
     linksExpiredCallbacksToAcceptedActRootWorkRecords: true,
     routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics: true,
     consumesAcceptedExpiredActRootWorkRecords: true,
@@ -459,16 +458,6 @@ function wrapSchedulerFunction(
       value: diagnostics,
       writable: false
     });
-    Object.defineProperty(
-      wrappedFunction,
-      privateSchedulerMockExpiredActRootWorkSourceValidator,
-      {
-        configurable: false,
-        enumerable: false,
-        value: schedulerMockExpiredActRootWorkSourceValidator,
-        writable: false
-      }
-    );
   }
 
   return Object.freeze(wrappedFunction);

@@ -627,6 +627,32 @@ test("local scheduler mock diagnostics stay hidden on mock flush helpers only", 
         false,
         key
       );
+      assert.equal(
+        descriptor.value
+          .providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics,
+        true,
+        key
+      );
+      assert.equal(
+        descriptor.value.schedulerMockExpiredActRootWorkSourceValidator !==
+          null &&
+          typeof descriptor.value
+            .schedulerMockExpiredActRootWorkSourceValidator === "object",
+        true,
+        key
+      );
+      assert.equal(
+        descriptor.value.schedulerMockExpiredActRootWorkSourceValidator.status,
+        "fast-react.scheduler.mock-expired-act-root-work-source-validator",
+        key
+      );
+      assert.equal(
+        descriptor.value.schedulerMockExpiredActRootWorkSourceValidator.isSchedulerMockExpiredActRootWorkSource(
+          descriptor.value
+        ),
+        true,
+        key
+      );
     }
   }
 

@@ -1659,30 +1659,30 @@ function readPrivateFlushDiagnostics(Scheduler) {
 
 function readSchedulerMockExpiredActRootWorkSourceValidator(Scheduler) {
   const flushExpired = Scheduler.unstable_flushExpired;
-  for (const key of Reflect.ownKeys(flushExpired)) {
-    if (typeof key !== 'symbol') {
-      continue;
-    }
+  const privateSymbolDescriptions = Reflect.ownKeys(flushExpired)
+    .filter((key) => typeof key === 'symbol')
+    .map((key) => key.description);
+  assert.deepEqual(privateSymbolDescriptions, []);
 
-    const descriptor = Object.getOwnPropertyDescriptor(flushExpired, key);
-    const value = descriptor === undefined ? null : descriptor.value;
-    if (
-      descriptor !== undefined &&
-      descriptor.configurable === false &&
-      descriptor.enumerable === false &&
-      descriptor.writable === false &&
-      value !== null &&
-      typeof value === 'object' &&
-      Object.isFrozen(value) &&
-      value.status ===
-        'fast-react.scheduler.mock-expired-act-root-work-source-validator' &&
-      typeof value.isSchedulerMockExpiredActRootWorkSource === 'function'
-    ) {
-      return value;
-    }
-  }
+  const diagnostics = readPrivateFlushDiagnostics(Scheduler);
+  assert.equal(
+    diagnostics.providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics,
+    true
+  );
 
-  assert.fail('Expected Scheduler mock source validator on unstable_flushExpired');
+  const value = diagnostics.schedulerMockExpiredActRootWorkSourceValidator;
+  assert.equal(value !== null && typeof value === 'object', true);
+  assert.equal(Object.isFrozen(value), true);
+  assert.equal(
+    value.status,
+    'fast-react.scheduler.mock-expired-act-root-work-source-validator'
+  );
+  assert.equal(
+    typeof value.isSchedulerMockExpiredActRootWorkSource,
+    'function'
+  );
+  assert.equal(value.isSchedulerMockExpiredActRootWorkSource(diagnostics), true);
+  return value;
 }
 
 function getSchedulerPriorityName(Scheduler, priorityLevel) {

@@ -2996,6 +2996,48 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
     label
   );
   assert.equal(
+    diagnostics.providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.schedulerMockExpiredActRootWorkSourceValidator !== null &&
+      typeof diagnostics.schedulerMockExpiredActRootWorkSourceValidator ===
+        "object",
+    true,
+    label
+  );
+  assert.equal(
+    Object.isFrozen(diagnostics.schedulerMockExpiredActRootWorkSourceValidator),
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.schedulerMockExpiredActRootWorkSourceValidator.status,
+    "fast-react.scheduler.mock-expired-act-root-work-source-validator",
+    label
+  );
+  assert.equal(
+    typeof diagnostics.schedulerMockExpiredActRootWorkSourceValidator
+      .isSchedulerMockExpiredActRootWorkSource,
+    "function",
+    label
+  );
+  assert.equal(
+    diagnostics.schedulerMockExpiredActRootWorkSourceValidator.isSchedulerMockExpiredActRootWorkSource(
+      diagnostics
+    ),
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.schedulerMockExpiredActRootWorkSourceValidator.isSchedulerMockExpiredActRootWorkSource(
+      Object.freeze({ ...diagnostics })
+    ),
+    false,
+    label
+  );
+  assert.equal(
     diagnostics.linksExpiredCallbacksToAcceptedActRootWorkRecords,
     true,
     label
