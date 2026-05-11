@@ -15206,6 +15206,11 @@ test('private resource root-map fake metadata negative matrix stays fail-closed 
 });
 
 test('private resource root-map storage execution mutates deterministic fake maps only', () => {
+  const rootContext = createPrivateRootBridgeAdmission();
+  const rootLifecycleBinding = {
+    rootBridgeAdmission: rootContext.admission,
+    rootLifecycleRequestBoundary: rootContext.lifecycleBoundary
+  };
   const scenario = createRootMapStoragePreflightScenario(
     'root-map-storage-private-execution'
   );
@@ -15214,7 +15219,7 @@ test('private resource root-map storage execution mutates deterministic fake map
     {
       explicitRootMapStoragePreflight: true,
       preflightId: 'private-execution-root-map-preflight',
-      rootId: 'private-execution-resource-root',
+      rootId: rootContext.admission.rootId,
       expectedSourceResourceMapCommitRowIds: [
         'resource-map-commit-1',
         'resource-map-commit-3',
@@ -15225,16 +15230,24 @@ test('private resource root-map storage execution mutates deterministic fake map
   const storageGate = resourceFormGate.createResourceHintRootMapStorageGate({
     requestIdPrefix: 'root-map-storage-private-execution-run'
   });
-  const execution = storageGate.recordRootMapStorageExecution(preflight, {
-    explicitRootMapStorageExecution: true,
-    executionId: 'private-execution-root-map-storage',
-    rootId: 'private-execution-resource-root',
-    expectedRootMapStorageRowIds: [
-      'root-map-storage-preflight-0',
-      'root-map-storage-preflight-1',
-      'root-map-storage-preflight-2'
-    ]
-  });
+  const execution = storageGate.recordRootMapStorageExecution(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      executionId: 'private-execution-root-map-storage',
+      rootId: rootContext.admission.rootId,
+      expectedRootMapStorageRowIds: [
+        'root-map-storage-preflight-0',
+        'root-map-storage-preflight-1',
+        'root-map-storage-preflight-2'
+      ]
+    },
+    rootLifecycleBinding
+  );
+  const rootIdentityPayload =
+    resourceFormGate.getPrivateResourceHintRootMapStorageRootIdentityPayload(
+      execution
+    );
   const summary =
     resourceFormGate.describePrivateResourceHintRootMapStorageGate();
 
@@ -15248,13 +15261,33 @@ test('private resource root-map storage execution mutates deterministic fake map
     ),
     execution
   );
+  assert.notEqual(rootIdentityPayload, null);
+  assert.equal(rootIdentityPayload.rootBridgeAdmission, rootContext.admission);
   assert.equal(
-    resourceFormGate.getPrivateResourceHintRootMapStorageRootIdentityPayload(
-      execution
-    ),
-    null
+    rootIdentityPayload.rootLifecycleRequestBoundary,
+    rootContext.lifecycleBoundary
   );
-  assert.equal(execution.rootExecutionBoundary, null);
+  assert.equal(
+    rootIdentityPayload.rootExecutionBoundary,
+    execution.rootExecutionBoundary
+  );
+  assert.equal(rootIdentityPayload.container, rootContext.container);
+  assert.equal(
+    execution.rootExecutionBoundary.rootId,
+    rootContext.admission.rootId
+  );
+  assert.equal(
+    execution.rootExecutionBoundary.sourceRootBridgeAdmissionId,
+    rootContext.admission.requestId
+  );
+  assert.equal(
+    execution.rootExecutionBoundary.sourceRootLifecycleBoundaryId,
+    rootContext.lifecycleBoundary.boundaryId
+  );
+  assert.equal(
+    execution.rootExecutionBoundary.rootContainerInfo,
+    rootIdentityPayload.containerInfo
+  );
   assert.equal(
     execution.rootMapStorageStatus,
     resourceFormGate.privateResourceHintRootMapStorageStatus
@@ -15430,6 +15463,21 @@ test('private resource root-map storage execution mutates deterministic fake map
     preflight,
     {
       explicitRootMapStorageExecution: true,
+      executionId: 'private-execution-root-map-storage-missing-lifecycle',
+      rootId: rootContext.admission.rootId,
+      expectedRootMapStorageRowIds: [
+        'root-map-storage-preflight-0',
+        'root-map-storage-preflight-1',
+        'root-map-storage-preflight-2'
+      ]
+    },
+    undefined,
+    'root lifecycle binding for resource root-map storage is required'
+  );
+  assertRootMapStorageExecutionAdmissionRejects(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
       sourceRootMapStoragePreflightId: 'stale-root-map-preflight'
     }
   );
@@ -15490,7 +15538,7 @@ test('private resource root-map storage execution mutates deterministic fake map
     preflight,
     {
       explicitRootMapStorageExecution: true,
-      rootId: 'private-execution-resource-root'
+      rootId: rootContext.admission.rootId
     },
     {
       rootBridgeAdmission: unmountAdmission,
@@ -19565,10 +19613,20 @@ test('private resource/form root execution consumer rejects stale cross-root mis
   const freshAdmission = bridge.admitRequest(nextRender);
   const freshLifecycleBoundary =
     rootBridge.createPrivateRootLifecycleRequestBoundary(freshAdmission);
-  const rootlessResourceExecution = createRootMapStorageExecutionForRoot(
-    'root-execution-consumer-rootless-resource',
-    freshAdmission.rootId
-  );
+  const foreignRootId = createPrivateRootBridgeAdmission({
+    requestIdPrefix: 'foreign-root-execution-consumer-request',
+    rootIdPrefix: 'foreign-root-execution-consumer-root',
+    updateIdPrefix: 'foreign-root-execution-consumer-update'
+  });
+  const foreignRootIdResourceExecution =
+    createRootMapStorageExecutionForRoot(
+      'root-execution-consumer-foreign-root-id',
+      foreignRootId.admission.rootId,
+      {
+        admission: foreignRootId.admission,
+        lifecycleBoundary: foreignRootId.lifecycleBoundary
+      }
+    );
   const resourceExecution = createRootMapStorageExecutionForRoot(
     'root-execution-consumer-negative',
     freshAdmission.rootId,
@@ -19577,11 +19635,6 @@ test('private resource/form root execution consumer rejects stale cross-root mis
       lifecycleBoundary: freshLifecycleBoundary
     }
   );
-  const foreignRootIdResourceExecution =
-    createRootMapStorageExecutionForRoot(
-      'root-execution-consumer-foreign-root-id',
-      'foreign-root-execution-consumer-root'
-    );
   const { fulfilledResetExecution: rootlessFulfilledResetExecution } =
     await createPrivateFulfilledResetExecutionRecord(
       'root-execution-consumer-negative-form'
@@ -19919,26 +19972,6 @@ test('private resource/form root execution consumer rejects stale cross-root mis
       compatibilityTarget,
       reason:
         'resource root-map storage execution root lifecycle identity must match root bridge admission and lifecycle boundary'
-    }
-  );
-  assert.throws(
-    () =>
-      gate.recordRootExecutionConsumer(
-        freshAdmission,
-        freshLifecycleBoundary,
-        rootlessResourceExecution,
-        fulfilledResetExecution,
-        {
-          explicitResourceFormRootExecutionConsumer: true
-        }
-      ),
-    {
-      code:
-        resourceFormGate
-          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
-      compatibilityTarget,
-      reason:
-        'resource root-map storage execution root lifecycle identity must be source-owned'
     }
   );
   assert.throws(
@@ -21141,13 +21174,23 @@ function createPrivateControlledWrapperPropertyPayloadScenario() {
   };
 }
 
-function createPrivateRootBridgeAdmission() {
+function createPrivateRootBridgeAdmission(options) {
+  const requestIdPrefix =
+    options && options.requestIdPrefix
+      ? options.requestIdPrefix
+      : 'root-gate-request';
+  const rootIdPrefix =
+    options && options.rootIdPrefix ? options.rootIdPrefix : 'root-gate';
+  const updateIdPrefix =
+    options && options.updateIdPrefix
+      ? options.updateIdPrefix
+      : 'root-gate-update';
   const document = createRootBridgeDocument();
   const container = createRootBridgeElement('DIV', document);
   const bridge = rootBridge.createPrivateRootBridgeShell({
-    requestIdPrefix: 'root-gate-request',
-    rootIdPrefix: 'root-gate',
-    updateIdPrefix: 'root-gate-update'
+    requestIdPrefix,
+    rootIdPrefix,
+    updateIdPrefix
   });
   const create = bridge.createClientRoot(container, {
     identifierPrefix: 'resource-form-'

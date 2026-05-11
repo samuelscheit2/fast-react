@@ -5154,15 +5154,13 @@ function recordResourceHintRootMapStorageWithGate(
   });
 
   resourceHintRootMapStoragePayloads.set(payload, payload);
-  if (rootLifecycleIdentity !== null) {
-    resourceHintRootMapStorageRootIdentityPayloads.set(
-      payload,
-      createResourceHintRootMapStorageRootIdentityPayload(
-        rootLifecycleIdentity,
-        rootExecutionBoundary
-      )
-    );
-  }
+  resourceHintRootMapStorageRootIdentityPayloads.set(
+    payload,
+    createResourceHintRootMapStorageRootIdentityPayload(
+      rootLifecycleIdentity,
+      rootExecutionBoundary
+    )
+  );
   return payload;
 }
 
@@ -10121,7 +10119,9 @@ function normalizeResourceHintRootMapStorageRootLifecycleBinding(
   storageAdmission
 ) {
   if (binding == null) {
-    return null;
+    throwInvalidResourceHintRootMapStorageAdmission(
+      'root lifecycle binding for resource root-map storage is required'
+    );
   }
 
   if (typeof binding !== 'object') {
@@ -10204,7 +10204,9 @@ function createResourceHintRootMapStorageRootLifecycleBoundary(
   rootLifecycleIdentity
 ) {
   if (rootLifecycleIdentity === null) {
-    return null;
+    throwInvalidResourceHintRootMapStorageAdmission(
+      'root lifecycle binding for resource root-map storage is required'
+    );
   }
 
   const admission = rootLifecycleIdentity.rootBridgeAdmission;

@@ -8,10 +8,10 @@
   evidence for resource root-map execution, matching root bridge admission,
   lifecycle boundary, container identity, visible boundary tokens, and hidden
   WeakMap payloads.
-- Preserved standalone private resource root-map diagnostics without a root
-  binding, while rejecting rootless, stale, cross-root/container, wrong
-  operation, public compatibility, native/Rust, and Worker 910 caller-token
-  smuggling at the root consumer.
+- Made standalone private resource root-map diagnostics require a source-owned
+  current render root lifecycle binding, while rejecting omitted bindings,
+  stale, cross-root/container, wrong operation, public compatibility,
+  native/Rust, and Worker 910 caller-token smuggling.
 - Extended the private-admission 850 ledger with resource root lifecycle
   boundary tokens and source-owned currentness fields.
 
@@ -26,14 +26,14 @@
 
 ## Evidence
 
-- Resource root-map execution records now optionally expose
+- Resource root-map execution records now always expose
   `rootExecutionBoundary` and store source-owned identity in
   `getPrivateResourceHintRootMapStorageRootIdentityPayload`.
 - Root execution consumers validate exact root admission, lifecycle boundary,
   lifecycle payload, container info, render operation, active/current lifecycle,
   visible source tokens, and blocked public/native flags before consuming
   resource evidence.
-- Negative canaries cover rootless resource evidence, stale resource
+- Negative canaries cover omitted resource lifecycle binding, stale resource
   lifecycle, cross-container resource reuse, wrong root operation, caller-built
   source tokens, Worker 910 evidence aliases, public compatibility claims, and
   native/Rust execution claims.
