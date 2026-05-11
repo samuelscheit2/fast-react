@@ -29,6 +29,29 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1009 Docs Refresh and Workers 1002-1008 Cleanup Batch
+
+- Worker 1009 refreshed master docs after the accepted Rust test-module
+  extraction batch. This was a docs-only refresh and makes no runtime or public
+  compatibility claim.
+- Workers 1002-1008 extracted inline reconciler `#[cfg(test)] mod tests` blocks
+  into sibling `tests.rs` files for `root_commit`, `root_work_loop`,
+  `host_work`, `function_component`, `begin_work`, `passive_effects`, and
+  `root_scheduler`.
+- The cleanup preserved production behavior: production files now keep only
+  `#[cfg(test)] mod tests;` declarations, and the moved test bodies remain
+  under the same module paths after rustfmt.
+- Independent audits for each extraction returned MERGE. Post-merge
+  verification passed `cargo test -p fast-react-reconciler` with 886 unit tests
+  and 1 doc-test, `cargo fmt --all --check`, git diff checks, npm
+  package-surface, and import smoke.
+- The accepted state for this cleanup batch is main `337c8b76` after merge
+  commits `0b4415ca`, `4f4d1644`, `46b24b04`, `62787d87`, `21c13485`,
+  `efe7f0d3`, and `337c8b76`. The cleanup only improves file organization;
+  public React DOM roots, test-renderer/native behavior, hooks, Scheduler
+  timing, hydration, events, resources/forms, package compatibility, and broad
+  renderer compatibility remain blocked unless separately proven.
+
 ### Worker 1001 Docs Refresh and Workers 967-1000 Accepted Batch
 
 - Worker 1001 reconciled master docs with main `8a3b4042`

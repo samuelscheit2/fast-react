@@ -45,20 +45,24 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current accepted docs baseline is main `8a3b4042`
-(`Refresh docs after worker 989`), with runtime implementation accepted through
-`cf31f851` (`Merge worker 989 conformance private gate false-green sweep`);
-this docs refresh makes no runtime compatibility claim. Accepted implementation
-history now includes the post-Worker-997 batch: Workers 986, 987, 992, 1000,
-998, 978, 999, 990, 967, 996, 994, and 989. Worker 853's competing
-test-renderer branch was rejected as redundant after Worker 844 was accepted;
-do not use it as accepted input.
+Top-level cap: 30 workers. Current accepted docs baseline is main `5793ba3f`
+(`Merge worker 1001 docs refresh accepted batch`), with cleanup accepted
+through `337c8b76` (`Merge worker 1008 root scheduler test extraction`);
+this docs refresh makes no runtime or public compatibility claim. Accepted
+implementation history still includes the post-Worker-997 batch: Workers 986,
+987, 992, 1000, 998, 978, 999, 990, 967, 996, 994, and 989. Accepted cleanup
+history now also includes Workers 1002-1008, which only moved inline Rust
+`#[cfg(test)] mod tests` blocks into sibling `tests.rs` files. Worker 853's
+competing test-renderer branch was rejected as redundant after Worker 844 was
+accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
 - No active implementation or audit workers are recorded in this plan after the
-  `8a3b4042` docs baseline. Start new work from the queue candidates below or
-  explicit orchestrator assignment.
+  `337c8b76` cleanup baseline. Start new work from the queue candidates below,
+  explicit orchestrator assignment, or narrow behavior-preserving module/facade
+  splits that reduce large-file pressure without changing runtime behavior,
+  package exports, public API shape, or compatibility claims.
 
 Do not consume future active worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair or audit lane lands, move
@@ -106,6 +110,11 @@ canonical evidence requirements.
 
 ## Next Queue Candidates
 
+- Behavior-preserving module/facade cleanup can split large Rust modules and
+  JS facade files when the change preserves module paths, exports, public API
+  shape, runtime behavior, and existing blocker language. Treat these as
+  organization-only workers requiring focused tests, package-surface/import
+  smoke when facades are touched, and no compatibility claims.
 - Rust root/sync-flush/function/deletion execution can extend accepted Workers
   855, 860, 862-867, 878-879, 889-890, 896, 898, 904, 906-907, 917-921, 936,
   943, 948, 954, 973, 980, 982, 985, 991, 997, and 998, plus Worker 966's
