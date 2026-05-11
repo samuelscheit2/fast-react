@@ -5,6 +5,7 @@ const {
   createUnsupportedError,
   createUnsupportedFunction
 } = require('../placeholder-utils.js');
+const rootBridge = require('./client/root-bridge.js');
 
 const entrypoint = 'react-dom/test-utils';
 const privateTestUtilsActGateExport =
@@ -92,16 +93,16 @@ const privateSchedulerDrivenPassiveEffectConsumptionStatus =
 const reactActSchedulerDrivenPassiveEffectConsumptionStatus =
   'consumed-accepted-private-scheduler-driven-passive-effect-execution-diagnostics';
 const privateSchedulerDrivenPassiveLifecycleBoundaryStatus =
-  'accepted-private-root-lifecycle-request-boundary-for-scheduler-driven-passive-diagnostics';
+  'accepted-private-root-public-facade-lifecycle-container-snapshot';
 const privateSchedulerDrivenPassiveLifecycleBoundaryKind =
-  'fast-react.react.private-scheduler-driven-passive-lifecycle-boundary';
+  'FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord';
 const privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId =
   'worker-874-react-dom-lifecycle-boundary-hardening';
 const privateSchedulerDrivenPassiveLifecycleBoundarySource =
   'packages/react-dom/src/client/root-bridge.js';
 const privateSchedulerDrivenPassiveLifecycleBoundaryRecords = freezeArray([
-  'FastReactDomPrivateRootPublicFacadeLifecycleRequestBoundary',
   'FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord',
+  'FastReactDomPrivateRootCreateRecord',
   'FastReactDomPrivateRootUpdateRecord'
 ]);
 const privateRootHostOutputDiagnosticGateId =
@@ -2617,57 +2618,81 @@ function isAcceptedReactSchedulerDrivenPassiveLifecycleBoundary(
   boundary,
   consumption
 ) {
+  const snapshotPayload =
+    isObjectLike(boundary)
+      ? rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
+          boundary
+        )
+      : null;
+  const rootPayload =
+    isObjectLike(snapshotPayload) && isObjectLike(snapshotPayload.payload)
+      ? snapshotPayload.payload
+      : null;
+  const createRecord =
+    isObjectLike(snapshotPayload) ? snapshotPayload.createRecord : null;
+  const sourceRecord =
+    isObjectLike(snapshotPayload) ? snapshotPayload.sourceRecord : null;
+
   return (
-    isObjectLike(boundary) &&
-    Object.isFrozen(boundary) &&
-    boundary.status === privateSchedulerDrivenPassiveLifecycleBoundaryStatus &&
-    boundary.kind === privateSchedulerDrivenPassiveLifecycleBoundaryKind &&
-    boundary.accepted === true &&
-    boundary.rendererCompatibilityTarget === 'react-dom@19.2.6' &&
-    boundary.packageName === 'react-dom' &&
-    boundary.entrypoint === 'react-dom/client' &&
-    boundary.source === privateSchedulerDrivenPassiveLifecycleBoundarySource &&
-    boundary.workerId ===
-      privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId &&
-    sameStringArray(
-      boundary.records,
-      privateSchedulerDrivenPassiveLifecycleBoundaryRecords
+    rootBridge.isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord(
+      boundary
     ) &&
+    snapshotPayload !== null &&
+    Object.isFrozen(boundary) &&
+    boundary.$$typeof ===
+      rootBridge.privateRootPublicFacadeLifecycleContainerSnapshotRecordType &&
+    boundary.kind === privateSchedulerDrivenPassiveLifecycleBoundaryKind &&
+    boundary.snapshotStatus ===
+      privateSchedulerDrivenPassiveLifecycleBoundaryStatus &&
+    consumption.lifecycleRequestBoundaryStatus === boundary.snapshotStatus &&
+    consumption.lifecycleRequestBoundaryKind === boundary.kind &&
     boundary.rootId === consumption.rootId &&
-    boundary.rootLabel === consumption.rootLabel &&
-    typeof boundary.requestId === 'string' &&
-    boundary.requestId.length > 0 &&
-    boundary.requestType === 'root.render' &&
-    boundary.operation === 'render' &&
-    boundary.lifecycleStatusBefore === 'created' &&
-    boundary.lifecycleStatusAfter === 'rendered' &&
-    boundary.lifecycleTransition === 'created->rendered' &&
+    (boundary.phase === 'render' || boundary.phase === 'update') &&
     boundary.sourceOwned === true &&
-    boundary.callerSupplied === false &&
-    boundary.frozenRows === true &&
-    boundary.requestBoundaryActive === true &&
-    boundary.requestBoundaryReplayed === false &&
-    boundary.stale === false &&
-    boundary.rootMatchesScheduler === true &&
-    boundary.packageEntrypointMatches === true &&
+    boundary.sourceRequestType === 'root.render' &&
+    boundary.sourceOperation === 'render' &&
+    typeof boundary.sourceRequestId === 'string' &&
+    boundary.sourceRequestId.length > 0 &&
+    boundary.sourceRequestSequence > 0 &&
+    boundary.markerListenerStatePreserved === true &&
+    (boundary.publicActPassiveDrain === undefined ||
+      boundary.publicActPassiveDrain === false) &&
     boundary.publicRootExecution === false &&
-    boundary.publicEffectExecution === false &&
-    boundary.publicActCompatibilityClaimed === false &&
-    boundary.publicReactActCompatibilityClaimed === false &&
-    boundary.publicSchedulerTimingCompatibilityClaimed === false &&
-    boundary.publicRootSchedulerCompatibilityClaimed === false &&
-    boundary.publicRendererCompatibilityClaimed === false &&
-    boundary.publicPackageCompatibilityClaimed === false &&
-    boundary.packageCompatibilityClaimed === false &&
-    boundary.drainsPublicSchedulerTaskQueue === false &&
-    boundary.drainsPublicReactActQueue === false &&
-    boundary.publicActPassiveDrain === false &&
-    boundary.executesQueuedWork === false &&
-    boundary.executesEffects === false &&
-    boundary.executesPassiveEffects === false &&
-    boundary.executesRendererWork === false &&
-    boundary.executesRendererRoots === false &&
-    boundary.compatibilityClaimed === false
+    boundary.publicRootCompatibilitySurface === false &&
+    boundary.nativeExecution === false &&
+    boundary.reconcilerExecution === false &&
+    boundary.browserDomMutation === false &&
+    boundary.markerWrites === false &&
+    boundary.listenerInstallation === false &&
+    boundary.hydration === false &&
+    boundary.eventDispatch === false &&
+    boundary.compatibilityClaimed === false &&
+    isObjectLike(createRecord) &&
+    createRecord.$$typeof === rootBridge.privateRootCreateRecordType &&
+    createRecord.kind === 'FastReactDomPrivateRootCreateRecord' &&
+    createRecord.requestType === 'createRoot' &&
+    createRecord.requestId === boundary.createRequestId &&
+    createRecord.rootId === boundary.rootId &&
+    createRecord.rootKind === boundary.rootKind &&
+    createRecord.rootTag === boundary.rootTag &&
+    isObjectLike(sourceRecord) &&
+    sourceRecord.$$typeof === rootBridge.privateRootUpdateRecordType &&
+    sourceRecord.kind === 'FastReactDomPrivateRootUpdateRecord' &&
+    sourceRecord.requestId === boundary.sourceRequestId &&
+    sourceRecord.requestSequence === boundary.sourceRequestSequence &&
+    sourceRecord.requestType === boundary.sourceRequestType &&
+    sourceRecord.operation === boundary.sourceOperation &&
+    sourceRecord.rootId === boundary.rootId &&
+    sourceRecord.rootKind === boundary.rootKind &&
+    sourceRecord.rootTag === boundary.rootTag &&
+    sourceRecord.requestSequence > createRecord.requestSequence &&
+    rootPayload !== null &&
+    rootPayload.createRecord === createRecord &&
+    Array.isArray(rootPayload.requestRecords) &&
+    Array.isArray(rootPayload.renderRecords) &&
+    rootPayload.requestRecords.includes(createRecord) &&
+    rootPayload.requestRecords.includes(sourceRecord) &&
+    rootPayload.renderRecords.includes(sourceRecord)
   );
 }
 

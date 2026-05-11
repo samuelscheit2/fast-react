@@ -4,6 +4,7 @@ const {
   compatibilityTarget,
   createUnimplementedError
 } = require('./placeholder-utils.js');
+const reactDomRootBridge = require('../react-dom/src/client/root-bridge.js');
 const CommonJsModule = require('node:module');
 
 const entrypoint = 'react';
@@ -127,21 +128,18 @@ const schedulerDrivenPassiveEffectDiagnosticsStatus =
 const schedulerDrivenPassiveEffectConsumptionStatus =
   'consumed-accepted-private-scheduler-driven-passive-effect-execution-diagnostics';
 const privateSchedulerDrivenPassiveLifecycleBoundaryKind =
-  'fast-react.react.private-scheduler-driven-passive-lifecycle-boundary';
-const privateSchedulerDrivenPassiveLifecycleBoundaryBrand = Symbol.for(
-  privateSchedulerDrivenPassiveLifecycleBoundaryKind
-);
+  'FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord';
 const privateSchedulerDrivenPassiveLifecycleBoundaryVersion = 1;
 const schedulerDrivenPassiveLifecycleBoundaryStatus =
-  'accepted-private-root-lifecycle-request-boundary-for-scheduler-driven-passive-diagnostics';
+  'accepted-private-root-public-facade-lifecycle-container-snapshot';
 const reactDomClientCompatibilityTarget = 'react-dom@19.2.6';
 const privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId =
   'worker-874-react-dom-lifecycle-boundary-hardening';
 const privateSchedulerDrivenPassiveLifecycleBoundarySource =
   'packages/react-dom/src/client/root-bridge.js';
 const privateSchedulerDrivenPassiveLifecycleBoundaryRecords = Object.freeze([
-  'FastReactDomPrivateRootPublicFacadeLifecycleRequestBoundary',
   'FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord',
+  'FastReactDomPrivateRootCreateRecord',
   'FastReactDomPrivateRootUpdateRecord'
 ]);
 const privateSchedulerDrivenPassiveEffectWorkerIds = Object.freeze([
@@ -225,57 +223,6 @@ const schedulerDrivenPassiveEffectDiagnosticsKeys = Object.freeze([
   'publicActPassiveDrain',
   'publicEffectExecution',
   'publicRootExecution',
-  'executesQueuedWork',
-  'executesEffects',
-  'executesPassiveEffects',
-  'executesRendererWork',
-  'executesRendererRoots',
-  'compatibilityClaimed'
-]);
-const schedulerDrivenPassiveLifecycleBoundaryKeys = Object.freeze([
-  'kind',
-  'version',
-  'status',
-  'accepted',
-  'compatibilityTarget',
-  'schedulerCompatibilityTarget',
-  'rendererCompatibilityTarget',
-  'packageName',
-  'entrypoint',
-  'source',
-  'workerId',
-  'records',
-  'rootId',
-  'rootLabel',
-  'requestId',
-  'requestSequence',
-  'requestType',
-  'operation',
-  'lifecycleStatusBefore',
-  'lifecycleStatusAfter',
-  'lifecycleTransition',
-  'lifecycleBoundaryOrder',
-  'schedulerRequestOrder',
-  'sourceOwned',
-  'callerSupplied',
-  'frozenRows',
-  'requestBoundaryActive',
-  'requestBoundaryReplayed',
-  'stale',
-  'rootMatchesScheduler',
-  'packageEntrypointMatches',
-  'publicRootExecution',
-  'publicEffectExecution',
-  'publicActCompatibilityClaimed',
-  'publicReactActCompatibilityClaimed',
-  'publicSchedulerTimingCompatibilityClaimed',
-  'publicRootSchedulerCompatibilityClaimed',
-  'publicRendererCompatibilityClaimed',
-  'publicPackageCompatibilityClaimed',
-  'packageCompatibilityClaimed',
-  'drainsPublicSchedulerTaskQueue',
-  'drainsPublicReactActQueue',
-  'publicActPassiveDrain',
   'executesQueuedWork',
   'executesEffects',
   'executesPassiveEffects',
@@ -3519,66 +3466,8 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
   const pendingMountCount = options.pendingMountCount ?? 1;
   const pendingRecordCount = pendingUnmountCount + pendingMountCount;
   const schedulerRequestOrder = options.schedulerRequestOrder ?? 1;
-  const lifecycleBoundaryOrder = options.lifecycleBoundaryOrder ?? 0;
-  const lifecycleRequestSequence = options.lifecycleRequestSequence ?? 1;
   const lifecycleRequestBoundary =
-    createSchedulerDrivenPassiveEffectOwnedLifecycleBoundaryRecord(
-      {
-        kind: privateSchedulerDrivenPassiveLifecycleBoundaryKind,
-        version: privateSchedulerDrivenPassiveLifecycleBoundaryVersion,
-        status: schedulerDrivenPassiveLifecycleBoundaryStatus,
-        accepted: true,
-        compatibilityTarget,
-        schedulerCompatibilityTarget,
-        rendererCompatibilityTarget: reactDomClientCompatibilityTarget,
-        packageName: 'react-dom',
-        entrypoint: 'react-dom/client',
-        source: privateSchedulerDrivenPassiveLifecycleBoundarySource,
-        workerId: privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId,
-        records: privateSchedulerDrivenPassiveLifecycleBoundaryRecords,
-        rootId,
-        rootLabel,
-        requestId:
-          options.lifecycleRequestId ??
-          `${String(rootLabel)}:lifecycle-request:${lifecycleRequestSequence}`,
-        requestSequence: lifecycleRequestSequence,
-        requestType: 'root.render',
-        operation: 'render',
-        lifecycleStatusBefore: 'created',
-        lifecycleStatusAfter: 'rendered',
-        lifecycleTransition: 'created->rendered',
-        lifecycleBoundaryOrder,
-        schedulerRequestOrder,
-        sourceOwned: true,
-        callerSupplied: false,
-        frozenRows: true,
-        requestBoundaryActive: true,
-        requestBoundaryReplayed: false,
-        stale: false,
-        rootMatchesScheduler: true,
-        packageEntrypointMatches: true,
-        publicRootExecution: false,
-        publicEffectExecution: false,
-        publicActCompatibilityClaimed: false,
-        publicReactActCompatibilityClaimed: false,
-        publicSchedulerTimingCompatibilityClaimed: false,
-        publicRootSchedulerCompatibilityClaimed: false,
-        publicRendererCompatibilityClaimed: false,
-        publicPackageCompatibilityClaimed: false,
-        packageCompatibilityClaimed: false,
-        drainsPublicSchedulerTaskQueue: false,
-        drainsPublicReactActQueue: false,
-        publicActPassiveDrain: false,
-        executesQueuedWork: false,
-        executesEffects: false,
-        executesPassiveEffects: false,
-        executesRendererWork: false,
-        executesRendererRoots: false,
-        compatibilityClaimed: false,
-        ...(options.lifecycleRequestBoundaryOverrides ?? {})
-      },
-      ownershipToken
-    );
+    getSchedulerDrivenPassiveLifecycleBoundaryFromOptions(options);
   const schedulerRequest = createSchedulerDrivenPassiveEffectOwnedRecord({
     recordKind: 'SchedulerPassiveEffectsFlushRequest',
     source: 'crates/fast-react-reconciler/src/scheduler_bridge.rs',
@@ -3725,8 +3614,14 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
     schedulerExecution,
     passiveEffects,
     lifecycleRequestBoundary,
-    lifecycleRequestBoundaryStatus: lifecycleRequestBoundary.status,
-    lifecycleRequestBoundaryKind: lifecycleRequestBoundary.kind,
+    lifecycleRequestBoundaryStatus:
+      getSchedulerDrivenPassiveLifecycleBoundaryStatus(
+        lifecycleRequestBoundary
+      ),
+    lifecycleRequestBoundaryKind:
+      getSchedulerDrivenPassiveLifecycleBoundaryKind(
+        lifecycleRequestBoundary
+      ),
     consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
     requiresSchedulerOwnedSourceProof: true,
     requiresSourceOwnedPassiveEvidence: true,
@@ -3786,6 +3681,75 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
   return frozenDiagnostics;
 }
 
+function getSchedulerDrivenPassiveLifecycleBoundaryFromOptions(options) {
+  const boundary = options.lifecycleRequestBoundary;
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'lifecycleRequestBoundaryOverrides'
+    )
+  ) {
+    return Object.freeze({
+      ...boundary,
+      ...(options.lifecycleRequestBoundaryOverrides ?? {})
+    });
+  }
+  if (
+    hasSchedulerDrivenPassiveLifecycleBoundaryRequestIdentityMismatch(
+      boundary,
+      options
+    )
+  ) {
+    return Object.freeze({
+      ...boundary,
+      sourceRequestId:
+        options.lifecycleRequestId ??
+        (isObjectLike(boundary) ? boundary.sourceRequestId : undefined),
+      sourceRequestSequence:
+        options.lifecycleRequestSequence ??
+        (isObjectLike(boundary)
+          ? boundary.sourceRequestSequence
+          : undefined)
+    });
+  }
+  return boundary;
+}
+
+function hasSchedulerDrivenPassiveLifecycleBoundaryRequestIdentityMismatch(
+  boundary,
+  options
+) {
+  if (!isObjectLike(options)) {
+    return false;
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(options, 'lifecycleRequestId') &&
+    (!isObjectLike(boundary) ||
+      options.lifecycleRequestId !== boundary.sourceRequestId)
+  ) {
+    return true;
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'lifecycleRequestSequence'
+    ) &&
+    (!isObjectLike(boundary) ||
+      options.lifecycleRequestSequence !== boundary.sourceRequestSequence)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function getSchedulerDrivenPassiveLifecycleBoundaryStatus(boundary) {
+  return isObjectLike(boundary) ? boundary.snapshotStatus : undefined;
+}
+
+function getSchedulerDrivenPassiveLifecycleBoundaryKind(boundary) {
+  return isObjectLike(boundary) ? boundary.kind : undefined;
+}
+
 function createSchedulerDrivenPassiveEffectOwnedRecord(record, ownershipToken) {
   const frozenRecord = Object.freeze(record);
   privateSchedulerDrivenPassiveEffectRecordTokens.set(
@@ -3793,27 +3757,6 @@ function createSchedulerDrivenPassiveEffectOwnedRecord(record, ownershipToken) {
     ownershipToken
   );
   return frozenRecord;
-}
-
-function createSchedulerDrivenPassiveEffectOwnedLifecycleBoundaryRecord(
-  record,
-  ownershipToken
-) {
-  Object.defineProperty(
-    record,
-    privateSchedulerDrivenPassiveLifecycleBoundaryBrand,
-    {
-      configurable: false,
-      enumerable: false,
-      value: true,
-      writable: false
-    }
-  );
-
-  return createSchedulerDrivenPassiveEffectOwnedRecord(
-    record,
-    ownershipToken
-  );
 }
 
 function isSchedulerDrivenPassiveEffectOwnedRecord(record, diagnostics) {
@@ -3895,59 +3838,88 @@ function isAcceptedSchedulerDrivenPassiveLifecycleBoundary(
   boundary,
   diagnostics
 ) {
+  const snapshotPayload =
+    isObjectLike(boundary)
+      ? reactDomRootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
+          boundary
+        )
+      : null;
+  const rootPayload =
+    isObjectLike(snapshotPayload) && isObjectLike(snapshotPayload.payload)
+      ? snapshotPayload.payload
+      : null;
+  const createRecord =
+    isObjectLike(snapshotPayload) ? snapshotPayload.createRecord : null;
+  const sourceRecord =
+    isObjectLike(snapshotPayload) ? snapshotPayload.sourceRecord : null;
+
   return (
-    isSchedulerDrivenPassiveEffectOwnedRecord(boundary, diagnostics) &&
-    hasExactOwnStringKeys(
-      boundary,
-      schedulerDrivenPassiveLifecycleBoundaryKeys
+    reactDomRootBridge.isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord(
+      boundary
     ) &&
-    Object.hasOwn(
-      boundary,
-      privateSchedulerDrivenPassiveLifecycleBoundaryBrand
-    ) &&
-    boundary[privateSchedulerDrivenPassiveLifecycleBoundaryBrand] === true &&
+    snapshotPayload !== null &&
+    Object.isFrozen(boundary) &&
+    boundary.$$typeof ===
+      reactDomRootBridge.privateRootPublicFacadeLifecycleContainerSnapshotRecordType &&
     boundary.kind === privateSchedulerDrivenPassiveLifecycleBoundaryKind &&
-    boundary.version ===
-      privateSchedulerDrivenPassiveLifecycleBoundaryVersion &&
-    boundary.status === schedulerDrivenPassiveLifecycleBoundaryStatus &&
-    boundary.accepted === true &&
-    boundary.compatibilityTarget === compatibilityTarget &&
-    boundary.schedulerCompatibilityTarget === schedulerCompatibilityTarget &&
-    boundary.rendererCompatibilityTarget === reactDomClientCompatibilityTarget &&
-    boundary.packageName === 'react-dom' &&
-    boundary.entrypoint === 'react-dom/client' &&
-    boundary.source === privateSchedulerDrivenPassiveLifecycleBoundarySource &&
-    boundary.workerId ===
-      privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId &&
-    hasExactStringList(
-      boundary.records,
-      privateSchedulerDrivenPassiveLifecycleBoundaryRecords
-    ) &&
+    boundary.snapshotStatus === schedulerDrivenPassiveLifecycleBoundaryStatus &&
+    diagnostics.lifecycleRequestBoundaryStatus === boundary.snapshotStatus &&
+    diagnostics.lifecycleRequestBoundaryKind === boundary.kind &&
     boundary.rootId === diagnostics.rootId &&
-    boundary.rootLabel === diagnostics.rootLabel &&
-    typeof boundary.requestId === 'string' &&
-    boundary.requestId.length > 0 &&
-    isPositiveInteger(boundary.requestSequence) &&
-    boundary.requestType === 'root.render' &&
-    boundary.operation === 'render' &&
-    boundary.lifecycleStatusBefore === 'created' &&
-    boundary.lifecycleStatusAfter === 'rendered' &&
-    boundary.lifecycleTransition === 'created->rendered' &&
-    isNonNegativeInteger(boundary.lifecycleBoundaryOrder) &&
-    boundary.lifecycleBoundaryOrder < diagnostics.schedulerRequest.order &&
-    boundary.schedulerRequestOrder === diagnostics.schedulerRequest.order &&
+    (boundary.phase === 'render' || boundary.phase === 'update') &&
     boundary.sourceOwned === true &&
-    boundary.callerSupplied === false &&
-    boundary.frozenRows === true &&
-    boundary.requestBoundaryActive === true &&
-    boundary.requestBoundaryReplayed === false &&
-    boundary.stale === false &&
-    boundary.rootMatchesScheduler === true &&
-    boundary.packageEntrypointMatches === true &&
-    boundary.publicActPassiveDrain === false &&
-    hasSchedulerDrivenPassiveEffectPublicBlockers(boundary) &&
-    hasBlockedPublicCompatibilityClaims(boundary) &&
-    hasBlockedPublicQueueAndExecutionClaims(boundary)
+    boundary.sourceRequestType === 'root.render' &&
+    boundary.sourceOperation === 'render' &&
+    typeof boundary.sourceRequestId === 'string' &&
+    boundary.sourceRequestId.length > 0 &&
+    isPositiveInteger(boundary.sourceRequestSequence) &&
+    boundary.createRequestId ===
+      (isObjectLike(createRecord) ? createRecord.requestId : undefined) &&
+    boundary.rootKind ===
+      (isObjectLike(sourceRecord) ? sourceRecord.rootKind : undefined) &&
+    boundary.rootTag ===
+      (isObjectLike(sourceRecord) ? sourceRecord.rootTag : undefined) &&
+    boundary.beforeChildCount >= 0 &&
+    boundary.afterChildCount >= 0 &&
+    boundary.markerListenerStatePreserved === true &&
+    (boundary.publicActPassiveDrain === undefined ||
+      boundary.publicActPassiveDrain === false) &&
+    boundary.publicRootExecution === false &&
+    boundary.publicRootCompatibilitySurface === false &&
+    boundary.nativeExecution === false &&
+    boundary.reconcilerExecution === false &&
+    boundary.browserDomMutation === false &&
+    boundary.markerWrites === false &&
+    boundary.listenerInstallation === false &&
+    boundary.hydration === false &&
+    boundary.eventDispatch === false &&
+    boundary.compatibilityClaimed === false &&
+    isObjectLike(createRecord) &&
+    createRecord.$$typeof === reactDomRootBridge.privateRootCreateRecordType &&
+    createRecord.kind === 'FastReactDomPrivateRootCreateRecord' &&
+    createRecord.requestType === 'createRoot' &&
+    createRecord.requestId === boundary.createRequestId &&
+    createRecord.rootId === boundary.rootId &&
+    createRecord.rootKind === boundary.rootKind &&
+    createRecord.rootTag === boundary.rootTag &&
+    isObjectLike(sourceRecord) &&
+    sourceRecord.$$typeof === reactDomRootBridge.privateRootUpdateRecordType &&
+    sourceRecord.kind === 'FastReactDomPrivateRootUpdateRecord' &&
+    sourceRecord.requestId === boundary.sourceRequestId &&
+    sourceRecord.requestSequence === boundary.sourceRequestSequence &&
+    sourceRecord.requestType === boundary.sourceRequestType &&
+    sourceRecord.operation === boundary.sourceOperation &&
+    sourceRecord.rootId === boundary.rootId &&
+    sourceRecord.rootKind === boundary.rootKind &&
+    sourceRecord.rootTag === boundary.rootTag &&
+    sourceRecord.requestSequence > createRecord.requestSequence &&
+    rootPayload !== null &&
+    rootPayload.createRecord === createRecord &&
+    Array.isArray(rootPayload.requestRecords) &&
+    Array.isArray(rootPayload.renderRecords) &&
+    rootPayload.requestRecords.includes(createRecord) &&
+    rootPayload.requestRecords.includes(sourceRecord) &&
+    rootPayload.renderRecords.includes(sourceRecord)
   );
 }
 
@@ -4174,11 +4146,7 @@ function getRejectedSchedulerDrivenPassiveEffectDiagnosticsReason(
     diagnostics.schedulerMockExpiredActRootWorkDiagnosticsStatus !==
       diagnostics.schedulerMockExpiredActRootWorkDiagnostics.status ||
     diagnostics.schedulerMockExpiredActRootWorkDiagnosticKind !==
-      diagnostics.schedulerMockExpiredActRootWorkDiagnostics.kind ||
-    diagnostics.lifecycleRequestBoundaryStatus !==
-      schedulerDrivenPassiveLifecycleBoundaryStatus ||
-    diagnostics.lifecycleRequestBoundaryKind !==
-      privateSchedulerDrivenPassiveLifecycleBoundaryKind
+      diagnostics.schedulerMockExpiredActRootWorkDiagnostics.kind
   ) {
     return 'scheduler-driven-passive-diagnostics-scheduler-link';
   }
@@ -4204,10 +4172,12 @@ function getRejectedSchedulerDrivenPassiveEffectDiagnosticsReason(
     return 'scheduler-driven-passive-diagnostics-root-link';
   }
   if (
-    !isSchedulerDrivenPassiveEffectOwnedRecord(
+    !reactDomRootBridge.isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord(
       diagnostics.lifecycleRequestBoundary,
-      diagnostics
-    )
+    ) ||
+    reactDomRootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
+      diagnostics.lifecycleRequestBoundary
+    ) === null
   ) {
     return 'scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership';
   }

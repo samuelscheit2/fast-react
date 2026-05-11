@@ -17,6 +17,12 @@ const worker810LedgerModuleUrl = pathToFileURL(
     '../../tests/conformance/src/private-admission-810-react-act-scheduler-diagnostics-ledger.mjs'
   )
 ).href;
+const {
+  createSourceOwnedReactDomLifecycleBoundary
+} = require(path.resolve(
+  packageRoot,
+  '../../tests/conformance/src/react-dom-source-owned-lifecycle-boundary.cjs'
+));
 const reactPrivateActDispatcherGatePath = path.resolve(
   packageRoot,
   '../react/private-act-dispatcher-gate.js'
@@ -828,13 +834,21 @@ test('private act gate prevents gateOverride tampering of Worker 810 ledger surf
 
 test('private act gate consumes scheduler-driven passive diagnostics through React private act only', () => {
   for (const nodeEnv of ['development', 'production']) {
+    const lifecycle =
+      createSourceOwnedReactDomLifecycleBoundary(
+        `test-utils-passive-${nodeEnv}`
+      );
     const { reactGate, report } =
-      createSchedulerMockDelayedActRootWorkDiagnostics(nodeEnv);
+      createSchedulerMockDelayedActRootWorkDiagnostics(nodeEnv, {
+        rootId: lifecycle.rootId,
+        rootLabel: lifecycle.rootLabel
+      });
     const expiredReport = report.expiredActRootWorkDrainReport;
     const passiveDiagnostics =
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         expiredReport,
         {
+          ...lifecycle.boundaryOptions,
           finishedWorkId: `test-utils-passive-${nodeEnv}`
         }
       );
@@ -893,13 +907,18 @@ test('private act gate consumes scheduler-driven passive diagnostics through Rea
       nodeEnv
     );
     assert.equal(
-      consumption.lifecycleRequestBoundary.entrypoint,
-      'react-dom/client',
+      consumption.lifecycleRequestBoundary.snapshotStatus,
+      gateModule.privateSchedulerDrivenPassiveLifecycleBoundaryStatus,
       nodeEnv
     );
-    assert.deepEqual(
-      consumption.lifecycleRequestBoundary.records,
-      gateModule.privateSchedulerDrivenPassiveLifecycleBoundaryRecords,
+    assert.equal(
+      consumption.lifecycleRequestBoundary.kind,
+      gateModule.privateSchedulerDrivenPassiveLifecycleBoundaryKind,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.lifecycleRequestBoundary.sourceRequestId,
+      lifecycle.boundary.sourceRequestId,
       nodeEnv
     );
     assert.equal(
@@ -928,6 +947,7 @@ test('private act gate consumes scheduler-driven passive diagnostics through Rea
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         expiredReport,
         {
+          ...lifecycle.boundaryOptions,
           finishedWorkId: passiveDiagnostics.finishedWorkId,
           diagnosticsOverrides:
             createCallerBuiltSchedulerDrivenPassiveEffectNestedRecords(
@@ -957,6 +977,7 @@ test('private act gate consumes scheduler-driven passive diagnostics through Rea
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         expiredReport,
         {
+          ...lifecycle.boundaryOptions,
           diagnosticsOverrides: {
             lifecycleRequestBoundary: {
               ...passiveDiagnostics.lifecycleRequestBoundary
@@ -971,41 +992,53 @@ test('private act gate consumes scheduler-driven passive diagnostics through Rea
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         expiredReport,
         {
-          lifecycleRequestBoundaryOverrides: {
-            stale: true
-          }
+          ...lifecycle.boundaryOptions,
+          lifecycleRequestId: `${lifecycle.rootId}:foreign-lifecycle-request`
         }
       ),
-      'scheduler-driven-passive-diagnostics-lifecycle-boundary',
-      `${nodeEnv}:stale-lifecycle-boundary`
+      'scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership',
+      `${nodeEnv}:stale-lifecycle-request-id`
     );
     assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         expiredReport,
         {
-          lifecycleRequestBoundaryOverrides: {
-            requestBoundaryReplayed: true
-          }
+          ...lifecycle.boundaryOptions,
+          lifecycleRequestSequence:
+            lifecycle.boundary.sourceRequestSequence + 1000
+        }
+      ),
+      'scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership',
+      `${nodeEnv}:replayed-lifecycle-request-sequence`
+    );
+    const crossRootLifecycle =
+      createSourceOwnedReactDomLifecycleBoundary(
+        `test-utils-passive-cross-root-${nodeEnv}`
+      );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        expiredReport,
+        {
+          ...crossRootLifecycle.boundaryOptions
         }
       ),
       'scheduler-driven-passive-diagnostics-lifecycle-boundary',
-      `${nodeEnv}:replayed-lifecycle-boundary`
+      `${nodeEnv}:cross-root-lifecycle-boundary`
     );
     assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         expiredReport,
         {
-          lifecycleRequestBoundaryOverrides: {
-            entrypoint: 'react-dom/server'
-          }
+          finishedWorkId: passiveDiagnostics.finishedWorkId
         }
       ),
-      'scheduler-driven-passive-diagnostics-lifecycle-boundary',
-      `${nodeEnv}:cross-entrypoint-lifecycle-boundary`
+      'scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership',
+      `${nodeEnv}:missing-lifecycle-boundary`
     );
     assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
-        cloneExpiredActRootWorkReport(expiredReport)
+        cloneExpiredActRootWorkReport(expiredReport),
+        lifecycle.boundaryOptions
       ),
       'scheduler-driven-passive-diagnostics-scheduler-source-proof',
       `${nodeEnv}:missing-scheduler-source-proof`
@@ -1014,6 +1047,7 @@ test('private act gate consumes scheduler-driven passive diagnostics through Rea
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         expiredReport,
         {
+          ...lifecycle.boundaryOptions,
           schedulerRequestOverrides: {
             rootId: 857,
             rootLabel: 'foreign-passive-root'
@@ -1034,6 +1068,8 @@ function createSchedulerMockDelayedActRootWorkDiagnostics(
     loadSchedulerMockAndReactGateForSourceProof(nodeEnv, options);
   const diagnostics =
     Scheduler.unstable_flushExpired[privateActQueueFlushDiagnosticsExport];
+  const rootId = options.rootId ?? 835;
+  const rootLabel = options.rootLabel ?? 'mock-root-835';
 
   Scheduler.reset();
   const events = [];
@@ -1093,8 +1129,14 @@ function createSchedulerMockDelayedActRootWorkDiagnostics(
     delayedHandle,
     actQueue,
     {
+      rootId,
+      rootLabel,
       rootWorkRecords: acceptedSchedulerMockExpiredActRootWorkRecords.map(
-        (recordKind) => createAcceptedExpiredActRootWorkRecord(recordKind)
+        (recordKind) =>
+          createAcceptedExpiredActRootWorkRecord(recordKind, {
+            rootId,
+            rootLabel
+          })
       )
     }
   );
@@ -1194,7 +1236,7 @@ function createExpiredActRootWorkMetadata(
   return Object.freeze(metadata);
 }
 
-function createAcceptedExpiredActRootWorkRecord(recordKind) {
+function createAcceptedExpiredActRootWorkRecord(recordKind, overrides = {}) {
   return Object.freeze({
     recordKind,
     accepted: true,
@@ -1214,7 +1256,8 @@ function createAcceptedExpiredActRootWorkRecord(recordKind) {
     executesRendererWork: false,
     executesRendererRoots: false,
     rendererWorkExecutionBlocked: true,
-    rootWorkMetadataOnly: true
+    rootWorkMetadataOnly: true,
+    ...overrides
   });
 }
 

@@ -2,15 +2,15 @@
 
 ## Summary
 
-- Added a private React scheduler-driven passive lifecycle boundary row that is
-  frozen, source-owned, package/entrypoint-pinned to `react-dom/client`, and
-  owned by the same diagnostic token as the nested passive records.
+- Replaced the React-minted lifecycle boundary row with a required
+  React DOM private root public-facade lifecycle container snapshot from
+  `packages/react-dom/src/client/root-bridge.js`.
 - React private act now rejects scheduler-driven passive diagnostics unless
-  they include active lifecycle/request-boundary evidence for the same root,
-  with ordering before the scheduler passive request.
+  they include root-bridge WeakMap-owned lifecycle evidence for the same root,
+  with request identity tied to the snapshot source record.
 - React DOM `test-utils` now verifies the React consumption report carries the
-  lifecycle boundary evidence before accepting the private passive diagnostic
-  route.
+  same root-bridge-owned lifecycle snapshot before accepting the private
+  passive diagnostic route.
 - Public `React.act`, `react-dom/test-utils.act`, public roots, public passive
   effect execution, Scheduler timing, renderer execution, and package
   compatibility remain blocked.
@@ -20,6 +20,7 @@
 - `packages/react/private-act-dispatcher-gate.js`
 - `packages/react-dom/src/test-utils-act-gate.js`
 - `packages/react-dom/test/react-dom-test-utils-act-gate.test.js`
+- `tests/conformance/src/react-dom-source-owned-lifecycle-boundary.cjs`
 - `tests/conformance/test/act-passive-local-gate.test.mjs`
 - `tests/conformance/test/react-act-oracle.test.mjs`
 - `tests/conformance/test/react-act-public-blocked-gate.mjs`
@@ -30,6 +31,7 @@
 
 - `node --check packages/react/private-act-dispatcher-gate.js`
 - `node --check packages/react-dom/src/test-utils-act-gate.js`
+- `node --check tests/conformance/src/react-dom-source-owned-lifecycle-boundary.cjs`
 - `node --check packages/react-dom/test/react-dom-test-utils-act-gate.test.js`
 - `node --check tests/conformance/test/react-act-public-blocked-gate.mjs`
 - `node --check tests/conformance/test/act-passive-local-gate.test.mjs`
@@ -53,10 +55,10 @@
 - Positive React and React DOM private consumers now expose and validate
   `requiresSourceOwnedActiveLifecycleRequestBoundary`,
   `consumesRootLifecycleRequestBoundary`, root identity, ordering, and
-  `react-dom/client` entrypoint evidence.
-- Negative coverage rejects caller-built lifecycle boundaries, stale
-  lifecycle boundaries, replayed lifecycle boundaries, cross-root lifecycle
-  boundaries, and cross-entrypoint lifecycle rows.
+  root-bridge source record evidence.
+- Negative coverage rejects missing lifecycle boundaries, cloned/caller-built
+  lifecycle snapshots, arbitrary lifecycle request id/sequence overrides, and
+  cross-root lifecycle snapshots.
 - Existing negative coverage continues to reject cloned top-level passive
   diagnostics, caller-built nested scheduler/passive records, missing Scheduler
   source proof, stale passive handoffs, cross-root scheduler/root rows, prose

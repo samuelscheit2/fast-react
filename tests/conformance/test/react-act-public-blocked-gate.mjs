@@ -39,8 +39,8 @@ assert.equal(
 assert.deepEqual(
   reactGate.acceptedSchedulerDrivenPassiveLifecycleBoundaryRecords,
   [
-    "FastReactDomPrivateRootPublicFacadeLifecycleRequestBoundary",
     "FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord",
+    "FastReactDomPrivateRootCreateRecord",
     "FastReactDomPrivateRootUpdateRecord"
   ]
 );
