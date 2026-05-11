@@ -110,8 +110,7 @@ const expectedCurrentUnmountIdentityEvidenceRoles = [
   "current-worker-754-cjs-production-totree-unmount-identity-source",
   "current-worker-757-package-root-unmount-identity-report",
   "current-worker-757-package-root-tojson-unmount-identity-source",
-  "current-worker-757-package-root-totree-unmount-identity-source",
-  "current-unmount-native-strict-identity-conformance"
+  "current-worker-757-package-root-totree-unmount-identity-source"
 ];
 
 const packageRootSource = "packages/react-test-renderer/index.js";
@@ -236,7 +235,7 @@ test("private admission 727-728 manifest records one skipped meta row and one ac
   );
 });
 
-test("private admission 727-728 gate recognizes strict unmount finished-work identity without public compatibility", () => {
+test("private admission 727-728 gate recognizes source-owned unmount identity metadata without public compatibility", () => {
   const gate = evaluatePrivateAdmission727728Gate();
 
   assert.equal(gate.status, PRIVATE_ADMISSION_727_728_GATE_STATUS);
@@ -757,40 +756,455 @@ test("private admission 727-728 gate rejects row override spoofing over current 
   }
 });
 
-test("private admission 727-728 gate rejects comment and string spoofed current source identity", () => {
-  const workspace = createWorkspaceWithMutatedEvidenceFile({
-    evidencePath: packageRootSource,
-    sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
-    find: "unmountNativeExecutionRequiresFinishedWorkIdentity: true",
-    replace:
-      "unmountNativeExecutionRequiresFinishedWorkIdentity: false /* unmountNativeExecutionRequiresFinishedWorkIdentity: true */,\n  stringSpoofedUnmountIdentitySource: 'unmountNativeExecutionRequiresFinishedWorkIdentity: true'"
-  });
-
-  try {
-    const gate = evaluatePrivateAdmission727728Gate({
-      workspaceRoot: workspace.root
-    });
-
-    assert.equal(gate.status, PRIVATE_ADMISSION_727_728_VIOLATION_STATUS);
-    assert.equal(gate.privateDiagnosticsRecognized, false);
-    assert.equal(gate.currentUnmountIdentityEvidenceRecognized, false);
-    assertViolationIds(gate, [
-      "current-unmount-identity-evidence-not-recognized"
-    ]);
-
-    const sourceEvidence =
-      gate.currentUnmountIdentityEvidenceByRole[
-        "current-worker-757-package-root-tojson-unmount-identity-source"
-      ];
-    assert.equal(sourceEvidence.recognized, false);
-    assertSourceAssertionFailure(sourceEvidence, {
-      property: "unmountNativeExecutionRequiresFinishedWorkIdentity",
-      actualSource:
-        "false /* unmountNativeExecutionRequiresFinishedWorkIdentity: true */",
+test("private admission 727-728 gate rejects comment, string, template, and regex spoofed current source identity", () => {
+  const token = "unmountNativeExecutionRequiresFinishedWorkIdentity: true";
+  const cases = [
+    {
+      label: "comment",
+      replacement: `unmountNativeExecutionRequiresFinishedWorkIdentity: false /* ${token} */`,
+      actualSource: `false /* ${token} */`,
       actualValue: null
+    },
+    {
+      label: "string",
+      replacement:
+        "unmountNativeExecutionRequiresFinishedWorkIdentity: false,\n  stringSpoofedUnmountIdentitySource: 'unmountNativeExecutionRequiresFinishedWorkIdentity: true'",
+      actualSource: "false",
+      actualValue: false
+    },
+    {
+      label: "template",
+      replacement:
+        "unmountNativeExecutionRequiresFinishedWorkIdentity: false,\n  templateSpoofedUnmountIdentitySource: `unmountNativeExecutionRequiresFinishedWorkIdentity: true`",
+      actualSource: "false",
+      actualValue: false
+    },
+    {
+      label: "regex",
+      replacement:
+        "unmountNativeExecutionRequiresFinishedWorkIdentity: false,\n  regexSpoofedUnmountIdentitySource: /unmountNativeExecutionRequiresFinishedWorkIdentity: true/",
+      actualSource: "false",
+      actualValue: false
+    }
+  ];
+
+  for (const testCase of cases) {
+    const workspace = createWorkspaceWithMutatedEvidenceFile({
+      evidencePath: packageRootSource,
+      sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+      find: token,
+      replace: testCase.replacement
     });
-  } finally {
-    workspace.cleanup();
+
+    try {
+      const gate = evaluatePrivateAdmission727728Gate({
+        workspaceRoot: workspace.root
+      });
+
+      assert.equal(
+        gate.status,
+        PRIVATE_ADMISSION_727_728_VIOLATION_STATUS,
+        testCase.label
+      );
+      assert.equal(gate.privateDiagnosticsRecognized, false, testCase.label);
+      assert.equal(
+        gate.currentUnmountIdentityEvidenceRecognized,
+        false,
+        testCase.label
+      );
+      assertViolationIds(
+        gate,
+        ["current-unmount-identity-evidence-not-recognized"],
+        testCase.label
+      );
+
+      const sourceEvidence =
+        gate.currentUnmountIdentityEvidenceByRole[
+          "current-worker-757-package-root-tojson-unmount-identity-source"
+        ];
+      assert.equal(sourceEvidence.recognized, false, testCase.label);
+      assertSourceAssertionFailure(sourceEvidence, {
+        property: "unmountNativeExecutionRequiresFinishedWorkIdentity",
+        actualSource: testCase.actualSource,
+        actualValue: testCase.actualValue
+      });
+    } finally {
+      workspace.cleanup();
+    }
+  }
+});
+
+test("private admission 727-728 gate rejects unsupported current source object members that can broaden compatibility", () => {
+  const cases = [
+    {
+      label: "post-assertion-spread",
+      member:
+        "...{ publicSerializationAvailable: true, nativeExecution: true, compatibilityClaimed: true }",
+      errorKind: "spread"
+    },
+    {
+      label: "computed-property",
+      member: '["compatibilityClaimed"]: true',
+      errorKind: "computed-property"
+    },
+    {
+      label: "accessor",
+      member: "get compatibilityClaimed() { return true; }",
+      errorKind: "accessor"
+    },
+    {
+      label: "method",
+      member: "compatibilityClaimed() { return true; }",
+      errorKind: "method"
+    }
+  ];
+
+  for (const testCase of cases) {
+    const workspace = createWorkspaceWithMutatedEvidenceFile({
+      evidencePath: packageRootSource,
+      mutate(text) {
+        return replaceInEvidenceSlice(text, {
+          sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+          find: "compatibilityClaimed: false",
+          replace: `compatibilityClaimed: false,\n  ${testCase.member}`
+        });
+      }
+    });
+
+    try {
+      const gate = evaluatePrivateAdmission727728Gate({
+        workspaceRoot: workspace.root
+      });
+
+      assert.equal(
+        gate.status,
+        PRIVATE_ADMISSION_727_728_VIOLATION_STATUS,
+        testCase.label
+      );
+      assert.equal(gate.privateDiagnosticsRecognized, false, testCase.label);
+      assert.equal(
+        gate.currentUnmountIdentityEvidenceRecognized,
+        false,
+        testCase.label
+      );
+      assertViolationIds(
+        gate,
+        ["current-unmount-identity-evidence-not-recognized"],
+        testCase.label
+      );
+
+      const sourceEvidence =
+        gate.currentUnmountIdentityEvidenceByRole[
+          "current-worker-757-package-root-tojson-unmount-identity-source"
+        ];
+      assert.equal(sourceEvidence.recognized, false, testCase.label);
+      assertUnsupportedObjectMemberFailure(
+        sourceEvidence,
+        testCase.errorKind,
+        testCase.label
+      );
+    } finally {
+      workspace.cleanup();
+    }
+  }
+});
+
+test("private admission 727-728 gate rejects unasserted compatibility-looking current source fields", () => {
+  const cases = [
+    {
+      label: "package-compatibility-claimed",
+      member: "packageCompatibilityClaimed: true",
+      property: "packageCompatibilityClaimed"
+    },
+    {
+      label: "native-execution-available",
+      member: "nativeExecutionAvailable: true",
+      property: "nativeExecutionAvailable"
+    },
+    {
+      label: "public-to-json-available",
+      member: "publicToJSONAvailable: true",
+      property: "publicToJSONAvailable"
+    },
+    {
+      label: "public-root-available",
+      member: "publicRootAvailable: true",
+      property: "publicRootAvailable"
+    },
+    {
+      label: "package-compatibility-shorthand",
+      member: "packageCompatibilityClaimed",
+      property: "packageCompatibilityClaimed"
+    },
+    {
+      label: "public-to-tree-available",
+      member: "publicToTreeAvailable: true",
+      property: "publicToTreeAvailable"
+    },
+    {
+      label: "root-compatibility-claimed",
+      member: "rootCompatibilityClaimed: true",
+      property: "rootCompatibilityClaimed"
+    },
+    {
+      label: "to-json-available",
+      member: "toJSONAvailable: true",
+      property: "toJSONAvailable"
+    },
+    {
+      label: "native-bridge-execution-available",
+      member: "nativeBridgeExecutionAvailable: true",
+      property: "nativeBridgeExecutionAvailable"
+    }
+  ];
+
+  for (const testCase of cases) {
+    const workspace = createWorkspaceWithMutatedEvidenceFile({
+      evidencePath: packageRootSource,
+      mutate(text) {
+        return replaceInEvidenceSlice(text, {
+          sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+          find: "compatibilityClaimed: false",
+          replace: `compatibilityClaimed: false,\n  ${testCase.member}`
+        });
+      }
+    });
+
+    try {
+      const gate = evaluatePrivateAdmission727728Gate({
+        workspaceRoot: workspace.root
+      });
+
+      assert.equal(
+        gate.status,
+        PRIVATE_ADMISSION_727_728_VIOLATION_STATUS,
+        testCase.label
+      );
+      assert.equal(gate.privateDiagnosticsRecognized, false, testCase.label);
+      assert.equal(
+        gate.currentUnmountIdentityEvidenceRecognized,
+        false,
+        testCase.label
+      );
+      assertViolationIds(
+        gate,
+        ["current-unmount-identity-evidence-not-recognized"],
+        testCase.label
+      );
+
+      const sourceEvidence =
+        gate.currentUnmountIdentityEvidenceByRole[
+          "current-worker-757-package-root-tojson-unmount-identity-source"
+        ];
+      assert.equal(sourceEvidence.recognized, false, testCase.label);
+      assertUnassertedCompatibilityFieldFailure(
+        sourceEvidence,
+        testCase.property,
+        testCase.label
+      );
+    } finally {
+      workspace.cleanup();
+    }
+  }
+});
+
+test("private admission 727-728 gate rejects hidden compatibility carrier current source fields", () => {
+  const cases = [
+    {
+      label: "proto-compatibility-aliases",
+      member: `__proto__: {
+    packageCompatibilityClaimed: true,
+    nativeExecutionAvailable: true,
+    publicRootAvailable: true
+  }`
+    },
+    {
+      label: "quoted-proto-compatibility-aliases",
+      member: `"__proto__": {
+    packageCompatibilityClaimed: true,
+    publicRootAvailable: true
+  }`
+    },
+    {
+      label: "escaped-quoted-proto-compatibility-aliases",
+      member: `"\\u005f\\u005fproto\\u005f\\u005f": {
+    packageCompatibilityClaimed: true,
+    publicRootAvailable: true
+  }`
+    },
+    {
+      label: "constructor-prototype-compatibility-aliases",
+      member: `constructor: {
+    prototype: {
+      packageCompatibilityClaimed: true,
+      publicRootAvailable: true
+    }
+  }`
+    },
+    {
+      label: "escaped-quoted-constructor-prototype-compatibility-aliases",
+      member: `"\\u0063onstructor": {
+    "\\u0070rototype": {
+      packageCompatibilityClaimed: true,
+      publicRootAvailable: true
+    }
+  }`
+    },
+    {
+      label: "prototype-compatibility-aliases",
+      member: `prototype: {
+    nativeExecutionAvailable: true,
+    rootCompatibilityClaimed: true
+  }`
+    },
+    {
+      label: "escaped-quoted-prototype-compatibility-aliases",
+      member: `"\\u0070rototype": {
+    nativeExecutionAvailable: true,
+    rootCompatibilityClaimed: true
+  }`
+    }
+  ];
+
+  for (const testCase of cases) {
+    const workspace = createWorkspaceWithMutatedEvidenceFile({
+      evidencePath: packageRootSource,
+      mutate(text) {
+        return replaceInEvidenceSlice(text, {
+          sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+          find: "compatibilityClaimed: false",
+          replace: `compatibilityClaimed: false,\n  ${testCase.member}`
+        });
+      }
+    });
+
+    try {
+      const gate = evaluatePrivateAdmission727728Gate({
+        workspaceRoot: workspace.root
+      });
+
+      assert.equal(
+        gate.status,
+        PRIVATE_ADMISSION_727_728_VIOLATION_STATUS,
+        testCase.label
+      );
+      assert.equal(gate.privateDiagnosticsRecognized, false, testCase.label);
+      assert.equal(
+        gate.currentUnmountIdentityEvidenceRecognized,
+        false,
+        testCase.label
+      );
+      assertViolationIds(
+        gate,
+        ["current-unmount-identity-evidence-not-recognized"],
+        testCase.label
+      );
+
+      const sourceEvidence =
+        gate.currentUnmountIdentityEvidenceByRole[
+          "current-worker-757-package-root-tojson-unmount-identity-source"
+        ];
+      assert.equal(sourceEvidence.recognized, false, testCase.label);
+      assertUnsupportedObjectMemberFailure(
+        sourceEvidence,
+        "hidden-claim-carrier",
+        testCase.label
+      );
+    } finally {
+      workspace.cleanup();
+    }
+  }
+});
+
+test("private admission 727-728 gate rejects nested hidden compatibility carrier current source fields", () => {
+  const cases = [
+    {
+      label: "nested-proto-compatibility-aliases",
+      member: `metadataCarrier: {
+    __proto__: {
+      packageCompatibilityClaimed: true,
+      publicRootAvailable: true
+    }
+  }`
+    },
+    {
+      label: "nested-escaped-quoted-proto-compatibility-aliases",
+      member: `metadataCarrier: {
+    "\\u005f\\u005fproto\\u005f\\u005f": {
+      packageCompatibilityClaimed: true,
+      publicRootAvailable: true
+    }
+  }`
+    },
+    {
+      label: "nested-constructor-prototype-compatibility-aliases",
+      member: `metadataCarrier: {
+    constructor: {
+      prototype: {
+        packageCompatibilityClaimed: true,
+        publicRootAvailable: true
+      }
+    }
+  }`
+    },
+    {
+      label: "nested-prototype-compatibility-aliases",
+      member: `metadataCarrier: {
+    prototype: {
+      nativeExecutionAvailable: true,
+      rootCompatibilityClaimed: true
+    }
+  }`
+    }
+  ];
+
+  for (const testCase of cases) {
+    const workspace = createWorkspaceWithMutatedEvidenceFile({
+      evidencePath: packageRootSource,
+      mutate(text) {
+        return replaceInEvidenceSlice(text, {
+          sliceStart: "const toJSONPrivateSerializationFacadeGate = Object.freeze({",
+          find: "compatibilityClaimed: false",
+          replace: `compatibilityClaimed: false,\n  ${testCase.member}`
+        });
+      }
+    });
+
+    try {
+      const gate = evaluatePrivateAdmission727728Gate({
+        workspaceRoot: workspace.root
+      });
+
+      assert.equal(
+        gate.status,
+        PRIVATE_ADMISSION_727_728_VIOLATION_STATUS,
+        testCase.label
+      );
+      assert.equal(gate.privateDiagnosticsRecognized, false, testCase.label);
+      assert.equal(
+        gate.currentUnmountIdentityEvidenceRecognized,
+        false,
+        testCase.label
+      );
+      assertViolationIds(
+        gate,
+        ["current-unmount-identity-evidence-not-recognized"],
+        testCase.label
+      );
+
+      const sourceEvidence =
+        gate.currentUnmountIdentityEvidenceByRole[
+          "current-worker-757-package-root-tojson-unmount-identity-source"
+        ];
+      assert.equal(sourceEvidence.recognized, false, testCase.label);
+      assertUnsupportedObjectMemberFailure(
+        sourceEvidence,
+        "hidden-claim-carrier",
+        testCase.label
+      );
+    } finally {
+      workspace.cleanup();
+    }
   }
 });
 
@@ -800,25 +1214,7 @@ test("private admission 727-728 gate rejects forged package-root gate anchors in
     mutate(text) {
       const anchor = "const toJSONPrivateSerializationFacadeGate = Object.freeze({";
       const forgedGate = `/*
-${anchor}
-  privateUnmountFinishedWorkIdentityGateAvailable: true,
-  unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:
-    'worker-733-test-renderer-unmount-finished-work-identity',
-  acceptedUnmountFinishedWorkIdentityWorker:
-    'worker-733-test-renderer-unmount-finished-work-identity',
-  unmountNativeExecutionRequiresFinishedWorkIdentity: true,
-  rejectsStaleUnmountFinishedWorkIdentity: true,
-  requiresUnmountDeletionCleanupHandoffEvidence: true,
-  validatesUnmountRootRequestIdentity: true,
-  validatesUnmountDeletionAndCleanupHandoffIdentity: true,
-  consumesCommittedHostRootFinishedWorkIdentity: true,
-  consumesCommittedHostRootFinishedWorkLanes: true,
-  publicSerializationAvailable: false,
-  publicRouteAvailable: false,
-  nativeBridgeAvailable: false,
-  nativeExecution: false,
-  compatibilityClaimed: false
-});
+${canonicalPackageRootToJSONGateSource()}
 */
 `;
       assert.equal(text.includes(anchor), true, anchor);
@@ -849,6 +1245,135 @@ ${anchor}
     assert.match(
       sourceEvidence.sliceError,
       /^slice-start-not-found: const toJSONPrivateSerializationFacadeGate = Object\.freeze/
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("private admission 727-728 gate rejects forged package-root gate anchors inside templates", () => {
+  const workspace = createWorkspaceWithMutatedEvidenceFile({
+    evidencePath: packageRootSource,
+    mutate(text) {
+      const anchor = "const toJSONPrivateSerializationFacadeGate = Object.freeze({";
+      const forgedGate = `const forgedGateTemplate = ${jsTemplateLiteral(
+        canonicalPackageRootToJSONGateSource()
+      )};
+`;
+      assert.equal(text.includes(anchor), true, anchor);
+      return text.replace(
+        anchor,
+        `${forgedGate}const toJSONPrivateSerializationFacadeGate = forgedObjectFreeze({`
+      );
+    }
+  });
+
+  try {
+    const gate = evaluatePrivateAdmission727728Gate({
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(gate.status, PRIVATE_ADMISSION_727_728_VIOLATION_STATUS);
+    assert.equal(gate.privateDiagnosticsRecognized, false);
+    assert.equal(gate.currentUnmountIdentityEvidenceRecognized, false);
+    assertViolationIds(gate, [
+      "current-unmount-identity-evidence-not-recognized"
+    ]);
+
+    const sourceEvidence =
+      gate.currentUnmountIdentityEvidenceByRole[
+        "current-worker-757-package-root-tojson-unmount-identity-source"
+      ];
+    assert.equal(sourceEvidence.recognized, false);
+    assert.match(
+      sourceEvidence.sliceError,
+      /^slice-start-not-found: const toJSONPrivateSerializationFacadeGate = Object\.freeze/
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("private admission 727-728 gate rejects caller-shaped package-root canonical shells", () => {
+  const workspace = createWorkspaceWithMutatedEvidenceFile({
+    evidencePath: packageRootSource,
+    mutate(text) {
+      const anchor = "const toJSONPrivateSerializationFacadeGate = Object.freeze({";
+      const forgedGate = `function createCallerShapedPrivateAdmission727728Shell() {
+  ${canonicalPackageRootToJSONGateSource().replaceAll("\n", "\n  ")}
+  return toJSONPrivateSerializationFacadeGate;
+}
+`;
+      assert.equal(text.includes(anchor), true, anchor);
+      return text.replace(
+        anchor,
+        `${forgedGate}const toJSONPrivateSerializationFacadeGate = forgedObjectFreeze({`
+      );
+    }
+  });
+
+  try {
+    const gate = evaluatePrivateAdmission727728Gate({
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(gate.status, PRIVATE_ADMISSION_727_728_VIOLATION_STATUS);
+    assert.equal(gate.privateDiagnosticsRecognized, false);
+    assert.equal(gate.currentUnmountIdentityEvidenceRecognized, false);
+    assertViolationIds(gate, [
+      "current-unmount-identity-evidence-not-recognized"
+    ]);
+
+    const sourceEvidence =
+      gate.currentUnmountIdentityEvidenceByRole[
+        "current-worker-757-package-root-tojson-unmount-identity-source"
+      ];
+    assert.equal(sourceEvidence.recognized, false);
+    assert.match(
+      sourceEvidence.sliceError,
+      /^slice-start-not-found: const toJSONPrivateSerializationFacadeGate = Object\.freeze/
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("private admission 727-728 gate does not admit failing strict serialization-local behavior as current evidence", () => {
+  const strictIdentityRole = "current-unmount-native-strict-identity-conformance";
+  const strictIdentityPath =
+    "tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs";
+  const workspace = createWorkspaceWithMutatedEvidenceFile({});
+
+  try {
+    assert.equal(
+      PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_EVIDENCE.some(
+        (evidenceRow) => evidenceRow.role === strictIdentityRole
+      ),
+      false
+    );
+    assert.equal(
+      PRIVATE_ADMISSION_727_728_REQUIRED_CURRENT_UNMOUNT_IDENTITY_EVIDENCE_ROLES.includes(
+        strictIdentityRole
+      ),
+      false
+    );
+    assert.equal(existsSync(join(workspace.root, strictIdentityPath)), false);
+
+    const gate = evaluatePrivateAdmission727728Gate({
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(gate.status, PRIVATE_ADMISSION_727_728_GATE_STATUS);
+    assert.equal(gate.currentUnmountIdentityEvidenceRecognized, true);
+    assert.equal(
+      gate.currentUnmountIdentityEvidenceByRole[strictIdentityRole],
+      undefined
+    );
+    assert.equal(
+      gate.currentUnmountIdentityEvidence.some(
+        (evidenceRow) => evidenceRow.path === strictIdentityPath
+      ),
+      false
     );
   } finally {
     workspace.cleanup();
@@ -1244,6 +1769,76 @@ function assertSourceAssertionFailure(
   assert.equal(failure.actualSource, actualSource, property);
   assert.equal(failure.actualValue, actualValue, property);
   assert.equal(failure.passed, false, property);
+}
+
+function assertUnsupportedObjectMemberFailure(evidenceRow, errorKind, message) {
+  assert.match(
+    evidenceRow.sourceAssertionError,
+    new RegExp(`^unsupported-object-member:${errorKind}:`),
+    message
+  );
+  assert.equal(
+    evidenceRow.failedSourceAssertions.length,
+    evidenceRow.sourceAssertions.length,
+    message
+  );
+
+  for (const failure of evidenceRow.failedSourceAssertions) {
+    assert.equal(failure.actualSource, null, message);
+    assert.equal(failure.actualValue, null, message);
+    assert.equal(failure.passed, false, message);
+    assert.equal(failure.error, evidenceRow.sourceAssertionError, message);
+  }
+}
+
+function assertUnassertedCompatibilityFieldFailure(
+  evidenceRow,
+  property,
+  message
+) {
+  const expectedError = `unasserted-compatibility-looking-properties:${property}`;
+  assert.equal(evidenceRow.sourceAssertionError, expectedError, message);
+  assert.equal(
+    evidenceRow.failedSourceAssertions.length,
+    evidenceRow.sourceAssertions.length,
+    message
+  );
+
+  for (const failure of evidenceRow.failedSourceAssertions) {
+    assert.equal(failure.actualSource, null, message);
+    assert.equal(failure.actualValue, null, message);
+    assert.equal(failure.passed, false, message);
+    assert.equal(failure.error, expectedError, message);
+  }
+}
+
+function canonicalPackageRootToJSONGateSource() {
+  return `const toJSONPrivateSerializationFacadeGate = Object.freeze({
+  privateUnmountFinishedWorkIdentityGateAvailable: true,
+  unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:
+    'worker-733-test-renderer-unmount-finished-work-identity',
+  acceptedUnmountFinishedWorkIdentityWorker:
+    'worker-733-test-renderer-unmount-finished-work-identity',
+  unmountNativeExecutionRequiresFinishedWorkIdentity: true,
+  rejectsStaleUnmountFinishedWorkIdentity: true,
+  requiresUnmountDeletionCleanupHandoffEvidence: true,
+  validatesUnmountRootRequestIdentity: true,
+  validatesUnmountDeletionAndCleanupHandoffIdentity: true,
+  consumesCommittedHostRootFinishedWorkIdentity: true,
+  consumesCommittedHostRootFinishedWorkLanes: true,
+  publicSerializationAvailable: false,
+  publicRouteAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});`;
+}
+
+function jsTemplateLiteral(value) {
+  return `\`${value
+    .replaceAll("\\", "\\\\")
+    .replaceAll("`", "\\`")
+    .replaceAll("${", "\\${")}\``;
 }
 
 function createWorkspaceWithMutatedEvidenceFile({
