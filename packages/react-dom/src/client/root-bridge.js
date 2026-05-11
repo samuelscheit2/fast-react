@@ -3459,7 +3459,9 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
     recoverableErrorPreflightRecords: [],
     records: [],
     targetClaimingPreflightRecords: [],
-    textNodeClaimPatchExecutionRecords: []
+    textNodeClaimPatchExecutionRecords: [],
+    textNodeClaimPatchExecutionRecordsByExecutionPreflight:
+      new WeakMap()
   };
   const preflight = freezeRecord({
     $$typeof: privateHydrateRootPublicFacadePreflightType,
@@ -5067,14 +5069,48 @@ function createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
       'hydrateRoot text-node claim patch requires the current marker/listener state to match the accepted execution preflight.'
     );
   }
+  const textNodeClaimPatchExecutionRecordsByExecutionPreflight =
+    preflightState
+      .textNodeClaimPatchExecutionRecordsByExecutionPreflight;
+  if (
+    textNodeClaimPatchExecutionRecordsByExecutionPreflight.has(
+      executionPreflightRecord
+    )
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot text-node claim patch already consumed this execution preflight.'
+    );
+  }
 
-  const textNodeClaimPatchExecutionRecord =
-    requestPayload.bridgeState.hydrationBoundaryGate
-      .createHydrationTextNodeClaimPatchExecutionRecord(
-        requestRecord.hydrationBoundaryRecord,
-        requestRecord.acceptedPrivateMetadataDiagnostics,
-        executionOptions.textNodeClaimPatchOptions
+  textNodeClaimPatchExecutionRecordsByExecutionPreflight.set(
+    executionPreflightRecord,
+    null
+  );
+  let textNodeClaimPatchExecutionRecord;
+  try {
+    textNodeClaimPatchExecutionRecord =
+      requestPayload.bridgeState.hydrationBoundaryGate
+        .createHydrationTextNodeClaimPatchExecutionRecord(
+          requestRecord.hydrationBoundaryRecord,
+          requestRecord.acceptedPrivateMetadataDiagnostics,
+          executionOptions.textNodeClaimPatchOptions
+        );
+  } catch (error) {
+    if (
+      textNodeClaimPatchExecutionRecordsByExecutionPreflight.get(
+        executionPreflightRecord
+      ) === null
+    ) {
+      textNodeClaimPatchExecutionRecordsByExecutionPreflight.delete(
+        executionPreflightRecord
       );
+    }
+    throw error;
+  }
+  textNodeClaimPatchExecutionRecordsByExecutionPreflight.set(
+    executionPreflightRecord,
+    textNodeClaimPatchExecutionRecord
+  );
   const textNodeClaimPatchExecutionPayload =
     assertHydrateRootTextNodeClaimPatchExecutionRecord(
       textNodeClaimPatchExecutionRecord,
@@ -5103,6 +5139,7 @@ function createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
     currentStateMatchesExecutionPreflight: true,
     executionPreflightRequired: true,
     executionPreflightAccepted: true,
+    executionPreflightConsumed: true,
     eventReplayPreflightRequired: true,
     eventReplayPreflightAccepted:
       executionPreflightRecord.preconditions.eventReplayPreflightAccepted,
@@ -5413,6 +5450,10 @@ function createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
       textNodeClaimPatchOptions:
         executionOptions.textNodeClaimPatchOptions
     })
+  );
+  textNodeClaimPatchExecutionRecordsByExecutionPreflight.set(
+    executionPreflightRecord,
+    record
   );
   return record;
 }

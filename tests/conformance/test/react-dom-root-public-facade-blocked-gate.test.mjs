@@ -1857,6 +1857,55 @@ test("React DOM client private hydrateRoot post-preflight execution applies fake
   assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
 });
 
+test("React DOM client private hydrateRoot post-preflight execution consumes a text patch preflight once", () => {
+  const {
+    eventReplayRecord,
+    hydrateRecord,
+    hydrationOptions,
+    preflight,
+    rootBridge,
+    textNodes
+  } = createHydrateRootExecutionPreflightScenario(
+    "public-facade-hydrate-text-claim-patch-one-shot",
+    {
+      textMismatchRows: true
+    }
+  );
+  const executionRecord = preflight.preflightExecution(eventReplayRecord, {
+    source: "conformance-hydrate-root-text-claim-patch-one-shot"
+  });
+  const mismatchRows = hydrateRecord.textMismatchDiagnostics.mismatchRows;
+
+  assert.equal(mismatchRows.length, 2);
+  const bridgeExecution = preflight.postPreflightExecution(
+    executionRecord,
+    {
+      hydrationOptions,
+      mismatchRow: mismatchRows[0]
+    }
+  );
+  assert.equal(bridgeExecution.textPatchApplied, true);
+  assert.equal(textNodes[0].textContent, "client text one");
+  assert.equal(textNodes[1].textContent, "server text two");
+
+  assert.throws(
+    () =>
+      preflight.postPreflightExecution(executionRecord, {
+        hydrationOptions,
+        mismatchRow: mismatchRows[1]
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
+  assert.equal(textNodes[1].textContent, "server text two");
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .textNodeClaimPatchExecutionRecordCount,
+    1
+  );
+});
+
 test("React DOM client private hydrateRoot post-preflight execution rejects noncanonical records", () => {
   const {
     eventReplayRecord,
@@ -1946,8 +1995,7 @@ test("React DOM client private hydrateRoot post-preflight execution rejects nonc
   assert.throws(
     () => preflight.postPreflightExecution(executionPreflightRecord),
     {
-      code:
-        "FAST_REACT_DOM_INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION"
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
     }
   );
   assert.equal(
@@ -4206,22 +4254,28 @@ function createHydrateRootExecutionPreflightScenario(label, options = {}) {
   const document = createPrivateGateDocument(label, domContainer);
   const container = createPrivateGateElement("DIV", document, domContainer);
   const target = createPrivateGateElement("BUTTON", document, domContainer);
-  const textNode =
-    options.textMismatch === true
-      ? createPrivateGateTextNode("server text", document, domContainer)
-      : null;
+  const textNodes =
+    options.textMismatchRows === true
+      ? [
+          createPrivateGateTextNode("server text one", document, domContainer),
+          createPrivateGateTextNode("server text two", document, domContainer)
+        ]
+      : options.textMismatch === true
+        ? [createPrivateGateTextNode("server text", document, domContainer)]
+        : [];
+  const textNode = textNodes.length === 0 ? null : textNodes[0];
   const start = createPrivateGateCommentNode("$", document, domContainer);
   const end = createPrivateGateCommentNode("/$", document, domContainer);
   start.parentNode = container;
   target.parentNode = container;
-  if (textNode !== null) {
-    textNode.parentNode = container;
+  for (const node of textNodes) {
+    node.parentNode = container;
   }
   end.parentNode = container;
   container.childNodes =
-    textNode === null
+    textNodes.length === 0
       ? [start, target, end]
-      : [start, target, textNode, end];
+      : [start, target, ...textNodes, end];
 
   const hydrationOptions = {
     identifierPrefix: `${label}-`
@@ -4241,7 +4295,9 @@ function createHydrateRootExecutionPreflightScenario(label, options = {}) {
     {
       props: {
         children:
-          options.textMismatch === true
+          options.textMismatchRows === true
+            ? ["client text one", "client text two"]
+            : options.textMismatch === true
             ? "client text"
             : `${label} child`
       },
@@ -4288,7 +4344,8 @@ function createHydrateRootExecutionPreflightScenario(label, options = {}) {
     rootBridge,
     target,
     targetClaimRecord,
-    textNode
+    textNode,
+    textNodes
   };
 }
 
@@ -4497,6 +4554,7 @@ function isPrivateGateLiveRootPreflightWriteKey(property) {
 
 function createPrivateGateTextNode(text, ownerDocument, domContainer) {
   const target = createPrivateGateEventTarget({
+    __fastReactFakeHydrationTextNode: true,
     nodeName: "#text",
     nodeType: domContainer.TEXT_NODE,
     ownerDocument

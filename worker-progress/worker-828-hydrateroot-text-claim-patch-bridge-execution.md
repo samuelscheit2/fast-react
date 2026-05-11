@@ -9,6 +9,11 @@
   path for the same hydration boundary and hydrateRoot options object.
 - Added bridge-owned payload/type guards and record getters for the post-
   preflight text patch execution.
+- Follow-up audit fix: `postPreflightExecution` now consumes each accepted
+  execution-preflight record once, before any second mismatch row can patch.
+- Follow-up audit fix: private fake text ownership no longer accepts structural
+  `writeLog` arrays; it now requires the explicit marker or private host text
+  constructor.
 - Preserved public hydrateRoot/root object/native/reconciler/browser DOM
   mutation/listener/event replay/recoverable callback/package compatibility
   blockers while allowing only the existing private fake text-node patch.
@@ -16,7 +21,9 @@
 ## Changed Files
 
 - `packages/react-dom/src/client/root-bridge.js`
+- `packages/react-dom/src/client/hydration-boundary-gate.js`
 - `packages/react-dom/test/hydrate-root-text-claim-patch-bridge.test.js`
+- `packages/react-dom/test/hydration-private.test.js`
 - `tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
 - `worker-progress/worker-828-hydrateroot-text-claim-patch-bridge-execution.md`
 
@@ -32,20 +39,28 @@
   accepted metadata, mismatch row, initial children, and hydration options.
 - Tests assert durable status/type/gate fields and source-owned constants
   instead of relying on error message text for the new assertions.
+- Regression tests cover two text mismatch rows sharing one execution-preflight:
+  the first fake text patch succeeds, the second row is rejected with
+  `FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT`, and the second text
+  node remains unchanged.
+- Regression tests cover `writeLog`-only spoof text nodes at both the lower
+  hydration gate and the hydrateRoot public-facade bridge.
 
 ## Verification
 
 - `node --check packages/react-dom/src/client/root-bridge.js`
+- `node --check packages/react-dom/src/client/hydration-boundary-gate.js`
 - `node --check packages/react-dom/test/hydrate-root-text-claim-patch-bridge.test.js`
+- `node --check packages/react-dom/test/hydration-private.test.js`
 - `node --check tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
 - `node --test packages/react-dom/test/hydrate-root-text-claim-patch-bridge.test.js`
 - `node --test packages/react-dom/test/hydration-private.test.js`
 - `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
-- `node --test packages/react-dom/test/hydrate-root-text-claim-patch-bridge.test.js tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
 - `npm run check --workspace @fast-react/react-dom`
 - `npm run check:package-surface`
 - `node tests/smoke/import-entrypoints.mjs`
 - `git diff --check`
+- `git diff --cached --check`
 
 ## Risks Or Blockers
 
