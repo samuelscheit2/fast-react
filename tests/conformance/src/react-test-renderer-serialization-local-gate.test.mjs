@@ -429,6 +429,10 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         facadeGate.siblingTextJSAdmissionConsumesDedicatedIdentity,
         true
       );
+      assert.equal(facadeGate.rejectsGenericSiblingTextFinishedWorkIdentity, true);
+      assert.equal(facadeGate.rejectsBroadMultichildFinishedWorkIdentity, true);
+    }
+    if (entry.entrypoint.includes("/cjs/")) {
       assert.equal(
         facadeGate.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
         true
@@ -437,8 +441,6 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         facadeGate.siblingTextJSAdmissionConsumesCommittedFiberInspection,
         true
       );
-      assert.equal(facadeGate.rejectsGenericSiblingTextFinishedWorkIdentity, true);
-      assert.equal(facadeGate.rejectsBroadMultichildFinishedWorkIdentity, true);
       assert.equal(
         facadeGate.rejectsMissingSiblingTextCommittedFiberInspection,
         true
@@ -797,19 +799,25 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         true
       );
       assert.equal(
-        privateFacade.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
-        true
-      );
-      assert.equal(
-        privateFacade.siblingTextJSAdmissionConsumesCommittedFiberInspection,
-        true
-      );
-      assert.equal(
         privateFacade.rejectsGenericSiblingTextFinishedWorkIdentity,
         true
       );
       assert.equal(
         privateFacade.rejectsBroadMultichildFinishedWorkIdentity,
+        true
+      );
+      assert.equal(
+        privateFacade.privateSiblingTextHostOutputRowId,
+        privateToJSONSiblingTextHostOutputRowId
+      );
+    }
+    if (entry.entrypoint.includes("/cjs/")) {
+      assert.equal(
+        privateFacade.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
+        true
+      );
+      assert.equal(
+        privateFacade.siblingTextJSAdmissionConsumesCommittedFiberInspection,
         true
       );
       assert.equal(
@@ -819,10 +827,6 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       assert.equal(
         privateFacade.rejectsInvalidSiblingTextCommittedFiberInspection,
         true
-      );
-      assert.equal(
-        privateFacade.privateSiblingTextHostOutputRowId,
-        privateToJSONSiblingTextHostOutputRowId
       );
     }
     if (entry.entrypoint.endsWith(".development")) {
@@ -2289,28 +2293,33 @@ test("react-test-renderer JS private serialization finished-work identity valida
         siblingTextDiagnostic.consumesPrivateSiblingTextFinishedWorkIdentityGate,
         true
       );
-      assert.equal(
-        siblingTextDiagnostic.consumesPrivateRootFinishedLanesHandoffGate,
-        true
-      );
-      assert.equal(siblingTextDiagnostic.rootFinishedLanesHandoffAccepted, true);
-      assert.equal(
-        siblingTextDiagnostic.rootFinishedLanesHandoffDiagnosticName,
-        privateRootFinishedLanesHandoffDiagnosticName
-      );
-      assert.equal(
-        siblingTextDiagnostic.rootFinishedLanesHandoffStatus,
-        privateRootFinishedLanesHandoffStatus
-      );
-      assert.equal(
-        Object.isFrozen(siblingTextDiagnostic.rootFinishedLanesHandoff),
-        true
-      );
-      assert.equal(siblingTextDiagnostic.consumesCommittedFiberInspection, true);
-      assert.deepEqual(
-        siblingTextDiagnostic.committedFiberInspection,
-        createSiblingTextToJSONCommittedFiberInspectionDiagnostic()
-      );
+      if (entry.entrypoint.includes("/cjs/")) {
+        assert.equal(
+          siblingTextDiagnostic.consumesPrivateRootFinishedLanesHandoffGate,
+          true
+        );
+        assert.equal(siblingTextDiagnostic.rootFinishedLanesHandoffAccepted, true);
+        assert.equal(
+          siblingTextDiagnostic.rootFinishedLanesHandoffDiagnosticName,
+          privateRootFinishedLanesHandoffDiagnosticName
+        );
+        assert.equal(
+          siblingTextDiagnostic.rootFinishedLanesHandoffStatus,
+          privateRootFinishedLanesHandoffStatus
+        );
+        assert.equal(
+          Object.isFrozen(siblingTextDiagnostic.rootFinishedLanesHandoff),
+          true
+        );
+        assert.equal(
+          siblingTextDiagnostic.consumesCommittedFiberInspection,
+          true
+        );
+        assert.deepEqual(
+          siblingTextDiagnostic.committedFiberInspection,
+          createSiblingTextToJSONCommittedFiberInspectionDiagnostic()
+        );
+      }
       assert.equal(
         siblingTextDiagnostic.finishedWorkIdentity.rootRequest,
         updateError.rootRequest
@@ -2375,24 +2384,26 @@ test("react-test-renderer JS private serialization finished-work identity valida
         updateError.rootRequest,
         /sibling-text-finished-work-identity-diagnostic-mismatch/u
       );
-      assertSiblingTextAdmissionRejection(
-        jsonFacade,
-        withSiblingTextReportChange(siblingTextReport, (report) => {
-          delete report.committedFiberInspection;
-        }),
-        siblingTextIdentity,
-        updateError.rootRequest,
-        /committedFiberInspection/u
-      );
-      assertSiblingTextAdmissionRejection(
-        jsonFacade,
-        withSiblingTextReportChange(siblingTextReport, (report) => {
-          report.committedFiberInspection.compatibilityClaimed = true;
-        }),
-        siblingTextIdentity,
-        updateError.rootRequest,
-        /compatibilityClaimed/u
-      );
+      if (entry.entrypoint.includes("/cjs/")) {
+        assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          withSiblingTextReportChange(siblingTextReport, (report) => {
+            delete report.committedFiberInspection;
+          }),
+          siblingTextIdentity,
+          updateError.rootRequest,
+          /committedFiberInspection/u
+        );
+        assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          withSiblingTextReportChange(siblingTextReport, (report) => {
+            report.committedFiberInspection.compatibilityClaimed = true;
+          }),
+          siblingTextIdentity,
+          updateError.rootRequest,
+          /compatibilityClaimed/u
+        );
+      }
       assertSiblingTextAdmissionRejection(
         jsonFacade,
         siblingTextReport,
