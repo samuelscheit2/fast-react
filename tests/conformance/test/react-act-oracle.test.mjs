@@ -286,6 +286,176 @@ test("public React.act scenario admission stays explicit and closed", () => {
   assert.equal(gate.unsupportedDefaultBehaviorRows.length, 10);
 });
 
+test("public React.act currentness gate stays fail-closed for rootless behavior", () => {
+  const gate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+  const report = gate.createPublicReactActBlockedCurrentnessReport();
+
+  assert.equal(
+    gate.isAcceptedPublicReactActBlockedCurrentnessReport(report),
+    true
+  );
+  assert.equal(
+    report.status,
+    gate.publicReactActBlockedCurrentnessStatus
+  );
+  assert.deepEqual(report.scenarioIds, [
+    "rootless-sync-callback",
+    "rootless-async-callback",
+    "rootless-error-callback",
+    "rootless-thenable-callback"
+  ]);
+  assert.deepEqual(report.acceptedBackgroundWorkerIds, [
+    "worker-857-react-dom-act-passive-consumer",
+    "worker-885-react-act-lifecycle-boundary-gate"
+  ]);
+  assert.deepEqual(report.excludedWorkerIds, [
+    "worker-902-react-test-renderer-private-act-lifecycle"
+  ]);
+  assert.deepEqual(report.reactServerAct, {
+    hasOwn: false,
+    exportKeysInclude: false,
+    value: {
+      type: "undefined"
+    }
+  });
+
+  const consumption =
+    gate.consumePublicReactActBlockedCurrentnessReport(report);
+  assert.equal(
+    consumption.status,
+    gate.publicReactActBlockedCurrentnessConsumptionStatus
+  );
+  assert.equal(consumption.publicActUnsupportedPlaceholder, true);
+  assert.equal(consumption.callbackInvocationBlocked, true);
+  assert.equal(consumption.thenableReturnBlocked, true);
+  assert.equal(consumption.reactServerActExportBlocked, true);
+  assert.equal(consumption.publicWarningCompatibilityClaimed, false);
+  assert.equal(consumption.publicActWarningCompatibilityClaimed, false);
+  assert.equal(consumption.queueFlushingReady, false);
+  assert.equal(consumption.rendererRootsReady, false);
+  assert.equal(consumption.passiveEffectsReady, false);
+  assert.equal(consumption.continuationFlushingReady, false);
+  assert.equal(consumption.drainsPublicReactActQueue, false);
+  assert.equal(consumption.publicActPassiveDrain, false);
+  assert.equal(consumption.publicEffectExecution, false);
+  assert.equal(consumption.publicRootExecution, false);
+  assert.equal(consumption.executesRendererRoots, false);
+  assert.equal(
+    consumption.privatePrerequisites
+      .schedulerDrivenPassiveEffectDiagnosticsReady,
+    true
+  );
+  assert.equal(
+    consumption.privatePrerequisites
+      .requiresSourceOwnedActiveLifecycleRequestBoundary,
+    true
+  );
+  assert.equal(
+    consumption.privatePrerequisites.consumesWorker902Evidence,
+    false
+  );
+
+  for (const scenario of report.scenarios) {
+    assert.equal(scenario.rootless, true, scenario.scenarioId);
+    assert.equal(scenario.callbackInvoked, false, scenario.scenarioId);
+    assert.equal(scenario.returnedThenable, false, scenario.scenarioId);
+    assert.deepEqual(scenario.consoleCalls, [], scenario.scenarioId);
+    assert.equal(
+      scenario.publicWarningCompatibilityClaimed,
+      false,
+      scenario.scenarioId
+    );
+    assert.equal(scenario.callAttempt.status, "throws", scenario.scenarioId);
+    assert.deepEqual(scenario.callAttempt.error, {
+      name: "FastReactUnimplementedError",
+      code: "FAST_REACT_UNIMPLEMENTED",
+      entrypoint: "react",
+      exportName: "act",
+      compatibilityTarget: "react@19.2.6"
+    });
+  }
+
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    Object.freeze({
+      ...report
+    }),
+    "public-react-act-currentness-source-proof"
+  );
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    gate.createPublicReactActBlockedCurrentnessReport({
+      publicReactActCompatibilityClaimed: true
+    }),
+    "public-react-act-currentness-public-claim"
+  );
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    gate.createPublicReactActBlockedCurrentnessReport({
+      scenarios: replacePublicReactActCurrentnessScenario(report, 0, {
+        callbackInvoked: true
+      })
+    }),
+    "public-react-act-currentness-callback-invoked"
+  );
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    gate.createPublicReactActBlockedCurrentnessReport({
+      scenarios: replacePublicReactActCurrentnessScenario(report, 3, {
+        callAttempt: {
+          status: "ok",
+          value: {
+            type: "object",
+            thenable: true
+          }
+        },
+        returnedThenable: true
+      })
+    }),
+    "public-react-act-currentness-thenable-returned"
+  );
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    gate.createPublicReactActBlockedCurrentnessReport({
+      queueFlushingReady: true
+    }),
+    "public-react-act-currentness-prerequisite-smuggling"
+  );
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    gate.createPublicReactActBlockedCurrentnessReport({
+      privatePrerequisites: {
+        ...report.privatePrerequisites,
+        consumesWorker902Evidence: true
+      }
+    }),
+    "public-react-act-currentness-private-prerequisite-boundary"
+  );
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    gate.createPublicReactActBlockedCurrentnessReport({
+      publicWarningCompatibilityClaimed: true
+    }),
+    "public-react-act-currentness-warning-compatibility-claim"
+  );
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    gate.createPublicReactActBlockedCurrentnessReport({
+      reactServerAct: {
+        hasOwn: true,
+        exportKeysInclude: true,
+        value: {
+          type: "function",
+          name: "act",
+          length: 1,
+          thenable: false
+        }
+      }
+    }),
+    "public-react-act-currentness-react-server-act-export"
+  );
+});
+
 test("public React.act gate rejects premature compatibility claims and scenario admissions", () => {
   const prematureClaimOracle = JSON.parse(JSON.stringify(oracle));
   prematureClaimOracle.conformanceClaims.compatibilityClaimed = true;
@@ -4082,6 +4252,48 @@ function assertSchedulerMockExpiredConsumerRejected(
       return true;
     },
     label
+  );
+}
+
+function assertPublicReactActCurrentnessRejected(gate, report, reason) {
+  assert.equal(
+    gate.isAcceptedPublicReactActBlockedCurrentnessReport(report),
+    false,
+    reason
+  );
+  assert.throws(
+    () => gate.consumePublicReactActBlockedCurrentnessReport(report),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", reason);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", reason);
+      assert.equal(error.entrypoint, "react", reason);
+      assert.equal(
+        error.exportName,
+        `${privateActDispatcherGateExport}.consumePublicReactActBlockedCurrentnessReport`,
+        reason
+      );
+      assert.equal(error.compatibilityTarget, "react@19.2.6", reason);
+      assert.equal(error.reason, reason);
+      assert.equal(error.publicReactActCompatibilityClaimed, false, reason);
+      assert.equal(error.publicWarningCompatibilityClaimed, false, reason);
+      assert.equal(error.drainsPublicReactActQueue, false, reason);
+      assert.equal(error.invokesCallback, false, reason);
+      assert.equal(error.returnsThenable, false, reason);
+      assert.equal(error.executesRendererRoots, false, reason);
+      return true;
+    },
+    reason
+  );
+}
+
+function replacePublicReactActCurrentnessScenario(report, index, overrides) {
+  return report.scenarios.map((scenario, scenarioIndex) =>
+    scenarioIndex === index
+      ? {
+          ...scenario,
+          ...overrides
+        }
+      : scenario
   );
 }
 

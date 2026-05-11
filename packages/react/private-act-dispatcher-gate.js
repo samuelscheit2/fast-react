@@ -142,6 +142,23 @@ const privateSchedulerDrivenPassiveLifecycleBoundaryRecords = Object.freeze([
   'FastReactDomPrivateRootCreateRecord',
   'FastReactDomPrivateRootUpdateRecord'
 ]);
+const publicReactActBlockedCurrentnessKind =
+  'fast-react.react.public-act-blocked-currentness';
+const publicReactActBlockedCurrentnessVersion = 1;
+const publicReactActBlockedCurrentnessStatus =
+  'blocked-public-react-act-unsupported-placeholder-currentness';
+const publicReactActBlockedCurrentnessConsumptionStatus =
+  'accepted-blocked-public-react-act-currentness';
+const publicReactActBlockedCurrentnessScenarios = Object.freeze([
+  'rootless-sync-callback',
+  'rootless-async-callback',
+  'rootless-error-callback',
+  'rootless-thenable-callback'
+]);
+const publicReactActBlockedCurrentnessBackgroundWorkerIds = Object.freeze([
+  'worker-857-react-dom-act-passive-consumer',
+  'worker-885-react-act-lifecycle-boundary-gate'
+]);
 const privateSchedulerDrivenPassiveEffectWorkerIds = Object.freeze([
   'worker-836-reconciler-private-act-queue-execution-path',
   'worker-837-scheduler-driven-passive-effect-execution'
@@ -547,6 +564,7 @@ let currentSchedulerMockExpiredActRootWorkSourceValidator = null;
 const privateSchedulerDrivenPassiveEffectDiagnostics = new WeakSet();
 const privateSchedulerDrivenPassiveEffectDiagnosticTokens = new WeakMap();
 const privateSchedulerDrivenPassiveEffectRecordTokens = new WeakMap();
+const publicReactActBlockedCurrentnessReports = new WeakSet();
 
 installSchedulerMockSourceProofLoadHook();
 
@@ -4360,6 +4378,660 @@ function consumeSchedulerDrivenPassiveEffectDiagnostics(diagnostics) {
   });
 }
 
+function createPublicReactActBlockedCurrentnessReport(overrides = {}) {
+  const normalizedOptions = overrides ?? {};
+  const React = require('./index.js');
+  const ReactServer = require('./react.react-server.js');
+  const scenarios = Object.freeze(
+    (
+      normalizedOptions.scenarios ??
+      createPublicReactActBlockedCurrentnessScenarios(React)
+    ).map(freezePublicReactActBlockedCurrentnessScenario)
+  );
+  const report = Object.freeze({
+    kind:
+      normalizedOptions.kind ?? publicReactActBlockedCurrentnessKind,
+    version:
+      normalizedOptions.version ?? publicReactActBlockedCurrentnessVersion,
+    status:
+      normalizedOptions.status ??
+      publicReactActBlockedCurrentnessStatus,
+    compatibilityTarget:
+      normalizedOptions.compatibilityTarget ?? compatibilityTarget,
+    source:
+      normalizedOptions.source ??
+      'packages/react/private-act-dispatcher-gate.js',
+    scenarioIds: frozenStringArray(
+      normalizedOptions.scenarioIds,
+      publicReactActBlockedCurrentnessScenarios
+    ),
+    scenarios,
+    publicActExport: freezePublicReactActExportShape(
+      normalizedOptions.publicActExport ??
+        describePublicReactActCurrentnessExport(React)
+    ),
+    reactServerAct: freezeReactServerActExportShape(
+      normalizedOptions.reactServerAct ??
+        describeReactServerActCurrentnessExport(ReactServer)
+    ),
+    acceptedBackgroundWorkerIds: frozenStringArray(
+      normalizedOptions.acceptedBackgroundWorkerIds,
+      publicReactActBlockedCurrentnessBackgroundWorkerIds
+    ),
+    excludedWorkerIds: frozenStringArray(
+      normalizedOptions.excludedWorkerIds,
+      ['worker-902-react-test-renderer-private-act-lifecycle']
+    ),
+    privatePrerequisites:
+      createPublicReactActBlockedCurrentnessPrivatePrerequisites(
+        normalizedOptions.privatePrerequisites
+      ),
+    callbackInvocationBlocked:
+      normalizedOptions.callbackInvocationBlocked ?? true,
+    thenableReturnBlocked:
+      normalizedOptions.thenableReturnBlocked ?? true,
+    reactServerActExportBlocked:
+      normalizedOptions.reactServerActExportBlocked ?? true,
+    queueFlushingReady: normalizedOptions.queueFlushingReady ?? false,
+    rendererRootsReady: normalizedOptions.rendererRootsReady ?? false,
+    passiveEffectsReady: normalizedOptions.passiveEffectsReady ?? false,
+    continuationFlushingReady:
+      normalizedOptions.continuationFlushingReady ?? false,
+    publicCompatibilityClaimed:
+      normalizedOptions.publicCompatibilityClaimed ?? false,
+    publicSchedulerTimingCompatibilityClaimed:
+      normalizedOptions.publicSchedulerTimingCompatibilityClaimed ?? false,
+    publicReactActCompatibilityClaimed:
+      normalizedOptions.publicReactActCompatibilityClaimed ?? false,
+    publicActWarningCompatibilityClaimed:
+      normalizedOptions.publicActWarningCompatibilityClaimed ?? false,
+    publicWarningCompatibilityClaimed:
+      normalizedOptions.publicWarningCompatibilityClaimed ?? false,
+    publicRootSchedulerCompatibilityClaimed:
+      normalizedOptions.publicRootSchedulerCompatibilityClaimed ?? false,
+    publicRendererCompatibilityClaimed:
+      normalizedOptions.publicRendererCompatibilityClaimed ?? false,
+    drainsPublicSchedulerTaskQueue:
+      normalizedOptions.drainsPublicSchedulerTaskQueue ?? false,
+    drainsPublicReactActQueue:
+      normalizedOptions.drainsPublicReactActQueue ?? false,
+    publicActPassiveDrain:
+      normalizedOptions.publicActPassiveDrain ?? false,
+    publicEffectExecution:
+      normalizedOptions.publicEffectExecution ?? false,
+    publicRootExecution: normalizedOptions.publicRootExecution ?? false,
+    invokesCallback: normalizedOptions.invokesCallback ?? false,
+    returnsThenable: normalizedOptions.returnsThenable ?? false,
+    executesQueuedWork: normalizedOptions.executesQueuedWork ?? false,
+    executesEffects: normalizedOptions.executesEffects ?? false,
+    executesRendererWork:
+      normalizedOptions.executesRendererWork ?? false,
+    executesRendererRoots:
+      normalizedOptions.executesRendererRoots ?? false,
+    compatibilityClaimed: normalizedOptions.compatibilityClaimed ?? false
+  });
+
+  publicReactActBlockedCurrentnessReports.add(report);
+  return report;
+}
+
+function createPublicReactActBlockedCurrentnessScenarios(React) {
+  return publicReactActBlockedCurrentnessScenarios.map((scenarioId) => {
+    if (scenarioId === 'rootless-async-callback') {
+      return capturePublicReactActBlockedCurrentnessScenario(
+        React,
+        scenarioId,
+        () => Promise.resolve('unexpected-async-act-result')
+      );
+    }
+    if (scenarioId === 'rootless-error-callback') {
+      return capturePublicReactActBlockedCurrentnessScenario(
+        React,
+        scenarioId,
+        () => {
+          throw new Error('unexpected-sync-act-error');
+        }
+      );
+    }
+    if (scenarioId === 'rootless-thenable-callback') {
+      return capturePublicReactActBlockedCurrentnessScenario(
+        React,
+        scenarioId,
+        () => ({
+          then(resolve) {
+            resolve('unexpected-thenable-act-result');
+          }
+        })
+      );
+    }
+
+    return capturePublicReactActBlockedCurrentnessScenario(
+      React,
+      scenarioId,
+      () => 'unexpected-sync-act-result'
+    );
+  });
+}
+
+function capturePublicReactActBlockedCurrentnessScenario(
+  React,
+  scenarioId,
+  callbackFactory
+) {
+  const consoleCalls = [];
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  let callbackInvoked = false;
+  let callAttempt;
+
+  console.error = (...args) => {
+    consoleCalls.push(freezeConsoleCall('error', args));
+  };
+  console.warn = (...args) => {
+    consoleCalls.push(freezeConsoleCall('warn', args));
+  };
+
+  try {
+    try {
+      const value = React.act(() => {
+        callbackInvoked = true;
+        return callbackFactory();
+      });
+      callAttempt = Object.freeze({
+        status: 'ok',
+        value: describePublicReactActCurrentnessValue(value)
+      });
+    } catch (error) {
+      callAttempt = Object.freeze({
+        status: 'throws',
+        error: describePublicReactActCurrentnessError(error)
+      });
+    }
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
+
+  return freezePublicReactActBlockedCurrentnessScenario({
+    scenarioId,
+    rootless: true,
+    callbackInvoked,
+    callAttempt,
+    returnedThenable:
+      callAttempt.status === 'ok' &&
+      isDescribedPublicReactActThenable(callAttempt.value),
+    consoleCalls,
+    publicCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicWarningCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function freezeConsoleCall(kind, args) {
+  return Object.freeze({
+    kind,
+    args: Object.freeze(
+      Array.from(args, describePublicReactActCurrentnessValue)
+    )
+  });
+}
+
+function describePublicReactActCurrentnessExport(React) {
+  const act = React.act;
+  return Object.freeze({
+    hasOwn: Object.hasOwn(React, 'act'),
+    exportKeysInclude: Object.keys(React).includes('act'),
+    value: describePublicReactActCurrentnessValue(act)
+  });
+}
+
+function describeReactServerActCurrentnessExport(ReactServer) {
+  return Object.freeze({
+    hasOwn: Object.hasOwn(ReactServer, 'act'),
+    exportKeysInclude: Object.keys(ReactServer).includes('act'),
+    value: describePublicReactActCurrentnessValue(ReactServer.act)
+  });
+}
+
+function describePublicReactActCurrentnessValue(value) {
+  if (value === undefined) {
+    return Object.freeze({
+      type: 'undefined'
+    });
+  }
+  if (value === null) {
+    return Object.freeze({
+      type: 'null'
+    });
+  }
+  if (typeof value === 'function') {
+    return Object.freeze({
+      type: 'function',
+      name: value.name,
+      length: value.length,
+      thenable: typeof value.then === 'function'
+    });
+  }
+  if (isObjectLike(value)) {
+    return Object.freeze({
+      type: 'object',
+      thenable: typeof value.then === 'function'
+    });
+  }
+
+  return Object.freeze({
+    type: typeof value,
+    thenable: false
+  });
+}
+
+function isDescribedPublicReactActThenable(value) {
+  return isObjectLike(value) && value.thenable === true;
+}
+
+function describePublicReactActCurrentnessError(error) {
+  return Object.freeze({
+    name: error?.name ?? null,
+    code: error?.code ?? null,
+    entrypoint: error?.entrypoint ?? null,
+    exportName: error?.exportName ?? null,
+    compatibilityTarget: error?.compatibilityTarget ?? null
+  });
+}
+
+function freezePublicReactActExportShape(shape) {
+  const normalizedShape = shape ?? {};
+  return Object.freeze({
+    hasOwn: normalizedShape.hasOwn === true,
+    exportKeysInclude: normalizedShape.exportKeysInclude === true,
+    value: freezePublicReactActValueShape(normalizedShape.value)
+  });
+}
+
+function freezeReactServerActExportShape(shape) {
+  const normalizedShape = shape ?? {};
+  return Object.freeze({
+    hasOwn: normalizedShape.hasOwn === true,
+    exportKeysInclude: normalizedShape.exportKeysInclude === true,
+    value: freezePublicReactActValueShape(normalizedShape.value)
+  });
+}
+
+function freezePublicReactActValueShape(value) {
+  const normalizedValue = value ?? {};
+  const shape = {
+    type: normalizedValue.type ?? 'undefined'
+  };
+
+  if (Object.hasOwn(normalizedValue, 'name')) {
+    shape.name = normalizedValue.name;
+  }
+  if (Object.hasOwn(normalizedValue, 'length')) {
+    shape.length = normalizedValue.length;
+  }
+  if (Object.hasOwn(normalizedValue, 'thenable')) {
+    shape.thenable = normalizedValue.thenable;
+  }
+
+  return Object.freeze(shape);
+}
+
+function freezePublicReactActBlockedCurrentnessScenario(scenario) {
+  const normalizedScenario = scenario ?? {};
+  return Object.freeze({
+    scenarioId: normalizedScenario.scenarioId ?? '',
+    rootless: normalizedScenario.rootless === true,
+    callbackInvoked: normalizedScenario.callbackInvoked === true,
+    callAttempt: freezePublicReactActCallAttempt(
+      normalizedScenario.callAttempt
+    ),
+    returnedThenable: normalizedScenario.returnedThenable === true,
+    consoleCalls: Object.freeze(
+      Array.isArray(normalizedScenario.consoleCalls)
+        ? [...normalizedScenario.consoleCalls]
+        : []
+    ),
+    publicCompatibilityClaimed:
+      normalizedScenario.publicCompatibilityClaimed === true,
+    publicReactActCompatibilityClaimed:
+      normalizedScenario.publicReactActCompatibilityClaimed === true,
+    publicWarningCompatibilityClaimed:
+      normalizedScenario.publicWarningCompatibilityClaimed === true,
+    compatibilityClaimed: normalizedScenario.compatibilityClaimed === true
+  });
+}
+
+function freezePublicReactActCallAttempt(callAttempt) {
+  const normalizedAttempt = callAttempt ?? {};
+  if (normalizedAttempt.status === 'throws') {
+    return Object.freeze({
+      status: 'throws',
+      error: describePublicReactActCurrentnessError(
+        normalizedAttempt.error
+      )
+    });
+  }
+
+  return Object.freeze({
+    status: normalizedAttempt.status ?? 'unknown',
+    value: freezePublicReactActValueShape(normalizedAttempt.value)
+  });
+}
+
+function createPublicReactActBlockedCurrentnessPrivatePrerequisites(
+  overrides = {}
+) {
+  const normalizedOptions = overrides ?? {};
+  return Object.freeze({
+    schedulerDrivenPassiveEffectDiagnosticsReady:
+      normalizedOptions.schedulerDrivenPassiveEffectDiagnosticsReady ??
+      true,
+    consumesSchedulerDrivenPassiveEffectDiagnostics:
+      normalizedOptions.consumesSchedulerDrivenPassiveEffectDiagnostics ??
+      true,
+    requiresSourceOwnedActiveLifecycleRequestBoundary:
+      normalizedOptions.requiresSourceOwnedActiveLifecycleRequestBoundary ??
+      true,
+    currentRootBoundWork:
+      normalizedOptions.currentRootBoundWork ?? true,
+    acceptedBackgroundWorkerIds: frozenStringArray(
+      normalizedOptions.acceptedBackgroundWorkerIds,
+      publicReactActBlockedCurrentnessBackgroundWorkerIds
+    ),
+    consumesWorker902Evidence:
+      normalizedOptions.consumesWorker902Evidence ?? false,
+    queueFlushingReady: normalizedOptions.queueFlushingReady ?? false,
+    rendererRootsReady: normalizedOptions.rendererRootsReady ?? false,
+    passiveEffectsReady: normalizedOptions.passiveEffectsReady ?? false,
+    continuationFlushingReady:
+      normalizedOptions.continuationFlushingReady ?? false,
+    publicCompatibilityClaimed:
+      normalizedOptions.publicCompatibilityClaimed ?? false,
+    publicSchedulerTimingCompatibilityClaimed:
+      normalizedOptions.publicSchedulerTimingCompatibilityClaimed ?? false,
+    publicReactActCompatibilityClaimed:
+      normalizedOptions.publicReactActCompatibilityClaimed ?? false,
+    publicWarningCompatibilityClaimed:
+      normalizedOptions.publicWarningCompatibilityClaimed ?? false,
+    publicRootSchedulerCompatibilityClaimed:
+      normalizedOptions.publicRootSchedulerCompatibilityClaimed ?? false,
+    publicRendererCompatibilityClaimed:
+      normalizedOptions.publicRendererCompatibilityClaimed ?? false,
+    drainsPublicSchedulerTaskQueue:
+      normalizedOptions.drainsPublicSchedulerTaskQueue ?? false,
+    drainsPublicReactActQueue:
+      normalizedOptions.drainsPublicReactActQueue ?? false,
+    publicActPassiveDrain:
+      normalizedOptions.publicActPassiveDrain ?? false,
+    publicEffectExecution:
+      normalizedOptions.publicEffectExecution ?? false,
+    publicRootExecution: normalizedOptions.publicRootExecution ?? false,
+    executesQueuedWork: normalizedOptions.executesQueuedWork ?? false,
+    executesEffects: normalizedOptions.executesEffects ?? false,
+    executesRendererWork:
+      normalizedOptions.executesRendererWork ?? false,
+    executesRendererRoots:
+      normalizedOptions.executesRendererRoots ?? false,
+    compatibilityClaimed: normalizedOptions.compatibilityClaimed ?? false
+  });
+}
+
+function isAcceptedPublicReactActBlockedCurrentnessReport(report) {
+  return validatePublicReactActBlockedCurrentnessReport(report) === null;
+}
+
+function validatePublicReactActBlockedCurrentnessReport(report) {
+  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+    return 'public-react-act-currentness-not-frozen';
+  }
+  if (!publicReactActBlockedCurrentnessReports.has(report)) {
+    return 'public-react-act-currentness-source-proof';
+  }
+  if (
+    report.kind !== publicReactActBlockedCurrentnessKind ||
+    report.version !== publicReactActBlockedCurrentnessVersion ||
+    report.status !== publicReactActBlockedCurrentnessStatus ||
+    report.compatibilityTarget !== compatibilityTarget ||
+    report.source !== 'packages/react/private-act-dispatcher-gate.js' ||
+    !hasExactStringList(
+      report.scenarioIds,
+      publicReactActBlockedCurrentnessScenarios
+    ) ||
+    !hasExactStringList(
+      report.acceptedBackgroundWorkerIds,
+      publicReactActBlockedCurrentnessBackgroundWorkerIds
+    ) ||
+    !hasExactStringList(report.excludedWorkerIds, [
+      'worker-902-react-test-renderer-private-act-lifecycle'
+    ])
+  ) {
+    return 'public-react-act-currentness-shape';
+  }
+  if (!isAcceptedPublicReactActCurrentnessExport(report.publicActExport)) {
+    return 'public-react-act-currentness-public-export-shape';
+  }
+  if (!isAcceptedReactServerActBlockedExport(report.reactServerAct)) {
+    return 'public-react-act-currentness-react-server-act-export';
+  }
+  if (
+    report.publicActWarningCompatibilityClaimed !== false ||
+    report.publicWarningCompatibilityClaimed !== false
+  ) {
+    return 'public-react-act-currentness-warning-compatibility-claim';
+  }
+  if (!hasBlockedPublicCompatibilityClaims(report)) {
+    return 'public-react-act-currentness-public-claim';
+  }
+  if (
+    report.callbackInvocationBlocked !== true ||
+    report.invokesCallback !== false
+  ) {
+    return 'public-react-act-currentness-callback-invoked';
+  }
+  if (
+    report.thenableReturnBlocked !== true ||
+    report.returnsThenable !== false
+  ) {
+    return 'public-react-act-currentness-thenable-returned';
+  }
+  if (
+    report.queueFlushingReady !== false ||
+    report.rendererRootsReady !== false ||
+    report.passiveEffectsReady !== false ||
+    report.continuationFlushingReady !== false ||
+    report.publicActPassiveDrain !== false ||
+    report.publicEffectExecution !== false ||
+    report.publicRootExecution !== false ||
+    !hasBlockedPublicQueueAndExecutionClaims(report)
+  ) {
+    return 'public-react-act-currentness-prerequisite-smuggling';
+  }
+  if (
+    !isAcceptedPublicReactActBlockedCurrentnessPrivatePrerequisites(
+      report.privatePrerequisites
+    )
+  ) {
+    return 'public-react-act-currentness-private-prerequisite-boundary';
+  }
+
+  return validatePublicReactActBlockedCurrentnessScenarios(
+    report.scenarios
+  );
+}
+
+function isAcceptedPublicReactActCurrentnessExport(exportShape) {
+  return (
+    isObjectLike(exportShape) &&
+    Object.isFrozen(exportShape) &&
+    exportShape.hasOwn === true &&
+    exportShape.exportKeysInclude === true &&
+    isObjectLike(exportShape.value) &&
+    Object.isFrozen(exportShape.value) &&
+    exportShape.value.type === 'function' &&
+    exportShape.value.name === 'act' &&
+    exportShape.value.length === 0 &&
+    exportShape.value.thenable === false
+  );
+}
+
+function isAcceptedReactServerActBlockedExport(exportShape) {
+  return (
+    isObjectLike(exportShape) &&
+    Object.isFrozen(exportShape) &&
+    exportShape.hasOwn === false &&
+    exportShape.exportKeysInclude === false &&
+    isObjectLike(exportShape.value) &&
+    Object.isFrozen(exportShape.value) &&
+    exportShape.value.type === 'undefined'
+  );
+}
+
+function isAcceptedPublicReactActBlockedCurrentnessPrivatePrerequisites(
+  prerequisites
+) {
+  return (
+    isObjectLike(prerequisites) &&
+    Object.isFrozen(prerequisites) &&
+    prerequisites.schedulerDrivenPassiveEffectDiagnosticsReady === true &&
+    prerequisites.consumesSchedulerDrivenPassiveEffectDiagnostics === true &&
+    prerequisites.requiresSourceOwnedActiveLifecycleRequestBoundary ===
+      true &&
+    prerequisites.currentRootBoundWork === true &&
+    hasExactStringList(
+      prerequisites.acceptedBackgroundWorkerIds,
+      publicReactActBlockedCurrentnessBackgroundWorkerIds
+    ) &&
+    prerequisites.consumesWorker902Evidence === false &&
+    prerequisites.queueFlushingReady === false &&
+    prerequisites.rendererRootsReady === false &&
+    prerequisites.passiveEffectsReady === false &&
+    prerequisites.continuationFlushingReady === false &&
+    prerequisites.publicWarningCompatibilityClaimed === false &&
+    prerequisites.publicActPassiveDrain === false &&
+    prerequisites.publicEffectExecution === false &&
+    prerequisites.publicRootExecution === false &&
+    hasBlockedPublicCompatibilityClaims(prerequisites) &&
+    hasBlockedPublicQueueAndExecutionClaims(prerequisites)
+  );
+}
+
+function validatePublicReactActBlockedCurrentnessScenarios(scenarios) {
+  if (
+    !Array.isArray(scenarios) ||
+    !Object.isFrozen(scenarios) ||
+    scenarios.length !== publicReactActBlockedCurrentnessScenarios.length
+  ) {
+    return 'public-react-act-currentness-scenario-shape';
+  }
+
+  for (let index = 0; index < scenarios.length; index++) {
+    const scenario = scenarios[index];
+    if (
+      !isObjectLike(scenario) ||
+      !Object.isFrozen(scenario) ||
+      scenario.scenarioId !==
+        publicReactActBlockedCurrentnessScenarios[index] ||
+      scenario.rootless !== true ||
+      !isObjectLike(scenario.callAttempt) ||
+      !Object.isFrozen(scenario.callAttempt) ||
+      !Array.isArray(scenario.consoleCalls) ||
+      !Object.isFrozen(scenario.consoleCalls)
+    ) {
+      return 'public-react-act-currentness-scenario-shape';
+    }
+    if (scenario.publicWarningCompatibilityClaimed !== false) {
+      return 'public-react-act-currentness-warning-compatibility-claim';
+    }
+    if (
+      scenario.publicCompatibilityClaimed !== false ||
+      scenario.publicReactActCompatibilityClaimed !== false ||
+      scenario.compatibilityClaimed !== false
+    ) {
+      return 'public-react-act-currentness-public-claim';
+    }
+    if (scenario.callbackInvoked !== false) {
+      return 'public-react-act-currentness-callback-invoked';
+    }
+    if (
+      scenario.returnedThenable !== false ||
+      isDescribedPublicReactActThenable(scenario.callAttempt.value)
+    ) {
+      return 'public-react-act-currentness-thenable-returned';
+    }
+    if (
+      scenario.callAttempt.status !== 'throws' ||
+      !isPublicReactActBlockedCurrentnessPlaceholderError(
+        scenario.callAttempt.error
+      )
+    ) {
+      return 'public-react-act-currentness-placeholder-behavior';
+    }
+    if (scenario.consoleCalls.length !== 0) {
+      return 'public-react-act-currentness-warning-compatibility-claim';
+    }
+  }
+
+  return null;
+}
+
+function isPublicReactActBlockedCurrentnessPlaceholderError(error) {
+  return (
+    isObjectLike(error) &&
+    Object.isFrozen(error) &&
+    error.name === 'FastReactUnimplementedError' &&
+    error.code === 'FAST_REACT_UNIMPLEMENTED' &&
+    error.entrypoint === entrypoint &&
+    error.exportName === 'act' &&
+    error.compatibilityTarget === compatibilityTarget
+  );
+}
+
+function consumePublicReactActBlockedCurrentnessReport(report) {
+  const rejectionReason =
+    validatePublicReactActBlockedCurrentnessReport(report);
+  if (rejectionReason !== null) {
+    throw createPublicReactActBlockedCurrentnessGateError(rejectionReason);
+  }
+
+  return Object.freeze({
+    status: publicReactActBlockedCurrentnessConsumptionStatus,
+    accepted: true,
+    currentnessStatus: report.status,
+    compatibilityTarget,
+    scenarioIds: report.scenarioIds,
+    scenarioCount: report.scenarios.length,
+    publicActUnsupportedPlaceholder: true,
+    callbackInvocationBlocked: true,
+    thenableReturnBlocked: true,
+    reactServerActExportBlocked: true,
+    publicWarningCompatibilityClaimed: false,
+    publicActWarningCompatibilityClaimed: false,
+    acceptedBackgroundWorkerIds: report.acceptedBackgroundWorkerIds,
+    excludedWorkerIds: report.excludedWorkerIds,
+    privatePrerequisites: report.privatePrerequisites,
+    queueFlushingReady: false,
+    rendererRootsReady: false,
+    passiveEffectsReady: false,
+    continuationFlushingReady: false,
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicActPassiveDrain: false,
+    publicEffectExecution: false,
+    publicRootExecution: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false,
+    compatibilityClaimed: false
+  });
+}
+
 function getDispatcherActQueueMetadata(dispatcher) {
   if (!isObjectLike(dispatcher)) {
     return null;
@@ -4499,6 +5171,35 @@ function createSchedulerDrivenPassiveEffectDiagnosticsGateError(
   error.executesQueuedWork = false;
   error.executesEffects = false;
   error.executesPassiveEffects = false;
+  error.executesRendererWork = false;
+  error.executesRendererRoots = false;
+  return error;
+}
+
+function createPublicReactActBlockedCurrentnessGateError(reason) {
+  const error = createUnimplementedError(
+    entrypoint,
+    `${privateActDispatcherGateExport}.consumePublicReactActBlockedCurrentnessReport`,
+    'rejected public React.act blocked currentness report',
+    'Only the current source-owned unsupported public React.act placeholder report can pass this package-private gate.'
+  );
+  error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  error.publicActWarningCompatibilityClaimed = false;
+  error.publicWarningCompatibilityClaimed = false;
+  error.publicRootSchedulerCompatibilityClaimed = false;
+  error.publicRendererCompatibilityClaimed = false;
+  error.drainsPublicSchedulerTaskQueue = false;
+  error.drainsPublicReactActQueue = false;
+  error.publicActPassiveDrain = false;
+  error.publicEffectExecution = false;
+  error.publicRootExecution = false;
+  error.invokesCallback = false;
+  error.returnsThenable = false;
+  error.executesQueuedWork = false;
+  error.executesEffects = false;
   error.executesRendererWork = false;
   error.executesRendererRoots = false;
   return error;
@@ -4756,6 +5457,12 @@ module.exports = Object.freeze({
   schedulerMockDelayedActRootWorkPreflightStatus,
   schedulerDrivenPassiveEffectDiagnosticsStatus,
   schedulerDrivenPassiveEffectConsumptionStatus,
+  publicReactActBlockedCurrentnessStatus,
+  publicReactActBlockedCurrentnessConsumptionStatus,
+  publicReactActBlockedCurrentnessKind,
+  publicReactActBlockedCurrentnessVersion,
+  publicReactActBlockedCurrentnessScenarios,
+  publicReactActBlockedCurrentnessBackgroundWorkerIds,
   schedulerDrivenPassiveLifecycleBoundaryStatus,
   schedulerDrivenPassiveLifecycleBoundaryKind:
     privateSchedulerDrivenPassiveLifecycleBoundaryKind,
@@ -4840,6 +5547,7 @@ module.exports = Object.freeze({
   executesRendererWork: false,
   executesRendererRoots: false,
   consumeRendererBackedActDrainDiagnostics,
+  consumePublicReactActBlockedCurrentnessReport,
   consumeSchedulerDrivenPassiveEffectDiagnostics,
   consumeSchedulerPrivateActContinuationDiagnostics,
   consumeSchedulerPostTaskYieldActRootHandoffDiagnostics,
@@ -4849,6 +5557,7 @@ module.exports = Object.freeze({
   createInternalActQueueTestCallback,
   createInternalActQueueTestQueue,
   createInternalActQueueTestTask,
+  createPublicReactActBlockedCurrentnessReport,
   createRendererBackedActDrainDiagnostics,
   createSchedulerDrivenPassiveEffectDiagnosticsForCanary,
   getPrivateActQueueMetadata,
@@ -4856,6 +5565,7 @@ module.exports = Object.freeze({
   isAcceptedInternalActQueueTestCallback,
   isAcceptedInternalActQueueTestQueue,
   isAcceptedInternalActQueueTestTask,
+  isAcceptedPublicReactActBlockedCurrentnessReport,
   isAcceptedRendererBackedActDrainDiagnostics,
   isAcceptedSchedulerDrivenPassiveEffectDiagnostics,
   isAcceptedSchedulerMockDelayedActRootWorkDiagnostics,
