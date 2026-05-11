@@ -114,6 +114,7 @@ const privateAdmission804Rows = freezeArray([
           "test_renderer_compatibility_claimed(self) -> bool",
           "broad_reconciliation_traversal_claimed(self) -> bool",
           "pub(crate) fn host_component_managed_child_complete_work_record_for_canary",
+          "if let Some(sibling) = child_node.sibling() {",
           "HostComponentManagedChildCompleteWorkErrorForCanary::UnexpectedParentFirstChild",
           "HostComponentManagedChildCompleteWorkErrorForCanary::UnexpectedChildSibling",
           "validate_managed_child_deletion_shape_for_canary",
@@ -122,6 +123,9 @@ const privateAdmission804Rows = freezeArray([
           "HostComponentManagedChildCompleteWorkErrorForCanary::DeletedChildStillInFinishedChildren"
         ],
         orderedTokens: [
+          "if child_node.return_fiber() != Some(parent_work_in_progress)",
+          "if let Some(sibling) = child_node.sibling() {",
+          "HostComponentManagedChildCompleteWorkErrorForCanary::UnexpectedChildSibling",
           "let deletion_list = match kind {",
           "HostComponentManagedChildMutationKindForCanary::Placement => {",
           "if parent_node.child() != Some(child)",
@@ -154,6 +158,7 @@ const privateAdmission804Rows = freezeArray([
           "blockers: [HostRootManagedChildCommitExecutionBlockerForCanary; 6]",
           "HostRootManagedChildCommitExecutionStatusForCanary",
           "ValidatedForTestHostMutation",
+          "HostRootManagedChildCommitExecutionBlockerForCanary::PublicRootRendering",
           "HostRootManagedChildCommitExecutionBlockerForCanary::PublicRendererHostMutation",
           "HostRootManagedChildCommitExecutionBlockerForCanary::ReactDomManagedChildCompatibilityClaim",
           "HostRootManagedChildCommitExecutionBlockerForCanary::ReactTestRendererCompatibilityClaim",
@@ -163,6 +168,7 @@ const privateAdmission804Rows = freezeArray([
           "MetadataChildPropsMismatch",
           "MetadataDeletionListMismatch",
           "PublicCompatibilityClaimed",
+          "public_root_rendering_blocked(&self) -> bool",
           "public_renderer_mutation_blocked(&self) -> bool",
           "hydration_events_refs_resources_forms_claimed(self) -> bool"
         ]
@@ -205,6 +211,7 @@ const privateAdmission804Rows = freezeArray([
           "#[derive(Debug, Clone, PartialEq, Eq)]\nenum TestHostRootManagedChildExecutionErrorForCanary",
         tokens: [
           "enum TestHostRootManagedChildExecutionBlockerForCanary",
+          "PublicRootRendering",
           "PublicRendererHostMutation",
           "ReactDomManagedChildCompatibility",
           "ReactTestRendererCompatibility",
@@ -221,6 +228,7 @@ const privateAdmission804Rows = freezeArray([
           "TestHostRootMutationHostCall::AppendChild",
           "TestHostRootMutationHostCall::RemoveChild",
           "TestHostRootDeletionCleanupAction::DetachDeletedInstance",
+          "public_root_rendering_blocked(&self) -> bool",
           "public_renderer_mutation_blocked(&self) -> bool",
           "react_dom_compatibility_claimed(&self) -> bool",
           "test_renderer_compatibility_claimed(&self) -> bool",
@@ -300,18 +308,22 @@ const privateAdmission804Rows = freezeArray([
           "const exactPrivatePublicFileGuards = {",
           "const nativeRuntimeKeys = [",
           "function assertNoPrivateDiagnosticRuntimeExports(",
-          "assert.deepEqual(Object.keys(nativeRuntime), nativeRuntimeKeys, 'native/index.cjs');"
+          "acceptedNativeDiagnosticRuntimeKeys",
+          "privateDiagnosticRuntimeExportPattern",
+          "assertNativePackageDiagnosticSurface(nativeRuntime)"
         ]
       }),
       evidenceData({
         role: "import-smoke-private-export-guard",
         path: importSmokePath,
         tokens: [
-          "const reactTestRendererPackageRoot = path.join(",
-          "const nativePackageRoot = path.join(repoRoot, 'bindings', 'node');",
+          "reactTestRendererPackageRoot",
+          "nativePackageRoot",
           "function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label)",
-          "assertNoPrivateDiagnosticRuntimeExports(renderer.toJSON, `${label}.toJSON`);",
-          "assertNoPrivateDiagnosticRuntimeExports(renderer.toTree, `${label}.toTree`);"
+          "reactTestRendererPrivateRuntimeFacadeSymbols.toJSON",
+          "reactTestRendererPrivateRuntimeFacadeSymbols.toTree",
+          "assertNoPrivateDiagnosticRuntimeExports(renderer.toJSON,",
+          "assertNoPrivateDiagnosticRuntimeExports(renderer.toTree,"
         ]
       })
     ])

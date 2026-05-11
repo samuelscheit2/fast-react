@@ -36,6 +36,62 @@ test("private admission 804 manifest pins Worker 785 managed child handoff", () 
     PRIVATE_ADMISSION_804_ROWS[0].evidence.map((row) => row.role),
     PRIVATE_ADMISSION_804_EVIDENCE_ROLES
   );
+
+  const evidenceByRole = Object.fromEntries(
+    PRIVATE_ADMISSION_804_ROWS[0].evidence.map((row) => [row.role, row])
+  );
+  const completeWorkEvidence =
+    evidenceByRole["complete-work-managed-child-metadata"];
+  assert.equal(
+    completeWorkEvidence.tokens.includes(
+      "if let Some(sibling) = child_node.sibling() {"
+    ),
+    true
+  );
+  assertOrderedBefore(
+    completeWorkEvidence.orderedTokens,
+    "if let Some(sibling) = child_node.sibling() {",
+    "let deletion_list = match kind {"
+  );
+  assertOrderedBefore(
+    completeWorkEvidence.orderedTokens,
+    "HostComponentManagedChildCompleteWorkErrorForCanary::UnexpectedChildSibling",
+    "HostComponentManagedChildMutationKindForCanary::Placement => {"
+  );
+
+  assert.equal(
+    evidenceByRole["root-commit-managed-child-request-record"].tokens.includes(
+      "HostRootManagedChildCommitExecutionBlockerForCanary::PublicRootRendering"
+    ),
+    true
+  );
+  assert.equal(
+    evidenceByRole["root-commit-managed-child-request-record"].tokens.includes(
+      "public_root_rendering_blocked(&self) -> bool"
+    ),
+    true
+  );
+  assert.equal(
+    evidenceByRole["host-work-managed-child-execution-diagnostic"].tokens.includes(
+      "PublicRootRendering"
+    ),
+    true
+  );
+  assert.equal(
+    evidenceByRole["host-work-managed-child-execution-diagnostic"].tokens.includes(
+      "public_root_rendering_blocked(&self) -> bool"
+    ),
+    true
+  );
+
+  const packageNativeGuardTokens = [
+    ...evidenceByRole["package-surface-private-export-guard"].tokens,
+    ...evidenceByRole["import-smoke-private-export-guard"].tokens
+  ];
+  for (const token of packageNativeGuardTokens) {
+    assert.equal(token.includes("${label}"), false, token);
+    assert.equal(token.includes("native/index"), false, token);
+  }
 });
 
 test("private admission 804 recognizes static managed child placement/delete evidence without public compatibility", () => {
@@ -258,6 +314,12 @@ function assertSubset(expectedSubset, actualSuperset) {
   for (const value of expectedSubset) {
     assert.equal(actualSuperset.includes(value), true, value);
   }
+}
+
+function assertOrderedBefore(tokens, earlier, later) {
+  assert.equal(tokens.includes(earlier), true, earlier);
+  assert.equal(tokens.includes(later), true, later);
+  assert.equal(tokens.indexOf(earlier) < tokens.indexOf(later), true);
 }
 
 function assertEvidenceRoleRecognized(gate, role, expectedRecognized) {

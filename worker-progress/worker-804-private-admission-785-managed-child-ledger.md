@@ -24,6 +24,10 @@ Complete.
 - The ledger only reads source text and manifests; it rejects any row claiming
   Rust execution, package code execution, native bridge execution, package
   surface changes, or public compatibility.
+- Audit follow-up tightened the ledger to pin the actual
+  `child_node.sibling()` sole-child guard, the `PublicRootRendering` blocker
+  and `public_root_rendering_blocked` accessors, and package/native guard
+  identifiers without assertion-label evidence tokens.
 
 ## Evidence Gathered
 
@@ -31,13 +35,18 @@ Complete.
   handoff scope in `complete_work.rs`, `root_commit.rs`, and `host_work.rs`.
 - `complete_work.rs` contains `HostComponentManagedChildCompleteWorkRecordForCanary`,
   placement/delete mutation kinds, deletion list metadata, public compatibility
-  false accessors, and sole finished-child rejection identifiers.
+  false accessors, and the real `child_node.sibling()` guard before placement
+  metadata.
 - `root_commit.rs` contains `HostRootManagedChildCommitExecutionRequestForCanary`,
-  blocker/status identifiers, metadata mismatch variants, and ordered validation
-  before `commit_finished_host_root_with_finished_work_handoff_for_canary`.
+  blocker/status identifiers including `PublicRootRendering`, metadata mismatch
+  variants, and ordered validation before
+  `commit_finished_host_root_with_finished_work_handoff_for_canary`.
 - `host_work.rs` contains the managed child diagnostic blockers, private
   `AppendChild`/`RemoveChild` status evidence, and `DetachDeletedInstance`
   cleanup evidence.
+- Package/native surface evidence now uses guard/export/function identifiers
+  such as `nativeRuntimeKeys`, `acceptedNativeDiagnosticRuntimeKeys`,
+  `assertNativePackageDiagnosticSurface`, and test-renderer facade symbol maps.
 
 ## Commands
 
