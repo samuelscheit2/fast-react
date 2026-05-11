@@ -531,6 +531,24 @@ test("private admission 754-766 gate rejects public compatibility promotion", ()
   );
 });
 
+test("private admission 754-766 gate rejects unknown false blocked admission claim keys", () => {
+  const gate = evaluatePrivateAdmission754766Gate({
+    rowOverrides: {
+      [worker766]: {
+        blockedAdmissionClaims: {
+          unknownBlockedAdmissionClaim: false
+        }
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_754_766_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.blockedAdmissionClaimsRecognized, false);
+  assert.deepEqual(gate.blockedAdmissionClaimViolationIds, []);
+  assertViolationIds(gate, ["blocked-admission-claim-mismatch"]);
+});
+
 test("private admission 754-766 gate rejects stale alias and clone guard removal", () => {
   const gate = evaluatePrivateAdmission754766Gate({
     rowOverrides: {

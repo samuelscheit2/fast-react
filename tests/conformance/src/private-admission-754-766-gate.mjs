@@ -1535,7 +1535,9 @@ export function evaluatePrivateAdmission754766Gate({
     ];
   });
   const blockedAdmissionClaimMismatches = evaluatedRows.flatMap((row) => {
-    const actualBlockedAdmissionClaims = row.blockedAdmissionClaimIds ?? [];
+    const actualBlockedAdmissionClaims = Object.keys(
+      row.blockedAdmissionClaims ?? {}
+    );
     if (
       sameStringSet(
         PRIVATE_ADMISSION_754_766_BLOCKED_ADMISSION_CLAIMS,

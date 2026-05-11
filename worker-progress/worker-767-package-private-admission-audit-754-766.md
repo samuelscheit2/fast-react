@@ -28,6 +28,10 @@
   profiling/test-utils/react-server public subpaths, native CJS and ESM export
   keys, and public manifest fields. The gate now also fails unknown private
   admission kinds instead of only computing `recognized`.
+- Re-audit fix: blocked admission key parity is now derived from
+  `Object.keys(blockedAdmissionClaims)`, so an extra false-valued blocked
+  admission claim cannot bypass the static gate through a stale
+  `blockedAdmissionClaimIds` list.
 
 ## Changed Files
 
@@ -77,15 +81,17 @@
   execution export.
 - Acceptance-audit regression tests now reject public subpath export drift,
   native ESM drift, public manifest drift, and unknown admission kinds.
+- Re-audit regression now rejects `{ unknownBlockedAdmissionClaim: false }`
+  with `blocked-admission-claim-mismatch` and no compatibility violation.
 
 ## Commands Run
 
 - `node --check tests/conformance/src/private-admission-754-766-gate.mjs`
 - `node --check tests/conformance/test/private-admission-754-766-gate.test.mjs`
 - `node --test tests/conformance/test/private-admission-754-766-gate.test.mjs`
-  - passed, 10 tests after the acceptance-audit fix.
+  - passed, 11 tests after the re-audit fix.
 - `node --test tests/conformance/test/private-admission-746-753-gate.test.mjs tests/conformance/test/private-admission-754-766-gate.test.mjs`
-  - passed, 18 tests after the acceptance-audit fix.
+  - passed, 19 tests after the re-audit fix.
 - `npm run check:package-surface`
   - passed; npm printed the existing `minimum-release-age` warning.
 - `node tests/smoke/import-entrypoints.mjs`
