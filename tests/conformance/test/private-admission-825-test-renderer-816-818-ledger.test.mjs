@@ -157,11 +157,22 @@ test("private admission 825 ledger recognizes source-owned evidence without publ
       assert.deepEqual(evidenceRow.missingTokens, []);
       assert.deepEqual(evidenceRow.forbiddenTokensPresent, []);
       for (const token of evidenceRow.tokens) {
-        assert.equal(/\s/.test(token), false, `${evidenceRow.evidenceId}:${token}`);
-        assert.equal(token.includes("panic!("), false, evidenceRow.evidenceId);
-        assert.equal(token.includes("reason:"), false, evidenceRow.evidenceId);
-        assert.equal(token.includes("assert_"), false, evidenceRow.evidenceId);
+        assertDurableEvidenceValue({
+          evidenceId: evidenceRow.evidenceId,
+          field: "tokens",
+          value: token
+        });
       }
+      assertDurableEvidenceValue({
+        evidenceId: evidenceRow.evidenceId,
+        field: "sliceStart",
+        value: evidenceRow.sliceStart
+      });
+      assertDurableEvidenceValue({
+        evidenceId: evidenceRow.evidenceId,
+        field: "sliceEnd",
+        value: evidenceRow.sliceEnd
+      });
     }
   }
 });
@@ -520,6 +531,26 @@ function assertEvidenceRecognized(ledger, workerId, evidenceId, expected) {
   );
   assert.notEqual(evidenceRow, undefined, evidenceId);
   assert.equal(evidenceRow.recognized, expected, evidenceId);
+}
+
+function assertDurableEvidenceValue({ evidenceId, field, value }) {
+  if (value === null) {
+    return;
+  }
+
+  const label = `${evidenceId}.${field}:${value}`;
+  assert.equal(/\s/.test(value), false, label);
+  assert.equal(
+    /^(fn|impl|pub|struct|enum|function)$/.test(value),
+    false,
+    label
+  );
+  for (const syntaxToken of ["panic!(", "reason:", "assert_", "=>"]) {
+    assert.equal(value.includes(syntaxToken), false, label);
+  }
+  for (const syntaxCharacter of ["{", "}", "(", ")", ";", ","]) {
+    assert.equal(value.includes(syntaxCharacter), false, label);
+  }
 }
 
 function rowContract(row) {

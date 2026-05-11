@@ -174,7 +174,7 @@ const privateAdmission825Rows = freezeArray([
         evidenceId: "worker-816-unmount-nested-gate-record-fields",
         path: testRendererRustSource,
         sliceStart: "TestRendererPrivateUnmountNestedSourceReportAdmissionGate",
-        sliceEnd: "impl TestRendererPrivateUnmountNestedSourceReportAdmissionGate",
+        sliceEnd: "public_native_package_js_surfaces_blocked",
         tokens: [
           "TestRendererPrivateUnmountNestedSourceReportAdmissionGate",
           "diagnostic_name",
@@ -221,7 +221,7 @@ const privateAdmission825Rows = freezeArray([
       evidenceData({
         evidenceId: "worker-816-unmount-nested-gate-methods",
         path: testRendererRustSource,
-        sliceStart: "impl TestRendererPrivateUnmountNestedSourceReportAdmissionGate",
+        sliceStart: "public_native_package_js_surfaces_blocked",
         sliceEnd: "TestRendererPrivateToJsonSiblingSnapshotFinishedWorkIdentityBlocker",
         tokens: [
           "public_native_package_js_surfaces_blocked",
@@ -283,10 +283,6 @@ const privateAdmission825Rows = freezeArray([
       evidenceData({
         evidenceId: "worker-816-route-admission-validators",
         path: testRendererRustSource,
-        sliceStart:
-          "fn validate_private_unmount_nested_source_report_nested_route_for_canary",
-        sliceEnd:
-          "fn validate_private_unmount_nested_source_report_ownership_for_canary",
         tokens: [
           "validate_private_unmount_nested_source_report_nested_route_for_canary",
           "validate_private_unmount_nested_source_report_unmount_admission_for_canary",
@@ -322,10 +318,6 @@ const privateAdmission825Rows = freezeArray([
       evidenceData({
         evidenceId: "worker-816-nested-source-report-ownership-validator",
         path: testRendererRustSource,
-        sliceStart:
-          "fn validate_private_unmount_nested_source_report_ownership_for_canary",
-        sliceEnd:
-          "fn validate_private_unmount_nested_source_report_admission_gate_for_canary",
         tokens: [
           "validate_private_unmount_nested_source_report_ownership_for_canary",
           "TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME",

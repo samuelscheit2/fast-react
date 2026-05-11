@@ -16,6 +16,10 @@
   compatibility claims.
 - No production Rust, package, native bridge, or renderer runtime code was
   changed.
+- Audit follow-up: replaced Rust syntax-bearing `sliceStart`/`sliceEnd` anchors
+  with durable source-owned names or unsliced source-token checks, and extended
+  the evidence durability guard to cover `sliceStart` and `sliceEnd` as well as
+  evidence tokens.
 
 ## Changed Files
 
@@ -36,6 +40,16 @@
 - `cargo test -p fast-react-test-renderer private_unmount_nested_source_report --all-targets --all-features`
 - `git diff --check`
 
+Audit follow-up:
+
+- `node --check tests/conformance/src/private-admission-825-test-renderer-816-818-ledger.mjs`
+- `node --check tests/conformance/test/private-admission-825-test-renderer-816-818-ledger.test.mjs`
+- `node --test tests/conformance/test/private-admission-825-test-renderer-816-818-ledger.test.mjs`
+- `node --test tests/conformance/test/private-admission-733-736-bridge-ledger.test.mjs`
+- `node --input-type=module - <<'EOF' ... anchor durability smoke ... EOF`
+- `cargo test -p fast-react-test-renderer private_unmount_nested_source_report --all-targets --all-features`
+- `git diff --check`
+
 ## Evidence Gathered
 
 - The new ledger recognizes exactly Worker 816 and Worker 818 rows and rejects
@@ -52,6 +66,9 @@
   evidence fails closed without consuming progress reports or test-title text.
 - The new test passes bridge row overrides to prove Worker 818 bridge-ledger
   regressions fail closed.
+- The audit follow-up test guard now rejects source syntax in `tokens`,
+  `sliceStart`, and `sliceEnd`, including whitespace-bearing declaration
+  anchors and punctuation-bearing snippets.
 - Focused Rust tests for Worker 816's private gate passed: 3 tests, all ok.
 
 ## Risks Or Blockers
