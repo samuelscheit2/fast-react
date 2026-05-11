@@ -15208,16 +15208,30 @@ function createPrivateToTreeHostOutputMetadata(rootRequest) {
     nativeBridgeAvailable: false,
     nativeExecution: false,
     compatibilityClaimed: false,
-    canDescribeAcceptedHostOutputDiagnostic(report) {
+    canDescribeAcceptedHostOutputDiagnostic(
+      report,
+      rootLifecycleExecutionEvidence = undefined
+    ) {
       try {
-        validatePrivateToTreeHostOutputDiagnostic(report);
+        describePrivateToTreeHostOutputDiagnostic(
+          report,
+          rootRequest,
+          rootLifecycleExecutionEvidence
+        );
         return true;
       } catch (_error) {
         return false;
       }
     },
-    describeAcceptedHostOutputDiagnostic(report) {
-      return describePrivateToTreeHostOutputDiagnostic(report);
+    describeAcceptedHostOutputDiagnostic(
+      report,
+      rootLifecycleExecutionEvidence = undefined
+    ) {
+      return describePrivateToTreeHostOutputDiagnostic(
+        report,
+        rootRequest,
+        rootLifecycleExecutionEvidence
+      );
     }
   });
 }
@@ -15455,8 +15469,20 @@ function createPrivateGetInstanceClassRootDiagnostics(rootRequest) {
   });
 }
 
-function describePrivateToTreeHostOutputDiagnostic(report) {
+function describePrivateToTreeHostOutputDiagnostic(
+  report,
+  rootRequest = undefined,
+  rootLifecycleExecutionEvidence = undefined
+) {
   const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+  if (rootRequest !== undefined) {
+    validatePrivateSerializationHostOutputLifecycleExecutionEvidence(
+      'create().toTree',
+      rootRequest,
+      diagnostic.hostOutputUpdateKind,
+      rootLifecycleExecutionEvidence
+    );
+  }
 
   if (diagnostic.kind === 'multi-child') {
     return describePrivateToTreeMultiChildHostOutputDiagnostic(diagnostic);

@@ -5097,6 +5097,8 @@ test("react-test-renderer private serialization currentness requires source-owne
       lifecycleEvidence,
       renderer,
       treeFacade: renderer.toTree[privateToTreeFacadeSymbol],
+      treeMetadata:
+        renderer.toTree[privateToTreeHostOutputMetadataSymbol],
       treeIdentity,
       treeReport,
       unmountRequest
@@ -5231,6 +5233,40 @@ test("react-test-renderer private serialization currentness requires source-owne
       ),
       null
     );
+    assert.equal(
+      context.treeMetadata.canDescribeAcceptedHostOutputDiagnostic(
+        context.treeReport
+      ),
+      false,
+      context.entry.entrypoint
+    );
+    const missingHostOutputMetadataLifecycleError = captureThrown(() =>
+      context.treeMetadata.describeAcceptedHostOutputDiagnostic(
+        context.treeReport
+      )
+    );
+    assert.match(
+      missingHostOutputMetadataLifecycleError.message,
+      /lifecycle execution evidence/u
+    );
+    assert.equal(
+      context.treeMetadata.canDescribeAcceptedHostOutputDiagnostic(
+        context.treeReport,
+        context.lifecycleEvidence
+      ),
+      true,
+      context.entry.entrypoint
+    );
+    const hostOutputMetadata =
+      context.treeMetadata.describeAcceptedHostOutputDiagnostic(
+        context.treeReport,
+        context.lifecycleEvidence
+      );
+    assert.equal(
+      hostOutputMetadata.id,
+      "react-test-renderer-private-totree-minimal-host-output-metadata"
+    );
+    assert.equal(hostOutputMetadata.publicTreeObjectAvailable, false);
 
     const clonedLifecycleError = captureThrown(() =>
       context.jsonFacade.validateAcceptedFinishedWorkIdentity(

@@ -35,22 +35,20 @@ Audit follow-up:
 - Strengthened `toTree` negative coverage for cloned lifecycle evidence and raw
   unmount serialization without lifecycle evidence.
 
+Second audit follow-up:
+
+- Closed the `privateToTreeHostOutputMetadataSymbol` bypass by threading the
+  same lifecycle evidence/currentness check through
+  `canDescribeAcceptedHostOutputDiagnostic` and
+  `describeAcceptedHostOutputDiagnostic` in package root, CJS development, and
+  CJS production.
+- Added focused negative coverage for that metadata object so an unmount
+  `toTree` report cannot return accepted metadata without source-owned
+  create/latest-update/unmount lifecycle evidence.
+
 ## Verification
 
-- `node --check packages/react-test-renderer/index.js`
-- `node --check packages/react-test-renderer/cjs/react-test-renderer.development.js`
-- `node --check packages/react-test-renderer/cjs/react-test-renderer.production.js`
-- `node --check tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`
-- `node --test tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`
-  - 37 tests passed.
-- `npm run check:package-surface`
-  - Passed. npm printed the existing `minimum-release-age` config warning.
-- `node tests/smoke/import-entrypoints.mjs`
-  - Passed.
-- `git diff --check`
-  - Passed.
-
-Audit follow-up re-run:
+Final audit follow-up re-run:
 
 - `node --check packages/react-test-renderer/index.js`
 - `node --check packages/react-test-renderer/cjs/react-test-renderer.development.js`
@@ -81,6 +79,8 @@ Audit follow-up re-run:
 - Raw `toJSON`/`toTree` unmount serialization uses the renderer create request
   to validate the same source-owned create/latest-update/unmount lifecycle
   evidence before returning `null` or a raw diagnostic result.
+- The separate `toTree` host-output metadata object now uses the same unmount
+  lifecycle evidence gate before reporting accepted metadata.
 
 ## Risks
 
