@@ -89,6 +89,20 @@ pub(crate) enum HostWorkError {
         fiber: FiberId,
         tag: FiberTag,
     },
+    MissingCurrentRootChild {
+        root: FiberRootId,
+        current: FiberId,
+    },
+    UnexpectedCurrentRootChildSibling {
+        root: FiberRootId,
+        current: FiberId,
+        child: FiberId,
+        sibling: FiberId,
+    },
+    MissingHostComponentTextChild {
+        root: FiberRootId,
+        component: FiberId,
+    },
     MissingHostWorkRootChild {
         root: FiberRootId,
         work_in_progress: FiberId,
@@ -116,6 +130,17 @@ pub(crate) enum HostWorkError {
         root: FiberRootId,
         fiber: FiberId,
         state_node: StateNodeHandle,
+    },
+    MissingHostComponentUpdatePayload {
+        root: FiberRootId,
+        fiber: FiberId,
+        state_node: StateNodeHandle,
+    },
+    ConsumedHostUpdatePayload {
+        root: FiberRootId,
+        fiber: FiberId,
+        state_node: StateNodeHandle,
+        kind: HostRootMutationApplyRecordKind,
     },
     UnchangedHostTextUpdatePayload {
         root: FiberRootId,
@@ -178,6 +203,31 @@ impl Display for HostWorkError {
                 tag,
                 fiber.slot().get()
             ),
+            Self::MissingCurrentRootChild { root, current } => write!(
+                formatter,
+                "root {} current HostRoot fiber {} has no child for private root host update",
+                root.raw(),
+                current.slot().get()
+            ),
+            Self::UnexpectedCurrentRootChildSibling {
+                root,
+                current,
+                child,
+                sibling,
+            } => write!(
+                formatter,
+                "root {} current HostRoot fiber {} child {} has sibling {}; private root host update admits exactly one current host child",
+                root.raw(),
+                current.slot().get(),
+                child.slot().get(),
+                sibling.slot().get()
+            ),
+            Self::MissingHostComponentTextChild { root, component } => write!(
+                formatter,
+                "root {} HostComponent fiber {} has no HostText child for private root component/text update",
+                root.raw(),
+                component.slot().get()
+            ),
             Self::MissingHostWorkRootChild {
                 root,
                 work_in_progress,
@@ -239,6 +289,30 @@ impl Display for HostWorkError {
                 fiber.slot().get(),
                 state_node.raw()
             ),
+            Self::MissingHostComponentUpdatePayload {
+                root,
+                fiber,
+                state_node,
+            } => write!(
+                formatter,
+                "root {} HostComponent update execution for fiber slot {} state node {} has no accepted component update payload",
+                root.raw(),
+                fiber.slot().get(),
+                state_node.raw()
+            ),
+            Self::ConsumedHostUpdatePayload {
+                root,
+                fiber,
+                state_node,
+                kind,
+            } => write!(
+                formatter,
+                "root {} host update execution for fiber slot {} state node {} has already consumed private {:?} payload evidence",
+                root.raw(),
+                fiber.slot().get(),
+                state_node.raw(),
+                kind
+            ),
             Self::UnchangedHostTextUpdatePayload {
                 root,
                 current,
@@ -299,7 +373,12 @@ impl Error for HostWorkError {
             | Self::InvalidDetachedInstance { .. }
             | Self::InvalidDetachedText { .. }
             | Self::CommitCurrentMismatch { .. }
+            | Self::MissingCurrentRootChild { .. }
+            | Self::UnexpectedCurrentRootChildSibling { .. }
+            | Self::MissingHostComponentTextChild { .. }
             | Self::MissingHostTextUpdatePayload { .. }
+            | Self::MissingHostComponentUpdatePayload { .. }
+            | Self::ConsumedHostUpdatePayload { .. }
             | Self::UnchangedHostTextUpdatePayload { .. }
             | Self::HostTextCommitRecordMismatch { .. }
             | Self::InvalidHostComponentPropertyUpdatePayload { .. } => None,
@@ -349,6 +428,7 @@ pub(crate) struct DetachedHostRecords {
     scopes: Vec<Option<HostNodeScope>>,
     component_updates: Vec<HostComponentUpdatePayload>,
     text_updates: Vec<HostTextUpdatePayload>,
+    consumed_host_updates: Vec<HostRootMutationApplyRecord>,
     test_host_text_records: Vec<Option<TestHostTextRecord>>,
 }
 
@@ -472,6 +552,35 @@ impl DetachedHostRecords {
 
     fn record_text_update(&mut self, payload: HostTextUpdatePayload) {
         self.text_updates.push(payload);
+    }
+
+    fn ensure_host_update_not_consumed(
+        &self,
+        mutation: HostRootMutationApplyRecord,
+    ) -> Result<(), HostWorkError> {
+        if self
+            .consumed_host_updates
+            .iter()
+            .any(|consumed| *consumed == mutation)
+        {
+            return Err(HostWorkError::ConsumedHostUpdatePayload {
+                root: mutation.root(),
+                fiber: mutation.fiber(),
+                state_node: mutation.state_node(),
+                kind: mutation.kind(),
+            });
+        }
+        Ok(())
+    }
+
+    fn mark_host_update_consumed(&mut self, mutation: HostRootMutationApplyRecord) {
+        debug_assert!(
+            !self
+                .consumed_host_updates
+                .iter()
+                .any(|consumed| *consumed == mutation)
+        );
+        self.consumed_host_updates.push(mutation);
     }
 
     fn component_update_payload(
@@ -988,6 +1097,85 @@ impl HostWorkResult {
         self.detached_hosts.text_count()
     }
 
+    pub(crate) fn test_host_text_record_text_for_canary(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<&str, HostWorkError> {
+        self.detached_hosts.test_host_text_record_text(handle)
+    }
+
+    pub(crate) fn test_host_text_record_update_count_for_canary(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<usize, HostWorkError> {
+        self.detached_hosts
+            .test_host_text_record_update_count(handle)
+    }
+
+    pub(crate) fn instance_property_update_count_for_canary(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<usize, HostWorkError> {
+        Ok(self.detached_hosts.instance_property_updates(handle)?.len())
+    }
+
+    pub(crate) fn instance_latest_props_for_canary(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<Option<PropsHandle>, HostWorkError> {
+        self.detached_hosts.instance_latest_props(handle)
+    }
+
+    pub(crate) fn instance_latest_props_update_count_for_canary(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<usize, HostWorkError> {
+        Ok(self
+            .detached_hosts
+            .instance_latest_props_updates(handle)?
+            .len())
+    }
+
+    pub(crate) fn mark_completed_host_component_update_payload_as_style_for_canary(
+        &mut self,
+    ) -> Result<(), HostWorkError> {
+        self.mark_completed_host_component_update_payload_for_canary(
+            TestHostComponentPropertyPayloadRow::style,
+        )
+    }
+
+    pub(crate) fn mark_completed_host_component_update_payload_as_text_content_reset_for_canary(
+        &mut self,
+    ) -> Result<(), HostWorkError> {
+        self.mark_completed_host_component_update_payload_for_canary(
+            TestHostComponentPropertyPayloadRow::text_content_reset,
+        )
+    }
+
+    fn mark_completed_host_component_update_payload_for_canary(
+        &mut self,
+        row: impl FnOnce(PropsHandle, PropsHandle) -> TestHostComponentPropertyPayloadRow,
+    ) -> Result<(), HostWorkError> {
+        let fiber = self
+            .completed_child
+            .ok_or(HostWorkError::MissingCurrentRootChild {
+                root: self.root,
+                current: self.work_in_progress,
+            })?;
+        let payload = self
+            .detached_hosts
+            .component_updates
+            .iter_mut()
+            .find(|payload| payload.work_in_progress() == fiber)
+            .ok_or(HostWorkError::MissingHostComponentUpdatePayload {
+                root: self.root,
+                fiber,
+                state_node: StateNodeHandle::NONE,
+            })?;
+        payload.property_row = row(payload.old_props(), payload.new_props());
+        Ok(())
+    }
+
     fn detached_hosts(&self) -> &DetachedHostRecords {
         &self.detached_hosts
     }
@@ -1086,7 +1274,7 @@ pub(crate) enum TestHostComponentPropertyPayloadKind {
 
 impl TestHostComponentPropertyPayloadKind {
     #[must_use]
-    const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::SafeTestProperty => "safe-test-property",
             Self::Style => "style",
@@ -1950,7 +2138,7 @@ impl TestHostRootHostUpdatePayloadForCanary {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TestHostRootHostUpdateExecutionBlockerForCanary {
+pub(crate) enum TestHostRootHostUpdateExecutionBlockerForCanary {
     PublicRootRendering,
     ReactDomCompatibility,
     TestRendererCompatibility,
@@ -2048,7 +2236,7 @@ impl TestHostRootHostUpdateExecutionDiagnosticForCanary {
     }
 
     #[must_use]
-    const fn blockers(&self) -> &[TestHostRootHostUpdateExecutionBlockerForCanary; 4] {
+    pub(crate) const fn blockers(&self) -> &[TestHostRootHostUpdateExecutionBlockerForCanary; 4] {
         &self.blockers
     }
 
@@ -2069,6 +2257,11 @@ impl TestHostRootHostUpdateExecutionDiagnosticForCanary {
 
     #[must_use]
     pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_dom_property_compatibility_claimed(&self) -> bool {
         false
     }
 }
@@ -3196,6 +3389,7 @@ fn apply_test_host_root_commit_mutations(
     let mut container = *root.container_info();
     let mut records = Vec::new();
 
+    preflight_test_host_root_update_consumption(commit, detached_hosts)?;
     preflight_test_host_root_component_property_updates(store, commit, detached_hosts)?;
 
     for &mutation in commit.mutation_apply_log().records() {
@@ -3671,7 +3865,7 @@ fn validate_sync_flush_host_mutation_request_matches_record(
     Ok(())
 }
 
-fn apply_one_test_host_update_with_finished_work_handoff_for_canary(
+pub(crate) fn apply_one_test_host_update_with_finished_work_handoff_for_canary(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
     render: HostRootRenderPhaseRecord,
@@ -4219,6 +4413,22 @@ fn preflight_test_host_root_component_property_updates(
                 &payload,
                 detached_hosts,
             )?;
+        }
+    }
+    Ok(())
+}
+
+fn preflight_test_host_root_update_consumption(
+    commit: &HostRootCommitRecord,
+    detached_hosts: &DetachedHostRecords,
+) -> Result<(), HostWorkError> {
+    for &mutation in commit.mutation_apply_log().records() {
+        if matches!(
+            mutation.kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+                | HostRootMutationApplyRecordKind::CommitHostTextUpdate
+        ) {
+            detached_hosts.ensure_host_update_not_consumed(mutation)?;
         }
     }
     Ok(())
@@ -5076,6 +5286,7 @@ fn apply_test_host_component_update_record(
     mutation: HostRootMutationApplyRecord,
     detached_hosts: &mut DetachedHostRecords,
 ) -> Result<TestHostRootMutationApplyStatus, HostWorkError> {
+    detached_hosts.ensure_host_update_not_consumed(mutation)?;
     let Some(payload) = detached_hosts.component_update_payload(mutation) else {
         return Ok(TestHostRootMutationApplyStatus::RecordedOnly);
     };
@@ -5100,6 +5311,7 @@ fn apply_test_host_component_update_record(
             )?;
         debug_assert!(commit.private_host_store_only());
         debug_assert!(!commit.public_dom_compatibility_claimed());
+        detached_hosts.mark_host_update_consumed(mutation);
         return Ok(TestHostRootMutationApplyStatus::PrivateHostStoreOnly(
             TestHostRootPrivateStoreMutation::HostComponentPropertyAndLatestProps,
         ));
@@ -5120,6 +5332,7 @@ fn apply_test_host_component_update_record(
             host_node_property_update_execution_for_host_call(host_call),
         ),
     )?;
+    detached_hosts.mark_host_update_consumed(mutation);
     Ok(TestHostRootMutationApplyStatus::Applied(host_call))
 }
 
@@ -5217,6 +5430,7 @@ fn apply_test_host_text_update_record(
     mutation: HostRootMutationApplyRecord,
     detached_hosts: &mut DetachedHostRecords,
 ) -> Result<TestHostRootMutationApplyStatus, HostWorkError> {
+    detached_hosts.ensure_host_update_not_consumed(mutation)?;
     let Some(payload) = detached_hosts.text_update_payload(mutation) else {
         return Ok(TestHostRootMutationApplyStatus::RecordedOnly);
     };
@@ -5249,6 +5463,7 @@ fn apply_test_host_text_update_record(
         &old_text,
         &new_text,
     )?;
+    detached_hosts.mark_host_update_consumed(mutation);
     Ok(TestHostRootMutationApplyStatus::Applied(
         TestHostRootMutationHostCall::CommitTextUpdate,
     ))
@@ -5912,6 +6127,216 @@ pub(crate) fn mount_test_function_component_single_host_child_work(
         sync_flush_host_work_epoch: 0,
         consumed_sync_flush_host_mutations: Vec::new(),
     })
+}
+
+pub(crate) fn update_test_host_root_work_with_detached_hosts_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    render: HostRootRenderPhaseRecord,
+    source: &TestHostTree,
+    mut detached_hosts: DetachedHostRecords,
+) -> Result<HostWorkResult, HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    if let Some(child) = store.fiber_arena().get(render.work_in_progress())?.child() {
+        return Err(HostWorkError::UnexpectedExistingChild {
+            parent: render.work_in_progress(),
+            child,
+        });
+    }
+
+    let current_child =
+        single_current_root_child_for_update(store, render.root(), render.current())?;
+    let source_node =
+        source
+            .root(render.resulting_element())
+            .ok_or(HostWorkError::MissingTestRootElement {
+                handle: render.resulting_element(),
+            })?;
+    let current_tag = store.fiber_arena().get(current_child)?.tag();
+
+    let completed_child = match (current_tag, source_node) {
+        (FiberTag::HostText, TestHostNode::Text(text)) => update_test_host_text_work(
+            store,
+            render.root(),
+            current_child,
+            text,
+            render.render_lanes(),
+            &mut detached_hosts,
+        )?
+        .work_in_progress(),
+        (FiberTag::HostComponent, TestHostNode::Element(element)) => {
+            update_test_host_component_work(
+                store,
+                render.root(),
+                current_child,
+                element,
+                render.render_lanes(),
+                &mut detached_hosts,
+            )?
+            .work_in_progress()
+        }
+        (actual, TestHostNode::Text(_)) => {
+            return Err(HostWorkError::ExpectedFiberTag {
+                fiber: current_child,
+                expected: FiberTag::HostText,
+                actual,
+            });
+        }
+        (actual, TestHostNode::Element(_)) => {
+            return Err(HostWorkError::ExpectedFiberTag {
+                fiber: current_child,
+                expected: FiberTag::HostComponent,
+                actual,
+            });
+        }
+    };
+
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[completed_child])?;
+    complete_host_root(store, render.work_in_progress())?;
+
+    Ok(HostWorkResult {
+        root: render.root(),
+        work_in_progress: render.work_in_progress(),
+        root_child: Some(completed_child),
+        root_children: vec![completed_child],
+        completed_child: Some(completed_child),
+        completed_children: vec![completed_child],
+        detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
+    })
+}
+
+pub(crate) fn update_test_host_root_component_with_text_child_work_with_detached_hosts_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    render: HostRootRenderPhaseRecord,
+    source: &TestHostTree,
+    mut detached_hosts: DetachedHostRecords,
+) -> Result<HostWorkResult, HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    if let Some(child) = store.fiber_arena().get(render.work_in_progress())?.child() {
+        return Err(HostWorkError::UnexpectedExistingChild {
+            parent: render.work_in_progress(),
+            child,
+        });
+    }
+
+    let current_component =
+        single_current_root_child_for_update(store, render.root(), render.current())?;
+    expect_tag(store, current_component, FiberTag::HostComponent)?;
+    let current_text =
+        single_host_text_child_for_root_component_update(store, render.root(), current_component)?;
+    let source_node =
+        source
+            .root(render.resulting_element())
+            .ok_or(HostWorkError::MissingTestRootElement {
+                handle: render.resulting_element(),
+            })?;
+    let TestHostNode::Element(element) = source_node else {
+        return Err(HostWorkError::ExpectedFiberTag {
+            fiber: current_component,
+            expected: FiberTag::HostComponent,
+            actual: FiberTag::HostText,
+        });
+    };
+    let next_text = element
+        .children()
+        .iter()
+        .find_map(|child| match child {
+            TestHostNode::Text(text) => Some(text),
+            TestHostNode::Element(_) => None,
+        })
+        .ok_or(HostWorkError::MissingHostComponentTextChild {
+            root: render.root(),
+            component: current_component,
+        })?;
+
+    let payload = update_test_host_component_work(
+        store,
+        render.root(),
+        current_component,
+        element,
+        render.render_lanes(),
+        &mut detached_hosts,
+    )?;
+    let diff = update_test_host_text_work(
+        store,
+        render.root(),
+        current_text,
+        next_text,
+        render.render_lanes(),
+        &mut detached_hosts,
+    )?;
+    store
+        .fiber_arena_mut()
+        .set_children(payload.work_in_progress(), &[diff.work_in_progress()])?;
+    complete_fiber_common(
+        store,
+        payload.work_in_progress(),
+        element.props(),
+        payload.state_node(),
+        InitialChildrenFinalization::NoCommitMount,
+    )?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[payload.work_in_progress()])?;
+    complete_host_root(store, render.work_in_progress())?;
+
+    Ok(HostWorkResult {
+        root: render.root(),
+        work_in_progress: render.work_in_progress(),
+        root_child: Some(payload.work_in_progress()),
+        root_children: vec![payload.work_in_progress()],
+        completed_child: Some(payload.work_in_progress()),
+        completed_children: vec![payload.work_in_progress(), diff.work_in_progress()],
+        detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
+    })
+}
+
+fn single_current_root_child_for_update(
+    store: &FiberRootStore<RecordingHost>,
+    root: FiberRootId,
+    current: FiberId,
+) -> Result<FiberId, HostWorkError> {
+    expect_tag(store, current, FiberTag::HostRoot)?;
+    let child = store
+        .fiber_arena()
+        .get(current)?
+        .child()
+        .ok_or(HostWorkError::MissingCurrentRootChild { root, current })?;
+    if let Some(sibling) = store.fiber_arena().get(child)?.sibling() {
+        return Err(HostWorkError::UnexpectedCurrentRootChildSibling {
+            root,
+            current,
+            child,
+            sibling,
+        });
+    }
+    Ok(child)
+}
+
+fn single_host_text_child_for_root_component_update(
+    store: &FiberRootStore<RecordingHost>,
+    root: FiberRootId,
+    component: FiberId,
+) -> Result<FiberId, HostWorkError> {
+    expect_tag(store, component, FiberTag::HostComponent)?;
+    let text = store
+        .fiber_arena()
+        .get(component)?
+        .child()
+        .ok_or(HostWorkError::MissingHostComponentTextChild { root, component })?;
+    expect_tag(store, text, FiberTag::HostText)?;
+    if let Some(sibling) = store.fiber_arena().get(text)?.sibling() {
+        return Err(HostWorkError::UnexpectedExistingChild {
+            parent: component,
+            child: sibling,
+        });
+    }
+    Ok(text)
 }
 
 fn validate_function_component_parent_topology(
@@ -10633,6 +11058,89 @@ mod tests {
     }
 
     #[test]
+    fn host_work_host_component_update_rejects_replayed_commit_record_before_second_host_call() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let initial_element = source.insert_host_element_with_text("section", "ignored");
+        let initial = element_from_root(&source, initial_element);
+        let create_render = render_test_root(&mut store, root_id, initial_element);
+        let current_component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            initial,
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store
+            .fiber_arena()
+            .get(current_component)
+            .unwrap()
+            .state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let next_element = source.insert_host_element_with_text("section", "updated");
+        let next = element_from_root(&source, next_element);
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        let payload = update_root_component_for_commit(
+            &mut store,
+            root_id,
+            update_render.finished_work(),
+            current_component,
+            next,
+            &mut detached_hosts,
+        );
+        let update_commit = commit_finished_host_root(&mut store, update_render).unwrap();
+        let first_apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &update_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+        assert_eq!(first_apply.applied_host_call_count(), 1);
+        assert_eq!(
+            first_apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::CommitUpdate)
+        );
+        let operations_after_first_apply = host.operations();
+        let token_count_after_first_apply = store.host_tokens().len();
+
+        let error = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &update_commit,
+            &mut detached_hosts,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostWorkError::ConsumedHostUpdatePayload {
+                root,
+                fiber,
+                state_node: consumed_state_node,
+                kind,
+            } if root == root_id
+                && fiber == payload.work_in_progress()
+                && consumed_state_node == state_node
+                && kind == HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        ));
+        assert_eq!(host.operations(), operations_after_first_apply);
+        assert_eq!(store.host_tokens().len(), token_count_after_first_apply);
+    }
+
+    #[test]
     fn host_work_finished_work_handoff_applies_one_host_component_update_to_test_host_commit_path()
     {
         let (mut store, root_id) = root_store();
@@ -12385,6 +12893,96 @@ mod tests {
         let mut expected_operations = operations_before_apply;
         expected_operations.push("commit_text_update");
         assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_host_text_update_rejects_replayed_commit_record_before_second_host_call() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(75_100));
+        let current_text = attach_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "before",
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let mut source = TestHostTree::new();
+        let next_element = source.insert_text("after");
+        let next_text = text_from_root(&source, next_element);
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        let diff = update_root_text_for_commit_with_payload(
+            &mut store,
+            root_id,
+            update_render.finished_work(),
+            current_text,
+            next_text,
+            &mut detached_hosts,
+        );
+        let update_commit = commit_finished_host_root(&mut store, update_render).unwrap();
+        let first_apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &update_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+        assert_eq!(first_apply.applied_host_call_count(), 1);
+        assert_eq!(
+            first_apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::CommitTextUpdate
+            )
+        );
+        assert_eq!(
+            detached_hosts
+                .test_host_text_record_update_count(state_node)
+                .unwrap(),
+            1
+        );
+        let operations_after_first_apply = host.operations();
+
+        let error = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &update_commit,
+            &mut detached_hosts,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostWorkError::ConsumedHostUpdatePayload {
+                root,
+                fiber,
+                state_node: consumed_state_node,
+                kind,
+            } if root == root_id
+                && fiber == diff.work_in_progress()
+                && consumed_state_node == state_node
+                && kind == HostRootMutationApplyRecordKind::CommitHostTextUpdate
+        ));
+        assert_eq!(host.operations(), operations_after_first_apply);
+        assert_eq!(
+            detached_hosts
+                .test_host_text_record_update_count(state_node)
+                .unwrap(),
+            1
+        );
     }
 
     #[test]
