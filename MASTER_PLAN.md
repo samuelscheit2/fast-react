@@ -46,19 +46,13 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Accepted/merged baseline includes Workers 803-837,
-842-846, 848-852, 855-860, 864, and 870. Worker 853's competing test-renderer
-branch was rejected as redundant after Worker 844 was accepted; do not use it
-as accepted input.
+842-846, 848-852, 855-860, 862, and 864-870. Worker 853's competing
+test-renderer branch was rejected as redundant after Worker 844 was accepted;
+do not use it as accepted input.
 
 Current active queue:
 
-- Worker 862: root unmount container execution.
 - Worker 863: root host update mutation execution.
-- Worker 865: function component mount host execution.
-- Worker 866: function component update host execution.
-- Worker 867: deleted subtree teardown execution.
-- Worker 868: Rust test-renderer root lifecycle execution consumer.
-- Worker 869: React DOM private facade fake-DOM lifecycle consumer.
 
 Accepted private evidence still keeps public root/render, `act`, `flushSync`,
 Scheduler timing, hydration, resources/forms, serialization, native execution,
@@ -70,12 +64,13 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Let Workers 862-863 and 865-869 run as the current active queue; do not
-   treat their outputs as accepted inputs until reviewed and merged.
-2. Use accepted Workers 855, 860, and 864 as private Rust execution inputs for
-   narrow root/sync-flush host mutation follow-ups only when source-owned
-   finished work, detached-host, lane/root, and sibling evidence is preserved.
-3. Consume accepted Workers 844, 848, 856, 857, 858, and 859 only through
+1. Keep Worker 863 in the active queue until reviewed and merged; do not treat
+   its output as accepted input yet.
+2. Use accepted Workers 855, 860, 862, and 864-867 as private Rust execution
+   inputs for narrow root/sync-flush/function/deletion host mutation follow-ups
+   only when source-owned finished work, detached-host, lane/root, topology, and
+   cleanup evidence is preserved.
+3. Consume accepted Workers 844, 848, 856-859, 868, 869, and 870 only through
    fail-closed package/private gates. Public compatibility still needs dual-run
    oracle evidence and broad package validation.
 4. Prefer parallelizable independent proofs even when they may conflict in test
@@ -86,22 +81,22 @@ canonical evidence requirements.
 
 ## Next Queue Candidates
 
-- Rust root/sync-flush execution can extend accepted Workers 855, 860, and 864
-  toward managed-child, HostText, update, and deletion shapes only as private
-  test-host canaries with source-owned commit, host-node, root, and lane
-  validation. Public React DOM/test-renderer roots and public `flushSync` remain
-  blocked.
+- Rust root/sync-flush/function/deletion execution can extend accepted Workers
+  855, 860, 862, and 864-867 toward managed-child, HostText, update, and
+  deletion shapes only as private test-host canaries with source-owned commit,
+  host-node, root/lane, topology, replay, ref/passive, and cleanup validation.
+  Public React DOM/test-renderer roots and public `flushSync` remain blocked.
 - Test-renderer package-root/native work should use accepted Worker 844
-  package-root native execution parity and Worker 859 Rust native consumer
-  hardening. Worker 853 remains rejected/redundant. Public serialization,
-  `ReactTestInstance`, JS/CJS/package compatibility, native bridge
-  loading/execution, root/act/Scheduler compatibility, and broad multichild
-  identity remain blocked.
+  package-root native execution parity plus Workers 859 and 868 Rust private
+  lifecycle/native consumer hardening. Worker 853 remains rejected/redundant.
+  Public serialization, `ReactTestInstance`, JS/CJS/package compatibility,
+  native bridge loading/execution, root/act/Scheduler compatibility, and broad
+  multichild identity remain blocked.
 - React DOM facade/native handoffs may use accepted Worker 848 nested facade
-  native handoff metadata as private diagnostic input. Any real native/Rust
-  execution or public facade work still must prove scheduling, commit, cleanup,
-  DOM output, listener/event/ref behavior, hydration boundaries, and package
-  compatibility.
+  native handoff metadata and Worker 869 fake-DOM lifecycle snapshots as private
+  diagnostic input. Any real native/Rust execution or public facade work still
+  must prove scheduling, commit, cleanup, DOM output, listener/event/ref
+  behavior, hydration boundaries, and package compatibility.
 - Resource and form work can consume accepted Worker 856's root execution
   consumer with Worker 850 ledger/source-token metadata. Public resources,
   forms, action/reset invocation, React updates, DOM/head mutation, native/root

@@ -29,7 +29,54 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-### Workers 844, 848, 855-860, 864, and 870
+### Workers 862 and 864-870
+
+- Worker 862 added private root-work-loop unmount execution for committed
+  one-level HostRoot output, validating committed current ownership, detached
+  host evidence, deletion records, container removals, and host-node cleanup
+  before fake host calls. Public root/renderers, React DOM, test-renderer,
+  native, hydration, package behavior, and broad traversal remain blocked.
+- Worker 864 extended the opt-in sync-flush private host mutation executor to
+  HostText update, HostComponent update, and root unmount/delete shapes. Its
+  accepted final state includes follow-up commit `16d56d9f`, which added
+  source-owned replay protection for sync-flush host mutation execution. The
+  default sync flush path remains inert, and public `flushSync`/renderer
+  behavior remains blocked.
+- Workers 865 and 866 added private FunctionComponent host execution canaries:
+  source-owned single-child HostText/HostComponent mount execution and
+  single-host useReducer update execution. The accepted follow-up rejects stale
+  committed topology before host calls. Public hooks/render behavior,
+  generalized child reconciliation, React DOM, test-renderer, hydration,
+  refs/effects, native, and package compatibility remain blocked.
+- Worker 867 added private deleted-subtree teardown execution, requiring
+  source-owned deletion-list/deleted-root, ref cleanup return, passive destroy,
+  and host cleanup evidence before running ordered teardown and host-node
+  cleanup. Public deletion semantics, refs/effects, renderers, native, and
+  package compatibility remain blocked.
+- Worker 868 added Rust test-renderer private root lifecycle execution
+  consumers for create, update, and unmount rows, binding evidence to renderer
+  IDs, root ownership, source rows, executed snapshots, cleanup/update counts,
+  and explicit public blockers. Public serialization, `ReactTestInstance`,
+  JS/CJS/package compatibility, native bridge loading/execution,
+  root/act/Scheduler compatibility, and broad multichild identity remain
+  blocked.
+- Worker 869 added React DOM private facade lifecycle consumers for fake-DOM
+  render, update, and unmount snapshots, preserving marker/listener state while
+  rejecting cloned or caller-built lifecycle records. Public `createRoot`,
+  browser DOM, hydration, resources/forms, refs/events, native/Rust execution,
+  and compatibility remain blocked.
+- Worker 870 added the private in-process Rust state-machine executor for
+  decoded native JSON create/render/unmount lifecycle rows, binding executor
+  rows to handle-table transitions, environment/root identity, generations, and
+  inert execution flags. Native addon loading, renderer/reconciler execution,
+  cleanup hooks, public native compatibility, and package exports remain
+  blocked.
+- The batch was accepted after focused Rust reconciler, sync-flush replay,
+  FunctionComponent, deleted-subtree, test-renderer lifecycle, React DOM
+  facade, native lifecycle, package-surface, import-smoke, formatting, and
+  `git diff --check` verification recorded in git history and worker reports.
+
+### Workers 844, 848, and 855-860
 
 - Worker 844 added package-root private `react-test-renderer` native execution
   parity for committed `toJSON`/`toTree` single-host and unmount rows, with
@@ -49,11 +96,6 @@ sequencing belong in `MASTER_PLAN.md`.
   before host calls while keeping default sync flush inert. Public React DOM,
   test-renderer, `flushSync`, hydration, native/package behavior, refs/effects,
   and broad renderer compatibility remain blocked.
-- Worker 864 extended the opt-in sync-flush private host mutation executor to
-  HostText update, HostComponent update, and root unmount/delete shapes. The
-  default sync flush path remains inert; deletion cleanup only runs through the
-  explicit private canary executor, and public `flushSync`/renderer behavior
-  remains blocked.
 - Worker 856 added the private resource/form root execution consumer, binding
   accepted resource root-map storage and fulfilled-reset fake queue/commit
   evidence to private root admission plus Worker 850 ledger/source-token
@@ -70,12 +112,6 @@ sequencing belong in `MASTER_PLAN.md`.
   and cleanup-hook preflight provenance without package exports. Native addon
   loading/execution, cleanup hooks, worker threads, renderer/reconciler output,
   public native compatibility, and React behavior remain blocked.
-- Worker 870 added the private in-process Rust state-machine executor for
-  decoded native JSON create/render/unmount lifecycle rows, binding executor
-  rows to handle-table transitions, environment/root identity, generations, and
-  inert execution flags. Native addon loading, renderer/reconciler execution,
-  cleanup hooks, public native compatibility, and package exports remain
-  blocked.
 - Worker 859 hardened the Rust test-renderer private unmount/nested native
   consumer with source-owned renderer IDs, `toJSON`/`toTree` identity surfaces,
   durable row IDs, cleanup counts, and update sequences. Public serialization,
