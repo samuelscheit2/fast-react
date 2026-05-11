@@ -640,6 +640,16 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
       "PassiveEffectDestroyCallbackExecutionRecord",
       "PassiveEffectMountCreateCallbackExecutionRecord"
     ],
+    requiresSourceOwnedActiveLifecycleRequestBoundary: true,
+    schedulerDrivenPassiveLifecycleBoundaryStatus:
+      "accepted-private-root-lifecycle-request-boundary-for-scheduler-driven-passive-diagnostics",
+    schedulerDrivenPassiveLifecycleBoundaryKind:
+      "fast-react.react.private-scheduler-driven-passive-lifecycle-boundary",
+    acceptedSchedulerDrivenPassiveLifecycleBoundaryRecords: [
+      "FastReactDomPrivateRootPublicFacadeLifecycleRequestBoundary",
+      "FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord",
+      "FastReactDomPrivateRootUpdateRecord"
+    ],
     privateSchedulerDrivenPassiveExecution: true,
     schedulerDrivenPassiveExecution: false,
     executesQueuedWork: false,
@@ -1440,6 +1450,27 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     schedulerDrivenPassiveDiagnostic.requiresSourceOwnedPassiveEvidence,
     true
   );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.requiresSourceOwnedActiveLifecycleRequestBoundary,
+    true
+  );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.consumesRootLifecycleRequestBoundary,
+    true
+  );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.validatesLifecycleRequestEntrypoint,
+    true
+  );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.lifecycleBoundaryWorkerId,
+    "worker-874-react-dom-lifecycle-boundary-hardening"
+  );
+  assert.deepEqual(schedulerDrivenPassiveDiagnostic.lifecycleBoundaryRecords, [
+    "FastReactDomPrivateRootPublicFacadeLifecycleRequestBoundary",
+    "FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord",
+    "FastReactDomPrivateRootUpdateRecord"
+  ]);
   assert.equal(
     schedulerDrivenPassiveDiagnostic.linksRootCommitPassiveExecutionToActFlushDiagnostics,
     true
@@ -2260,6 +2291,31 @@ test("Fast React test-utils private act route consumes source-owned scheduler-dr
     assert.equal(consumption.requiresSchedulerOwnedSourceProof, true, nodeEnv);
     assert.equal(consumption.requiresSourceOwnedPassiveEvidence, true, nodeEnv);
     assert.equal(
+      consumption.requiresSourceOwnedActiveLifecycleRequestBoundary,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.consumesRootLifecycleRequestBoundary,
+      true,
+      nodeEnv
+    );
+    assert.equal(consumption.validatesLifecycleRequestRootIdentity, true, nodeEnv);
+    assert.equal(consumption.validatesLifecycleRequestOrdering, true, nodeEnv);
+    assert.equal(consumption.validatesLifecycleRequestEntrypoint, true, nodeEnv);
+    assert.equal(consumption.currentRootBoundWork, true, nodeEnv);
+    assert.equal(Object.isFrozen(consumption.lifecycleRequestBoundary), true, nodeEnv);
+    assert.equal(
+      consumption.lifecycleRequestBoundary.entrypoint,
+      "react-dom/client",
+      nodeEnv
+    );
+    assert.equal(
+      consumption.lifecycleRequestBoundary.workerId,
+      gateModule.privateSchedulerDrivenPassiveLifecycleBoundaryWorkerId,
+      nodeEnv
+    );
+    assert.equal(
       consumption.linksRootCommitPassiveExecutionToActFlushDiagnostics,
       true,
       nodeEnv
@@ -2347,6 +2403,60 @@ test("Fast React test-utils private act route consumes source-owned scheduler-dr
       ),
       "scheduler-driven-passive-diagnostics-pending-passive",
       `${nodeEnv}:stale-pending-passive`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          diagnosticsOverrides: {
+            lifecycleRequestBoundary: {
+              ...diagnostics.lifecycleRequestBoundary
+            }
+          }
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership",
+      `${nodeEnv}:caller-built-lifecycle-boundary`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          lifecycleRequestBoundaryOverrides: {
+            stale: true
+          }
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary",
+      `${nodeEnv}:stale-lifecycle-boundary`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          lifecycleRequestBoundaryOverrides: {
+            requestBoundaryReplayed: true
+          }
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary",
+      `${nodeEnv}:replayed-lifecycle-boundary`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          lifecycleRequestBoundaryOverrides: {
+            entrypoint: "react-dom/server"
+          }
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-lifecycle-boundary",
+      `${nodeEnv}:cross-entrypoint-lifecycle-boundary`
     );
     assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
       gateModule,

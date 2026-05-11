@@ -874,6 +874,35 @@ test('private act gate consumes scheduler-driven passive diagnostics through Rea
     assert.equal(consumption.requiresSchedulerOwnedSourceProof, true, nodeEnv);
     assert.equal(consumption.requiresSourceOwnedPassiveEvidence, true, nodeEnv);
     assert.equal(
+      consumption.requiresSourceOwnedActiveLifecycleRequestBoundary,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.consumesRootLifecycleRequestBoundary,
+      true,
+      nodeEnv
+    );
+    assert.equal(consumption.validatesLifecycleRequestRootIdentity, true, nodeEnv);
+    assert.equal(consumption.validatesLifecycleRequestOrdering, true, nodeEnv);
+    assert.equal(consumption.validatesLifecycleRequestEntrypoint, true, nodeEnv);
+    assert.equal(Object.isFrozen(consumption.lifecycleRequestBoundary), true, nodeEnv);
+    assert.equal(
+      consumption.lifecycleRequestBoundaryStatus,
+      gateModule.privateSchedulerDrivenPassiveLifecycleBoundaryStatus,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.lifecycleRequestBoundary.entrypoint,
+      'react-dom/client',
+      nodeEnv
+    );
+    assert.deepEqual(
+      consumption.lifecycleRequestBoundary.records,
+      gateModule.privateSchedulerDrivenPassiveLifecycleBoundaryRecords,
+      nodeEnv
+    );
+    assert.equal(
       consumption.linksRootCommitPassiveExecutionToActFlushDiagnostics,
       true,
       nodeEnv
@@ -923,6 +952,56 @@ test('private act gate consumes scheduler-driven passive diagnostics through Rea
       callerBuiltNestedDiagnostics,
       'scheduler-driven-passive-diagnostics-nested-passive-ownership',
       `${nodeEnv}:caller-built-nested-passive-records`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        expiredReport,
+        {
+          diagnosticsOverrides: {
+            lifecycleRequestBoundary: {
+              ...passiveDiagnostics.lifecycleRequestBoundary
+            }
+          }
+        }
+      ),
+      'scheduler-driven-passive-diagnostics-lifecycle-boundary-ownership',
+      `${nodeEnv}:caller-built-lifecycle-boundary`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        expiredReport,
+        {
+          lifecycleRequestBoundaryOverrides: {
+            stale: true
+          }
+        }
+      ),
+      'scheduler-driven-passive-diagnostics-lifecycle-boundary',
+      `${nodeEnv}:stale-lifecycle-boundary`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        expiredReport,
+        {
+          lifecycleRequestBoundaryOverrides: {
+            requestBoundaryReplayed: true
+          }
+        }
+      ),
+      'scheduler-driven-passive-diagnostics-lifecycle-boundary',
+      `${nodeEnv}:replayed-lifecycle-boundary`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        expiredReport,
+        {
+          lifecycleRequestBoundaryOverrides: {
+            entrypoint: 'react-dom/server'
+          }
+        }
+      ),
+      'scheduler-driven-passive-diagnostics-lifecycle-boundary',
+      `${nodeEnv}:cross-entrypoint-lifecycle-boundary`
     );
     assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
