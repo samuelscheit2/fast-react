@@ -54,20 +54,21 @@ Worker 844 was accepted; do not use it as accepted input.
 
 Current active queue:
 
-- Worker 885: active DO NOT MERGE fix for stale same-root `act` lifecycle
-  snapshots.
-- Worker 887: active DO NOT MERGE fix to preserve both `nodeSnapshot` and
-  hydrateRoot `textContent` snapshot fields.
-- Worker 891: active DO NOT MERGE fix for unmount lifecycle blocked-behavior
-  aliases and source boundary path.
-- Worker 895: active implementation worker.
+- Worker 885: latest stale same-root `act` lifecycle snapshot fix is under
+  read-only audit in `audit_885_react_act_lifecycle_boundary_latest_fix`.
+- Worker 887: latest hydrateRoot snapshot-field preservation fix is under
+  read-only audit in `audit_887_hydrateroot_lifecycle_boundary_final`.
+- Worker 891: active fixing after DO NOT MERGE for unmount lifecycle
+  blocked-behavior aliases and source boundary path.
+- Worker 895: completed implementation is under read-only audit in
+  `audit_895_rust_test_renderer_multichild_lifecycle_native`.
 - Worker 897: active docs worker refreshing coordination docs after the latest
   accepted batch.
 - Worker 898: active implementation worker.
 
-Implementation workers 885, 887, 891, 895, and 898 are fixing or active
-implementation work only. Do not use their branches as accepted input until
-they are reviewed, verified, and merged. Worker 897 is docs-only.
+Workers 885, 887, 891, 895, and 898 remain unaccepted. Do not use their
+branches as accepted input until they are reviewed, verified, and merged.
+Worker 897 is docs-only.
 
 Accepted private evidence still keeps public root/render, `act`, `flushSync`,
 Scheduler timing, hydration, resources/forms, serialization, native execution,
@@ -84,13 +85,15 @@ canonical evidence requirements.
    package, root, native, React DOM, test-renderer, Scheduler, `act`,
    hydration, resource/form, serialization, and `flushSync` compatibility still
    require fail-closed gates and dual-run oracle evidence.
-2. Re-audit Workers 885, 887, and 891 before reconsidering merge; their active
-   fixes remain non-input until the stated lifecycle/currentness/source-boundary
-   gaps are closed.
-3. Review Workers 895 and 898 against the accepted source-owned lifecycle,
-   deletion, sync-flush, HostRoot lane handoff, native-generation,
-   resource/form, Scheduler variant, package-surface, and public blocker
-   requirements before any merge.
+2. Complete read-only audits for Workers 885, 887, and 895 before
+   reconsidering merge; their latest fixes remain non-input until the stated
+   lifecycle/currentness/source-boundary and test-renderer/native gaps are
+   closed.
+3. Re-review Worker 891 after its active DO NOT MERGE fix is ready, and review
+   Worker 898 against the accepted source-owned lifecycle, deletion,
+   sync-flush, HostRoot lane handoff, native-generation, resource/form,
+   Scheduler variant, package-surface, and public blocker requirements before
+   any merge.
 4. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.

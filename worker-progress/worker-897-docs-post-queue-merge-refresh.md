@@ -15,6 +15,9 @@ Date: 2026-05-11
 - Added one concise accepted-history batch to `MASTER_PROGRESS.md`.
 - Kept the active queue limited to Workers 885, 887, 891, 895, 897, and 898,
   with public compatibility blockers still explicit.
+- Follow-up status correction records Workers 885, 887, and 895 under
+  read-only audit, Worker 891 still fixing after DO NOT MERGE, Worker 898
+  active implementation, and accepted history unchanged.
 - No code files were edited.
 
 ## Changed Files
@@ -34,6 +37,9 @@ Date: 2026-05-11
 - Self-review confirmed newly accepted Workers 881, 888, 890, 892, 893, and
   896 now appear as accepted history/input only, while Workers 885, 887, 891,
   895, 897, and 898 remain active/current work in `MASTER_PLAN.md`.
+- Follow-up self-review confirmed Workers 885, 887, and 895 are audit-pending
+  only, Worker 891 remains fixing, Worker 898 remains active implementation,
+  and `MASTER_PROGRESS.md` accepted history stayed unchanged.
 
 ## Commands Run
 
@@ -63,6 +69,24 @@ git status --short --branch
 git add MASTER_PLAN.md MASTER_PROGRESS.md worker-progress/worker-897-docs-post-queue-merge-refresh.md
 git diff --cached --name-only
 git diff --cached --check
+sed -n '46,110p' MASTER_PLAN.md
+sed -n '1,140p' worker-progress/worker-897-docs-post-queue-merge-refresh.md
+```
+
+Follow-up correction:
+
+```sh
+git status --short --branch
+sed -n '46,110p' MASTER_PLAN.md
+sed -n '1,140p' worker-progress/worker-897-docs-post-queue-merge-refresh.md
+git diff -- MASTER_PLAN.md worker-progress/worker-897-docs-post-queue-merge-refresh.md
+git diff --name-only
+git diff -- MASTER_PROGRESS.md
+rg -n "audit_885|audit_887|audit_895|Worker 891|Worker 898|Worker 895|DO NOT MERGE|accepted history unchanged|non-input|accepted/merged baseline" MASTER_PLAN.md MASTER_PROGRESS.md worker-progress/worker-897-docs-post-queue-merge-refresh.md
+git diff --check
+git add MASTER_PLAN.md worker-progress/worker-897-docs-post-queue-merge-refresh.md
+git diff --cached --check
+git diff --cached --name-only
 ```
 
 ## Checks
@@ -73,14 +97,16 @@ git diff --cached --check
 ## Risks Or Blockers
 
 - No implementation blockers. This branch is docs-only.
-- Workers 885, 887, and 891 remain active DO NOT MERGE fixes and are not
-  accepted input.
-- Workers 895 and 898 remain active implementation workers and are not accepted
+- Workers 885, 887, and 895 are under read-only audit and are not accepted
   input.
+- Worker 891 remains active fixing after DO NOT MERGE and is not accepted
+  input.
+- Worker 898 remains active implementation and is not accepted input.
 
 ## Recommended Next Tasks
 
-- Review Workers 885, 887, 891, 895, and 898 against the accepted private
-  blockers before any future merge.
+- Complete audits for Workers 885, 887, and 895, continue Worker 891 fixing,
+  and review Worker 898 against accepted private blockers before any future
+  merge.
 - Refresh `MASTER_PLAN.md` and `MASTER_PROGRESS.md` again after the next
   accepted batch.
