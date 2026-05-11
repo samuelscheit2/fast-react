@@ -1,6 +1,6 @@
 # Fast React Master Plan
 
-Last updated: 2026-05-10
+Last updated: 2026-05-11
 
 This file owns current and future work only. Accepted history belongs in
 `MASTER_PROGRESS.md`; durable orchestration policy belongs in `ORCHESTRATOR.md`;
@@ -46,10 +46,21 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Workers 785-802 have been accepted, verified,
-merged, and cleaned up. No implementation worker is currently active after the
-latest merge batch. Accepted private evidence still keeps public root, act,
-Scheduler timing, hydration, serialization, native execution, package
-compatibility, and broad renderer compatibility blocked.
+merged, and cleaned up. Workers 803-810 are active in isolated worktrees.
+Accepted private evidence still keeps public root, act, Scheduler timing,
+hydration, serialization, native execution, package compatibility, and broad
+renderer compatibility blocked.
+
+Active workers:
+
+- Worker 803: Rust managed-child sibling-order private canary.
+- Worker 804: static admission ledger for Worker 785 managed child evidence.
+- Worker 805: static Scheduler diagnostics admission ledger.
+- Worker 806: static hydrateRoot admission ledger.
+- Worker 807: static native no-load admission ledger.
+- Worker 808: static resource/form admission ledger.
+- Worker 809: test-renderer sibling-text negative matrix.
+- Worker 810: static React act/Scheduler diagnostics ledger.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -57,14 +68,18 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Launch the next parallel batch from accepted private evidence when a task has a
-   narrow proof boundary: delayed Scheduler/React act diagnostics, hydrateRoot
+1. Audit and merge Workers 803-810 as they complete. Expect overlap in
+   Scheduler/React act static evidence, React DOM hydration/resource/form
+   ledgers, test-renderer sibling-text tests, and Rust managed-child host
+   traversal.
+2. Launch the next parallel batch from accepted private evidence when a task has
+   a narrow proof boundary: delayed Scheduler/React act diagnostics, hydrateRoot
    marker/listener/target/recoverable-error rows, resource/form fake metadata,
    sibling-text serialization/native evidence, and managed child host traversal.
-2. Prefer parallelizable independent proofs even when they may conflict in test
+3. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
-3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
