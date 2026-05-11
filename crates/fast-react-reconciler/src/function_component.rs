@@ -7,6 +7,8 @@
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
+#[cfg(test)]
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use fast_react_core::{
     ContextHandle, ContextStack, ContextStackError, ContextStackSnapshot, ContextValueChange,
@@ -22,7 +24,7 @@ use fast_react_core::{
 use fast_react_host_config::HostTypes;
 
 #[cfg(test)]
-use fast_react_core::RenderPhaseHookUpdates;
+use fast_react_core::{HookUpdateStaging, RenderPhaseHookUpdates};
 
 use crate::root_scheduler::{RootRescheduleRequestRecord, ensure_root_is_rescheduled};
 use crate::{
@@ -2488,6 +2490,57 @@ impl FunctionComponentHookRenderState {
 const FUNCTION_COMPONENT_RENDER_PHASE_RE_RENDER_LIMIT: usize = 25;
 
 #[cfg(test)]
+const HOOK_ID_GENERATION_SHIFT_FOR_CANARY: u32 = 32;
+
+#[cfg(test)]
+static FUNCTION_COMPONENT_RENDER_ATTEMPT_SEQUENCE_FOR_CANARY: AtomicU64 = AtomicU64::new(1);
+
+#[cfg(test)]
+#[must_use]
+const fn hook_queue_generation_for_canary(queue: HookQueueId) -> u32 {
+    (queue.raw() >> HOOK_ID_GENERATION_SHIFT_FOR_CANARY) as u32
+}
+
+#[cfg(test)]
+#[must_use]
+const fn hook_update_generation_for_canary(update: HookUpdateId) -> u32 {
+    (update.raw() >> HOOK_ID_GENERATION_SHIFT_FOR_CANARY) as u32
+}
+
+#[cfg(test)]
+#[must_use]
+fn next_render_attempt_id_for_canary(
+    state: FunctionComponentHookRenderState,
+    render_lanes: Lanes,
+) -> FunctionComponentRenderAttemptId {
+    let sequence =
+        FUNCTION_COMPONENT_RENDER_ATTEMPT_SEQUENCE_FOR_CANARY.fetch_add(1, Ordering::Relaxed);
+    FunctionComponentRenderAttemptId::from_raw(
+        ((state.render_fiber().slot().get() as u64) << 32)
+            ^ (state.work_in_progress_list().arena_id().get() << 17)
+            ^ ((state.work_in_progress_list().slot().get() as u64) << 1)
+            ^ state.work_in_progress_list().generation().get()
+            ^ render_lanes.bits() as u64
+            ^ sequence,
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) struct FunctionComponentRenderAttemptId(u64);
+
+impl FunctionComponentRenderAttemptId {
+    #[must_use]
+    pub const fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    #[must_use]
+    pub const fn raw(self) -> u64 {
+        self.0
+    }
+}
+
+#[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentRenderPhaseSourceEvidenceForCanary {
     react_version: &'static str,
@@ -2496,9 +2549,16 @@ pub(crate) struct FunctionComponentRenderPhaseSourceEvidenceForCanary {
     is_render_phase_update: &'static str,
     enqueue_render_phase_update: &'static str,
     reset_hooks_on_unwind: &'static str,
+    hook_queue_generation_guard: &'static str,
+    hook_staging_failure_preservation: &'static str,
+    bailout_blocker: &'static str,
     rerender_limit: usize,
     public_hook_compatibility_claimed: bool,
+    public_root_compatibility_claimed: bool,
     root_scheduler_integration_claimed: bool,
+    scheduler_compatibility_claimed: bool,
+    act_compatibility_claimed: bool,
+    renderer_compatibility_claimed: bool,
 }
 
 #[cfg(test)]
@@ -2512,9 +2572,16 @@ impl FunctionComponentRenderPhaseSourceEvidenceForCanary {
             is_render_phase_update: "isRenderPhaseUpdate",
             enqueue_render_phase_update: "enqueueRenderPhaseUpdate",
             reset_hooks_on_unwind: "resetHooksOnUnwind",
+            hook_queue_generation_guard: "HookQueueId generation",
+            hook_staging_failure_preservation: "HookUpdateStaging.finish_queueing",
+            bailout_blocker: "begin_work_function_component_bailout_blocker",
             rerender_limit: FUNCTION_COMPONENT_RENDER_PHASE_RE_RENDER_LIMIT,
             public_hook_compatibility_claimed: false,
+            public_root_compatibility_claimed: false,
             root_scheduler_integration_claimed: false,
+            scheduler_compatibility_claimed: false,
+            act_compatibility_claimed: false,
+            renderer_compatibility_claimed: false,
         }
     }
 
@@ -2549,6 +2616,21 @@ impl FunctionComponentRenderPhaseSourceEvidenceForCanary {
     }
 
     #[must_use]
+    pub const fn hook_queue_generation_guard(self) -> &'static str {
+        self.hook_queue_generation_guard
+    }
+
+    #[must_use]
+    pub const fn hook_staging_failure_preservation(self) -> &'static str {
+        self.hook_staging_failure_preservation
+    }
+
+    #[must_use]
+    pub const fn bailout_blocker(self) -> &'static str {
+        self.bailout_blocker
+    }
+
+    #[must_use]
     pub const fn rerender_limit(self) -> usize {
         self.rerender_limit
     }
@@ -2559,8 +2641,28 @@ impl FunctionComponentRenderPhaseSourceEvidenceForCanary {
     }
 
     #[must_use]
+    pub const fn public_root_compatibility_claimed(self) -> bool {
+        self.public_root_compatibility_claimed
+    }
+
+    #[must_use]
     pub const fn root_scheduler_integration_claimed(self) -> bool {
         self.root_scheduler_integration_claimed
+    }
+
+    #[must_use]
+    pub const fn scheduler_compatibility_claimed(self) -> bool {
+        self.scheduler_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn act_compatibility_claimed(self) -> bool {
+        self.act_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn renderer_compatibility_claimed(self) -> bool {
+        self.renderer_compatibility_claimed
     }
 }
 
@@ -2589,8 +2691,183 @@ impl FunctionComponentRenderPhaseDispatchKind {
 
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentRenderPhaseBailoutBlockerState {
+    render_fiber: FiberId,
+    current: Option<FiberId>,
+    render_lanes: Lanes,
+    context_dependency_count: usize,
+    context_dependency_lanes: Lanes,
+    child_traversal_blocked: bool,
+}
+
+#[cfg(test)]
+impl FunctionComponentRenderPhaseBailoutBlockerState {
+    #[must_use]
+    pub const fn active_render(
+        state: FunctionComponentHookRenderState,
+        render_lanes: Lanes,
+    ) -> Self {
+        Self {
+            render_fiber: state.render_fiber(),
+            current: state.current(),
+            render_lanes,
+            context_dependency_count: 0,
+            context_dependency_lanes: Lanes::NO,
+            child_traversal_blocked: false,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_context_dependency_lanes(
+        self,
+        context_dependency_count: usize,
+        context_dependency_lanes: Lanes,
+    ) -> Self {
+        Self {
+            context_dependency_count,
+            context_dependency_lanes,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub const fn with_child_traversal_blocked(self, child_traversal_blocked: bool) -> Self {
+        Self {
+            child_traversal_blocked,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub const fn with_render_fiber(self, render_fiber: FiberId) -> Self {
+        Self {
+            render_fiber,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub const fn render_fiber(self) -> FiberId {
+        self.render_fiber
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn context_dependency_count(self) -> usize {
+        self.context_dependency_count
+    }
+
+    #[must_use]
+    pub const fn context_dependency_lanes(self) -> Lanes {
+        self.context_dependency_lanes
+    }
+
+    #[must_use]
+    pub const fn child_traversal_blocked(self) -> bool {
+        self.child_traversal_blocked
+    }
+
+    #[must_use]
+    pub fn is_current_for_render(
+        self,
+        state: FunctionComponentHookRenderState,
+        render_lanes: Lanes,
+    ) -> bool {
+        self.render_fiber == state.render_fiber()
+            && self.current == state.current()
+            && self.render_lanes == render_lanes
+            && !self.child_traversal_blocked
+            && !self.context_dependency_lanes.contains_any(render_lanes)
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentRenderPhaseStagingOwner {
+    source_owned: bool,
+    caller_built: bool,
+    attempt: FunctionComponentRenderAttemptId,
+    staging_generation: u64,
+    render_fiber: FiberId,
+    current: Option<FiberId>,
+    work_in_progress_list: HookListId,
+    queue_owner: FiberId,
+    queue: HookQueueId,
+    queue_generation: u32,
+    update_generation: u32,
+    render_lanes: Lanes,
+    update_lane: HookUpdateLane,
+    blocker: FunctionComponentRenderPhaseBailoutBlockerState,
+}
+
+#[cfg(test)]
+impl FunctionComponentRenderPhaseStagingOwner {
+    #[must_use]
+    fn source_owned(
+        gate: &FunctionComponentRenderPhaseUpdateGate,
+        binding: FunctionComponentStateDispatchBinding,
+        update: HookUpdateId,
+        update_lane: HookUpdateLane,
+    ) -> Self {
+        Self {
+            source_owned: true,
+            caller_built: false,
+            attempt: gate.attempt(),
+            staging_generation: gate.staging_generation(),
+            render_fiber: gate.state().render_fiber(),
+            current: gate.state().current(),
+            work_in_progress_list: gate.state().work_in_progress_list(),
+            queue_owner: binding.fiber,
+            queue: binding.queue,
+            queue_generation: hook_queue_generation_for_canary(binding.queue),
+            update_generation: hook_update_generation_for_canary(update),
+            render_lanes: gate.render_lanes(),
+            update_lane,
+            blocker: gate.blocker_state(),
+        }
+    }
+
+    #[must_use]
+    pub const fn attempt(self) -> FunctionComponentRenderAttemptId {
+        self.attempt
+    }
+
+    #[must_use]
+    pub const fn staging_generation(self) -> u64 {
+        self.staging_generation
+    }
+
+    #[must_use]
+    pub const fn queue_generation(self) -> u32 {
+        self.queue_generation
+    }
+
+    #[must_use]
+    pub const fn update_generation(self) -> u32 {
+        self.update_generation
+    }
+
+    #[must_use]
+    pub const fn source_owned_currentness(self) -> bool {
+        self.source_owned && !self.caller_built
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentRenderPhaseDispatchRecord {
     source: FunctionComponentRenderPhaseSourceEvidenceForCanary,
+    attempt: FunctionComponentRenderAttemptId,
+    staging_generation: u64,
     pass_index: usize,
     rerender_count: usize,
     render_fiber: FiberId,
@@ -2599,8 +2876,10 @@ pub(crate) struct FunctionComponentRenderPhaseDispatchRecord {
     work_in_progress_list: HookListId,
     queue_owner: FiberId,
     queue: HookQueueId,
+    queue_generation: u32,
     dispatch: FunctionComponentStateDispatchHandle,
     update: HookUpdateId,
+    update_generation: u32,
     lane: HookUpdateLane,
     revert_lane: HookRevertLane,
     action: FunctionComponentStateActionHandle,
@@ -2610,6 +2889,9 @@ pub(crate) struct FunctionComponentRenderPhaseDispatchRecord {
     did_schedule_render_phase_update_during_this_pass: bool,
     root_scheduled: bool,
     public_hook_compatibility_claimed: bool,
+    source_owned_currentness: bool,
+    caller_built_rows_accepted: bool,
+    blocker: FunctionComponentRenderPhaseBailoutBlockerState,
 }
 
 #[cfg(test)]
@@ -2617,6 +2899,16 @@ impl FunctionComponentRenderPhaseDispatchRecord {
     #[must_use]
     pub const fn source(self) -> FunctionComponentRenderPhaseSourceEvidenceForCanary {
         self.source
+    }
+
+    #[must_use]
+    pub const fn attempt(self) -> FunctionComponentRenderAttemptId {
+        self.attempt
+    }
+
+    #[must_use]
+    pub const fn staging_generation(self) -> u64 {
+        self.staging_generation
     }
 
     #[must_use]
@@ -2660,6 +2952,11 @@ impl FunctionComponentRenderPhaseDispatchRecord {
     }
 
     #[must_use]
+    pub const fn queue_generation(self) -> u32 {
+        self.queue_generation
+    }
+
+    #[must_use]
     pub const fn dispatch(self) -> FunctionComponentStateDispatchHandle {
         self.dispatch
     }
@@ -2667,6 +2964,11 @@ impl FunctionComponentRenderPhaseDispatchRecord {
     #[must_use]
     pub const fn update(self) -> HookUpdateId {
         self.update
+    }
+
+    #[must_use]
+    pub const fn update_generation(self) -> u32 {
+        self.update_generation
     }
 
     #[must_use]
@@ -2715,6 +3017,21 @@ impl FunctionComponentRenderPhaseDispatchRecord {
     }
 
     #[must_use]
+    pub const fn source_owned_currentness(self) -> bool {
+        self.source_owned_currentness
+    }
+
+    #[must_use]
+    pub const fn caller_built_rows_accepted(self) -> bool {
+        self.caller_built_rows_accepted
+    }
+
+    #[must_use]
+    pub const fn blocker_state(self) -> FunctionComponentRenderPhaseBailoutBlockerState {
+        self.blocker
+    }
+
+    #[must_use]
     pub fn dispatch_belongs_to_currently_rendering_fiber(self) -> bool {
         self.queue_owner == self.render_fiber || self.current == Some(self.queue_owner)
     }
@@ -2729,11 +3046,15 @@ impl FunctionComponentRenderPhaseDispatchRecord {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentRenderPhaseProcessRecord {
     source: FunctionComponentRenderPhaseSourceEvidenceForCanary,
+    attempt: FunctionComponentRenderAttemptId,
+    staging_generation: u64,
     pass_index: usize,
     rerender_count: usize,
     render_fiber: FiberId,
+    render_lanes: Lanes,
     hook: HookSlotId,
     queue: HookQueueId,
+    queue_generation: u32,
     dispatch: FunctionComponentStateDispatchHandle,
     kind: FunctionComponentRenderPhaseDispatchKind,
     previous_memoized_state: StateHandle,
@@ -2748,6 +3069,16 @@ impl FunctionComponentRenderPhaseProcessRecord {
     #[must_use]
     pub const fn source(self) -> FunctionComponentRenderPhaseSourceEvidenceForCanary {
         self.source
+    }
+
+    #[must_use]
+    pub const fn attempt(self) -> FunctionComponentRenderAttemptId {
+        self.attempt
+    }
+
+    #[must_use]
+    pub const fn staging_generation(self) -> u64 {
+        self.staging_generation
     }
 
     #[must_use]
@@ -2766,6 +3097,11 @@ impl FunctionComponentRenderPhaseProcessRecord {
     }
 
     #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
     pub const fn hook(self) -> HookSlotId {
         self.hook
     }
@@ -2773,6 +3109,11 @@ impl FunctionComponentRenderPhaseProcessRecord {
     #[must_use]
     pub const fn queue(self) -> HookQueueId {
         self.queue
+    }
+
+    #[must_use]
+    pub const fn queue_generation(self) -> u32 {
+        self.queue_generation
     }
 
     #[must_use]
@@ -2815,6 +3156,7 @@ impl FunctionComponentRenderPhaseProcessRecord {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentRenderPhaseRerenderPassRecord {
     source: FunctionComponentRenderPhaseSourceEvidenceForCanary,
+    attempt: FunctionComponentRenderAttemptId,
     render_fiber: FiberId,
     pass_index: usize,
     rerender_count: usize,
@@ -2826,6 +3168,11 @@ impl FunctionComponentRenderPhaseRerenderPassRecord {
     #[must_use]
     pub const fn source(self) -> FunctionComponentRenderPhaseSourceEvidenceForCanary {
         self.source
+    }
+
+    #[must_use]
+    pub const fn attempt(self) -> FunctionComponentRenderAttemptId {
+        self.attempt
     }
 
     #[must_use]
@@ -2851,10 +3198,136 @@ impl FunctionComponentRenderPhaseRerenderPassRecord {
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentRenderPhaseStagingDrainRecord {
+    source: FunctionComponentRenderPhaseSourceEvidenceForCanary,
+    attempt: FunctionComponentRenderAttemptId,
+    staging_generation: u64,
+    next_staging_generation: u64,
+    render_fiber: FiberId,
+    current: Option<FiberId>,
+    render_lanes: Lanes,
+    staging_lanes: Lanes,
+    blocker: FunctionComponentRenderPhaseBailoutBlockerState,
+    queues: Vec<HookQueueId>,
+    updates: Vec<HookUpdateId>,
+    queue_generations: Vec<u32>,
+    update_generations: Vec<u32>,
+    source_owned_currentness: bool,
+    caller_built_rows_accepted: bool,
+    root_scheduled: bool,
+}
+
+#[cfg(test)]
+impl FunctionComponentRenderPhaseStagingDrainRecord {
+    #[must_use]
+    pub const fn source(&self) -> FunctionComponentRenderPhaseSourceEvidenceForCanary {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn attempt(&self) -> FunctionComponentRenderAttemptId {
+        self.attempt
+    }
+
+    #[must_use]
+    pub const fn staging_generation(&self) -> u64 {
+        self.staging_generation
+    }
+
+    #[must_use]
+    pub const fn next_staging_generation(&self) -> u64 {
+        self.next_staging_generation
+    }
+
+    #[must_use]
+    pub const fn render_fiber(&self) -> FiberId {
+        self.render_fiber
+    }
+
+    #[must_use]
+    pub const fn current(&self) -> Option<FiberId> {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn render_lanes(&self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn staging_lanes(&self) -> Lanes {
+        self.staging_lanes
+    }
+
+    #[must_use]
+    pub const fn blocker_state(&self) -> FunctionComponentRenderPhaseBailoutBlockerState {
+        self.blocker
+    }
+
+    #[must_use]
+    pub fn queues(&self) -> &[HookQueueId] {
+        &self.queues
+    }
+
+    #[must_use]
+    pub fn updates(&self) -> &[HookUpdateId] {
+        &self.updates
+    }
+
+    #[must_use]
+    pub fn queue_generations(&self) -> &[u32] {
+        &self.queue_generations
+    }
+
+    #[must_use]
+    pub fn update_generations(&self) -> &[u32] {
+        &self.update_generations
+    }
+
+    #[must_use]
+    pub fn drained_update_count(&self) -> usize {
+        self.updates.len()
+    }
+
+    #[must_use]
+    pub const fn source_owned_currentness(&self) -> bool {
+        self.source_owned_currentness
+    }
+
+    #[must_use]
+    pub const fn caller_built_rows_accepted(&self) -> bool {
+        self.caller_built_rows_accepted
+    }
+
+    #[must_use]
+    pub const fn root_scheduled(&self) -> bool {
+        self.root_scheduled
+    }
+
+    #[must_use]
+    pub fn proves_current_render_phase_staging(&self) -> bool {
+        self.source_owned_currentness
+            && !self.caller_built_rows_accepted
+            && !self.root_scheduled
+            && self.blocker.render_fiber() == self.render_fiber
+            && self.blocker.current() == self.current
+            && self.blocker.render_lanes() == self.render_lanes
+            && !self.blocker.child_traversal_blocked()
+            && !self
+                .blocker
+                .context_dependency_lanes()
+                .contains_any(self.render_lanes)
+            && self.staging_lanes.is_subset_of(self.render_lanes)
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FunctionComponentRenderPhaseCleanupRecord {
     source: FunctionComponentRenderPhaseSourceEvidenceForCanary,
     render_fiber: FiberId,
     queues: Vec<HookQueueId>,
+    staged_update_count_before_cleanup: usize,
     did_schedule_render_phase_update_after_cleanup: bool,
     did_schedule_render_phase_update_during_this_pass_after_cleanup: bool,
 }
@@ -2882,6 +3355,11 @@ impl FunctionComponentRenderPhaseCleanupRecord {
     }
 
     #[must_use]
+    pub const fn staged_update_count_before_cleanup(&self) -> usize {
+        self.staged_update_count_before_cleanup
+    }
+
+    #[must_use]
     pub const fn did_schedule_render_phase_update_after_cleanup(&self) -> bool {
         self.did_schedule_render_phase_update_after_cleanup
     }
@@ -2897,6 +3375,10 @@ impl FunctionComponentRenderPhaseCleanupRecord {
 pub(crate) struct FunctionComponentRenderPhaseUpdateGate {
     state: FunctionComponentHookRenderState,
     render_lanes: Lanes,
+    attempt: FunctionComponentRenderAttemptId,
+    staging_generation: u64,
+    staging: HookUpdateStaging<FunctionComponentRenderPhaseStagingOwner>,
+    blocker: FunctionComponentRenderPhaseBailoutBlockerState,
     recorded: RenderPhaseHookUpdates,
     rerender_count: usize,
     did_schedule_render_phase_update: bool,
@@ -2908,9 +3390,17 @@ pub(crate) struct FunctionComponentRenderPhaseUpdateGate {
 impl FunctionComponentRenderPhaseUpdateGate {
     #[must_use]
     pub fn new(state: FunctionComponentHookRenderState, render_lanes: Lanes) -> Self {
+        let attempt = next_render_attempt_id_for_canary(state, render_lanes);
         Self {
             state,
             render_lanes,
+            attempt,
+            staging_generation: 0,
+            staging: HookUpdateStaging::new(),
+            blocker: FunctionComponentRenderPhaseBailoutBlockerState::active_render(
+                state,
+                render_lanes,
+            ),
             recorded: RenderPhaseHookUpdates::new(),
             rerender_count: 0,
             did_schedule_render_phase_update: false,
@@ -2927,6 +3417,32 @@ impl FunctionComponentRenderPhaseUpdateGate {
     #[must_use]
     pub const fn render_lanes(&self) -> Lanes {
         self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn attempt(&self) -> FunctionComponentRenderAttemptId {
+        self.attempt
+    }
+
+    #[must_use]
+    pub const fn staging_generation(&self) -> u64 {
+        self.staging_generation
+    }
+
+    #[must_use]
+    pub const fn blocker_state(&self) -> FunctionComponentRenderPhaseBailoutBlockerState {
+        self.blocker
+    }
+
+    pub fn set_blocker_state_for_canary(
+        &mut self,
+        blocker: FunctionComponentRenderPhaseBailoutBlockerState,
+    ) {
+        self.blocker = blocker;
+    }
+
+    pub fn advance_render_attempt_for_canary(&mut self) {
+        self.attempt = next_render_attempt_id_for_canary(self.state, self.render_lanes);
     }
 
     #[must_use]
@@ -2954,6 +3470,16 @@ impl FunctionComponentRenderPhaseUpdateGate {
         self.recorded.queues()
     }
 
+    #[must_use]
+    pub fn staged_update_count(&self) -> usize {
+        self.staging.entries().len()
+    }
+
+    #[must_use]
+    pub const fn staging_lanes(&self) -> Lanes {
+        self.staging.lanes()
+    }
+
     pub fn begin_rerender_pass(
         &mut self,
     ) -> Result<FunctionComponentRenderPhaseRerenderPassRecord, FunctionComponentRenderError> {
@@ -2969,6 +3495,7 @@ impl FunctionComponentRenderPhaseUpdateGate {
         self.did_schedule_render_phase_update_during_this_pass = false;
         Ok(FunctionComponentRenderPhaseRerenderPassRecord {
             source: FunctionComponentRenderPhaseSourceEvidenceForCanary::react_19_2_6(),
+            attempt: self.attempt,
             render_fiber: self.state.render_fiber(),
             pass_index,
             rerender_count: self.rerender_count,
@@ -2981,12 +3508,17 @@ impl FunctionComponentRenderPhaseUpdateGate {
         hook_store: &mut FunctionComponentHookRenderStore,
     ) -> Result<FunctionComponentRenderPhaseCleanupRecord, FunctionComponentRenderError> {
         let queues = self.recorded.queues().to_vec();
+        let staged_update_count_before_cleanup = self.staged_update_count();
         hook_store
             .state_queues
             .clear_render_phase_updates(&mut self.recorded)
             .map_err(|error| {
                 FunctionComponentRenderError::hook_queue(self.state.render_fiber(), error)
             })?;
+        self.staging = HookUpdateStaging::new();
+        if staged_update_count_before_cleanup > 0 {
+            self.staging_generation += 1;
+        }
         self.did_schedule_render_phase_update = false;
         self.did_schedule_render_phase_update_during_this_pass = false;
 
@@ -2994,6 +3526,7 @@ impl FunctionComponentRenderPhaseUpdateGate {
             source: FunctionComponentRenderPhaseSourceEvidenceForCanary::react_19_2_6(),
             render_fiber: self.state.render_fiber(),
             queues,
+            staged_update_count_before_cleanup,
             did_schedule_render_phase_update_after_cleanup: self.did_schedule_render_phase_update,
             did_schedule_render_phase_update_during_this_pass_after_cleanup: self
                 .did_schedule_render_phase_update_during_this_pass,
@@ -3003,6 +3536,210 @@ impl FunctionComponentRenderPhaseUpdateGate {
     fn record_render_phase_update_scheduled(&mut self) {
         self.did_schedule_render_phase_update = true;
         self.did_schedule_render_phase_update_during_this_pass = true;
+    }
+
+    fn validate_update_currentness(
+        &self,
+        lane: HookUpdateLane,
+    ) -> Result<(), FunctionComponentRenderError> {
+        self.validate_blocker_currentness()?;
+        let lane_priority = lane.priority_lanes();
+        if lane_priority.is_non_empty() && !self.render_lanes.contains_all(lane_priority) {
+            return Err(FunctionComponentRenderError::RenderPhaseLaneMismatch {
+                fiber: self.state.render_fiber(),
+                render_lanes: self.render_lanes,
+                update_lane: lane,
+            });
+        }
+        Ok(())
+    }
+
+    fn validate_blocker_currentness(&self) -> Result<(), FunctionComponentRenderError> {
+        if self
+            .blocker
+            .is_current_for_render(self.state, self.render_lanes)
+        {
+            return Ok(());
+        }
+
+        Err(
+            FunctionComponentRenderError::RenderPhaseBailoutContextAlias {
+                fiber: self.state.render_fiber(),
+                blocker_fiber: self.blocker.render_fiber(),
+                current: self.state.current(),
+                blocker_current: self.blocker.current(),
+                render_lanes: self.render_lanes,
+                blocker_lanes: self.blocker.render_lanes(),
+                context_dependency_count: self.blocker.context_dependency_count(),
+                context_dependency_lanes: self.blocker.context_dependency_lanes(),
+                child_traversal_blocked: self.blocker.child_traversal_blocked(),
+            },
+        )
+    }
+
+    fn stage_render_phase_update(
+        &mut self,
+        binding: FunctionComponentStateDispatchBinding,
+        update: HookUpdateId,
+        lane: HookUpdateLane,
+    ) {
+        let owner =
+            FunctionComponentRenderPhaseStagingOwner::source_owned(self, binding, update, lane);
+        self.staging.stage(owner, binding.queue, update, lane);
+    }
+
+    fn validate_staged_row_currentness(
+        &self,
+        owner: FunctionComponentRenderPhaseStagingOwner,
+        row_queue: HookQueueId,
+        row_update: HookUpdateId,
+        row_lane: HookUpdateLane,
+    ) -> Result<(), FunctionComponentRenderError> {
+        if !owner.source_owned_currentness() {
+            return Err(
+                FunctionComponentRenderError::RenderPhaseCallerBuiltRowsRejected {
+                    fiber: self.state.render_fiber(),
+                    queue: row_queue,
+                    update: row_update,
+                },
+            );
+        }
+
+        if owner.attempt != self.attempt {
+            return Err(FunctionComponentRenderError::StaleRenderPhaseAttempt {
+                fiber: self.state.render_fiber(),
+                expected: self.attempt,
+                actual: owner.attempt,
+            });
+        }
+
+        if owner.staging_generation != self.staging_generation {
+            return Err(
+                FunctionComponentRenderError::StaleRenderPhaseStagingGeneration {
+                    fiber: self.state.render_fiber(),
+                    expected: self.staging_generation,
+                    actual: owner.staging_generation,
+                },
+            );
+        }
+
+        if owner.render_fiber != self.state.render_fiber()
+            || owner.current != self.state.current()
+            || owner.work_in_progress_list != self.state.work_in_progress_list()
+            || owner.queue != row_queue
+            || owner.queue_generation != hook_queue_generation_for_canary(row_queue)
+            || owner.update_generation != hook_update_generation_for_canary(row_update)
+            || owner.update_lane != row_lane
+            || !(owner.queue_owner == self.state.render_fiber()
+                || self.state.current() == Some(owner.queue_owner))
+        {
+            return Err(
+                FunctionComponentRenderError::RenderPhaseWrongFiberOrHookQueue {
+                    fiber: self.state.render_fiber(),
+                    owner_fiber: owner.render_fiber,
+                    queue_owner: owner.queue_owner,
+                    expected_queue: owner.queue,
+                    actual_queue: row_queue,
+                },
+            );
+        }
+
+        if owner.render_lanes != self.render_lanes {
+            return Err(FunctionComponentRenderError::RenderPhaseLaneMismatch {
+                fiber: self.state.render_fiber(),
+                render_lanes: self.render_lanes,
+                update_lane: row_lane,
+            });
+        }
+
+        self.validate_update_currentness(row_lane)?;
+        Ok(())
+    }
+
+    fn validate_recorded_queue_for_processing(
+        &self,
+        queue: HookQueueId,
+    ) -> Result<(), FunctionComponentRenderError> {
+        if self.recorded.queues().contains(&queue) {
+            Ok(())
+        } else {
+            Err(
+                FunctionComponentRenderError::RenderPhaseWrongFiberOrHookQueue {
+                    fiber: self.state.render_fiber(),
+                    owner_fiber: self.state.render_fiber(),
+                    queue_owner: self.state.render_fiber(),
+                    expected_queue: queue,
+                    actual_queue: queue,
+                },
+            )
+        }
+    }
+
+    pub fn finish_staged_render_phase_updates_for_canary(
+        &mut self,
+        hook_store: &mut FunctionComponentHookRenderStore,
+    ) -> Result<FunctionComponentRenderPhaseStagingDrainRecord, FunctionComponentRenderError> {
+        self.validate_blocker_currentness()?;
+        for entry in self.staging.entries() {
+            self.validate_staged_row_currentness(
+                *entry.owner(),
+                entry.queue(),
+                entry.update(),
+                entry.lane(),
+            )?;
+        }
+
+        let attempt = self.attempt;
+        let staging_generation = self.staging_generation;
+        let render_fiber = self.state.render_fiber();
+        let current = self.state.current();
+        let render_lanes = self.render_lanes;
+        let staging_lanes = self.staging.lanes();
+        let blocker = self.blocker;
+        let finished = self
+            .staging
+            .finish_queueing(&mut hook_store.state_queues)
+            .map_err(|error| FunctionComponentRenderError::hook_queue(render_fiber, error))?;
+
+        let queues = finished
+            .iter()
+            .map(|entry| entry.queue())
+            .collect::<Vec<_>>();
+        let updates = finished
+            .iter()
+            .map(|entry| entry.update())
+            .collect::<Vec<_>>();
+        let queue_generations = finished
+            .iter()
+            .map(|entry| hook_queue_generation_for_canary(entry.queue()))
+            .collect::<Vec<_>>();
+        let update_generations = finished
+            .iter()
+            .map(|entry| hook_update_generation_for_canary(entry.update()))
+            .collect::<Vec<_>>();
+        for queue in &queues {
+            self.recorded.record(*queue);
+        }
+        self.staging_generation += 1;
+
+        Ok(FunctionComponentRenderPhaseStagingDrainRecord {
+            source: FunctionComponentRenderPhaseSourceEvidenceForCanary::react_19_2_6(),
+            attempt,
+            staging_generation,
+            next_staging_generation: self.staging_generation,
+            render_fiber,
+            current,
+            render_lanes,
+            staging_lanes,
+            blocker,
+            queues,
+            updates,
+            queue_generations,
+            update_generations,
+            source_owned_currentness: true,
+            caller_built_rows_accepted: false,
+            root_scheduled: false,
+        })
     }
 }
 
@@ -5809,6 +6546,7 @@ impl FunctionComponentHookRenderStore {
         self.validate_basic_state_dispatch_binding(binding)?;
         self.validate_dispatch_eager_state(binding, request.eager_state())?;
         self.validate_state_dispatch_render_context(gate.state(), binding)?;
+        gate.validate_update_currentness(request.lane())?;
 
         let update = self
             .state_queues
@@ -5823,13 +6561,13 @@ impl FunctionComponentHookRenderStore {
                 update_record.set_eager_state(eager_state.eager_state());
             }
         }
-        self.state_queues
-            .enqueue_render_phase_update(binding.queue, update, &mut gate.recorded)
-            .map_err(|error| FunctionComponentRenderError::hook_queue(binding.fiber, error))?;
+        gate.stage_render_phase_update(binding, update, request.lane());
         gate.record_render_phase_update_scheduled();
 
         Ok(FunctionComponentRenderPhaseDispatchRecord {
             source: FunctionComponentRenderPhaseSourceEvidenceForCanary::react_19_2_6(),
+            attempt: gate.attempt(),
+            staging_generation: gate.staging_generation(),
             pass_index: gate.rerender_count(),
             rerender_count: gate.rerender_count(),
             render_fiber: gate.state().render_fiber(),
@@ -5838,8 +6576,10 @@ impl FunctionComponentHookRenderStore {
             work_in_progress_list: gate.state().work_in_progress_list(),
             queue_owner: binding.fiber,
             queue: binding.queue,
+            queue_generation: hook_queue_generation_for_canary(binding.queue),
             dispatch: binding.handle,
             update,
+            update_generation: hook_update_generation_for_canary(update),
             lane: request.lane(),
             revert_lane: request.revert_lane(),
             action: request.action(),
@@ -5850,6 +6590,9 @@ impl FunctionComponentHookRenderStore {
                 .did_schedule_render_phase_update_during_this_pass(),
             root_scheduled: false,
             public_hook_compatibility_claimed: false,
+            source_owned_currentness: true,
+            caller_built_rows_accepted: false,
+            blocker: gate.blocker_state(),
         })
     }
 
@@ -5864,6 +6607,7 @@ impl FunctionComponentHookRenderStore {
         let reducer = self.reducer_for_queue(binding.fiber, binding.queue)?;
         self.validate_dispatch_eager_state(binding, request.eager_state())?;
         self.validate_reducer_dispatch_render_context(gate.state(), binding)?;
+        gate.validate_update_currentness(request.lane())?;
 
         let update = self
             .state_queues
@@ -5878,13 +6622,13 @@ impl FunctionComponentHookRenderStore {
                 update_record.set_eager_state(eager_state.eager_state());
             }
         }
-        self.state_queues
-            .enqueue_render_phase_update(binding.queue, update, &mut gate.recorded)
-            .map_err(|error| FunctionComponentRenderError::hook_queue(binding.fiber, error))?;
+        gate.stage_render_phase_update(binding, update, request.lane());
         gate.record_render_phase_update_scheduled();
 
         Ok(FunctionComponentRenderPhaseDispatchRecord {
             source: FunctionComponentRenderPhaseSourceEvidenceForCanary::react_19_2_6(),
+            attempt: gate.attempt(),
+            staging_generation: gate.staging_generation(),
             pass_index: gate.rerender_count(),
             rerender_count: gate.rerender_count(),
             render_fiber: gate.state().render_fiber(),
@@ -5893,8 +6637,10 @@ impl FunctionComponentHookRenderStore {
             work_in_progress_list: gate.state().work_in_progress_list(),
             queue_owner: binding.fiber,
             queue: binding.queue,
+            queue_generation: hook_queue_generation_for_canary(binding.queue),
             dispatch: binding.handle,
             update,
+            update_generation: hook_update_generation_for_canary(update),
             lane: request.lane(),
             revert_lane: request.revert_lane(),
             action: request.action(),
@@ -5905,6 +6651,9 @@ impl FunctionComponentHookRenderStore {
                 .did_schedule_render_phase_update_during_this_pass(),
             root_scheduled: false,
             public_hook_compatibility_claimed: false,
+            source_owned_currentness: true,
+            caller_built_rows_accepted: false,
+            blocker: gate.blocker_state(),
         })
     }
 
@@ -5917,6 +6666,7 @@ impl FunctionComponentHookRenderStore {
     ) -> Result<FunctionComponentRenderPhaseProcessRecord, FunctionComponentRenderError> {
         let state = gate.state();
         let previous_payload = self.state_payload_for_hook(state.render_fiber(), hook)?;
+        gate.validate_recorded_queue_for_processing(previous_payload.queue())?;
         let dispatch =
             self.state_dispatch_for_queue(state.render_fiber(), previous_payload.queue())?;
         let binding = self.state_dispatch_binding(dispatch)?;
@@ -5938,11 +6688,15 @@ impl FunctionComponentHookRenderStore {
 
         Ok(FunctionComponentRenderPhaseProcessRecord {
             source: FunctionComponentRenderPhaseSourceEvidenceForCanary::react_19_2_6(),
+            attempt: gate.attempt(),
+            staging_generation: gate.staging_generation(),
             pass_index: gate.rerender_count(),
             rerender_count: gate.rerender_count(),
             render_fiber: state.render_fiber(),
+            render_lanes: gate.render_lanes(),
             hook,
             queue: previous_payload.queue(),
+            queue_generation: hook_queue_generation_for_canary(previous_payload.queue()),
             dispatch,
             kind: FunctionComponentRenderPhaseDispatchKind::BasicState,
             previous_memoized_state: previous_payload.memoized_state(),
@@ -5963,6 +6717,7 @@ impl FunctionComponentHookRenderStore {
     ) -> Result<FunctionComponentRenderPhaseProcessRecord, FunctionComponentRenderError> {
         let state = gate.state();
         let previous_payload = self.state_payload_for_hook(state.render_fiber(), hook)?;
+        gate.validate_recorded_queue_for_processing(previous_payload.queue())?;
         let dispatch =
             self.state_dispatch_for_queue(state.render_fiber(), previous_payload.queue())?;
         let binding = self.state_dispatch_binding(dispatch)?;
@@ -5990,11 +6745,15 @@ impl FunctionComponentHookRenderStore {
 
         Ok(FunctionComponentRenderPhaseProcessRecord {
             source: FunctionComponentRenderPhaseSourceEvidenceForCanary::react_19_2_6(),
+            attempt: gate.attempt(),
+            staging_generation: gate.staging_generation(),
             pass_index: gate.rerender_count(),
             rerender_count: gate.rerender_count(),
             render_fiber: state.render_fiber(),
+            render_lanes: gate.render_lanes(),
             hook,
             queue: previous_payload.queue(),
+            queue_generation: hook_queue_generation_for_canary(previous_payload.queue()),
             dispatch,
             kind: FunctionComponentRenderPhaseDispatchKind::Reducer(reducer_id),
             previous_memoized_state: previous_payload.memoized_state(),
@@ -7791,6 +8550,44 @@ pub(crate) enum FunctionComponentRenderError {
         render_fiber: FiberId,
         current: Option<FiberId>,
     },
+    StaleRenderPhaseAttempt {
+        fiber: FiberId,
+        expected: FunctionComponentRenderAttemptId,
+        actual: FunctionComponentRenderAttemptId,
+    },
+    StaleRenderPhaseStagingGeneration {
+        fiber: FiberId,
+        expected: u64,
+        actual: u64,
+    },
+    RenderPhaseLaneMismatch {
+        fiber: FiberId,
+        render_lanes: Lanes,
+        update_lane: HookUpdateLane,
+    },
+    RenderPhaseBailoutContextAlias {
+        fiber: FiberId,
+        blocker_fiber: FiberId,
+        current: Option<FiberId>,
+        blocker_current: Option<FiberId>,
+        render_lanes: Lanes,
+        blocker_lanes: Lanes,
+        context_dependency_count: usize,
+        context_dependency_lanes: Lanes,
+        child_traversal_blocked: bool,
+    },
+    RenderPhaseWrongFiberOrHookQueue {
+        fiber: FiberId,
+        owner_fiber: FiberId,
+        queue_owner: FiberId,
+        expected_queue: HookQueueId,
+        actual_queue: HookQueueId,
+    },
+    RenderPhaseCallerBuiltRowsRejected {
+        fiber: FiberId,
+        queue: HookQueueId,
+        update: HookUpdateId,
+    },
     TooManyRenderPhaseRerenders {
         fiber: FiberId,
         limit: usize,
@@ -8066,6 +8863,88 @@ impl Display for FunctionComponentRenderError {
                 render_fiber.slot().get(),
                 current.map(|fiber| fiber.slot().get())
             ),
+            Self::StaleRenderPhaseAttempt {
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "function component fiber {} rejected render-phase update from stale render attempt {}; current attempt is {}",
+                fiber.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::StaleRenderPhaseStagingGeneration {
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "function component fiber {} rejected render-phase staging generation {}; current generation is {}",
+                fiber.slot().get(),
+                actual,
+                expected
+            ),
+            Self::RenderPhaseLaneMismatch {
+                fiber,
+                render_lanes,
+                update_lane,
+            } => write!(
+                formatter,
+                "function component fiber {} rejected render-phase update lane {:?}; active render lanes are {:?}",
+                fiber.slot().get(),
+                update_lane.lanes(),
+                render_lanes
+            ),
+            Self::RenderPhaseBailoutContextAlias {
+                fiber,
+                blocker_fiber,
+                current,
+                blocker_current,
+                render_lanes,
+                blocker_lanes,
+                context_dependency_count,
+                context_dependency_lanes,
+                child_traversal_blocked,
+            } => write!(
+                formatter,
+                "function component fiber {} rejected render-phase update because bailout/context blocker state belongs to fiber {} current {:?}, lanes {:?}, {} context dependencies {:?}, child traversal blocked {}; active current {:?}, lanes {:?}",
+                fiber.slot().get(),
+                blocker_fiber.slot().get(),
+                blocker_current.map(|fiber| fiber.slot().get()),
+                blocker_lanes,
+                context_dependency_count,
+                context_dependency_lanes,
+                child_traversal_blocked,
+                current.map(|fiber| fiber.slot().get()),
+                render_lanes
+            ),
+            Self::RenderPhaseWrongFiberOrHookQueue {
+                fiber,
+                owner_fiber,
+                queue_owner,
+                expected_queue,
+                actual_queue,
+            } => write!(
+                formatter,
+                "function component fiber {} rejected render-phase staged row for owner fiber {}, queue owner {}, expected queue {}, actual queue {}",
+                fiber.slot().get(),
+                owner_fiber.slot().get(),
+                queue_owner.slot().get(),
+                expected_queue.raw(),
+                actual_queue.raw()
+            ),
+            Self::RenderPhaseCallerBuiltRowsRejected {
+                fiber,
+                queue,
+                update,
+            } => write!(
+                formatter,
+                "function component fiber {} rejected caller-built render-phase staged row for queue {} update {}",
+                fiber.slot().get(),
+                queue.raw(),
+                update.raw()
+            ),
             Self::TooManyRenderPhaseRerenders { fiber, limit } => write!(
                 formatter,
                 "function component fiber {} exceeded private render-phase rerender limit {}",
@@ -8171,6 +9050,12 @@ impl Error for FunctionComponentRenderError {
             | Self::ExpectedBasicStateQueue { .. }
             | Self::ReducerDispatchOutsideRenderContext { .. }
             | Self::StateDispatchOutsideRenderContext { .. }
+            | Self::StaleRenderPhaseAttempt { .. }
+            | Self::StaleRenderPhaseStagingGeneration { .. }
+            | Self::RenderPhaseLaneMismatch { .. }
+            | Self::RenderPhaseBailoutContextAlias { .. }
+            | Self::RenderPhaseWrongFiberOrHookQueue { .. }
+            | Self::RenderPhaseCallerBuiltRowsRejected { .. }
             | Self::TooManyRenderPhaseRerenders { .. }
             | Self::UnknownStateDispatch { .. }
             | Self::StateDispatchHandleOverflow
@@ -10657,20 +11542,73 @@ mod tests {
             dispatch.source().render_with_hooks_again(),
             "ReactFiberHooks.renderWithHooksAgain"
         );
+        assert_eq!(
+            dispatch.source().hook_staging_failure_preservation(),
+            "HookUpdateStaging.finish_queueing"
+        );
         assert_eq!(dispatch.source().rerender_limit(), 25);
+        assert_eq!(dispatch.attempt(), gate.attempt());
+        assert_eq!(dispatch.staging_generation(), 0);
         assert!(dispatch.kind().is_basic_state());
         assert_eq!(dispatch.render_fiber(), work_in_progress);
         assert_eq!(dispatch.queue_owner(), work_in_progress);
         assert_eq!(dispatch.queue(), mount.queue());
+        assert_eq!(
+            dispatch.queue_generation(),
+            hook_queue_generation_for_canary(mount.queue())
+        );
         assert_eq!(dispatch.dispatch(), mount.dispatch());
         assert_eq!(dispatch.lane(), lane);
         assert_eq!(dispatch.action(), action(11));
+        assert_eq!(
+            dispatch.update_generation(),
+            hook_update_generation_for_canary(dispatch.update())
+        );
         assert!(dispatch.dispatch_belongs_to_currently_rendering_fiber());
         assert!(dispatch.did_schedule_render_phase_update());
         assert!(dispatch.did_schedule_render_phase_update_during_this_pass());
         assert!(dispatch.pending_update_did_not_escape_to_root_scheduler());
         assert!(!dispatch.public_hook_compatibility_claimed());
+        assert!(dispatch.source_owned_currentness());
+        assert!(!dispatch.caller_built_rows_accepted());
+        assert_eq!(
+            dispatch.blocker_state(),
+            FunctionComponentRenderPhaseBailoutBlockerState::active_render(
+                hook_state,
+                Lanes::DEFAULT,
+            )
+        );
+        assert_eq!(gate.staged_update_count(), 1);
+        assert_eq!(gate.staging_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(mount.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+
+        let drain = gate
+            .finish_staged_render_phase_updates_for_canary(&mut hook_store)
+            .unwrap();
+
+        assert!(drain.proves_current_render_phase_staging());
+        assert_eq!(drain.attempt(), dispatch.attempt());
+        assert_eq!(drain.staging_generation(), 0);
+        assert_eq!(drain.next_staging_generation(), 1);
+        assert_eq!(drain.render_fiber(), work_in_progress);
+        assert_eq!(drain.current(), Some(_current));
+        assert_eq!(drain.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(drain.staging_lanes(), Lanes::DEFAULT);
+        assert_eq!(drain.queues(), &[mount.queue()]);
+        assert_eq!(drain.updates(), &[dispatch.update()]);
+        assert_eq!(drain.queue_generations(), &[dispatch.queue_generation()]);
+        assert_eq!(drain.update_generations(), &[dispatch.update_generation()]);
+        assert!(drain.source_owned_currentness());
+        assert!(!drain.caller_built_rows_accepted());
+        assert!(!drain.root_scheduled());
         assert_eq!(gate.recorded_queues(), &[mount.queue()]);
+        assert_eq!(gate.staged_update_count(), 0);
         assert_eq!(
             hook_store
                 .state_queues()
@@ -10688,6 +11626,7 @@ mod tests {
         );
 
         let pass = gate.begin_rerender_pass().unwrap();
+        assert_eq!(pass.attempt(), dispatch.attempt());
         assert_eq!(pass.render_fiber(), work_in_progress);
         assert_eq!(pass.pass_index(), 0);
         assert_eq!(pass.rerender_count(), 1);
@@ -10705,8 +11644,12 @@ mod tests {
         assert_eq!(processed.pass_index(), 1);
         assert_eq!(processed.rerender_count(), 1);
         assert_eq!(processed.render_fiber(), work_in_progress);
+        assert_eq!(processed.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(processed.attempt(), dispatch.attempt());
+        assert_eq!(processed.staging_generation(), 1);
         assert_eq!(processed.hook(), mount.hook());
         assert_eq!(processed.queue(), mount.queue());
+        assert_eq!(processed.queue_generation(), dispatch.queue_generation());
         assert_eq!(processed.dispatch(), mount.dispatch());
         assert_eq!(
             processed.kind(),
@@ -10788,6 +11731,15 @@ mod tests {
             dispatch.work_in_progress_list(),
             render.hook_state().work_in_progress_list()
         );
+        assert_eq!(gate.staged_update_count(), 1);
+        assert_eq!(gate.recorded_queues(), &[]);
+
+        let drain = gate
+            .finish_staged_render_phase_updates_for_canary(&mut hook_store)
+            .unwrap();
+        assert!(drain.proves_current_render_phase_staging());
+        assert_eq!(drain.queues(), &[current_reducer.queue()]);
+        assert_eq!(drain.updates(), &[dispatch.update()]);
         assert_eq!(gate.recorded_queues(), &[current_reducer.queue()]);
 
         gate.begin_rerender_pass().unwrap();
@@ -11009,8 +11961,12 @@ mod tests {
                 FunctionComponentStateDispatchRequest::new(mount.dispatch(), action(61), lane),
             )
             .unwrap();
+        let drain = gate
+            .finish_staged_render_phase_updates_for_canary(&mut hook_store)
+            .unwrap();
 
         assert!(dispatch.pending_update_did_not_escape_to_root_scheduler());
+        assert!(!drain.root_scheduled());
         assert_eq!(
             store.root(root_id).unwrap().lanes().pending_lanes(),
             Lanes::NO
@@ -11156,6 +12112,8 @@ mod tests {
                 FunctionComponentStateDispatchRequest::new(mount.dispatch(), action(83), lane),
             )
             .unwrap();
+        gate.finish_staged_render_phase_updates_for_canary(&mut hook_store)
+            .unwrap();
 
         let cleanup = gate
             .cleanup_pending_render_phase_updates(&mut hook_store)
@@ -11168,6 +12126,7 @@ mod tests {
         assert_eq!(cleanup.render_fiber(), work_in_progress);
         assert_eq!(cleanup.queues(), &[mount.queue()]);
         assert_eq!(cleanup.cleared_queue_count(), 1);
+        assert_eq!(cleanup.staged_update_count_before_cleanup(), 0);
         assert!(!cleanup.did_schedule_render_phase_update_after_cleanup());
         assert!(!cleanup.did_schedule_render_phase_update_during_this_pass_after_cleanup());
         assert_eq!(
@@ -11187,7 +12146,342 @@ mod tests {
     }
 
     #[test]
-    fn function_component_render_phase_evidence_does_not_claim_public_hook_compatibility() {
+    fn function_component_render_phase_hook_staging_rejects_stale_render_attempt() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(917)));
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let render = render_function_component_with_use_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseStateRenderRequest::new(StateHandle::from_raw(90), lanes),
+            &mut registry,
+            action_as_state,
+        )
+        .unwrap();
+        let mount = render.state_hook().mount_record().unwrap();
+        let mut gate =
+            FunctionComponentRenderPhaseUpdateGate::new(render.hook_state(), Lanes::DEFAULT);
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let dispatch = hook_store
+            .enqueue_state_render_phase_update_for_canary(
+                &mut gate,
+                FunctionComponentStateDispatchRequest::new(mount.dispatch(), action(91), lane),
+            )
+            .unwrap();
+
+        gate.advance_render_attempt_for_canary();
+
+        assert_eq!(
+            gate.finish_staged_render_phase_updates_for_canary(&mut hook_store),
+            Err(FunctionComponentRenderError::StaleRenderPhaseAttempt {
+                fiber: work_in_progress,
+                expected: gate.attempt(),
+                actual: dispatch.attempt(),
+            })
+        );
+        assert_eq!(gate.staged_update_count(), 1);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(mount.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+    }
+
+    #[test]
+    fn function_component_render_phase_hook_staging_preserves_failure_and_rejects_replay() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(918)));
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let render = render_function_component_with_use_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseStateRenderRequest::new(StateHandle::from_raw(100), lanes),
+            &mut registry,
+            action_as_state,
+        )
+        .unwrap();
+        let mount = render.state_hook().mount_record().unwrap();
+        let mut gate =
+            FunctionComponentRenderPhaseUpdateGate::new(render.hook_state(), Lanes::DEFAULT);
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let dispatch = hook_store
+            .enqueue_state_render_phase_update_for_canary(
+                &mut gate,
+                FunctionComponentStateDispatchRequest::new(mount.dispatch(), action(101), lane),
+            )
+            .unwrap();
+        let entry = gate.staging.entries()[0].clone();
+        gate.staging
+            .stage(*entry.owner(), entry.queue(), entry.update(), entry.lane());
+
+        for _ in 0..2 {
+            let error = gate
+                .finish_staged_render_phase_updates_for_canary(&mut hook_store)
+                .unwrap_err();
+            match error {
+                FunctionComponentRenderError::HookQueue { fiber, error } => {
+                    assert_eq!(fiber, work_in_progress);
+                    assert!(matches!(
+                        *error,
+                        HookQueueError::DuplicateStagedUpdate { id }
+                            if id == dispatch.update()
+                    ));
+                }
+                other => panic!("unexpected render-phase staging error: {other:?}"),
+            }
+            assert_eq!(gate.staged_update_count(), 2);
+            assert_eq!(
+                hook_store
+                    .state_queues()
+                    .pending_updates(mount.queue())
+                    .unwrap(),
+                Vec::<HookUpdateId>::new()
+            );
+        }
+    }
+
+    #[test]
+    fn function_component_render_phase_hook_staging_rejects_wrong_fiber_hook_queue() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(919)));
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let render = render_function_component_with_use_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseStateRenderRequest::new(StateHandle::from_raw(110), lanes),
+            &mut registry,
+            action_as_state,
+        )
+        .unwrap();
+        let mount = render.state_hook().mount_record().unwrap();
+        let other_fiber = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(5),
+            FiberMode::NO,
+        );
+        let other_state = hook_store
+            .create_current_state_hook(other_fiber, StateHandle::from_raw(111))
+            .unwrap();
+        let mut gate =
+            FunctionComponentRenderPhaseUpdateGate::new(render.hook_state(), Lanes::DEFAULT);
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let dispatch = hook_store
+            .enqueue_state_render_phase_update_for_canary(
+                &mut gate,
+                FunctionComponentStateDispatchRequest::new(mount.dispatch(), action(112), lane),
+            )
+            .unwrap();
+        let mut owner = *gate.staging.entries()[0].owner();
+        owner.render_fiber = other_fiber;
+        owner.queue_owner = other_fiber;
+        owner.queue = other_state.queue();
+        owner.queue_generation = hook_queue_generation_for_canary(other_state.queue());
+        gate.staging = HookUpdateStaging::new();
+        gate.staging
+            .stage(owner, mount.queue(), dispatch.update(), lane);
+
+        assert_eq!(
+            gate.finish_staged_render_phase_updates_for_canary(&mut hook_store),
+            Err(
+                FunctionComponentRenderError::RenderPhaseWrongFiberOrHookQueue {
+                    fiber: work_in_progress,
+                    owner_fiber: other_fiber,
+                    queue_owner: other_fiber,
+                    expected_queue: other_state.queue(),
+                    actual_queue: mount.queue(),
+                }
+            )
+        );
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(mount.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+    }
+
+    #[test]
+    fn function_component_render_phase_hook_staging_rejects_lane_mismatch() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_state = hook_store
+            .create_current_state_hook(current, StateHandle::from_raw(120))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(920)));
+        let render = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let mut gate = FunctionComponentRenderPhaseUpdateGate::new(
+            render.hook_state().unwrap(),
+            Lanes::DEFAULT,
+        );
+        let sync_lane = HookUpdateLane::from_lane(Lane::SYNC).unwrap();
+
+        assert_eq!(
+            hook_store.enqueue_state_render_phase_update_for_canary(
+                &mut gate,
+                FunctionComponentStateDispatchRequest::new(
+                    current_state.dispatch(),
+                    action(121),
+                    sync_lane,
+                ),
+            ),
+            Err(FunctionComponentRenderError::RenderPhaseLaneMismatch {
+                fiber: work_in_progress,
+                render_lanes: Lanes::DEFAULT,
+                update_lane: sync_lane,
+            })
+        );
+        assert_eq!(gate.staged_update_count(), 0);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(current_state.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+    }
+
+    #[test]
+    fn function_component_render_phase_hook_staging_rejects_bailout_context_alias() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_state = hook_store
+            .create_current_state_hook(current, StateHandle::from_raw(130))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(921)));
+        let render = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let state = render.hook_state().unwrap();
+        let mut gate = FunctionComponentRenderPhaseUpdateGate::new(state, Lanes::DEFAULT);
+        let blocker =
+            FunctionComponentRenderPhaseBailoutBlockerState::active_render(state, Lanes::DEFAULT)
+                .with_render_fiber(current)
+                .with_context_dependency_lanes(1, Lanes::DEFAULT)
+                .with_child_traversal_blocked(true);
+        gate.set_blocker_state_for_canary(blocker);
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+
+        assert_eq!(
+            hook_store.enqueue_state_render_phase_update_for_canary(
+                &mut gate,
+                FunctionComponentStateDispatchRequest::new(
+                    current_state.dispatch(),
+                    action(131),
+                    lane,
+                ),
+            ),
+            Err(
+                FunctionComponentRenderError::RenderPhaseBailoutContextAlias {
+                    fiber: work_in_progress,
+                    blocker_fiber: current,
+                    current: Some(current),
+                    blocker_current: Some(current),
+                    render_lanes: Lanes::DEFAULT,
+                    blocker_lanes: Lanes::DEFAULT,
+                    context_dependency_count: 1,
+                    context_dependency_lanes: Lanes::DEFAULT,
+                    child_traversal_blocked: true,
+                }
+            )
+        );
+        assert_eq!(gate.staged_update_count(), 0);
+    }
+
+    #[test]
+    fn function_component_render_phase_hook_staging_rejects_caller_built_rows() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(922)));
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let render = render_function_component_with_use_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseStateRenderRequest::new(StateHandle::from_raw(140), lanes),
+            &mut registry,
+            action_as_state,
+        )
+        .unwrap();
+        let mount = render.state_hook().mount_record().unwrap();
+        let mut gate =
+            FunctionComponentRenderPhaseUpdateGate::new(render.hook_state(), Lanes::DEFAULT);
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let update = hook_store
+            .state_queues_mut()
+            .create_update(lane, action(141));
+        let owner = FunctionComponentRenderPhaseStagingOwner {
+            source_owned: false,
+            caller_built: true,
+            attempt: gate.attempt(),
+            staging_generation: gate.staging_generation(),
+            render_fiber: work_in_progress,
+            current: gate.state().current(),
+            work_in_progress_list: gate.state().work_in_progress_list(),
+            queue_owner: work_in_progress,
+            queue: mount.queue(),
+            queue_generation: hook_queue_generation_for_canary(mount.queue()),
+            update_generation: hook_update_generation_for_canary(update),
+            render_lanes: Lanes::DEFAULT,
+            update_lane: lane,
+            blocker: gate.blocker_state(),
+        };
+        gate.staging.stage(owner, mount.queue(), update, lane);
+
+        assert_eq!(
+            gate.finish_staged_render_phase_updates_for_canary(&mut hook_store),
+            Err(
+                FunctionComponentRenderError::RenderPhaseCallerBuiltRowsRejected {
+                    fiber: work_in_progress,
+                    queue: mount.queue(),
+                    update,
+                }
+            )
+        );
+        assert_eq!(gate.staged_update_count(), 1);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(mount.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+    }
+
+    #[test]
+    fn function_component_render_phase_evidence_does_not_claim_public_hook_root_scheduler_act_or_renderer_compatibility()
+     {
         let evidence = FunctionComponentRenderPhaseSourceEvidenceForCanary::react_19_2_6();
 
         assert_eq!(evidence.react_version(), "19.2.6");
@@ -11200,9 +12494,25 @@ mod tests {
             evidence.enqueue_render_phase_update(),
             "enqueueRenderPhaseUpdate"
         );
+        assert_eq!(
+            evidence.hook_queue_generation_guard(),
+            "HookQueueId generation"
+        );
+        assert_eq!(
+            evidence.hook_staging_failure_preservation(),
+            "HookUpdateStaging.finish_queueing"
+        );
+        assert_eq!(
+            evidence.bailout_blocker(),
+            "begin_work_function_component_bailout_blocker"
+        );
         assert_eq!(evidence.rerender_limit(), 25);
         assert!(!evidence.public_hook_compatibility_claimed());
+        assert!(!evidence.public_root_compatibility_claimed());
         assert!(!evidence.root_scheduler_integration_claimed());
+        assert!(!evidence.scheduler_compatibility_claimed());
+        assert!(!evidence.act_compatibility_claimed());
+        assert!(!evidence.renderer_compatibility_claimed());
     }
 
     #[test]
