@@ -825,6 +825,12 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
   const rootBridge = require(
     path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
   );
+  const hydrationGate = require(
+    path.join(
+      repoRoot,
+      "packages/react-dom/src/client/hydration-boundary-gate.js"
+    )
+  );
   const rootMarkers = require(
     path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
   );
@@ -960,7 +966,8 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
     [
       "private-hydrate-root-bridge-request-admission",
       "unsupported-hydration-boundary-diagnostics",
-      "hydrate-root-marker-listener-preflight-diagnostics"
+      "hydrate-root-marker-listener-preflight-diagnostics",
+      "hydrate-root-recoverable-error-preflight-diagnostics"
     ]
   );
   assert.equal(
@@ -1130,6 +1137,41 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
     false
   );
   assert.equal(
+    record.recoverableErrorPreflight.recoverableErrorMetadata,
+    record.recoverableErrorMetadata
+  );
+  assert.equal(
+    record.recoverableErrorPreflight.acceptedBoundaryMetadataDiagnostics,
+    record.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    record.recoverableErrorPreflightStatus,
+    hydrationGate.privateHydrationTextMismatchRecoverableErrorPreflightStatus
+  );
+  assert.equal(record.recoverableErrorPreflightAccepted, true);
+  assert.equal(record.recoverableErrorMetadataAccepted, true);
+  assert.equal(record.recoverableErrorMetadataCount, 1);
+  assert.equal(record.queuedRecoverableErrorCount, 0);
+  assert.equal(record.wouldQueueRecoverableErrorCount, 1);
+  assert.equal(record.recoverableErrorsQueued, false);
+  assert.equal(record.willQueueRecoverableErrors, false);
+  assert.equal(record.onRecoverableErrorConfigured, true);
+  assert.equal(record.onRecoverableErrorInvoked, false);
+  assert.equal(record.publicOnRecoverableErrorInvoked, false);
+  assert.equal(record.rootErrorCallbackInvocationCount, 0);
+  assert.equal(
+    rootBridge.isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord(
+      record.recoverableErrorPreflight
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload(
+      record.recoverableErrorPreflight
+    ).hydrationBoundaryRecord,
+    record.hydrationBoundaryRecord
+  );
+  assert.equal(
     payload.requestRecord.hydrationBoundaryRecord,
     record.hydrationBoundaryRecord
   );
@@ -1155,6 +1197,16 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
   assert.equal(
     rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
       .markerListenerPreflightRecordCount,
+    1
+  );
+  assert.deepEqual(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .recoverableErrorPreflightRecords,
+    [record.recoverableErrorPreflight]
+  );
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .recoverableErrorPreflightRecordCount,
     1
   );
   assert.equal(rootMarkers.getContainerRoot(container), null);

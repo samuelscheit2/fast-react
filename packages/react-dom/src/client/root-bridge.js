@@ -50,12 +50,15 @@ const {
   createHydrationBoundaryGate,
   createHydrationReplayOwnershipGateDiagnostic,
   createHydrationReplayTargetDispatchLinkDiagnostic,
+  createHydrationTextMismatchRecoverableErrorPreflightRecord,
   getPrivateHydrationBoundaryRecordPayload,
   getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload,
   getPrivateHydrationTargetClaimingDiagnosticPayload,
+  getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload,
   isPrivateHydrationBoundaryRecord,
   isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
   isPrivateHydrationTargetClaimingDiagnostic,
+  isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord,
   privateHydrationBoundaryAcceptedMetadataGateId,
   privateHydrationBoundaryAcceptedMetadataStatus,
   privateHydrationClaimedReplayTargetDispatchExecutionGateId,
@@ -526,6 +529,12 @@ const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES =
       accepted: true,
       reason:
         'The private hydrateRoot preflight validated root marker and listener guard snapshots without writing markers or installing listeners.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-recoverable-error-preflight-diagnostics',
+      accepted: true,
+      reason:
+        'The private hydrateRoot preflight accepted recoverable-error metadata without queueing errors or invoking root callbacks.'
     })
   ]);
 const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES =
@@ -3263,6 +3272,7 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
       options && options.publicFacadeHydratePreflightIdPrefix,
       'hydrate-root-public-facade-preflight'
     ),
+    recoverableErrorPreflightRecords: [],
     records: [],
     targetClaimingPreflightRecords: []
   };
@@ -3344,6 +3354,29 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
   preflightState.markerListenerPreflightRecords.push(
     markerListenerPreflight
   );
+  const requestPayload = rootRecordPayloads.get(requestRecord);
+  if (requestPayload === undefined) {
+    throwInvalidRootPublicFacadePreflight(
+      'Expected a private React DOM hydrateRoot record for public-facade recoverable-error preflight.'
+    );
+  }
+  const recoverableErrorPreflight =
+    createHydrationTextMismatchRecoverableErrorPreflightRecord(
+      requestRecord.hydrationBoundaryRecord,
+      requestRecord.acceptedPrivateMetadataDiagnostics,
+      requestRecord.recoverableErrorMetadata,
+      {
+        enableRecoverableErrorPreflight: true,
+        hydrationOptions: requestPayload.hydrationOptions,
+        preflightId: `${preflightId}:recoverable-error`,
+        preflightSequence,
+        source:
+          'private-hydrate-root-public-facade-recoverable-error-preflight'
+      }
+    );
+  preflightState.recoverableErrorPreflightRecords.push(
+    recoverableErrorPreflight
+  );
   const record = freezeRecord({
     $$typeof: privateHydrateRootPublicFacadePreflightRecordType,
     kind: 'FastReactDomPrivateHydrateRootPublicFacadePreflightRecord',
@@ -3371,6 +3404,33 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     markerEvidence: requestRecord.markerEvidence,
     textMismatchDiagnostics: requestRecord.textMismatchDiagnostics,
     recoverableErrorMetadata: requestRecord.recoverableErrorMetadata,
+    recoverableErrorPreflight,
+    recoverableErrorPreflightId: recoverableErrorPreflight.preflightId,
+    recoverableErrorPreflightStatus:
+      recoverableErrorPreflight.preflightStatus,
+    recoverableErrorPreflightAccepted: true,
+    recoverableErrorMetadataAccepted:
+      recoverableErrorPreflight.recoverableErrorMetadataAccepted,
+    recoverableErrorMetadataStatus:
+      recoverableErrorPreflight.sourceRecoverableErrorMetadataStatus,
+    recoverableErrorMetadataCount:
+      recoverableErrorPreflight.recoverableErrorMetadataCount,
+    queuedRecoverableErrorCount:
+      recoverableErrorPreflight.queuedRecoverableErrorCount,
+    wouldQueueRecoverableErrorCount:
+      recoverableErrorPreflight.wouldQueueRecoverableErrorCount,
+    recoverableErrorsQueued:
+      recoverableErrorPreflight.recoverableErrorsQueued,
+    willQueueRecoverableErrors:
+      recoverableErrorPreflight.willQueueRecoverableErrors,
+    onRecoverableErrorConfigured:
+      recoverableErrorPreflight.onRecoverableErrorConfigured,
+    onRecoverableErrorInvoked:
+      recoverableErrorPreflight.onRecoverableErrorInvoked,
+    publicOnRecoverableErrorInvoked:
+      recoverableErrorPreflight.publicOnRecoverableErrorInvoked,
+    rootErrorCallbackInvocationCount:
+      recoverableErrorPreflight.rootErrorCallbackInvocationCount,
     replayQueueDiagnostics: requestRecord.replayQueueDiagnostics,
     targetResolutionDiagnostics: requestRecord.targetResolutionDiagnostics,
     eventReplayBlockers: requestRecord.eventReplayBlockers,
@@ -3427,6 +3487,7 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     markerListenerPreflight,
     nativeHandoffRecord: null,
     preflight: preflightState.preflight,
+    recoverableErrorPreflight,
     requestAdmission,
     requestRecord
   });
@@ -9116,6 +9177,11 @@ function getPrivateHydrateRootPublicFacadePreflightPayload(preflight) {
     preflight: payload.preflight,
     preflightRecordCount: payload.records.length,
     preflightRecords: freezeArray(payload.records),
+    recoverableErrorPreflightRecordCount:
+      payload.recoverableErrorPreflightRecords.length,
+    recoverableErrorPreflightRecords: freezeArray(
+      payload.recoverableErrorPreflightRecords
+    ),
     targetClaimingPreflightRecordCount:
       payload.targetClaimingPreflightRecords.length,
     targetClaimingPreflightRecords: freezeArray(
@@ -9139,6 +9205,7 @@ function getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
     markerListenerPreflight: payload.markerListenerPreflight,
     nativeHandoffRecord: payload.nativeHandoffRecord,
     preflight: payload.preflight,
+    recoverableErrorPreflight: payload.recoverableErrorPreflight,
     requestAdmission: payload.requestAdmission,
     requestRecord: payload.requestRecord
   });
@@ -20819,6 +20886,7 @@ module.exports = {
   getPrivateRootHydrationRecoverableErrorRoutingPayload,
   getPrivateRootHydrationReplayErrorMetadataPayload,
   getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload,
+  getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload,
   getPrivateHydrationTargetClaimingDiagnosticPayload,
   getPrivateRootRefCallbackErrorRoutingPayload,
   getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload,
@@ -20866,6 +20934,7 @@ module.exports = {
   isPrivateRootHydrationRecoverableErrorRoutingRecord,
   isPrivateRootHydrationReplayErrorMetadataRecord,
   isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
+  isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord,
   isPrivateHydrationTargetClaimingDiagnostic,
   isPrivateRootRefCallbackErrorRoutingRecord,
   isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord,

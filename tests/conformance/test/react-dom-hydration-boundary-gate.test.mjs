@@ -1462,6 +1462,170 @@ test("private hydration text mismatch gate records recoverable-error metadata wi
   assert.deepEqual(document.__registrations, []);
 });
 
+test("private hydrateRoot recoverable-error preflight accepts metadata without invoking callbacks", () => {
+  const document = createDocument("recoverable-preflight");
+  const container = createElement("DIV", document);
+  const callbackCalls = [];
+  container.childNodes = [createText("server preflight")];
+
+  function onRecoverableError(error) {
+    callbackCalls.push(error.message);
+  }
+
+  const hydrationOptions = {
+    identifierPrefix: "recoverable-preflight-",
+    onRecoverableError
+  };
+  const record = hydrationGate
+    .createHydrationBoundaryGate({
+      markerOracle: oracle,
+      recordIdPrefix: "recoverable-preflight"
+    })
+    .recordUnsupportedHydrateRoot(
+      container,
+      { props: { children: "client preflight" }, type: "App" },
+      hydrationOptions
+    );
+
+  const preflight =
+    hydrationGate
+      .createHydrationTextMismatchRecoverableErrorPreflightRecord(
+        record,
+        record.acceptedPrivateMetadataDiagnostics,
+        record.recoverableErrorMetadata,
+        {
+          enableRecoverableErrorPreflight: true,
+          hydrationOptions,
+          preflightId: "recoverable-preflight-record:1",
+          preflightSequence: 1,
+          source: "conformance-recoverable-error-preflight"
+        }
+      );
+
+  assert.equal(
+    hydrationGate
+      .isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord(
+        preflight
+      ),
+    true
+  );
+  assert.equal(
+    rootBridge
+      .isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord(
+        preflight
+      ),
+    true
+  );
+  assert.equal(
+    preflight.kind,
+    hydrationGate
+      .HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_RECORD_KIND
+  );
+  assert.equal(
+    preflight.gateId,
+    hydrationGate.privateHydrationTextMismatchRecoverableErrorPreflightGateId
+  );
+  assert.equal(
+    preflight.preflightStatus,
+    hydrationGate.privateHydrationTextMismatchRecoverableErrorPreflightStatus
+  );
+  assert.equal(preflight.preflightId, "recoverable-preflight-record:1");
+  assert.equal(preflight.preflightSequence, 1);
+  assert.equal(preflight.acceptedBoundaryMetadataConsumed, true);
+  assert.equal(
+    preflight.acceptedBoundaryMetadataDiagnostics,
+    record.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    preflight.acceptedBoundaryMetadataRow.metadataId,
+    hydrationGate
+      .privateHydrationTextMismatchRecoverableErrorRoutingMetadataId
+  );
+  assert.equal(preflight.recoverableErrorMetadata, record.recoverableErrorMetadata);
+  assert.equal(preflight.recoverableErrorMetadataAccepted, true);
+  assert.equal(preflight.textMismatchRowCount, 1);
+  assert.equal(preflight.recoverableErrorMetadataCount, 1);
+  assert.equal(preflight.queuedRecoverableErrorCount, 0);
+  assert.equal(preflight.wouldQueueRecoverableErrorCount, 1);
+  assert.equal(preflight.recoverableErrorsQueued, false);
+  assert.equal(preflight.willQueueRecoverableErrors, false);
+  assert.equal(preflight.onRecoverableErrorConfigured, true);
+  assert.equal(preflight.onRecoverableErrorInvoked, false);
+  assert.equal(preflight.privateOnRecoverableErrorInvoked, false);
+  assert.equal(preflight.publicOnRecoverableErrorInvoked, false);
+  assert.equal(preflight.rootErrorCallbackInvocationCount, 0);
+  assert.equal(preflight.publicHydrateRootSupported, false);
+  assert.equal(preflight.publicHydrationCompatibilityClaimed, false);
+  assert.equal(preflight.publicHydrationReplayCompatibilityClaimed, false);
+  assert.equal(preflight.compatibilityClaimed, false);
+  assert.deepEqual(callbackCalls, []);
+
+  const payload =
+    hydrationGate
+      .getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload(
+        preflight
+      );
+  assert.equal(payload.hydrationBoundaryRecord, record);
+  assert.equal(payload.hydrationOptions, hydrationOptions);
+  assert.equal(payload.recoverableErrorMetadata, record.recoverableErrorMetadata);
+  assert.equal(payload.recoverableErrorRows.length, 1);
+
+  assert.throws(
+    () =>
+      hydrationGate
+        .createHydrationTextMismatchRecoverableErrorPreflightRecord(
+          record,
+          record.acceptedPrivateMetadataDiagnostics,
+          Object.freeze({
+            ...record.recoverableErrorMetadata
+          }),
+          {
+            enableRecoverableErrorPreflight: true,
+            hydrationOptions
+          }
+        ),
+    {
+      code:
+        hydrationGate
+          .INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_CODE,
+      message: /must match/
+    }
+  );
+  assert.throws(
+    () =>
+      hydrationGate
+        .createHydrationTextMismatchRecoverableErrorPreflightRecord(
+          record,
+          record.acceptedPrivateMetadataDiagnostics,
+          Object.freeze({
+            ...record.recoverableErrorMetadata,
+            recoverableErrorRows: Object.freeze(
+              record.recoverableErrorMetadata.recoverableErrorRows.map(
+                (row, index) =>
+                  Object.freeze({
+                    ...row,
+                    queuedRecoverableError: index === 0
+                  })
+              )
+            )
+          }),
+          {
+            enableRecoverableErrorPreflight: true,
+            hydrationOptions
+          }
+        ),
+    {
+      code:
+        hydrationGate
+          .INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_CODE,
+      message: /unqueued recoverable mismatch rows/
+    }
+  );
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+  assert.equal(container.childNodes[0].nodeValue, "server preflight");
+});
+
 test("private hydration text mismatch recoverable-error routing execution consumes accepted boundary metadata", () => {
   const document = createDocument("text-mismatch-recoverable-execution");
   const container = createElement("DIV", document);
