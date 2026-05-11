@@ -326,6 +326,8 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   ];
   const privateSchedulerMockExpiredActRootWorkPrerequisiteId =
     "scheduler-mock-expired-act-root-work-diagnostics";
+  const privateReactActSchedulerDiagnosticsLedgerPrerequisiteId =
+    "react-act-scheduler-private-diagnostics-ledger";
 
   assert.equal(
     gate.status,
@@ -349,6 +351,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   assert.deepEqual(gate.acceptedPrivatePrerequisiteIds, [
     "react-act-private-dispatcher-gate",
     privateSchedulerMockExpiredActRootWorkPrerequisiteId,
+    privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
     "scheduler-act-queue-routing-records",
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
@@ -853,6 +856,69 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   );
   assert.equal(
     gate.privateSchedulerMockExpiredActRootWorkDiagnostics.executesRendererRoots,
+    false
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.gateId,
+    "private-admission-810-react-act-scheduler-diagnostics-ledger-1"
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.status,
+    "recognized-react-act-scheduler-private-diagnostics-ledger-public-blocked"
+  );
+  assert.deepEqual(gate.privateReactActSchedulerDiagnosticsLedger.workerIds, [
+    "worker-747-react-private-act-expired-scheduler-consumer",
+    "worker-772-scheduler-delayed-root-producer",
+    "worker-773-test-utils-act-expired-scheduler-handoff",
+    "worker-775-react-act-delayed-mock-consumer",
+    "worker-791-scheduler-source-proof-private-diagnostics",
+    "worker-792-react-delayed-renderer-root-preflight",
+    "worker-793-delayed-renderer-root-negative-coverage",
+    "worker-798-scheduler-private-diagnostics-integrity"
+  ]);
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.staticReadOnlyLedger,
+    true
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.sourceTokenChecksOnly,
+    true
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.manifestEvaluationOnly,
+    true
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.publicTestUtilsActReady,
+    false
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.publicSchedulerTimingReady,
+    false
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger
+      .publicSchedulerFlushBehaviorExecuted,
+    false
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.publicActExecution,
+    false
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.publicRootExecution,
+    false
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.publicEffectExecution,
+    false
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.executesRendererRoots,
+    false
+  );
+  assert.equal(
+    gate.privateReactActSchedulerDiagnosticsLedger.compatibilityClaimed,
     false
   );
   assert.deepEqual(gate.passiveEffects, {
