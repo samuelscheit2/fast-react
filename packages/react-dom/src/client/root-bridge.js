@@ -6377,10 +6377,16 @@ function createPrivateRootPublicFacadeRoot(
           lifecycleRequestBoundary
         );
         if (preparedUnmount !== null) {
-          assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionMatchesRecord(
-            preparedUnmount.lifecycleExecution,
-            record
-          );
+          completePrivateRootPublicFacadeRootUnmountLifecycleExecution({
+            execution: preparedUnmount.lifecycleExecution,
+            payload,
+            rootUnmountLifecycleBoundary:
+              createPrivateRootPublicFacadeRootUnmountLifecycleRequestBoundary({
+                payload,
+                unmountRecord: record
+              }),
+            unmountRecord: record
+          });
         }
         if (activeHostOutput !== null && !record.noOp) {
           unmountPrivateRootPublicFacadeActiveHostOutputFromPayload(
@@ -10010,10 +10016,16 @@ function unmountPrivateRootPublicFacadeHostOutputFromPayload(
       unmountRecord,
       unmountLifecycleRequestBoundary
     );
-    assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionMatchesRecord(
-      preparedUnmount.lifecycleExecution,
+    completePrivateRootPublicFacadeRootUnmountLifecycleExecution({
+      execution: preparedUnmount.lifecycleExecution,
+      payload,
+      rootUnmountLifecycleBoundary:
+        createPrivateRootPublicFacadeRootUnmountLifecycleRequestBoundary({
+          payload,
+          unmountRecord
+        }),
       unmountRecord
-    );
+    });
     unmountRefPassiveEvidence =
       createPrivateRootPublicFacadeUnmountRefPassiveEvidence({
         element,
@@ -10247,6 +10259,15 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
       unmountLifecycleExecution.record,
     rootUnmountLifecycleExecutionSourceOwned:
       unmountLifecycleExecution.record.sourceOwned,
+    rootUnmountLifecycleRequestBoundaryRecord:
+      unmountLifecycleExecution.record
+        .rootUnmountLifecycleRequestBoundaryRecord,
+    rootUnmountLifecycleRequestBoundaryStatus:
+      unmountLifecycleExecution.record
+        .rootUnmountLifecycleRequestBoundaryStatus,
+    rootUnmountLifecycleRequestBoundarySourceOwned:
+      unmountLifecycleExecution.record
+        .rootUnmountLifecycleRequestBoundarySourceOwned,
     rootUnmountLifecycleRequestBoundaryCurrent:
       unmountLifecycleExecution.record.requestBoundaryCurrent,
     rootUnmountLifecycleSnapshotOwned:
@@ -10414,6 +10435,12 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
       rootPublicFacadeLifecycleContainerSnapshotPayloads.get(
         sourceContainerSnapshot
       ),
+    rootUnmountLifecycleRequestBoundaryPayload:
+      unmountLifecycleExecution.payload
+        .rootUnmountLifecycleRequestBoundaryPayload,
+    rootUnmountLifecycleRequestBoundaryRecord:
+      unmountLifecycleExecution.payload
+        .rootUnmountLifecycleRequestBoundaryRecord,
     unmountLifecycleExecutionPayload: unmountLifecycleExecution.payload,
     unmountLifecycleExecutionRecord: unmountLifecycleExecution.record,
     unmountCallback,
@@ -10770,18 +10797,52 @@ function createPrivateRootPublicFacadeRootUnmountLifecycleSourceRow({
 
 function assertNoPublicFacadeRootUnmountLifecycleAliasClaims(row) {
   const blockedFields = [
+    'browserDomMutation',
+    'browserDomMutationClaimed',
+    'browserMutation',
+    'compatibilityClaimed',
+    'domCompatibility',
+    'domCompatibilityClaimed',
+    'domMutation',
+    'errorMessage',
+    'eventDispatch',
+    'eventDispatchClaimed',
+    'events',
+    'eventsClaimed',
+    'hydration',
+    'hydrationClaimed',
     'publicRootExecution',
+    'publicRootRender',
+    'publicRootRenderCompatibilityClaimed',
     'publicRootUnmount',
     'publicRootUnmounted',
     'publicRootCompatibilitySurface',
     'publicRootUnmountCompatibilityClaimed',
+    'publicDomMutation',
+    'publicDomMutationClaimed',
+    'publicRootBehaviorChanged',
+    'publicRootCreated',
+    'publicRootObjectExposed',
+    'packageCompatibility',
+    'packageCompatibilitySurface',
     'nativeExecution',
+    'nativeExecutionClaimed',
     'rustExecution',
+    'rustExecutionClaimed',
     'reconcilerExecution',
+    'reconcilerExecutionClaimed',
+    'refEffects',
+    'refEffectsClaimed',
     'packageCompatibilityClaimed',
-    'compatibilityClaimed',
+    'prose',
+    'proseString',
+    'proseText',
+    'sourceSyntax',
+    'sourceSyntaxString',
+    'sourceSyntaxText',
     'sourceSyntaxAlias',
     'proseAlias',
+    'testTitle',
     'testTitleAlias',
     'errorMessageAlias'
   ];
@@ -10830,7 +10891,7 @@ function createPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
 
   const executionId =
     `${expectedSource.updateId}:root-unmount-lifecycle-execution`;
-  const record = freezeRecord({
+  const record = {
     $$typeof:
       privateRootPublicFacadeRootUnmountLifecycleExecutionRecordType,
     kind:
@@ -10881,7 +10942,11 @@ function createPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
       normalizedMetadata.lifecycleRows.length,
     lifecycleRowsFrozen:
       normalizedMetadata.lifecycleRows.every((row) => Object.isFrozen(row)),
-    requestBoundaryCurrent: true,
+    requestBoundaryCurrent: false,
+    rootUnmountLifecycleAdmissionRecord: null,
+    rootUnmountLifecycleRequestBoundaryRecord: null,
+    rootUnmountLifecycleRequestBoundaryStatus: null,
+    rootUnmountLifecycleRequestBoundarySourceOwned: false,
     consumed: false,
     replayRejected: true,
     fakeDomMutation: false,
@@ -10898,7 +10963,7 @@ function createPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
     eventDispatch: false,
     refEffects: false,
     compatibilityClaimed: false
-  });
+  };
 
   rootPublicFacadeRootUnmountLifecycleExecutionPayloads.set(record, {
     createPayload,
@@ -10912,6 +10977,9 @@ function createPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
     normalizedMetadata,
     payload,
     rootHandle: payload.rootHandle,
+    rootUnmountLifecycleAdmissionRecord: null,
+    rootUnmountLifecycleRequestBoundaryPayload: null,
+    rootUnmountLifecycleRequestBoundaryRecord: null,
     sourceContainerSnapshotBefore
   });
   return record;
@@ -10993,6 +11061,11 @@ function assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
   }
   const executionPayload =
     rootPublicFacadeRootUnmountLifecycleExecutionPayloads.get(record);
+  if (executionPayload !== undefined && executionPayload.consumed) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount rejected a replayed lifecycle execution record.'
+    );
+  }
   if (
     executionPayload === undefined ||
     record.$$typeof !==
@@ -11002,20 +11075,32 @@ function assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
     record.entrypoint !== 'react-dom/client' ||
     record.sameEntrypoint !== true ||
     record.sourceOwned !== true ||
-    record.requestBoundaryCurrent !== true ||
+    record.requestBoundaryCurrent !== false ||
+    record.rootUnmountLifecycleAdmissionRecord !== null ||
+    record.rootUnmountLifecycleRequestBoundaryRecord !== null ||
+    record.rootUnmountLifecycleRequestBoundaryStatus !== null ||
+    record.rootUnmountLifecycleRequestBoundarySourceOwned !== false ||
     record.sourceContainerSnapshotOwned !== true ||
     record.fakeDomMutation !== false ||
+    record.domMutation !== false ||
+    record.browserDomMutation !== false ||
+    record.publicRootExecution !== false ||
+    record.publicRootCompatibilitySurface !== false ||
     record.nativeExecution !== false ||
     record.reconcilerExecution !== false ||
-    record.compatibilityClaimed !== false
+    record.rootScheduled !== false ||
+    record.markerWrites !== false ||
+    record.listenerInstallation !== false ||
+    record.hydration !== false ||
+    record.eventDispatch !== false ||
+    record.refEffects !== false ||
+    record.compatibilityClaimed !== false ||
+    !privateRootPublicFacadeRootUnmountLifecyclePendingRecordWritable(
+      record
+    )
   ) {
     throwInvalidRootPublicFacadeHostOutputUnmount(
       'Public-facade root.unmount requires an intact source-owned lifecycle execution record.'
-    );
-  }
-  if (executionPayload.consumed) {
-    throwInvalidRootPublicFacadeHostOutputUnmount(
-      'Public-facade root.unmount rejected a replayed lifecycle execution record.'
     );
   }
   if (
@@ -11050,6 +11135,44 @@ function assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord({
     payload: executionPayload,
     record
   };
+}
+
+function privateRootPublicFacadeRootUnmountLifecyclePendingRecordWritable(
+  record
+) {
+  return (
+    isWritableOwnDataProperty(record, 'requestBoundaryCurrent', false) &&
+    isWritableOwnDataProperty(
+      record,
+      'rootUnmountLifecycleAdmissionRecord',
+      null
+    ) &&
+    isWritableOwnDataProperty(
+      record,
+      'rootUnmountLifecycleRequestBoundaryRecord',
+      null
+    ) &&
+    isWritableOwnDataProperty(
+      record,
+      'rootUnmountLifecycleRequestBoundaryStatus',
+      null
+    ) &&
+    isWritableOwnDataProperty(
+      record,
+      'rootUnmountLifecycleRequestBoundarySourceOwned',
+      false
+    )
+  );
+}
+
+function isWritableOwnDataProperty(record, field, expectedValue) {
+  const descriptor = Object.getOwnPropertyDescriptor(record, field);
+  return (
+    descriptor !== undefined &&
+    Object.prototype.hasOwnProperty.call(descriptor, 'value') &&
+    descriptor.value === expectedValue &&
+    descriptor.writable === true
+  );
 }
 
 function assertPrivateRootPublicFacadeRootUnmountExpectedSourceCurrent(
@@ -11169,9 +11292,217 @@ function assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionMatchesRecord
   }
 }
 
+function createPrivateRootPublicFacadeRootUnmountLifecycleRequestBoundary({
+  payload,
+  unmountRecord
+}) {
+  const rootUnmountLifecycleAdmissionRecord =
+    payload.bridge.admitRequest(unmountRecord);
+  const rootUnmountLifecycleRequestBoundaryRecord =
+    payload.bridge.createLifecycleRequestBoundary(
+      rootUnmountLifecycleAdmissionRecord
+    );
+  return freezeRecord({
+    rootUnmountLifecycleAdmissionRecord,
+    rootUnmountLifecycleRequestBoundaryRecord
+  });
+}
+
+function completePrivateRootPublicFacadeRootUnmountLifecycleExecution({
+  execution,
+  payload,
+  rootUnmountLifecycleBoundary,
+  unmountRecord
+}) {
+  assertPrivateRootPublicFacadeRootUnmountLifecycleExecutionMatchesRecord(
+    execution,
+    unmountRecord
+  );
+
+  const rootUnmountLifecycleAdmissionRecord =
+    rootUnmountLifecycleBoundary.rootUnmountLifecycleAdmissionRecord;
+  const rootUnmountLifecycleRequestBoundaryRecord =
+    rootUnmountLifecycleBoundary.rootUnmountLifecycleRequestBoundaryRecord;
+  const rootUnmountLifecycleRequestBoundaryPayload =
+    assertPrivateRootPublicFacadeRootUnmountLifecycleRequestBoundary({
+      expectedSource: execution.payload.expectedSource,
+      payload,
+      rootUnmountLifecycleAdmissionRecord,
+      rootUnmountLifecycleRequestBoundaryRecord,
+      unmountRecord
+    });
+  if (
+    execution.payload.rootUnmountLifecycleAdmissionRecord !== null ||
+    execution.payload.rootUnmountLifecycleRequestBoundaryRecord !== null ||
+    execution.payload.rootUnmountLifecycleRequestBoundaryPayload !== null ||
+    !privateRootPublicFacadeRootUnmountLifecyclePendingRecordWritable(
+      execution.record
+    )
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount lifecycle execution rejected stale, replayed, or tampered request-boundary metadata.'
+    );
+  }
+
+  execution.record.rootUnmountLifecycleAdmissionRecord =
+    rootUnmountLifecycleAdmissionRecord;
+  execution.record.rootUnmountLifecycleRequestBoundaryRecord =
+    rootUnmountLifecycleRequestBoundaryRecord;
+  execution.record.rootUnmountLifecycleRequestBoundaryStatus =
+    rootUnmountLifecycleRequestBoundaryRecord.boundaryStatus;
+  execution.record.rootUnmountLifecycleRequestBoundarySourceOwned =
+    rootUnmountLifecycleRequestBoundaryRecord.sourceOwned;
+  execution.record.requestBoundaryCurrent =
+    rootUnmountLifecycleRequestBoundaryRecord.requestBoundaryCurrent;
+  Object.freeze(execution.record);
+
+  execution.payload.rootUnmountLifecycleAdmissionRecord =
+    rootUnmountLifecycleAdmissionRecord;
+  execution.payload.rootUnmountLifecycleRequestBoundaryPayload =
+    rootUnmountLifecycleRequestBoundaryPayload;
+  execution.payload.rootUnmountLifecycleRequestBoundaryRecord =
+    rootUnmountLifecycleRequestBoundaryRecord;
+  execution.payload.unmountRecord = unmountRecord;
+
+  if (
+    execution.record.requestBoundaryCurrent !== true ||
+    execution.record.rootUnmountLifecycleRequestBoundaryRecord !==
+      rootUnmountLifecycleRequestBoundaryRecord ||
+    Object.isFrozen(execution.record) !== true
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount lifecycle execution requires a finalized source-owned request boundary.'
+    );
+  }
+
+  return execution;
+}
+
+function assertPrivateRootPublicFacadeRootUnmountLifecycleRequestBoundary({
+  expectedSource,
+  payload,
+  rootUnmountLifecycleAdmissionRecord,
+  rootUnmountLifecycleRequestBoundaryRecord,
+  unmountRecord
+}) {
+  const admissionPayload = rootBridgeAdmissionPayloads.get(
+    rootUnmountLifecycleAdmissionRecord
+  );
+  const boundaryPayload = rootLifecycleRequestBoundaryPayloads.get(
+    rootUnmountLifecycleRequestBoundaryRecord
+  );
+  const handleState = getPrivateRootHandleState(payload.rootHandle);
+  const lifecycle =
+    rootUnmountLifecycleAdmissionRecord == null
+      ? null
+      : rootUnmountLifecycleAdmissionRecord.lifecyclePrerequisites;
+  if (
+    admissionPayload === undefined ||
+    boundaryPayload === undefined ||
+    lifecycle === null ||
+    boundaryPayload.admissionRecord !==
+      rootUnmountLifecycleAdmissionRecord ||
+    boundaryPayload.bridgeState !== admissionPayload.bridgeState ||
+    boundaryPayload.rootHandleState !== handleState ||
+    boundaryPayload.sourceRecord !== unmountRecord ||
+    admissionPayload.rootHandleState !== handleState ||
+    admissionPayload.sourceRecord !== unmountRecord ||
+    handleState.latestLifecycleRequestRecord !== unmountRecord ||
+    handleState.lifecycleStatus !== ROOT_LIFECYCLE_UNMOUNTED ||
+    handleState.lifecycleRequestVersion !==
+      expectedSource.lifecycleRequestVersionAfter ||
+    rootUnmountLifecycleAdmissionRecord.operation !== 'unmount' ||
+    rootUnmountLifecycleAdmissionRecord.requestId !==
+      unmountRecord.requestId ||
+    rootUnmountLifecycleAdmissionRecord.requestSequence !==
+      unmountRecord.requestSequence ||
+    rootUnmountLifecycleAdmissionRecord.requestType !==
+      unmountRecord.requestType ||
+    rootUnmountLifecycleAdmissionRecord.executionStatus !==
+      ROOT_BRIDGE_EXECUTION_BLOCKED ||
+    rootUnmountLifecycleAdmissionRecord.compatibilityStatus !==
+      ROOT_BRIDGE_COMPATIBILITY_BLOCKED ||
+    lifecycle.lifecycleStatusBefore !==
+      expectedSource.lifecycleStatusBefore ||
+    lifecycle.lifecycleStatusAfter !== expectedSource.lifecycleStatusAfter ||
+    lifecycle.operation !== 'unmount' ||
+    rootUnmountLifecycleRequestBoundaryRecord.$$typeof !==
+      privateRootLifecycleRequestBoundaryRecordType ||
+    rootUnmountLifecycleRequestBoundaryRecord.kind !==
+      'FastReactDomPrivateRootLifecycleRequestBoundaryRecord' ||
+    rootUnmountLifecycleRequestBoundaryRecord.operation !==
+      'root-lifecycle-request-boundary' ||
+    rootUnmountLifecycleRequestBoundaryRecord.boundaryStatus !==
+      ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED ||
+    rootUnmountLifecycleRequestBoundaryRecord.sourceAdmissionId !==
+      rootUnmountLifecycleAdmissionRecord.requestId ||
+    rootUnmountLifecycleRequestBoundaryRecord.sourceAdmissionStatus !==
+      rootUnmountLifecycleAdmissionRecord.admissionStatus ||
+    rootUnmountLifecycleRequestBoundaryRecord.sourceRequestId !==
+      unmountRecord.requestId ||
+    rootUnmountLifecycleRequestBoundaryRecord.sourceRequestSequence !==
+      unmountRecord.requestSequence ||
+    rootUnmountLifecycleRequestBoundaryRecord.sourceRequestType !==
+      unmountRecord.requestType ||
+    rootUnmountLifecycleRequestBoundaryRecord.sourceOperation !== 'unmount' ||
+    rootUnmountLifecycleRequestBoundaryRecord.rootId !==
+      expectedSource.rootId ||
+    rootUnmountLifecycleRequestBoundaryRecord.rootKind !==
+      expectedSource.rootKind ||
+    rootUnmountLifecycleRequestBoundaryRecord.rootTag !==
+      expectedSource.rootTag ||
+    rootUnmountLifecycleRequestBoundaryRecord.sourceLifecycleStatusBefore !==
+      expectedSource.lifecycleStatusBefore ||
+    rootUnmountLifecycleRequestBoundaryRecord.sourceLifecycleStatusAfter !==
+      expectedSource.lifecycleStatusAfter ||
+    rootUnmountLifecycleRequestBoundaryRecord.lifecycleTransition !==
+      lifecycle.lifecycleTransition ||
+    rootUnmountLifecycleRequestBoundaryRecord.activeLifecycleStatus !==
+      ROOT_LIFECYCLE_UNMOUNTED ||
+    rootUnmountLifecycleRequestBoundaryRecord.latestSourceRequestId !==
+      unmountRecord.requestId ||
+    rootUnmountLifecycleRequestBoundaryRecord.latestSourceRequestSequence !==
+      unmountRecord.requestSequence ||
+    rootUnmountLifecycleRequestBoundaryRecord.lifecycleRequestVersion !==
+      expectedSource.lifecycleRequestVersionAfter ||
+    rootUnmountLifecycleRequestBoundaryRecord.sourceOwned !== true ||
+    rootUnmountLifecycleRequestBoundaryRecord.activeRootLifecycle !== true ||
+    rootUnmountLifecycleRequestBoundaryRecord.requestBoundaryCurrent !== true ||
+    rootUnmountLifecycleRequestBoundaryRecord.publicRootExecution !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.nativeExecution !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.reconcilerExecution !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.domMutation !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.browserDomMutation !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.markerWrites !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.listenerInstallation !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.hydration !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.eventDispatch !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.refEffects !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.packageCompatibility !== false ||
+    rootUnmountLifecycleRequestBoundaryRecord.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount lifecycle execution requires a source-owned private root lifecycle request boundary.'
+    );
+  }
+
+  return boundaryPayload;
+}
+
 function consumePrivateRootPublicFacadeRootUnmountLifecycleExecution(
   execution
 ) {
+  if (
+    execution.record.requestBoundaryCurrent !== true ||
+    execution.record.rootUnmountLifecycleRequestBoundaryRecord === null ||
+    execution.payload.rootUnmountLifecycleRequestBoundaryRecord !==
+      execution.record.rootUnmountLifecycleRequestBoundaryRecord ||
+    Object.isFrozen(execution.record) !== true
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Public-facade root.unmount cleanup requires finalized source-owned lifecycle execution evidence.'
+    );
+  }
   assertPrivateRootPublicFacadeRootUnmountLifecycleRowsFresh(
     execution.payload.lifecycleRows
   );
@@ -12024,7 +12355,7 @@ function createPrivateRootLifecycleRequestBoundaryWithBridge(
   admissionRecord
 ) {
   const validation =
-    validateActivePrivateRootLifecycleAdmission(admissionRecord);
+    validateCurrentPrivateRootLifecycleAdmission(admissionRecord);
   if (bridgeState !== null && validation.bridgeState !== bridgeState) {
     throwForeignRootBridgeRequest();
   }
@@ -12066,10 +12397,13 @@ function createPrivateRootLifecycleRequestBoundaryWithBridge(
     nativeExecution: false,
     reconcilerExecution: false,
     domMutation: false,
+    browserDomMutation: false,
     markerWrites: false,
     listenerInstallation: false,
     hydration: false,
     eventDispatch: false,
+    refEffects: false,
+    packageCompatibility: false,
     compatibilityClaimed: false
   });
 
@@ -15200,7 +15534,7 @@ function createRootBridgeAdmissionRecord(record, validation) {
   return admissionRecord;
 }
 
-function validateActivePrivateRootLifecycleAdmission(admissionRecord) {
+function validatePrivateRootLifecycleAdmission(admissionRecord) {
   if (
     !isSourceOwnedPrivateRootBridgeAdmissionRecord(admissionRecord) ||
     admissionRecord.executionStatus !== ROOT_BRIDGE_EXECUTION_BLOCKED ||
@@ -15213,6 +15547,16 @@ function validateActivePrivateRootLifecycleAdmission(admissionRecord) {
   }
 
   const payload = rootBridgeAdmissionPayloads.get(admissionRecord);
+  if (payload === undefined) {
+    throwInvalidRootBridgeRequest(
+      'Private root lifecycle request boundaries require a source-owned root bridge admission payload.'
+    );
+  }
+  return payload;
+}
+
+function validateActivePrivateRootLifecycleAdmission(admissionRecord) {
+  const payload = validatePrivateRootLifecycleAdmission(admissionRecord);
   const rootHandleState = payload.rootHandleState;
   const sourceRecord = payload.sourceRecord;
   if (
@@ -15226,6 +15570,35 @@ function validateActivePrivateRootLifecycleAdmission(admissionRecord) {
   }
 
   return payload;
+}
+
+function validateCurrentPrivateRootLifecycleAdmission(admissionRecord) {
+  const payload = validatePrivateRootLifecycleAdmission(admissionRecord);
+  const rootHandleState = payload.rootHandleState;
+  const sourceRecord = payload.sourceRecord;
+  if (
+    rootHandleState !== null &&
+    rootHandleState.lifecycleStatus !== ROOT_LIFECYCLE_UNMOUNTED &&
+    rootHandleState.latestLifecycleRequestRecord === sourceRecord
+  ) {
+    return payload;
+  }
+
+  if (
+    rootHandleState !== null &&
+    sourceRecord.operation === 'unmount' &&
+    sourceRecord.noOp !== true &&
+    sourceRecord.lifecycleStatusBefore === ROOT_LIFECYCLE_RENDERED &&
+    sourceRecord.lifecycleStatusAfter === ROOT_LIFECYCLE_UNMOUNTED &&
+    rootHandleState.lifecycleStatus === ROOT_LIFECYCLE_UNMOUNTED &&
+    rootHandleState.latestLifecycleRequestRecord === sourceRecord
+  ) {
+    return payload;
+  }
+
+  throwInvalidRootBridgeRequest(
+    'Private root lifecycle request boundaries require the current source root request.'
+  );
 }
 
 function validateActivePrivateRootLifecycleRequestBoundary(
@@ -15293,10 +15666,13 @@ function validateActivePrivateRootLifecycleRequestBoundary(
     boundaryRecord.nativeExecution !== false ||
     boundaryRecord.reconcilerExecution !== false ||
     boundaryRecord.domMutation !== false ||
+    boundaryRecord.browserDomMutation !== false ||
     boundaryRecord.markerWrites !== false ||
     boundaryRecord.listenerInstallation !== false ||
     boundaryRecord.hydration !== false ||
     boundaryRecord.eventDispatch !== false ||
+    boundaryRecord.refEffects !== false ||
+    boundaryRecord.packageCompatibility !== false ||
     boundaryRecord.compatibilityClaimed !== false
   ) {
     return null;

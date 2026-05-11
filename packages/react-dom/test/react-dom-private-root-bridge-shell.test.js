@@ -11354,6 +11354,12 @@ test('private react-dom/client facade root.unmount clears active host output met
     rootBridge.getPrivateRootPublicFacadeRootUnmountLifecycleExecutionPayload(
       unmountLifecycleExecution
     );
+  const unmountLifecycleRequestBoundary =
+    unmountLifecycleExecution.rootUnmountLifecycleRequestBoundaryRecord;
+  const unmountLifecycleRequestBoundaryPayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      unmountLifecycleRequestBoundary
+    );
   const unmountSnapshot = diagnostic.sourceContainerSnapshot;
   const unmountSnapshotPayload =
     rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
@@ -11416,6 +11422,18 @@ test('private react-dom/client facade root.unmount clears active host output met
   );
   assert.equal(diagnostic.rootUnmountLifecycleExecutionConsumed, true);
   assert.equal(diagnostic.rootUnmountLifecycleExecutionSourceOwned, true);
+  assert.equal(
+    diagnostic.rootUnmountLifecycleRequestBoundaryRecord,
+    unmountLifecycleRequestBoundary
+  );
+  assert.equal(
+    diagnostic.rootUnmountLifecycleRequestBoundaryStatus,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
+  );
+  assert.equal(
+    diagnostic.rootUnmountLifecycleRequestBoundarySourceOwned,
+    true
+  );
   assert.equal(diagnostic.rootUnmountLifecycleRequestBoundaryCurrent, true);
   assert.equal(diagnostic.rootUnmountLifecycleSnapshotOwned, true);
   assert.equal(diagnostic.rootUnmountLifecycleSnapshotBeforeChildCount, 1);
@@ -11450,6 +11468,23 @@ test('private react-dom/client facade root.unmount clears active host output met
   assert.equal(unmountLifecycleExecution.sameEntrypoint, true);
   assert.equal(unmountLifecycleExecution.sourceOwned, true);
   assert.equal(unmountLifecycleExecution.requestBoundaryCurrent, true);
+  assert.equal(Object.isFrozen(unmountLifecycleExecution), true);
+  assert.equal(
+    unmountLifecycleExecution.rootUnmountLifecycleAdmissionRecord,
+    unmountLifecycleExecutionPayload.rootUnmountLifecycleAdmissionRecord
+  );
+  assert.equal(
+    unmountLifecycleExecution.rootUnmountLifecycleRequestBoundaryRecord,
+    unmountLifecycleRequestBoundary
+  );
+  assert.equal(
+    unmountLifecycleExecution.rootUnmountLifecycleRequestBoundaryStatus,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
+  );
+  assert.equal(
+    unmountLifecycleExecution.rootUnmountLifecycleRequestBoundarySourceOwned,
+    true
+  );
   assert.equal(unmountLifecycleExecution.replayRejected, true);
   assert.equal(unmountLifecycleExecution.lifecycleRowsFrozen, true);
   assert.equal(unmountLifecycleExecution.nativeExecution, false);
@@ -11457,6 +11492,91 @@ test('private react-dom/client facade root.unmount clears active host output met
   assert.equal(unmountLifecycleExecution.compatibilityClaimed, false);
   assert.equal(unmountLifecycleExecutionPayload.consumed, true);
   assert.equal(unmountLifecycleExecutionPayload.payload.root, root);
+  assert.equal(
+    unmountLifecycleExecutionPayload.rootUnmountLifecycleRequestBoundaryRecord,
+    unmountLifecycleRequestBoundary
+  );
+  assert.equal(
+    unmountLifecycleExecutionPayload.rootUnmountLifecycleRequestBoundaryPayload,
+    unmountLifecycleRequestBoundaryPayload
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.$$typeof,
+    rootBridge.privateRootLifecycleRequestBoundaryRecordType
+  );
+  assert.equal(
+    rootBridge.isPrivateRootLifecycleRequestBoundaryRecord(
+      unmountLifecycleRequestBoundary
+    ),
+    true
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.boundaryStatus,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceRequestId,
+    unmount.requestId
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceRequestSequence,
+    unmount.requestSequence
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceRequestType,
+    'root.unmount'
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceOperation,
+    'unmount'
+  );
+  assert.equal(unmountLifecycleRequestBoundary.rootId, unmount.rootId);
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceLifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceLifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.activeLifecycleStatus,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.latestSourceRequestId,
+    unmount.requestId
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.latestSourceRequestSequence,
+    unmount.requestSequence
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.lifecycleRequestVersion,
+    unmountLifecycleExecution.lifecycleRequestVersionAfter
+  );
+  assert.equal(unmountLifecycleRequestBoundary.sourceOwned, true);
+  assert.equal(unmountLifecycleRequestBoundary.activeRootLifecycle, true);
+  assert.equal(unmountLifecycleRequestBoundary.requestBoundaryCurrent, true);
+  assert.equal(unmountLifecycleRequestBoundary.publicRootExecution, false);
+  assert.equal(unmountLifecycleRequestBoundary.nativeExecution, false);
+  assert.equal(unmountLifecycleRequestBoundary.reconcilerExecution, false);
+  assert.equal(unmountLifecycleRequestBoundary.domMutation, false);
+  assert.equal(unmountLifecycleRequestBoundary.browserDomMutation, false);
+  assert.equal(unmountLifecycleRequestBoundary.hydration, false);
+  assert.equal(unmountLifecycleRequestBoundary.eventDispatch, false);
+  assert.equal(unmountLifecycleRequestBoundary.refEffects, false);
+  assert.equal(unmountLifecycleRequestBoundary.packageCompatibility, false);
+  assert.equal(unmountLifecycleRequestBoundary.compatibilityClaimed, false);
+  assert.equal(
+    unmountLifecycleRequestBoundaryPayload.admissionRecord,
+    unmountLifecycleExecution.rootUnmountLifecycleAdmissionRecord
+  );
+  assert.equal(unmountLifecycleRequestBoundaryPayload.sourceRecord, unmount);
+  assert.equal(
+    unmountLifecycleRequestBoundaryPayload.lifecycleRequestVersion,
+    unmountLifecycleExecution.lifecycleRequestVersionAfter
+  );
   assert.equal(
     unmountLifecycleExecutionPayload.createRecord,
     renderPayload.createRecord
@@ -11472,6 +11592,14 @@ test('private react-dom/client facade root.unmount clears active host output met
   assert.equal(
     cleanupPayload.unmountLifecycleExecutionPayload,
     unmountLifecycleExecutionPayload
+  );
+  assert.equal(
+    cleanupPayload.rootUnmountLifecycleRequestBoundaryRecord,
+    unmountLifecycleRequestBoundary
+  );
+  assert.equal(
+    cleanupPayload.rootUnmountLifecycleRequestBoundaryPayload,
+    unmountLifecycleRequestBoundaryPayload
   );
   assert.equal(
     diagnostic.sourceContainerSnapshotStatus,
@@ -11686,8 +11814,39 @@ test('private react-dom/client facade root.unmount lifecycle execution fails clo
       message: /alias claims/
     }
   );
+  assert.throws(
+    () =>
+      root.unmount({
+        rootUnmountLifecycleExecutionFactory(context) {
+          const row = context.createRootUnmountLifecycleExecutionRow({
+            browserDomMutation: true,
+            eventDispatch: true,
+            hydration: true,
+            kind: 'audit-alias-unmount-lifecycle-row',
+            packageCompatibility: true,
+            prose: 'claimed cleanup prose alias',
+            refEffects: true,
+            sourceSyntax: 'root.unmount()'
+          });
+          return context.createRootUnmountLifecycleExecutionRecord({
+            lifecycleRows: [row],
+            source: 'audit-alias-unmount-lifecycle'
+          });
+        }
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT',
+      message: /alias claims/
+    }
+  );
   assert.deepEqual(adapter.getRootHostOutputUnmountCleanupDiagnostics(root), []);
   assert.equal(container.textContent, 'unmount lifecycle initial');
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root)
+      .rootLifecycleStatus,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
 
   const unmount = root.unmount({
     rootUnmountLifecycleExecutionFactory(context) {
