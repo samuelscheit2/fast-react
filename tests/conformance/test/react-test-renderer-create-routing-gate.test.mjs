@@ -2534,16 +2534,9 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   );
   const [createRequest] = bridge.getRendererRootRequests(renderer);
   const createAdmission = bridge.getRootCreateRouteAdmission(createRequest);
-  const updateError = captureThrown(() =>
-    renderer.update({
-      props: { "data-state": "new", children: "goodbye" },
-      type: "span"
-    })
-  );
   const facade = renderer.toJSON[privateToJSONSerializationFacadeSymbol];
   const requestsBySequence = new Map([
-    [createRequest.requestSequence, createRequest],
-    [updateError.rootRequest.requestSequence, updateError.rootRequest]
+    [createRequest.requestSequence, createRequest]
   ]);
   const executor = (handoff) => {
     const request = requestsBySequence.get(handoff.requestSequence);
@@ -2573,7 +2566,6 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   };
 
   const createResult = bridge.executeRootRequest(createRequest, executor);
-  const updateResult = bridge.executeRootRequest(updateError.rootRequest, executor);
 
   assert.equal(facade.privateNativeExecutionEvidenceAvailable, true);
   assert.equal(
@@ -2903,6 +2895,18 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   );
   assert.match(sourceReportError.message, /serialization source report/u);
 
+  const updateError = captureThrown(() =>
+    renderer.update({
+      props: { "data-state": "new", children: "goodbye" },
+      type: "span"
+    })
+  );
+  requestsBySequence.set(
+    updateError.rootRequest.requestSequence,
+    updateError.rootRequest
+  );
+  const updateResult = bridge.executeRootRequest(updateError.rootRequest, executor);
+
   const updateJSONReport = privateToJSONReport({
     hostOutputUpdateKind: "Update",
     rowId: privateToJSONUpdateHostOutputRowId,
@@ -3161,15 +3165,21 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     update: laterUpdateResult,
     unmount: unmountResult
   });
-  const unmountJSONIdentity = privateSerializationFinishedWorkIdentityEvidence({
-    rootRequest: unmountError.rootRequest,
-    publicSurface: "create().toJSON",
-    sourceSerializationDiagnosticName:
-      "fast-react-test-renderer.serialization.private-json-canary",
-    consumesPrivateToJSONEvidence: true,
-    consumesPrivateToTreeEvidence: false,
-    hostOutputUpdateKind: "Unmount"
-  });
+  const unmountJSONIdentity = {
+    ...privateSerializationFinishedWorkIdentityEvidence({
+      rootRequest: unmountError.rootRequest,
+      publicSurface: "create().toJSON",
+      sourceSerializationDiagnosticName:
+        "fast-react-test-renderer.serialization.private-json-canary",
+      consumesPrivateToJSONEvidence: true,
+      consumesPrivateToTreeEvidence: false,
+      hostOutputUpdateKind: "Unmount"
+    }),
+    rootRequestOperation: "unmount",
+    rootRequestUpdateKind: unmountError.rootRequest.updateKind,
+    privateUnmountNativeBridgeAdmission:
+      unmountResult.privateUnmountNativeBridgeAdmission
+  };
   assert.equal(
     facade.canCreateAcceptedNativeExecutionDiagnosticResult(
       unmountResult,
@@ -3353,13 +3363,9 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   );
   const [createRequest] = bridge.getRendererRootRequests(renderer);
   const createAdmission = bridge.getRootCreateRouteAdmission(createRequest);
-  const updateError = captureThrown(() =>
-    renderer.update({ props: { children: "goodbye" }, type: "span" })
-  );
   const facade = renderer.toTree[privateToTreeFacadeSymbol];
   const requestsBySequence = new Map([
-    [createRequest.requestSequence, createRequest],
-    [updateError.rootRequest.requestSequence, updateError.rootRequest]
+    [createRequest.requestSequence, createRequest]
   ]);
   const executor = (handoff) => {
     const request = requestsBySequence.get(handoff.requestSequence);
@@ -3389,7 +3395,6 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   };
 
   const createResult = bridge.executeRootRequest(createRequest, executor);
-  const updateResult = bridge.executeRootRequest(updateError.rootRequest, executor);
 
   assert.equal(facade.privateNativeExecutionEvidenceAvailable, true);
   assert.equal(
@@ -3565,6 +3570,15 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
     /diagnostic identity is not accepted/u
   );
 
+  const updateError = captureThrown(() =>
+    renderer.update({ props: { children: "goodbye" }, type: "span" })
+  );
+  requestsBySequence.set(
+    updateError.rootRequest.requestSequence,
+    updateError.rootRequest
+  );
+  const updateResult = bridge.executeRootRequest(updateError.rootRequest, executor);
+
   const updateTreeReport = privateToTreeReport({
     hostOutputUpdateKind: "Update",
     rowId: privateToJSONUpdateHostOutputRowId,
@@ -3669,14 +3683,20 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
     update: updateResult,
     unmount: unmountResult
   });
-  const unmountTreeIdentity = privateSerializationFinishedWorkIdentityEvidence({
-    rootRequest: unmountError.rootRequest,
-    publicSurface: "create().toTree",
-    sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
-    consumesPrivateToJSONEvidence: false,
-    consumesPrivateToTreeEvidence: true,
-    hostOutputUpdateKind: "Unmount"
-  });
+  const unmountTreeIdentity = {
+    ...privateSerializationFinishedWorkIdentityEvidence({
+      rootRequest: unmountError.rootRequest,
+      publicSurface: "create().toTree",
+      sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+      consumesPrivateToJSONEvidence: false,
+      consumesPrivateToTreeEvidence: true,
+      hostOutputUpdateKind: "Unmount"
+    }),
+    rootRequestOperation: "unmount",
+    rootRequestUpdateKind: unmountError.rootRequest.updateKind,
+    privateUnmountNativeBridgeAdmission:
+      unmountResult.privateUnmountNativeBridgeAdmission
+  };
   assert.equal(
     facade.canCreateAcceptedNativeExecutionDiagnosticResult(
       unmountResult,
@@ -5105,6 +5125,29 @@ test("react-test-renderer private serialization currentness requires source-owne
       "FastReactTestRendererPrivateToJSONSerializationError"
     );
     assert.match(missingLifecycleError.message, /lifecycle execution evidence/u);
+    assert.equal(
+      context.jsonFacade.canSerializeAcceptedHostOutputDiagnostic(
+        context.jsonReport
+      ),
+      false,
+      context.entry.entrypoint
+    );
+    const missingRawJSONLifecycleError = captureThrown(() =>
+      context.jsonFacade.serializeAcceptedHostOutputDiagnostic(
+        context.jsonReport
+      )
+    );
+    assert.match(
+      missingRawJSONLifecycleError.message,
+      /lifecycle execution evidence/u
+    );
+    assert.equal(
+      context.jsonFacade.canCreateAcceptedHostOutputDiagnosticResult(
+        context.jsonReport
+      ),
+      false,
+      context.entry.entrypoint
+    );
 
     const jsonCurrentness =
       context.jsonFacade.validateAcceptedFinishedWorkIdentity(
@@ -5121,6 +5164,34 @@ test("react-test-renderer private serialization currentness requires source-owne
     assert.equal(jsonCurrentness.latestUpdateLifecycleBeforeUnmountAccepted, true);
     assert.equal(jsonCurrentness.publicSerializationAvailable, false);
     assert.equal(jsonCurrentness.compatibilityClaimed, false);
+    assert.equal(
+      context.jsonFacade.canSerializeAcceptedHostOutputDiagnostic(
+        context.jsonReport,
+        context.lifecycleEvidence
+      ),
+      true,
+      context.entry.entrypoint
+    );
+    assert.equal(
+      context.jsonFacade.serializeAcceptedHostOutputDiagnostic(
+        context.jsonReport,
+        context.lifecycleEvidence
+      ),
+      null
+    );
+    const rawJSONDiagnostic =
+      context.jsonFacade.createAcceptedHostOutputDiagnosticResult(
+        context.jsonReport,
+        context.lifecycleEvidence
+      );
+    assert.equal(
+      rawJSONDiagnostic.rootLifecycleExecutionEvidence,
+      context.lifecycleEvidence
+    );
+    assert.equal(
+      rawJSONDiagnostic.consumesPrivateRootLifecycleExecutionEvidence,
+      true
+    );
 
     const treeCurrentness =
       context.treeFacade.validateAcceptedFinishedWorkIdentity(
@@ -5131,6 +5202,35 @@ test("react-test-renderer private serialization currentness requires source-owne
       );
     assert.equal(treeCurrentness.rootLifecycleExecutionEvidence, context.lifecycleEvidence);
     assert.equal(treeCurrentness.publicToTreeAvailable, false);
+    assert.equal(
+      context.treeFacade.canSerializeAcceptedTreeMetadata(
+        context.treeReport
+      ),
+      false,
+      context.entry.entrypoint
+    );
+    const missingRawTreeLifecycleError = captureThrown(() =>
+      context.treeFacade.serializeAcceptedTreeMetadata(context.treeReport)
+    );
+    assert.match(
+      missingRawTreeLifecycleError.message,
+      /lifecycle execution evidence/u
+    );
+    assert.equal(
+      context.treeFacade.canSerializeAcceptedTreeMetadata(
+        context.treeReport,
+        context.lifecycleEvidence
+      ),
+      true,
+      context.entry.entrypoint
+    );
+    assert.equal(
+      context.treeFacade.serializeAcceptedTreeMetadata(
+        context.treeReport,
+        context.lifecycleEvidence
+      ),
+      null
+    );
 
     const clonedLifecycleError = captureThrown(() =>
       context.jsonFacade.validateAcceptedFinishedWorkIdentity(
@@ -5146,6 +5246,18 @@ test("react-test-renderer private serialization currentness requires source-owne
     );
     assert.match(
       clonedLifecycleError.message,
+      /source-owned private root lifecycle execution evidence/u
+    );
+    const clonedTreeLifecycleError = captureThrown(() =>
+      context.treeFacade.validateAcceptedFinishedWorkIdentity(
+        context.treeIdentity,
+        context.treeReport,
+        context.unmountRequest,
+        { ...context.lifecycleEvidence }
+      )
+    );
+    assert.match(
+      clonedTreeLifecycleError.message,
       /source-owned private root lifecycle execution evidence/u
     );
 

@@ -22,7 +22,35 @@ Date: 2026-05-11
 - Updated unmount serialization fixtures to include accepted lifecycle evidence
   and valid empty-root unmount source rows for package-root and CJS coverage.
 
+Audit follow-up:
+
+- Aligned CJS development and production finished-work identity currentness with
+  package root by applying the latest scheduled request check to all operations
+  and requiring unmount deletion/cleanup handoff identity evidence.
+- Closed the raw private serialization bypass by threading source-owned
+  lifecycle evidence through `serializeAcceptedHostOutputDiagnostic`,
+  `createAcceptedHostOutputDiagnosticResult`, and
+  `serializeAcceptedTreeMetadata`; accepted unmount raw serialization now fails
+  before returning output unless the same lifecycle evidence gate accepts it.
+- Strengthened `toTree` negative coverage for cloned lifecycle evidence and raw
+  unmount serialization without lifecycle evidence.
+
 ## Verification
+
+- `node --check packages/react-test-renderer/index.js`
+- `node --check packages/react-test-renderer/cjs/react-test-renderer.development.js`
+- `node --check packages/react-test-renderer/cjs/react-test-renderer.production.js`
+- `node --check tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`
+- `node --test tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`
+  - 37 tests passed.
+- `npm run check:package-surface`
+  - Passed. npm printed the existing `minimum-release-age` config warning.
+- `node tests/smoke/import-entrypoints.mjs`
+  - Passed.
+- `git diff --check`
+  - Passed.
+
+Audit follow-up re-run:
 
 - `node --check packages/react-test-renderer/index.js`
 - `node --check packages/react-test-renderer/cjs/react-test-renderer.development.js`
@@ -50,6 +78,9 @@ Date: 2026-05-11
 - Package-root unmount currentness now accepts the unmount-specific cleanup and
   deletion handoff shape already admitted by the private unmount bridge while
   still matching it back to the source unmount request.
+- Raw `toJSON`/`toTree` unmount serialization uses the renderer create request
+  to validate the same source-owned create/latest-update/unmount lifecycle
+  evidence before returning `null` or a raw diagnostic result.
 
 ## Risks
 
