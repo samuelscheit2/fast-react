@@ -46,13 +46,22 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Accepted/merged baseline includes Workers 803-837,
-842-846, 848-852, 855-860, 862-870, and 872-874. Worker 853's competing
-test-renderer branch was rejected as redundant after Worker 844 was accepted;
-do not use it as accepted input.
+842-846, 848-852, 855-860, 862-870, and 872-874, with coordination docs
+current through Worker 877. Worker 853's competing test-renderer branch was
+rejected as redundant after Worker 844 was accepted; do not use it as accepted
+input.
 
 Current active queue:
 
-- None.
+- Worker 878: Rust root multichild host update execution.
+- Worker 879: FunctionComponent delete teardown execution.
+- Worker 880: React DOM root update execution consumer.
+- Worker 881: test-renderer serialization lifecycle gate.
+- Worker 882: native JS generation admission ledger.
+- Worker 883: resource/form lifecycle boundary hardening.
+
+Workers 878-883 are active or pending implementation work only. Do not use them
+as accepted input until their branches are reviewed, verified, and merged.
 
 Accepted private evidence still keeps public root/render, `act`, `flushSync`,
 Scheduler timing, hydration, resources/forms, serialization, native execution,
