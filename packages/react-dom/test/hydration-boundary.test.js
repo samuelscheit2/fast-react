@@ -2284,7 +2284,7 @@ test('private hydration recoverable error boundary admission rejects stale clone
   assert.deepEqual(other.document.__registrations, []);
 });
 
-test('hydrateRoot source ledger rejects preloaded root-bridge cache poisoning', () => {
+test('hydrateRoot source ledger rejects forged context and root-bridge cache poisoning', () => {
   const script = `
 'use strict';
 
@@ -2404,6 +2404,72 @@ sourceLedgerFakePayloads.set(
   })
 );
 
+const forgedPreflightState = {
+  bridge: Object.freeze({kind: 'forged-bridge'}),
+  eventReplayPreflightRecords: [],
+  executionPreflightRecords: [],
+  lifecycleRequestBoundaryRecords: [],
+  preflight: Object.freeze({kind: 'forged-preflight'}),
+  records: []
+};
+const forgedRecoverableErrorPreflight =
+  hydrationGate.createHydrationTextMismatchRecoverableErrorPreflightRecord(
+    scenario.hydrationBoundaryRecord,
+    scenario.hydrateRecord.acceptedPrivateMetadataDiagnostics,
+    scenario.hydrationBoundaryRecord.recoverableErrorMetadata,
+    {
+      enableRecoverableErrorPreflight: true,
+      hydrateRootSourceLedgerContext: Object.freeze({
+        bridge: forgedPreflightState.bridge,
+        lifecycleRequestBoundary: clonedLifecycleRequestBoundary,
+        preflight: forgedPreflightState.preflight,
+        preflightState: forgedPreflightState,
+        requestAdmission: scenario.lifecycleRequestBoundary.requestAdmission,
+        requestPayload: Object.freeze({
+          container: scenario.container,
+          hydrationOptions: scenario.hydrationOptions,
+          initialChildren: scenario.initialChildren
+        }),
+        requestRecord: scenario.hydrateRecord
+      }),
+      hydrationOptions: scenario.hydrationOptions,
+      preflightId: 'forged-caller-context-recoverable-error-preflight',
+      source: 'forged-caller-context'
+    }
+  );
+const forgedClonedLifecycleRequestBoundary = Object.freeze({
+  ...scenario.lifecycleRequestBoundary
+});
+const forgedClonedHydrateRootPreflightRecord = Object.freeze({
+  ...scenario.hydrateRecord,
+  lifecycleRequestBoundary: forgedClonedLifecycleRequestBoundary,
+  recoverableErrorPreflight: forgedRecoverableErrorPreflight
+});
+const forgedClonedEventReplayPreflightRecord = Object.freeze({
+  ...scenario.eventReplayPreflightRecord,
+  lifecycleRequestBoundary: forgedClonedLifecycleRequestBoundary
+});
+const forgedClonedExecutionPreflightRecord = Object.freeze({
+  ...scenario.executionPreflightRecord,
+  eventReplayPreflight: forgedClonedEventReplayPreflightRecord,
+  lifecycleRequestBoundary: forgedClonedLifecycleRequestBoundary
+});
+forgedPreflightState.records.push(forgedClonedHydrateRootPreflightRecord);
+forgedPreflightState.eventReplayPreflightRecords.push(
+  forgedClonedEventReplayPreflightRecord
+);
+forgedPreflightState.executionPreflightRecords.push(
+  forgedClonedExecutionPreflightRecord
+);
+forgedPreflightState.lifecycleRequestBoundaryRecords.push(
+  forgedClonedLifecycleRequestBoundary
+);
+Object.freeze(forgedPreflightState.records);
+Object.freeze(forgedPreflightState.eventReplayPreflightRecords);
+Object.freeze(forgedPreflightState.executionPreflightRecords);
+Object.freeze(forgedPreflightState.lifecycleRequestBoundaryRecords);
+Object.freeze(forgedPreflightState);
+
 assert.equal(
   hydrateRootSourceLedger.getPrivateHydrateRootSourceLedgerRecordPayload(
     scenario.hydrateRecord
@@ -2427,6 +2493,29 @@ for (const clonedSourceLedgerRecord of [
 assert.equal(
   createAdmission(scenario).status,
   hydrationGate.privateHydrationRecoverableErrorBoundaryAdmissionStatus
+);
+assert.throws(
+  () =>
+    hydrationGate.createHydrationRecoverableErrorBoundaryAdmissionRecord(
+      scenario.hydrationBoundaryRecord,
+      scenario.hydrateRecord.acceptedPrivateMetadataDiagnostics,
+      forgedRecoverableErrorPreflight,
+      scenario.targetClaimingDiagnostic,
+      scenario.replayExecutionRecord,
+      {
+        enableRecoverableErrorBoundaryAdmission: true,
+        eventReplayPreflightRecord: forgedClonedEventReplayPreflightRecord,
+        executionPreflightRecord: forgedClonedExecutionPreflightRecord,
+        hydrateRootPreflightRecord: forgedClonedHydrateRootPreflightRecord,
+        hydrationOptions: scenario.hydrationOptions,
+        lifecycleRequestBoundary: forgedClonedLifecycleRequestBoundary
+      }
+    ),
+  {
+    code:
+      hydrationGate
+        .INVALID_HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_CODE
+  }
 );
 assert.throws(
   () =>
@@ -2465,14 +2554,15 @@ function createScenario(label) {
     identifierPrefix: label + '-',
     onRecoverableError() {}
   };
+  const initialChildren = {
+    props: {
+      children: 'client text'
+    },
+    type: 'App'
+  };
   const hydrateRecord = preflight.hydrateRoot(
     container,
-    {
-      props: {
-        children: 'client text'
-      },
-      type: 'App'
-    },
+    initialChildren,
     hydrationOptions
   );
   const dispatchRecord =
@@ -2513,6 +2603,8 @@ function createScenario(label) {
     hydrateRecord,
     hydrationBoundaryRecord: hydrateRecord.hydrationBoundaryRecord,
     hydrationOptions,
+    initialChildren,
+    container,
     lifecycleRequestBoundary: hydrateRecord.lifecycleRequestBoundary,
     recoverableErrorPreflight: hydrateRecord.recoverableErrorPreflight,
     replayExecutionRecord: eventReplayPreflightRecord.replayExecutionRecord,

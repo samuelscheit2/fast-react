@@ -4,22 +4,25 @@
 
 - Repaired the audited pre-load `require.cache[rootBridgePath]` poisoning
   path for hydrateRoot recoverable-error boundary admission.
-- `hydration-boundary-gate.js` no longer imports
-  `hydrate-root-source-ledger.js`, and the ledger shim no longer imports or
-  trusts `root-bridge.js` exports.
-- The authoritative admission source ledger now lives in
-  `hydration-boundary-gate.js` as a gate-owned WeakMap context captured from
-  the real hydrateRoot recoverable-error preflight.
-- `root-bridge.js` passes the source preflight state, request payload,
-  request record, lifecycle boundary, and admission record into that private
-  preflight context. Admission then requires the hydrateRoot preflight,
-  event-replay preflight, execution preflight, and lifecycle boundary records
-  to be current members of the source-owned preflight state arrays.
+- `hydrate-root-source-ledger.js` still exposes fail-closed public readers, but
+  now owns a symbol-keyed private WeakMap ledger used only by `root-bridge.js`
+  as writer and `hydration-boundary-gate.js` as reader.
+- The authoritative admission source ledger is exact-record provenance:
+  root bridge registers the real hydrateRoot preflight, event-replay preflight,
+  execution preflight, and lifecycle boundary records after creating them, and
+  admission requires those exact WeakMap keys.
+- `hydration-boundary-gate.js` no longer accepts
+  `options.hydrateRootSourceLedgerContext` as authority; forged caller
+  preflight-state arrays are ignored and cloned records are absent from the
+  private ledger.
 - Added a fresh-process regression that pre-seeds
   `require.cache[rootBridgePath]` with fake source-ledger readers before
   importing `hydrate-root-source-ledger.js` and
   `hydration-boundary-gate.js`; cloned/forged records still reject and the real
   source path still admits.
+- Added a fresh-process regression for the audit reproduction: a caller-created
+  recoverable-error preflight with forged `preflightState` arrays containing
+  cloned hydrate/event/execution/lifecycle records rejects.
 - Merged current `main`, including Worker 947's root-bridge smoke fix, and
   preserved the Worker 910 source-ledger hardening.
 - Updated the public client facade spy regression to preload a frozen fake
@@ -37,17 +40,16 @@
 
 ## Cache-Poisoning-Resistant Path
 
-1. `hydrate-root-source-ledger.js` is fail-closed and has no dependency on
-   `root-bridge.js`.
-2. `hydration-boundary-gate.js` consumes no source-ledger reader function from
-   any CommonJS module export.
-3. Root bridge passes source-owned context only while creating the canonical
-   recoverable-error preflight record.
-4. Admission reads that hidden gate WeakMap context and validates source
-   records against the live root-bridge preflight state arrays instead of
-   caller-replaceable exports.
-5. A forged cache module can still exist before imports, but its fake readers
-   are never consulted by boundary admission.
+1. `hydrate-root-source-ledger.js` has no dependency on `root-bridge.js`; its
+   public reader APIs remain fail-closed.
+2. Root bridge registers exact source records in the ledger through a
+   non-enumerable symbol-keyed private writer after the records are created.
+3. Hydration boundary admission reads only the symbol-keyed private ledger
+   payloads for the exact records supplied to admission.
+4. Caller-provided `hydrateRootSourceLedgerContext` objects are ignored by
+   recoverable-error preflight creation and cannot seed admission provenance.
+5. A forged root-bridge cache module can still exist before imports, but its
+   fake readers are never consulted by boundary admission.
 
 ## Commands Run
 
@@ -81,7 +83,8 @@
 ## Evidence Gathered
 
 - Focused hydration-boundary tests pass, including the new fresh-process
-  pre-load cache-poisoning regression.
+  forged preflight-state regression and the pre-load root-bridge cache
+  poisoning regression.
 - Adjacent private hydration, hydrateRoot text claim patch, and root-bridge
   suites pass.
 - The public client facade symbol regression passes with immutable real
