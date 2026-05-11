@@ -3,17 +3,18 @@
 ## Progress
 
 - Added package-root private `react-test-renderer` native execution metadata for
-  `toJSON` and `toTree`, matching the accepted CJS private facade shape without
-  opening public bridge execution.
+  the committed `toJSON`/`toTree` single-host and unmount rows without opening
+  public bridge execution.
 - Added package-root private native diagnostic creators, execution-record
-  consumers, and accepted shape validators for minimal, nested, sibling-text,
-  and unmount serialization evidence.
+  consumers, and accepted shape validators for minimal and unmount
+  serialization evidence.
 - Added strict package-root unmount cleanup/deletion/passive-ref evidence
   validation while keeping public `create`, `update`, `unmount`, `toJSON`,
   `toTree`, `ReactTestInstance`, and native bridge loading/execution blocked.
 - Broadened conformance gates so package-root create/update facade metadata is
-  validated alongside CJS/Rust-backed evidence for sibling text, nested trees,
-  and unmount paths.
+  validated alongside CJS/Rust-backed evidence while nested/sibling rows remain
+  private JS serialization/admission evidence rather than package-root native
+  execution evidence.
 
 ## Changed Files
 
@@ -44,16 +45,15 @@
 
 ## Audit Follow-up
 
-- Made package-root native update `toJSON` nested-row evidence reachable through
-  the generic finished-work identity gate.
-- Made package-root native update `toJSON` sibling-text row evidence reachable
-  through the dedicated sibling-text finished-work identity gate and committed
-  fiber inspection validation.
+- Kept package-root nested-row and sibling-text evidence on private JS
+  serialization/admission paths rather than claiming package-root native
+  execution reachability.
 - Required direct `hostOutputRowId` evidence to match embedded
   `hostOutputRow.id` exactly, and added negative package-root coverage for that
   mismatch.
-- Added focused package-root nested and sibling-text native update coverage in
-  both serialization and create-routing conformance gates.
+- Added focused package-root negative coverage that rejects nested/sibling rows
+  on native update execution while preserving their private row/admission
+  metadata.
 
 ## Read-only Audit Follow-up
 
@@ -66,7 +66,10 @@
   kept create records stale after a later package-root native update.
 - Required identity-only direct row ids to match embedded `hostOutputRow.id` and
   required explicit `hostOutputShape` on update/unmount rows.
+- Follow-up tightened identity-only update/unmount reports to require embedded
+  `hostOutputRow` metadata and narrowed package-root `toTree` metadata so
+  sibling-text remains a JS admission path, not native execution evidence.
 - Verified with `node --check packages/react-test-renderer/index.js`,
   `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`,
   `node --test tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`,
-  and pending final diff checks before commit.
+  `git diff --check`, and `git diff --cached --check`.

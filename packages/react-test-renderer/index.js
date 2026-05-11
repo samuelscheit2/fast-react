@@ -1599,7 +1599,6 @@ const toTreePrivateFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary',
     'TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary',
     'TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary',
-    'TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary',
     'TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary',
     'TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary',
     'TestRendererRoot::describe_private_to_tree_unmount_finished_work_identity_gate_for_canary',
@@ -1618,8 +1617,6 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_to_tree_update_native_execution_requires_finished_work_identity_gate',
     'root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate',
     'root_private_to_tree_native_execution_evidence_records_composite_host_shape',
-    'root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate',
-    'root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity',
     'root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate',
     'root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
@@ -10134,7 +10131,27 @@ function validatePrivateSerializationFinishedWorkIdentitySourceReport(
   const directHostOutputRowId =
     readPrivateToJSONField(report, 'hostOutputRowId', 'host_output_row_id') ??
     readPrivateToJSONField(report, 'privateRowId', 'private_row_id');
+  const requiresHostOutputRow =
+    identity.hostOutputUpdateKind === 'Update' ||
+    identity.hostOutputUpdateKind === 'Unmount';
+  if (
+    requiresHostOutputRow &&
+    (hostOutputRow === undefined ||
+      hostOutputRow === null ||
+      typeof hostOutputRow !== 'object')
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected private serialization source report hostOutputRow.'
+    );
+  }
   const embeddedHostOutputRowId = readPrivateToJSONField(hostOutputRow, 'id');
+  if (requiresHostOutputRow && embeddedHostOutputRowId === undefined) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected private serialization source report hostOutputRow.id.'
+    );
+  }
   if (
     directHostOutputRowId !== undefined &&
     embeddedHostOutputRowId !== undefined &&
@@ -10146,7 +10163,7 @@ function validatePrivateSerializationFinishedWorkIdentitySourceReport(
     );
   }
   const hostOutputRowId =
-    directHostOutputRowId ?? embeddedHostOutputRowId;
+    embeddedHostOutputRowId ?? directHostOutputRowId;
   const directHostOutputShape =
     readPrivateToJSONField(report, 'hostOutputShape', 'host_output_shape') ??
     readPrivateToJSONField(hostOutputRow, 'hostOutputShape', 'host_output_shape');

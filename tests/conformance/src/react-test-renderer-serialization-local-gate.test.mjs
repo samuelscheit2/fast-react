@@ -1550,6 +1550,9 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       nativeToTreeEvidence &&
       facadeGate.nativeExecutionCompositeWorker ===
         "worker-698-test-renderer-totree-composite-native-execution";
+    const siblingTextNativeToTreeEvidence =
+      hasSiblingTextPrivateAdmission(entry) &&
+      entry.entrypoint !== packageRootEntrypoint;
     assert.deepEqual(
       facadeGate.acceptedHostOutputUpdateKinds,
       nativeToTreeEvidence ? ["Create", "Update", "Unmount"] : ["Create", "Update"]
@@ -1575,9 +1578,13 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
             "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary",
           ]
         : []),
+      ...(siblingTextNativeToTreeEvidence
+        ? [
+            "TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary"
+          ]
+        : []),
       ...(hasSiblingTextPrivateAdmission(entry)
         ? [
-            "TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary",
             "TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary"
           ]
         : []),
@@ -1612,10 +1619,14 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
               : []),
           ]
         : []),
-      ...(hasSiblingTextPrivateAdmission(entry)
+      ...(siblingTextNativeToTreeEvidence
         ? [
             "root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate",
-            "root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity",
+            "root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity"
+          ]
+        : []),
+      ...(hasSiblingTextPrivateAdmission(entry)
+        ? [
             "root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate"
           ]
         : []),
@@ -2427,6 +2438,33 @@ test("react-test-renderer JS private serialization finished-work identity valida
         /hostOutputRowId to match hostOutputRow\.id/u
       );
 
+      const missingIdentityRowReport = JSON.parse(
+        JSON.stringify(jsonUpdateReport)
+      );
+      missingIdentityRowReport.hostOutputRowId =
+        privateToJSONUpdateHostOutputRowId;
+      delete missingIdentityRowReport.hostOutputRow;
+      assert.equal(
+        jsonFacade.canValidateAcceptedFinishedWorkIdentity(
+          jsonUpdateEvidence,
+          missingIdentityRowReport,
+          updateError.rootRequest
+        ),
+        false
+      );
+      const missingIdentityRowError = captureThrown(() =>
+        jsonFacade.validateAcceptedFinishedWorkIdentity(
+          jsonUpdateEvidence,
+          missingIdentityRowReport,
+          updateError.rootRequest
+        )
+      );
+      assert.equal(
+        missingIdentityRowError.name,
+        "FastReactTestRendererPrivateToJSONSerializationError"
+      );
+      assert.match(missingIdentityRowError.message, /hostOutputRow/u);
+
       const missingIdentityRowShapeReport = JSON.parse(
         JSON.stringify(jsonUpdateReport)
       );
@@ -3018,7 +3056,7 @@ test("react-test-renderer JS private serialization finished-work identity valida
       );
       assert.match(
         genericSiblingTreeError.message,
-        /broad-multichild-identity-unexpectedly-open/u
+        /hostOutputRow|broad-multichild-identity-unexpectedly-open/u
       );
       assert.equal(
         treeFacade.canCreateAcceptedSiblingTextDiagnosticResult(

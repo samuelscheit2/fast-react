@@ -3865,6 +3865,62 @@ test("react-test-renderer package root private toJSON/toTree facades consume acc
   assert.equal(updateJSONEvidence.acceptedHostOutputRowShape, true);
   assert.equal(updateJSONEvidence.nativeExecution, false);
 
+  assert.equal(
+    jsonFacade.canValidateAcceptedFinishedWorkIdentity(
+      updateJSONIdentity,
+      updateJSONReport,
+      updateRequest
+    ),
+    true
+  );
+  const missingIdentityRowReport = JSON.parse(JSON.stringify(updateJSONReport));
+  missingIdentityRowReport.hostOutputRowId = privateToJSONUpdateHostOutputRowId;
+  delete missingIdentityRowReport.hostOutputRow;
+  assert.equal(
+    jsonFacade.canValidateAcceptedFinishedWorkIdentity(
+      updateJSONIdentity,
+      missingIdentityRowReport,
+      updateRequest
+    ),
+    false
+  );
+  const missingIdentityRowError = captureThrown(() =>
+    jsonFacade.validateAcceptedFinishedWorkIdentity(
+      updateJSONIdentity,
+      missingIdentityRowReport,
+      updateRequest
+    )
+  );
+  assert.equal(
+    missingIdentityRowError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(missingIdentityRowError.message, /hostOutputRow/u);
+  const missingIdentityRowShapeReport = JSON.parse(
+    JSON.stringify(updateJSONReport)
+  );
+  delete missingIdentityRowShapeReport.hostOutputRow.hostOutputShape;
+  assert.equal(
+    jsonFacade.canValidateAcceptedFinishedWorkIdentity(
+      updateJSONIdentity,
+      missingIdentityRowShapeReport,
+      updateRequest
+    ),
+    false
+  );
+  const missingIdentityRowShapeError = captureThrown(() =>
+    jsonFacade.validateAcceptedFinishedWorkIdentity(
+      updateJSONIdentity,
+      missingIdentityRowShapeReport,
+      updateRequest
+    )
+  );
+  assert.equal(
+    missingIdentityRowShapeError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(missingIdentityRowShapeError.message, /hostOutputShape/u);
+
   const nestedUpdateJSONReport = privateToJSONReport({
     hostOutputUpdateKind: "Update",
     rowId: privateToJSONNestedUpdateHostOutputRowId,
@@ -11611,6 +11667,9 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     nativeToTreeEvidence &&
     gate.nativeExecutionCompositeWorker ===
       "worker-698-test-renderer-totree-composite-native-execution";
+  const siblingTextNativeToTreeEvidence =
+    hasSiblingTextPrivateAdmission(entrypoint) &&
+    !isPackageRootEntrypoint(entrypoint);
   if (entrypoint.includes("/cjs/")) {
     assert.equal(nativeToTreeEvidence, true, entrypoint);
   }
@@ -11708,9 +11767,13 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
           "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary",
         ]
       : []),
+    ...(siblingTextNativeToTreeEvidence
+      ? [
+          "TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary"
+        ]
+      : []),
     ...(hasSiblingTextPrivateAdmission(entrypoint)
       ? [
-          "TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary",
           "TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary"
         ]
       : []),
@@ -11745,10 +11808,14 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
             : []),
         ]
       : []),
-    ...(hasSiblingTextPrivateAdmission(entrypoint)
+    ...(siblingTextNativeToTreeEvidence
       ? [
           "root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate",
-          "root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity",
+          "root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity"
+        ]
+      : []),
+    ...(hasSiblingTextPrivateAdmission(entrypoint)
+      ? [
           "root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate"
         ]
       : []),
