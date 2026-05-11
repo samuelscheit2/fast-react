@@ -74,18 +74,15 @@ const privateHydrationTextNodeClaimPatchExecutionStatus =
 const privateHydrationTextNodeClaimPatchMetadataId =
   'hydration-text-node-claim-patch';
 let hydrationBoundaryGateModule = null;
-const privateHydrateRootSourceLedgerRegisterSymbol = Symbol.for(
-  'fast.react_dom.private_hydrate_root_source_ledger_register'
-);
+const rootBridgeHydrateRootSourceLedgerAuthorityToken = Object.freeze({
+  source: 'root-bridge-hydrate-root-source-ledger-authority'
+});
 const {
   hasListeningMarker,
   inspectListeningMarker,
   internalEventHandlersKey
 } = require('../events/listener-registry.js');
-const hydrateRootSourceLedger = require('./hydrate-root-source-ledger.js');
 const refCallbackGate = require('./ref-callback-gate.js');
-const registerPrivateHydrateRootSourceLedgerRecord =
-  hydrateRootSourceLedger[privateHydrateRootSourceLedgerRegisterSymbol];
 const {
   PORTAL_PREPARE_MOUNT_LISTENER_INTENT_RECORDED,
   ROOT_LISTENERS_REGISTERED,
@@ -175,8 +172,16 @@ function getHydrationBoundaryGateModule() {
 }
 
 function registerHydrateRootSourceLedgerRecord(record, payload) {
-  if (typeof registerPrivateHydrateRootSourceLedgerRecord === 'function') {
-    registerPrivateHydrateRootSourceLedgerRecord(record, payload);
+  const hydrationBoundaryGate = getHydrationBoundaryGateModule();
+  const registerSourceLedgerRecord =
+    hydrationBoundaryGate
+      .registerPrivateHydrateRootSourceLedgerRecordForRootBridge;
+  if (typeof registerSourceLedgerRecord === 'function') {
+    registerSourceLedgerRecord(
+      record,
+      payload,
+      rootBridgeHydrateRootSourceLedgerAuthorityToken
+    );
   }
 }
 

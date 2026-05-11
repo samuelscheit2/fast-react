@@ -2068,6 +2068,21 @@ test('private hydration recoverable error boundary admission rejects stale clone
       .installPrivateHydrateRootSourceLedgerPayloadReaders,
     undefined
   );
+  assert.deepEqual(Object.getOwnPropertySymbols(hydrateRootSourceLedger), []);
+  assert.equal(
+    hydrateRootSourceLedger[
+      Symbol.for('fast.react_dom.private_hydrate_root_source_ledger_register')
+    ],
+    undefined
+  );
+  assert.equal(
+    hydrateRootSourceLedger[
+      Symbol.for(
+        'fast.react_dom.private_hydrate_root_source_ledger_payload_reader'
+      )
+    ],
+    undefined
+  );
   assert.throws(
     () =>
       vm.runInNewContext(
@@ -2184,6 +2199,20 @@ test('private hydration recoverable error boundary admission rejects stale clone
   }, TypeError);
   assert.equal(require(rootBridgePath), rootBridge);
   assert.equal(
+    hydrationGate.registerPrivateHydrateRootSourceLedgerRecordForRootBridge(
+      clonedHydrateRootPreflightRecord,
+      {
+        ...rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
+          scenario.hydrateRecord
+        ),
+        ledgerKind: 'hydrate-root-public-facade-preflight-record',
+        record: clonedHydrateRootPreflightRecord
+      },
+      Object.freeze({source: 'caller-token'})
+    ),
+    null
+  );
+  assert.equal(
     hydrateRootSourceLedger.getPrivateHydrateRootSourceLedgerRecordPayload(
       scenario.hydrateRecord
     ),
@@ -2284,7 +2313,7 @@ test('private hydration recoverable error boundary admission rejects stale clone
   assert.deepEqual(other.document.__registrations, []);
 });
 
-test('hydrateRoot source ledger rejects forged context and root-bridge cache poisoning', () => {
+test('hydrateRoot source ledger rejects forged context and cache poisoning', () => {
   const script = `
 'use strict';
 
@@ -2294,6 +2323,11 @@ const path = require('node:path');
 const packageRoot = ${JSON.stringify(packageRoot)};
 const rootBridgePath = path.join(packageRoot, 'src/client/root-bridge.js');
 const rootBridgeCacheKey = require.resolve(rootBridgePath);
+const sourceLedgerPath = path.join(
+  packageRoot,
+  'src/client/hydrate-root-source-ledger.js'
+);
+const sourceLedgerCacheKey = require.resolve(sourceLedgerPath);
 const sourceLedgerFakePayloads = new WeakMap();
 const fakeRootBridgeCacheExports = Object.freeze({
   getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
@@ -2309,12 +2343,38 @@ const fakeRootBridgeCacheExports = Object.freeze({
     return sourceLedgerFakePayloads.get(record) || null;
   }
 });
+const fakeHydrateRootSourceLedgerExports = Object.freeze({
+  getPrivateHydrateRootSourceLedgerRecordPayload() {
+    return null;
+  },
+  isPrivateHydrateRootSourceLedgerRecord() {
+    return false;
+  },
+  [Symbol.for('fast.react_dom.private_hydrate_root_source_ledger_register')](
+    record,
+    payload
+  ) {
+    sourceLedgerFakePayloads.set(record, payload);
+    return record;
+  },
+  [Symbol.for(
+    'fast.react_dom.private_hydrate_root_source_ledger_payload_reader'
+  )](record) {
+    return sourceLedgerFakePayloads.get(record) || null;
+  }
+});
 
 require.cache[rootBridgeCacheKey] = {
   id: rootBridgeCacheKey,
   filename: rootBridgeCacheKey,
   loaded: true,
   exports: fakeRootBridgeCacheExports
+};
+require.cache[sourceLedgerCacheKey] = {
+  id: sourceLedgerCacheKey,
+  filename: sourceLedgerCacheKey,
+  loaded: true,
+  exports: fakeHydrateRootSourceLedgerExports
 };
 
 const hydrationGate = require(path.join(
@@ -2326,6 +2386,7 @@ const hydrateRootSourceLedger = require(path.join(
   'src/client/hydrate-root-source-ledger.js'
 ));
 assert.equal(require(rootBridgePath), fakeRootBridgeCacheExports);
+assert.equal(hydrateRootSourceLedger, fakeHydrateRootSourceLedgerExports);
 delete require.cache[rootBridgeCacheKey];
 const rootBridge = require(rootBridgePath);
 assert.notEqual(rootBridge, fakeRootBridgeCacheExports);
