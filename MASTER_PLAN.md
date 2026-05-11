@@ -46,7 +46,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Workers 785-802 have been accepted, verified,
-merged, and cleaned up. Workers 803-810 are active in isolated worktrees.
+merged, and cleaned up. Workers 803-818 are active in isolated worktrees.
 Accepted private evidence still keeps public root, act, Scheduler timing,
 hydration, serialization, native execution, package compatibility, and broad
 renderer compatibility blocked.
@@ -61,6 +61,14 @@ Active workers:
 - Worker 808: static resource/form admission ledger.
 - Worker 809: test-renderer sibling-text negative matrix.
 - Worker 810: static React act/Scheduler diagnostics ledger.
+- Worker 811: React DOM hydration replay/target negative matrix.
+- Worker 812: resource/form fake-metadata negative matrix.
+- Worker 813: Scheduler mock diagnostics descriptor negative matrix.
+- Worker 814: React act expired/delayed Scheduler negative matrix.
+- Worker 815: native worker-thread cleanup stale-evidence matrix.
+- Worker 816: test-renderer unmount/nested source-report bridge gate.
+- Worker 817: root work-loop finished-lanes handoff negative matrix.
+- Worker 818: static private-admission ledger for Workers 733/736.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -68,10 +76,11 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Audit and merge Workers 803-810 as they complete. Expect overlap in
+1. Audit and merge Workers 803-818 as they complete. Expect overlap in
    Scheduler/React act static evidence, React DOM hydration/resource/form
-   ledgers, test-renderer sibling-text tests, and Rust managed-child host
-   traversal.
+   ledgers and negative matrices, test-renderer sibling-text/unmount/nested
+   tests, native no-load cleanup coverage, and Rust managed-child/root
+   handoffs.
 2. Launch the next parallel batch from accepted private evidence when a task has
    a narrow proof boundary: delayed Scheduler/React act diagnostics, hydrateRoot
    marker/listener/target/recoverable-error rows, resource/form fake metadata,
