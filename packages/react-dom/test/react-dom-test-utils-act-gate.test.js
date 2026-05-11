@@ -248,14 +248,18 @@ test('private act gate rejects stale foreign or tampered Worker 810 ledger metad
         publicCompatibilityClaimed: true,
         publicTestUtilsActReady: true,
         publicSchedulerTimingReady: true,
+        publicReactActCompatibilityClaimed: true,
         publicSchedulerFlushBehaviorExecuted: true,
+        packageSurfaceChanged: true,
         publicRootExecution: true,
         publicEffectExecution: true,
         executesRendererRoots: true,
         publicBlockerClaims: {
           ...baseline.publicBlockerClaims,
           publicTestUtilsActReady: true,
+          publicReactActCompatibilityClaimed: true,
           publicSchedulerFlushBehaviorExecuted: true,
+          packageSurfaceChanged: true,
           publicRootExecution: true,
           publicEffectExecution: true,
           executesRendererRoots: true
@@ -265,12 +269,16 @@ test('private act gate rejects stale foreign or tampered Worker 810 ledger metad
         'publicCompatibilityClaimed-not-false',
         'publicTestUtilsActReady-not-false',
         'publicSchedulerTimingReady-not-false',
+        'packageSurfaceChanged-not-false',
+        'publicReactActCompatibilityClaimed-not-false',
         'publicSchedulerFlushBehaviorExecuted-not-false',
         'publicRootExecution-not-false',
         'publicEffectExecution-not-false',
         'executesRendererRoots-not-false',
         'publicBlockerClaims.publicTestUtilsActReady-not-false',
+        'publicBlockerClaims.publicReactActCompatibilityClaimed-not-false',
         'publicBlockerClaims.publicSchedulerFlushBehaviorExecuted-not-false',
+        'publicBlockerClaims.packageSurfaceChanged-not-false',
         'publicBlockerClaims.publicRootExecution-not-false',
         'publicBlockerClaims.publicEffectExecution-not-false',
         'publicBlockerClaims.executesRendererRoots-not-false'
@@ -279,12 +287,16 @@ test('private act gate rejects stale foreign or tampered Worker 810 ledger metad
         'publicCompatibilityClaimed',
         'publicTestUtilsActReady',
         'publicSchedulerTimingReady',
+        'publicReactActCompatibilityClaimed',
         'publicSchedulerFlushBehaviorExecuted',
+        'packageSurfaceChanged',
         'publicRootExecution',
         'publicEffectExecution',
         'executesRendererRoots',
         'publicBlockerClaims.publicTestUtilsActReady',
+        'publicBlockerClaims.publicReactActCompatibilityClaimed',
         'publicBlockerClaims.publicSchedulerFlushBehaviorExecuted',
+        'publicBlockerClaims.packageSurfaceChanged',
         'publicBlockerClaims.publicRootExecution',
         'publicBlockerClaims.publicEffectExecution',
         'publicBlockerClaims.executesRendererRoots'
@@ -350,6 +362,66 @@ test('private act gate rejects stale foreign or tampered Worker 810 ledger metad
       label
     );
   }
+});
+
+test('private act gate prevents gateOverride tampering of Worker 810 ledger surface', () => {
+  const baseline = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate();
+  const evaluated = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+    gateOverrides: {
+      privateReactActSchedulerDiagnosticsLedger: {
+        ...baseline.privateReactActSchedulerDiagnosticsLedger,
+        summary: {
+          ...baseline.privateReactActSchedulerDiagnosticsLedger.summary,
+          publicActExecution: true,
+          publicReactActCompatibilityClaimed: true,
+          packageSurfaceChanged: true,
+          publicBlockerClaims: {
+            ...baseline.privateReactActSchedulerDiagnosticsLedger.summary
+              .publicBlockerClaims,
+            publicActExecution: true,
+            publicReactActCompatibilityClaimed: true,
+            packageSurfaceChanged: true
+          }
+        }
+      }
+    }
+  });
+
+  assert.deepEqual(evaluated.violations, []);
+  assert.deepEqual(evaluated.privatePrerequisitePublicClaims, []);
+  assert.deepEqual(evaluated.stalePrivatePrerequisites, []);
+  assert.equal(
+    evaluated.privateReactActSchedulerDiagnosticsLedger.summary
+      .publicActExecution,
+    false
+  );
+  assert.equal(
+    evaluated.privateReactActSchedulerDiagnosticsLedger.summary
+      .publicReactActCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    evaluated.privateReactActSchedulerDiagnosticsLedger.summary
+      .packageSurfaceChanged,
+    false
+  );
+  assert.equal(
+    evaluated.privateReactActSchedulerDiagnosticsLedger.summary
+      .publicBlockerClaims.publicActExecution,
+    false
+  );
+  assert.equal(
+    evaluated.privateReactActSchedulerDiagnosticsLedger.summary
+      .publicBlockerClaims.publicReactActCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    evaluated.privateReactActSchedulerDiagnosticsLedger.summary
+      .publicBlockerClaims.packageSurfaceChanged,
+    false
+  );
+  assert.equal(evaluated.publicTestUtilsActReady, false);
+  assert.equal(evaluated.sideEffectPolicy.executesRendererRoots, false);
 });
 
 function replacePrerequisite(prerequisites, replacement) {

@@ -19,6 +19,10 @@
   the Worker 810 ledger prerequisite, including nested `summary.publicBlockerClaims`.
   Nested summary worker-id, public execution, and public blocker-claim tampering
   now fail closed.
+- Re-audit follow-up prevents `gateOverrides` from replacing the returned
+  Worker 810 ledger surface, and classifies `publicReactActCompatibilityClaimed`
+  and `packageSurfaceChanged` as public-claim violations when accepted Worker
+  810 metadata sets them.
 
 ## Changed Files
 
@@ -52,6 +56,17 @@
 - Audit follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
 - Audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
 - Audit follow-up: `git diff --check` - passed.
+- Re-audit follow-up: `node --check packages/react-dom/src/test-utils-act-gate.js` - passed.
+- Re-audit follow-up: `node --check packages/react-dom/test/react-dom-test-utils-act-gate.test.js` - passed.
+- Re-audit follow-up: `node --check tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs` - passed.
+- Re-audit follow-up: `node --check tests/conformance/test/react-act-oracle.test.mjs` - passed.
+- Re-audit follow-up: `node --test packages/react-dom/test/react-dom-test-utils-act-gate.test.js` - passed, 5 tests.
+- Re-audit follow-up: `node --test tests/conformance/test/private-admission-810-react-act-scheduler-diagnostics-ledger.test.mjs tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs` - passed, 25 tests.
+- Re-audit follow-up: `node --test tests/conformance/test/react-act-oracle.test.mjs tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs tests/conformance/test/scheduler-mock-oracle.test.mjs tests/conformance/test/scheduler-native-entry-oracle.test.mjs tests/conformance/test/scheduler-mock-expired-lane-flush.test.mjs` - passed, 69 tests.
+- Re-audit follow-up: `npm run check --workspace @fast-react/react-dom` - passed, 183 package tests plus import smoke; npm printed the existing `minimum-release-age` warning.
+- Re-audit follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
+- Re-audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
+- Re-audit follow-up: `git diff --check` - passed.
 
 ## Evidence Gathered
 
@@ -75,6 +90,14 @@
   `summary.publicBlockerClaims.publicActExecution: true` each produce
   fail-closed Worker 810 prerequisite violations and do not open public
   test-utils act readiness or side-effect execution.
+- Re-audit follow-up confirmed a `gateOverrides.privateReactActSchedulerDiagnosticsLedger`
+  payload with nested `summary.publicActExecution`,
+  `summary.publicReactActCompatibilityClaimed`, `summary.packageSurfaceChanged`,
+  and matching nested `summary.publicBlockerClaims` claims cannot replace or
+  tamper with the returned Worker 810 ledger surface.
+- Re-audit follow-up confirmed accepted prerequisite metadata that sets
+  `publicReactActCompatibilityClaimed` or `packageSurfaceChanged` is reported in
+  `privatePrerequisitePublicClaims`, not only stale-evidence reasons.
 
 ## Risks Or Blockers
 

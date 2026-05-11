@@ -680,7 +680,9 @@ const acceptedPrivatePrerequisitePublicClaimFields = freezeArray([
   'publicCompatibilityClaimed',
   'publicPackageCompatibilityClaimed',
   'packageCompatibilityClaimed',
+  'packageSurfaceChanged',
   'publicSchedulerTimingCompatibilityClaimed',
+  'publicReactActCompatibilityClaimed',
   'publicActCompatibilityClaimed',
   'publicFlushSyncCompatibilityClaimed',
   'publicRootCompatibilityClaimed',
@@ -1529,13 +1531,6 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       drainsPublicReactActQueue: false,
       compatibilityClaimed: false
     }),
-    privateReactActSchedulerDiagnosticsLedger: freezeRecord({
-      prerequisiteId: privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
-      acceptedPrerequisiteId:
-        privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
-      summary: privateReactActSchedulerDiagnosticsLedgerSummary,
-      ...privateReactActSchedulerDiagnosticsLedgerSummary
-    }),
     passiveEffects: freezeRecord({
       status: passiveEffectsFlushMetadataStatus,
       records: passiveEffectsFlushRecords,
@@ -1655,7 +1650,18 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
     sideEffectPolicy,
     deprecationWarningBehavior:
       'preserved-no-warning-while-public-test-utils-act-is-placeholder',
-    ...overrides
+    ...overrides,
+    privateReactActSchedulerDiagnosticsLedger:
+      createReactActSchedulerDiagnosticsLedgerGateSurface()
+  });
+}
+
+function createReactActSchedulerDiagnosticsLedgerGateSurface() {
+  return freezeRecord({
+    prerequisiteId: privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
+    acceptedPrerequisiteId: privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
+    summary: privateReactActSchedulerDiagnosticsLedgerSummary,
+    ...privateReactActSchedulerDiagnosticsLedgerSummary
   });
 }
 
