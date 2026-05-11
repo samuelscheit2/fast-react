@@ -73,6 +73,15 @@ const privateActNativeUpdatePassiveEffectDrainPrerequisiteId =
   'private-native-update-execution-passive-effect-drain-metadata';
 const privateActNativeUpdatePassiveEffectDrainStatus =
   'private-act-native-update-passive-effect-drain-public-act-blocked';
+const privateActUpdateLifecycleBoundaryDiagnosticId =
+  'react-test-renderer-act-update-lifecycle-boundary-private-diagnostic';
+const privateActUpdateLifecycleBoundaryStatus =
+  'private-act-update-lifecycle-boundary-source-owned-lifecycle-host-output-public-act-blocked';
+const privateActUpdateLifecycleBoundaryWorkers = Object.freeze([
+  'worker-881-test-renderer-serialization-lifecycle-gate',
+  'worker-888-test-renderer-instance-lifecycle-gate',
+  'worker-895-rust-test-renderer-multichild-lifecycle-native'
+]);
 const privateActQueueTestQueueBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-queue'
 );
@@ -673,6 +682,30 @@ const testRendererRootActFlushRecords = Object.freeze([
     hostOutputProducedFromJs: false
   }),
   Object.freeze({
+    id: privateActUpdateLifecycleBoundaryDiagnosticId,
+    jsRecord: 'FastReactTestRendererPrivateActUpdateLifecycleBoundary',
+    symbol: 'fast.react_test_renderer.root_request_bridge',
+    status: privateActUpdateLifecycleBoundaryStatus,
+    acceptedWorkers: privateActUpdateLifecycleBoundaryWorkers,
+    requiresSourceOwnedCreateUpdateUnmountLifecycleEvidence: true,
+    requiresCurrentFinishedWorkIdentity: true,
+    requiresCurrentHostOutputSnapshot: true,
+    requiresSameEntrypointRootAndRendererOwner: true,
+    requiresLatestUpdateBeforeUnmountSequence: true,
+    rejectsPublicActStrings: true,
+    rejectsTestTitlesAndProseClaims: true,
+    rejectsSourceSyntaxClaims: true,
+    rejectsRawSerializationReports: true,
+    rejectsCallerBuiltRows: true,
+    rejectsClonedRows: true,
+    rejectsSchedulerPackageAndNativeAliases: true,
+    publicActAvailable: false,
+    nativeExecution: false,
+    rustExecution: false,
+    hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
+  }),
+  Object.freeze({
     id: 'test-renderer-private-getinstance-class-root-diagnostic',
     jsRecord: 'react-test-renderer-get-instance-private-class-root-diagnostics',
     symbol: 'fast.react_test_renderer.private_get_instance_diagnostics',
@@ -1135,7 +1168,8 @@ const schedulerReactActQueueDiagnosticRecords = Object.freeze([
       'worker-670-test-renderer-act-passive-native-flush',
     buildsOnWorkers: Object.freeze([
       'worker-473-test-renderer-act-passive-effect-drain',
-      'worker-637-test-renderer-update-native-execution'
+      'worker-637-test-renderer-update-native-execution',
+      ...privateActUpdateLifecycleBoundaryWorkers
     ]),
     nativeUpdateExecutionResultKind:
       'FastReactTestRendererPrivateRootExecutionResult',
@@ -1146,6 +1180,9 @@ const schedulerReactActQueueDiagnosticRecords = Object.freeze([
     consumesAcceptedNativeUpdateExecution: true,
     consumesPrivateUpdateNativeBridgeAdmission: true,
     consumesAcceptedNativeUpdateHostOutput: true,
+    privateActUpdateLifecycleBoundaryDiagnosticId,
+    consumesSourceOwnedActUpdateLifecycleBoundary: true,
+    requiresSourceOwnedActUpdateLifecycleBoundary: true,
     consumesPendingPassiveFlushMetadata: true,
     consumesAcceptedSchedulerFlushMetadata: true,
     drainsAcceptedPendingPassiveFlushMetadata: true,
@@ -1282,6 +1319,12 @@ privateActPassiveEffectDrainDiagnostics = Object.freeze({
     privateActNativeUpdatePassiveEffectDrainDiagnosticId,
   nativeUpdatePassiveEffectDrainStatus:
     privateActNativeUpdatePassiveEffectDrainStatus,
+  privateActUpdateLifecycleBoundaryDiagnosticId,
+  privateActUpdateLifecycleBoundaryStatus,
+  privateActUpdateLifecycleBoundaryAcceptedWorkers:
+    privateActUpdateLifecycleBoundaryWorkers,
+  requiresSourceOwnedActUpdateLifecycleBoundary: true,
+  requiresCurrentActUpdateFinishedWorkIdentity: true,
   privateUpdateNativeBridgeAdmissionDiagnosticId:
     'react-test-renderer-update-native-bridge-admission-private-diagnostic',
   privateUpdateNativeBridgeAdmissionStatus:
@@ -1289,6 +1332,7 @@ privateActPassiveEffectDrainDiagnostics = Object.freeze({
   consumesAcceptedNativeUpdateExecution: true,
   consumesPrivateUpdateNativeBridgeAdmission: true,
   consumesAcceptedNativeUpdateHostOutput: true,
+  consumesSourceOwnedActUpdateLifecycleBoundary: true,
   drainsAcceptedPendingPassiveFlushMetadata: true,
   publicUpdateCompatibilityClaimed: false,
   drainsPublicSchedulerTaskQueue: false,
@@ -1304,6 +1348,8 @@ privateActPassiveEffectDrainDiagnostics = Object.freeze({
   createAcceptedPendingPassiveFlushRecord,
   describeAcceptedPendingPassiveFlushMetadata,
   consumeAcceptedPendingPassiveFlushMetadata,
+  describePrivateActUpdateLifecycleBoundary,
+  consumePrivateActUpdateLifecycleBoundary,
   describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
   consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
   drainAcceptedPendingPassiveFlushMetadata:
@@ -1676,7 +1722,8 @@ const actSchedulerGate = Object.freeze({
     'worker-576-test-renderer-act-private-root-passive-sequence',
     'worker-622-scheduler-mock-act-root-work-execution',
     'worker-640-test-renderer-act-scheduler-flush-execution',
-    'worker-670-test-renderer-act-passive-native-flush'
+    'worker-670-test-renderer-act-passive-native-flush',
+    ...privateActUpdateLifecycleBoundaryWorkers
   ]),
   publicActBehaviorAvailable: false,
   publicSchedulerFlushExecutionAvailable: false,
@@ -7249,16 +7296,220 @@ function getRejectedNativeUpdateExecutionResultReason(result) {
   return null;
 }
 
-function describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+function getRejectedPrivateActUpdateLifecycleBoundaryReason(
   updateExecutionResult,
-  metadata
+  rootLifecycleExecutionEvidence,
+  finishedWorkIdentity
 ) {
   const updateRejectionReason =
     getRejectedNativeUpdateExecutionResultReason(updateExecutionResult);
+  if (updateRejectionReason !== null) {
+    return updateRejectionReason;
+  }
+  if (!rootExecutionResults.has(updateExecutionResult)) {
+    return 'act-update-execution-not-source-owned';
+  }
+  const admission = updateExecutionResult.privateUpdateNativeBridgeAdmission;
+  if (
+    rootRequestUpdateNativeBridgeAdmissions.get(
+      updateExecutionResult.request
+    ) !== admission
+  ) {
+    return 'act-update-admission-not-source-owned';
+  }
+  if (!isObjectLike(rootLifecycleExecutionEvidence)) {
+    return 'act-update-lifecycle-evidence-not-object';
+  }
+  if (!Object.isFrozen(rootLifecycleExecutionEvidence)) {
+    return 'act-update-lifecycle-evidence-not-frozen';
+  }
+  if (!rootLifecycleExecutionEvidences.has(rootLifecycleExecutionEvidence)) {
+    return 'act-update-lifecycle-evidence-not-source-owned';
+  }
+
+  let lifecycle;
+  try {
+    lifecycle = validatePrivateSerializationLifecycleExecutionEvidence(
+      'create().act(update)',
+      updateExecutionResult.request,
+      rootLifecycleExecutionEvidence
+    );
+  } catch (_error) {
+    return 'act-update-lifecycle-evidence-currentness';
+  }
+  if (
+    lifecycle.updateRequest !== updateExecutionResult.request ||
+    lifecycle.evidence.update.requestSequence !==
+      updateExecutionResult.requestSequence ||
+    lifecycle.evidence.unmount.requestSequence <=
+      updateExecutionResult.requestSequence
+  ) {
+    return 'act-update-lifecycle-request-sequence';
+  }
+  if (
+    lifecycle.evidence.create.sourceExecutionRecordId !==
+      privateCreateNativeBridgeHostOutputHandoffDiagnosticId ||
+    lifecycle.evidence.update.sourceExecutionRecordId !==
+      privateUpdateNativeBridgeAdmissionDiagnosticId ||
+    lifecycle.evidence.unmount.sourceExecutionRecordId !==
+      privateUnmountNativeBridgeAdmissionDiagnosticId
+  ) {
+    return 'act-update-lifecycle-source-records';
+  }
+  if (!isObjectLike(finishedWorkIdentity)) {
+    return 'act-update-finished-work-identity-not-object';
+  }
+  if (!Object.isFrozen(finishedWorkIdentity)) {
+    return 'act-update-finished-work-identity-not-frozen';
+  }
+  if (!privateSerializationFinishedWorkIdentityResults.has(finishedWorkIdentity)) {
+    return 'act-update-finished-work-identity-not-source-owned';
+  }
+  if (
+    finishedWorkIdentity.diagnosticName !==
+      privateSerializationFinishedWorkIdentityDiagnosticName ||
+    finishedWorkIdentity.rootRequest !== updateExecutionResult.request ||
+    finishedWorkIdentity.rootRequestOperation !== 'update' ||
+    finishedWorkIdentity.rootRequestSequence !==
+      updateExecutionResult.requestSequence ||
+    finishedWorkIdentity.hostOutputUpdateKind !== 'Update'
+  ) {
+    return 'act-update-finished-work-identity-currentness';
+  }
+  if (
+    finishedWorkIdentity.rootFinishedLanesHandoffAccepted !== true ||
+    finishedWorkIdentity.consumesPrivateRootFinishedLanesHandoffGate !== true ||
+    finishedWorkIdentity.hostOutputSnapshotCurrent !== true ||
+    finishedWorkIdentity.consumesCommittedHostRootFinishedWorkIdentity !== true ||
+    finishedWorkIdentity.consumesCommittedHostRootFinishedWorkLanes !== true
+  ) {
+    return 'act-update-finished-work-identity-host-output';
+  }
+  if (
+    finishedWorkIdentity.publicToJSONAvailable !== false ||
+    finishedWorkIdentity.publicToTreeAvailable !== false ||
+    finishedWorkIdentity.publicTestInstanceAvailable !== false ||
+    finishedWorkIdentity.publicSerializationAvailable !== false ||
+    finishedWorkIdentity.compatibilityClaimed !== false
+  ) {
+    return 'act-update-finished-work-identity-public-claim';
+  }
+
+  return null;
+}
+
+function describePrivateActUpdateLifecycleBoundary(
+  updateExecutionResult,
+  rootLifecycleExecutionEvidence,
+  finishedWorkIdentity
+) {
+  const rejectionReason = getRejectedPrivateActUpdateLifecycleBoundaryReason(
+    updateExecutionResult,
+    rootLifecycleExecutionEvidence,
+    finishedWorkIdentity
+  );
+  const accepted = rejectionReason === null;
+
+  return freezeRecord({
+    id: privateActUpdateLifecycleBoundaryDiagnosticId,
+    status: accepted
+      ? privateActUpdateLifecycleBoundaryStatus
+      : 'rejected-private-act-update-lifecycle-boundary',
+    accepted,
+    rejectionReason,
+    acceptedWorkers: privateActUpdateLifecycleBoundaryWorkers,
+    consumer: 'react-test-renderer-act-update-lifecycle-boundary-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    updateRequestId: isObjectLike(updateExecutionResult)
+      ? updateExecutionResult.requestId
+      : null,
+    updateRequestSequence: isObjectLike(updateExecutionResult)
+      ? updateExecutionResult.requestSequence
+      : null,
+    rootId: isObjectLike(updateExecutionResult)
+      ? updateExecutionResult.rootId
+      : null,
+    sourceOwnedLifecycleEvidenceAccepted: accepted,
+    sourceOwnedFinishedWorkIdentityAccepted: accepted,
+    sourceOwnedCurrentHostOutputAccepted: accepted,
+    consumesSourceOwnedCreateUpdateUnmountLifecycleEvidence: accepted,
+    consumesFinishedWorkCurrentHostOutputIdentity: accepted,
+    consumesAcceptedNativeUpdateExecution: accepted,
+    consumesPrivateUpdateNativeBridgeAdmission: accepted,
+    requiresLatestUpdateBeforeUnmountSequence: true,
+    rejectsPublicActStrings: true,
+    rejectsTestTitlesAndProseClaims: true,
+    rejectsSourceSyntaxClaims: true,
+    rejectsRawSerializationReports: true,
+    rejectsCallerBuiltRows: true,
+    rejectsClonedRows: true,
+    rejectsSchedulerPackageAndNativeAliases: true,
+    publicActCompatibilityClaimed: false,
+    publicUpdateCompatibilityClaimed: false,
+    publicSerializationAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
+function consumePrivateActUpdateLifecycleBoundary(
+  updateExecutionResult,
+  rootLifecycleExecutionEvidence,
+  finishedWorkIdentity
+) {
+  const boundary = describePrivateActUpdateLifecycleBoundary(
+    updateExecutionResult,
+    rootLifecycleExecutionEvidence,
+    finishedWorkIdentity
+  );
+  if (boundary.accepted !== true) {
+    throw createPrivateActPassiveEffectDrainDiagnosticError(
+      boundary.rejectionReason
+    );
+  }
+
+  return freezeRecord({
+    ...boundary,
+    status: privateActUpdateLifecycleBoundaryStatus,
+    rootLifecycleExecutionEvidence,
+    rootLifecycleExecutionDiagnosticName:
+      rootLifecycleExecutionEvidence.diagnosticName,
+    rootLifecycleExecutionStatus: rootLifecycleExecutionEvidence.status,
+    finishedWorkIdentity,
+    finishedWorkIdentityDiagnosticName: finishedWorkIdentity.diagnosticName,
+    finishedWorkIdentityStatus: finishedWorkIdentity.status,
+    privateUpdateNativeBridgeAdmission:
+      updateExecutionResult.privateUpdateNativeBridgeAdmission,
+    privateUpdateNativeBridgeAdmissionId:
+      updateExecutionResult.privateUpdateNativeBridgeAdmission.id,
+    rootFinishedLanesHandoff: finishedWorkIdentity.rootFinishedLanesHandoff,
+    rootFinishedLanesHandoffAccepted: true,
+    hostOutputSnapshotCurrent: true,
+    sourceExecutionRecordIds:
+      rootLifecycleExecutionEvidence.sourceExecutionRecordIds,
+    latestUpdateLifecycleBeforeUnmountAccepted: true
+  });
+}
+
+function describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+  updateExecutionResult,
+  metadata,
+  rootLifecycleExecutionEvidence = undefined,
+  finishedWorkIdentity = undefined
+) {
+  const updateRejectionReason =
+    getRejectedNativeUpdateExecutionResultReason(updateExecutionResult);
+  const boundaryRejectionReason =
+    getRejectedPrivateActUpdateLifecycleBoundaryReason(
+      updateExecutionResult,
+      rootLifecycleExecutionEvidence,
+      finishedWorkIdentity
+    );
   const passiveRejectionReason =
     getRejectedPendingPassiveFlushMetadataReason(metadata);
   const accepted =
-    updateRejectionReason === null && passiveRejectionReason === null;
+    boundaryRejectionReason === null && passiveRejectionReason === null;
   const pendingCount =
     isObjectLike(metadata) && Array.isArray(metadata.records)
       ? metadata.records.length
@@ -7270,8 +7521,9 @@ function describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
       ? 'accepted-native-update-execution-and-pending-passive-flush-metadata'
       : 'rejected-native-update-execution-and-pending-passive-flush-metadata',
     accepted,
-    rejectionReason: updateRejectionReason ?? passiveRejectionReason,
+    rejectionReason: boundaryRejectionReason ?? passiveRejectionReason,
     updateExecutionAccepted: updateRejectionReason === null,
+    actUpdateLifecycleBoundaryAccepted: boundaryRejectionReason === null,
     passiveMetadataAccepted: passiveRejectionReason === null,
     nativeUpdateExecutionResultKind: isObjectLike(updateExecutionResult)
       ? updateExecutionResult.kind
@@ -7289,9 +7541,12 @@ function describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
     consumer:
       'react-test-renderer-act-native-update-passive-drain-private-gate',
     gateStatus: actSchedulerGateStatus,
+    privateActUpdateLifecycleBoundaryDiagnosticId,
+    privateActUpdateLifecycleBoundaryStatus,
     consumesAcceptedNativeUpdateExecution: accepted,
     consumesPrivateUpdateNativeBridgeAdmission: accepted,
     consumesAcceptedNativeUpdateHostOutput: accepted,
+    consumesSourceOwnedActUpdateLifecycleBoundary: accepted,
     consumesPendingPassiveFlushMetadata: passiveRejectionReason === null,
     consumesAcceptedSchedulerFlushMetadata: passiveRejectionReason === null,
     drainsAcceptedPendingPassiveFlushMetadata: accepted,
@@ -7308,12 +7563,16 @@ function describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
 
 function consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
   updateExecutionResult,
-  metadata
+  metadata,
+  rootLifecycleExecutionEvidence = undefined,
+  finishedWorkIdentity = undefined
 ) {
   const description =
     describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
       updateExecutionResult,
-      metadata
+      metadata,
+      rootLifecycleExecutionEvidence,
+      finishedWorkIdentity
     );
   if (description.accepted !== true) {
     throw createPrivateActPassiveEffectDrainDiagnosticError(
@@ -7321,6 +7580,12 @@ function consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
     );
   }
 
+  const actUpdateLifecycleBoundary =
+    consumePrivateActUpdateLifecycleBoundary(
+      updateExecutionResult,
+      rootLifecycleExecutionEvidence,
+      finishedWorkIdentity
+    );
   const passiveDrainReport =
     consumeAcceptedPendingPassiveFlushMetadata(metadata);
   const admission = updateExecutionResult.privateUpdateNativeBridgeAdmission;
@@ -7342,6 +7607,16 @@ function consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
     privateUpdateNativeBridgeAdmission: admission,
     privateUpdateNativeBridgeAdmissionId: admission.id,
     privateUpdateNativeBridgeAdmissionStatus: admission.status,
+    privateActUpdateLifecycleBoundary: actUpdateLifecycleBoundary,
+    privateActUpdateLifecycleBoundaryId:
+      actUpdateLifecycleBoundary.id,
+    privateActUpdateLifecycleBoundaryStatus:
+      actUpdateLifecycleBoundary.status,
+    rootLifecycleExecutionEvidence,
+    rootLifecycleExecutionDiagnosticName:
+      rootLifecycleExecutionEvidence.diagnosticName,
+    finishedWorkIdentity,
+    finishedWorkIdentityDiagnosticName: finishedWorkIdentity.diagnosticName,
     nativeUpdateExecutionConsumed: true,
     privateRootRequestExecutionConsumed: true,
     rustRootExecutionBoundaryCalled: true,
@@ -7363,6 +7638,8 @@ function consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
     consumesAcceptedNativeUpdateExecution: true,
     consumesPrivateUpdateNativeBridgeAdmission: true,
     consumesAcceptedNativeUpdateHostOutput: true,
+    consumesSourceOwnedActUpdateLifecycleBoundary: true,
+    consumesFinishedWorkCurrentHostOutputIdentity: true,
     drainsAcceptedPendingPassiveFlushMetadata: true,
     drainsPublicSchedulerTaskQueue: false,
     drainsPublicReactActQueue: false,
@@ -7447,6 +7724,7 @@ const rootRequestUpdateNativeBridgeAdmissions = new WeakMap();
 const rootHandleTestInstanceLifecycleEvidence = new WeakMap();
 const rootExecutionResults = new WeakSet();
 const rootLifecycleExecutionEvidences = new WeakSet();
+const privateSerializationFinishedWorkIdentityResults = new WeakSet();
 
 function createTestRendererRootRequestBridge(options) {
   const bridgeState = {
@@ -7655,6 +7933,41 @@ function createTestRendererRootRequestBridge(options) {
     },
     consumePrivateRootLifecycleExecutionEvidence(records) {
       return consumePrivateRootLifecycleExecutionEvidence(records);
+    },
+    describePrivateActUpdateLifecycleBoundary(
+      updateExecutionResult,
+      rootLifecycleExecutionEvidence,
+      finishedWorkIdentity
+    ) {
+      return describePrivateActUpdateLifecycleBoundary(
+        updateExecutionResult,
+        rootLifecycleExecutionEvidence,
+        finishedWorkIdentity
+      );
+    },
+    canConsumePrivateActUpdateLifecycleBoundary(
+      updateExecutionResult,
+      rootLifecycleExecutionEvidence,
+      finishedWorkIdentity
+    ) {
+      return (
+        getRejectedPrivateActUpdateLifecycleBoundaryReason(
+          updateExecutionResult,
+          rootLifecycleExecutionEvidence,
+          finishedWorkIdentity
+        ) === null
+      );
+    },
+    consumePrivateActUpdateLifecycleBoundary(
+      updateExecutionResult,
+      rootLifecycleExecutionEvidence,
+      finishedWorkIdentity
+    ) {
+      return consumePrivateActUpdateLifecycleBoundary(
+        updateExecutionResult,
+        rootLifecycleExecutionEvidence,
+        finishedWorkIdentity
+      );
     },
     executeRootRequest(record, executor) {
       return executeRootRequestWithBridge(record, executor);
@@ -14051,7 +14364,7 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
       rootLifecycleExecutionEvidenceInput
     );
 
-  return freezeRecord({
+  const result = freezeRecord({
     id: 'react-test-renderer-private-serialization-finished-work-identity-result',
     diagnosticName: privateSerializationFinishedWorkIdentityDiagnosticName,
     status: privateSerializationFinishedWorkIdentityStatus,
@@ -14132,6 +14445,8 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     publicSerializationAvailable: false,
     compatibilityClaimed: false
   });
+  privateSerializationFinishedWorkIdentityResults.add(result);
+  return result;
 }
 
 function validatePrivateSerializationUnmountHandoffIdentity(

@@ -185,6 +185,15 @@ const ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID =
   "react-test-renderer-act-native-update-passive-drain-private-diagnostic";
 const ACT_NATIVE_UPDATE_PASSIVE_DRAIN_PREREQUISITE_ID =
   "private-native-update-execution-passive-effect-drain-metadata";
+const ACT_UPDATE_LIFECYCLE_BOUNDARY_RECORD_ID =
+  "react-test-renderer-act-update-lifecycle-boundary-private-diagnostic";
+const ACT_UPDATE_LIFECYCLE_BOUNDARY_STATUS =
+  "private-act-update-lifecycle-boundary-source-owned-lifecycle-host-output-public-act-blocked";
+const ACT_UPDATE_LIFECYCLE_BOUNDARY_WORKERS = [
+  "worker-881-test-renderer-serialization-lifecycle-gate",
+  "worker-888-test-renderer-instance-lifecycle-gate",
+  "worker-895-rust-test-renderer-multichild-lifecycle-native"
+];
 const ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID =
   "react-test-renderer-act-nested-scope-passive-flush-private-diagnostic";
 const ACT_NESTED_SCOPE_PASSIVE_FLUSH_PREREQUISITE_ID =
@@ -345,7 +354,8 @@ const ACT_SCHEDULER_ROOT_FLUSH_RECORD_IDS = [
   "test-renderer-private-root-update-unmount-lifecycle",
   "test-renderer-private-root-native-canary-metadata",
   "test-renderer-private-tojson-host-output-diagnostic",
-  "test-renderer-private-testinstance-query-path"
+  "test-renderer-private-testinstance-query-path",
+  ACT_UPDATE_LIFECYCLE_BOUNDARY_RECORD_ID
 ];
 const ACT_SCHEDULER_CJS_ROOT_FLUSH_RECORD_IDS = [
   ...ACT_SCHEDULER_ROOT_FLUSH_RECORD_IDS,
@@ -2421,9 +2431,33 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
       diagnostics.nativeUpdatePassiveEffectDrainDiagnosticId,
       ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID
     );
+    assert.equal(
+      diagnostics.privateActUpdateLifecycleBoundaryDiagnosticId,
+      ACT_UPDATE_LIFECYCLE_BOUNDARY_RECORD_ID
+    );
+    assert.equal(
+      diagnostics.privateActUpdateLifecycleBoundaryStatus,
+      ACT_UPDATE_LIFECYCLE_BOUNDARY_STATUS
+    );
+    assert.deepEqual(
+      diagnostics.privateActUpdateLifecycleBoundaryAcceptedWorkers,
+      ACT_UPDATE_LIFECYCLE_BOUNDARY_WORKERS
+    );
+    assert.equal(
+      diagnostics.requiresSourceOwnedActUpdateLifecycleBoundary,
+      true
+    );
+    assert.equal(
+      diagnostics.requiresCurrentActUpdateFinishedWorkIdentity,
+      true
+    );
     assert.equal(diagnostics.consumesAcceptedNativeUpdateExecution, true);
     assert.equal(diagnostics.consumesPrivateUpdateNativeBridgeAdmission, true);
     assert.equal(diagnostics.consumesAcceptedNativeUpdateHostOutput, true);
+    assert.equal(
+      diagnostics.consumesSourceOwnedActUpdateLifecycleBoundary,
+      true
+    );
     assert.equal(diagnostics.drainsAcceptedPendingPassiveFlushMetadata, true);
     assert.equal(
       diagnostics.nestedScopePassiveFlushDiagnosticId,
@@ -2448,6 +2482,14 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
       cjsDevelopmentOnly ? true : undefined
     );
     assert.equal(diagnostics.publicUpdateCompatibilityClaimed, false);
+    assert.equal(
+      typeof diagnostics.describePrivateActUpdateLifecycleBoundary,
+      "function"
+    );
+    assert.equal(
+      typeof diagnostics.consumePrivateActUpdateLifecycleBoundary,
+      "function"
+    );
     assert.equal(
       typeof diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
       "function"
@@ -2643,6 +2685,8 @@ function assertPrivateActNativeUpdatePassiveDrainConsumer(
     entry,
     moduleExports
   );
+  const callerLifecycleEvidence = Object.freeze({});
+  const callerFinishedWorkIdentity = Object.freeze({});
   const metadata = diagnostics.createAcceptedPendingPassiveFlushMetadata([
     diagnostics.createAcceptedPendingPassiveFlushRecord({
       label: "native-update-passive-gate",
@@ -2658,84 +2702,37 @@ function assertPrivateActNativeUpdatePassiveDrainConsumer(
   const description =
     diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
       updateExecutionResult,
-      metadata
+      metadata,
+      callerLifecycleEvidence,
+      callerFinishedWorkIdentity
     );
 
   assert.equal(description.id, ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID);
-  assert.equal(description.accepted, true);
-  assert.equal(description.rejectionReason, null);
+  assert.equal(description.accepted, false);
+  assert.equal(
+    description.rejectionReason,
+    "act-update-lifecycle-evidence-not-source-owned"
+  );
   assert.equal(description.updateExecutionAccepted, true);
+  assert.equal(description.actUpdateLifecycleBoundaryAccepted, false);
   assert.equal(description.passiveMetadataAccepted, true);
-  assert.equal(description.consumesAcceptedNativeUpdateExecution, true);
-  assert.equal(description.drainsAcceptedPendingPassiveFlushMetadata, true);
+  assert.equal(description.consumesAcceptedNativeUpdateExecution, false);
+  assert.equal(
+    description.consumesSourceOwnedActUpdateLifecycleBoundary,
+    false
+  );
+  assert.equal(description.consumesPendingPassiveFlushMetadata, true);
+  assert.equal(description.drainsAcceptedPendingPassiveFlushMetadata, false);
   assert.equal(description.publicActCompatibilityClaimed, false);
   assert.equal(description.publicUpdateCompatibilityClaimed, false);
 
-  const report =
-    diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
-      updateExecutionResult,
-      metadata
-    );
-  assert.equal(report.id, ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID);
-  assert.equal(
-    report.status,
-    "private-act-native-update-passive-effect-drain-public-act-blocked"
-  );
-  assert.equal(report.accepted, true);
-  assert.equal(report.updateRequestId, updateExecutionResult.requestId);
-  assert.equal(report.updateRequestSequence, updateExecutionResult.requestSequence);
-  assert.equal(report.privateUpdateNativeBridgeAdmissionId,
-    "react-test-renderer-update-native-bridge-admission-private-diagnostic"
-  );
-  assert.equal(report.nativeUpdateExecutionConsumed, true);
-  assert.equal(report.privateRootRequestExecutionConsumed, true);
-  assert.equal(report.rustRootExecutionBoundaryCalled, true);
-  assert.equal(report.rustExecution, true);
-  assert.equal(report.reconcilerExecution, true);
-  assert.equal(report.hostOutputProduced, true);
-  assert.equal(report.textUpdateApplyRecorded, true);
-  assert.equal(report.hostTextUpdateApplyCount, 1);
-  assert.equal(report.hostComponentUpdateApplyCount, 1);
-  assert.equal(report.pendingBefore, 1);
-  assert.equal(report.drainedCount, 1);
-  assert.equal(report.remainingCount, 0);
-  assert.equal(report.drainedRecords[0].recordKind,
-    "PassiveEffectSchedulerFlushExecutionRecord"
-  );
-  assert.equal(report.privatePassiveEffectDrainDiagnosticsConsumed, true);
-  assert.equal(report.consumesPendingPassiveFlushMetadata, true);
-  assert.equal(report.consumesAcceptedSchedulerFlushMetadata, true);
-  assert.equal(report.consumesAcceptedNativeUpdateExecution, true);
-  assert.equal(report.consumesPrivateUpdateNativeBridgeAdmission, true);
-  assert.equal(report.consumesAcceptedNativeUpdateHostOutput, true);
-  assert.equal(report.drainsAcceptedPendingPassiveFlushMetadata, true);
-  assert.equal(report.drainsPublicSchedulerTaskQueue, false);
-  assert.equal(report.drainsPublicReactActQueue, false);
-  assert.equal(report.publicReactActCompatibilityClaimed, false);
-  assert.equal(report.publicActCompatibilityClaimed, false);
-  assert.equal(report.publicUpdateCompatibilityClaimed, false);
-  assert.equal(report.compatibilityClaimed, false);
-  assert.equal(report.invokesActCallback, false);
-  assert.equal(report.executesQueuedWork, false);
-  assert.equal(report.executesScheduledCallbacks, false);
-  assert.equal(report.executesPassiveEffects, false);
-  assert.equal(report.invokesEffectCallbacks, false);
-  assert.equal(report.executesRendererRoots, false);
-  assert.equal(report.mutatesHostOutput, false);
-  assert.equal(metadata.records.length, 0, entry.entrypoint);
-
-  const rejected =
-    diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
-      [],
-      diagnostics.createAcceptedPendingPassiveFlushMetadata([])
-  );
-  assert.equal(rejected.accepted, false);
-  assert.equal(rejected.rejectionReason, "native-update-result-not-frozen");
   assert.throws(
     () =>
       diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
         updateExecutionResult,
-        []
+        metadata,
+        callerLifecycleEvidence,
+        callerFinishedWorkIdentity
       ),
     (error) => {
       assert.equal(
@@ -2746,7 +2743,51 @@ function assertPrivateActNativeUpdatePassiveDrainConsumer(
         error.code,
         "FAST_REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_REJECTED"
       );
-      assert.equal(error.reason, "metadata-missing-internal-brand");
+      assert.equal(
+        error.reason,
+        "act-update-lifecycle-evidence-not-source-owned"
+      );
+      assert.equal(error.entrypoint, entry.entrypoint);
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      assert.equal(error.publicActCompatibilityClaimed, false);
+      assert.equal(error.executesPassiveEffects, false);
+      assert.equal(error.invokesEffectCallbacks, false);
+      return true;
+    },
+    entry.entrypoint
+  );
+  assert.equal(metadata.records.length, 1, entry.entrypoint);
+
+  const rejected =
+    diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+      [],
+      diagnostics.createAcceptedPendingPassiveFlushMetadata([]),
+      callerLifecycleEvidence,
+      callerFinishedWorkIdentity
+    );
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.rejectionReason, "native-update-result-not-frozen");
+  assert.throws(
+    () =>
+      diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+        updateExecutionResult,
+        [],
+        callerLifecycleEvidence,
+        callerFinishedWorkIdentity
+      ),
+    (error) => {
+      assert.equal(
+        error.name,
+        "FastReactTestRendererPrivateActPassiveEffectDrainError"
+      );
+      assert.equal(
+        error.code,
+        "FAST_REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_REJECTED"
+      );
+      assert.equal(
+        error.reason,
+        "act-update-lifecycle-evidence-not-source-owned"
+      );
       assert.equal(error.entrypoint, entry.entrypoint);
       assert.equal(error.publicReactActCompatibilityClaimed, false);
       assert.equal(error.publicActCompatibilityClaimed, false);
@@ -3115,6 +3156,7 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-700-test-renderer-act-nested-scope-passive-flush"
     );
   }
+  expectedAcceptedWorkers.push(...ACT_UPDATE_LIFECYCLE_BOUNDARY_WORKERS);
 
   assert.equal(Object.isFrozen(gate), true, entrypoint);
   assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
