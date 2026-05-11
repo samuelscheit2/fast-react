@@ -3998,6 +3998,15 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
       requestRecord.recoverableErrorMetadata,
       {
         enableRecoverableErrorPreflight: true,
+        hydrateRootSourceLedgerContext: {
+          bridge: preflightState.bridge,
+          lifecycleRequestBoundary,
+          preflight: preflightState.preflight,
+          preflightState,
+          requestAdmission,
+          requestPayload,
+          requestRecord
+        },
         hydrationOptions: requestPayload.hydrationOptions,
         preflightId: `${preflightId}:recoverable-error`,
         preflightSequence,

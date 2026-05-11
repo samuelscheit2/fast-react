@@ -2183,7 +2183,7 @@ test('private hydration recoverable error boundary admission rejects stale clone
     rootBridgeCacheEntry.exports = fakeRootBridgeCacheExports;
   }, TypeError);
   assert.equal(require(rootBridgePath), rootBridge);
-  assert.notEqual(
+  assert.equal(
     hydrateRootSourceLedger.getPrivateHydrateRootSourceLedgerRecordPayload(
       scenario.hydrateRecord
     ),
@@ -2284,7 +2284,7 @@ test('private hydration recoverable error boundary admission rejects stale clone
   assert.deepEqual(other.document.__registrations, []);
 });
 
-test('hydrateRoot source ledger rejects first-load root-bridge cache export replacement', () => {
+test('hydrateRoot source ledger rejects preloaded root-bridge cache poisoning', () => {
   const script = `
 'use strict';
 
@@ -2293,8 +2293,7 @@ const path = require('node:path');
 
 const packageRoot = ${JSON.stringify(packageRoot)};
 const rootBridgePath = path.join(packageRoot, 'src/client/root-bridge.js');
-const rootBridge = require(rootBridgePath);
-const rootBridgeCacheEntry = require.cache[require.resolve(rootBridgePath)];
+const rootBridgeCacheKey = require.resolve(rootBridgePath);
 const sourceLedgerFakePayloads = new WeakMap();
 const fakeRootBridgeCacheExports = Object.freeze({
   getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
@@ -2311,14 +2310,12 @@ const fakeRootBridgeCacheExports = Object.freeze({
   }
 });
 
-assert.equal(
-  Reflect.set(rootBridgeCacheEntry, 'exports', fakeRootBridgeCacheExports),
-  false
-);
-assert.throws(() => {
-  rootBridgeCacheEntry.exports = fakeRootBridgeCacheExports;
-}, TypeError);
-assert.equal(require(rootBridgePath), rootBridge);
+require.cache[rootBridgeCacheKey] = {
+  id: rootBridgeCacheKey,
+  filename: rootBridgeCacheKey,
+  loaded: true,
+  exports: fakeRootBridgeCacheExports
+};
 
 const hydrationGate = require(path.join(
   packageRoot,
@@ -2328,6 +2325,10 @@ const hydrateRootSourceLedger = require(path.join(
   packageRoot,
   'src/client/hydrate-root-source-ledger.js'
 ));
+assert.equal(require(rootBridgePath), fakeRootBridgeCacheExports);
+delete require.cache[rootBridgeCacheKey];
+const rootBridge = require(rootBridgePath);
+assert.notEqual(rootBridge, fakeRootBridgeCacheExports);
 const domContainer = require(path.join(
   packageRoot,
   'src/client/dom-container.js'
@@ -2403,7 +2404,7 @@ sourceLedgerFakePayloads.set(
   })
 );
 
-assert.notEqual(
+assert.equal(
   hydrateRootSourceLedger.getPrivateHydrateRootSourceLedgerRecordPayload(
     scenario.hydrateRecord
   ),

@@ -12,9 +12,6 @@ const {
   resolveHydrationContainerNodePath
 } = require('./hydration-marker-parser.js');
 const {
-  getPrivateHydrateRootSourceLedgerRecordPayload
-} = require('./hydrate-root-source-ledger.js');
-const {
   duplicateCreateRootWarning,
   getCreateRootWarning,
   hasLegacyRootMarker,
@@ -534,6 +531,8 @@ const hydrationTargetClaimingDiagnosticPayloads = new WeakMap();
 const hydrationClaimedReplayTargetDispatchExecutionPayloads =
   new WeakMap();
 const hydrationTextMismatchRecoverableErrorPreflightPayloads =
+  new WeakMap();
+const hydrationTextMismatchRecoverableErrorPreflightSourceLedgerContexts =
   new WeakMap();
 const hydrationTextMismatchRecoverableErrorRoutingExecutionPayloads =
   new WeakMap();
@@ -1637,6 +1636,16 @@ function createHydrationTextMismatchRecoverableErrorPreflightRecord(
       textMismatchDiagnostics: validation.textMismatchDiagnostics
     })
   );
+  const hydrateRootSourceLedgerContext =
+    createHydrateRootSourceLedgerContextForRecoverableErrorPreflight(
+      preflightOptions.hydrateRootSourceLedgerContext
+    );
+  if (hydrateRootSourceLedgerContext !== null) {
+    hydrationTextMismatchRecoverableErrorPreflightSourceLedgerContexts.set(
+      preflightRecord,
+      hydrateRootSourceLedgerContext
+    );
+  }
 
   return preflightRecord;
 }
@@ -1654,6 +1663,24 @@ function isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord(
   value
 ) {
   return hydrationTextMismatchRecoverableErrorPreflightPayloads.has(value);
+}
+
+function createHydrateRootSourceLedgerContextForRecoverableErrorPreflight(
+  context
+) {
+  if (!context || typeof context !== 'object') {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: context.bridge,
+    lifecycleRequestBoundary: context.lifecycleRequestBoundary,
+    preflight: context.preflight,
+    preflightState: context.preflightState,
+    requestAdmission: context.requestAdmission,
+    requestPayload: context.requestPayload,
+    requestRecord: context.requestRecord
+  });
 }
 
 function createHydrationTextMismatchRecoverableErrorRoutingExecutionRecord(
@@ -3337,6 +3364,8 @@ function normalizeHydrationTextMismatchRecoverableErrorPreflightOptions(
     enableRecoverableErrorPreflight:
       normalizedOptions.enableRecoverableErrorPreflight === true,
     hasHydrationOptions,
+    hydrateRootSourceLedgerContext:
+      normalizedOptions.hydrateRootSourceLedgerContext,
     hydrationOptions: hasHydrationOptions
       ? normalizedOptions.hydrationOptions
       : undefined,
@@ -4259,6 +4288,8 @@ function validateHydrationRecoverableErrorBoundaryAdmission(
       recoverableErrorPreflightRecord,
       targetClaimingDiagnostic,
       replayExecutionRecord,
+      targetClaimingPayload,
+      replayExecutionPayload,
       admissionOptions,
       currentness
     );
@@ -4620,6 +4651,8 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
   recoverableErrorPreflightRecord,
   targetClaimingDiagnostic,
   replayExecutionRecord,
+  targetClaimingPayload,
+  replayExecutionPayload,
   admissionOptions,
   currentness
 ) {
@@ -4631,21 +4664,47 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
     admissionOptions.executionPreflightRecord;
   const lifecycleRequestBoundary =
     admissionOptions.lifecycleRequestBoundary;
+  const sourceLedgerContext =
+    getHydrateRootSourceLedgerContextForRecoverableErrorBoundaryAdmission(
+      recoverableErrorPreflightRecord,
+      hydrationBoundaryRecord,
+      hydrationBoundaryPayload
+    );
   const hydrateRootSourceLedgerPayload =
-    getPrivateHydrateRootSourceLedgerRecordPayload(
-      hydrateRootPreflightRecord
+    getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+      sourceLedgerContext,
+      hydrateRootPreflightRecord,
+      'hydrate-root-public-facade-preflight-record',
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
     );
   const eventReplaySourceLedgerPayload =
-    getPrivateHydrateRootSourceLedgerRecordPayload(
-      eventReplayPreflightRecord
+    getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+      sourceLedgerContext,
+      eventReplayPreflightRecord,
+      'hydrate-root-public-facade-event-replay-preflight-record',
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
     );
   const executionSourceLedgerPayload =
-    getPrivateHydrateRootSourceLedgerRecordPayload(
-      executionPreflightRecord
+    getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+      sourceLedgerContext,
+      executionPreflightRecord,
+      'hydrate-root-public-facade-execution-preflight-record',
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
     );
   const lifecycleSourceLedgerPayload =
-    getPrivateHydrateRootSourceLedgerRecordPayload(
-      lifecycleRequestBoundary
+    getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+      sourceLedgerContext,
+      lifecycleRequestBoundary,
+      'hydrate-root-public-facade-lifecycle-request-boundary',
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
     );
 
   if (
@@ -4807,6 +4866,243 @@ function isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
     payload.record === record &&
     payload.ledgerKind === ledgerKind
   );
+}
+
+function getHydrateRootSourceLedgerContextForRecoverableErrorBoundaryAdmission(
+  recoverableErrorPreflightRecord,
+  hydrationBoundaryRecord,
+  hydrationBoundaryPayload
+) {
+  const context =
+    hydrationTextMismatchRecoverableErrorPreflightSourceLedgerContexts.get(
+      recoverableErrorPreflightRecord
+    );
+  if (!context || typeof context !== 'object') {
+    return null;
+  }
+
+  const preflightState = context.preflightState;
+  const requestRecord = context.requestRecord;
+  const requestPayload = context.requestPayload;
+  const lifecycleRequestBoundary = context.lifecycleRequestBoundary;
+  if (
+    !preflightState ||
+    typeof preflightState !== 'object' ||
+    !Array.isArray(preflightState.records) ||
+    !Array.isArray(preflightState.eventReplayPreflightRecords) ||
+    !Array.isArray(preflightState.executionPreflightRecords) ||
+    !Array.isArray(preflightState.lifecycleRequestBoundaryRecords) ||
+    preflightState.preflight !== context.preflight ||
+    preflightState.bridge !== context.bridge ||
+    !requestRecord ||
+    typeof requestRecord !== 'object' ||
+    requestRecord.hydrationBoundaryRecord !== hydrationBoundaryRecord ||
+    !requestPayload ||
+    typeof requestPayload !== 'object' ||
+    requestPayload.container !== hydrationBoundaryPayload.container ||
+    requestPayload.initialChildren !==
+      hydrationBoundaryPayload.initialChildren ||
+    requestPayload.hydrationOptions !==
+      hydrationBoundaryPayload.hydrationOptions ||
+    !lifecycleRequestBoundary ||
+    typeof lifecycleRequestBoundary !== 'object' ||
+    lifecycleRequestBoundary.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    lifecycleRequestBoundary.requestAdmission !== context.requestAdmission
+  ) {
+    return null;
+  }
+
+  return context;
+}
+
+function getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
+  sourceLedgerContext,
+  record,
+  ledgerKind,
+  targetClaimingPayload,
+  replayExecutionPayload,
+  replayExecutionRecord
+) {
+  if (!sourceLedgerContext || !record || typeof record !== 'object') {
+    return null;
+  }
+
+  if (ledgerKind === 'hydrate-root-public-facade-preflight-record') {
+    return createHydrateRootPreflightSourceLedgerPayload(
+      sourceLedgerContext,
+      record,
+      ledgerKind
+    );
+  }
+  if (
+    ledgerKind ===
+    'hydrate-root-public-facade-event-replay-preflight-record'
+  ) {
+    return createHydrateRootEventReplaySourceLedgerPayload(
+      sourceLedgerContext,
+      record,
+      ledgerKind,
+      targetClaimingPayload,
+      replayExecutionPayload,
+      replayExecutionRecord
+    );
+  }
+  if (
+    ledgerKind === 'hydrate-root-public-facade-execution-preflight-record'
+  ) {
+    return createHydrateRootExecutionSourceLedgerPayload(
+      sourceLedgerContext,
+      record,
+      ledgerKind,
+      replayExecutionPayload,
+      replayExecutionRecord
+    );
+  }
+  if (
+    ledgerKind === 'hydrate-root-public-facade-lifecycle-request-boundary'
+  ) {
+    return createHydrateRootLifecycleSourceLedgerPayload(
+      sourceLedgerContext,
+      record,
+      ledgerKind
+    );
+  }
+
+  return null;
+}
+
+function createHydrateRootPreflightSourceLedgerPayload(
+  sourceLedgerContext,
+  record,
+  ledgerKind
+) {
+  if (
+    !sourceLedgerContext.preflightState.records.includes(record) ||
+    record.requestAdmission !== sourceLedgerContext.requestAdmission ||
+    record.lifecycleRequestBoundary !==
+      sourceLedgerContext.lifecycleRequestBoundary
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: sourceLedgerContext.bridge,
+    hydrationBoundaryRecord:
+      sourceLedgerContext.requestRecord.hydrationBoundaryRecord,
+    ledgerKind,
+    lifecycleRequestBoundary: record.lifecycleRequestBoundary,
+    markerListenerPreflight: record.markerListenerPreflight,
+    nativeHandoffRecord: record.nativeHandoffRecord,
+    preflight: sourceLedgerContext.preflight,
+    recoverableErrorPreflight: record.recoverableErrorPreflight,
+    requestAdmission: sourceLedgerContext.requestAdmission,
+    requestRecord: sourceLedgerContext.requestRecord,
+    record
+  });
+}
+
+function createHydrateRootEventReplaySourceLedgerPayload(
+  sourceLedgerContext,
+  record,
+  ledgerKind,
+  targetClaimingPayload,
+  replayExecutionPayload,
+  replayExecutionRecord
+) {
+  if (
+    !sourceLedgerContext.preflightState.eventReplayPreflightRecords.includes(
+      record
+    ) ||
+    record.lifecycleRequestBoundary !==
+      sourceLedgerContext.lifecycleRequestBoundary ||
+    record.targetClaimingDiagnostic !==
+      replayExecutionPayload.targetClaimingDiagnostic ||
+    record.replayExecutionRecord !== replayExecutionRecord
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: sourceLedgerContext.bridge,
+    hydrationBoundaryRecord:
+      sourceLedgerContext.requestRecord.hydrationBoundaryRecord,
+    ledgerKind,
+    lifecycleRequestBoundary: record.lifecycleRequestBoundary,
+    preflight: sourceLedgerContext.preflight,
+    replayExecutionPayload,
+    replayExecutionRecord: record.replayExecutionRecord,
+    requestRecord: sourceLedgerContext.requestRecord,
+    targetClaimingPayload: freezeRecord({
+      ...targetClaimingPayload,
+      targetClaimingDiagnostic: replayExecutionPayload.targetClaimingDiagnostic
+    }),
+    targetClaimingPreflight: record.targetClaimingPreflight,
+    record
+  });
+}
+
+function createHydrateRootExecutionSourceLedgerPayload(
+  sourceLedgerContext,
+  record,
+  ledgerKind,
+  replayExecutionPayload,
+  replayExecutionRecord
+) {
+  if (
+    !sourceLedgerContext.preflightState.executionPreflightRecords.includes(
+      record
+    ) ||
+    record.lifecycleRequestBoundary !==
+      sourceLedgerContext.lifecycleRequestBoundary ||
+    record.replayExecutionRecord !== replayExecutionRecord
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: sourceLedgerContext.bridge,
+    eventReplayPreflight: record.eventReplayPreflight,
+    hydrationBoundaryRecord:
+      sourceLedgerContext.requestRecord.hydrationBoundaryRecord,
+    ledgerKind,
+    lifecycleRequestBoundary: record.lifecycleRequestBoundary,
+    preflight: sourceLedgerContext.preflight,
+    replayExecutionPayload,
+    replayExecutionRecord: record.replayExecutionRecord,
+    requestRecord: sourceLedgerContext.requestRecord,
+    record
+  });
+}
+
+function createHydrateRootLifecycleSourceLedgerPayload(
+  sourceLedgerContext,
+  record,
+  ledgerKind
+) {
+  if (
+    !sourceLedgerContext.preflightState.lifecycleRequestBoundaryRecords.includes(
+      record
+    ) ||
+    record !== sourceLedgerContext.lifecycleRequestBoundary ||
+    record.requestAdmission !== sourceLedgerContext.requestAdmission
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: sourceLedgerContext.bridge,
+    container: sourceLedgerContext.requestPayload.container,
+    hydrationBoundaryRecord:
+      sourceLedgerContext.requestRecord.hydrationBoundaryRecord,
+    ledgerKind,
+    lifecycleContainerSnapshot: record.lifecycleContainerSnapshot,
+    preflight: sourceLedgerContext.preflight,
+    requestAdmission: sourceLedgerContext.requestAdmission,
+    requestPayload: sourceLedgerContext.requestPayload,
+    requestRecord: sourceLedgerContext.requestRecord,
+    record
+  });
 }
 
 function isHydrationRecoverableErrorBoundaryAdmissionHydrateRootPreflight(
