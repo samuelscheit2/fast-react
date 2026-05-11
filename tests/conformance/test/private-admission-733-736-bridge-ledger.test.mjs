@@ -17,8 +17,10 @@ import {
   PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_STATUS,
   PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_VIOLATION_STATUS,
   PRIVATE_ADMISSION_733_736_BRIDGE_PUBLIC_COMPATIBILITY_CLAIMS,
+  PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_EVIDENCE,
   PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_BINDINGS,
   PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_CARRY_FORWARD_BLOCKERS,
+  PRIVATE_ADMISSION_733_736_BRIDGE_ROW_CONTRACT,
   PRIVATE_ADMISSION_733_736_BRIDGE_ROWS,
   PRIVATE_ADMISSION_733_736_BRIDGE_WORKERS,
   evaluatePrivateAdmission733736BridgeLedger
@@ -112,7 +114,9 @@ test("private admission 733-736 bridge ledger recognizes Rust identifiers withou
   assert.equal(ledger.status, PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_STATUS);
   assert.equal(ledger.privateBridgePrerequisitesRecognized, true);
   assert.equal(ledger.rustEvidenceRecognized, true);
+  assert.equal(ledger.evidenceContractRecognized, true);
   assert.equal(ledger.bridgeBindingsRecognized, true);
+  assert.equal(ledger.rowContractRecognized, true);
   assert.equal(ledger.blockerCarryForwardRecognized, true);
   assert.equal(ledger.publicCompatibilityClaimed, false);
   assert.deepEqual(ledger.violations, []);
@@ -176,6 +180,79 @@ test("private admission 733-736 bridge ledger rejects unexpected worker ids thro
   assert.deepEqual(ledger.manifest.unexpectedWorkerIds, [staleWorkerId]);
   assert.deepEqual(ledger.manifest.duplicateWorkerIds, []);
   assertViolationIds(ledger, ["bridge-worker-manifest-mismatch"]);
+});
+
+test("private admission 733-736 bridge ledger rejects removed required evidence rows", () => {
+  for (const workerId of [worker733, worker736]) {
+    const ledger = evaluatePrivateAdmission733736BridgeLedger({
+      rowOverrides: {
+        [workerId]: {
+          evidence: []
+        }
+      }
+    });
+
+    assert.equal(
+      ledger.status,
+      PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_VIOLATION_STATUS,
+      workerId
+    );
+    assert.equal(ledger.privateBridgePrerequisitesRecognized, false, workerId);
+    assert.equal(ledger.rustEvidenceRecognized, false, workerId);
+    assert.equal(ledger.evidenceContractRecognized, false, workerId);
+    assert.equal(ledger.rowsByWorker[workerId].evidenceRecognized, false);
+    assert.deepEqual(ledger.rowsByWorker[workerId].evidence, []);
+    assertViolationIds(ledger, ["bridge-required-evidence-mismatch"]);
+
+    const violation = ledger.violations.find(
+      (row) => row.id === "bridge-required-evidence-mismatch"
+    );
+    const mismatch = violation.rows.find((row) => row.workerId === workerId);
+    assert.deepEqual(mismatch.actualEvidenceIds, []);
+    assert.deepEqual(
+      mismatch.missingEvidenceIds,
+      [...PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_EVIDENCE[workerId]]
+    );
+  }
+});
+
+test("private admission 733-736 bridge ledger rejects row contract tampering", () => {
+  const ledger = evaluatePrivateAdmission733736BridgeLedger({
+    rowOverrides: {
+      [worker736]: {
+        sourceQueue: "public-bridge",
+        privateAdmission: "accepted-public-compatibility",
+        localGateCoverage: "public-test-renderer-bridge",
+        runtimeCapabilityAdded: true,
+        promotion: "accepted-public",
+        privateEvidenceOnly: false,
+        blockedPublicClaims: [],
+        blockedAdmissionClaimIds: []
+      }
+    }
+  });
+
+  assert.equal(
+    ledger.status,
+    PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_VIOLATION_STATUS
+  );
+  assert.equal(ledger.privateBridgePrerequisitesRecognized, false);
+  assert.equal(ledger.rowContractRecognized, false);
+  assert.equal(ledger.rustEvidenceRecognized, true);
+  assert.equal(ledger.blockerCarryForwardRecognized, true);
+  assertViolationIds(ledger, ["bridge-row-contract-mismatch"]);
+
+  const violation = ledger.violations.find(
+    (row) => row.id === "bridge-row-contract-mismatch"
+  );
+  assert.equal(violation.rows.length, 1);
+  assert.equal(violation.rows[0].workerId, worker736);
+  assert.deepEqual(
+    violation.rows[0].expectedContract,
+    PRIVATE_ADMISSION_733_736_BRIDGE_ROW_CONTRACT
+  );
+  assert.deepEqual(violation.rows[0].actualContract.blockedPublicClaims, []);
+  assert.deepEqual(violation.rows[0].actualContract.blockedAdmissionClaimIds, []);
 });
 
 test("private admission 733-736 bridge ledger rejects corrupted Worker 733 cleanup handoff metadata", () => {

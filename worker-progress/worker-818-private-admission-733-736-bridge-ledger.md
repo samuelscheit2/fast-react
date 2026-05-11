@@ -44,6 +44,10 @@ ledger. Evidence reads source text slices only.
 - Audit follow-up: unexpected `workerId` tampering now fails closed through the
   `bridge-worker-manifest-mismatch` violation path instead of attempting a
   binding comparison without expected worker data.
+- Re-audit follow-up: required evidence IDs and row contract metadata now fail
+  closed when evidence rows are removed or row overrides tamper source queue,
+  admission type, local gate coverage, static/private flags, promotion, or
+  blocker claim ID arrays.
 
 ## Commands Run
 
@@ -56,6 +60,7 @@ ledger. Evidence reads source text slices only.
 - `git diff --cached --check`
 - `git commit -m "Add private admission 733-736 bridge ledger"`
 - `git commit -m "Fix bridge ledger unexpected worker handling"`
+- `git commit -m "Fail closed bridge ledger evidence and row contracts"`
 
 ## Risks Or Blockers
 

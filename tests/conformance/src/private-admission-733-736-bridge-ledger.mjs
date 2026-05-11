@@ -465,6 +465,29 @@ export const PRIVATE_ADMISSION_733_736_BRIDGE_ROWS = freezeArray(
   )
 );
 
+export const PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_EVIDENCE =
+  freezeRecord(
+    Object.fromEntries(
+      PRIVATE_ADMISSION_733_736_BRIDGE_ROWS.map((row) => [
+        row.workerId,
+        freezeArray(row.evidence.map((evidenceRow) => evidenceRow.evidenceId))
+      ])
+    )
+  );
+
+export const PRIVATE_ADMISSION_733_736_BRIDGE_ROW_CONTRACT = freezeRecord({
+  sourceQueue: "733-736-bridge",
+  privateAdmission: "accepted-private-diagnostic-bridge-prerequisite",
+  localGateCoverage: PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_ID,
+  runtimeCapabilityAdded: false,
+  compatibilityClaimed: false,
+  promotion: "rejected",
+  privateEvidenceOnly: true,
+  blockedPublicClaims: PRIVATE_ADMISSION_733_736_BRIDGE_PUBLIC_COMPATIBILITY_CLAIMS,
+  blockedAdmissionClaimIds:
+    PRIVATE_ADMISSION_733_736_BRIDGE_BLOCKED_ADMISSION_CLAIMS
+});
+
 export function evaluatePrivateAdmission733736BridgeLedger({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT,
   rowOverrides = {}
@@ -513,6 +536,39 @@ export function evaluatePrivateAdmission733736BridgeLedger({
         })
       )
   );
+  const evidenceContractMismatches = evaluatedRows.flatMap((row) => {
+    if (
+      !Object.hasOwn(
+        PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_EVIDENCE,
+        row.workerId
+      )
+    ) {
+      return [];
+    }
+
+    const expectedEvidenceIds =
+      PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_EVIDENCE[row.workerId];
+    const actualEvidenceIds = row.evidence.map(
+      (evidenceRow) => evidenceRow.evidenceId
+    );
+    if (sameStringSet(expectedEvidenceIds, actualEvidenceIds)) {
+      return [];
+    }
+
+    return [
+      freezeRecord({
+        workerId: row.workerId,
+        expectedEvidenceIds,
+        actualEvidenceIds: freezeArray(actualEvidenceIds),
+        missingEvidenceIds: missingValues(expectedEvidenceIds, actualEvidenceIds),
+        unexpectedEvidenceIds: missingValues(
+          actualEvidenceIds,
+          expectedEvidenceIds
+        ),
+        duplicateEvidenceIds: duplicateValues(actualEvidenceIds)
+      })
+    ];
+  });
   const bridgeBindingMismatches = evaluatedRows.flatMap((row) => {
     if (
       !Object.hasOwn(
@@ -532,6 +588,29 @@ export function evaluatePrivateAdmission733736BridgeLedger({
         workerId: row.workerId,
         expectedBinding: expected,
         actualBinding: row.binding
+      })
+    ];
+  });
+  const rowContractMismatches = evaluatedRows.flatMap((row) => {
+    if (!PRIVATE_ADMISSION_733_736_BRIDGE_WORKERS.includes(row.workerId)) {
+      return [];
+    }
+
+    const actualContract = rowContract(row);
+    if (
+      sameBridgeRowContract(
+        PRIVATE_ADMISSION_733_736_BRIDGE_ROW_CONTRACT,
+        actualContract
+      )
+    ) {
+      return [];
+    }
+
+    return [
+      freezeRecord({
+        workerId: row.workerId,
+        expectedContract: PRIVATE_ADMISSION_733_736_BRIDGE_ROW_CONTRACT,
+        actualContract
       })
     ];
   });
@@ -651,8 +730,18 @@ export function evaluatePrivateAdmission733736BridgeLedger({
   );
   pushRowsViolation(
     violations,
+    "bridge-required-evidence-mismatch",
+    evidenceContractMismatches
+  );
+  pushRowsViolation(
+    violations,
     "bridge-prerequisite-binding-mismatch",
     bridgeBindingMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "bridge-row-contract-mismatch",
+    rowContractMismatches
   );
   pushRowsViolation(
     violations,
@@ -690,8 +779,12 @@ export function evaluatePrivateAdmission733736BridgeLedger({
     compatibilityClaimWorkerIds
   );
 
-  const rustEvidenceRecognized = evidenceTokenMismatches.length === 0;
+  const rustEvidenceRecognized =
+    evidenceTokenMismatches.length === 0 &&
+    evidenceContractMismatches.length === 0;
+  const evidenceContractRecognized = evidenceContractMismatches.length === 0;
   const bridgeBindingsRecognized = bridgeBindingMismatches.length === 0;
+  const rowContractRecognized = rowContractMismatches.length === 0;
   const blockerCarryForwardRecognized =
     blockedSurfaceMismatches.length === 0 &&
     publicClaimKeyMismatches.length === 0 &&
@@ -705,6 +798,7 @@ export function evaluatePrivateAdmission733736BridgeLedger({
     manifest.duplicateWorkerIds.length === 0 &&
     rustEvidenceRecognized &&
     bridgeBindingsRecognized &&
+    rowContractRecognized &&
     blockerCarryForwardRecognized &&
     publicCompatibilityViolations.length === 0 &&
     blockedAdmissionClaimViolations.length === 0 &&
@@ -717,7 +811,9 @@ export function evaluatePrivateAdmission733736BridgeLedger({
       : PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_VIOLATION_STATUS,
     privateBridgePrerequisitesRecognized,
     rustEvidenceRecognized,
+    evidenceContractRecognized,
     bridgeBindingsRecognized,
+    rowContractRecognized,
     blockerCarryForwardRecognized,
     publicCompatibilityClaimed,
     queueWorkers: PRIVATE_ADMISSION_733_736_BRIDGE_WORKERS,
@@ -866,9 +962,9 @@ function evaluateBridgeRow({ fileCache, row, workspaceRoot }) {
   return freezeRecord({
     ...row,
     evidence: freezeArray(evidence),
-    evidenceRecognized: evidence.every(
-      (evidenceRow) => evidenceRow.recognized === true
-    )
+    evidenceRecognized:
+      evidence.length > 0 &&
+      evidence.every((evidenceRow) => evidenceRow.recognized === true)
   });
 }
 
@@ -961,6 +1057,43 @@ function readWorkspaceFile({ fileCache, path, workspaceRoot }) {
 function missingValues(expectedSubset, actualSuperset) {
   return freezeArray(
     expectedSubset.filter((value) => !actualSuperset.includes(value))
+  );
+}
+
+function duplicateValues(values) {
+  return freezeArray(
+    values.filter((value, index) => values.indexOf(value) !== index)
+  );
+}
+
+function rowContract(row) {
+  return freezeRecord({
+    sourceQueue: row.sourceQueue,
+    privateAdmission: row.privateAdmission,
+    localGateCoverage: row.localGateCoverage,
+    runtimeCapabilityAdded: row.runtimeCapabilityAdded,
+    compatibilityClaimed: row.compatibilityClaimed,
+    promotion: row.promotion,
+    privateEvidenceOnly: row.privateEvidenceOnly,
+    blockedPublicClaims: freezeArray(row.blockedPublicClaims ?? []),
+    blockedAdmissionClaimIds: freezeArray(row.blockedAdmissionClaimIds ?? [])
+  });
+}
+
+function sameBridgeRowContract(expected, actual) {
+  return (
+    actual.sourceQueue === expected.sourceQueue &&
+    actual.privateAdmission === expected.privateAdmission &&
+    actual.localGateCoverage === expected.localGateCoverage &&
+    actual.runtimeCapabilityAdded === expected.runtimeCapabilityAdded &&
+    actual.compatibilityClaimed === expected.compatibilityClaimed &&
+    actual.promotion === expected.promotion &&
+    actual.privateEvidenceOnly === expected.privateEvidenceOnly &&
+    sameStringSet(expected.blockedPublicClaims, actual.blockedPublicClaims) &&
+    sameStringSet(
+      expected.blockedAdmissionClaimIds,
+      actual.blockedAdmissionClaimIds
+    )
   );
 }
 
