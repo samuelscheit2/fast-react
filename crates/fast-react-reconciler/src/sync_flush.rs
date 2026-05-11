@@ -11,7 +11,7 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberId, Lanes, StateNodeHandle, UpdateQueueHandle};
+use fast_react_core::{FiberId, LaneTimestamp, Lanes, StateNodeHandle, UpdateQueueHandle};
 use fast_react_host_config::HostTypes;
 
 #[cfg(not(test))]
@@ -36,10 +36,11 @@ use crate::root_commit::{
 use crate::root_scheduler::{
     RootRenderErrorOptionCallbackRecord, SYNC_FLUSH_LANES,
     SchedulerBridgeActContinuationExecutionError, SchedulerBridgeActContinuationExecutionResult,
+    SchedulerBridgeActQueueExecutionError, SchedulerBridgeActQueueExecutionResult,
     SyncFlushActContinuationDrainRecord, SyncFlushActPostPassiveContinuationGateRecord,
     SyncFlushPostPassiveContinuationExecutionGateRecord, SyncFlushRootRecoverySnapshotForCanary,
-    execute_scheduler_bridge_act_continuations, recompute_might_have_pending_sync_work,
-    record_root_render_error_option_callbacks,
+    execute_scheduler_bridge_act_continuations, execute_scheduler_bridge_act_queue_for_canary,
+    recompute_might_have_pending_sync_work, record_root_render_error_option_callbacks,
     sync_flush_act_continuation_drain_record_after_host_output_canary,
     sync_flush_act_continuation_lanes_for_root, sync_flush_act_post_passive_continuation_gate,
     sync_flush_lanes_for_root, sync_flush_post_passive_continuation_execution_gate,
@@ -448,6 +449,18 @@ impl SyncFlushActPrivateExecutionDiagnosticsForCanary {
         SchedulerBridgeActContinuationExecutionError,
     > {
         execute_scheduler_bridge_act_continuations(store, &self.drained_act_continuations)
+    }
+
+    pub(crate) fn execute_accepted_scheduler_bridge_act_queue_for_canary<H: HostTypes>(
+        &self,
+        store: &mut FiberRootStore<H>,
+        current_time: LaneTimestamp,
+    ) -> Result<SchedulerBridgeActQueueExecutionResult, SchedulerBridgeActQueueExecutionError> {
+        execute_scheduler_bridge_act_queue_for_canary(
+            store,
+            current_time,
+            &self.drained_act_continuations,
+        )
     }
 }
 
@@ -2837,7 +2850,8 @@ mod tests {
     use crate::root_config::RootErrorOptionCallbackPhase;
     use crate::root_scheduler::{
         RootSyncSchedulerContinuationExecutionStatus,
-        SchedulerBridgeActContinuationExecutionStatus, root_sync_flush_record_for_canary,
+        SchedulerBridgeActContinuationExecutionStatus,
+        SchedulerBridgeActQueueRequestExecutionStatus, root_sync_flush_record_for_canary,
     };
     use crate::root_updates::{
         host_root_queued_callback_order_snapshot_for_canary, update_container_transition_for_canary,
@@ -2847,9 +2861,10 @@ mod tests {
     use crate::{
         ExecutionContextState, RootElementHandle, RootErrorCallbackHandle, RootOptions,
         RootRecoverableErrorCallbackHandle, RootSyncFlushExitStatus, RootSyncFlushRecordStatus,
-        TestRendererHostOutputCanaryFixture, TestRendererHostOutputCanaryMutationKind,
-        ensure_root_is_scheduled, finish_test_renderer_host_output_canary_fibers,
-        flush_sync_work_on_all_roots, inspect_test_renderer_host_output_canary_commit,
+        RootTaskScheduleOutcome, TestRendererHostOutputCanaryFixture,
+        TestRendererHostOutputCanaryMutationKind, ensure_root_is_scheduled,
+        finish_test_renderer_host_output_canary_fibers, flush_sync_work_on_all_roots,
+        inspect_test_renderer_host_output_canary_commit,
         prepare_test_renderer_host_output_canary_fibers, scheduled_roots, update_container,
         update_container_sync,
     };
@@ -4267,6 +4282,118 @@ mod tests {
         assert_eq!(
             store.scheduler_bridge().act_queue_requests().len(),
             act_queue_request_count
+        );
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_act_queue_helper_routes_drained_continuation_and_consumes_root_schedule() {
+        let (mut store, root_id, host) = root_store();
+        let sync_element = RootElementHandle::from_raw(844);
+        let default_element = RootElementHandle::from_raw(845);
+        store.scheduler_bridge_mut().enter_act_scope();
+        schedule_sync_update(&mut store, root_id, sync_element);
+        let default_update = update_container(&mut store, root_id, default_element, None).unwrap();
+        ensure_root_is_scheduled(&mut store, default_update.schedule()).unwrap();
+
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        let prepared = prepare_test_renderer_host_output_canary_fibers(
+            &mut store,
+            render_phase,
+            TestRendererHostOutputCanaryFixture::new(846, 847, 848),
+        )
+        .unwrap();
+        finish_test_renderer_host_output_canary_fibers(&mut store, prepared, 849, 850).unwrap();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+
+        let (mut committed, diagnostics) =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_diagnostics_for_canary(
+                &mut store,
+                rendered_record,
+            )
+            .unwrap();
+        let private_execution =
+            committed.drain_accepted_act_continuations_after_host_output_canary(diagnostics);
+
+        assert_eq!(private_execution.drained_count(), 1);
+        assert_eq!(current_host_root_element(&store, root_id), sync_element);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::DEFAULT
+        );
+
+        let queue_execution = private_execution
+            .execute_accepted_scheduler_bridge_act_queue_for_canary(&mut store, 1_000_000)
+            .unwrap();
+
+        assert_eq!(queue_execution.request_records().len(), 1);
+        assert_eq!(queue_execution.consumed_request_count(), 1);
+        assert_eq!(queue_execution.rejected_request_count(), 0);
+        assert_eq!(queue_execution.executed_render_callback_count(), 0);
+        assert!(queue_execution.did_consume_queued_act_requests());
+        assert!(queue_execution.did_execute_accepted_internal_act_continuations());
+        assert!(queue_execution.records_preserve_act_queue_order());
+        assert!(!queue_execution.did_execute_accepted_render_callbacks());
+        assert!(!queue_execution.routed_private_act_queue_requests_and_continuations_for_canary());
+        assert!(!queue_execution.drains_public_react_act_queue());
+        assert!(!queue_execution.public_act_compatibility_claimed());
+        assert!(!queue_execution.public_root_compatibility_claimed());
+        assert!(!queue_execution.public_flush_sync_compatibility_claimed());
+        assert!(!queue_execution.public_scheduler_timing_compatibility_claimed());
+        assert!(!queue_execution.executes_effects());
+
+        let root_schedule = &queue_execution.request_records()[0];
+        assert_eq!(root_schedule.queue_order(), 0);
+        assert_eq!(
+            root_schedule.status(),
+            SchedulerBridgeActQueueRequestExecutionStatus::RootScheduleProcessed
+        );
+        assert!(root_schedule.did_process_root_schedule());
+        assert_eq!(root_schedule.root_schedule().unwrap().records().len(), 1);
+        assert_eq!(
+            root_schedule.root_schedule().unwrap().records()[0].outcome(),
+            RootTaskScheduleOutcome::NoWork
+        );
+        assert!(root_schedule.render_callback().is_none());
+        assert!(!root_schedule.drains_public_react_act_queue());
+        assert!(!root_schedule.public_act_compatibility_claimed());
+        assert!(!root_schedule.public_root_compatibility_claimed());
+        assert!(!root_schedule.public_scheduler_timing_compatibility_claimed());
+        assert!(!root_schedule.executes_effects());
+
+        let continuation_execution = queue_execution.continuation_execution().unwrap();
+        assert_eq!(continuation_execution.records().len(), 1);
+        assert_eq!(continuation_execution.executed_count(), 1);
+        assert_eq!(continuation_execution.rejected_count(), 0);
+        assert_eq!(continuation_execution.blocked_count(), 0);
+        assert!(continuation_execution.did_execute_accepted_internal_act_continuations());
+        assert!(continuation_execution.records_preserve_sync_flush_order());
+        let continuation = &continuation_execution.records()[0];
+        assert_eq!(
+            continuation.status(),
+            SchedulerBridgeActContinuationExecutionStatus::RenderedAndCommitted
+        );
+        assert!(continuation.routed_through_root_scheduler_and_commit_evidence_for_canary());
+        assert_eq!(
+            continuation.render_phase().unwrap().resulting_element(),
+            default_element
+        );
+        assert_eq!(current_host_root_element(&store, root_id), default_element);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_consumed_request_count(),
+            act_queue_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().pending_act_queue_request_count(),
+            0
         );
         assert!(store.scheduler_bridge().callback_requests().is_empty());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
