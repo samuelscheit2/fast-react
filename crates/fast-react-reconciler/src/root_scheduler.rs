@@ -143,6 +143,19 @@ impl RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary {
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary {
+    raw: usize,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RootFinishedWorkQueueLaneCommitCurrentnessSourceForCanary {
+    identity: RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+    token: RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary,
+}
+
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary {
     identity: RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
@@ -647,11 +660,13 @@ pub struct RootSchedulerState {
     is_flushing_work: bool,
     current_event_transition_lane: Lane,
     #[cfg(test)]
+    next_finished_work_queue_lane_commit_currentness_source_token: usize,
+    #[cfg(test)]
     finished_work_queue_lane_commit_currentness_sources:
-        Vec<RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary>,
+        Vec<RootFinishedWorkQueueLaneCommitCurrentnessSourceForCanary>,
     #[cfg(test)]
     consumed_finished_work_queue_lane_commit_currentness:
-        Vec<RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary>,
+        Vec<RootFinishedWorkQueueLaneCommitCurrentnessSourceForCanary>,
 }
 
 impl RootSchedulerState {
@@ -665,6 +680,8 @@ impl RootSchedulerState {
             might_have_pending_sync_work: false,
             is_flushing_work: false,
             current_event_transition_lane: Lane::NO,
+            #[cfg(test)]
+            next_finished_work_queue_lane_commit_currentness_source_token: 0,
             #[cfg(test)]
             finished_work_queue_lane_commit_currentness_sources: Vec::new(),
             #[cfg(test)]
@@ -744,50 +761,65 @@ impl RootSchedulerState {
     fn record_finished_work_queue_lane_commit_currentness_source(
         &mut self,
         identity: RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
-    ) {
-        if !self
+    ) -> RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary {
+        if let Some(source) = self
             .finished_work_queue_lane_commit_currentness_sources
             .iter()
-            .any(|source| *source == identity)
-            && !self
-                .consumed_finished_work_queue_lane_commit_currentness
-                .iter()
-                .any(|consumed| *consumed == identity)
+            .find(|source| source.identity == identity)
         {
-            self.finished_work_queue_lane_commit_currentness_sources
-                .push(identity);
+            return source.token;
         }
+        if let Some(consumed) = self
+            .consumed_finished_work_queue_lane_commit_currentness
+            .iter()
+            .find(|consumed| consumed.identity == identity)
+        {
+            return consumed.token;
+        }
+
+        let token = RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary {
+            raw: self.next_finished_work_queue_lane_commit_currentness_source_token,
+        };
+        self.next_finished_work_queue_lane_commit_currentness_source_token = self
+            .next_finished_work_queue_lane_commit_currentness_source_token
+            .saturating_add(1);
+        self.finished_work_queue_lane_commit_currentness_sources
+            .push(RootFinishedWorkQueueLaneCommitCurrentnessSourceForCanary { identity, token });
+        token
     }
 
     #[cfg(test)]
     fn has_pending_finished_work_queue_lane_commit_currentness_source(
         &self,
         identity: &RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+        token: RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary,
     ) -> bool {
         self.finished_work_queue_lane_commit_currentness_sources
             .iter()
-            .any(|source| source == identity)
+            .any(|source| &source.identity == identity && source.token == token)
     }
 
     #[cfg(test)]
     fn has_consumed_finished_work_queue_lane_commit_currentness_source(
         &self,
         identity: &RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+        token: RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary,
     ) -> bool {
         self.consumed_finished_work_queue_lane_commit_currentness
             .iter()
-            .any(|consumed| consumed == identity)
+            .any(|consumed| &consumed.identity == identity && consumed.token == token)
     }
 
     #[cfg(test)]
     fn consume_finished_work_queue_lane_commit_currentness_source(
         &mut self,
         identity: &RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+        token: RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary,
     ) -> bool {
         let Some(index) = self
             .finished_work_queue_lane_commit_currentness_sources
             .iter()
-            .position(|source| source == identity)
+            .position(|source| &source.identity == identity && source.token == token)
         else {
             return false;
         };
@@ -2534,7 +2566,7 @@ pub(crate) enum RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary {
 }
 
 #[cfg(test)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
     handoff: RootSyncFlushRecord,
     requested_callback_node: RootSchedulerCallbackHandle,
@@ -2547,6 +2579,28 @@ pub(crate) struct RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary
     queue_handoff_error: Option<HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary>,
     queue_commit_handoff: Option<HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary>,
     commit: Option<HostRootCommitRecord>,
+    currentness_source_token:
+        Option<RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary>,
+}
+
+#[cfg(test)]
+impl Clone for RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
+    fn clone(&self) -> Self {
+        Self {
+            handoff: self.handoff,
+            requested_callback_node: self.requested_callback_node,
+            current_callback_node: self.current_callback_node,
+            selected_lanes: self.selected_lanes,
+            pending_passive_blocker: self.pending_passive_blocker,
+            finished_work_handoff_identity: self.finished_work_handoff_identity,
+            status: self.status,
+            queue_handoff: self.queue_handoff.clone(),
+            queue_handoff_error: self.queue_handoff_error.clone(),
+            queue_commit_handoff: self.queue_commit_handoff.clone(),
+            commit: self.commit.clone(),
+            currentness_source_token: None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2636,6 +2690,13 @@ impl RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
     #[must_use]
     pub(crate) fn commit(&self) -> Option<&HostRootCommitRecord> {
         self.commit.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn currentness_source_token(
+        &self,
+    ) -> Option<RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary> {
+        self.currentness_source_token
     }
 
     #[must_use]
@@ -2833,10 +2894,19 @@ pub(crate) fn consume_finished_work_queue_lane_commit_currentness_for_canary<H: 
         execution.selected_lanes(),
         queue_commit_handoff,
     );
+    let Some(source_token) = execution.currentness_source_token() else {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
+                root: identity.root(),
+                finished_work: identity.finished_work(),
+                commit_order: identity.commit_order(),
+            },
+        );
+    };
 
     if store
         .root_scheduler()
-        .has_consumed_finished_work_queue_lane_commit_currentness_source(&identity)
+        .has_consumed_finished_work_queue_lane_commit_currentness_source(&identity, source_token)
     {
         return Err(
             RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceAlreadyConsumed {
@@ -2849,7 +2919,7 @@ pub(crate) fn consume_finished_work_queue_lane_commit_currentness_for_canary<H: 
 
     if !store
         .root_scheduler()
-        .has_pending_finished_work_queue_lane_commit_currentness_source(&identity)
+        .has_pending_finished_work_queue_lane_commit_currentness_source(&identity, source_token)
     {
         return Err(
             RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
@@ -2884,7 +2954,7 @@ pub(crate) fn consume_finished_work_queue_lane_commit_currentness_for_canary<H: 
     let source_pending_before_consume = true;
     if !store
         .root_scheduler_mut()
-        .consume_finished_work_queue_lane_commit_currentness_source(&identity)
+        .consume_finished_work_queue_lane_commit_currentness_source(&identity, source_token)
     {
         return Err(
             RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
@@ -2896,7 +2966,7 @@ pub(crate) fn consume_finished_work_queue_lane_commit_currentness_for_canary<H: 
     }
     let source_consumed_after = store
         .root_scheduler()
-        .has_consumed_finished_work_queue_lane_commit_currentness_source(&identity);
+        .has_consumed_finished_work_queue_lane_commit_currentness_source(&identity, source_token);
 
     Ok(RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary {
         identity,
@@ -6915,25 +6985,26 @@ pub(crate) fn execute_sync_scheduler_continuation_for_queue_lane_handoff_for_can
         selected_lanes,
         &queue_commit_handoff,
     );
-    store
+    let currentness_source_token = store
         .root_scheduler_mut()
         .record_finished_work_queue_lane_commit_currentness_source(currentness_identity);
 
-    Ok(
-        sync_scheduler_queue_lane_continuation_execution_record_for_canary(
-            handoff,
-            requested_callback_node,
-            current_callback_node,
-            selected_lanes,
-            None,
-            Some(finished_work_handoff_identity),
-            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::RenderedAndCommitted,
-            queue_handoff,
-            None,
-            Some(queue_commit_handoff),
-            Some(commit),
-        ),
-    )
+    let mut execution = sync_scheduler_queue_lane_continuation_execution_record_for_canary(
+        handoff,
+        requested_callback_node,
+        current_callback_node,
+        selected_lanes,
+        None,
+        Some(finished_work_handoff_identity),
+        RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::RenderedAndCommitted,
+        queue_handoff,
+        None,
+        Some(queue_commit_handoff),
+        Some(commit),
+    );
+    execution.currentness_source_token = Some(currentness_source_token);
+
+    Ok(execution)
 }
 
 #[cfg(test)]
@@ -6966,6 +7037,7 @@ fn sync_scheduler_queue_lane_continuation_execution_record_for_canary(
         queue_handoff_error,
         queue_commit_handoff,
         commit,
+        currentness_source_token: None,
     }
 }
 
@@ -11921,6 +11993,56 @@ fn main() {{}}
             currentness.finished_work()
         );
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_finished_work_queue_lane_commit_currentness_rejects_preconsume_clone() {
+        let (mut store, root_id, host) = root_store();
+        let (_accepted, handoff, queue_handoff) = sync_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(94821),
+        );
+        let execution = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+        let cloned_execution = execution.clone();
+        let commit = execution.commit().unwrap();
+        let commit_order = execution
+            .queue_commit_handoff()
+            .unwrap()
+            .finished_work_handoff()
+            .commit_order();
+
+        assert!(execution.currentness_source_token().is_some());
+        assert_eq!(cloned_execution.currentness_source_token(), None);
+        assert_eq!(
+            consume_finished_work_queue_lane_commit_currentness_for_canary(
+                &mut store,
+                &cloned_execution,
+            )
+            .unwrap_err(),
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
+                root: root_id,
+                finished_work: commit.finished_work(),
+                commit_order
+            }
+        );
+
+        let currentness =
+            consume_finished_work_queue_lane_commit_currentness_for_canary(&mut store, &execution)
+                .unwrap();
+        assert!(currentness.source_pending_before_consume());
+        assert!(currentness.source_consumed_after());
+        assert!(currentness.source_owned_currentness_consumed());
+        assert!(currentness.ties_finished_work_queue_lane_commit_to_live_tree_state_for_canary());
+        assert_eq!(currentness.root(), root_id);
+        assert_eq!(currentness.finished_work(), commit.finished_work());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 

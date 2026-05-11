@@ -7,6 +7,9 @@
 - Tied the source-owned record to root/current/finished-work identity,
   selected/finished/remaining lanes, scheduler callback identity, queue handoff,
   commit order, update sequence ids, and resulting committed HostRoot state.
+- Repaired the pre-consume clone hole by minting a private source token for the
+  canonical execution record and dropping that token from cloned execution
+  records.
 - Kept public React DOM, test renderer, flushSync, act, Scheduler timing,
   native host execution, and public effect compatibility blocked.
 
@@ -27,6 +30,12 @@ queue rows, committed HostRoot element, and committed child topology before
 moving that identity from pending to consumed. Replay, caller-built callback
 identity drift, stale live roots, scheduler-only evidence, and skipped-lane
 smuggling all fail before consumption.
+
+The pending/consumed ledgers now match on both source identity and a private
+`RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary`. The token is
+stored only on the canonical execution record returned by the scheduler
+continuation; `Clone` for that execution record intentionally clears the token
+so exact pre-consume clones cannot consume the pending source.
 
 ## Tests And Checks
 
@@ -49,8 +58,10 @@ smuggling all fail before consumption.
   HostRoot child output, verifies previous/current/finished-work identity,
   queue lane metadata, callback identity, commit order, and mutation/deletion
   evidence.
-- Negative canaries reject replay, caller-built callback identity drift,
-  stale live root state, scheduler-only execution, and skipped-lane smuggling.
+- Negative canaries reject pre-consume cloned execution records while leaving
+  the canonical original consumable, replay, caller-built callback identity
+  drift, stale live root state, scheduler-only execution, and skipped-lane
+  smuggling.
 - `RootSchedulerState` private source ledgers stay under `#[cfg(test)]`, and
   public `Debug` / `PartialEq` output remains compatibility-neutral.
 - Currentness record helpers explicitly report no public root, Scheduler
@@ -61,9 +72,10 @@ smuggling all fail before consumption.
 - This remains a private/test-only canary. It does not expose public React DOM,
   test renderer, flushSync, act, Scheduler timing, native host mutation, or
   effect behavior.
-- Bit-for-bit in-process clones before first consume are not distinguishable by
-  value equality; replay after consume and caller-built drift are rejected by
-  the source-owned pending/consumed ledger.
+- The private source token closes the bit-for-bit pre-consume clone admission
+  hole for `Clone`-produced execution records. Module-local tests can still
+  mutate private fields directly, so future canaries should continue to assert
+  source-owned token flow before widening any public surface.
 
 ## Recommended Next Tasks
 
