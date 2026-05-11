@@ -53,23 +53,26 @@ Worker 844 was accepted; do not use it as accepted input.
 
 Current active queue:
 
-- Worker 881: active fix after DO NOT MERGE audit for serialization lifecycle,
-  package/CJS parity, and raw serialization bypass gaps.
+- Worker 881: fix under fresh read-only audit for serialization lifecycle,
+  package/CJS parity, and raw serialization bypass gaps after a prior DO NOT
+  MERGE audit.
 - Worker 885: active fix after DO NOT MERGE audit so React `act` lifecycle
   evidence consumes React DOM source-owned lifecycle boundary rows rather than
   self-minting rows.
-- Worker 887: completed hydrateRoot lifecycle boundary admission work under
-  read-only audit; not accepted input yet.
-- Worker 888: completed test-renderer instance lifecycle gate work under
-  read-only audit; not accepted input yet.
+- Worker 887: active fix after DO NOT MERGE audit for hydrateRoot
+  same-container currentness.
+- Worker 888: active fix after DO NOT MERGE audit for TestInstance fallback
+  acceptance without real finished-work/current host-output source records.
 - Worker 890: active Rust deleted-subtree passive sync continuation.
 - Worker 891: active React DOM root unmount lifecycle consumer.
 - Worker 892: active native lifecycle cleanup generation gate.
 - Worker 893: active resource/form reset lifecycle execution.
+- Worker 895: active implementation worker.
+- Worker 896: active implementation worker.
 
-Workers 881, 885, and 887-893 are active, fixing, or audit-pending work only.
-Do not use their implementation branches as accepted input until they are
-reviewed, verified, and merged.
+Workers 881, 885, 887-888, 890-893, and 895-896 are audit-pending, fixing, or
+active implementation work only. Do not use their implementation branches as
+accepted input until they are reviewed, verified, and merged.
 
 Accepted private evidence still keeps public root/render, `act`, `flushSync`,
 Scheduler timing, hydration, resources/forms, serialization, native execution,
@@ -85,14 +88,15 @@ canonical evidence requirements.
    Public package, root, native, React DOM, test-renderer, Scheduler,
    `act`, hydration, resource/form, serialization, and `flushSync`
    compatibility still require fail-closed gates and dual-run oracle evidence.
-2. Re-audit Worker 881 and Worker 885 fixes before reconsidering merge; their
-   prior branches were DO NOT MERGE and remain non-input until the stated
-   lifecycle/package/CJS/source-ownership gaps are closed.
-3. Audit Workers 887 and 888 before using them as inputs. Keep their completed
-   branches separate from accepted history until read-only review passes.
-4. Review Workers 890-893 against the accepted source-owned lifecycle,
-   deletion, sync-flush, native-generation, resource/form, Scheduler variant,
-   and package-surface blockers before any merge.
+2. Complete Worker 881's fresh read-only audit before reconsidering merge; the
+   fix remains non-input until the serialization lifecycle, package/CJS parity,
+   and raw serialization bypass blockers are verified closed.
+3. Re-audit Worker 885, Worker 887, and Worker 888 fixes before reconsidering
+   merge; their prior branches were DO NOT MERGE and remain non-input until
+   the stated source-ownership/currentness/fallback gaps are closed.
+4. Review Workers 890-893 and 895-896 against the accepted source-owned
+   lifecycle, deletion, sync-flush, native-generation, resource/form, Scheduler
+   variant, and package-surface blockers before any merge.
 5. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
