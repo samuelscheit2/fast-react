@@ -664,6 +664,166 @@ pub(crate) struct FunctionComponentReducerDispatchRootRescheduleRecord {
     scheduled: ScheduledRootUpdateResult,
 }
 
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseReducerAcceptedUpdateEvidenceForCanary {
+    root: FiberRootId,
+    current: FiberId,
+    work_in_progress: FiberId,
+    hook_state: FunctionComponentHookRenderState,
+    hook: HookSlotId,
+    queue: HookQueueId,
+    dispatch: FunctionComponentStateDispatchHandle,
+    dispatch_update: HookUpdateId,
+    dispatch_lane: HookUpdateLane,
+    reducer_at_dispatch: FunctionComponentReducerHandle,
+    render_reducer: FunctionComponentReducerHandle,
+    render_lanes: Lanes,
+    applied_update_count: usize,
+    skipped_update_count: usize,
+    remaining_lanes: Lanes,
+}
+
+#[cfg(test)]
+impl FunctionComponentUseReducerAcceptedUpdateEvidenceForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn current(self) -> FiberId {
+        self.current
+    }
+
+    #[must_use]
+    pub(crate) const fn work_in_progress(self) -> FiberId {
+        self.work_in_progress
+    }
+
+    #[must_use]
+    pub(crate) const fn hook_state(self) -> FunctionComponentHookRenderState {
+        self.hook_state
+    }
+
+    #[must_use]
+    pub(crate) const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(self) -> HookQueueId {
+        self.queue
+    }
+
+    #[must_use]
+    pub(crate) const fn dispatch(self) -> FunctionComponentStateDispatchHandle {
+        self.dispatch
+    }
+
+    #[must_use]
+    pub(crate) const fn dispatch_update(self) -> HookUpdateId {
+        self.dispatch_update
+    }
+
+    #[must_use]
+    pub(crate) const fn dispatch_lane(self) -> HookUpdateLane {
+        self.dispatch_lane
+    }
+
+    #[must_use]
+    pub(crate) const fn reducer_at_dispatch(self) -> FunctionComponentReducerHandle {
+        self.reducer_at_dispatch
+    }
+
+    #[must_use]
+    pub(crate) const fn render_reducer(self) -> FunctionComponentReducerHandle {
+        self.render_reducer
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn applied_update_count(self) -> usize {
+        self.applied_update_count
+    }
+
+    #[must_use]
+    pub(crate) const fn skipped_update_count(self) -> usize {
+        self.skipped_update_count
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn public_hook_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary {
+    MissingAcceptedReducerUpdate {
+        root: FiberRootId,
+        function_component: FiberId,
+    },
+    StaleHookQueueRenderEvidence {
+        root: FiberRootId,
+        queue_owner: FiberId,
+        render_fiber: FiberId,
+        queue: HookQueueId,
+        dispatch: FunctionComponentStateDispatchHandle,
+        render_lanes: Lanes,
+        dispatch_lanes: Lanes,
+    },
+}
+
+#[cfg(test)]
+impl Display for FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingAcceptedReducerUpdate {
+                root,
+                function_component,
+            } => write!(
+                formatter,
+                "root {} FunctionComponent fiber {} has no accepted private useReducer update evidence",
+                root.raw(),
+                function_component.slot().get()
+            ),
+            Self::StaleHookQueueRenderEvidence {
+                root,
+                queue_owner,
+                render_fiber,
+                queue,
+                dispatch,
+                render_lanes,
+                dispatch_lanes,
+            } => write!(
+                formatter,
+                "root {} rejected stale private useReducer queue/render evidence: queue {} dispatch {} belongs to fiber {}, render fiber {} used lanes {:?} for dispatch lanes {:?}",
+                root.raw(),
+                queue.raw(),
+                dispatch.raw(),
+                queue_owner.slot().get(),
+                render_fiber.slot().get(),
+                render_lanes,
+                dispatch_lanes
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary {}
+
 impl FunctionComponentReducerDispatchRootRescheduleRecord {
     #[must_use]
     pub(crate) const fn dispatch(&self) -> FunctionComponentReducerDispatchRecord {
@@ -684,6 +844,81 @@ impl FunctionComponentReducerDispatchRootRescheduleRecord {
     pub(crate) const fn scheduled(&self) -> ScheduledRootUpdateResult {
         self.scheduled
     }
+}
+
+#[cfg(test)]
+pub(crate) fn function_component_use_reducer_accepted_update_evidence_for_canary(
+    dispatch: &FunctionComponentReducerDispatchRootRescheduleRecord,
+    render: FunctionComponentUseReducerRenderRecord,
+) -> Result<
+    FunctionComponentUseReducerAcceptedUpdateEvidenceForCanary,
+    FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary,
+> {
+    let dispatch_record = dispatch.dispatch();
+    let update = render.reducer_hook().update_record().ok_or(
+        FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary::MissingAcceptedReducerUpdate {
+            root: dispatch.root(),
+            function_component: render.work_in_progress(),
+        },
+    )?;
+    let hook_state = render.hook_state();
+    let current = render.current().ok_or(
+        FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary::StaleHookQueueRenderEvidence {
+            root: dispatch.root(),
+            queue_owner: dispatch_record.fiber(),
+            render_fiber: render.work_in_progress(),
+            queue: dispatch_record.queue(),
+            dispatch: dispatch_record.dispatch(),
+            render_lanes: render.render_lanes(),
+            dispatch_lanes: dispatch_record.lane().priority_lanes(),
+        },
+    )?;
+    let dispatch_lanes = dispatch_record.lane().priority_lanes();
+    let render_owns_dispatch_queue = dispatch.root() == dispatch.reschedule().root()
+        && dispatch.root() == dispatch.scheduled().root()
+        && current == dispatch_record.fiber()
+        && hook_state.phase() == FunctionComponentHookRenderPhase::Update
+        && hook_state.render_fiber() == render.work_in_progress()
+        && hook_state.current() == Some(dispatch_record.fiber())
+        && update.fiber() == render.work_in_progress()
+        && update.queue() == dispatch_record.queue()
+        && update.dispatch() == dispatch_record.dispatch()
+        && update.render_lanes() == render.render_lanes()
+        && update.root_render_lanes() == render.render_lanes()
+        && render.render_lanes().contains_all(dispatch_lanes)
+        && update.applied_update_count() > 0
+        && !dispatch_record.lane().is_no_lane();
+    if !render_owns_dispatch_queue {
+        return Err(
+            FunctionComponentUseReducerAcceptedUpdateEvidenceErrorForCanary::StaleHookQueueRenderEvidence {
+                root: dispatch.root(),
+                queue_owner: dispatch_record.fiber(),
+                render_fiber: render.work_in_progress(),
+                queue: dispatch_record.queue(),
+                dispatch: dispatch_record.dispatch(),
+                render_lanes: render.render_lanes(),
+                dispatch_lanes,
+            },
+        );
+    }
+
+    Ok(FunctionComponentUseReducerAcceptedUpdateEvidenceForCanary {
+        root: dispatch.root(),
+        current,
+        work_in_progress: render.work_in_progress(),
+        hook_state,
+        hook: update.hook(),
+        queue: update.queue(),
+        dispatch: update.dispatch(),
+        dispatch_update: dispatch_record.update(),
+        dispatch_lane: dispatch_record.lane(),
+        reducer_at_dispatch: dispatch_record.reducer(),
+        render_reducer: update.reducer(),
+        render_lanes: render.render_lanes(),
+        applied_update_count: update.applied_update_count(),
+        skipped_update_count: update.skipped_update_count(),
+        remaining_lanes: update.remaining_lanes(),
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
