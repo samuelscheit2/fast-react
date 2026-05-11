@@ -7789,6 +7789,7 @@ test('private react-dom/client hydrateRoot target-claiming preflight requires ma
     targetClaimPreflight.acceptedCapabilities.map((capability) => capability.id),
     [
       'hydrate-root-marker-listener-preflight-required',
+      'hydrate-root-lifecycle-request-boundary-required',
       'hydrate-root-target-dispatch-link-diagnostic',
       'hydrate-root-target-claiming-canonical-evidence',
       'hydrate-root-target-claiming-state-unchanged'
@@ -8066,6 +8067,7 @@ test('private react-dom/client hydrateRoot event replay preflight validates bloc
     ),
     [
       'hydrate-root-marker-listener-preflight-required',
+      'hydrate-root-lifecycle-request-boundary-required',
       'hydrate-root-target-claiming-preflight-required',
       'hydrate-root-replay-target-dispatch-execution-metadata',
       'hydrate-root-event-replay-state-unchanged'
@@ -8452,7 +8454,7 @@ test('private react-dom/client hydrateRoot event replay preflight rejects stale 
     () => preflight.preflightEventReplay(targetClaimPreflight),
     {
       code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT',
-      message: /current marker\/listener state/
+      message: /lifecycle container snapshot|current marker\/listener state/
     }
   );
   staleStateBridge.revertCreateRootSideEffects(staleStateSideEffects);
@@ -13449,6 +13451,7 @@ function assertPrivateHydrateRootPublicFacadePreflightRecord(record, expected) {
     record.acceptedCapabilities.map((capability) => capability.id),
     [
       'private-hydrate-root-bridge-request-admission',
+      'hydrate-root-lifecycle-request-boundary',
       'unsupported-hydration-boundary-diagnostics',
       'hydrate-root-marker-listener-preflight-diagnostics',
       'hydrate-root-recoverable-error-preflight-diagnostics'
@@ -13666,6 +13669,7 @@ function assertPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
     record.acceptedCapabilities.map((capability) => capability.id),
     [
       'hydrate-root-marker-guard-snapshot',
+      'hydrate-root-lifecycle-request-boundary-required',
       'hydrate-root-listener-guard-snapshot',
       'hydrate-root-marker-listener-state-unchanged'
     ]

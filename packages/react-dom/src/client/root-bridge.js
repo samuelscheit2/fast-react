@@ -259,6 +259,8 @@ const privateHydrateRootPublicFacadeExecutionPreflightRecordType =
   'fast.react_dom.private_hydrate_root_public_facade_execution_preflight_record';
 const privateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecordType =
   'fast.react_dom.private_hydrate_root_public_facade_text_node_claim_patch_execution_record';
+const privateHydrateRootPublicFacadeLifecycleRequestBoundaryRecordType =
+  'fast.react_dom.private_hydrate_root_public_facade_lifecycle_request_boundary_record';
 const privateRootLiveContainerPreflightRecordType =
   'fast.react_dom.private_root_live_container_preflight_record';
 const privateRootPublicFacadeMarkerListenerPreflightRecordType =
@@ -383,6 +385,8 @@ const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EXECUTION_PREFLIGHTED =
   'preflighted-private-hydrate-root-public-facade-execution-gate';
 const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TEXT_NODE_CLAIM_PATCH_EXECUTED =
   'executed-private-hydrate-root-public-facade-text-node-claim-patch';
+const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_LIFECYCLE_BOUNDARY_ACCEPTED =
+  'accepted-private-hydrate-root-public-facade-lifecycle-request-boundary';
 const ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED =
   'blocked-private-root-live-container-preflight';
 const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED =
@@ -551,6 +555,12 @@ const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES =
         'The private hydrateRoot facade call produced a bridge-owned unsupported hydration request record.'
     }),
     freezeRecord({
+      id: 'hydrate-root-lifecycle-request-boundary',
+      accepted: true,
+      reason:
+        'The private hydrateRoot request admission is retained behind a source-owned lifecycle request boundary.'
+    }),
+    freezeRecord({
       id: 'unsupported-hydration-boundary-diagnostics',
       accepted: true,
       reason:
@@ -640,6 +650,12 @@ const ROOT_BRIDGE_HYDRATE_ROOT_MARKER_LISTENER_PREFLIGHT_ACCEPTED_CAPABILITIES =
         'The private hydrateRoot preflight validated the deferred root marker guard against the container marker snapshot.'
     }),
     freezeRecord({
+      id: 'hydrate-root-lifecycle-request-boundary-required',
+      accepted: true,
+      reason:
+        'The marker/listener preflight consumes only source-owned hydrateRoot lifecycle request-boundary evidence.'
+    }),
+    freezeRecord({
       id: 'hydrate-root-listener-guard-snapshot',
       accepted: true,
       reason:
@@ -661,6 +677,12 @@ const ROOT_BRIDGE_HYDRATE_ROOT_TARGET_CLAIMING_PREFLIGHT_ACCEPTED_CAPABILITIES =
       accepted: true,
       reason:
         'The private target-claiming preflight starts only after the hydrateRoot marker/listener preflight has accepted unchanged guard snapshots.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-lifecycle-request-boundary-required',
+      accepted: true,
+      reason:
+        'The private target-claiming preflight retains the same source-owned lifecycle request boundary.'
     }),
     freezeRecord({
       id: 'hydrate-root-target-dispatch-link-diagnostic',
@@ -692,6 +714,12 @@ const ROOT_BRIDGE_HYDRATE_ROOT_EVENT_REPLAY_PREFLIGHT_ACCEPTED_CAPABILITIES =
         'The private event replay preflight starts only after the hydrateRoot marker/listener preflight has accepted unchanged guard snapshots.'
     }),
     freezeRecord({
+      id: 'hydrate-root-lifecycle-request-boundary-required',
+      accepted: true,
+      reason:
+        'The private event replay preflight retains the same source-owned lifecycle request boundary.'
+    }),
+    freezeRecord({
       id: 'hydrate-root-target-claiming-preflight-required',
       accepted: true,
       reason:
@@ -719,6 +747,12 @@ const ROOT_BRIDGE_HYDRATE_ROOT_EXECUTION_PREFLIGHT_ACCEPTED_CAPABILITIES =
       accepted: true,
       reason:
         'The private execution preflight starts only after the hydrateRoot event replay preflight has accepted blocked dispatch metadata.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-lifecycle-request-boundary-required',
+      accepted: true,
+      reason:
+        'The private execution preflight retains the source-owned hydrateRoot lifecycle request boundary before execution evidence can be consumed.'
     }),
     freezeRecord({
       id: 'hydrate-root-replay-execution-boundary-canonical',
@@ -754,6 +788,12 @@ const ROOT_BRIDGE_HYDRATE_ROOT_TEXT_NODE_CLAIM_PATCH_ACCEPTED_CAPABILITIES =
       accepted: true,
       reason:
         'The private text claim patch starts only after hydrateRoot execution preflight has accepted the blocked replay boundary.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-lifecycle-request-boundary-required',
+      accepted: true,
+      reason:
+        'The private text claim patch requires source-owned active lifecycle request-boundary evidence before the fake DOM text write.'
     }),
     freezeRecord({
       id: 'hydrate-root-text-node-claim-patch-execution-record',
@@ -2966,6 +3006,10 @@ const rootHydratePublicFacadeExecutionPreflightPayloads =
   new WeakMap();
 const rootHydratePublicFacadeTextNodeClaimPatchExecutionPayloads =
   new WeakMap();
+const rootHydratePublicFacadeLifecycleRequestBoundaryPayloads =
+  new WeakMap();
+const rootHydratePublicFacadeLatestLifecycleRequestBoundaryByContainer =
+  new WeakMap();
 const rootLiveContainerPreflightPayloads = new WeakMap();
 const rootPublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootPublicFacadeHostOutputRenderPayloads = new WeakMap();
@@ -3498,9 +3542,13 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
     bridge,
     eventReplayPreflightRecords: [],
     executionPreflightRecords: [],
+    lifecycleRequestBoundaryRecords: [],
+    lifecycleRequestBoundaryRecordsByContainer: new WeakMap(),
+    lifecycleRequestBoundaryRecordsByRequest: new WeakMap(),
     markerListenerPreflightRecords: [],
     nextEventReplayPreflightSequence: 1,
     nextExecutionPreflightSequence: 1,
+    nextLifecycleRequestBoundarySequence: 1,
     nextPreflightSequence: 1,
     nextTargetClaimingPreflightSequence: 1,
     nextTextNodeClaimPatchExecutionSequence: 1,
@@ -3621,30 +3669,200 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
   return preflight;
 }
 
+function createPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(
+  preflightState,
+  requestRecord,
+  requestAdmission,
+  requestPayload,
+  preflightId,
+  preflightSequence
+) {
+  const admissionPayload = rootBridgeAdmissionPayloads.get(requestAdmission);
+  if (
+    requestPayload === undefined ||
+    admissionPayload === undefined ||
+    admissionPayload.sourceRecord !== requestRecord ||
+    admissionPayload.bridgeState !== requestPayload.bridgeState ||
+    admissionPayload.operation !== 'hydrate' ||
+    !isSourceOwnedPrivateRootBridgeAdmissionRecord(requestAdmission) ||
+    requestAdmission.lifecyclePrerequisites.accepted !== true ||
+    requestAdmission.lifecyclePrerequisites.operation !== 'hydrate' ||
+    requestAdmission.lifecyclePrerequisites.lifecycleStatusBefore !== null ||
+    requestAdmission.lifecyclePrerequisites.lifecycleStatusAfter !==
+      ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION ||
+    requestAdmission.lifecyclePrerequisites.lifecycleTransition !==
+      `none->${ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION}` ||
+    requestAdmission.requestId !== requestRecord.requestId ||
+    requestAdmission.requestSequence !== requestRecord.requestSequence ||
+    requestAdmission.requestType !== requestRecord.requestType ||
+    requestAdmission.hydrateId !== requestRecord.hydrateId ||
+    requestAdmission.rootId !== requestRecord.rootId ||
+    requestAdmission.rootKind !== requestRecord.rootKind ||
+    requestAdmission.rootTag !== requestRecord.rootTag ||
+    requestAdmission.markerParserEvidence !==
+      requestRecord.markerParserEvidence ||
+    requestAdmission.markerEvidence !== requestRecord.markerEvidence ||
+    requestAdmission.textMismatchDiagnostics !==
+      requestRecord.textMismatchDiagnostics ||
+    requestAdmission.recoverableErrorMetadata !==
+      requestRecord.recoverableErrorMetadata ||
+    requestAdmission.replayQueueDiagnostics !==
+      requestRecord.replayQueueDiagnostics ||
+    requestAdmission.targetResolutionDiagnostics !==
+      requestRecord.targetResolutionDiagnostics ||
+    requestAdmission.eventReplayBlockers !==
+      requestRecord.eventReplayBlockers ||
+    requestAdmission.executionStatus !== ROOT_BRIDGE_EXECUTION_BLOCKED ||
+    requestAdmission.compatibilityStatus !== ROOT_BRIDGE_COMPATIBILITY_BLOCKED ||
+    requestAdmission.nativeExecution !== false ||
+    requestAdmission.reconcilerExecution !== false ||
+    requestAdmission.domMutation !== false ||
+    requestAdmission.hydration !== false ||
+    requestAdmission.eventDispatch !== false ||
+    requestAdmission.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot lifecycle request-boundary requires a source-owned admitted private hydrateRoot request record.'
+    );
+  }
+
+  const container = requestPayload.container;
+  const lifecycleContainerSnapshot =
+    capturePrivateRootPublicFacadeLifecycleContainerSnapshot(container);
+  const lifecycleRequestBoundarySequence =
+    preflightState.nextLifecycleRequestBoundarySequence++;
+  const lifecycleRequestBoundaryId =
+    `${preflightId}:lifecycle-boundary:${lifecycleRequestBoundarySequence}`;
+  const record = freezeRecord({
+    $$typeof:
+      privateHydrateRootPublicFacadeLifecycleRequestBoundaryRecordType,
+    kind:
+      'FastReactDomPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord',
+    operation: 'hydrate-root-lifecycle-request-boundary',
+    facadeCall: 'hydrateRoot',
+    entrypoint: 'react-dom/client',
+    lifecycleRequestBoundaryId,
+    lifecycleRequestBoundarySequence,
+    preflightId,
+    preflightSequence,
+    boundaryStatus:
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_LIFECYCLE_BOUNDARY_ACCEPTED,
+    requestId: requestRecord.requestId,
+    requestSequence: requestRecord.requestSequence,
+    requestType: requestRecord.requestType,
+    hydrateId: requestRecord.hydrateId,
+    rootId: requestRecord.rootId,
+    rootKind: requestRecord.rootKind,
+    rootTag: requestRecord.rootTag,
+    rootRecordId: requestRecord.hydrationBoundaryRecord.recordId,
+    sourceOwned: true,
+    active: true,
+    sourceTokenOwnership: 'weakmap-root-bridge-admission',
+    requestAdmission,
+    requestAdmissionStatus: requestAdmission.admissionStatus,
+    lifecyclePrerequisites: requestAdmission.lifecyclePrerequisites,
+    lifecyclePrerequisitesAccepted: true,
+    lifecycleStatusBefore: requestRecord.lifecycleStatusBefore,
+    lifecycleStatusAfter: requestRecord.lifecycleStatusAfter,
+    lifecycleTransition:
+      requestAdmission.lifecyclePrerequisites.lifecycleTransition,
+    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+    acceptedPrivateMetadataDiagnostics:
+      requestRecord.acceptedPrivateMetadataDiagnostics,
+    markerGuard: requestRecord.markerGuard,
+    listenerGuard: requestRecord.listenerGuard,
+    lifecycleContainerSnapshot,
+    lifecycleContainerSnapshotOwned: true,
+    lifecycleContainerSnapshotChildCount:
+      lifecycleContainerSnapshot.childCount,
+    containerInfo: requestRecord.containerInfo,
+    publicHydrateRootEnabled: false,
+    publicHydrateRootSupported: false,
+    publicRootCreated: false,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    publicRootCompatibilitySurface: false,
+    canHydrate: false,
+    containerMarked: false,
+    listenersAttached: false,
+    domMutated: false,
+    browserDomMutated: false,
+    rootScheduled: false,
+    suspenseHydrationScheduled: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicHydrationReplayCompatibilityClaimed: false
+  });
+
+  rootHydratePublicFacadeLifecycleRequestBoundaryPayloads.set(
+    record,
+    freezeRecord({
+      admissionPayload,
+      bridge: preflightState.bridge,
+      container,
+      lifecycleContainerSnapshot,
+      preflight: preflightState.preflight,
+      requestAdmission,
+      requestPayload,
+      requestRecord
+    })
+  );
+  return record;
+}
+
 function createPrivateHydrateRootPublicFacadePreflightRecord(
   preflightState,
   requestRecord
 ) {
   const requestAdmission = preflightState.bridge.admitRequest(requestRecord);
-  const preflightSequence = preflightState.nextPreflightSequence++;
-  const preflightId =
-    `${preflightState.preflightIdPrefix}:${preflightSequence}`;
-  const markerListenerPreflight =
-    createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
-      preflightState,
-      requestRecord,
-      preflightId,
-      preflightSequence
-    );
-  preflightState.markerListenerPreflightRecords.push(
-    markerListenerPreflight
-  );
   const requestPayload = rootRecordPayloads.get(requestRecord);
   if (requestPayload === undefined) {
     throwInvalidRootPublicFacadePreflight(
       'Expected a private React DOM hydrateRoot record for public-facade recoverable-error preflight.'
     );
   }
+  const preflightSequence = preflightState.nextPreflightSequence++;
+  const preflightId =
+    `${preflightState.preflightIdPrefix}:${preflightSequence}`;
+  const lifecycleRequestBoundary =
+    createPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(
+      preflightState,
+      requestRecord,
+      requestAdmission,
+      requestPayload,
+      preflightId,
+      preflightSequence
+    );
+  preflightState.lifecycleRequestBoundaryRecords.push(
+    lifecycleRequestBoundary
+  );
+  preflightState.lifecycleRequestBoundaryRecordsByRequest.set(
+    requestRecord,
+    lifecycleRequestBoundary
+  );
+  recordHydrateRootLifecycleRequestBoundaryContainerCurrentness(
+    preflightState,
+    requestPayload.container,
+    lifecycleRequestBoundary
+  );
+  const markerListenerPreflight =
+    createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
+      preflightState,
+      requestRecord,
+      lifecycleRequestBoundary,
+      preflightId,
+      preflightSequence
+    );
+  preflightState.markerListenerPreflightRecords.push(
+    markerListenerPreflight
+  );
   const recoverableErrorPreflight =
     createHydrationTextMismatchRecoverableErrorPreflightRecord(
       requestRecord.hydrationBoundaryRecord,
@@ -3733,6 +3951,18 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
       markerListenerPreflight.preconditions.accepted,
     markerListenerStateUnchanged:
       markerListenerPreflight.preconditions.stateUnchanged,
+    lifecycleRequestBoundary,
+    lifecycleRequestBoundaryId:
+      lifecycleRequestBoundary.lifecycleRequestBoundaryId,
+    lifecycleRequestBoundaryStatus:
+      lifecycleRequestBoundary.boundaryStatus,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned:
+      lifecycleRequestBoundary.sourceOwned,
+    lifecycleContainerSnapshot:
+      lifecycleRequestBoundary.lifecycleContainerSnapshot,
+    lifecycleContainerSnapshotOwned:
+      lifecycleRequestBoundary.lifecycleContainerSnapshotOwned,
     requestAdmission,
     nativeHandoffRecord: null,
     requestAdmissionStatus: requestAdmission.admissionStatus,
@@ -3769,6 +3999,7 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
 
   rootHydratePublicFacadePreflightRecordPayloads.set(record, freezeRecord({
     bridge: preflightState.bridge,
+    lifecycleRequestBoundary,
     markerListenerPreflight,
     nativeHandoffRecord: null,
     preflight: preflightState.preflight,
@@ -3782,6 +4013,7 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
 function createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
   preflightState,
   requestRecord,
+  lifecycleRequestBoundary,
   preflightId,
   preflightSequence
 ) {
@@ -3795,6 +4027,14 @@ function createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
   const container = requestPayload.container;
   assertValidContainer(container, requestPayload.bridgeState.validationOptions);
   assertHydrateRootMarkerListenerPreflightRequestBlocked(requestRecord);
+  const lifecycleBoundaryPayload =
+    assertHydrateRootLifecycleRequestBoundaryForPreflight(
+      lifecycleRequestBoundary,
+      preflightState,
+      requestRecord,
+      requestPayload,
+      'marker-listener'
+    );
 
   const ownerDocument = getOwnerDocument(container);
   const beforeState =
@@ -3839,6 +4079,12 @@ function createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
     listenerGuardAction: listenerGuard.action,
     markerGuardMatchesContainerState: true,
     listenerGuardMatchesContainerState: true,
+    lifecycleRequestBoundaryRequired: true,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned: true,
+    lifecycleContainerSnapshotOwned: true,
+    lifecycleContainerSnapshotCurrent:
+      lifecycleBoundaryPayload.containerSnapshotCurrent,
     hasLegacyRootMarker: markerGuard.hasLegacyRootMarker,
     isContainerMarkedAsRoot: markerGuard.isContainerMarkedAsRoot,
     rootMarkerPropertyCount:
@@ -3879,6 +4125,10 @@ function createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
     blockerReasons,
     markerStateUnchanged: stateUnchanged,
     listenerStateUnchanged: stateUnchanged,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned: true,
+    lifecycleContainerSnapshotCurrent:
+      lifecycleBoundaryPayload.containerSnapshotCurrent,
     rootMarkerWriteBlocked: true,
     rootListenerInstallationBlocked: true,
     hydrationMarkerConsumptionBlocked: true,
@@ -3913,6 +4163,18 @@ function createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
     ownerDocumentInfo: beforeState.ownerDocumentInfo,
     markerGuard,
     listenerGuard,
+    lifecycleRequestBoundary,
+    lifecycleRequestBoundaryId:
+      lifecycleRequestBoundary.lifecycleRequestBoundaryId,
+    lifecycleRequestBoundaryStatus:
+      lifecycleRequestBoundary.boundaryStatus,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned:
+      lifecycleRequestBoundary.sourceOwned,
+    lifecycleContainerSnapshot:
+      lifecycleRequestBoundary.lifecycleContainerSnapshot,
+    lifecycleContainerSnapshotOwned:
+      lifecycleRequestBoundary.lifecycleContainerSnapshotOwned,
     beforeState,
     afterState,
     preconditions,
@@ -3954,6 +4216,8 @@ function createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
     bridge: preflightState.bridge,
     container,
     listenerGuard,
+    lifecycleBoundaryPayload,
+    lifecycleRequestBoundary,
     markerGuard,
     ownerDocument,
     preconditions,
@@ -3987,6 +4251,14 @@ function createPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord(
       preflightRecordPayload.markerListenerPreflight,
       requestRecord,
       preflightState
+    );
+  const lifecycleBoundaryPayload =
+    assertHydrateRootLifecycleRequestBoundaryForPreflight(
+      markerListenerPayload.lifecycleRequestBoundary,
+      preflightState,
+      requestRecord,
+      requestPayload,
+      'target-claiming'
     );
   const container = requestPayload.container;
   const ownerDocument = getOwnerDocument(container);
@@ -4056,6 +4328,11 @@ function createPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord(
     currentStateMatchesMarkerListenerPreflight: true,
     markerListenerPreflightRequired: true,
     markerListenerPreflightAccepted: true,
+    lifecycleRequestBoundaryRequired: true,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned: true,
+    lifecycleContainerSnapshotCurrent:
+      lifecycleBoundaryPayload.containerSnapshotCurrent,
     markerListenerStateUnchanged:
       preflightRecordPayload.markerListenerPreflight.preconditions
         .stateUnchanged,
@@ -4092,6 +4369,8 @@ function createPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord(
     status:
       ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TARGET_CLAIMING_PREFLIGHTED,
     markerListenerPreflightRequired: true,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned: true,
     markerListenerStateUnchanged: stateUnchanged,
     targetClaimingCanonical: true,
     targetClaimingImmutable: Object.isFrozen(targetClaimingDiagnostic),
@@ -4146,6 +4425,22 @@ function createPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord(
     markerListenerStateUnchanged:
       preflightRecordPayload.markerListenerPreflight.preconditions
         .stateUnchanged,
+    lifecycleRequestBoundary:
+      markerListenerPayload.lifecycleRequestBoundary,
+    lifecycleRequestBoundaryId:
+      markerListenerPayload.lifecycleRequestBoundary
+        .lifecycleRequestBoundaryId,
+    lifecycleRequestBoundaryStatus:
+      markerListenerPayload.lifecycleRequestBoundary.boundaryStatus,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned:
+      markerListenerPayload.lifecycleRequestBoundary.sourceOwned,
+    lifecycleContainerSnapshot:
+      markerListenerPayload.lifecycleRequestBoundary
+        .lifecycleContainerSnapshot,
+    lifecycleContainerSnapshotOwned:
+      markerListenerPayload.lifecycleRequestBoundary
+        .lifecycleContainerSnapshotOwned,
     markerGuard: requestRecord.markerGuard,
     listenerGuard: requestRecord.listenerGuard,
     beforeState,
@@ -4265,6 +4560,9 @@ function createPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord(
     bridge: preflightState.bridge,
     container,
     dispatchRecord,
+    lifecycleBoundaryPayload,
+    lifecycleRequestBoundary:
+      markerListenerPayload.lifecycleRequestBoundary,
     markerListenerPayload,
     markerListenerPreflight:
       preflightRecordPayload.markerListenerPreflight,
@@ -4304,6 +4602,14 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
       targetClaimingPayload.markerListenerPreflight,
       requestRecord,
       preflightState
+    );
+  const lifecycleBoundaryPayload =
+    assertHydrateRootLifecycleRequestBoundaryForPreflight(
+      targetClaimingPayload.lifecycleRequestBoundary,
+      preflightState,
+      requestRecord,
+      requestPayload,
+      'event-replay'
     );
   const container = requestPayload.container;
   const ownerDocument = getOwnerDocument(container);
@@ -4373,6 +4679,11 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     currentStateMatchesTargetClaimingPreflight: true,
     markerListenerPreflightRequired: true,
     markerListenerPreflightAccepted: true,
+    lifecycleRequestBoundaryRequired: true,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned: true,
+    lifecycleContainerSnapshotCurrent:
+      lifecycleBoundaryPayload.containerSnapshotCurrent,
     markerListenerStateUnchanged:
       targetClaimingPayload.markerListenerPreflight.preconditions
         .stateUnchanged,
@@ -4408,6 +4719,8 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     status: ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EVENT_REPLAY_PREFLIGHTED,
     markerListenerPreflightRequired: true,
     targetClaimingPreflightRequired: true,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned: true,
     markerListenerStateUnchanged: stateUnchanged,
     targetClaimingCanonical: true,
     replayExecutionCanonical: true,
@@ -4468,6 +4781,22 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     markerListenerStateUnchanged:
       targetClaimingPayload.markerListenerPreflight.preconditions
         .stateUnchanged,
+    lifecycleRequestBoundary:
+      targetClaimingPayload.lifecycleRequestBoundary,
+    lifecycleRequestBoundaryId:
+      targetClaimingPayload.lifecycleRequestBoundary
+        .lifecycleRequestBoundaryId,
+    lifecycleRequestBoundaryStatus:
+      targetClaimingPayload.lifecycleRequestBoundary.boundaryStatus,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned:
+      targetClaimingPayload.lifecycleRequestBoundary.sourceOwned,
+    lifecycleContainerSnapshot:
+      targetClaimingPayload.lifecycleRequestBoundary
+        .lifecycleContainerSnapshot,
+    lifecycleContainerSnapshotOwned:
+      targetClaimingPayload.lifecycleRequestBoundary
+        .lifecycleContainerSnapshotOwned,
     targetClaimingPreflight: targetClaimingPreflightRecord,
     targetClaimingPreflightStatus:
       targetClaimingPreflightRecord.preflightStatus,
@@ -4668,6 +4997,9 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     bridge: preflightState.bridge,
     container,
     eventReplayPreflightOptions: preflightOptions.rawOptions,
+    lifecycleBoundaryPayload,
+    lifecycleRequestBoundary:
+      targetClaimingPayload.lifecycleRequestBoundary,
     markerListenerPayload,
     markerListenerPreflight:
       targetClaimingPayload.markerListenerPreflight,
@@ -4701,6 +5033,14 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     );
   }
 
+  const lifecycleBoundaryPayload =
+    assertHydrateRootLifecycleRequestBoundaryForPreflight(
+      eventReplayPayload.lifecycleRequestBoundary,
+      preflightState,
+      requestRecord,
+      requestPayload,
+      'execution'
+    );
   const container = requestPayload.container;
   const ownerDocument = getOwnerDocument(container);
   const preflightOptions =
@@ -4749,6 +5089,11 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     currentStateMatchesEventReplayPreflight: true,
     markerListenerPreflightRequired: true,
     markerListenerPreflightAccepted: true,
+    lifecycleRequestBoundaryRequired: true,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned: true,
+    lifecycleContainerSnapshotCurrent:
+      lifecycleBoundaryPayload.containerSnapshotCurrent,
     markerListenerStateUnchanged:
       eventReplayPayload.markerListenerPreflight.preconditions
         .stateUnchanged,
@@ -4790,6 +5135,8 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     status:
       ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EXECUTION_PREFLIGHTED,
     eventReplayPreflightRequired: true,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned: true,
     eventReplayStateUnchanged: stateUnchanged,
     replayExecutionCanonical: true,
     rootCreationBlocked: true,
@@ -4871,6 +5218,20 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
       eventReplayPreflightRecord.preconditions.accepted,
     eventReplayStateUnchanged:
       eventReplayPreflightRecord.preconditions.stateUnchanged,
+    lifecycleRequestBoundary:
+      eventReplayPayload.lifecycleRequestBoundary,
+    lifecycleRequestBoundaryId:
+      eventReplayPayload.lifecycleRequestBoundary.lifecycleRequestBoundaryId,
+    lifecycleRequestBoundaryStatus:
+      eventReplayPayload.lifecycleRequestBoundary.boundaryStatus,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned:
+      eventReplayPayload.lifecycleRequestBoundary.sourceOwned,
+    lifecycleContainerSnapshot:
+      eventReplayPayload.lifecycleRequestBoundary.lifecycleContainerSnapshot,
+    lifecycleContainerSnapshotOwned:
+      eventReplayPayload.lifecycleRequestBoundary
+        .lifecycleContainerSnapshotOwned,
     markerGuard: requestRecord.markerGuard,
     listenerGuard: requestRecord.listenerGuard,
     beforeState,
@@ -5075,6 +5436,9 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     eventReplayPayload,
     eventReplayPreflight: eventReplayPreflightRecord,
     executionPreflightOptions: preflightOptions.rawOptions,
+    lifecycleBoundaryPayload,
+    lifecycleRequestBoundary:
+      eventReplayPayload.lifecycleRequestBoundary,
     markerListenerPreflight:
       eventReplayPayload.markerListenerPreflight,
     ownerDocument,
@@ -5114,6 +5478,14 @@ function createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
     normalizeHydrateRootTextNodeClaimPatchExecutionOptions(
       options,
       requestPayload.hydrationOptions
+    );
+  const lifecycleBoundaryPayload =
+    assertHydrateRootLifecycleRequestBoundaryForTextNodeClaimPatch(
+      executionPayload,
+      preflightState,
+      requestRecord,
+      requestPayload,
+      executionOptions
     );
   const beforeState =
     inspectPublicFacadeMarkerListenerPreflightState(container);
@@ -5193,6 +5565,12 @@ function createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
     executionPreflightRequired: true,
     executionPreflightAccepted: true,
     executionPreflightConsumed: true,
+    lifecycleRequestBoundaryRequired: true,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned: true,
+    lifecycleContainerSnapshotOwned: true,
+    lifecycleContainerSnapshotCurrent:
+      lifecycleBoundaryPayload.containerSnapshotCurrent,
     eventReplayPreflightRequired: true,
     eventReplayPreflightAccepted:
       executionPreflightRecord.preconditions.eventReplayPreflightAccepted,
@@ -5228,6 +5606,8 @@ function createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
       ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TEXT_NODE_CLAIM_PATCH_EXECUTED,
     executionPreflightRequired: true,
     executionPreflightAccepted: true,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned: true,
     markerListenerStateUnchanged: stateUnchanged,
     fakeDomOnly: true,
     fakeDomMutation: true,
@@ -5312,6 +5692,20 @@ function createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
       executionPreflightRecord.preflightStatus,
     executionPreflightAccepted:
       executionPreflightRecord.executionPreflightAccepted,
+    lifecycleRequestBoundary:
+      executionPayload.lifecycleRequestBoundary,
+    lifecycleRequestBoundaryId:
+      executionPayload.lifecycleRequestBoundary.lifecycleRequestBoundaryId,
+    lifecycleRequestBoundaryStatus:
+      executionPayload.lifecycleRequestBoundary.boundaryStatus,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned:
+      executionPayload.lifecycleRequestBoundary.sourceOwned,
+    lifecycleContainerSnapshot:
+      executionPayload.lifecycleRequestBoundary.lifecycleContainerSnapshot,
+    lifecycleContainerSnapshotOwned:
+      executionPayload.lifecycleRequestBoundary
+        .lifecycleContainerSnapshotOwned,
     markerGuard: requestRecord.markerGuard,
     listenerGuard: requestRecord.listenerGuard,
     beforeState,
@@ -5489,6 +5883,9 @@ function createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
       eventReplayPreflight: executionPayload.eventReplayPreflight,
       executionPreflight: executionPreflightRecord,
       executionPayload,
+      lifecycleBoundaryPayload,
+      lifecycleRequestBoundary:
+        executionPayload.lifecycleRequestBoundary,
       markerListenerPreflight:
         executionPayload.markerListenerPreflight,
       ownerDocument,
@@ -5529,6 +5926,10 @@ function assertPrivateHydrateRootPublicFacadePreflightRecordForPreflight(
     record.executionStatus !== ROOT_BRIDGE_EXECUTION_BLOCKED ||
     record.compatibilityStatus !== ROOT_BRIDGE_COMPATIBILITY_BLOCKED ||
     record.markerListenerPreflight !== payload.markerListenerPreflight ||
+    record.lifecycleRequestBoundary !== payload.lifecycleRequestBoundary ||
+    record.lifecycleRequestBoundaryAccepted !== true ||
+    record.lifecycleRequestBoundarySourceOwned !== true ||
+    record.lifecycleContainerSnapshotOwned !== true ||
     record.markerListenerPreconditionsAccepted !== true ||
     record.markerListenerStateUnchanged !== true ||
     record.publicHydrateRootEnabled !== false ||
@@ -5564,8 +5965,17 @@ function assertHydrateRootTargetClaimingMarkerListenerPreflight(
       ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED ||
     markerListenerPreflight.markerGuard !== requestRecord.markerGuard ||
     markerListenerPreflight.listenerGuard !== requestRecord.listenerGuard ||
+    markerListenerPreflight.lifecycleRequestBoundary !==
+      payload.lifecycleRequestBoundary ||
+    markerListenerPreflight.lifecycleRequestBoundaryAccepted !== true ||
+    markerListenerPreflight.lifecycleRequestBoundarySourceOwned !== true ||
+    markerListenerPreflight.lifecycleContainerSnapshotOwned !== true ||
     markerListenerPreflight.preconditions.accepted !== true ||
     markerListenerPreflight.preconditions.stateUnchanged !== true ||
+    markerListenerPreflight.preconditions.lifecycleRequestBoundaryAccepted !==
+      true ||
+    markerListenerPreflight.preconditions.lifecycleRequestBoundarySourceOwned !==
+      true ||
     markerListenerPreflight.preconditions.markerGuardMatchesContainerState !==
       true ||
     markerListenerPreflight.preconditions.listenerGuardMatchesContainerState !==
@@ -5586,6 +5996,198 @@ function assertHydrateRootTargetClaimingMarkerListenerPreflight(
   }
 
   return payload;
+}
+
+function recordHydrateRootLifecycleRequestBoundaryContainerCurrentness(
+  preflightState,
+  container,
+  lifecycleRequestBoundary
+) {
+  if (!isObjectOrFunction(container)) {
+    return;
+  }
+  preflightState.lifecycleRequestBoundaryRecordsByContainer.set(
+    container,
+    lifecycleRequestBoundary
+  );
+  rootHydratePublicFacadeLatestLifecycleRequestBoundaryByContainer.set(
+    container,
+    lifecycleRequestBoundary
+  );
+}
+
+function hydrateRootLifecycleRequestBoundaryMatchesCurrentContainerRequest(
+  lifecycleRequestBoundary,
+  preflightState,
+  requestRecord,
+  requestPayload
+) {
+  const container = requestPayload.container;
+  if (!isObjectOrFunction(container)) {
+    return true;
+  }
+  const currentPreflightBoundary =
+    preflightState.lifecycleRequestBoundaryRecordsByContainer.get(container);
+  const currentContainerBoundary =
+    rootHydratePublicFacadeLatestLifecycleRequestBoundaryByContainer.get(
+      container
+    );
+  return (
+    currentPreflightBoundary === lifecycleRequestBoundary &&
+    currentContainerBoundary === lifecycleRequestBoundary &&
+    lifecycleRequestBoundary.requestId === requestRecord.requestId &&
+    lifecycleRequestBoundary.requestSequence ===
+      requestRecord.requestSequence &&
+    lifecycleRequestBoundary.hydrateId === requestRecord.hydrateId
+  );
+}
+
+function assertHydrateRootLifecycleRequestBoundaryForPreflight(
+  lifecycleRequestBoundary,
+  preflightState,
+  requestRecord,
+  requestPayload,
+  phase
+) {
+  const payload =
+    rootHydratePublicFacadeLifecycleRequestBoundaryPayloads.get(
+      lifecycleRequestBoundary
+    );
+  const currentBoundary =
+    preflightState.lifecycleRequestBoundaryRecordsByRequest.get(
+      requestRecord
+    );
+  if (
+    payload === undefined ||
+    payload.preflight !== preflightState.preflight ||
+    payload.bridge !== preflightState.bridge ||
+    payload.requestRecord !== requestRecord ||
+    payload.requestPayload !== requestPayload ||
+    payload.container !== requestPayload.container ||
+    currentBoundary !== lifecycleRequestBoundary ||
+    !preflightState.lifecycleRequestBoundaryRecords.includes(
+      lifecycleRequestBoundary
+    ) ||
+    lifecycleRequestBoundary.$$typeof !==
+      privateHydrateRootPublicFacadeLifecycleRequestBoundaryRecordType ||
+    lifecycleRequestBoundary.kind !==
+      'FastReactDomPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord' ||
+    lifecycleRequestBoundary.boundaryStatus !==
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_LIFECYCLE_BOUNDARY_ACCEPTED ||
+    lifecycleRequestBoundary.sourceOwned !== true ||
+    lifecycleRequestBoundary.active !== true ||
+    lifecycleRequestBoundary.requestAdmission !== payload.requestAdmission ||
+    lifecycleRequestBoundary.requestAdmissionStatus !==
+      ROOT_BRIDGE_REQUEST_ADMITTED ||
+    lifecycleRequestBoundary.lifecyclePrerequisitesAccepted !== true ||
+    lifecycleRequestBoundary.lifecycleStatusBefore !== null ||
+    lifecycleRequestBoundary.lifecycleStatusAfter !==
+      ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION ||
+    lifecycleRequestBoundary.hydrationBoundaryRecord !==
+      requestRecord.hydrationBoundaryRecord ||
+    lifecycleRequestBoundary.acceptedPrivateMetadataDiagnostics !==
+      requestRecord.acceptedPrivateMetadataDiagnostics ||
+    lifecycleRequestBoundary.markerGuard !== requestRecord.markerGuard ||
+    lifecycleRequestBoundary.listenerGuard !== requestRecord.listenerGuard ||
+    lifecycleRequestBoundary.lifecycleContainerSnapshot !==
+      payload.lifecycleContainerSnapshot ||
+    lifecycleRequestBoundary.lifecycleContainerSnapshotOwned !== true ||
+    lifecycleRequestBoundary.publicHydrateRootEnabled !== false ||
+    lifecycleRequestBoundary.publicHydrateRootSupported !== false ||
+    lifecycleRequestBoundary.publicRootCreated !== false ||
+    lifecycleRequestBoundary.publicRootExecution !== false ||
+    lifecycleRequestBoundary.publicRootObjectExposed !== false ||
+    lifecycleRequestBoundary.nativeExecution !== false ||
+    lifecycleRequestBoundary.reconcilerExecution !== false ||
+    lifecycleRequestBoundary.domMutation !== false ||
+    lifecycleRequestBoundary.hydration !== false ||
+    lifecycleRequestBoundary.eventDispatch !== false ||
+    lifecycleRequestBoundary.compatibilityClaimed !== false ||
+    !isSourceOwnedPrivateRootBridgeAdmissionRecord(payload.requestAdmission)
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      `hydrateRoot ${phase} requires source-owned active lifecycle request-boundary evidence for the same hydrateRoot request.`
+    );
+  }
+  const containerRequestCurrent =
+    hydrateRootLifecycleRequestBoundaryMatchesCurrentContainerRequest(
+      lifecycleRequestBoundary,
+      preflightState,
+      requestRecord,
+      requestPayload
+    );
+  if (!containerRequestCurrent) {
+    throwInvalidRootPublicFacadePreflight(
+      `hydrateRoot ${phase} rejected stale same-container lifecycle request-boundary evidence.`
+    );
+  }
+
+  const snapshotPayload =
+    rootPublicFacadeLifecycleContainerSnapshotCaptures.get(
+      lifecycleRequestBoundary.lifecycleContainerSnapshot
+    );
+  const currentState = inspectPublicFacadeMarkerListenerPreflightState(
+    requestPayload.container
+  );
+  const containerSnapshotCurrent =
+    snapshotPayload !== undefined &&
+    snapshotPayload.container === requestPayload.container &&
+    getChildNodeCount(requestPayload.container) ===
+      lifecycleRequestBoundary.lifecycleContainerSnapshot.childCount &&
+    getContainerTextContent(requestPayload.container) ===
+      lifecycleRequestBoundary.lifecycleContainerSnapshot.textContent &&
+    markerListenerStateMatches(
+      lifecycleRequestBoundary.lifecycleContainerSnapshot
+        .markerListenerState,
+      currentState
+    );
+  if (!containerSnapshotCurrent) {
+    throwInvalidRootPublicFacadePreflight(
+      `hydrateRoot ${phase} rejected stale lifecycle container snapshot evidence.`
+    );
+  }
+
+  return freezeRecord({
+    ...payload,
+    containerSnapshotCurrent,
+    containerRequestCurrent,
+    currentState
+  });
+}
+
+function assertHydrateRootLifecycleRequestBoundaryForTextNodeClaimPatch(
+  executionPayload,
+  preflightState,
+  requestRecord,
+  requestPayload,
+  executionOptions
+) {
+  const lifecycleRequestBoundary = executionPayload.lifecycleRequestBoundary;
+  if (
+    executionOptions.hasLifecycleRequestBoundary &&
+    executionOptions.lifecycleRequestBoundary !== lifecycleRequestBoundary
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot text-node claim patch rejected stale, cloned, cross-root, or caller-built lifecycle request-boundary evidence.'
+    );
+  }
+  if (
+    executionOptions.hasLifecycleContainerSnapshot &&
+    executionOptions.lifecycleContainerSnapshot !==
+      lifecycleRequestBoundary.lifecycleContainerSnapshot
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot text-node claim patch rejected stale, cloned, cross-container, or caller-built lifecycle container snapshot evidence.'
+    );
+  }
+
+  return assertHydrateRootLifecycleRequestBoundaryForPreflight(
+    lifecycleRequestBoundary,
+    preflightState,
+    requestRecord,
+    requestPayload,
+    'text-node claim patch'
+  );
 }
 
 function assertPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecordForPreflight(
@@ -5609,6 +6211,10 @@ function assertPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecordForPre
     record.executionStatus !== ROOT_BRIDGE_EXECUTION_BLOCKED ||
     record.compatibilityStatus !== ROOT_BRIDGE_COMPATIBILITY_BLOCKED ||
     record.markerListenerPreflight !== payload.markerListenerPreflight ||
+    record.lifecycleRequestBoundary !== payload.lifecycleRequestBoundary ||
+    record.lifecycleRequestBoundaryAccepted !== true ||
+    record.lifecycleRequestBoundarySourceOwned !== true ||
+    record.lifecycleContainerSnapshotOwned !== true ||
     record.targetClaimingDiagnostic !== payload.targetClaimingDiagnostic ||
     record.targetDispatchLinkDiagnostic !==
       payload.targetDispatchLinkDiagnostic ||
@@ -5618,6 +6224,8 @@ function assertPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecordForPre
     record.preconditions.accepted !== true ||
     record.preconditions.stateUnchanged !== true ||
     record.preconditions.markerListenerPreflightAccepted !== true ||
+    record.preconditions.lifecycleRequestBoundaryAccepted !== true ||
+    record.preconditions.lifecycleRequestBoundarySourceOwned !== true ||
     record.preconditions.canonicalTargetClaimingEvidence !== true ||
     record.targetClaimExecuted !== false ||
     record.publicHydrationTargetClaimed !== false ||
@@ -5663,6 +6271,10 @@ function assertPrivateHydrateRootPublicFacadeEventReplayPreflightRecordForExecut
     record.executionStatus !== ROOT_BRIDGE_EXECUTION_BLOCKED ||
     record.compatibilityStatus !== ROOT_BRIDGE_COMPATIBILITY_BLOCKED ||
     record.markerListenerPreflight !== payload.markerListenerPreflight ||
+    record.lifecycleRequestBoundary !== payload.lifecycleRequestBoundary ||
+    record.lifecycleRequestBoundaryAccepted !== true ||
+    record.lifecycleRequestBoundarySourceOwned !== true ||
+    record.lifecycleContainerSnapshotOwned !== true ||
     record.targetClaimingPreflight !== payload.targetClaimingPreflight ||
     record.targetClaimingDiagnostic !==
       payload.targetClaimingPayload.targetClaimingDiagnostic ||
@@ -5673,6 +6285,8 @@ function assertPrivateHydrateRootPublicFacadeEventReplayPreflightRecordForExecut
     record.preconditions.accepted !== true ||
     record.preconditions.stateUnchanged !== true ||
     record.preconditions.targetClaimingPreflightAccepted !== true ||
+    record.preconditions.lifecycleRequestBoundaryAccepted !== true ||
+    record.preconditions.lifecycleRequestBoundarySourceOwned !== true ||
     record.preconditions.canonicalReplayExecutionMetadata !== true ||
     record.blockerEvidence.publicHydrateRootBlocked !== true ||
     record.blockerEvidence.eventReplayBlocked !== true ||
@@ -5726,6 +6340,10 @@ function assertPrivateHydrateRootPublicFacadeExecutionPreflightRecordForTextNode
     record.executionStatus !== ROOT_BRIDGE_EXECUTION_BLOCKED ||
     record.compatibilityStatus !== ROOT_BRIDGE_COMPATIBILITY_BLOCKED ||
     record.eventReplayPreflight !== payload.eventReplayPreflight ||
+    record.lifecycleRequestBoundary !== payload.lifecycleRequestBoundary ||
+    record.lifecycleRequestBoundaryAccepted !== true ||
+    record.lifecycleRequestBoundarySourceOwned !== true ||
+    record.lifecycleContainerSnapshotOwned !== true ||
     record.replayExecutionRecord !== payload.replayExecutionRecord ||
     record.replayExecutionPayloadAccepted !== true ||
     record.executionPreflightAccepted !== true ||
@@ -5734,6 +6352,8 @@ function assertPrivateHydrateRootPublicFacadeExecutionPreflightRecordForTextNode
     record.preconditions.accepted !== true ||
     record.preconditions.stateUnchanged !== true ||
     record.preconditions.eventReplayPreflightAccepted !== true ||
+    record.preconditions.lifecycleRequestBoundaryAccepted !== true ||
+    record.preconditions.lifecycleRequestBoundarySourceOwned !== true ||
     record.preconditions.canonicalReplayExecutionMetadata !== true ||
     record.blockerEvidence.publicHydrateRootBlocked !== true ||
     record.blockerEvidence.eventReplayBlocked !== true ||
@@ -5807,7 +6427,21 @@ function normalizeHydrateRootTextNodeClaimPatchExecutionOptions(
       normalizedOptions,
       'mismatchRow'
     ),
+    hasLifecycleContainerSnapshot:
+      Object.prototype.hasOwnProperty.call(
+        normalizedOptions,
+        'lifecycleContainerSnapshot'
+      ),
+    hasLifecycleRequestBoundary:
+      Object.prototype.hasOwnProperty.call(
+        normalizedOptions,
+        'lifecycleRequestBoundary'
+      ),
     hydrationOptions,
+    lifecycleContainerSnapshot:
+      normalizedOptions.lifecycleContainerSnapshot,
+    lifecycleRequestBoundary:
+      normalizedOptions.lifecycleRequestBoundary,
     mismatchRow: normalizedOptions.mismatchRow,
     rawOptions: options,
     source,
@@ -13099,6 +13733,21 @@ function isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord(value) {
   return rootPublicFacadeLifecycleContainerSnapshotPayloads.has(value);
 }
 
+function getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload(
+  record
+) {
+  return (
+    rootHydratePublicFacadeLifecycleRequestBoundaryPayloads.get(record) ||
+    null
+  );
+}
+
+function isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(
+  value
+) {
+  return rootHydratePublicFacadeLifecycleRequestBoundaryPayloads.has(value);
+}
+
 function getPrivateRootPublicFacadePreflightPayload(preflight) {
   const payload = rootPublicFacadePreflightPayloads.get(preflight);
   if (payload === undefined) {
@@ -13175,6 +13824,11 @@ function getPrivateHydrateRootPublicFacadePreflightPayload(preflight) {
     executionPreflightRecords: freezeArray(
       payload.executionPreflightRecords
     ),
+    lifecycleRequestBoundaryRecordCount:
+      payload.lifecycleRequestBoundaryRecords.length,
+    lifecycleRequestBoundaryRecords: freezeArray(
+      payload.lifecycleRequestBoundaryRecords
+    ),
     markerListenerPreflightRecordCount:
       payload.markerListenerPreflightRecords.length,
     markerListenerPreflightRecords: freezeArray(
@@ -13213,6 +13867,7 @@ function getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
 
   return freezeRecord({
     bridge: payload.bridge,
+    lifecycleRequestBoundary: payload.lifecycleRequestBoundary,
     markerListenerPreflight: payload.markerListenerPreflight,
     nativeHandoffRecord: payload.nativeHandoffRecord,
     preflight: payload.preflight,
@@ -22482,10 +23137,14 @@ function capturePrivateRootPublicFacadeLifecycleContainerSnapshot(container) {
     markerListenerState:
       inspectPublicFacadeMarkerListenerPreflightState(container),
     nodeSnapshot: createActiveHostOutputNodeSnapshot(container),
-    textContent:
-      container == null || container.textContent == null
-        ? ''
-        : String(container.textContent)
+    textContent: getContainerTextContent(container),
+    toJSON() {
+      return {
+        childCount: this.childCount,
+        markerListenerState: this.markerListenerState,
+        textContent: this.textContent
+      };
+    }
   });
   rootPublicFacadeLifecycleContainerSnapshotCaptures.set(
     snapshot,
@@ -22494,6 +23153,12 @@ function capturePrivateRootPublicFacadeLifecycleContainerSnapshot(container) {
     })
   );
   return snapshot;
+}
+
+function getContainerTextContent(container) {
+  return container == null || container.textContent == null
+    ? ''
+    : String(container.textContent);
 }
 
 function getChildNodeCountFromLifecycleSnapshot(snapshot) {
@@ -25496,6 +26161,7 @@ module.exports = {
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EVENT_REPLAY_PREFLIGHTED,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EXECUTION_PREFLIGHTED,
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_LIFECYCLE_BOUNDARY_ACCEPTED,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TARGET_CLAIMING_PREFLIGHTED,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TEXT_NODE_CLAIM_PATCH_EXECUTED,
@@ -25594,6 +26260,7 @@ module.exports = {
   getPrivateRootRenderHostOutputFinishedWorkPayload,
   getPrivateRootPublicFacadeHostOutputUpdatePayload,
   getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload,
+  getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload,
   getPrivateRootPublicFacadeNestedHostOutputUpdatePayload,
   getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload,
   getPrivateRootPublicFacadeAdapterPayload,
@@ -25650,6 +26317,7 @@ module.exports = {
   isPrivateRootRenderHostOutputFinishedWorkRecord,
   isPrivateRootPublicFacadeHostOutputUpdateRecord,
   isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord,
+  isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord,
   isPrivateRootPublicFacadeNestedHostOutputUpdateRecord,
   isPrivateRootPublicFacadeHostOutputUnmountCleanupRecord,
   isPrivateRootPublicFacadeAdapter,
@@ -25707,6 +26375,7 @@ module.exports = {
   privateRootPublicFacadeHostOutputUpdateRecordType,
   privateRootPublicFacadeRootCommitHostComponentUpdateExecutionRecordType,
   privateRootPublicFacadeLifecycleContainerSnapshotRecordType,
+  privateHydrateRootPublicFacadeLifecycleRequestBoundaryRecordType,
   privateRootPublicFacadeNestedHostOutputUpdateRecordType,
   privateRootPublicFacadeHostOutputUnmountCleanupRecordType,
   privateHydrateRootPublicFacadeMarkerListenerPreflightRecordType,
