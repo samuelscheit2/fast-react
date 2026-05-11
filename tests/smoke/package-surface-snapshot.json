@@ -1011,7 +1011,13 @@
               "functionName": "",
               "length": 0
             }
-          ]
+          ],
+          "privateRuntimeFacadeSymbols": {
+            "createRoot": [
+              "fast.react_dom.client.private_root_public_facade_adapter",
+              "fast.react_dom.client.private_root_public_facade_preflight"
+            ]
+          }
         },
         {
           "file": "profiling.react-server.js",

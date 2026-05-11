@@ -7,9 +7,36 @@ const {
   definePlaceholderMetadata,
   reactDomVersion
 } = require('./placeholder-utils.js');
+const {
+  createPrivateRootPublicFacadeAdapter,
+  createPrivateRootPublicFacadePreflight,
+  privateRootPublicFacadeAdapterSymbol,
+  privateRootPublicFacadePreflightSymbol
+} = require('./src/client/root-bridge.js');
 const {createPortal} = require('./src/shared/create-portal.js');
 
 const entrypoint = 'react-dom/profiling';
+const createRoot = createUnsupportedFunction(entrypoint, 'createRoot', 2);
+
+function definePrivateSymbolOnlyFacadeGate(target, symbol, value) {
+  Object.defineProperty(target, symbol, {
+    configurable: false,
+    enumerable: false,
+    value,
+    writable: false
+  });
+}
+
+definePrivateSymbolOnlyFacadeGate(
+  createRoot,
+  privateRootPublicFacadeAdapterSymbol,
+  createPrivateRootPublicFacadeAdapter
+);
+definePrivateSymbolOnlyFacadeGate(
+  createRoot,
+  privateRootPublicFacadePreflightSymbol,
+  createPrivateRootPublicFacadePreflight
+);
 
 exports.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE =
   createPrivateInternalsPlaceholder(
@@ -18,7 +45,7 @@ exports.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE =
     'react-dom-export-oracle-shape'
   );
 exports.createPortal = createPortal;
-exports.createRoot = createUnsupportedFunction(entrypoint, 'createRoot', 2);
+exports.createRoot = createRoot;
 exports.flushSync = createUnsupportedFunction(entrypoint, 'flushSync', 1);
 exports.hydrateRoot = createUnsupportedFunction(entrypoint, 'hydrateRoot', 3);
 exports.preconnect = createUnsupportedFunction(entrypoint, 'preconnect', 2);

@@ -123,6 +123,10 @@ test('public createRoot and hydrateRoot placeholders throw before root or DOM si
     reactDomClient.hydrateRoot[
       rootBridge.privateHydrateRootPublicFacadePreflightSymbol
     ]();
+  const profilingAdapter =
+    profiling.createRoot[rootBridge.privateRootPublicFacadeAdapterSymbol]();
+  const profilingPreflight =
+    profiling.createRoot[rootBridge.privateRootPublicFacadePreflightSymbol]();
 
   assertPrivateFacadePayloadCounts({
     adapter,
@@ -131,6 +135,12 @@ test('public createRoot and hydrateRoot placeholders throw before root or DOM si
     expectedRootCount: 0,
     expectedPreflightRecordCount: 0,
     expectedHydrateRecordCount: 0
+  });
+  assertPrivateRootPublicFacadePayloadCounts({
+    adapter: profilingAdapter,
+    expectedPreflightRecordCount: 0,
+    expectedRootCount: 0,
+    preflight: profilingPreflight
   });
 
   const createRootDocument = createDocument('public-create-root-placeholder');
@@ -189,6 +199,41 @@ test('public createRoot and hydrateRoot placeholders throw before root or DOM si
   assert.equal(recoverableErrorCalls, 0);
   assertContainerUntouched(hydrateRootContainer, hydrateRootDocument);
 
+  const profilingCreateRootDocument = createDocument(
+    'public-profiling-create-root-placeholder'
+  );
+  const profilingCreateRootContainer = createElement(
+    'DIV',
+    profilingCreateRootDocument
+  );
+  let profilingCreateRootResult;
+  let profilingCallbackCalls = 0;
+
+  assert.throws(
+    () => {
+      profilingCreateRootResult = profiling.createRoot(
+        profilingCreateRootContainer,
+        {
+          onRecoverableError() {
+            profilingCallbackCalls++;
+          }
+        }
+      );
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/profiling',
+      exportName: 'createRoot'
+    }
+  );
+  assert.equal(profilingCreateRootResult, undefined);
+  assert.equal(profilingCallbackCalls, 0);
+  assert.equal(typeof profilingCreateRootResult?.render, 'undefined');
+  assertContainerUntouched(
+    profilingCreateRootContainer,
+    profilingCreateRootDocument
+  );
+
   assertPrivateFacadePayloadCounts({
     adapter,
     preflight,
@@ -197,7 +242,14 @@ test('public createRoot and hydrateRoot placeholders throw before root or DOM si
     expectedPreflightRecordCount: 0,
     expectedHydrateRecordCount: 0
   });
+  assertPrivateRootPublicFacadePayloadCounts({
+    adapter: profilingAdapter,
+    expectedPreflightRecordCount: 0,
+    expectedRootCount: 0,
+    preflight: profilingPreflight
+  });
   assertNoCompatibilityClaims(reactDomClient);
+  assertNoCompatibilityClaims(profiling);
   assert.equal(Object.hasOwn(reactDomClient, 'unstable_batchedUpdates'), false);
 });
 
@@ -230,11 +282,20 @@ test('public placeholders do not invoke private lifecycle facade factories', () 
       exportName: 'hydrateRoot',
       label: 'hydrateRoot',
       status: 'throws'
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/profiling',
+      exportName: 'createRoot',
+      label: 'profiling.createRoot',
+      status: 'throws'
     }
   ]);
   assert.equal(result.createRootAdapterDescriptorUsesSpy, true);
   assert.equal(result.createRootPreflightDescriptorUsesSpy, true);
   assert.equal(result.hydrateRootPreflightDescriptorUsesSpy, true);
+  assert.equal(result.profilingCreateRootAdapterDescriptorUsesSpy, true);
+  assert.equal(result.profilingCreateRootPreflightDescriptorUsesSpy, true);
   assert.deepEqual(result.sideEffects, {
     createRootDocumentListenerCount: 0,
     createRootDocumentMutationCount: 0,
@@ -243,19 +304,73 @@ test('public placeholders do not invoke private lifecycle facade factories', () 
     hydrateRootDocumentListenerCount: 0,
     hydrateRootDocumentMutationCount: 0,
     hydrateRootListenerCount: 0,
-    hydrateRootMutationCount: 0
+    hydrateRootMutationCount: 0,
+    profilingCreateRootDocumentListenerCount: 0,
+    profilingCreateRootDocumentMutationCount: 0,
+    profilingCreateRootListenerCount: 0,
+    profilingCreateRootMutationCount: 0
   });
 });
 
-test('profiling and react-server entrypoints do not leak client facade symbols or claims', () => {
+test('profiling createRoot private facade symbols are descriptor-stable without hydrate parity or claims', () => {
+  assert.deepEqual(Object.keys(profiling), [
+    '__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE',
+    'createPortal',
+    'createRoot',
+    'flushSync',
+    'hydrateRoot',
+    'preconnect',
+    'prefetchDNS',
+    'preinit',
+    'preinitModule',
+    'preload',
+    'preloadModule',
+    'requestFormReset',
+    'unstable_batchedUpdates',
+    'useFormState',
+    'useFormStatus',
+    'version'
+  ]);
   assertNoPrivateFacadeSymbols(profiling);
-  assertNoPrivateFacadeSymbols(profiling.createRoot);
   assertNoPrivateFacadeSymbols(profiling.hydrateRoot);
   assert.deepEqual(Object.getOwnPropertySymbols(profiling), []);
-  assert.deepEqual(Object.getOwnPropertySymbols(profiling.createRoot), []);
+  assertNoEnumerableSymbols(profiling.createRoot);
+  assert.deepEqual(Object.getOwnPropertySymbols(profiling.createRoot), [
+    rootBridge.privateRootPublicFacadeAdapterSymbol,
+    rootBridge.privateRootPublicFacadePreflightSymbol
+  ]);
   assert.deepEqual(Object.getOwnPropertySymbols(profiling.hydrateRoot), []);
   assert.equal(profiling.createRoot.length, 2);
   assert.equal(profiling.hydrateRoot.length, 3);
+  assert.equal(profiling.version, '19.2.6');
+
+  assertStablePrivateFacadeDescriptor(
+    profiling.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol,
+    rootBridge.createPrivateRootPublicFacadeAdapter,
+    'fast.react_dom.client.private_root_public_facade_adapter'
+  );
+  assertStablePrivateFacadeDescriptor(
+    profiling.createRoot,
+    rootBridge.privateRootPublicFacadePreflightSymbol,
+    rootBridge.createPrivateRootPublicFacadePreflight,
+    'fast.react_dom.client.private_root_public_facade_preflight'
+  );
+
+  assert.equal(
+    Object.getOwnPropertyDescriptor(
+      profiling.hydrateRoot,
+      rootBridge.privateHydrateRootPublicFacadePreflightSymbol
+    ),
+    undefined
+  );
+  assert.equal(
+    Object.getOwnPropertyDescriptor(
+      profiling.createRoot,
+      rootBridge.privateHydrateRootPublicFacadePreflightSymbol
+    ),
+    undefined
+  );
   assertNoCompatibilityClaims(profiling);
 
   assert.throws(
@@ -328,17 +443,12 @@ function assertPrivateFacadePayloadCounts({
   expectedPreflightRecordCount,
   expectedHydrateRecordCount
 }) {
-  assert.equal(
-    rootBridge.getPrivateRootPublicFacadeAdapterPayload(adapter).rootCount,
-    expectedRootCount
-  );
-  const preflightPayload =
-    rootBridge.getPrivateRootPublicFacadePreflightPayload(preflight);
-  assert.equal(preflightPayload.rootCount, expectedRootCount);
-  assert.equal(
-    preflightPayload.preflightRecordCount,
-    expectedPreflightRecordCount
-  );
+  assertPrivateRootPublicFacadePayloadCounts({
+    adapter,
+    expectedPreflightRecordCount,
+    expectedRootCount,
+    preflight
+  });
   const hydratePreflightPayload =
     rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(
       hydratePreflight
@@ -354,6 +464,25 @@ function assertPrivateFacadePayloadCounts({
   assert.equal(
     hydratePreflightPayload.markerListenerPreflightRecordCount,
     expectedHydrateRecordCount
+  );
+}
+
+function assertPrivateRootPublicFacadePayloadCounts({
+  adapter,
+  preflight,
+  expectedRootCount,
+  expectedPreflightRecordCount
+}) {
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeAdapterPayload(adapter).rootCount,
+    expectedRootCount
+  );
+  const preflightPayload =
+    rootBridge.getPrivateRootPublicFacadePreflightPayload(preflight);
+  assert.equal(preflightPayload.rootCount, expectedRootCount);
+  assert.equal(
+    preflightPayload.preflightRecordCount,
+    expectedPreflightRecordCount
   );
 }
 
@@ -483,10 +612,16 @@ function createPrivateLifecycleFacadeFactorySpy(key) {
 }
 
 const client = require(path.join(packageRoot, 'client.js'));
+const profiling = require(path.join(packageRoot, 'profiling.js'));
 const createRootDocument = createDocument('spy-create-root');
 const createRootContainer = createElement('DIV', createRootDocument);
 const hydrateRootDocument = createDocument('spy-hydrate-root');
 const hydrateRootContainer = createElement('DIV', hydrateRootDocument);
+const profilingCreateRootDocument = createDocument('spy-profiling-create-root');
+const profilingCreateRootContainer = createElement(
+  'DIV',
+  profilingCreateRootDocument
+);
 const publicCalls = [];
 
 recordPublicCall('createRoot', () => client.createRoot(createRootContainer));
@@ -494,6 +629,13 @@ recordPublicCall('hydrateRoot', () =>
   client.hydrateRoot(hydrateRootContainer, 'hydrated text', {
     onRecoverableError() {
       factoryCalls.push('onRecoverableError');
+    }
+  })
+);
+recordPublicCall('profiling.createRoot', () =>
+  profiling.createRoot(profilingCreateRootContainer, {
+    onRecoverableError() {
+      factoryCalls.push('profilingOnRecoverableError');
     }
   })
 );
@@ -516,6 +658,16 @@ process.stdout.write(JSON.stringify({
       client.hydrateRoot,
       rootBridge.privateHydrateRootPublicFacadePreflightSymbol
     ).value === rootBridge.createPrivateHydrateRootPublicFacadePreflight,
+  profilingCreateRootAdapterDescriptorUsesSpy:
+    Object.getOwnPropertyDescriptor(
+      profiling.createRoot,
+      rootBridge.privateRootPublicFacadeAdapterSymbol
+    ).value === rootBridge.createPrivateRootPublicFacadeAdapter,
+  profilingCreateRootPreflightDescriptorUsesSpy:
+    Object.getOwnPropertyDescriptor(
+      profiling.createRoot,
+      rootBridge.privateRootPublicFacadePreflightSymbol
+    ).value === rootBridge.createPrivateRootPublicFacadePreflight,
   sideEffects: {
     createRootDocumentListenerCount: createRootDocument.__registrations.length,
     createRootDocumentMutationCount: createRootDocument.__mutationLog.length,
@@ -525,7 +677,15 @@ process.stdout.write(JSON.stringify({
       hydrateRootDocument.__registrations.length,
     hydrateRootDocumentMutationCount: hydrateRootDocument.__mutationLog.length,
     hydrateRootListenerCount: hydrateRootContainer.__registrations.length,
-    hydrateRootMutationCount: hydrateRootContainer.__mutationLog.length
+    hydrateRootMutationCount: hydrateRootContainer.__mutationLog.length,
+    profilingCreateRootDocumentListenerCount:
+      profilingCreateRootDocument.__registrations.length,
+    profilingCreateRootDocumentMutationCount:
+      profilingCreateRootDocument.__mutationLog.length,
+    profilingCreateRootListenerCount:
+      profilingCreateRootContainer.__registrations.length,
+    profilingCreateRootMutationCount:
+      profilingCreateRootContainer.__mutationLog.length
   }
 }));
 
