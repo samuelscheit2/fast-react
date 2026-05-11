@@ -3538,6 +3538,10 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_STATUS: &
 pub const TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_FIBER_INSPECTION_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.tojson.direct-multi-child-host-text.committed-fiber-inspection";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_FIBER_INSPECTION_STATUS: &str = "private-tojson-direct-multi-child-host-text-current-fiber-inspection-validated-public-native-package-blocked";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.tojson.direct-multi-child-host-text.row-identity";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_STATUS: &str =
+    "private-tojson-direct-multi-child-host-text-row-bound-to-current-fiber-commit";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-unmount-nested-source-report-gate";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS: &str =
@@ -9299,6 +9303,190 @@ impl TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate {
             && !self.cjs_facade_available()
             && !self.package_compatibility_claimed()
             && !self.compatibility_claimed()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateDirectMultiChildHostTextRowIdentity {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    renderer_id: TestRendererId,
+    root_scheduled_update_sequence: usize,
+    public_surface: &'static str,
+    host_output_row: TestRendererPrivateToJsonHostOutputRow,
+    render_current: TestRendererFiberHandleDiagnostics,
+    render_finished_work: TestRendererFiberHandleDiagnostics,
+    commit_previous_current: TestRendererFiberHandleDiagnostics,
+    commit_current: TestRendererFiberHandleDiagnostics,
+    store_current: TestRendererFiberHandleDiagnostics,
+    host_component_fiber: TestRendererFiberHandleDiagnostics,
+    stable_text_fiber: TestRendererFiberHandleDiagnostics,
+    placed_text_fiber: TestRendererFiberHandleDiagnostics,
+    render_lanes_bits: u32,
+    commit_finished_lanes_bits: u32,
+    commit_remaining_lanes_bits: u32,
+    commit_pending_lanes_bits: u32,
+    row_matches_shape: bool,
+    row_owner_matches_root: bool,
+    row_handles_match_output: bool,
+    row_lanes_match_commit: bool,
+    public_native_package_js_surfaces_blocked: bool,
+}
+
+impl TestRendererPrivateDirectMultiChildHostTextRowIdentity {
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[cfg(test)]
+    const fn renderer_id(self) -> TestRendererId {
+        self.renderer_id
+    }
+
+    #[must_use]
+    pub const fn root_scheduled_update_sequence(self) -> usize {
+        self.root_scheduled_update_sequence
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn host_output_row(self) -> TestRendererPrivateToJsonHostOutputRow {
+        self.host_output_row
+    }
+
+    #[must_use]
+    pub const fn source_row_id(self) -> &'static str {
+        self.host_output_row.id()
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_row.host_output_update_kind()
+    }
+
+    #[must_use]
+    pub const fn host_output_shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_row.host_output_shape()
+    }
+
+    #[must_use]
+    pub const fn render_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_current
+    }
+
+    #[must_use]
+    pub const fn render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_previous_current
+    }
+
+    #[must_use]
+    pub const fn commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_current
+    }
+
+    #[must_use]
+    pub const fn store_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.store_current
+    }
+
+    #[must_use]
+    pub const fn host_component_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.host_component_fiber
+    }
+
+    #[must_use]
+    pub const fn stable_text_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.stable_text_fiber
+    }
+
+    #[must_use]
+    pub const fn placed_text_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.placed_text_fiber
+    }
+
+    #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_finished_lanes_bits(self) -> u32 {
+        self.commit_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_remaining_lanes_bits(self) -> u32 {
+        self.commit_remaining_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_pending_lanes_bits(self) -> u32 {
+        self.commit_pending_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn row_matches_shape(self) -> bool {
+        self.row_matches_shape
+    }
+
+    #[must_use]
+    pub const fn row_owner_matches_root(self) -> bool {
+        self.row_owner_matches_root
+    }
+
+    #[must_use]
+    pub const fn row_handles_match_output(self) -> bool {
+        self.row_handles_match_output
+    }
+
+    #[must_use]
+    pub const fn row_lanes_match_commit(self) -> bool {
+        self.row_lanes_match_commit
+    }
+
+    #[must_use]
+    pub const fn public_native_package_js_surfaces_blocked(self) -> bool {
+        self.public_native_package_js_surfaces_blocked
+    }
+
+    #[must_use]
+    pub fn source_owned_current_row_identity_accepted(self) -> bool {
+        self.diagnostic_name()
+            == TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_DIAGNOSTIC_NAME
+            && self.status()
+                == TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_STATUS
+            && self.public_surface() == "create().update -> create().toJSON"
+            && self.source_row_id()
+                == TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
+            && self.host_output_update_kind() == TestRendererRootUpdateKind::Update
+            && self.host_output_shape()
+                == TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            && self.row_matches_shape()
+            && self.row_owner_matches_root()
+            && self.row_handles_match_output()
+            && self.row_lanes_match_commit()
+            && self.public_native_package_js_surfaces_blocked()
     }
 }
 
@@ -17423,13 +17611,105 @@ impl TestRendererRoot {
         Ok(gate)
     }
 
+    pub fn describe_private_direct_multi_child_host_text_row_identity_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+    ) -> Result<TestRendererPrivateDirectMultiChildHostTextRowIdentity, TestRendererRootError> {
+        self.validate_private_multi_child_host_text_output_for_canary(output)?;
+        let row =
+            self.describe_private_to_json_multi_child_host_text_output_row_for_canary(output)?;
+        let render = output.render();
+        let commit = output.commit();
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let current = output.updated_fibers();
+        let render_current = fiber_handle!(render.current());
+        let render_finished_work = fiber_handle!(render.finished_work());
+        let commit_previous_current = fiber_handle!(commit.previous_current());
+        let commit_current = fiber_handle!(commit.current());
+        let store_current = self.store.root(self.root_id)?.current();
+        let store_current = fiber_handle!(store_current);
+        let host_component_fiber = fiber_handle!(current.component());
+        let stable_text_fiber = fiber_handle!(current.text());
+        let placed_text_fiber = output.placed_text_fiber();
+        let row_matches_shape = row.id()
+            == TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
+            && row.host_output_update_kind() == TestRendererRootUpdateKind::Update
+            && row.host_output_shape()
+                == TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            && row.current_root_child_count() == 1
+            && row.current_host_component_count() == 1
+            && row.current_host_text_count() == 2
+            && row.current_root_text_count() == 0
+            && row.current_max_host_component_depth() == 1;
+        let row_owner_matches_root = render.root() == self.root_id
+            && commit.root() == self.root_id
+            && commit_current == store_current;
+        let row_handles_match_output = render_finished_work == commit_current
+            && commit_previous_current == render_current
+            && host_component_fiber == fiber_handle!(current.component())
+            && stable_text_fiber == fiber_handle!(current.text())
+            && placed_text_fiber == output.placed_text_fiber();
+        let row_lanes_match_commit = render.render_lanes().bits() != 0
+            && render.render_lanes() == commit.finished_lanes()
+            && commit.remaining_lanes().bits() == 0
+            && commit.pending_lanes().bits() == 0;
+        let public_native_package_js_surfaces_blocked = row.public_blockers().all_blocked()
+            && row.dependency_diagnostics().public_surfaces_blocked();
+
+        let row_identity = TestRendererPrivateDirectMultiChildHostTextRowIdentity {
+            diagnostic_name:
+                TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_STATUS,
+            root: self.root_id,
+            renderer_id: self.renderer.renderer_id,
+            root_scheduled_update_sequence: output.scheduled_update_sequence(),
+            public_surface: "create().update -> create().toJSON",
+            host_output_row: row,
+            render_current,
+            render_finished_work,
+            commit_previous_current,
+            commit_current,
+            store_current,
+            host_component_fiber,
+            stable_text_fiber,
+            placed_text_fiber,
+            render_lanes_bits: render.render_lanes().bits(),
+            commit_finished_lanes_bits: commit.finished_lanes().bits(),
+            commit_remaining_lanes_bits: commit.remaining_lanes().bits(),
+            commit_pending_lanes_bits: commit.pending_lanes().bits(),
+            row_matches_shape,
+            row_owner_matches_root,
+            row_handles_match_output,
+            row_lanes_match_commit,
+            public_native_package_js_surfaces_blocked,
+        };
+        self.validate_private_direct_multi_child_host_text_row_identity_for_canary(
+            output,
+            row_identity,
+            row,
+        )?;
+
+        Ok(row_identity)
+    }
+
     pub fn describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
         &self,
         output: &TestRendererHostParentPlacedHostOutput,
         route: Option<TestRendererPrivateUpdateRouteAdmissionRecord>,
         lifecycle: Option<&TestRendererPrivateRootLifecycleExecutionEvidence>,
         identity: Option<TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate>,
-        row: Option<TestRendererPrivateToJsonHostOutputRow>,
+        row_identity: Option<TestRendererPrivateDirectMultiChildHostTextRowIdentity>,
     ) -> Result<
         TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection,
         TestRendererRootError,
@@ -17455,7 +17735,7 @@ impl TestRendererRoot {
                 ),
             );
         };
-        let Some(row) = row else {
+        let Some(row_identity) = row_identity else {
             return Err(
                 Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
                     "direct-multi-child-host-text-row-identity-missing",
@@ -17519,32 +17799,11 @@ impl TestRendererRoot {
 
         let expected_row =
             self.describe_private_to_json_multi_child_host_text_output_row_for_canary(output)?;
-        if row != expected_row
-            || row.id() != TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
-            || row.host_output_update_kind() != TestRendererRootUpdateKind::Update
-            || row.host_output_shape()
-                != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
-            || row.current_root_child_count() != 1
-            || row.current_host_component_count() != 1
-            || row.current_host_text_count() != 2
-            || row.current_root_text_count() != 0
-            || row.current_max_host_component_depth() != 1
-        {
-            return Err(
-                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
-                    "direct-multi-child-host-text-row-identity-mismatch",
-                ),
-            );
-        }
-        if !row.public_blockers().all_blocked()
-            || !row.dependency_diagnostics().public_surfaces_blocked()
-        {
-            return Err(
-                Self::private_direct_multi_child_host_text_committed_fiber_inspection_public_error(
-                    "public-or-native-package-js-compatibility-claim",
-                ),
-            );
-        }
+        self.validate_private_direct_multi_child_host_text_row_identity_for_canary(
+            output,
+            row_identity,
+            expected_row,
+        )?;
 
         let root_node = self
             .store
@@ -17652,7 +17911,7 @@ impl TestRendererRoot {
             source_lifecycle_status: lifecycle.status(),
             source_identity_diagnostic_name: identity.diagnostic_name(),
             source_identity_status: identity.status(),
-            source_row_id: row.id(),
+            source_row_id: row_identity.source_row_id(),
             host_output_update_kind: TestRendererRootUpdateKind::Update,
             host_output_shape: TestRendererPrivateToJsonHostOutputShape::MultiChildHostText,
             current_fiber_shape: TEST_RENDERER_PRIVATE_TREE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE,
@@ -20185,6 +20444,134 @@ impl TestRendererRoot {
             reason,
         }
         .into()
+    }
+
+    fn validate_private_direct_multi_child_host_text_row_identity_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+        row_identity: TestRendererPrivateDirectMultiChildHostTextRowIdentity,
+        expected_row: TestRendererPrivateToJsonHostOutputRow,
+    ) -> Result<(), TestRendererRootError> {
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let render = output.render();
+        let commit = output.commit();
+        let current = output.updated_fibers();
+        let store_current = self.store.root(self.root_id)?.current();
+        let row = row_identity.host_output_row();
+
+        if row_identity.diagnostic_name()
+            != TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_DIAGNOSTIC_NAME
+            || row_identity.status()
+                != TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_STATUS
+            || row_identity.public_surface() != "create().update -> create().toJSON"
+        {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-row-identity-mismatch",
+                ),
+            );
+        }
+        if row_identity.root() != self.root_id
+            || row_identity.renderer_id != self.renderer.renderer_id
+            || render.root() != self.root_id
+            || commit.root() != self.root_id
+            || !row_identity.row_owner_matches_root()
+        {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_foreign_error(
+                    "direct-multi-child-host-text-row-identity-mismatch",
+                ),
+            );
+        }
+        if row_identity.root_scheduled_update_sequence() != self.scheduled_updates.len()
+            || row_identity.root_scheduled_update_sequence() != output.scheduled_update_sequence()
+        {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_stale_error(
+                    "direct-multi-child-host-text-row-identity-mismatch",
+                ),
+            );
+        }
+        if row != expected_row
+            || row.id() != TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
+            || row.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || row.host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            || row.current_root_child_count() != 1
+            || row.current_host_component_count() != 1
+            || row.current_host_text_count() != 2
+            || row.current_root_text_count() != 0
+            || row.current_max_host_component_depth() != 1
+            || !row_identity.row_matches_shape()
+        {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-row-identity-mismatch",
+                ),
+            );
+        }
+        if !row.public_blockers().all_blocked()
+            || !row.dependency_diagnostics().public_surfaces_blocked()
+            || !row_identity.public_native_package_js_surfaces_blocked()
+        {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_public_error(
+                    "public-or-native-package-js-compatibility-claim",
+                ),
+            );
+        }
+        if row_identity.render_current() != fiber_handle!(render.current())
+            || row_identity.render_finished_work() != fiber_handle!(render.finished_work())
+            || row_identity.commit_previous_current() != fiber_handle!(commit.previous_current())
+            || row_identity.commit_current() != fiber_handle!(commit.current())
+            || row_identity.store_current() != fiber_handle!(store_current)
+            || row_identity.host_component_fiber() != fiber_handle!(current.component())
+            || row_identity.stable_text_fiber() != fiber_handle!(current.text())
+            || row_identity.placed_text_fiber() != output.placed_text_fiber()
+            || row_identity.render_finished_work() != row_identity.commit_current()
+            || row_identity.commit_current() != row_identity.store_current()
+            || row_identity.commit_previous_current() != row_identity.render_current()
+            || !row_identity.row_handles_match_output()
+        {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-row-identity-mismatch",
+                ),
+            );
+        }
+        if row_identity.render_lanes_bits() == 0
+            || row_identity.render_lanes_bits() != render.render_lanes().bits()
+            || row_identity.commit_finished_lanes_bits() != commit.finished_lanes().bits()
+            || row_identity.render_lanes_bits() != row_identity.commit_finished_lanes_bits()
+            || row_identity.commit_remaining_lanes_bits() != 0
+            || row_identity.commit_pending_lanes_bits() != 0
+            || !row_identity.row_lanes_match_commit()
+        {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-row-identity-mismatch",
+                ),
+            );
+        }
+        if !row_identity.source_owned_current_row_identity_accepted() {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-row-identity-mismatch",
+                ),
+            );
+        }
+
+        Ok(())
     }
 
     fn validate_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
@@ -25518,7 +25905,7 @@ mod tests {
     #[test]
     fn root_private_direct_multi_child_host_text_committed_fiber_inspection_consumes_source_owned_current_topology()
      {
-        let (root, output, route, lifecycle, identity, row, inspection) =
+        let (root, output, route, lifecycle, identity, row, row_identity, inspection) =
             direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
 
         assert_eq!(
@@ -25552,6 +25939,59 @@ mod tests {
         );
         assert_eq!(inspection.source_identity_status(), identity.status());
         assert_eq!(inspection.source_row_id(), row.id());
+        assert_eq!(
+            row_identity.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            row_identity.status(),
+            TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_ROW_IDENTITY_STATUS
+        );
+        assert_eq!(row_identity.root(), root.root_id());
+        assert_eq!(row_identity.renderer_id(), root.renderer.renderer_id);
+        assert_eq!(
+            row_identity.root_scheduled_update_sequence(),
+            output.scheduled_update_sequence()
+        );
+        assert_eq!(
+            row_identity.public_surface(),
+            "create().update -> create().toJSON"
+        );
+        assert_eq!(row_identity.host_output_row(), row);
+        assert_eq!(row_identity.source_row_id(), row.id());
+        assert_eq!(row_identity.render_current(), route.render_current());
+        assert_eq!(
+            row_identity.render_finished_work(),
+            route.render_finished_work()
+        );
+        assert_eq!(
+            row_identity.commit_previous_current(),
+            route.commit_previous_current()
+        );
+        assert_eq!(row_identity.commit_current(), route.commit_current());
+        assert_eq!(row_identity.store_current(), row_identity.commit_current());
+        assert_eq!(
+            row_identity.host_component_fiber().slot(),
+            output.updated_fibers().component().slot().get()
+        );
+        assert_eq!(
+            row_identity.stable_text_fiber().slot(),
+            output.updated_fibers().text().slot().get()
+        );
+        assert_eq!(row_identity.placed_text_fiber(), output.placed_text_fiber());
+        assert_eq!(row_identity.render_lanes_bits(), route.render_lanes_bits());
+        assert_eq!(
+            row_identity.commit_finished_lanes_bits(),
+            route.commit_finished_lanes_bits()
+        );
+        assert_eq!(row_identity.commit_remaining_lanes_bits(), 0);
+        assert_eq!(row_identity.commit_pending_lanes_bits(), 0);
+        assert!(row_identity.row_matches_shape());
+        assert!(row_identity.row_owner_matches_root());
+        assert!(row_identity.row_handles_match_output());
+        assert!(row_identity.row_lanes_match_commit());
+        assert!(row_identity.public_native_package_js_surfaces_blocked());
+        assert!(row_identity.source_owned_current_row_identity_accepted());
         assert_eq!(
             inspection.host_output_update_kind(),
             TestRendererRootUpdateKind::Update
@@ -25653,7 +26093,7 @@ mod tests {
     #[test]
     fn root_private_direct_multi_child_host_text_committed_fiber_inspection_rejects_missing_stale_or_replayed_source_rows()
      {
-        let (root, output, route, lifecycle, identity, row, _inspection) =
+        let (root, output, route, lifecycle, identity, _row, row_identity, _inspection) =
             direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
 
         assert_direct_multi_child_host_text_inspection_error_reason(
@@ -25662,7 +26102,7 @@ mod tests {
                 None,
                 Some(&lifecycle),
                 Some(identity),
-                Some(row),
+                Some(row_identity),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-route-evidence-missing",
@@ -25676,21 +26116,29 @@ mod tests {
                 Some(stale_route),
                 Some(&lifecycle),
                 Some(identity),
-                Some(row),
+                Some(row_identity),
             )
             .unwrap_err(),
             "multi-child-host-text-route-update-sequence-stale",
         );
 
-        let (_other_root, _other_output, other_route, _other_lifecycle, _other_identity, _, _) =
-            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+        let (
+            _other_root,
+            _other_output,
+            other_route,
+            _other_lifecycle,
+            _other_identity,
+            _other_row,
+            _other_row_identity,
+            _other_inspection,
+        ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
         assert_direct_multi_child_host_text_inspection_error_reason(
             root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
                 &output,
                 Some(other_route),
                 Some(&lifecycle),
                 Some(identity),
-                Some(row),
+                Some(row_identity),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-cross-root-current-mismatch",
@@ -25702,7 +26150,7 @@ mod tests {
                 Some(route),
                 None,
                 Some(identity),
-                Some(row),
+                Some(row_identity),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-lifecycle-evidence-missing",
@@ -25716,7 +26164,7 @@ mod tests {
                 Some(route),
                 Some(&cloned_lifecycle),
                 Some(identity),
-                Some(row),
+                Some(row_identity),
             )
             .unwrap_err(),
             "multi-child-host-text-lifecycle-evidence-mismatch",
@@ -25728,17 +26176,64 @@ mod tests {
                 Some(route),
                 Some(&lifecycle),
                 None,
-                Some(row),
+                Some(row_identity),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-finished-work-identity-missing",
+        );
+
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                None,
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-row-identity-missing",
+        );
+    }
+
+    #[test]
+    fn root_private_direct_multi_child_host_text_committed_fiber_inspection_rejects_same_shape_foreign_row_identity()
+     {
+        let (root, output, route, lifecycle, identity, row, row_identity, _inspection) =
+            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+        let (
+            _other_root,
+            _other_output,
+            _other_route,
+            _other_lifecycle,
+            _other_identity,
+            other_row,
+            other_row_identity,
+            _other_inspection,
+        ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+
+        assert_eq!(row, other_row);
+        assert_ne!(row_identity.renderer_id(), other_row_identity.renderer_id());
+        assert_ne!(
+            row_identity.host_component_fiber(),
+            other_row_identity.host_component_fiber()
+        );
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(other_row_identity),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-row-identity-mismatch",
         );
     }
 
     #[test]
     fn root_private_direct_multi_child_host_text_committed_fiber_inspection_rejects_row_topology_lane_current_and_public_aliases()
      {
-        let (root, output, route, lifecycle, identity, row, _inspection) =
+        let (root, output, route, lifecycle, identity, _row, row_identity, _inspection) =
             direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
 
         let mut wrong_kind_route = route;
@@ -25749,21 +26244,24 @@ mod tests {
                 Some(wrong_kind_route),
                 Some(&lifecycle),
                 Some(identity),
-                Some(row),
+                Some(row_identity),
             )
             .unwrap_err(),
             "multi-child-host-text-route-metadata-stale",
         );
 
-        let mut wrong_kind_row = row;
-        wrong_kind_row.host_output_update_kind = TestRendererRootUpdateKind::Create;
+        let mut wrong_kind_row_identity = row_identity;
+        wrong_kind_row_identity
+            .host_output_row
+            .host_output_update_kind = TestRendererRootUpdateKind::Create;
+        wrong_kind_row_identity.row_matches_shape = false;
         assert_direct_multi_child_host_text_inspection_error_reason(
             root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
                 &output,
                 Some(route),
                 Some(&lifecycle),
                 Some(identity),
-                Some(wrong_kind_row),
+                Some(wrong_kind_row_identity),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-row-identity-mismatch",
@@ -25777,7 +26275,7 @@ mod tests {
                 Some(route),
                 Some(&lifecycle),
                 Some(lane_drift_identity),
-                Some(row),
+                Some(row_identity),
             )
             .unwrap_err(),
             "multi-child-host-text-finished-work-identity-lane-mismatch",
@@ -25785,27 +26283,37 @@ mod tests {
 
         let mut stale_topology_output = output.clone();
         stale_topology_output.placed_text_fiber.slot += 1;
+        let mut stale_topology_row_identity = row_identity;
+        stale_topology_row_identity.placed_text_fiber = stale_topology_output.placed_text_fiber();
         assert_direct_multi_child_host_text_inspection_error_reason(
             root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
                 &stale_topology_output,
                 Some(route),
                 Some(&lifecycle),
                 Some(identity),
-                Some(row),
+                Some(stale_topology_row_identity),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-current-child-topology-mismatch",
         );
 
-        let (_cross_root, cross_output, cross_route, cross_lifecycle, cross_identity, cross_row, _) =
-            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+        let (
+            _cross_root,
+            cross_output,
+            cross_route,
+            cross_lifecycle,
+            cross_identity,
+            _cross_row,
+            cross_row_identity,
+            _cross_inspection,
+        ) = direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
         assert_direct_multi_child_host_text_inspection_error_reason(
             root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
                 &cross_output,
                 Some(cross_route),
                 Some(&cross_lifecycle),
                 Some(cross_identity),
-                Some(cross_row),
+                Some(cross_row_identity),
             )
             .unwrap_err(),
             "direct-multi-child-host-text-cross-root-current-mismatch",
@@ -25819,7 +26327,7 @@ mod tests {
                 Some(route),
                 Some(&lifecycle),
                 Some(public_alias_identity),
-                Some(row),
+                Some(row_identity),
             )
             .unwrap_err(),
             "public-or-native-package-js-compatibility-claim",
@@ -26110,6 +26618,7 @@ mod tests {
         TestRendererPrivateRootLifecycleExecutionEvidence,
         TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate,
         TestRendererPrivateToJsonHostOutputRow,
+        TestRendererPrivateDirectMultiChildHostTextRowIdentity,
         TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection,
     ) {
         let (root, output, route, lifecycle, identity) =
@@ -26117,17 +26626,29 @@ mod tests {
         let row = root
             .describe_private_to_json_multi_child_host_text_output_row_for_canary(&output)
             .unwrap();
+        let row_identity = root
+            .describe_private_direct_multi_child_host_text_row_identity_for_canary(&output)
+            .unwrap();
         let inspection = root
             .describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
                 &output,
                 Some(route),
                 Some(&lifecycle),
                 Some(identity),
-                Some(row),
+                Some(row_identity),
             )
             .unwrap();
 
-        (root, output, route, lifecycle, identity, row, inspection)
+        (
+            root,
+            output,
+            route,
+            lifecycle,
+            identity,
+            row,
+            row_identity,
+            inspection,
+        )
     }
 
     fn assert_sibling_text_identity_error_reason(
