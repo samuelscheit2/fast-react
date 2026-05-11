@@ -2060,7 +2060,7 @@ pub(crate) enum TestHostRootDeletionCleanupStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TestHostRootDeletionCleanupApplyRecord {
+pub(crate) struct TestHostRootDeletionCleanupApplyRecord {
     cleanup: HostRootDeletionCleanupRecord,
     status: TestHostRootDeletionCleanupStatus,
     previous_metadata: Option<HostNodeMetadata>,
@@ -2068,23 +2068,23 @@ struct TestHostRootDeletionCleanupApplyRecord {
 
 impl TestHostRootDeletionCleanupApplyRecord {
     #[must_use]
-    const fn cleanup(self) -> HostRootDeletionCleanupRecord {
+    pub(crate) const fn cleanup(self) -> HostRootDeletionCleanupRecord {
         self.cleanup
     }
 
     #[must_use]
-    const fn status(self) -> TestHostRootDeletionCleanupStatus {
+    pub(crate) const fn status(self) -> TestHostRootDeletionCleanupStatus {
         self.status
     }
 
     #[must_use]
-    const fn previous_metadata(self) -> Option<HostNodeMetadata> {
+    pub(crate) const fn previous_metadata(self) -> Option<HostNodeMetadata> {
         self.previous_metadata
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct TestHostRootDeletionCleanupApplyResult {
+pub(crate) struct TestHostRootDeletionCleanupApplyResult {
     root: FiberRootId,
     finished_work: FiberId,
     records: Vec<TestHostRootDeletionCleanupApplyRecord>,
@@ -2092,22 +2092,22 @@ struct TestHostRootDeletionCleanupApplyResult {
 
 impl TestHostRootDeletionCleanupApplyResult {
     #[must_use]
-    const fn root(&self) -> FiberRootId {
+    pub(crate) const fn root(&self) -> FiberRootId {
         self.root
     }
 
     #[must_use]
-    const fn finished_work(&self) -> FiberId {
+    pub(crate) const fn finished_work(&self) -> FiberId {
         self.finished_work
     }
 
     #[must_use]
-    fn records(&self) -> &[TestHostRootDeletionCleanupApplyRecord] {
+    pub(crate) fn records(&self) -> &[TestHostRootDeletionCleanupApplyRecord] {
         &self.records
     }
 
     #[must_use]
-    fn applied_record_count(&self) -> usize {
+    pub(crate) fn applied_record_count(&self) -> usize {
         self.records
             .iter()
             .filter(|record| {
@@ -2120,13 +2120,26 @@ impl TestHostRootDeletionCleanupApplyResult {
     }
 
     #[must_use]
-    fn detached_instance_count(&self) -> usize {
+    pub(crate) fn detached_instance_count(&self) -> usize {
         self.records
             .iter()
             .filter(|record| {
                 record.status()
                     == TestHostRootDeletionCleanupStatus::Applied(
                         TestHostRootDeletionCleanupAction::DetachDeletedInstance,
+                    )
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn invalidated_text_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.status()
+                    == TestHostRootDeletionCleanupStatus::Applied(
+                        TestHostRootDeletionCleanupAction::InvalidateDeletedText,
                     )
             })
             .count()
@@ -3522,6 +3535,108 @@ fn apply_test_host_root_deletion_cleanup(
         finished_work: commit.finished_work(),
         records,
     })
+}
+
+pub(crate) fn preflight_test_host_root_deletion_apply_and_cleanup_for_canary(
+    store: &FiberRootStore<RecordingHost>,
+    commit: &HostRootCommitRecord,
+    host_work: &HostWorkResult,
+) -> Result<(), HostWorkError> {
+    let root = store.root(commit.root())?;
+    if root.current() != commit.current() {
+        return Err(HostWorkError::CommitCurrentMismatch {
+            root: commit.root(),
+            expected: commit.current(),
+            actual: root.current(),
+        });
+    }
+
+    let detached_hosts = host_work.detached_hosts();
+    for &mutation in commit.mutation_apply_log().records() {
+        if matches!(
+            mutation.kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromContainer
+                | HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent
+        ) {
+            owned_detached_host_child_for_apply_record(store, detached_hosts, mutation)?;
+        }
+    }
+
+    for &cleanup in commit.host_node_deletion_cleanup_log().records() {
+        preflight_test_host_root_deletion_cleanup_record(store, cleanup, detached_hosts)?;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn apply_test_host_root_deletion_cleanup_for_canary(
+    store: &FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    commit: &HostRootCommitRecord,
+    host_work: &mut HostWorkResult,
+) -> Result<TestHostRootDeletionCleanupApplyResult, HostWorkError> {
+    apply_test_host_root_deletion_cleanup(store, host, commit, host_work.detached_hosts_mut())
+}
+
+fn preflight_test_host_root_deletion_cleanup_record(
+    store: &FiberRootStore<RecordingHost>,
+    cleanup: HostRootDeletionCleanupRecord,
+    detached_hosts: &DetachedHostRecords,
+) -> Result<(), HostWorkError> {
+    if cleanup.state_node().is_none() {
+        return Ok(());
+    }
+
+    store.host_tokens().validate(
+        cleanup.token(),
+        cleanup.root(),
+        cleanup.fiber(),
+        cleanup.token_phase(),
+        cleanup.token_target(),
+    )?;
+
+    match cleanup.token_target() {
+        HostFiberTokenTarget::Instance => {
+            let metadata = detached_hosts.instance_metadata(cleanup.state_node())?;
+            validate_deletion_cleanup_metadata(cleanup, metadata)
+        }
+        HostFiberTokenTarget::TextInstance => {
+            let metadata = detached_hosts.text_metadata(cleanup.state_node())?;
+            validate_deletion_cleanup_metadata(cleanup, metadata)
+        }
+        HostFiberTokenTarget::HydratableInstance
+        | HostFiberTokenTarget::ActivityBoundary
+        | HostFiberTokenTarget::SuspenseBoundary => Ok(()),
+    }
+}
+
+fn validate_deletion_cleanup_metadata(
+    cleanup: HostRootDeletionCleanupRecord,
+    metadata: HostNodeMetadata,
+) -> Result<(), HostWorkError> {
+    let violation = if metadata.target() != cleanup.token_target() {
+        Some(HostNodeViolation::WrongTarget)
+    } else if metadata.root_id() != cleanup.root() {
+        Some(HostNodeViolation::WrongRoot)
+    } else if metadata.fiber_id() != cleanup.fiber() {
+        Some(HostNodeViolation::WrongFiber)
+    } else if !metadata.is_active() {
+        Some(HostNodeViolation::Stale)
+    } else {
+        None
+    };
+
+    if let Some(violation) = violation {
+        return Err(HostNodeValidationError::new(
+            cleanup.state_node(),
+            HostFiberTokenPhase::Deletion,
+            cleanup.token_target(),
+            violation,
+        )
+        .into());
+    }
+
+    Ok(())
 }
 
 fn apply_test_host_root_deletion_subtree_host_detachment_for_canary(
