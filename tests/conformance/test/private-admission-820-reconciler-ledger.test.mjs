@@ -17,7 +17,8 @@ import {
 
 const worker803 = "worker-803-reconciler-managed-child-sibling-order";
 const worker817 = "worker-817-root-work-loop-finished-lanes-negative-matrix";
-const expectedWorkers = [worker803, worker817];
+const worker887 = "worker-887-hydrateroot-lifecycle-boundary-admission";
+const expectedWorkers = [worker803, worker817, worker887];
 
 test("private admission 820 manifest pins accepted reconciler ledger workers", () => {
   assert.deepEqual(PRIVATE_ADMISSION_820_WORKERS, expectedWorkers);
@@ -25,7 +26,7 @@ test("private admission 820 manifest pins accepted reconciler ledger workers", (
     PRIVATE_ADMISSION_820_ROWS.map((row) => row.workerId),
     expectedWorkers
   );
-  assert.equal(PRIVATE_ADMISSION_820_ROWS.length, 2);
+  assert.equal(PRIVATE_ADMISSION_820_ROWS.length, 3);
 
   for (const row of PRIVATE_ADMISSION_820_ROWS) {
     assert.equal(Object.isFrozen(row), true, row.workerId);
@@ -114,6 +115,11 @@ test("private admission 820 recognizes static source-owned evidence without publ
     managedChild.privateAdmission,
     "accepted-private-managed-child-sibling-order-handoff"
   );
+  assertEvidenceIncludes(
+    managedChild,
+    "worker-803-complete-work-sibling-order-record",
+    "HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedManagedHostOrderSibling"
+  );
   assertIncludes(managedChild.acceptedStatusIdentifiers, [
     "HostRootPlacementSiblingStatus::InsertBefore",
     "TestHostRootMutationHostCall::InsertBefore",
@@ -132,6 +138,41 @@ test("private admission 820 recognizes static source-owned evidence without publ
     "SchedulerBridgeActContinuationExecutionStatus::RejectedContinuation"
   ]);
   assertEvidenceRolesRecognized(finishedLanes);
+
+  const hydrateRootLifecycle = gate.rowsByWorker[worker887];
+  assert.equal(
+    hydrateRootLifecycle.privateAdmission,
+    "accepted-private-hydrateroot-lifecycle-boundary-admission"
+  );
+  assertIncludes(hydrateRootLifecycle.requiredCapabilities, [
+    "hydrate-root-lifecycle-request-boundary",
+    "hydrate-root-lifecycle-request-boundary-required",
+    "hydrate-root-execution-preflight-required",
+    "public-hydrate-root-execution",
+    "native-execution",
+    "reconciler-execution",
+    "dom-mutation",
+    "events",
+    "compatibility-claims"
+  ]);
+  assertIncludes(hydrateRootLifecycle.acceptedStatusIdentifiers, [
+    "privateHydrateRootPublicFacadeLifecycleRequestBoundaryRecordType",
+    "FastReactDomPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord",
+    "ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_LIFECYCLE_BOUNDARY_ACCEPTED",
+    "accepted-private-hydrate-root-public-facade-lifecycle-request-boundary",
+    "ROOT_BRIDGE_REQUEST_ADMITTED"
+  ]);
+  assertEvidenceIncludes(
+    hydrateRootLifecycle,
+    "worker-887-root-bridge-lifecycle-currentness",
+    "hydrateRootLifecycleRequestBoundaryMatchesCurrentContainerRequest"
+  );
+  assertEvidenceIncludes(
+    hydrateRootLifecycle,
+    "worker-887-root-bridge-text-patch-boundary-admission",
+    "assertHydrateRootLifecycleRequestBoundaryForTextNodeClaimPatch"
+  );
+  assertEvidenceRolesRecognized(hydrateRootLifecycle);
 });
 
 test("private admission 820 rejects missing, extra, and duplicate workers", () => {
@@ -150,7 +191,7 @@ test("private admission 820 rejects missing, extra, and duplicate workers", () =
   assert.equal(gate.status, PRIVATE_ADMISSION_820_VIOLATION_STATUS);
   assert.equal(gate.privateDiagnosticsRecognized, false);
   assert.equal(gate.manifestRecognized, false);
-  assert.deepEqual(gate.manifest.missingWorkerIds, [worker817]);
+  assert.deepEqual(gate.manifest.missingWorkerIds, [worker817, worker887]);
   assert.deepEqual(gate.manifest.unexpectedWorkerIds, [
     "worker-999-unexpected-private-ledger-row"
   ]);
@@ -212,6 +253,19 @@ test("private admission 820 rejects missing evidence and unstable progress or sn
             forbiddenTokens: []
           }
         ]
+      },
+      [worker887]: {
+        evidence: [
+          {
+            role: "worker-887-test-title-prose",
+            path: "packages/react-dom/test/hydrate-root-text-claim-patch-bridge.test.js",
+            tokens: [
+              "private hydrateRoot post-preflight execution applies one fake text claim patch",
+              "createPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord("
+            ],
+            forbiddenTokens: []
+          }
+        ]
       }
     }
   });
@@ -239,6 +293,17 @@ test("private admission 820 rejects missing evidence and unstable progress or sn
       "source-snippet-token:host_component_managed_child_sibling_order_complete_work_record_for_canary()"
     ],
     progressMismatch.unstableEvidenceReasons
+  );
+  const testTitleMismatch = evidenceViolation.rows.find(
+    (row) => row.role === "worker-887-test-title-prose"
+  );
+  assertSubset(
+    [
+      "test-evidence-path",
+      "prose-or-formatted-token:private hydrateRoot post-preflight execution applies one fake text claim patch",
+      "source-snippet-token:createPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord("
+    ],
+    testTitleMismatch.unstableEvidenceReasons
   );
   const missingTokenMismatch = evidenceViolation.rows.find(
     (row) => row.role === "worker-817-root-scheduler-finished-lanes-negative"
@@ -387,6 +452,109 @@ test("private admission 820 rejects top-level public and runtime alias claims", 
   );
 });
 
+test("private admission 820 rejects hydrateRoot lifecycle public and runtime alias claims", () => {
+  const gate = evaluatePrivateAdmission820Gate({
+    rowOverrides: {
+      [worker887]: {
+        publicHydrateRootSupported: true,
+        publicRootObjectExposed: true,
+        nativeExecution: true,
+        reconcilerExecution: true,
+        browserDomMutated: true,
+        listenerInstallation: true,
+        eventReplayInstalled: true,
+        recoverableErrorsQueued: true,
+        onRecoverableErrorInvoked: true,
+        packageCompatibilityClaimed: true,
+        packageExportsChanged: true,
+        publicCompatibilityClaimed: true,
+        compatibilityClaimed: true,
+        runtimeExecutionClaimed: true,
+        rustExecutionClaimed: true,
+        publicBlockerClaims: {
+          publicHydrateRootSupported: true,
+          publicRootObjectExposed: true,
+          nativeExecution: true,
+          reconcilerExecution: true,
+          browserDomMutated: true,
+          listenerInstallation: true,
+          eventReplayInstalled: true,
+          recoverableErrorsQueued: true,
+          onRecoverableErrorInvoked: true,
+          packageCompatibilityClaimed: true,
+          packageExportsChanged: true,
+          publicCompatibilityClaimed: true,
+          compatibilityClaimed: true
+        }
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_820_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.blockedPublicClaimsRecognized, false);
+  assert.equal(gate.staticReadOnlyRecognized, false);
+  assert.equal(gate.compatibilityClaimed, true);
+  assert.deepEqual(gate.staticReadOnlyViolationIds, [worker887]);
+  assertViolationIds(gate, [
+    "private-admission-820-public-claim-detected",
+    "private-admission-820-runtime-execution-claim",
+    "private-admission-820-static-ledger-mode-mismatch",
+    "private-admission-820-public-compatibility-claim-detected"
+  ]);
+  assertSubset(
+    [
+      `${worker887}.publicHydrateRootSupported`,
+      `${worker887}.publicRootObjectExposed`,
+      `${worker887}.nativeExecution`,
+      `${worker887}.reconcilerExecution`,
+      `${worker887}.browserDomMutated`,
+      `${worker887}.listenerInstallation`,
+      `${worker887}.eventReplayInstalled`,
+      `${worker887}.recoverableErrorsQueued`,
+      `${worker887}.onRecoverableErrorInvoked`,
+      `${worker887}.packageCompatibilityClaimed`,
+      `${worker887}.packageExportsChanged`,
+      `${worker887}.publicCompatibilityClaimed`,
+      `${worker887}.compatibilityClaimed`
+    ],
+    gate.publicClaimViolationIds
+  );
+  assertSubset(
+    [
+      `${worker887}.runtimeExecutionClaimed`,
+      `${worker887}.rustExecutionClaimed`,
+      `${worker887}.nativeExecution`,
+      `${worker887}.reconcilerExecution`,
+      `${worker887}.browserDomMutated`,
+      `${worker887}.listenerInstallation`,
+      `${worker887}.eventReplayInstalled`,
+      `${worker887}.recoverableErrorsQueued`,
+      `${worker887}.onRecoverableErrorInvoked`,
+      `${worker887}.packageExportsChanged`
+    ],
+    gate.runtimeExecutionClaimViolationIds
+  );
+  assertSubset(
+    [
+      `${worker887}.publicHydrateRootSupported`,
+      `${worker887}.publicRootObjectExposed`,
+      `${worker887}.nativeExecution`,
+      `${worker887}.reconcilerExecution`,
+      `${worker887}.browserDomMutated`,
+      `${worker887}.listenerInstallation`,
+      `${worker887}.eventReplayInstalled`,
+      `${worker887}.recoverableErrorsQueued`,
+      `${worker887}.onRecoverableErrorInvoked`,
+      `${worker887}.packageCompatibilityClaimed`,
+      `${worker887}.packageExportsChanged`,
+      `${worker887}.publicCompatibilityClaimed`,
+      `${worker887}.compatibilityClaimed`
+    ],
+    gate.publicCompatibilityClaimIds
+  );
+});
+
 test("private admission 820 rejects root, act, Scheduler, package, native, runtime, and public compatibility claims", () => {
   const gate = evaluatePrivateAdmission820Gate({
     rowOverrides: {
@@ -530,4 +698,12 @@ function withMissingEvidenceToken(row, role, token) {
         }
       : evidenceRow
   );
+}
+
+function assertEvidenceIncludes(row, role, token) {
+  const evidenceRow = row.evidence.find(
+    (candidate) => candidate.role === role
+  );
+  assert.notEqual(evidenceRow, undefined, role);
+  assert.equal(evidenceRow.tokens.includes(token), true, token);
 }

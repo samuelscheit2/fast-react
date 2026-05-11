@@ -7,18 +7,20 @@ const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
 );
 
 export const PRIVATE_ADMISSION_820_GATE_ID =
-  "private-admission-820-reconciler-managed-child-finished-lanes-ledger-1";
+  "private-admission-820-reconciler-managed-child-finished-lanes-hydrateroot-lifecycle-ledger-2";
 export const PRIVATE_ADMISSION_820_GATE_STATUS =
-  "recognized-accepted-private-reconciler-sibling-order-and-finished-lanes-negatives-public-blocked";
+  "recognized-accepted-private-reconciler-and-hydrateroot-lifecycle-boundary-public-blocked";
 export const PRIVATE_ADMISSION_820_VIOLATION_STATUS =
   "blocked-accepted-private-reconciler-ledger-with-violations";
 
 const worker803 = "worker-803-reconciler-managed-child-sibling-order";
 const worker817 = "worker-817-root-work-loop-finished-lanes-negative-matrix";
+const worker887 = "worker-887-hydrateroot-lifecycle-boundary-admission";
 
 const completeWorkPath = "crates/fast-react-reconciler/src/complete_work.rs";
 const rootCommitPath = "crates/fast-react-reconciler/src/root_commit.rs";
 const hostWorkPath = "crates/fast-react-reconciler/src/host_work.rs";
+const reactDomRootBridgePath = "packages/react-dom/src/client/root-bridge.js";
 const rootWorkLoopPath = "crates/fast-react-reconciler/src/root_work_loop.rs";
 const rootSchedulerPath = "crates/fast-react-reconciler/src/root_scheduler.rs";
 const schedulerBridgePath =
@@ -27,7 +29,8 @@ const syncFlushPath = "crates/fast-react-reconciler/src/sync_flush.rs";
 
 export const PRIVATE_ADMISSION_820_WORKERS = freezeArray([
   worker803,
-  worker817
+  worker817,
+  worker887
 ]);
 
 export const PRIVATE_ADMISSION_820_REQUIRED_CAPABILITIES = freezeRecord({
@@ -49,6 +52,20 @@ export const PRIVATE_ADMISSION_820_REQUIRED_CAPABILITIES = freezeRecord({
     "scheduler-act-fabricated-continuation-rejected",
     "expired-lane-foreign-callback-rejected",
     "root-act-scheduler-public-claims-blocked"
+  ]),
+  [worker887]: freezeArray([
+    "hydrate-root-lifecycle-request-boundary",
+    "hydrate-root-lifecycle-request-boundary-required",
+    "hydrate-root-marker-listener-preflight-required",
+    "hydrate-root-event-replay-preflight-required",
+    "hydrate-root-execution-preflight-required",
+    "hydrate-root-text-node-claim-patch-execution-record",
+    "public-hydrate-root-execution",
+    "native-execution",
+    "reconciler-execution",
+    "dom-mutation",
+    "events",
+    "compatibility-claims"
   ])
 });
 
@@ -76,6 +93,15 @@ export const PRIVATE_ADMISSION_820_REQUIRED_STATUS_IDENTIFIERS = freezeRecord({
     "SchedulerBridgeActContinuationExecutionStatus::BlockedByLaneMismatch",
     "SchedulerActContinuationStatus::PendingContinuation",
     "SchedulerActContinuationStatus::NoContinuation"
+  ]),
+  [worker887]: freezeArray([
+    "privateHydrateRootPublicFacadeLifecycleRequestBoundaryRecordType",
+    "FastReactDomPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord",
+    "ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_LIFECYCLE_BOUNDARY_ACCEPTED",
+    "accepted-private-hydrate-root-public-facade-lifecycle-request-boundary",
+    "ROOT_BRIDGE_REQUEST_ADMITTED",
+    "ROOT_BRIDGE_EXECUTION_BLOCKED",
+    "ROOT_BRIDGE_COMPATIBILITY_BLOCKED"
   ])
 });
 
@@ -93,6 +119,12 @@ export const PRIVATE_ADMISSION_820_REQUIRED_EVIDENCE_ROLES = freezeRecord({
     "worker-817-root-scheduler-finished-lanes-negative",
     "worker-817-scheduler-act-source-record-negative",
     "worker-817-expired-lane-callback-negative"
+  ]),
+  [worker887]: freezeArray([
+    "worker-887-root-bridge-lifecycle-boundary-record",
+    "worker-887-root-bridge-lifecycle-currentness",
+    "worker-887-root-bridge-text-patch-boundary-admission",
+    "worker-887-root-bridge-hydrateroot-public-blockers"
   ])
 });
 
@@ -101,7 +133,49 @@ export const PRIVATE_ADMISSION_820_PUBLIC_BLOCKER_FIELDS = freezeArray([
   "publicRootCompatibilityClaimed",
   "rootFacadeCompatibilityClaimed",
   "rootCommitPublicCompatibilityClaimed",
+  "publicHydrateRootEnabled",
+  "publicHydrateRootSupported",
+  "publicHydrationCompatibilityClaimed",
+  "publicHydrationReplayCompatibilityClaimed",
+  "publicRootCreated",
+  "publicRootExecution",
+  "publicRootObjectExposed",
+  "publicRootCompatibilitySurface",
+  "canHydrate",
   "publicRendererHostMutationClaimed",
+  "containerMarked",
+  "domMutated",
+  "domMutation",
+  "browserDomMutated",
+  "markerWrites",
+  "listenerInstallation",
+  "listenersAttached",
+  "eventDispatch",
+  "eventReplayInstalled",
+  "eventReplaySupported",
+  "hydrationReplaySupported",
+  "eventsReplayed",
+  "replayQueueDrained",
+  "replayQueuesDrained",
+  "targetDispatchExecuted",
+  "eventReplayDispatchAttempted",
+  "pluginDispatchEventForPluginEventSystemCalled",
+  "nativeEventRedispatched",
+  "syntheticEventCreated",
+  "listenerInvocationCount",
+  "willInvokeListeners",
+  "recoverableErrorsQueued",
+  "willQueueRecoverableErrors",
+  "onRecoverableErrorInvoked",
+  "publicOnRecoverableErrorInvoked",
+  "rootErrorCallbackInvocationCount",
+  "rootErrorCallbacksInvoked",
+  "publicRootErrorCallbacksInvoked",
+  "rootErrorUpdatesScheduled",
+  "reportGlobalErrorInvoked",
+  "browserDomEventCompatibilityClaimed",
+  "nativeExecution",
+  "reconcilerExecution",
   "reactDomCompatibilityClaimed",
   "reactTestRendererCompatibilityClaimed",
   "broadReconcilerTraversalClaimed",
@@ -115,6 +189,7 @@ export const PRIVATE_ADMISSION_820_PUBLIC_BLOCKER_FIELDS = freezeArray([
   "packageSurfaceChanged",
   "packageCodeExecuted",
   "packageCompatibilityClaimed",
+  "packageExportsChanged",
   "publicPackageCompatibilityClaimed",
   "nativeBridgeExecuted",
   "nativeCompatibilityClaimed",
@@ -131,9 +206,53 @@ export const PRIVATE_ADMISSION_820_TOP_LEVEL_PUBLIC_CLAIM_FIELDS =
     "rootFacadeCompatibilityClaimed",
     "rootCommitPublicCompatibilityClaimed",
     "rootCommitCompatibilityClaimed",
+    "publicHydrateRootEnabled",
+    "publicHydrateRootSupported",
+    "publicHydrationCompatibilityClaimed",
+    "publicHydrationReplayCompatibilityClaimed",
+    "publicRootCreated",
+    "publicRootExecution",
+    "publicRootObjectExposed",
+    "publicRootCompatibilitySurface",
+    "canHydrate",
+    "hydrateInstanceCalled",
+    "hydrateTextInstanceCalled",
     "publicRendererHostMutationClaimed",
     "publicRendererHostMutationAvailable",
     "publicRendererCompatibilityClaimed",
+    "containerMarked",
+    "domMutated",
+    "domMutation",
+    "browserDomMutated",
+    "markerWrites",
+    "listenerInstallation",
+    "listenersAttached",
+    "eventDispatch",
+    "eventReplayInstalled",
+    "eventReplaySupported",
+    "hydrationReplaySupported",
+    "eventsReplayed",
+    "replayQueueDrained",
+    "replayQueuesDrained",
+    "targetDispatchExecuted",
+    "eventReplayDispatchAttempted",
+    "pluginDispatchEventForPluginEventSystemCalled",
+    "nativeEventRedispatched",
+    "syntheticEventCreated",
+    "listenerInvocationCount",
+    "willInvokeListeners",
+    "recoverableErrorsQueued",
+    "willQueueRecoverableErrors",
+    "onRecoverableErrorInvoked",
+    "publicOnRecoverableErrorInvoked",
+    "rootErrorCallbackInvocationCount",
+    "rootErrorCallbacksInvoked",
+    "publicRootErrorCallbacksInvoked",
+    "rootErrorUpdatesScheduled",
+    "reportGlobalErrorInvoked",
+    "browserDomEventCompatibilityClaimed",
+    "nativeExecution",
+    "reconcilerExecution",
     "reactDomCompatibilityClaimed",
     "reactDomManagedChildCompatibilityClaimed",
     "reactTestRendererCompatibilityClaimed",
@@ -171,6 +290,7 @@ export const PRIVATE_ADMISSION_820_TOP_LEVEL_PUBLIC_CLAIM_FIELDS =
     "executesRendererRoots",
     "packageCompatibilityClaimed",
     "packageSurfaceCompatibilityClaimed",
+    "packageExportsChanged",
     "publicPackageCompatibilityClaimed",
     "nativeBridgeCompatibilityClaimed",
     "nativeCompatibilityClaimed",
@@ -188,6 +308,36 @@ export const PRIVATE_ADMISSION_820_TOP_LEVEL_RUNTIME_CLAIM_FIELDS =
     "rootRuntimeExecuted",
     "rootRuntimeExecutionClaimed",
     "rootCommitRuntimeExecutionClaimed",
+    "publicRootExecution",
+    "domMutated",
+    "domMutation",
+    "browserDomMutated",
+    "markerWrites",
+    "listenerInstallation",
+    "listenersAttached",
+    "eventDispatch",
+    "eventReplayInstalled",
+    "eventsReplayed",
+    "replayQueueDrained",
+    "replayQueuesDrained",
+    "targetDispatchExecuted",
+    "eventReplayDispatchAttempted",
+    "pluginDispatchEventForPluginEventSystemCalled",
+    "nativeEventRedispatched",
+    "syntheticEventCreated",
+    "listenerInvocationCount",
+    "willInvokeListeners",
+    "recoverableErrorsQueued",
+    "willQueueRecoverableErrors",
+    "onRecoverableErrorInvoked",
+    "publicOnRecoverableErrorInvoked",
+    "rootErrorCallbackInvocationCount",
+    "rootErrorCallbacksInvoked",
+    "publicRootErrorCallbacksInvoked",
+    "rootErrorUpdatesScheduled",
+    "reportGlobalErrorInvoked",
+    "nativeExecution",
+    "reconcilerExecution",
     "actRuntimeExecuted",
     "actRuntimeExecutionClaimed",
     "schedulerRuntimeExecuted",
@@ -203,6 +353,7 @@ export const PRIVATE_ADMISSION_820_TOP_LEVEL_RUNTIME_CLAIM_FIELDS =
     "executesRendererRoots",
     "packageSurfaceChanged",
     "packageCodeExecuted",
+    "packageExportsChanged",
     "nativeBridgeExecuted"
   ]);
 
@@ -238,7 +389,7 @@ const privateAdmission820Rows = freezeArray([
           "order_sibling_flags",
           "order_evidence_name",
           "with_order_sibling_state_node_for_canary",
-          "HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedHostComponentOrderSibling",
+          "HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedManagedHostOrderSibling",
           "HostComponentManagedChildCompleteWorkErrorForCanary::OrderSiblingParentMismatch",
           "HostComponentManagedChildCompleteWorkErrorForCanary::MissingOrderSiblingStateNode",
           "HostComponentManagedChildCompleteWorkErrorForCanary::OrderSiblingStillBeingPlaced",
@@ -413,6 +564,122 @@ const privateAdmission820Rows = freezeArray([
           "rejected_stale_callback_node",
           "async_callback_execution_blocked",
           "public_update_scheduling_blocked"
+        ]
+      })
+    ])
+  }),
+  row({
+    workerId: worker887,
+    privateAdmission:
+      "accepted-private-hydrateroot-lifecycle-boundary-admission",
+    area:
+      "hydrateRoot lifecycle boundary and same-container currentness evidence",
+    rustImplementationPaths: freezeArray([reactDomRootBridgePath]),
+    requiredCapabilities:
+      PRIVATE_ADMISSION_820_REQUIRED_CAPABILITIES[worker887],
+    acceptedStatusIdentifiers:
+      PRIVATE_ADMISSION_820_REQUIRED_STATUS_IDENTIFIERS[worker887],
+    evidence: freezeArray([
+      evidenceData({
+        role: "worker-887-root-bridge-lifecycle-boundary-record",
+        path: reactDomRootBridgePath,
+        tokens: [
+          "privateHydrateRootPublicFacadeLifecycleRequestBoundaryRecordType",
+          "fast.react_dom.private_hydrate_root_public_facade_lifecycle_request_boundary_record",
+          "createPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord",
+          "FastReactDomPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord",
+          "hydrate-root-lifecycle-request-boundary",
+          "ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_LIFECYCLE_BOUNDARY_ACCEPTED",
+          "accepted-private-hydrate-root-public-facade-lifecycle-request-boundary",
+          "sourceTokenOwnership",
+          "weakmap-root-bridge-admission",
+          "sourceOwned",
+          "active",
+          "requestAdmissionStatus",
+          "lifecyclePrerequisitesAccepted",
+          "lifecycleContainerSnapshotOwned",
+          "requestId",
+          "requestSequence",
+          "requestType",
+          "hydrateId",
+          "rootId",
+          "rootKind",
+          "rootTag",
+          "hydrationBoundaryRecord",
+          "acceptedPrivateMetadataDiagnostics",
+          "markerGuard",
+          "listenerGuard"
+        ]
+      }),
+      evidenceData({
+        role: "worker-887-root-bridge-lifecycle-currentness",
+        path: reactDomRootBridgePath,
+        tokens: [
+          "recordHydrateRootLifecycleRequestBoundaryContainerCurrentness",
+          "hydrateRootLifecycleRequestBoundaryMatchesCurrentContainerRequest",
+          "lifecycleRequestBoundaryRecordsByContainer",
+          "lifecycleRequestBoundaryRecordsByRequest",
+          "rootHydratePublicFacadeLatestLifecycleRequestBoundaryByContainer",
+          "currentPreflightBoundary",
+          "currentContainerBoundary",
+          "containerRequestCurrent",
+          "containerSnapshotCurrent",
+          "container",
+          "requestPayload",
+          "requestRecord",
+          "requestId",
+          "requestSequence",
+          "hydrateId",
+          "markerListenerStateMatches",
+          "rootPublicFacadeLifecycleContainerSnapshotCaptures"
+        ]
+      }),
+      evidenceData({
+        role: "worker-887-root-bridge-text-patch-boundary-admission",
+        path: reactDomRootBridgePath,
+        tokens: [
+          "assertHydrateRootLifecycleRequestBoundaryForTextNodeClaimPatch",
+          "assertHydrateRootLifecycleRequestBoundaryForPreflight",
+          "normalizeHydrateRootTextNodeClaimPatchExecutionOptions",
+          "createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord",
+          "executionOptions",
+          "hasLifecycleRequestBoundary",
+          "hasLifecycleContainerSnapshot",
+          "lifecycleRequestBoundaryAccepted",
+          "lifecycleRequestBoundarySourceOwned",
+          "lifecycleContainerSnapshotCurrent",
+          "hydrate-root-lifecycle-request-boundary-required",
+          "hydrate-root-text-node-claim-patch-execution-record",
+          "hydrate-root-execution-preflight-required",
+          "textNodeClaimPatchExecutionRecordsByExecutionPreflight",
+          "currentStateMatchesExecutionPreflight",
+          "canonicalTextNodeClaimPatchExecution",
+          "textPatchApplied"
+        ]
+      }),
+      evidenceData({
+        role: "worker-887-root-bridge-hydrateroot-public-blockers",
+        path: reactDomRootBridgePath,
+        tokens: [
+          "ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES",
+          "ROOT_BRIDGE_HYDRATE_ROOT_TEXT_NODE_CLAIM_PATCH_BLOCKED_CAPABILITIES",
+          "public-hydrate-root-execution",
+          "public-root-object",
+          "native-execution",
+          "reconciler-execution",
+          "dom-mutation",
+          "listener-installation",
+          "events",
+          "compatibility-claims",
+          "publicHydrateRootSupported",
+          "publicRootObjectExposed",
+          "nativeExecution",
+          "reconcilerExecution",
+          "browserDomMutated",
+          "eventReplayInstalled",
+          "recoverableErrorsQueued",
+          "onRecoverableErrorInvoked",
+          "compatibilityClaimed"
         ]
       })
     ])
@@ -748,6 +1015,12 @@ function evidenceStabilityReasons(evidenceRow) {
   const reasons = [];
   if (evidenceRow.path.startsWith("worker-progress/")) {
     reasons.push("worker-progress-evidence-path");
+  }
+  if (
+    evidenceRow.path.startsWith("tests/") ||
+    evidenceRow.path.includes("/test/")
+  ) {
+    reasons.push("test-evidence-path");
   }
   for (const token of evidenceRow.tokens ?? []) {
     if (/\s/u.test(token)) {
