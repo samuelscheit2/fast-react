@@ -261,7 +261,11 @@ const transitionHookCompatibilityFalseFlags = freezeArray([
   'exposesPublicHookImplementation',
   'publicStartTransitionDispatcherRouting',
   'publicUseTransitionImplementation',
+  'hookExecutionCompatibility',
+  'publicActIntegration',
+  'publicSchedulerTimingCompatibility',
   'rendererIntegration',
+  'rendererCompatibility',
   'schedulerIntegration',
   'rootLaneIntegration',
   'schedulerExecution',
@@ -273,6 +277,38 @@ const transitionHookCompatibilityFalseFlags = freezeArray([
   'returnsPendingState',
   'readsThenables'
 ]);
+const transitionHookBlockerCurrentnessFieldNames = freezeArray([
+  'status',
+  'compatibilityTarget',
+  'startTransitionRootlessCurrent',
+  'publicUseTransitionBlocked',
+  'publicUseDeferredValueBlocked',
+  'schedulerPrerequisitesBlocked',
+  'rootLanePrerequisitesBlocked',
+  'rootSchedulingBlocked',
+  'laneIntegrationBlocked',
+  'hookExecutionCompatibilityBlocked',
+  'publicActBlocked',
+  'publicSchedulerTimingBlocked',
+  'rendererCompatibilityBlocked',
+  'compatibilityClaimed'
+]);
+const transitionHookBlockerCurrentness = freezeRecord({
+  status: 'blocked-until-scheduler-root-lanes-and-renderer-hooks-admitted',
+  compatibilityTarget: 'react@19.2.6',
+  startTransitionRootlessCurrent: true,
+  publicUseTransitionBlocked: true,
+  publicUseDeferredValueBlocked: true,
+  schedulerPrerequisitesBlocked: true,
+  rootLanePrerequisitesBlocked: true,
+  rootSchedulingBlocked: true,
+  laneIntegrationBlocked: true,
+  hookExecutionCompatibilityBlocked: true,
+  publicActBlocked: true,
+  publicSchedulerTimingBlocked: true,
+  rendererCompatibilityBlocked: true,
+  compatibilityClaimed: false
+});
 
 const effectHookMetadataByHookName = Object.freeze({
   useEffect: createEffectHookMetadata({
@@ -392,7 +428,11 @@ const privateTransitionHookDispatcherMetadata = freezeRecord({
   exposesPublicHookImplementation: false,
   publicStartTransitionDispatcherRouting: false,
   publicUseTransitionImplementation: false,
+  hookExecutionCompatibility: false,
+  publicActIntegration: false,
+  publicSchedulerTimingCompatibility: false,
   rendererIntegration: false,
+  rendererCompatibility: false,
   schedulerIntegration: false,
   rootLaneIntegration: false,
   schedulerExecution: false,
@@ -419,6 +459,8 @@ const privateTransitionHookDispatcherMetadata = freezeRecord({
   missingSchedulerPrerequisites: transitionHookMissingSchedulerPrerequisites,
   missingRootLanePrerequisites: transitionHookMissingRootLanePrerequisites,
   compatibilityFalseFlags: transitionHookCompatibilityFalseFlags,
+  blockerCurrentnessFieldNames: transitionHookBlockerCurrentnessFieldNames,
+  blockerCurrentness: transitionHookBlockerCurrentness,
   acceptedReconcilerRecords: transitionAcceptedReconcilerRecords
 });
 
@@ -433,6 +475,7 @@ const privateTransitionHookDispatcherMetadataArrayKeys = freezeArray([
   'missingSchedulerPrerequisites',
   'missingRootLanePrerequisites',
   'compatibilityFalseFlags',
+  'blockerCurrentnessFieldNames',
   'acceptedReconcilerRecords'
 ]);
 
@@ -1439,6 +1482,11 @@ function isPrivateTransitionHookDispatcherMetadata(metadata) {
       metadata.transitionPendingStateTupleShape,
       privateTransitionHookDispatcherMetadata.transitionPendingStateTupleShape,
       transitionPendingStateTupleFieldNames
+    ) &&
+    hasSameRecordFields(
+      metadata.blockerCurrentness,
+      privateTransitionHookDispatcherMetadata.blockerCurrentness,
+      transitionHookBlockerCurrentnessFieldNames
     )
   );
 }

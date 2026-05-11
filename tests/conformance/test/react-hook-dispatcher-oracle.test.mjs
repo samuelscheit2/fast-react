@@ -141,7 +141,11 @@ const expectedCompatibilityFalseFlags = [
   "exposesPublicHookImplementation",
   "publicStartTransitionDispatcherRouting",
   "publicUseTransitionImplementation",
+  "hookExecutionCompatibility",
+  "publicActIntegration",
+  "publicSchedulerTimingCompatibility",
   "rendererIntegration",
+  "rendererCompatibility",
   "schedulerIntegration",
   "rootLaneIntegration",
   "schedulerExecution",
@@ -153,6 +157,38 @@ const expectedCompatibilityFalseFlags = [
   "returnsPendingState",
   "readsThenables"
 ];
+const expectedBlockerCurrentnessFieldNames = [
+  "status",
+  "compatibilityTarget",
+  "startTransitionRootlessCurrent",
+  "publicUseTransitionBlocked",
+  "publicUseDeferredValueBlocked",
+  "schedulerPrerequisitesBlocked",
+  "rootLanePrerequisitesBlocked",
+  "rootSchedulingBlocked",
+  "laneIntegrationBlocked",
+  "hookExecutionCompatibilityBlocked",
+  "publicActBlocked",
+  "publicSchedulerTimingBlocked",
+  "rendererCompatibilityBlocked",
+  "compatibilityClaimed"
+];
+const expectedBlockerCurrentness = {
+  status: "blocked-until-scheduler-root-lanes-and-renderer-hooks-admitted",
+  compatibilityTarget: "react@19.2.6",
+  startTransitionRootlessCurrent: true,
+  publicUseTransitionBlocked: true,
+  publicUseDeferredValueBlocked: true,
+  schedulerPrerequisitesBlocked: true,
+  rootLanePrerequisitesBlocked: true,
+  rootSchedulingBlocked: true,
+  laneIntegrationBlocked: true,
+  hookExecutionCompatibilityBlocked: true,
+  publicActBlocked: true,
+  publicSchedulerTimingBlocked: true,
+  rendererCompatibilityBlocked: true,
+  compatibilityClaimed: false
+};
 const expectedAcceptedTransitionReconcilerRecords = [
   "RootUpdateLaneChoiceRecord",
   "RootUpdateLaneSourcePriority",
@@ -224,6 +260,11 @@ test("private transition-hook dispatcher blockers record public shape and lane p
     expectedCompatibilityFalseFlags
   );
   assert.deepEqual(
+    metadata.blockerCurrentnessFieldNames,
+    expectedBlockerCurrentnessFieldNames
+  );
+  assert.deepEqual(metadata.blockerCurrentness, expectedBlockerCurrentness);
+  assert.deepEqual(
     metadata.acceptedReconcilerRecords,
     expectedAcceptedTransitionReconcilerRecords
   );
@@ -255,6 +296,7 @@ test("private transition-hook dispatcher blockers record public shape and lane p
   assert.equal(Object.isFrozen(metadata.startTransitionPublicRoutingBlocker), true);
   assert.equal(Object.isFrozen(metadata.transitionLaneMetadata), true);
   assert.equal(Object.isFrozen(metadata.transitionPendingStateTupleShape), true);
+  assert.equal(Object.isFrozen(metadata.blockerCurrentness), true);
 
   assert.equal(React.privateTransitionHookDispatcherMetadata, undefined);
   assert.equal(React.markPrivateTransitionHookDispatcher, undefined);
@@ -331,6 +373,87 @@ test("private transition-hook dispatcher marker rejects blocker metadata drift",
     false
   );
   assert.deepEqual(calls, []);
+});
+
+test("private transition-hook dispatcher marker rejects forged blocker currentness metadata", () => {
+  const calls = [];
+  const dispatcher = {
+    useDeferredValue(value) {
+      calls.push(["useDeferredValue", value]);
+      return value;
+    },
+    useTransition() {
+      calls.push(["useTransition"]);
+      return [false, () => calls.push(["startTransition"])];
+    }
+  };
+  const metadata = hookDispatcher.privateTransitionHookDispatcherMetadata;
+  const forgedMetadata = {
+    ...metadata,
+    blockerCurrentness: {
+      ...metadata.blockerCurrentness,
+      schedulerPrerequisitesBlocked: false
+    }
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateTransitionHookDispatcherMetadata(forgedMetadata),
+    false
+  );
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.markPrivateTransitionHookDispatcher(
+        dispatcher,
+        forgedMetadata
+      ),
+    "useTransition"
+  );
+  assert.equal(
+    hookDispatcher.isPrivateTransitionHookDispatcher(dispatcher),
+    false
+  );
+  assert.deepEqual(calls, []);
+});
+
+test("private transition-hook metadata rejects compatibility flags flipped true", () => {
+  const metadata = hookDispatcher.privateTransitionHookDispatcherMetadata;
+  const dispatcher = {
+    useDeferredValue(value) {
+      return value;
+    },
+    useTransition() {
+      return [false, () => {}];
+    }
+  };
+
+  for (const flagName of expectedCompatibilityFalseFlags) {
+    const forgedMetadata = {
+      ...metadata,
+      [flagName]: true
+    };
+
+    assert.equal(
+      hookDispatcher.isPrivateTransitionHookDispatcherMetadata(forgedMetadata),
+      false,
+      flagName
+    );
+  }
+
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.markPrivateTransitionHookDispatcher(
+        dispatcher,
+        {
+          ...metadata,
+          schedulerIntegration: true
+        }
+      ),
+    "useTransition"
+  );
+  assert.equal(
+    hookDispatcher.isPrivateTransitionHookDispatcher(dispatcher),
+    false
+  );
 });
 
 test("private transition-hook dispatcher marker records diagnostics without executing hooks", () => {
