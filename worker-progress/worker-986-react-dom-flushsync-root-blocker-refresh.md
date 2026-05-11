@@ -18,6 +18,14 @@ Date: 2026-05-11
   `publicNativeCompatibilityClaimed`, `nativeExecution`,
   `rustExecutionClaimed`, `nativeBridgeAvailable`, and
   `nativeRuntimeExecutionClaimed`.
+- Follow-up repair: source-row claim scanning now also probes descriptor-hidden
+  string claim fields through guarded `in` checks and property access, so
+  proxy-wrapped entrypoints cannot expose native/Rust/native-bridge/runtime
+  claims while hiding them from `ownKeys` and `getOwnPropertyDescriptor`.
+- Blocker repair: descriptor-hidden native/Rust/native-bridge/runtime source-row
+  claim probes are presence-based when property access returns any non-undefined
+  value, including `false`, matching descriptor scanning for own
+  `nativeExecution: false`-style keys.
 - Public `flushSync` callback execution, return/thenable behavior, public
   Scheduler queue draining, root execution, DOM mutation, act/test-utils
   routing, profiling/package compatibility, and native/Rust behavior remain
@@ -46,6 +54,7 @@ Date: 2026-05-11
 - `npm run check:package-surface`
 - `node tests/smoke/import-entrypoints.mjs`
 - `git diff --check`
+- `git diff --cached --check`
 
 ## Evidence Gathered
 
@@ -63,6 +72,13 @@ Date: 2026-05-11
 - Audit repair coverage proves native/Rust claims are rejected as enumerable,
   non-enumerable, symbol, accessor, inherited, function-property, and
   proxy-hidden aliases before any public `flushSync` evidence is accepted.
+- Proxy-hidden source-row regressions swap the cached `react-dom` and
+  `react-dom/profiling` exports with proxies that keep the real `flushSync`
+  descriptor visible while exposing `nativeExecution`,
+  `publicNativeCompatibilityClaimed`, `rustExecutionClaimed`,
+  `nativeBridgeAvailable`, and `nativeRuntimeExecutionClaimed` only through
+  `has` or `get` traps, including `has` false / `get` false exposure for
+  native/Rust/native-bridge/runtime claim keys.
 - The accepted private blocker prerequisites remain limited to Workers 694,
   718, and 901; Worker 910 and later root/resource/form evidence cannot be
   smuggled into the public `flushSync` lane.

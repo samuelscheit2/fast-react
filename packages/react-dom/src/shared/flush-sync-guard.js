@@ -993,12 +993,21 @@ function describePublicFlushSyncSourceClaims(
     }
   }
 
+  const hiddenProxyPublicCompatibilityClaimKeys =
+    describeProxyHiddenPublicCompatibilityClaimKeys(
+      ReactDOM,
+      moduleDescriptors
+    );
+
   return freezeRecord({
     ownPublicCompatibilityClaimKeys: freezeArray(
       ownPublicCompatibilityClaimKeys
     ),
     hiddenPublicCompatibilityAliasKeys: freezeArray(
-      hiddenPublicCompatibilityAliasKeys
+      uniqueStringArray([
+        ...hiddenPublicCompatibilityAliasKeys,
+        ...hiddenProxyPublicCompatibilityClaimKeys
+      ])
     ),
     symbolPublicCompatibilityClaimKeys: freezeArray(
       symbolPublicCompatibilityClaimKeys
@@ -1014,6 +1023,60 @@ function describePublicFlushSyncSourceClaims(
     functionPublicCompatibilityClaimKeys:
       describeFunctionPublicCompatibilityClaimKeys(flushSyncValue)
   });
+}
+
+function describeProxyHiddenPublicCompatibilityClaimKeys(
+  target,
+  moduleDescriptors
+) {
+  const hiddenClaimKeys = [];
+  const claimFields = publicFlushSyncBlockedCurrentnessSourceIdentityClaimFields;
+
+  for (const field of claimFields) {
+    if (Object.prototype.hasOwnProperty.call(moduleDescriptors, field)) {
+      continue;
+    }
+
+    const exposure = describeProxyHiddenPublicCompatibilityClaimKey(
+      target,
+      field
+    );
+    if (exposure !== null) {
+      hiddenClaimKeys.push(exposure);
+    }
+  }
+
+  return uniqueStringArray(hiddenClaimKeys);
+}
+
+function describeProxyHiddenPublicCompatibilityClaimKey(target, field) {
+  try {
+    if (field in Object(target)) {
+      return field;
+    }
+  } catch {
+    return `${field}:unreadable-in`;
+  }
+
+  try {
+    const value = target[field];
+    if (value === undefined) {
+      return null;
+    }
+    if (
+      value === false &&
+      !isPresenceBasedPublicFlushSyncSourceClaimField(field)
+    ) {
+      return null;
+    }
+    return field;
+  } catch {
+    return `${field}:unreadable-get`;
+  }
+}
+
+function isPresenceBasedPublicFlushSyncSourceClaimField(field) {
+  return publicFlushSyncBlockedCurrentnessNativeRustClaimFields.includes(field);
 }
 
 function freezePublicFlushSyncBlockedCurrentnessSourceRows(rows) {

@@ -779,6 +779,106 @@ test('public React DOM flushSync source rows reject hidden entrypoint claims', (
   });
 });
 
+test('public React DOM flushSync source rows reject proxy-hidden entrypoint claims', () => {
+  const cases = [
+    {
+      entrypoint: 'react-dom',
+      modulePath: path.join(packageRoot, 'index.js'),
+      target: ReactDOM,
+      claimKey: 'nativeExecution',
+      exposure: 'has'
+    },
+    {
+      entrypoint: 'react-dom/profiling',
+      modulePath: path.join(packageRoot, 'profiling.js'),
+      target: ReactDOMProfiling,
+      claimKey: 'publicNativeCompatibilityClaimed',
+      exposure: 'get'
+    },
+    {
+      entrypoint: 'react-dom',
+      modulePath: path.join(packageRoot, 'index.js'),
+      target: ReactDOM,
+      claimKey: 'rustExecutionClaimed',
+      exposure: 'get'
+    },
+    {
+      entrypoint: 'react-dom/profiling',
+      modulePath: path.join(packageRoot, 'profiling.js'),
+      target: ReactDOMProfiling,
+      claimKey: 'nativeBridgeAvailable',
+      exposure: 'has'
+    },
+    {
+      entrypoint: 'react-dom',
+      modulePath: path.join(packageRoot, 'index.js'),
+      target: ReactDOM,
+      claimKey: 'nativeRuntimeExecutionClaimed',
+      exposure: 'get'
+    },
+    {
+      entrypoint: 'react-dom',
+      modulePath: path.join(packageRoot, 'index.js'),
+      target: ReactDOM,
+      claimKey: 'nativeExecution',
+      exposure: 'get',
+      getValue: false
+    },
+    {
+      entrypoint: 'react-dom/profiling',
+      modulePath: path.join(packageRoot, 'profiling.js'),
+      target: ReactDOMProfiling,
+      claimKey: 'publicNativeCompatibilityClaimed',
+      exposure: 'get',
+      getValue: false
+    },
+    {
+      entrypoint: 'react-dom',
+      modulePath: path.join(packageRoot, 'index.js'),
+      target: ReactDOM,
+      claimKey: 'rustExecutionClaimed',
+      exposure: 'get',
+      getValue: false
+    },
+    {
+      entrypoint: 'react-dom/profiling',
+      modulePath: path.join(packageRoot, 'profiling.js'),
+      target: ReactDOMProfiling,
+      claimKey: 'nativeBridgeAvailable',
+      exposure: 'get',
+      getValue: false
+    },
+    {
+      entrypoint: 'react-dom',
+      modulePath: path.join(packageRoot, 'index.js'),
+      target: ReactDOM,
+      claimKey: 'nativeRuntimeExecutionClaimed',
+      exposure: 'get',
+      getValue: false
+    }
+  ];
+
+  for (const testCase of cases) {
+    const proxy = createProxyHiddenClaimEntrypoint(testCase);
+    withTemporaryModuleExports(testCase.modulePath, proxy, () => {
+      const report =
+        guard.createPublicReactDomFlushSyncBlockedCurrentnessReport();
+      const row = report.sourceRows.find(
+        (sourceRow) => sourceRow.entrypoint === testCase.entrypoint
+      );
+
+      assert.ok(
+        row.hiddenPublicCompatibilityAliasKeys.includes(testCase.claimKey),
+        `${testCase.entrypoint}:${testCase.claimKey}`
+      );
+      assertFlushSyncCurrentnessRejected(
+        report,
+        'public-react-dom-flush-sync-currentness-source-rows'
+      );
+    });
+  }
+});
+
 function assertPublicFlushSyncPlaceholder(ReactDOM, entrypoint) {
   const descriptor = Object.getOwnPropertyDescriptor(ReactDOM, 'flushSync');
 
@@ -889,5 +989,49 @@ function withTemporaryPrototype(target, prototype, callback) {
     callback();
   } finally {
     Object.setPrototypeOf(target, previousPrototype);
+  }
+}
+
+function createProxyHiddenClaimEntrypoint({
+  target,
+  claimKey,
+  exposure,
+  getValue = true
+}) {
+  return new Proxy(target, {
+    ownKeys(proxyTarget) {
+      return Reflect.ownKeys(proxyTarget).filter((key) => key !== claimKey);
+    },
+    getOwnPropertyDescriptor(proxyTarget, key) {
+      if (key === claimKey) {
+        return undefined;
+      }
+      return Reflect.getOwnPropertyDescriptor(proxyTarget, key);
+    },
+    has(proxyTarget, key) {
+      if (key === claimKey) {
+        return exposure === 'has';
+      }
+      return Reflect.has(proxyTarget, key);
+    },
+    get(proxyTarget, key, receiver) {
+      if (key === claimKey) {
+        return getValue;
+      }
+      return Reflect.get(proxyTarget, key, receiver);
+    }
+  });
+}
+
+function withTemporaryModuleExports(modulePath, exportsValue, callback) {
+  const resolvedPath = require.resolve(modulePath);
+  const moduleRecord = require.cache[resolvedPath];
+  const previousExports = moduleRecord.exports;
+
+  moduleRecord.exports = exportsValue;
+  try {
+    callback();
+  } finally {
+    moduleRecord.exports = previousExports;
   }
 }
