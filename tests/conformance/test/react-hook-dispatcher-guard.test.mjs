@@ -1146,6 +1146,26 @@ test("private ref-hook dispatcher metadata records source-owned blockers", () =>
     "FunctionComponentUseRefHookRenderRecord",
     "FunctionComponentUseMemoUseRefRenderRecord"
   ]);
+  assert.deepEqual(
+    metadata.rendererLifecycleBlockerRowFieldNames,
+    hookDispatcher.useRefHookRendererLifecycleBlockerRowFieldNames
+  );
+  assert.deepEqual(
+    metadata.rendererLifecycleBlockerRows,
+    hookDispatcher.useRefHookRendererLifecycleBlockerRows
+  );
+  assert.deepEqual(
+    metadata.rendererLifecycleBlockerReportFieldNames,
+    hookDispatcher.useRefHookRendererLifecycleBlockerReportFieldNames
+  );
+  assert.equal(
+    metadata.rendererLifecycleBlockerStatus,
+    hookDispatcher.useRefHookRendererLifecycleBlockerStatus
+  );
+  assert.deepEqual(
+    metadata.rendererLifecycleCompatibilityFalseFlags,
+    hookDispatcher.useRefHookRendererLifecycleCompatibilityFalseFlags
+  );
 
   for (const flagName of metadata.compatibilityFalseFlags) {
     assert.equal(metadata[flagName], false, flagName);
@@ -1172,6 +1192,8 @@ test("private ref-hook dispatcher metadata records source-owned blockers", () =>
   assert.equal(React.markPrivateRefHookDispatcher, undefined);
   assert.equal(React.createUseRefHookCurrentnessReport, undefined);
   assert.equal(React.consumeUseRefHookCurrentnessReport, undefined);
+  assert.equal(React.createUseRefHookRendererLifecycleBlockerReport, undefined);
+  assert.equal(React.consumeUseRefHookRendererLifecycleBlockerReport, undefined);
   assert.equal(ReactServer.privateRefHookDispatcherMetadata, undefined);
   assert.equal(ReactServer.markPrivateRefHookDispatcher, undefined);
 });

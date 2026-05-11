@@ -35,6 +35,9 @@ const useRefHookSurfaceCurrentnessRowsByReport = new WeakMap();
 const useRefHookExecutionEvidenceReports = new WeakSet();
 const useRefHookExecutionRefObjects = new WeakSet();
 const useRefHookExecutionEvidenceOverrideKeysByReport = new WeakMap();
+const useRefHookRendererLifecycleBlockerReports = new WeakSet();
+const useRefHookRendererLifecycleBlockerRowsByReport = new WeakMap();
+const useRefHookRendererLifecycleBlockerOverrideKeysByReport = new WeakMap();
 const unsupportedPlaceholderHookCurrentnessReports = new WeakSet();
 const unsupportedPlaceholderHookSurfaceCurrentnessRowsByReport = new WeakMap();
 const unsupportedPlaceholderHookCurrentnessReportOverrideKeys = new WeakMap();
@@ -1375,6 +1378,188 @@ const useRefHookExecutionEvidenceStatus =
   'source-owned-private-useRef-mount-update-ref-identity-evidence';
 const useRefHookExecutionEvidenceConsumptionStatus =
   'accepted-source-owned-private-useRef-execution-evidence';
+const useRefHookCurrentnessReportKind =
+  'fast-react.private.use_ref_hook_currentness';
+const useRefHookCurrentnessReportVersion = 1;
+const useRefHookCurrentnessStatus =
+  'blocked-private-useRef-hook-currentness';
+const useRefHookCurrentnessConsumptionStatus =
+  'accepted-blocked-private-useRef-hook-currentness';
+const useRefHookRendererLifecycleBlockerSourceReportFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'reactSourceTag',
+  'reactSourceCommit',
+  'fastReactSource',
+  'privateCurrentnessStatus',
+  'privateExecutionEvidenceStatus',
+  'rendererRootLifecycleCompatibilityAdmitted',
+  'publicUseRefCompatibilityAdmitted',
+  'compatibilityClaimed'
+]);
+const useRefHookRendererLifecycleBlockerSourceReport = freezeRecord({
+  kind: 'fast-react.private.use_ref_hook_renderer_lifecycle_blocker_source_report',
+  version: 1,
+  status: 'source-current-for-react-19.2.6-useRef-renderer-lifecycle-blockers',
+  reactSourceTag: 'v19.2.6',
+  reactSourceCommit: 'eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401',
+  fastReactSource: 'packages/react/hook-dispatcher.js',
+  privateCurrentnessStatus: useRefHookCurrentnessConsumptionStatus,
+  privateExecutionEvidenceStatus: useRefHookExecutionEvidenceConsumptionStatus,
+  rendererRootLifecycleCompatibilityAdmitted: false,
+  publicUseRefCompatibilityAdmitted: false,
+  compatibilityClaimed: false
+});
+const useRefHookRendererLifecycleBlockerRowFieldNames = freezeArray([
+  'blockerId',
+  'acceptedPrivateEvidenceStatus',
+  'sourceOwnedPrivateEvidence',
+  'missingRendererRootPrerequisite',
+  'requiredPublicEvidence',
+  'currentBlocked',
+  'compatibilityClaimed'
+]);
+const useRefHookRendererLifecycleBlockerRows = freezeUseRefRendererLifecycleBlockerRows([
+  {
+    blockerId: 'private-currentness-is-not-public-useRef-compatibility',
+    acceptedPrivateEvidenceStatus: useRefHookCurrentnessConsumptionStatus,
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      'renderer-owned hook dispatcher lifecycle during root render',
+    requiredPublicEvidence:
+      'root renderWithHooks dispatcher installation and teardown evidence',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    blockerId: 'private-execution-is-not-renderer-ref-object-compatibility',
+    acceptedPrivateEvidenceStatus: useRefHookExecutionEvidenceConsumptionStatus,
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      'real mutable JavaScript ref object identity through a renderer root',
+    requiredPublicEvidence:
+      'renderer/root-backed mount and update ref object identity and mutability evidence',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    blockerId: 'dispatcher-lifecycle-not-root-backed',
+    acceptedPrivateEvidenceStatus: useRefHookExecutionEvidenceConsumptionStatus,
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      'mount/update dispatcher switching owned by a renderer root',
+    requiredPublicEvidence:
+      'dispatcher lifecycle evidence tied to the current render fiber and root',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    blockerId: 'root-rendering-and-hook-list-rebinding-not-admitted',
+    acceptedPrivateEvidenceStatus: useRefHookExecutionEvidenceConsumptionStatus,
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      'root rendering, commit handoff, and hook-list rebinding',
+    requiredPublicEvidence:
+      'HostRoot render/update/commit evidence with current hook-list rebinding',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    blockerId: 'scheduler-and-act-timing-not-admitted',
+    acceptedPrivateEvidenceStatus: useRefHookExecutionEvidenceConsumptionStatus,
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      'Scheduler timing and public act lifecycle integration',
+    requiredPublicEvidence:
+      'Scheduler callback timing and act-flush evidence under a public root',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    blockerId: 'adjacent-hooks-and-package-compatibility-not-admitted',
+    acceptedPrivateEvidenceStatus: useRefHookExecutionEvidenceConsumptionStatus,
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      'callback, external-store, id-generation, and package compatibility',
+    requiredPublicEvidence:
+      'cross-hook and published package compatibility evidence',
+    currentBlocked: true,
+    compatibilityClaimed: false
+  }
+]);
+const useRefHookRendererLifecycleCompatibilityFalseFlags = freezeArray([
+  ...useRefHookCompatibilityFalseFlags,
+  'realJsRefObjectRendererCompatibility',
+  'refObjectMutabilityCompatibility',
+  'dispatcherLifecycleCompatibility',
+  'rootRenderingCompatibility',
+  'schedulerTimingCompatibility',
+  'actCompatibility'
+]);
+const useRefHookRendererLifecycleBlockerReportFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'compatibilityTarget',
+  'hookNames',
+  'sourceReport',
+  'privateCurrentnessReport',
+  'privateExecutionEvidence',
+  'acceptedPrivateCurrentnessStatus',
+  'acceptedPrivateExecutionEvidenceStatus',
+  'blockerRowFieldNames',
+  'blockerRows',
+  'rootUseRefSourceFunctionCurrent',
+  'privateDispatcherMetadataIdentityCurrent',
+  'sourceOwnedPrivateDispatcherExecution',
+  'sourceOwnedPrivateRefObject',
+  'sourceOwnedPrivateRefObjectFrozen',
+  'callerSuppliedRefObjectAccepted',
+  'publicUseRefCompatibilityBlocked',
+  'rendererRefObjectIdentityBlocked',
+  'rendererRefObjectMutabilityBlocked',
+  'dispatcherLifecycleBlocked',
+  'rootRenderingBlocked',
+  'rootCommitHookListRebindingBlocked',
+  'rootSchedulerIntegrationBlocked',
+  'schedulerTimingBlocked',
+  'actIntegrationBlocked',
+  'callbackHookCompatibilityBlocked',
+  'externalStoreCompatibilityBlocked',
+  'idGenerationCompatibilityBlocked',
+  'packageCompatibilityBlocked',
+  ...useRefHookRendererLifecycleCompatibilityFalseFlags
+]);
+const useRefHookRendererLifecycleBlockerReportKind =
+  'fast-react.private.use_ref_hook_renderer_lifecycle_blockers';
+const useRefHookRendererLifecycleBlockerReportVersion = 1;
+const useRefHookRendererLifecycleBlockerStatus =
+  'accepted-private-useRef-evidence-public-renderer-lifecycle-blocked';
+const useRefHookRendererLifecycleBlockerConsumptionStatus =
+  'accepted-useRef-renderer-lifecycle-blockers';
+const useRefHookRendererLifecycleBlockerReportOptionNames = freezeArray([
+  'hookNames',
+  'sourceReport',
+  'privateCurrentnessReport',
+  'privateExecutionEvidence',
+  'blockerRows',
+  'blockerRowOverrides',
+  'publicUseRefCompatibilityBlocked',
+  'rendererRefObjectIdentityBlocked',
+  'rendererRefObjectMutabilityBlocked',
+  'dispatcherLifecycleBlocked',
+  'rootRenderingBlocked',
+  'rootCommitHookListRebindingBlocked',
+  'rootSchedulerIntegrationBlocked',
+  'schedulerTimingBlocked',
+  'actIntegrationBlocked',
+  'callbackHookCompatibilityBlocked',
+  'externalStoreCompatibilityBlocked',
+  'idGenerationCompatibilityBlocked',
+  'packageCompatibilityBlocked',
+  ...useRefHookRendererLifecycleCompatibilityFalseFlags
+]);
 const useRefHookCurrentnessReportOptionNames = freezeArray([
   'hookNames',
   'publicShapeBlockers',
@@ -1390,13 +1575,6 @@ const useRefHookCurrentnessReportOptionNames = freezeArray([
   'privateDispatcherRequired',
   ...useRefHookCompatibilityFalseFlags
 ]);
-const useRefHookCurrentnessReportKind =
-  'fast-react.private.use_ref_hook_currentness';
-const useRefHookCurrentnessReportVersion = 1;
-const useRefHookCurrentnessStatus =
-  'blocked-private-useRef-hook-currentness';
-const useRefHookCurrentnessConsumptionStatus =
-  'accepted-blocked-private-useRef-hook-currentness';
 const privateRefHookDispatcherMetadata = freezeRecord({
   capability: 'fast-react.private.ref_hook_dispatcher',
   compatibilityTarget: 'react@19.2.6',
@@ -1431,6 +1609,18 @@ const privateRefHookDispatcherMetadata = freezeRecord({
   executionCallRecordFieldNames: useRefHookExecutionCallRecordFieldNames,
   refIdentityRecordFieldNames: useRefHookRefIdentityRecordFieldNames,
   privateExecutionEvidenceStatus: useRefHookExecutionEvidenceStatus,
+  rendererLifecycleBlockerSourceReportFieldNames:
+    useRefHookRendererLifecycleBlockerSourceReportFieldNames,
+  rendererLifecycleBlockerSourceReport:
+    useRefHookRendererLifecycleBlockerSourceReport,
+  rendererLifecycleBlockerRowFieldNames:
+    useRefHookRendererLifecycleBlockerRowFieldNames,
+  rendererLifecycleBlockerRows: useRefHookRendererLifecycleBlockerRows,
+  rendererLifecycleBlockerReportFieldNames:
+    useRefHookRendererLifecycleBlockerReportFieldNames,
+  rendererLifecycleBlockerStatus: useRefHookRendererLifecycleBlockerStatus,
+  rendererLifecycleCompatibilityFalseFlags:
+    useRefHookRendererLifecycleCompatibilityFalseFlags,
   sourceOwnedPrivateExecutionEvidence: true,
   callerSuppliedRefObjectsAccepted: false,
   rowOverridesAccepted: false,
@@ -1471,6 +1661,10 @@ const privateRefHookDispatcherMetadataArrayKeys = freezeArray([
   'executionEvidenceFieldNames',
   'executionCallRecordFieldNames',
   'refIdentityRecordFieldNames',
+  'rendererLifecycleBlockerSourceReportFieldNames',
+  'rendererLifecycleBlockerRowFieldNames',
+  'rendererLifecycleBlockerReportFieldNames',
+  'rendererLifecycleCompatibilityFalseFlags',
   'blockerCurrentnessFieldNames',
   'surfaceCurrentnessFieldNames',
   'hookCallFields',
@@ -1841,6 +2035,41 @@ function createUseRefHookExecutionEvidenceGateError(reason) {
     'Only current package-owned useRef mount/update execution and ref identity evidence can pass this package-private gate.'
   );
   error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.publicHookCompatibility = false;
+  error.exposesPublicHookImplementation = false;
+  error.hookExecutionCompatibility = false;
+  error.refIdentityCompatibility = false;
+  error.refObjectCompatibility = false;
+  error.rendererCompatibility = false;
+  error.schedulerIntegration = false;
+  error.rootLaneIntegration = false;
+  error.rootScheduling = false;
+  error.rootExecution = false;
+  error.callbackExecutionClaimed = false;
+  error.externalStoreSubscriptionClaimed = false;
+  error.externalStoreSnapshotReadClaimed = false;
+  error.idGenerationClaimed = false;
+  error.packageCompatibility = false;
+  error.compatibilityClaimed = false;
+  return error;
+}
+
+function createUseRefHookRendererLifecycleBlockerGateError(reason) {
+  const error = createUnimplementedError(
+    'react',
+    'useRefHookRendererLifecycleBlockers',
+    'rejected useRef renderer lifecycle blocker report',
+    'Only current source-owned useRef renderer/root lifecycle blocker reports can pass this package-private gate.'
+  );
+  error.reason = reason;
+  error.publicUseRefCompatibilityBlocked = true;
+  error.rendererRefObjectIdentityBlocked = true;
+  error.rendererRefObjectMutabilityBlocked = true;
+  error.dispatcherLifecycleBlocked = true;
+  error.rootRenderingBlocked = true;
+  error.schedulerTimingBlocked = true;
+  error.actIntegrationBlocked = true;
   error.publicCompatibilityClaimed = false;
   error.publicHookCompatibility = false;
   error.exposesPublicHookImplementation = false;
@@ -3021,6 +3250,209 @@ function consumeUseRefHookExecutionEvidence(report) {
   });
 }
 
+function createUseRefHookRendererLifecycleBlockerReport(overrides = {}) {
+  const normalized = captureKnownOwnDataOptions(
+    overrides,
+    arguments.length > 0,
+    useRefHookRendererLifecycleBlockerReportOptionNames
+  );
+  const optionValues = normalized.values;
+  const hasOption = (key) =>
+    Object.prototype.hasOwnProperty.call(optionValues, key);
+  const privateExecutionEvidence = hasOption('privateExecutionEvidence')
+    ? optionValues.privateExecutionEvidence
+    : createUseRefHookExecutionEvidence();
+  const privateCurrentnessReport = hasOption('privateCurrentnessReport')
+    ? optionValues.privateCurrentnessReport
+    : isObjectLike(privateExecutionEvidence)
+      ? privateExecutionEvidence.currentnessReport
+      : null;
+  const hasBlockerRowsOverride = hasOption('blockerRows');
+  const hasBlockerRowOverrides = hasOption('blockerRowOverrides');
+  const blockerRows = hasBlockerRowsOverride
+    ? freezeUseRefRendererLifecycleBlockerRows(optionValues.blockerRows)
+    : hasBlockerRowOverrides
+      ? createUseRefRendererLifecycleBlockerRows(
+          optionValues.blockerRowOverrides
+        )
+      : useRefHookRendererLifecycleBlockerRows;
+  const privateCurrentnessAccepted =
+    validateUseRefHookCurrentnessReport(privateCurrentnessReport) === null;
+  const privateExecutionEvidenceAccepted =
+    validateUseRefHookExecutionEvidence(privateExecutionEvidence) === null;
+  const refIdentityRecord = isObjectLike(privateExecutionEvidence)
+    ? privateExecutionEvidence.refIdentityRecord
+    : null;
+  const mountCallRecord = isObjectLike(privateExecutionEvidence)
+    ? privateExecutionEvidence.mountCallRecord
+    : null;
+  const updateCallRecord = isObjectLike(privateExecutionEvidence)
+    ? privateExecutionEvidence.updateCallRecord
+    : null;
+  const sourceOwnedPrivateRefObject =
+    isObjectLike(privateExecutionEvidence) &&
+    privateExecutionEvidence.sourceOwnedRefObject === true &&
+    isObjectLike(refIdentityRecord) &&
+    refIdentityRecord.sourceOwnedRefObject === true;
+  const privateDispatcherMetadataIdentityCurrent =
+    isObjectLike(mountCallRecord) &&
+    mountCallRecord.metadataIdentityCurrent === true &&
+    isObjectLike(updateCallRecord) &&
+    updateCallRecord.metadataIdentityCurrent === true;
+  const sourceOwnedPrivateRefObjectFrozen =
+    isObjectLike(refIdentityRecord) &&
+    isObjectLike(refIdentityRecord.mountRefObject) &&
+    Object.isFrozen(refIdentityRecord.mountRefObject);
+  const report = freezeRecord({
+    kind: useRefHookRendererLifecycleBlockerReportKind,
+    version: useRefHookRendererLifecycleBlockerReportVersion,
+    status: useRefHookRendererLifecycleBlockerStatus,
+    compatibilityTarget: 'react@19.2.6',
+    hookNames: freezeArray(optionValues.hookNames ?? useRefHookNames),
+    sourceReport: freezeRecord({
+      ...useRefHookRendererLifecycleBlockerSourceReport,
+      ...(optionValues.sourceReport ?? {})
+    }),
+    privateCurrentnessReport,
+    privateExecutionEvidence,
+    acceptedPrivateCurrentnessStatus: privateCurrentnessAccepted
+      ? useRefHookCurrentnessConsumptionStatus
+      : null,
+    acceptedPrivateExecutionEvidenceStatus: privateExecutionEvidenceAccepted
+      ? useRefHookExecutionEvidenceConsumptionStatus
+      : null,
+    blockerRowFieldNames: freezeArray(
+      useRefHookRendererLifecycleBlockerRowFieldNames
+    ),
+    blockerRows,
+    rootUseRefSourceFunctionCurrent:
+      isObjectLike(privateExecutionEvidence) &&
+      privateExecutionEvidence.rootUseRefSourceFunctionCurrent === true,
+    privateDispatcherMetadataIdentityCurrent,
+    sourceOwnedPrivateDispatcherExecution:
+      isObjectLike(privateExecutionEvidence) &&
+      privateExecutionEvidence.sourceOwnedDispatcherExecution === true,
+    sourceOwnedPrivateRefObject,
+    sourceOwnedPrivateRefObjectFrozen,
+    callerSuppliedRefObjectAccepted:
+      isObjectLike(refIdentityRecord) &&
+      refIdentityRecord.callerSuppliedRefObjectAccepted === true,
+    publicUseRefCompatibilityBlocked:
+      optionValues.publicUseRefCompatibilityBlocked ?? true,
+    rendererRefObjectIdentityBlocked:
+      optionValues.rendererRefObjectIdentityBlocked ?? true,
+    rendererRefObjectMutabilityBlocked:
+      optionValues.rendererRefObjectMutabilityBlocked ?? true,
+    dispatcherLifecycleBlocked:
+      optionValues.dispatcherLifecycleBlocked ?? true,
+    rootRenderingBlocked: optionValues.rootRenderingBlocked ?? true,
+    rootCommitHookListRebindingBlocked:
+      optionValues.rootCommitHookListRebindingBlocked ?? true,
+    rootSchedulerIntegrationBlocked:
+      optionValues.rootSchedulerIntegrationBlocked ?? true,
+    schedulerTimingBlocked: optionValues.schedulerTimingBlocked ?? true,
+    actIntegrationBlocked: optionValues.actIntegrationBlocked ?? true,
+    callbackHookCompatibilityBlocked:
+      optionValues.callbackHookCompatibilityBlocked ?? true,
+    externalStoreCompatibilityBlocked:
+      optionValues.externalStoreCompatibilityBlocked ?? true,
+    idGenerationCompatibilityBlocked:
+      optionValues.idGenerationCompatibilityBlocked ?? true,
+    packageCompatibilityBlocked:
+      optionValues.packageCompatibilityBlocked ?? true,
+    compatibilityClaimed: optionValues.compatibilityClaimed ?? false,
+    publicCompatibilityClaimed:
+      optionValues.publicCompatibilityClaimed ?? false,
+    publicHookCompatibility: optionValues.publicHookCompatibility ?? false,
+    exposesPublicHookImplementation:
+      optionValues.exposesPublicHookImplementation ?? false,
+    hookExecutionCompatibility:
+      optionValues.hookExecutionCompatibility ?? false,
+    refIdentityCompatibility:
+      optionValues.refIdentityCompatibility ?? false,
+    refObjectCompatibility: optionValues.refObjectCompatibility ?? false,
+    rendererIntegration: optionValues.rendererIntegration ?? false,
+    rendererCompatibility: optionValues.rendererCompatibility ?? false,
+    publicActIntegration: optionValues.publicActIntegration ?? false,
+    schedulerIntegration: optionValues.schedulerIntegration ?? false,
+    schedulerPrerequisitesReady:
+      optionValues.schedulerPrerequisitesReady ?? false,
+    rootLaneIntegration: optionValues.rootLaneIntegration ?? false,
+    rootScheduling: optionValues.rootScheduling ?? false,
+    rootExecution: optionValues.rootExecution ?? false,
+    callbackExecutionClaimed:
+      optionValues.callbackExecutionClaimed ?? false,
+    externalStoreSubscriptionClaimed:
+      optionValues.externalStoreSubscriptionClaimed ?? false,
+    externalStoreSnapshotReadClaimed:
+      optionValues.externalStoreSnapshotReadClaimed ?? false,
+    idGenerationClaimed: optionValues.idGenerationClaimed ?? false,
+    packageCompatibility: optionValues.packageCompatibility ?? false,
+    realJsRefObjectRendererCompatibility:
+      optionValues.realJsRefObjectRendererCompatibility ?? false,
+    refObjectMutabilityCompatibility:
+      optionValues.refObjectMutabilityCompatibility ?? false,
+    dispatcherLifecycleCompatibility:
+      optionValues.dispatcherLifecycleCompatibility ?? false,
+    rootRenderingCompatibility:
+      optionValues.rootRenderingCompatibility ?? false,
+    schedulerTimingCompatibility:
+      optionValues.schedulerTimingCompatibility ?? false,
+    actCompatibility: optionValues.actCompatibility ?? false
+  });
+
+  useRefHookRendererLifecycleBlockerReports.add(report);
+  useRefHookRendererLifecycleBlockerOverrideKeysByReport.set(
+    report,
+    normalized.overrideKeys
+  );
+
+  if (!hasBlockerRowsOverride && !hasBlockerRowOverrides) {
+    useRefHookRendererLifecycleBlockerRowsByReport.set(report, blockerRows);
+  }
+
+  return report;
+}
+
+function consumeUseRefHookRendererLifecycleBlockerReport(report) {
+  const rejectionReason =
+    validateUseRefHookRendererLifecycleBlockerReport(report);
+
+  if (rejectionReason !== null) {
+    throw createUseRefHookRendererLifecycleBlockerGateError(rejectionReason);
+  }
+
+  return freezeRecord({
+    status: useRefHookRendererLifecycleBlockerConsumptionStatus,
+    accepted: true,
+    blockerStatus: report.status,
+    compatibilityTarget: 'react@19.2.6',
+    hookNames: report.hookNames,
+    acceptedPrivateCurrentnessStatus: useRefHookCurrentnessConsumptionStatus,
+    acceptedPrivateExecutionEvidenceStatus:
+      useRefHookExecutionEvidenceConsumptionStatus,
+    blockerRows: report.blockerRows,
+    sourceOwnedPrivateDispatcherExecution: true,
+    sourceOwnedPrivateRefObject: true,
+    sourceOwnedPrivateRefObjectFrozen: true,
+    publicUseRefCompatibilityBlocked: true,
+    rendererRefObjectIdentityBlocked: true,
+    rendererRefObjectMutabilityBlocked: true,
+    dispatcherLifecycleBlocked: true,
+    rootRenderingBlocked: true,
+    rootCommitHookListRebindingBlocked: true,
+    rootSchedulerIntegrationBlocked: true,
+    schedulerTimingBlocked: true,
+    actIntegrationBlocked: true,
+    callbackHookCompatibilityBlocked: true,
+    externalStoreCompatibilityBlocked: true,
+    idGenerationCompatibilityBlocked: true,
+    packageCompatibilityBlocked: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createUnsupportedPlaceholderHookSurfaceCurrentnessRows(
   rowOverridesBySurfaceId
 ) {
@@ -3569,6 +4001,15 @@ function isPrivateRefHookDispatcherMetadata(metadata) {
       useRefHookExecutionSourceReportFieldNames
     ) &&
     hasSameRecordFields(
+      metadata.rendererLifecycleBlockerSourceReport,
+      privateRefHookDispatcherMetadata.rendererLifecycleBlockerSourceReport,
+      useRefHookRendererLifecycleBlockerSourceReportFieldNames
+    ) &&
+    hasSameUseRefRendererLifecycleBlockerRows(
+      metadata.rendererLifecycleBlockerRows,
+      privateRefHookDispatcherMetadata.rendererLifecycleBlockerRows
+    ) &&
+    hasSameRecordFields(
       metadata.blockerCurrentness,
       privateRefHookDispatcherMetadata.blockerCurrentness,
       useRefHookBlockerCurrentnessFieldNames
@@ -3771,6 +4212,10 @@ function isUseRefHookExecutionEvidence(report) {
   return validateUseRefHookExecutionEvidence(report) === null;
 }
 
+function isUseRefHookRendererLifecycleBlockerReport(report) {
+  return validateUseRefHookRendererLifecycleBlockerReport(report) === null;
+}
+
 function validateUseRefHookCurrentnessReport(report) {
   if (!isObjectLike(report) || !Object.isFrozen(report)) {
     return 'useRef-hook-currentness-not-frozen';
@@ -3926,6 +4371,123 @@ function validateUseRefHookExecutionEvidence(report) {
 
   if (overrideKeys.length > 0) {
     return 'useRef-hook-execution-caller-overrides';
+  }
+
+  return null;
+}
+
+function validateUseRefHookRendererLifecycleBlockerReport(report) {
+  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+    return 'useRef-hook-renderer-lifecycle-not-frozen';
+  }
+
+  if (!useRefHookRendererLifecycleBlockerReports.has(report)) {
+    return 'useRef-hook-renderer-lifecycle-source-proof';
+  }
+
+  if (
+    report.kind !== useRefHookRendererLifecycleBlockerReportKind ||
+    report.version !== useRefHookRendererLifecycleBlockerReportVersion ||
+    report.status !== useRefHookRendererLifecycleBlockerStatus ||
+    report.compatibilityTarget !== 'react@19.2.6' ||
+    !hasSameStringArray(report.hookNames, useRefHookNames) ||
+    !hasSameStringArray(
+      report.blockerRowFieldNames,
+      useRefHookRendererLifecycleBlockerRowFieldNames
+    )
+  ) {
+    return 'useRef-hook-renderer-lifecycle-shape';
+  }
+
+  if (
+    !hasSameRecordFields(
+      report.sourceReport,
+      useRefHookRendererLifecycleBlockerSourceReport,
+      useRefHookRendererLifecycleBlockerSourceReportFieldNames
+    )
+  ) {
+    return 'useRef-hook-renderer-lifecycle-source-report';
+  }
+
+  const currentnessReason = validateUseRefHookCurrentnessReport(
+    report.privateCurrentnessReport
+  );
+  if (currentnessReason !== null) {
+    return 'useRef-hook-renderer-lifecycle-private-currentness-report';
+  }
+
+  const executionReason = validateUseRefHookExecutionEvidence(
+    report.privateExecutionEvidence
+  );
+  if (executionReason !== null) {
+    if (executionReason === 'useRef-hook-execution-caller-ref-object') {
+      return 'useRef-hook-renderer-lifecycle-caller-ref-object';
+    }
+
+    if (
+      executionReason === 'useRef-hook-execution-source-function' ||
+      executionReason === 'useRef-hook-execution-private-execution' ||
+      executionReason === 'useRef-hook-execution-ref-identity'
+    ) {
+      return 'useRef-hook-renderer-lifecycle-dispatcher-source-identity';
+    }
+
+    if (
+      executionReason ===
+      'useRef-hook-execution-root-renderer-prerequisite-smuggling'
+    ) {
+      return 'useRef-hook-renderer-lifecycle-prerequisite-smuggling';
+    }
+
+    return 'useRef-hook-renderer-lifecycle-private-execution-evidence';
+  }
+
+  if (
+    report.acceptedPrivateCurrentnessStatus !==
+      useRefHookCurrentnessConsumptionStatus ||
+    report.acceptedPrivateExecutionEvidenceStatus !==
+      useRefHookExecutionEvidenceConsumptionStatus
+  ) {
+    return 'useRef-hook-renderer-lifecycle-private-evidence-status';
+  }
+
+  if (
+    useRefHookRendererLifecycleBlockerRowsByReport.get(report) !==
+    report.blockerRows
+  ) {
+    return 'useRef-hook-renderer-lifecycle-blocker-rows-source-proof';
+  }
+
+  if (
+    !hasSameUseRefRendererLifecycleBlockerRows(
+      report.blockerRows,
+      useRefHookRendererLifecycleBlockerRows
+    )
+  ) {
+    return 'useRef-hook-renderer-lifecycle-blocker-rows';
+  }
+
+  if (!hasUseRefRendererLifecyclePrivateEvidenceIdentity(report)) {
+    return 'useRef-hook-renderer-lifecycle-dispatcher-source-identity';
+  }
+
+  if (report.callerSuppliedRefObjectAccepted !== false) {
+    return 'useRef-hook-renderer-lifecycle-caller-ref-object';
+  }
+
+  if (!hasBlockedUseRefRendererLifecyclePrerequisites(report)) {
+    return 'useRef-hook-renderer-lifecycle-prerequisite-smuggling';
+  }
+
+  if (!hasBlockedUseRefRendererLifecycleCompatibilityClaims(report)) {
+    return 'useRef-hook-renderer-lifecycle-public-compatibility-claim';
+  }
+
+  const overrideKeys =
+    useRefHookRendererLifecycleBlockerOverrideKeysByReport.get(report) ||
+    freezeArray([]);
+  if (overrideKeys.length > 0) {
+    return 'useRef-hook-renderer-lifecycle-caller-overrides';
   }
 
   return null;
@@ -4172,6 +4734,50 @@ function hasSameUseRefSurfaceCurrentnessRow(actual, expected) {
   return true;
 }
 
+function hasSameUseRefRendererLifecycleBlockerRows(actual, expected) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) {
+    return false;
+  }
+
+  for (let index = 0; index < expected.length; index += 1) {
+    if (
+      !hasSameUseRefRendererLifecycleBlockerRow(actual[index], expected[index])
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasSameUseRefRendererLifecycleBlockerRow(actual, expected) {
+  if (!isObjectLike(actual) || !Object.isFrozen(actual)) {
+    return false;
+  }
+
+  for (const fieldName of useRefHookRendererLifecycleBlockerRowFieldNames) {
+    if (actual[fieldName] !== expected[fieldName]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasUseRefRendererLifecyclePrivateEvidenceIdentity(report) {
+  return (
+    report.rootUseRefSourceFunctionCurrent === true &&
+    report.privateDispatcherMetadataIdentityCurrent === true &&
+    report.sourceOwnedPrivateDispatcherExecution === true &&
+    report.sourceOwnedPrivateRefObject === true &&
+    report.sourceOwnedPrivateRefObjectFrozen === true &&
+    report.privateExecutionEvidence.rootUseRefSourceFunctionCurrent === true &&
+    report.privateExecutionEvidence.privateDispatcherMarked === true &&
+    report.privateExecutionEvidence.sourceOwnedDispatcherExecution === true &&
+    report.privateExecutionEvidence.sourceOwnedRefObject === true
+  );
+}
+
 function hasSourceOwnedUseRefExecutionRecords(report) {
   const mount = report.mountCallRecord;
   const update = report.updateCallRecord;
@@ -4298,6 +4904,52 @@ function hasBlockedUseRefExecutionCompatibilityClaims(report) {
     report.refIdentityRecord.refIdentityCompatibilityClaimed === false &&
     report.refIdentityRecord.refObjectCompatibilityClaimed === false
   );
+}
+
+function hasBlockedUseRefRendererLifecyclePrerequisites(report) {
+  return (
+    report.publicUseRefCompatibilityBlocked === true &&
+    report.rendererRefObjectIdentityBlocked === true &&
+    report.rendererRefObjectMutabilityBlocked === true &&
+    report.dispatcherLifecycleBlocked === true &&
+    report.rootRenderingBlocked === true &&
+    report.rootCommitHookListRebindingBlocked === true &&
+    report.rootSchedulerIntegrationBlocked === true &&
+    report.schedulerTimingBlocked === true &&
+    report.actIntegrationBlocked === true &&
+    report.callbackHookCompatibilityBlocked === true &&
+    report.externalStoreCompatibilityBlocked === true &&
+    report.idGenerationCompatibilityBlocked === true &&
+    report.packageCompatibilityBlocked === true &&
+    report.realJsRefObjectRendererCompatibility === false &&
+    report.refObjectMutabilityCompatibility === false &&
+    report.dispatcherLifecycleCompatibility === false &&
+    report.rootRenderingCompatibility === false &&
+    report.schedulerTimingCompatibility === false &&
+    report.actCompatibility === false &&
+    report.rendererIntegration === false &&
+    report.rendererCompatibility === false &&
+    report.publicActIntegration === false &&
+    report.schedulerIntegration === false &&
+    report.schedulerPrerequisitesReady === false &&
+    report.rootLaneIntegration === false &&
+    report.rootScheduling === false &&
+    report.rootExecution === false &&
+    report.callbackExecutionClaimed === false &&
+    report.externalStoreSubscriptionClaimed === false &&
+    report.externalStoreSnapshotReadClaimed === false &&
+    report.idGenerationClaimed === false
+  );
+}
+
+function hasBlockedUseRefRendererLifecycleCompatibilityClaims(report) {
+  for (const flagName of useRefHookRendererLifecycleCompatibilityFalseFlags) {
+    if (report[flagName] !== false) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function hasSameSurfaceCurrentnessRows(actual, expected) {
@@ -4437,8 +5089,71 @@ function captureOwnDataOptions(options, callerProvided) {
   });
 }
 
+function captureKnownOwnDataOptions(options, callerProvided, knownOptionNames) {
+  const values = Object.create(null);
+  const callerProvidedObject =
+    callerProvided && options !== null && options !== undefined;
+  const overrideKeys = [];
+  const descriptorKeys = new Set();
+
+  if (callerProvidedObject) {
+    overrideKeys.push('caller-options-object');
+
+    try {
+      const descriptors = Object.getOwnPropertyDescriptors(Object(options));
+
+      for (const key of Reflect.ownKeys(descriptors)) {
+        descriptorKeys.add(key);
+        overrideKeys.push(key);
+
+        const descriptor = descriptors[key];
+        if (
+          typeof key === 'string' &&
+          knownOptionNames.includes(key) &&
+          Object.prototype.hasOwnProperty.call(descriptor, 'value')
+        ) {
+          values[key] = descriptor.value;
+        }
+      }
+    } catch {
+      overrideKeys.push('unreadable-caller-options');
+    }
+
+    for (const key of knownOptionNames) {
+      if (descriptorKeys.has(key)) {
+        continue;
+      }
+
+      try {
+        if (Object.prototype.hasOwnProperty.call(Object(options), key)) {
+          overrideKeys.push(`proxy-hidden:${key}`);
+        }
+      } catch {
+        overrideKeys.push(`unreadable-known-option:${key}`);
+      }
+    }
+  }
+
+  return freezeRecord({
+    values,
+    overrideKeys: freezeArray(overrideKeys)
+  });
+}
+
 function freezeRecord(record) {
   return Object.freeze(record);
+}
+
+function createUseRefRendererLifecycleBlockerRows(rowOverridesById) {
+  const rowOverrides = rowOverridesById ?? {};
+
+  return freezeUseRefRendererLifecycleBlockerRows(
+    useRefHookRendererLifecycleBlockerRows.map((row) =>
+      Object.prototype.hasOwnProperty.call(rowOverrides, row.blockerId)
+        ? { ...row, ...rowOverrides[row.blockerId] }
+        : row
+    )
+  );
 }
 
 function freezeUseRefSurfaceCurrentnessRow(row) {
@@ -4453,6 +5168,22 @@ function freezeUseRefSurfaceCurrentnessRow(row) {
 
 function freezeUseRefSurfaceCurrentnessRows(rows) {
   return freezeArray((rows ?? []).map(freezeUseRefSurfaceCurrentnessRow));
+}
+
+function freezeUseRefRendererLifecycleBlockerRow(row) {
+  const blockerRow = {};
+
+  for (const fieldName of useRefHookRendererLifecycleBlockerRowFieldNames) {
+    blockerRow[fieldName] = row[fieldName];
+  }
+
+  return freezeRecord(blockerRow);
+}
+
+function freezeUseRefRendererLifecycleBlockerRows(rows) {
+  return freezeArray(
+    (rows ?? []).map(freezeUseRefRendererLifecycleBlockerRow)
+  );
 }
 
 function freezeUseRefHookExecutionCallRecord({
@@ -4578,11 +5309,13 @@ module.exports = {
   callPrivateStateDispatcherHook,
   consumeUseRefHookExecutionEvidence,
   consumeUseRefHookCurrentnessReport,
+  consumeUseRefHookRendererLifecycleBlockerReport,
   consumeUnsupportedPlaceholderHookCurrentnessReport,
   createInvalidHookCallError,
   createMissingPrivateStateHookDispatcherError,
   createUseRefHookExecutionEvidence,
   createUseRefHookCurrentnessReport,
+  createUseRefHookRendererLifecycleBlockerReport,
   createUnsupportedPlaceholderHookCurrentnessReport,
   createUnsupportedPrivateTransitionCallbackError,
   effectHookMetadataByHookName,
@@ -4614,6 +5347,7 @@ module.exports = {
   isPrivateTransitionHookDispatcherMetadata,
   isUseRefHookExecutionEvidence,
   isUseRefHookCurrentnessReport,
+  isUseRefHookRendererLifecycleBlockerReport,
   isUnsupportedPlaceholderHookCurrentnessReport,
   markPrivateCallbackHookDispatcher,
   markPrivateContextHookDispatcher,
@@ -4640,6 +5374,14 @@ module.exports = {
   useRefHookExecutionSourceReportFieldNames,
   useRefHookExecutionSourceReport,
   useRefHookRefIdentityRecordFieldNames,
+  useRefHookRendererLifecycleBlockerConsumptionStatus,
+  useRefHookRendererLifecycleBlockerReportFieldNames,
+  useRefHookRendererLifecycleBlockerRowFieldNames,
+  useRefHookRendererLifecycleBlockerRows,
+  useRefHookRendererLifecycleBlockerSourceReport,
+  useRefHookRendererLifecycleBlockerSourceReportFieldNames,
+  useRefHookRendererLifecycleBlockerStatus,
+  useRefHookRendererLifecycleCompatibilityFalseFlags,
   useRefHookCurrentnessConsumptionStatus,
   useRefHookCurrentnessStatus,
   useRefHookNames,
@@ -4652,6 +5394,7 @@ module.exports = {
   unsupportedPlaceholderHookNames,
   validateUseRefHookExecutionEvidence,
   validateUseRefHookCurrentnessReport,
+  validateUseRefHookRendererLifecycleBlockerReport,
   validateUnsupportedPlaceholderHookCurrentnessReport,
   use,
   useCallback,

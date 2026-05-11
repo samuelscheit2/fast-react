@@ -531,6 +531,159 @@ const expectedUseRefExecutionEvidenceFieldNames = [
   "idGenerationBlocked",
   ...expectedUseRefCompatibilityFalseFlags
 ];
+const expectedUseRefRendererLifecycleSourceReportFieldNames = [
+  "kind",
+  "version",
+  "status",
+  "reactSourceTag",
+  "reactSourceCommit",
+  "fastReactSource",
+  "privateCurrentnessStatus",
+  "privateExecutionEvidenceStatus",
+  "rendererRootLifecycleCompatibilityAdmitted",
+  "publicUseRefCompatibilityAdmitted",
+  "compatibilityClaimed"
+];
+const expectedUseRefRendererLifecycleSourceReport = {
+  kind: "fast-react.private.use_ref_hook_renderer_lifecycle_blocker_source_report",
+  version: 1,
+  status: "source-current-for-react-19.2.6-useRef-renderer-lifecycle-blockers",
+  reactSourceTag: "v19.2.6",
+  reactSourceCommit: "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401",
+  fastReactSource: "packages/react/hook-dispatcher.js",
+  privateCurrentnessStatus: "accepted-blocked-private-useRef-hook-currentness",
+  privateExecutionEvidenceStatus:
+    "accepted-source-owned-private-useRef-execution-evidence",
+  rendererRootLifecycleCompatibilityAdmitted: false,
+  publicUseRefCompatibilityAdmitted: false,
+  compatibilityClaimed: false
+};
+const expectedUseRefRendererLifecycleBlockerRowFieldNames = [
+  "blockerId",
+  "acceptedPrivateEvidenceStatus",
+  "sourceOwnedPrivateEvidence",
+  "missingRendererRootPrerequisite",
+  "requiredPublicEvidence",
+  "currentBlocked",
+  "compatibilityClaimed"
+];
+const expectedUseRefRendererLifecycleBlockerRows = [
+  {
+    blockerId: "private-currentness-is-not-public-useRef-compatibility",
+    acceptedPrivateEvidenceStatus:
+      "accepted-blocked-private-useRef-hook-currentness",
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      "renderer-owned hook dispatcher lifecycle during root render",
+    requiredPublicEvidence:
+      "root renderWithHooks dispatcher installation and teardown evidence",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    blockerId: "private-execution-is-not-renderer-ref-object-compatibility",
+    acceptedPrivateEvidenceStatus:
+      "accepted-source-owned-private-useRef-execution-evidence",
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      "real mutable JavaScript ref object identity through a renderer root",
+    requiredPublicEvidence:
+      "renderer/root-backed mount and update ref object identity and mutability evidence",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    blockerId: "dispatcher-lifecycle-not-root-backed",
+    acceptedPrivateEvidenceStatus:
+      "accepted-source-owned-private-useRef-execution-evidence",
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      "mount/update dispatcher switching owned by a renderer root",
+    requiredPublicEvidence:
+      "dispatcher lifecycle evidence tied to the current render fiber and root",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    blockerId: "root-rendering-and-hook-list-rebinding-not-admitted",
+    acceptedPrivateEvidenceStatus:
+      "accepted-source-owned-private-useRef-execution-evidence",
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      "root rendering, commit handoff, and hook-list rebinding",
+    requiredPublicEvidence:
+      "HostRoot render/update/commit evidence with current hook-list rebinding",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    blockerId: "scheduler-and-act-timing-not-admitted",
+    acceptedPrivateEvidenceStatus:
+      "accepted-source-owned-private-useRef-execution-evidence",
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      "Scheduler timing and public act lifecycle integration",
+    requiredPublicEvidence:
+      "Scheduler callback timing and act-flush evidence under a public root",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  },
+  {
+    blockerId: "adjacent-hooks-and-package-compatibility-not-admitted",
+    acceptedPrivateEvidenceStatus:
+      "accepted-source-owned-private-useRef-execution-evidence",
+    sourceOwnedPrivateEvidence: true,
+    missingRendererRootPrerequisite:
+      "callback, external-store, id-generation, and package compatibility",
+    requiredPublicEvidence:
+      "cross-hook and published package compatibility evidence",
+    currentBlocked: true,
+    compatibilityClaimed: false
+  }
+];
+const expectedUseRefRendererLifecycleCompatibilityFalseFlags = [
+  ...expectedUseRefCompatibilityFalseFlags,
+  "realJsRefObjectRendererCompatibility",
+  "refObjectMutabilityCompatibility",
+  "dispatcherLifecycleCompatibility",
+  "rootRenderingCompatibility",
+  "schedulerTimingCompatibility",
+  "actCompatibility"
+];
+const expectedUseRefRendererLifecycleReportFieldNames = [
+  "kind",
+  "version",
+  "status",
+  "compatibilityTarget",
+  "hookNames",
+  "sourceReport",
+  "privateCurrentnessReport",
+  "privateExecutionEvidence",
+  "acceptedPrivateCurrentnessStatus",
+  "acceptedPrivateExecutionEvidenceStatus",
+  "blockerRowFieldNames",
+  "blockerRows",
+  "rootUseRefSourceFunctionCurrent",
+  "privateDispatcherMetadataIdentityCurrent",
+  "sourceOwnedPrivateDispatcherExecution",
+  "sourceOwnedPrivateRefObject",
+  "sourceOwnedPrivateRefObjectFrozen",
+  "callerSuppliedRefObjectAccepted",
+  "publicUseRefCompatibilityBlocked",
+  "rendererRefObjectIdentityBlocked",
+  "rendererRefObjectMutabilityBlocked",
+  "dispatcherLifecycleBlocked",
+  "rootRenderingBlocked",
+  "rootCommitHookListRebindingBlocked",
+  "rootSchedulerIntegrationBlocked",
+  "schedulerTimingBlocked",
+  "actIntegrationBlocked",
+  "callbackHookCompatibilityBlocked",
+  "externalStoreCompatibilityBlocked",
+  "idGenerationCompatibilityBlocked",
+  "packageCompatibilityBlocked",
+  ...expectedUseRefRendererLifecycleCompatibilityFalseFlags
+];
 const expectedUnsupportedPlaceholderHookNames = [
   "useActionState",
   "useOptimistic",
@@ -1112,6 +1265,34 @@ test("private useRef hook blockers record source and surface currentness", () =>
     metadata.privateExecutionEvidenceStatus,
     hookDispatcher.useRefHookExecutionEvidenceStatus
   );
+  assert.deepEqual(
+    metadata.rendererLifecycleBlockerSourceReportFieldNames,
+    expectedUseRefRendererLifecycleSourceReportFieldNames
+  );
+  assert.deepEqual(
+    metadata.rendererLifecycleBlockerSourceReport,
+    expectedUseRefRendererLifecycleSourceReport
+  );
+  assert.deepEqual(
+    metadata.rendererLifecycleBlockerRowFieldNames,
+    expectedUseRefRendererLifecycleBlockerRowFieldNames
+  );
+  assert.deepEqual(
+    metadata.rendererLifecycleBlockerRows,
+    expectedUseRefRendererLifecycleBlockerRows
+  );
+  assert.deepEqual(
+    metadata.rendererLifecycleBlockerReportFieldNames,
+    expectedUseRefRendererLifecycleReportFieldNames
+  );
+  assert.equal(
+    metadata.rendererLifecycleBlockerStatus,
+    hookDispatcher.useRefHookRendererLifecycleBlockerStatus
+  );
+  assert.deepEqual(
+    metadata.rendererLifecycleCompatibilityFalseFlags,
+    expectedUseRefRendererLifecycleCompatibilityFalseFlags
+  );
   assert.equal(metadata.sourceOwnedPrivateExecutionEvidence, true);
   assert.equal(metadata.callerSuppliedRefObjectsAccepted, false);
   assert.equal(metadata.rowOverridesAccepted, false);
@@ -1179,6 +1360,30 @@ test("private useRef hook blockers record source and surface currentness", () =>
     hookDispatcher.useRefHookRefIdentityRecordFieldNames,
     expectedUseRefRefIdentityRecordFieldNames
   );
+  assert.deepEqual(
+    hookDispatcher.useRefHookRendererLifecycleBlockerSourceReportFieldNames,
+    expectedUseRefRendererLifecycleSourceReportFieldNames
+  );
+  assert.deepEqual(
+    hookDispatcher.useRefHookRendererLifecycleBlockerSourceReport,
+    expectedUseRefRendererLifecycleSourceReport
+  );
+  assert.deepEqual(
+    hookDispatcher.useRefHookRendererLifecycleBlockerRowFieldNames,
+    expectedUseRefRendererLifecycleBlockerRowFieldNames
+  );
+  assert.deepEqual(
+    hookDispatcher.useRefHookRendererLifecycleBlockerRows,
+    expectedUseRefRendererLifecycleBlockerRows
+  );
+  assert.deepEqual(
+    hookDispatcher.useRefHookRendererLifecycleBlockerReportFieldNames,
+    expectedUseRefRendererLifecycleReportFieldNames
+  );
+  assert.deepEqual(
+    hookDispatcher.useRefHookRendererLifecycleCompatibilityFalseFlags,
+    expectedUseRefRendererLifecycleCompatibilityFalseFlags
+  );
   assert.equal(
     hookDispatcher.isPrivateRefHookDispatcherMetadata(metadata),
     true
@@ -1196,6 +1401,19 @@ test("private useRef hook blockers record source and surface currentness", () =>
   assert.equal(ReactCjsDevelopment.createUseRefHookExecutionEvidence, undefined);
   assert.equal(ReactCjsProduction.createUseRefHookExecutionEvidence, undefined);
   assert.equal(ReactServer.createUseRefHookExecutionEvidence, undefined);
+  assert.equal(React.createUseRefHookRendererLifecycleBlockerReport, undefined);
+  assert.equal(
+    ReactCjsDevelopment.createUseRefHookRendererLifecycleBlockerReport,
+    undefined
+  );
+  assert.equal(
+    ReactCjsProduction.createUseRefHookRendererLifecycleBlockerReport,
+    undefined
+  );
+  assert.equal(
+    ReactServer.createUseRefHookRendererLifecycleBlockerReport,
+    undefined
+  );
 });
 
 test("useRef hook currentness rejects stale source, surface drift, and forged claims", () => {
@@ -1678,6 +1896,322 @@ test("private useRef execution evidence rejects same-shaped fake root useRef", (
         currentnessReport
       }),
       "useRef-hook-execution-source-function"
+    );
+  } finally {
+    React.useRef = originalUseRef;
+  }
+});
+
+test("private useRef renderer lifecycle blockers separate private evidence from public compatibility", () => {
+  const report = hookDispatcher.createUseRefHookRendererLifecycleBlockerReport();
+
+  assert.equal(
+    report.kind,
+    "fast-react.private.use_ref_hook_renderer_lifecycle_blockers"
+  );
+  assert.equal(report.version, 1);
+  assert.equal(
+    report.status,
+    hookDispatcher.useRefHookRendererLifecycleBlockerStatus
+  );
+  assert.equal(report.compatibilityTarget, "react@19.2.6");
+  assert.deepEqual(Object.keys(report), expectedUseRefRendererLifecycleReportFieldNames);
+  assert.deepEqual(report.hookNames, expectedUseRefHookNames);
+  assert.deepEqual(
+    report.sourceReport,
+    expectedUseRefRendererLifecycleSourceReport
+  );
+  assert.equal(
+    hookDispatcher.validateUseRefHookCurrentnessReport(
+      report.privateCurrentnessReport
+    ),
+    null
+  );
+  assert.equal(
+    hookDispatcher.validateUseRefHookExecutionEvidence(
+      report.privateExecutionEvidence
+    ),
+    null
+  );
+  assert.equal(
+    report.acceptedPrivateCurrentnessStatus,
+    hookDispatcher.useRefHookCurrentnessConsumptionStatus
+  );
+  assert.equal(
+    report.acceptedPrivateExecutionEvidenceStatus,
+    hookDispatcher.useRefHookExecutionEvidenceConsumptionStatus
+  );
+  assert.deepEqual(
+    report.blockerRowFieldNames,
+    expectedUseRefRendererLifecycleBlockerRowFieldNames
+  );
+  assert.deepEqual(
+    report.blockerRows,
+    expectedUseRefRendererLifecycleBlockerRows
+  );
+  assert.equal(report.rootUseRefSourceFunctionCurrent, true);
+  assert.equal(report.privateDispatcherMetadataIdentityCurrent, true);
+  assert.equal(report.sourceOwnedPrivateDispatcherExecution, true);
+  assert.equal(report.sourceOwnedPrivateRefObject, true);
+  assert.equal(report.sourceOwnedPrivateRefObjectFrozen, true);
+  assert.equal(report.callerSuppliedRefObjectAccepted, false);
+  assert.equal(report.publicUseRefCompatibilityBlocked, true);
+  assert.equal(report.rendererRefObjectIdentityBlocked, true);
+  assert.equal(report.rendererRefObjectMutabilityBlocked, true);
+  assert.equal(report.dispatcherLifecycleBlocked, true);
+  assert.equal(report.rootRenderingBlocked, true);
+  assert.equal(report.rootCommitHookListRebindingBlocked, true);
+  assert.equal(report.rootSchedulerIntegrationBlocked, true);
+  assert.equal(report.schedulerTimingBlocked, true);
+  assert.equal(report.actIntegrationBlocked, true);
+  assert.equal(report.callbackHookCompatibilityBlocked, true);
+  assert.equal(report.externalStoreCompatibilityBlocked, true);
+  assert.equal(report.idGenerationCompatibilityBlocked, true);
+  assert.equal(report.packageCompatibilityBlocked, true);
+
+  for (const flagName of expectedUseRefRendererLifecycleCompatibilityFalseFlags) {
+    assert.equal(report[flagName], false, flagName);
+  }
+
+  assert.equal(
+    hookDispatcher.validateUseRefHookRendererLifecycleBlockerReport(report),
+    null
+  );
+  assert.equal(
+    hookDispatcher.isUseRefHookRendererLifecycleBlockerReport(report),
+    true
+  );
+
+  const consumption =
+    hookDispatcher.consumeUseRefHookRendererLifecycleBlockerReport(report);
+  assert.equal(
+    consumption.status,
+    hookDispatcher.useRefHookRendererLifecycleBlockerConsumptionStatus
+  );
+  assert.equal(consumption.accepted, true);
+  assert.deepEqual(
+    consumption.blockerRows,
+    expectedUseRefRendererLifecycleBlockerRows
+  );
+  assert.equal(consumption.publicUseRefCompatibilityBlocked, true);
+  assert.equal(consumption.rendererRefObjectIdentityBlocked, true);
+  assert.equal(consumption.rendererRefObjectMutabilityBlocked, true);
+  assert.equal(consumption.dispatcherLifecycleBlocked, true);
+  assert.equal(consumption.rootRenderingBlocked, true);
+  assert.equal(consumption.schedulerTimingBlocked, true);
+  assert.equal(consumption.actIntegrationBlocked, true);
+  assert.equal(consumption.callbackHookCompatibilityBlocked, true);
+  assert.equal(consumption.externalStoreCompatibilityBlocked, true);
+  assert.equal(consumption.idGenerationCompatibilityBlocked, true);
+  assert.equal(consumption.packageCompatibilityBlocked, true);
+  assert.equal(consumption.publicCompatibilityClaimed, false);
+  assert.equal(consumption.compatibilityClaimed, false);
+
+  assert.equal(React.consumeUseRefHookRendererLifecycleBlockerReport, undefined);
+  assert.equal(
+    ReactCjsDevelopment.consumeUseRefHookRendererLifecycleBlockerReport,
+    undefined
+  );
+  assert.equal(
+    ReactCjsProduction.consumeUseRefHookRendererLifecycleBlockerReport,
+    undefined
+  );
+  assert.equal(
+    ReactServer.consumeUseRefHookRendererLifecycleBlockerReport,
+    undefined
+  );
+});
+
+test("private useRef renderer lifecycle blockers reject forged public lifecycle claims", () => {
+  const report = hookDispatcher.createUseRefHookRendererLifecycleBlockerReport();
+
+  assertUseRefRendererLifecycleRejected(
+    Object.freeze({ ...report }),
+    "useRef-hook-renderer-lifecycle-source-proof"
+  );
+  assertUseRefRendererLifecycleRejected(
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport({
+      sourceReport: {
+        reactSourceCommit: "forged"
+      }
+    }),
+    "useRef-hook-renderer-lifecycle-source-report"
+  );
+  assertUseRefRendererLifecycleRejected(
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport({
+      blockerRows: expectedUseRefRendererLifecycleBlockerRows.map((row) => ({
+        ...row
+      }))
+    }),
+    "useRef-hook-renderer-lifecycle-blocker-rows-source-proof"
+  );
+  assertUseRefRendererLifecycleRejected(
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport({
+      blockerRowOverrides: {
+        "root-rendering-and-hook-list-rebinding-not-admitted": {
+          currentBlocked: false
+        }
+      }
+    }),
+    "useRef-hook-renderer-lifecycle-blocker-rows-source-proof"
+  );
+  assertUseRefRendererLifecycleRejected(
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport({
+      privateCurrentnessReport: hookDispatcher.createUseRefHookCurrentnessReport({
+        sourceReport: {
+          reactSourceCommit: "forged"
+        }
+      })
+    }),
+    "useRef-hook-renderer-lifecycle-private-currentness-report"
+  );
+  assertUseRefRendererLifecycleRejected(
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport({
+      privateExecutionEvidence: hookDispatcher.createUseRefHookExecutionEvidence({
+        refObject: { current: "fast-react-private-useRef-mount-initial" }
+      })
+    }),
+    "useRef-hook-renderer-lifecycle-caller-ref-object"
+  );
+  assertUseRefRendererLifecycleRejected(
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport({
+      privateExecutionEvidence: hookDispatcher.createUseRefHookExecutionEvidence({
+        dispatcherMetadata: {
+          ...hookDispatcher.privateRefHookDispatcherMetadata
+        }
+      })
+    }),
+    "useRef-hook-renderer-lifecycle-dispatcher-source-identity"
+  );
+
+  for (const prerequisiteSmuggling of [
+    { rootRenderingBlocked: false },
+    { rootSchedulerIntegrationBlocked: false },
+    { schedulerTimingBlocked: false },
+    { actIntegrationBlocked: false },
+    { rootExecution: true },
+    { schedulerIntegration: true },
+    { publicActIntegration: true }
+  ]) {
+    assertUseRefRendererLifecycleRejected(
+      hookDispatcher.createUseRefHookRendererLifecycleBlockerReport(
+        prerequisiteSmuggling
+      ),
+      "useRef-hook-renderer-lifecycle-prerequisite-smuggling"
+    );
+  }
+
+  for (const flagName of [
+    "publicCompatibilityClaimed",
+    "publicHookCompatibility",
+    "hookExecutionCompatibility",
+    "refIdentityCompatibility",
+    "packageCompatibility"
+  ]) {
+    assertUseRefRendererLifecycleRejected(
+      hookDispatcher.createUseRefHookRendererLifecycleBlockerReport({
+        [flagName]: true
+      }),
+      "useRef-hook-renderer-lifecycle-public-compatibility-claim"
+    );
+  }
+});
+
+test("private useRef renderer lifecycle blockers reject hidden caller claims", () => {
+  let accessorRead = false;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, "publicCompatibilityClaimed", {
+    enumerable: true,
+    get() {
+      accessorRead = true;
+      return true;
+    }
+  });
+
+  assertUseRefRendererLifecycleRejected(
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport(
+      accessorOptions
+    ),
+    "useRef-hook-renderer-lifecycle-caller-overrides"
+  );
+  assert.equal(accessorRead, false);
+
+  const symbolClaim = Symbol("publicCompatibilityClaimed");
+  assertUseRefRendererLifecycleRejected(
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport({
+      [symbolClaim]: true
+    }),
+    "useRef-hook-renderer-lifecycle-caller-overrides"
+  );
+
+  const nonEnumerableOptions = {};
+  Object.defineProperty(nonEnumerableOptions, "publicCompatibilityClaimed", {
+    enumerable: false,
+    value: true
+  });
+  assertUseRefRendererLifecycleRejected(
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport(
+      nonEnumerableOptions
+    ),
+    "useRef-hook-renderer-lifecycle-public-compatibility-claim"
+  );
+
+  const proxyHiddenOptions = new Proxy(
+    {},
+    {
+      ownKeys() {
+        return [];
+      },
+      getOwnPropertyDescriptor(_target, key) {
+        if (key === "publicCompatibilityClaimed") {
+          return {
+            configurable: true,
+            enumerable: true,
+            value: true
+          };
+        }
+
+        return undefined;
+      }
+    }
+  );
+  assertUseRefRendererLifecycleRejected(
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport(
+      proxyHiddenOptions
+    ),
+    "useRef-hook-renderer-lifecycle-caller-overrides"
+  );
+});
+
+test("private useRef renderer lifecycle blockers reject same-shaped fake root useRef", () => {
+  const originalUseRef = React.useRef;
+  const currentnessReport = hookDispatcher.createUseRefHookCurrentnessReport();
+  const fakeRefObject = { current: "fast-react-private-useRef-mount-initial" };
+  const fakeUseRef = function () {
+    return fakeRefObject;
+  };
+
+  Object.defineProperties(fakeUseRef, {
+    length: {
+      configurable: true,
+      value: 1
+    },
+    name: {
+      configurable: true,
+      value: ""
+    }
+  });
+
+  React.useRef = fakeUseRef;
+
+  try {
+    assertUseRefRendererLifecycleRejected(
+      hookDispatcher.createUseRefHookRendererLifecycleBlockerReport({
+        privateExecutionEvidence: hookDispatcher.createUseRefHookExecutionEvidence({
+          currentnessReport
+        })
+      }),
+      "useRef-hook-renderer-lifecycle-dispatcher-source-identity"
     );
   } finally {
     React.useRef = originalUseRef;
@@ -2679,6 +3213,58 @@ function assertUseRefExecutionEvidenceRejected(report, reason) {
       );
       assert.equal(error.compatibilityTarget, "react@19.2.6", reason);
       assert.equal(error.reason, reason);
+      assert.equal(error.publicCompatibilityClaimed, false, reason);
+      assert.equal(error.publicHookCompatibility, false, reason);
+      assert.equal(error.exposesPublicHookImplementation, false, reason);
+      assert.equal(error.hookExecutionCompatibility, false, reason);
+      assert.equal(error.refIdentityCompatibility, false, reason);
+      assert.equal(error.refObjectCompatibility, false, reason);
+      assert.equal(error.rendererCompatibility, false, reason);
+      assert.equal(error.schedulerIntegration, false, reason);
+      assert.equal(error.rootLaneIntegration, false, reason);
+      assert.equal(error.rootScheduling, false, reason);
+      assert.equal(error.rootExecution, false, reason);
+      assert.equal(error.callbackExecutionClaimed, false, reason);
+      assert.equal(error.externalStoreSubscriptionClaimed, false, reason);
+      assert.equal(error.externalStoreSnapshotReadClaimed, false, reason);
+      assert.equal(error.idGenerationClaimed, false, reason);
+      assert.equal(error.packageCompatibility, false, reason);
+      assert.equal(error.compatibilityClaimed, false, reason);
+      return true;
+    },
+    reason
+  );
+}
+
+function assertUseRefRendererLifecycleRejected(report, reason) {
+  assert.equal(
+    hookDispatcher.validateUseRefHookRendererLifecycleBlockerReport(report),
+    reason
+  );
+  assert.equal(
+    hookDispatcher.isUseRefHookRendererLifecycleBlockerReport(report),
+    false
+  );
+  assert.throws(
+    () => hookDispatcher.consumeUseRefHookRendererLifecycleBlockerReport(report),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", reason);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", reason);
+      assert.equal(error.entrypoint, "react", reason);
+      assert.equal(
+        error.exportName,
+        "useRefHookRendererLifecycleBlockers",
+        reason
+      );
+      assert.equal(error.compatibilityTarget, "react@19.2.6", reason);
+      assert.equal(error.reason, reason);
+      assert.equal(error.publicUseRefCompatibilityBlocked, true, reason);
+      assert.equal(error.rendererRefObjectIdentityBlocked, true, reason);
+      assert.equal(error.rendererRefObjectMutabilityBlocked, true, reason);
+      assert.equal(error.dispatcherLifecycleBlocked, true, reason);
+      assert.equal(error.rootRenderingBlocked, true, reason);
+      assert.equal(error.schedulerTimingBlocked, true, reason);
+      assert.equal(error.actIntegrationBlocked, true, reason);
       assert.equal(error.publicCompatibilityClaimed, false, reason);
       assert.equal(error.publicHookCompatibility, false, reason);
       assert.equal(error.exposesPublicHookImplementation, false, reason);
