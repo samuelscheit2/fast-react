@@ -3,6 +3,8 @@
 Goal status: active before final `update_goal`
 Started: 2026-05-11
 
+Audit follow-up: source fix committed after initial handoff.
+
 ## Summary
 
 Hardened stale-evidence coverage without admitting native execution. The Rust
@@ -19,8 +21,18 @@ compatibility claims are rejected before request validation.
 No production loader, package export, native addon loading, renderer,
 reconciler, worker-thread, or public native compatibility behavior was added.
 
+Audit update: extended the JS native root bridge handoff guard so claim flags
+are rejected on direct valid request records, outer handoff wrappers, and
+nested `nativeRequestRecord` objects instead of being accepted and normalized
+to false.
+
 ## Changed Files
 
+- `bindings/node/index.cjs`
+  - Extended `assertBlockedNativeRootBridgeHandoff` to inspect both wrapper and
+    direct/nested request-record objects.
+  - Added rejection coverage for `nativeAddonLoaded`, `rendererExecution`, and
+    `publicNativeCompatibility` claims alongside existing fail-closed flags.
 - `crates/fast-react-napi/src/lib.rs`
   - Added private test helper coverage for cleanup-hook evidence rejection
     rows.
@@ -32,6 +44,10 @@ reconciler, worker-thread, or public native compatibility behavior was added.
   - Added an explicit dynamic CommonJS `.node` fixture caught by `Module._load`.
   - Added no-load guard assertions that native execution, reconciler execution,
     and package compatibility claims fail before native request validation.
+  - Audit update: switched claim checks to valid request records and added
+    focused valid-record cases for `nativeAddonLoaded`, `rendererExecution`,
+    and `publicNativeCompatibility` on direct, wrapper, and nested handoff
+    shapes.
 - `worker-progress/worker-815-native-worker-thread-cleanup-stale-matrix.md`
   - Recorded implementation, verification, evidence, risks, and handoff.
 
@@ -60,9 +76,16 @@ reconciler, worker-thread, or public native compatibility behavior was added.
 - `git diff --check`
 - `git diff --stat`
 - `git status --short --branch`
+- `sed -n '1,240p' /root/audit_815_native_cleanup_stale_matrix` (path was not
+  present in this environment)
+- `find /Users/user/Developer/Developer -maxdepth 3 -name '*audit*815*' -o -name 'audit_815_native_cleanup_stale_matrix'`
+- `node --check bindings/node/index.cjs`
 
 ## Evidence Gathered
 
+- Audit follow-up source check proved the previous JS guard only inspected
+  handoff wrappers with `nativeRequestRecord` and did not reject
+  `nativeAddonLoaded`, `rendererExecution`, or `publicNativeCompatibility`.
 - Worker 764 and current Rust preflight code prove worker teardown invalidates
   worker root/value handles while preserving peer handles and all
   no-execution/no-compatibility flags.
@@ -80,6 +103,10 @@ reconciler, worker-thread, or public native compatibility behavior was added.
 - Native no-load guard assertions still prove native addon loading, native
   execution, renderer/reconciler execution, public native compatibility, and
   package compatibility claims remain false or fail closed.
+- Audit follow-up no-load guard assertions prove a valid native root bridge
+  request still passes with no claim flags, while valid direct records, wrapper
+  claims, and nested `nativeRequestRecord` claims now reject
+  `nativeAddonLoaded`, `rendererExecution`, and `publicNativeCompatibility`.
 
 ## Verification
 
@@ -88,6 +115,7 @@ Passed:
 - `cargo fmt --all --check`
 - `cargo test -p fast-react-napi --all-features cleanup_hook_preflight`: 6
   focused tests passed.
+- `node --check bindings/node/index.cjs`
 - `node --check bindings/node/test/native-no-load-guard.test.cjs`
 - `node bindings/node/test/native-no-load-guard.test.cjs`
 - `cargo test -p fast-react-napi`: 57 unit tests and 0 doctests passed.
@@ -106,8 +134,12 @@ result.
 - Overlap risk: `crates/fast-react-napi/src/lib.rs` is shared by active native
   workers. This change is test-only inside the cleanup-hook preflight area and
   does not revert or alter production logic.
-- The JS no-load guard change is also test-only and does not alter package
-  exports, platform package resolution, or loader implementation.
+- The audit JS source change is limited to claim rejection in the existing
+  placeholder handoff guard. It does not alter package exports, platform
+  package resolution, native addon loading, or loader implementation.
+- `/root/audit_815_native_cleanup_stale_matrix` was not present in this
+  environment; the audit fix was implemented from the blocker text and current
+  source behavior.
 
 ## Recommended Next Tasks
 

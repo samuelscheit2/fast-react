@@ -193,6 +193,71 @@ async function assertForbiddenLoad(label, action, expectedAttemptedLoad) {
   );
 }
 
+function createValidNativeRootBridgeRequestRecord(overrides = {}) {
+  return {
+    requestId: 1,
+    kind: 'create',
+    environmentId: 815,
+    rootHandle: {
+      environmentId: 815,
+      slot: 1,
+      generation: 1,
+      kind: 'root'
+    },
+    rootId: 1,
+    valueHandle: {
+      environmentId: 815,
+      slot: 2,
+      generation: 1,
+      kind: 'value'
+    },
+    rootHandleState: 'active',
+    ...overrides
+  };
+}
+
+function assertBlockedNativeRootBridgeClaim(native, blockedClaim) {
+  for (const [label, input] of [
+    [
+      'direct valid request record',
+      createValidNativeRootBridgeRequestRecord({ [blockedClaim]: true })
+    ],
+    [
+      'valid request handoff wrapper',
+      {
+        nativeRequestRecord: createValidNativeRootBridgeRequestRecord(),
+        [blockedClaim]: true
+      }
+    ],
+    [
+      'valid nested handoff request record',
+      {
+        nativeRequestRecord: createValidNativeRootBridgeRequestRecord({
+          [blockedClaim]: true
+        })
+      }
+    ]
+  ]) {
+    assert.throws(
+      () => native.createNativeRootBridgeRequestShapeGate(input),
+      (error) => {
+        assert.equal(error.name, 'FastReactNativeRequestShapeError');
+        assert.equal(
+          error.code,
+          'FAST_REACT_NATIVE_ROOT_BRIDGE_REQUEST_SHAPE_INVALID'
+        );
+        assert.deepEqual(error.details, { flag: blockedClaim });
+        assert.equal(error.nativeAddonLoaded, false);
+        assert.equal(error.nativeExecution, false);
+        assert.equal(error.rendererExecution, false);
+        assert.equal(error.reconcilerExecution, false);
+        return true;
+      },
+      `native no-load guard must reject ${blockedClaim} on ${label}`
+    );
+  }
+}
+
 async function runForbiddenLoadFixtureMatrix() {
   const fixtures = createForbiddenLoadFixtureMatrix();
 
@@ -322,32 +387,21 @@ async function main() {
       actualRootBridgeEvidence,
       expectedRootBridgeEvidence
     );
+    assert.equal(
+      native.createNativeRootBridgeRequestShapeGate(
+        createValidNativeRootBridgeRequestRecord()
+      ).requestCount,
+      1
+    );
     for (const blockedClaim of [
+      'nativeAddonLoaded',
       'nativeExecution',
+      'rendererExecution',
       'reconcilerExecution',
+      'publicNativeCompatibility',
       'compatibilityClaimed'
     ]) {
-      assert.throws(
-        () =>
-          native.createNativeRootBridgeRequestShapeGate({
-            nativeRequestRecord: {},
-            [blockedClaim]: true
-          }),
-        (error) => {
-          assert.equal(error.name, 'FastReactNativeRequestShapeError');
-          assert.equal(
-            error.code,
-            'FAST_REACT_NATIVE_ROOT_BRIDGE_REQUEST_SHAPE_INVALID'
-          );
-          assert.deepEqual(error.details, { flag: blockedClaim });
-          assert.equal(error.nativeAddonLoaded, false);
-          assert.equal(error.nativeExecution, false);
-          assert.equal(error.rendererExecution, false);
-          assert.equal(error.reconcilerExecution, false);
-          return true;
-        },
-        `native no-load guard must reject ${blockedClaim} claims before request validation`
-      );
+      assertBlockedNativeRootBridgeClaim(native, blockedClaim);
     }
     assert.equal(
       native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
