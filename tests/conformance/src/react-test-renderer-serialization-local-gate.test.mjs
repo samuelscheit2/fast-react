@@ -3532,6 +3532,150 @@ test("react-test-renderer CJS dev/prod private toTree sibling text admission req
   }
 });
 
+test("react-test-renderer sibling-text private admissions reject stale identity and public/native claim matrices", () => {
+  const packageRootEntry = jsEntrypoints.find(
+    (entry) => entry.entrypoint === packageRootEntrypoint
+  );
+  assert.notEqual(packageRootEntry, undefined);
+
+  {
+    const { jsonFacade, updateRootRequest } =
+      createSiblingTextAdmissionRuntime(packageRootEntry);
+    const siblingTextReport = createAcceptedSiblingTextHostOutputDiagnostic();
+    const siblingTextIdentity =
+      createAcceptedSiblingTextFinishedWorkIdentityEvidence({
+        rootRequest: updateRootRequest
+      });
+    assertSiblingTextAdmissionNegativeMatrix({
+      report: siblingTextReport,
+      evidence: siblingTextIdentity,
+      sourceRootRequest: updateRootRequest,
+      reject(report, evidence, messagePattern) {
+        return assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          report,
+          evidence,
+          updateRootRequest,
+          messagePattern
+        );
+      },
+      includeMissingCanonicalRootIds: true
+    });
+    assertSiblingTextHostOutputReportClaimRejections({
+      report: siblingTextReport,
+      evidence: siblingTextIdentity,
+      reject(report, evidence, messagePattern) {
+        return assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          report,
+          evidence,
+          updateRootRequest,
+          messagePattern
+        );
+      }
+    });
+  }
+
+  const cjsEntries = jsEntrypoints.filter((entry) =>
+    entry.entrypoint.includes("/cjs/")
+  );
+  for (const entry of cjsEntries) {
+    const { jsonFacade, treeFacade, updateRootRequest } =
+      createSiblingTextAdmissionRuntime(entry);
+    const siblingTextReport = createAcceptedSiblingTextHostOutputDiagnostic();
+    const siblingTextIdentity =
+      createAcceptedSiblingTextFinishedWorkIdentityEvidence({
+        rootRequest: updateRootRequest
+      });
+
+    assertSiblingTextAdmissionNegativeMatrix({
+      report: siblingTextReport,
+      evidence: siblingTextIdentity,
+      sourceRootRequest: updateRootRequest,
+      reject(report, evidence, messagePattern) {
+        return assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          report,
+          evidence,
+          updateRootRequest,
+          messagePattern
+        );
+      }
+    });
+    assertSiblingTextHostOutputReportClaimRejections({
+      report: siblingTextReport,
+      evidence: siblingTextIdentity,
+      reject(report, evidence, messagePattern) {
+        return assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          report,
+          evidence,
+          updateRootRequest,
+          messagePattern
+        );
+      }
+    });
+    assertSiblingTextCommittedFiberInspectionRejections({
+      report: siblingTextReport,
+      evidence: siblingTextIdentity,
+      reject(report, evidence, messagePattern) {
+        return assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          report,
+          evidence,
+          updateRootRequest,
+          messagePattern
+        );
+      }
+    });
+
+    const siblingTreeReport = createAcceptedMultiChildTreeMetadataDiagnostic({
+      composite: true,
+      hostOutputUpdateKind: "Update"
+    });
+    assertSiblingTextAdmissionNegativeMatrix({
+      report: siblingTreeReport,
+      evidence: siblingTextIdentity,
+      sourceRootRequest: updateRootRequest,
+      reject(report, evidence, messagePattern) {
+        return assertToTreeSiblingTextAdmissionRejection(
+          treeFacade,
+          report,
+          evidence,
+          updateRootRequest,
+          messagePattern
+        );
+      }
+    });
+    assertToTreeSiblingTextReportClaimRejections({
+      report: siblingTreeReport,
+      evidence: siblingTextIdentity,
+      reject(report, evidence, messagePattern) {
+        return assertToTreeSiblingTextAdmissionRejection(
+          treeFacade,
+          report,
+          evidence,
+          updateRootRequest,
+          messagePattern
+        );
+      }
+    });
+    assertToTreeSiblingTextCommittedFiberInspectionRejections({
+      report: siblingTreeReport,
+      evidence: siblingTextIdentity,
+      reject(report, evidence, messagePattern) {
+        return assertToTreeSiblingTextAdmissionRejection(
+          treeFacade,
+          report,
+          evidence,
+          updateRootRequest,
+          messagePattern
+        );
+      }
+    });
+  }
+});
+
 test("react-test-renderer package-root private unmount finished-work identity requires matching handoff evidence", () => {
   const entry = jsEntrypoints.find(
     (candidate) => candidate.entrypoint === "react-test-renderer"
@@ -4999,6 +5143,327 @@ function withSiblingTextReportChange(report, mutate) {
   const clone = JSON.parse(JSON.stringify(report));
   mutate(clone);
   return clone;
+}
+
+function createSiblingTextAdmissionRuntime(entry) {
+  const moduleExports = loadFresh(entry.specifier);
+  const renderer = moduleExports.create({
+    type: "span",
+    props: {},
+    children: ["hello"]
+  });
+  const updateError = captureThrown(() =>
+    renderer.update({
+      type: "span",
+      props: {},
+      children: ["goodbye"]
+    })
+  );
+
+  return {
+    updateRootRequest: updateError.rootRequest,
+    jsonFacade: Object.getOwnPropertyDescriptor(
+      renderer.toJSON,
+      privateToJSONSerializationFacadeSymbol
+    ).value,
+    treeFacade: Object.getOwnPropertyDescriptor(
+      renderer.toTree,
+      privateToTreeFacadeSymbol
+    ).value
+  };
+}
+
+function assertSiblingTextAdmissionNegativeMatrix({
+  report,
+  evidence,
+  sourceRootRequest,
+  reject,
+  includeMissingCanonicalRootIds = false
+}) {
+  for (const alias of privateRootFinishedLanesHandoffAliasKeys) {
+    reject(
+      report,
+      withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+        const handoff = changedEvidence.rootFinishedLanesHandoff;
+        delete changedEvidence.rootFinishedLanesHandoff;
+        changedEvidence[alias] = handoff;
+      }),
+      /rootFinishedLanesHandoff/u
+    );
+  }
+  reject(
+    report,
+    withInheritedSiblingTextRootFinishedLanesHandoff(evidence),
+    /rootFinishedLanesHandoff/u
+  );
+
+  for (const fieldName of ["rootRequestId", "rootId"]) {
+    reject(
+      report,
+      withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+        changedEvidence[fieldName] = `${changedEvidence[fieldName]}:stale`;
+      }),
+      /sibling-text-finished-work-identity-stale/u
+    );
+  }
+  reject(
+    report,
+    withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+      changedEvidence.rootRequestSequence += 1;
+    }),
+    /sibling-text-finished-work-identity-stale/u
+  );
+  if (includeMissingCanonicalRootIds) {
+    for (const fieldName of ["rootRequestId", "rootId"]) {
+      reject(
+        report,
+        withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+          delete changedEvidence[fieldName];
+        }),
+        /sibling-text-finished-work-identity-stale/u
+      );
+    }
+  }
+
+  for (const fieldName of [
+    "rootRequestId",
+    "rootId"
+  ]) {
+    reject(
+      report,
+      withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+        changedEvidence.rootFinishedLanesHandoff[fieldName] =
+          `${changedEvidence.rootFinishedLanesHandoff[fieldName]}:stale`;
+      }),
+      /private root request/u
+    );
+  }
+  reject(
+    report,
+    withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+      changedEvidence.rootFinishedLanesHandoff.rootRequestSequence += 1;
+    }),
+    /private root request/u
+  );
+  reject(
+    report,
+    withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+      changedEvidence.rootFinishedLanesHandoff.commitCurrent.slot += 1;
+    }),
+    /committed HostRoot identity/u
+  );
+  reject(
+    report,
+    withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+      changedEvidence.rootFinishedLanesHandoff.commitFinishedLanesBits = 2;
+    }),
+    /finished_lanes handoff/u
+  );
+
+  for (const fieldName of [
+    "publicSerializationAvailable",
+    "publicRouteAvailable",
+    "nativeBridgeAvailable",
+    "nativeExecution",
+    "packageCompatibilityClaimed",
+    "compatibilityClaimed"
+  ]) {
+    reject(
+      report,
+      withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+        changedEvidence.rootFinishedLanesHandoff[fieldName] = true;
+      }),
+      /public, native, or package compatibility/u
+    );
+  }
+
+  reject(
+    report,
+    createAcceptedFinishedWorkIdentityEvidence({
+      rootRequest: sourceRootRequest,
+      publicSurface: "create().toJSON",
+      sourceSerializationDiagnosticName:
+        "fast-react-test-renderer.serialization.private-json-canary",
+      consumesPrivateToJSONEvidence: true,
+      consumesPrivateToTreeEvidence: false,
+      hostOutputUpdateKind: "Update"
+    }),
+    /sibling-text-finished-work-identity-diagnostic-mismatch/u
+  );
+  reject(
+    report,
+    withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+      changedEvidence.broadMultichildIdentityAvailable = true;
+    }),
+    /broad-multichild-identity-unexpectedly-open/u
+  );
+
+  for (const fieldName of [
+    "publicToJSONAvailable",
+    "publicToTreeAvailable",
+    "publicTestInstanceAvailable",
+    "publicSerializationAvailable",
+    "publicRouteAvailable",
+    "nativeBridgeLoadingAvailable",
+    "nativeBridgeAvailable",
+    "nativeExecutionAvailable",
+    "jsFacadeAvailable",
+    "cjsFacadeAvailable",
+    "packageCompatibilityClaimed",
+    "compatibilityClaimed"
+  ]) {
+    reject(
+      report,
+      withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+        changedEvidence[fieldName] = true;
+      }),
+      /public-or-native-package-js-compatibility-claim/u
+    );
+  }
+}
+
+function assertSiblingTextHostOutputReportClaimRejections({
+  report,
+  evidence,
+  reject
+}) {
+  for (const fieldName of [
+    "publicToJSONAvailable",
+    "publicTestInstanceAvailable",
+    "nativeExecution",
+    "compatibilityClaimed"
+  ]) {
+    reject(
+      withSiblingTextReportChange(report, (changedReport) => {
+        changedReport.hostOutputRow[fieldName] = true;
+      }),
+      evidence,
+      /sibling-text-host-output-row-public-native-package-claim/u
+    );
+  }
+  for (const fieldName of [
+    "publicToJSONAvailable",
+    "publicTestInstanceAvailable",
+    "nativeExecutionAvailable",
+    "compatibilityClaimed"
+  ]) {
+    reject(
+      withSiblingTextReportChange(report, (changedReport) => {
+        changedReport.hostOutputRow.dependencyMetadata[fieldName] = true;
+      }),
+      evidence,
+      /public|native|compatibility/u
+    );
+  }
+  reject(
+    withSiblingTextReportChange(report, (changedReport) => {
+      changedReport.publicBlockers.compatibilityClaimBlocked = false;
+    }),
+    evidence,
+    /compatibility/u
+  );
+}
+
+function assertSiblingTextCommittedFiberInspectionRejections({
+  report,
+  evidence,
+  reject
+}) {
+  reject(
+    withSiblingTextReportChange(report, (changedReport) => {
+      changedReport.committedFiberInspection.fiberShape =
+        privateToTreeCompositeMultiChildAcceptedFiberShape;
+    }),
+    evidence,
+    /committedFiberInspection|fiberShape/u
+  );
+  reject(
+    withSiblingTextReportChange(report, (changedReport) => {
+      changedReport.committedFiberInspection.rootChildFiberTags = [
+        "FunctionComponent"
+      ];
+    }),
+    evidence,
+    /committedFiberInspection|rootChildFiberTags/u
+  );
+  reject(
+    withSiblingTextReportChange(report, (changedReport) => {
+      changedReport.committedFiberInspection.functionComponentPresent = true;
+      changedReport.committedFiberInspection.functionComponentFiberTag =
+        "FunctionComponent";
+    }),
+    evidence,
+    /functionComponentPresent|FunctionComponent|committedFiberInspection/u
+  );
+}
+
+function assertToTreeSiblingTextReportClaimRejections({
+  report,
+  evidence,
+  reject
+}) {
+  for (const mutate of [
+    (changedReport) => {
+      changedReport.publicTreeObjectAvailable = true;
+    },
+    (changedReport) => {
+      changedReport.hostRoot.publicTreeObjectAvailable = true;
+    },
+    (changedReport) => {
+      changedReport.functionComponent.publicTreeObjectAvailable = true;
+    },
+    (changedReport) => {
+      changedReport.hostChildren[0].publicTreeObjectAvailable = true;
+    },
+    (changedReport) => {
+      changedReport.hostChildren[1].publicTreeObjectAvailable = true;
+    }
+  ]) {
+    reject(
+      withSiblingTextReportChange(report, mutate),
+      evidence,
+      /publicTreeObjectAvailable|public tree/u
+    );
+  }
+  reject(
+    withSiblingTextReportChange(report, (changedReport) => {
+      changedReport.publicBlockers.compatibilityClaimBlocked = false;
+    }),
+    evidence,
+    /compatibility/u
+  );
+}
+
+function assertToTreeSiblingTextCommittedFiberInspectionRejections({
+  report,
+  evidence,
+  reject
+}) {
+  reject(
+    withSiblingTextReportChange(report, (changedReport) => {
+      changedReport.committedFiberInspection.fiberShape =
+        privateToTreeMultiChildAcceptedFiberShape;
+    }),
+    evidence,
+    /committedFiberInspection|fiberShape/u
+  );
+  reject(
+    withSiblingTextReportChange(report, (changedReport) => {
+      changedReport.committedFiberInspection.rootChildFiberTags = [
+        "HostText",
+        "HostComponent"
+      ];
+    }),
+    evidence,
+    /committedFiberInspection|rootChildFiberTags/u
+  );
+  reject(
+    withSiblingTextReportChange(report, (changedReport) => {
+      changedReport.committedFiberInspection.wrapsCommittedHostOutput = false;
+    }),
+    evidence,
+    /committedFiberInspection|wrapsCommittedHostOutput/u
+  );
 }
 
 function withHostOutputReportChange(report, mutate) {
