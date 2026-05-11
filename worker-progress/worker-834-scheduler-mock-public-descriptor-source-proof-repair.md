@@ -34,6 +34,15 @@ Complete; ready for handoff.
   executed Scheduler mock CJS child module shape. The focused cache-slot
   regression now uses an actual `Module` instance replacement with fake exports
   and a fake validator.
+- Final re-audit follow-up: moved React source-proof validation off CommonJS
+  module/cache records entirely. The real Scheduler module now installs a
+  locked global current-validator record when it executes, and React reads that
+  Scheduler-owned record after attempting to load the Scheduler entrypoint.
+  Cache-hit replacement modules do not execute Scheduler code and cannot update
+  the current-validator record.
+- Strengthened the cache-slot regression to forge a CommonJS `Module`
+  replacement with `paths`, a fake Scheduler mock CJS child module shape, fake
+  exports, and a fake validator.
 
 ## Verification So Far
 
@@ -74,15 +83,18 @@ Complete; ready for handoff.
   proof.
 - Re-audit coverage confirms the same rejection when the cache replacement is
   a forged CommonJS `Module` instance rather than a plain object.
+- Final re-audit coverage confirms the same rejection when the forged
+  CommonJS `Module` also has `paths` plus a fake Scheduler mock CJS child
+  module shape.
 
 ## Risks Or Blockers
 
 - No blocker remains in this worker scope.
-- The React gate now trusts Scheduler-owned source-validator records only from
-  real loaded CommonJS `Module` records with the executed Scheduler mock CJS
-  child module shape. That keeps public Scheduler exports oracle-compatible,
-  but it remains a package-private CommonJS contract and should be rerun if the
-  Scheduler mock entrypoint is converted away from CommonJS module records.
+- The React gate now trusts the locked Scheduler-owned global current-validator
+  record installed by real Scheduler module execution. That keeps public
+  Scheduler exports oracle-compatible, but it remains a package-private
+  CommonJS-era handoff and should be rerun if the Scheduler mock entrypoint is
+  converted away from CommonJS module execution.
 
 ## Recommended Next Tasks
 

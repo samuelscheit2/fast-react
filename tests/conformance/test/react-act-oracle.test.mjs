@@ -4193,12 +4193,31 @@ function assertSchedulerMockExpiredDiagnosticsRejectedWithFakeCacheModuleRecord(
   );
   fakeModuleRecord.filename = resolvedSchedulerMockEntrypoint;
   fakeModuleRecord.loaded = true;
+  fakeModuleRecord.paths = CommonJsModule._nodeModulePaths(
+    path.dirname(resolvedSchedulerMockEntrypoint)
+  );
   fakeModuleRecord.exports = {
     unstable_flushExpired:
       createFakeSchedulerFlushHelperWithPrivateDiagnostics(
         originalDiagnostics
       )
   };
+  const fakeCjsChildModule = new CommonJsModule(
+    path.join(
+      repoRoot,
+      "packages/scheduler/cjs/scheduler-unstable_mock.development.js"
+    ),
+    fakeModuleRecord
+  );
+  fakeCjsChildModule.filename = fakeCjsChildModule.id;
+  fakeCjsChildModule.loaded = true;
+  fakeCjsChildModule.paths = CommonJsModule._nodeModulePaths(
+    path.dirname(fakeCjsChildModule.filename)
+  );
+  fakeCjsChildModule.exports = {
+    unstable_flushExpired: fakeModuleRecord.exports.unstable_flushExpired
+  };
+  fakeModuleRecord.children.push(fakeCjsChildModule);
 
   Object.defineProperty(
     fakeModuleRecord,

@@ -90,6 +90,12 @@ const privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey =
   Symbol.for(
     privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKind
   );
+const privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind =
+  'fast-react.scheduler.mock-expired-act-root-work-source-validator-global-record';
+const privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey =
+  Symbol.for(
+    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind
+  );
 const privateSchedulerMockExpiredActRootWorkMetadataKind =
   'fast-react.scheduler.mock-expired-act-root-work-metadata';
 const privateSchedulerMockExpiredActRootWorkMetadataVersion = 1;
@@ -107,9 +113,6 @@ const privateSchedulerMockDelayedActRootWorkMetadataVersion = 1;
 const privateSchedulerMockDelayedRendererRootWorkMetadataKind =
   'fast-react.scheduler.mock-delayed-renderer-root-work-metadata';
 const privateSchedulerMockDelayedRendererRootWorkMetadataVersion = 1;
-const trustedSchedulerMockExpiredActRootWorkSourceValidatorRecords =
-  new WeakSet();
-const trustedSchedulerMockExpiredActRootWorkSourceValidators = [];
 const schedulerMockDelayedActRootWorkDiagnosticsStatus =
   'drained-delayed-mock-scheduler-work-with-act-root-metadata-for-diagnostics';
 const schedulerMockDelayedActRootWorkAcceptedRootProducerKind =
@@ -385,14 +388,6 @@ function includesString(value, expectedValues) {
 function refreshSchedulerMockExpiredActRootWorkSourceValidators() {
   for (const resolvedModulePath of resolveSchedulerMockSourceProofPaths()) {
     loadSchedulerMockForExpiredActRootWorkSourceProof(resolvedModulePath);
-    for (const moduleRecord of getSchedulerMockSourceProofModuleRecords(
-      resolvedModulePath
-    )) {
-      trustSchedulerMockExpiredActRootWorkSourceValidatorFromModuleRecord(
-        moduleRecord,
-        resolvedModulePath
-      );
-    }
   }
 }
 
@@ -430,137 +425,40 @@ function loadSchedulerMockForExpiredActRootWorkSourceProof(
   }
 }
 
-function getSchedulerMockSourceProofModuleRecords(resolvedModulePath) {
-  const moduleRecords = [];
-  for (const childModule of module.children) {
-    if (childModule && childModule.id === resolvedModulePath) {
-      moduleRecords.push(childModule);
-    }
-  }
-  return moduleRecords;
-}
-
-function trustSchedulerMockExpiredActRootWorkSourceValidatorFromModuleRecord(
-  moduleRecord,
-  resolvedModulePath
-) {
-  if (
-    !isTrustedSchedulerMockSourceProofModuleRecord(
-      moduleRecord,
-      resolvedModulePath
-    ) ||
-    trustedSchedulerMockExpiredActRootWorkSourceValidatorRecords.has(
-      moduleRecord
-    )
-  ) {
-    return;
-  }
-
-  const Scheduler = moduleRecord.exports;
-  if (!isObjectLike(Scheduler)) {
-    return;
-  }
-
-  const flushExpiredDescriptor = Object.getOwnPropertyDescriptor(
-    Scheduler,
-    'unstable_flushExpired'
+function getSchedulerMockExpiredActRootWorkSourceValidatorFromGlobalRecord() {
+  const globalRecordDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKey
   );
   if (
-    flushExpiredDescriptor === undefined ||
-    flushExpiredDescriptor.enumerable !== true ||
-    typeof flushExpiredDescriptor.value !== 'function'
-  ) {
-    return;
-  }
-
-  const validator =
-    getSchedulerMockExpiredActRootWorkSourceValidatorFromModuleRecord(
-      moduleRecord
-    );
-  if (validator === null) {
-    return;
-  }
-
-  trustedSchedulerMockExpiredActRootWorkSourceValidatorRecords.add(
-    moduleRecord
-  );
-  trustedSchedulerMockExpiredActRootWorkSourceValidators.push(validator);
-}
-
-function isTrustedSchedulerMockSourceProofModuleRecord(
-  moduleRecord,
-  resolvedModulePath
-) {
-  return (
-    isObjectLike(moduleRecord) &&
-    moduleRecord instanceof module.constructor &&
-    moduleRecord.id === resolvedModulePath &&
-    moduleRecord.filename === resolvedModulePath &&
-    moduleRecord.loaded === true &&
-    hasSchedulerMockSourceProofModulePaths(moduleRecord) &&
-    hasSchedulerMockSourceProofCjsChildModule(moduleRecord)
-  );
-}
-
-function hasSchedulerMockSourceProofModulePaths(moduleRecord) {
-  return (
-    Array.isArray(moduleRecord.paths) &&
-    moduleRecord.paths.length > 0 &&
-    moduleRecord.paths.every((nodeModulePath) =>
-      typeof nodeModulePath === 'string'
-    )
-  );
-}
-
-function hasSchedulerMockSourceProofCjsChildModule(moduleRecord) {
-  return (
-    Array.isArray(moduleRecord.children) &&
-    moduleRecord.children.some((childModule) =>
-      isSchedulerMockSourceProofCjsChildModule(childModule, moduleRecord)
-    )
-  );
-}
-
-function isSchedulerMockSourceProofCjsChildModule(
-  childModule,
-  parentModuleRecord
-) {
-  return (
-    isObjectLike(childModule) &&
-    childModule instanceof module.constructor &&
-    childModule.parent === parentModuleRecord &&
-    childModule.loaded === true &&
-    typeof childModule.id === 'string' &&
-    (childModule.id.endsWith(
-      '/scheduler-unstable_mock.development.js'
-    ) ||
-      childModule.id.endsWith('/scheduler-unstable_mock.production.js')) &&
-    isObjectLike(childModule.exports) &&
-    typeof childModule.exports.unstable_flushExpired === 'function'
-  );
-}
-
-function getSchedulerMockExpiredActRootWorkSourceValidatorFromModuleRecord(
-  moduleRecord
-) {
-  if (!isObjectLike(moduleRecord)) {
-    return null;
-  }
-
-  const sourceRecordDescriptor = Object.getOwnPropertyDescriptor(
-    moduleRecord,
-    privateSchedulerMockExpiredActRootWorkSourceValidatorModuleRecordKey
-  );
-  if (
-    sourceRecordDescriptor === undefined ||
-    sourceRecordDescriptor.configurable !== false ||
-    sourceRecordDescriptor.enumerable !== false ||
-    sourceRecordDescriptor.writable !== false
+    globalRecordDescriptor === undefined ||
+    globalRecordDescriptor.configurable !== false ||
+    globalRecordDescriptor.enumerable !== false ||
+    globalRecordDescriptor.writable !== false
   ) {
     return null;
   }
 
-  const sourceRecord = sourceRecordDescriptor.value;
+  const globalRecord = globalRecordDescriptor.value;
+  if (
+    !isObjectLike(globalRecord) ||
+    !Object.isFrozen(globalRecord) ||
+    globalRecord.status !==
+      privateSchedulerMockExpiredActRootWorkSourceValidatorGlobalRecordKind ||
+    typeof globalRecord
+      .getSchedulerMockExpiredActRootWorkSourceValidatorRecord !== 'function'
+  ) {
+    return null;
+  }
+
+  return getSchedulerMockExpiredActRootWorkSourceValidatorFromSourceRecord(
+    globalRecord.getSchedulerMockExpiredActRootWorkSourceValidatorRecord()
+  );
+}
+
+function getSchedulerMockExpiredActRootWorkSourceValidatorFromSourceRecord(
+  sourceRecord
+) {
   if (
     !isObjectLike(sourceRecord) ||
     !Object.isFrozen(sourceRecord) ||
@@ -611,12 +509,13 @@ function getSchedulerMockExpiredActRootWorkSourceValidatorFromModuleRecord(
 
 function hasSchedulerMockExpiredActRootWorkSourceProof(value) {
   refreshSchedulerMockExpiredActRootWorkSourceValidators();
+  const validator =
+    getSchedulerMockExpiredActRootWorkSourceValidatorFromGlobalRecord();
   return (
     isObjectLike(value) &&
     Object.isFrozen(value) &&
-    trustedSchedulerMockExpiredActRootWorkSourceValidators.some((validator) =>
-      validator.isSchedulerMockExpiredActRootWorkSource(value) === true
-    )
+    validator !== null &&
+    validator.isSchedulerMockExpiredActRootWorkSource(value) === true
   );
 }
 
