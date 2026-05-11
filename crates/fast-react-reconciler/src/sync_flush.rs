@@ -2886,6 +2886,7 @@ mod tests {
     };
     use crate::host_work::{
         DetachedHostRecords, HostWorkError, HostWorkResult,
+        SyncFlushDeletedSubtreeTeardownExecutionDiagnosticForCanary,
         SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary,
         SyncFlushHostMutationExecutionErrorForCanary,
         TestHostRootDeletionRefPassiveCleanupExecutionPhase,
@@ -3432,6 +3433,255 @@ mod tests {
             host_work,
             operations_before_teardown,
         }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct SyncFlushDeletedSubtreePostPassiveContinuationDiagnosticForCanary {
+        deleted_subtree_teardown: SyncFlushDeletedSubtreeTeardownExecutionDiagnosticForCanary,
+        post_passive_continuation: SyncFlushPostPassiveContinuationExecutionRecord,
+    }
+
+    impl SyncFlushDeletedSubtreePostPassiveContinuationDiagnosticForCanary {
+        fn deleted_subtree_teardown(
+            &self,
+        ) -> &SyncFlushDeletedSubtreeTeardownExecutionDiagnosticForCanary {
+            &self.deleted_subtree_teardown
+        }
+
+        fn post_passive_continuation(&self) -> &SyncFlushPostPassiveContinuationExecutionRecord {
+            &self.post_passive_continuation
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    enum SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary {
+        MissingPendingPassiveHandoff {
+            root: FiberRootId,
+            finished_work: FiberId,
+        },
+        StalePostPassiveContinuationEvidence {
+            expected_root: FiberRootId,
+            actual_root: FiberRootId,
+            expected_finished_work: FiberId,
+            actual_finished_work: FiberId,
+            expected_lanes: Lanes,
+            actual_lanes: Lanes,
+        },
+        DeletedSubtreeTeardown(SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary),
+        SyncFlushContinuation(SyncFlushError),
+        MissingPostPassiveContinuation {
+            root: FiberRootId,
+            finished_work: FiberId,
+        },
+        MissingFollowUpSyncFlush {
+            root: FiberRootId,
+            finished_work: FiberId,
+        },
+        UnexpectedContinuationRootCount {
+            root: FiberRootId,
+            expected: usize,
+            actual: usize,
+        },
+        UnexpectedContinuationRoot {
+            expected_root: FiberRootId,
+            actual_root: FiberRootId,
+        },
+        UnexpectedContinuationLanes {
+            root: FiberRootId,
+            expected_lanes: Lanes,
+            actual_lanes: Lanes,
+        },
+        UnexpectedFollowUpSyncFlushRecordCount {
+            expected: usize,
+            actual: usize,
+        },
+    }
+
+    impl From<SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary>
+        for SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary
+    {
+        fn from(error: SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary) -> Self {
+            Self::DeletedSubtreeTeardown(error)
+        }
+    }
+
+    impl From<SyncFlushError> for SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary {
+        fn from(error: SyncFlushError) -> Self {
+            Self::SyncFlushContinuation(error)
+        }
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "private canary composes sync-flush deletion teardown with post-passive continuation evidence"
+    )]
+    fn execute_sync_flush_deleted_subtree_teardown_and_post_passive_continuation_for_canary<E>(
+        store: &mut FiberRootStore<RecordingHost>,
+        host: &mut RecordingHost,
+        sync_flush_record: &SyncFlushRootRecord,
+        sync_flush_diagnostics: SyncFlushRootHostOutputCommitDiagnosticsForCanary,
+        sync_flush_request: crate::host_work::SyncFlushHostMutationExecutionRequestForCanary,
+        deletion_handoff: &HostRootFinishedWorkCommitHandoffRecordForCanary,
+        source_deletion_request: crate::host_work::TestHostRootDeletionTeardownExecutionRequestForCanary,
+        deletion_request: crate::host_work::TestHostRootDeletionTeardownExecutionRequestForCanary,
+        post_passive_handoff: PendingPassiveCommitHandoff,
+        expected_continuation_root: FiberRootId,
+        expected_continuation_lanes: Lanes,
+        host_work: &mut HostWorkResult,
+        executor: &mut E,
+    ) -> Result<
+        SyncFlushDeletedSubtreePostPassiveContinuationDiagnosticForCanary,
+        SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary,
+    >
+    where
+        E: DeletedSubtreeRefCleanupReturnExecutor + PassiveEffectDestroyCallbackExecutor,
+    {
+        let source_post_passive_handoff = sync_flush_record
+            .commit()
+            .pending_passive_handoff()
+            .ok_or(
+                SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::MissingPendingPassiveHandoff {
+                    root: sync_flush_record.root(),
+                    finished_work: sync_flush_record.commit().finished_work(),
+                },
+            )?;
+        if source_post_passive_handoff != post_passive_handoff {
+            return Err(
+                SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::StalePostPassiveContinuationEvidence {
+                    expected_root: source_post_passive_handoff.root(),
+                    actual_root: post_passive_handoff.root(),
+                    expected_finished_work: source_post_passive_handoff.finished_work(),
+                    actual_finished_work: post_passive_handoff.finished_work(),
+                    expected_lanes: source_post_passive_handoff.lanes(),
+                    actual_lanes: post_passive_handoff.lanes(),
+                },
+            );
+        }
+
+        let deleted_subtree_teardown = execute_sync_flush_deleted_subtree_teardown_for_canary(
+            store,
+            host,
+            sync_flush_record,
+            sync_flush_diagnostics,
+            sync_flush_request,
+            deletion_handoff,
+            source_deletion_request,
+            deletion_request,
+            host_work,
+            executor,
+        )?;
+
+        let post_passive_continuation = flush_sync_post_passive_continuation_after_passive_effects(
+            store,
+            &ExecutionContextState::new(),
+            Some(post_passive_handoff),
+        )?
+        .ok_or(
+            SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::MissingPostPassiveContinuation {
+                root: sync_flush_request.root(),
+                finished_work: sync_flush_request.finished_work(),
+            },
+        )?;
+
+        if !post_passive_continuation.did_request_follow_up_sync_flush()
+            || !post_passive_continuation.did_execute_follow_up_sync_flush()
+        {
+            return Err(
+                SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::MissingFollowUpSyncFlush {
+                    root: sync_flush_request.root(),
+                    finished_work: sync_flush_request.finished_work(),
+                },
+            );
+        }
+
+        let gate = post_passive_continuation.gate();
+        if gate.pending_passive_root() != sync_flush_request.root()
+            || gate.pending_passive_finished_work() != sync_flush_request.finished_work()
+            || gate.pending_passive_lanes() != sync_flush_request.finished_lanes()
+        {
+            return Err(
+                SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::StalePostPassiveContinuationEvidence {
+                    expected_root: sync_flush_request.root(),
+                    actual_root: gate.pending_passive_root(),
+                    expected_finished_work: sync_flush_request.finished_work(),
+                    actual_finished_work: gate.pending_passive_finished_work(),
+                    expected_lanes: sync_flush_request.finished_lanes(),
+                    actual_lanes: gate.pending_passive_lanes(),
+                },
+            );
+        }
+
+        if gate.continuation_roots().len() != 1 {
+            return Err(
+                SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::UnexpectedContinuationRootCount {
+                    root: sync_flush_request.root(),
+                    expected: 1,
+                    actual: gate.continuation_roots().len(),
+                },
+            );
+        }
+
+        let continuation_root = gate.continuation_roots()[0];
+        if continuation_root.root() != expected_continuation_root {
+            return Err(
+                SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::UnexpectedContinuationRoot {
+                    expected_root: expected_continuation_root,
+                    actual_root: continuation_root.root(),
+                },
+            );
+        }
+
+        if continuation_root.lanes() != expected_continuation_lanes {
+            return Err(
+                SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::UnexpectedContinuationLanes {
+                    root: expected_continuation_root,
+                    expected_lanes: expected_continuation_lanes,
+                    actual_lanes: continuation_root.lanes(),
+                },
+            );
+        }
+
+        let sync_flush_result = post_passive_continuation.sync_flush_result().ok_or(
+            SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::MissingFollowUpSyncFlush {
+                root: sync_flush_request.root(),
+                finished_work: sync_flush_request.finished_work(),
+            },
+        )?;
+        if sync_flush_result.records().len() != 1 {
+            return Err(
+                SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::UnexpectedFollowUpSyncFlushRecordCount {
+                    expected: 1,
+                    actual: sync_flush_result.records().len(),
+                },
+            );
+        }
+
+        let sync_flush_record = &sync_flush_result.records()[0];
+        if sync_flush_record.root() != expected_continuation_root {
+            return Err(
+                SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::UnexpectedContinuationRoot {
+                    expected_root: expected_continuation_root,
+                    actual_root: sync_flush_record.root(),
+                },
+            );
+        }
+
+        if sync_flush_record.render_lanes() != expected_continuation_lanes {
+            return Err(
+                SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::UnexpectedContinuationLanes {
+                    root: expected_continuation_root,
+                    expected_lanes: expected_continuation_lanes,
+                    actual_lanes: sync_flush_record.render_lanes(),
+                },
+            );
+        }
+
+        Ok(
+            SyncFlushDeletedSubtreePostPassiveContinuationDiagnosticForCanary {
+                deleted_subtree_teardown,
+                post_passive_continuation,
+            },
+        )
     }
 
     fn root_callback_error(raw: u64) -> RootUpdateCallbackInvocationErrorHandle {
@@ -5483,6 +5733,615 @@ mod tests {
                     order,
                     finished_work,
                 }
+            ) if root == root_id
+                && order == fixture.committed.order()
+                && finished_work == fixture.committed.commit().finished_work()
+        ));
+        assert_eq!(executor.ref_cleanup_calls().len(), 1);
+        assert_eq!(executor.destroy_calls().len(), 1);
+        assert_eq!(host.operations(), operations_after_first_execute);
+    }
+
+    #[test]
+    fn sync_flush_private_deleted_subtree_post_passive_continuation_runs_after_ref_passive_and_host_cleanup()
+     {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let mut host = RecordingHost::default();
+        let root_id = store
+            .create_client_root(FakeContainer::new(890), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(891), RootOptions::new())
+            .unwrap();
+        let mut fixture = prepare_sync_flush_deleted_subtree_teardown_fixture(
+            &mut store, &mut host, root_id, 890_100,
+        );
+        let post_passive_handoff = fixture
+            .committed
+            .commit()
+            .pending_passive_handoff()
+            .unwrap();
+        let deletion_handoff = fixture
+            .committed
+            .root_finished_work_commit_handoff_for_canary()
+            .unwrap()
+            .clone();
+        let continuation_element = RootElementHandle::from_raw(890_111);
+        schedule_sync_update(&mut store, continuation_root, continuation_element);
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut executor = RecordingSyncFlushDeletedSubtreeTeardownExecutor::default();
+
+        let diagnostic =
+            execute_sync_flush_deleted_subtree_teardown_and_post_passive_continuation_for_canary(
+                &mut store,
+                &mut host,
+                &fixture.committed,
+                fixture.diagnostics,
+                fixture.sync_request,
+                &deletion_handoff,
+                fixture.deletion_request,
+                fixture.deletion_request,
+                post_passive_handoff,
+                continuation_root,
+                Lanes::SYNC,
+                &mut fixture.host_work,
+                &mut executor,
+            )
+            .unwrap();
+
+        let teardown = diagnostic.deleted_subtree_teardown();
+        assert_eq!(teardown.root(), root_id);
+        assert_eq!(teardown.sync_flush_request(), fixture.sync_request);
+        assert!(teardown.ref_cleanup_return_callbacks_invoked());
+        assert!(teardown.passive_destroy_callbacks_invoked());
+        assert!(teardown.private_host_subtree_detachment_applied());
+        assert!(teardown.private_opt_in_sync_flush_teardown_requested());
+        assert!(!teardown.public_flush_sync_compatibility_claimed());
+        assert!(!teardown.public_unmount_compatibility_claimed());
+        assert!(!teardown.public_ref_or_effect_compatibility_claimed());
+
+        let apply_records = fixture.committed.commit().mutation_apply_log().records();
+        assert_eq!(apply_records.len(), 1);
+        assert_eq!(
+            apply_records[0].source(),
+            HostRootMutationApplyRecordSource::DeletionList(fixture.deletion_list)
+        );
+        assert_eq!(
+            apply_records[0].kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent
+        );
+
+        let ref_passive = teardown.deletion_teardown().ref_passive_cleanup();
+        assert_eq!(ref_passive.ref_cleanup_return_executions().len(), 1);
+        assert_eq!(executor.ref_cleanup_calls().len(), 1);
+        assert_eq!(executor.destroy_calls().len(), 1);
+        assert_eq!(
+            ref_passive.passive_effects().unwrap().records()[0].fiber(),
+            fixture.deleted_function
+        );
+        assert_eq!(
+            ref_passive
+                .passive_effects()
+                .unwrap()
+                .destroy_callback_executions()[0]
+                .destroy_callback(),
+            fixture.passive_destroy
+        );
+
+        let snapshot = teardown.deletion_teardown().execution_snapshot();
+        let mut observed_order = vec!["deletion-record"];
+        observed_order.extend(
+            snapshot
+                .records()
+                .iter()
+                .map(|record| match record.phase() {
+                    TestHostRootDeletionRefPassiveCleanupExecutionPhase::RefCleanupReturnGate => {
+                        "ref-cleanup"
+                    }
+                    TestHostRootDeletionRefPassiveCleanupExecutionPhase::PassiveDestroyCallback => {
+                        "passive-destroy"
+                    }
+                    TestHostRootDeletionRefPassiveCleanupExecutionPhase::HostSubtreeDetach => {
+                        "host-detach"
+                    }
+                    TestHostRootDeletionRefPassiveCleanupExecutionPhase::HostNodeCleanup => {
+                        "host-cleanup"
+                    }
+                }),
+        );
+        observed_order.push("post-passive-sync-flush-continuation");
+        assert_eq!(
+            observed_order,
+            vec![
+                "deletion-record",
+                "ref-cleanup",
+                "passive-destroy",
+                "host-detach",
+                "host-cleanup",
+                "host-cleanup",
+                "post-passive-sync-flush-continuation",
+            ]
+        );
+
+        let continuation = diagnostic.post_passive_continuation();
+        assert!(continuation.did_request_follow_up_sync_flush());
+        assert!(continuation.did_execute_follow_up_sync_flush());
+        assert!(continuation.did_flush_follow_up_sync_work());
+        assert_eq!(
+            continuation.gate().exit_status(),
+            RootSyncFlushExitStatus::Completed
+        );
+        assert_eq!(continuation.gate().pending_passive_root(), root_id);
+        assert_eq!(
+            continuation.gate().pending_passive_finished_work(),
+            fixture.sync_request.finished_work()
+        );
+        assert_eq!(continuation.gate().pending_passive_lanes(), Lanes::SYNC);
+        assert_eq!(continuation.gate().pending_passive_unmount_count(), 1);
+        assert_eq!(continuation.gate().pending_passive_mount_count(), 0);
+        assert_eq!(continuation.gate().pending_passive_record_count(), 1);
+        assert_eq!(continuation.gate().continuation_roots().len(), 1);
+        assert_eq!(
+            continuation.gate().continuation_roots()[0].root(),
+            continuation_root
+        );
+        assert_eq!(
+            continuation.gate().continuation_roots()[0].lanes(),
+            Lanes::SYNC
+        );
+
+        let sync_flush = continuation.sync_flush_result().unwrap();
+        assert!(sync_flush.did_flush_work());
+        assert_eq!(sync_flush.records().len(), 1);
+        assert_eq!(sync_flush.records()[0].root(), continuation_root);
+        assert_eq!(sync_flush.records()[0].render_lanes(), Lanes::SYNC);
+        assert_eq!(
+            current_host_root_element(&store, continuation_root),
+            continuation_element
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert!(
+            !fixture
+                .host_work
+                .detached_hosts_mut_for_canary()
+                .text_metadata(fixture.deleted_text_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert!(
+            !fixture
+                .host_work
+                .detached_hosts_mut_for_canary()
+                .instance_metadata(fixture.deleted_host_state_node)
+                .unwrap()
+                .is_active()
+        );
+        let mut expected_operations = fixture.operations_before_teardown;
+        expected_operations.push("remove_child");
+        expected_operations.push("detach_deleted_instance");
+        assert_eq!(host.operations(), expected_operations);
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+    }
+
+    #[test]
+    fn sync_flush_private_deleted_subtree_post_passive_continuation_rejects_missing_ref_passive_evidence_before_host_calls()
+     {
+        let mut fixture =
+            sync_flush_host_mutation_fixture("missing deleted post passive continuation evidence");
+        schedule_sync_update(&mut fixture.store, fixture.root_id, RootElementHandle::NONE);
+        let rendered =
+            flush_sync_work_on_all_roots(&mut fixture.store, &ExecutionContextState::new())
+                .unwrap();
+        let rendered_record = rendered.records()[0];
+        delete_test_host_work_root_child_for_canary(
+            &mut fixture.store,
+            &mut fixture.host_work,
+            rendered_record.render_phase(),
+        )
+        .unwrap();
+        let operations_before_request = fixture.host.operations();
+        let (committed, _diagnostics) =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_diagnostics_for_canary(
+                &mut fixture.store,
+                rendered_record,
+            )
+            .unwrap();
+
+        let error = test_host_root_deletion_teardown_execution_request_for_canary(
+            committed
+                .root_finished_work_commit_handoff_for_canary()
+                .unwrap(),
+            SYNC_FLUSH_DELETED_SUBTREE_TEARDOWN_REQUEST_ORDER,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootDeletionTeardownExecutionErrorForCanary::MissingDeletionTeardownMetadata {
+                root,
+                finished_work,
+            } if root == fixture.root_id && finished_work == committed.commit().finished_work()
+        ));
+        assert_eq!(fixture.host.operations(), operations_before_request);
+    }
+
+    #[test]
+    fn sync_flush_private_deleted_subtree_post_passive_continuation_rejects_stale_continuation_and_cross_root_deletion_evidence()
+     {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let mut host = RecordingHost::default();
+        let root_id = store
+            .create_client_root(FakeContainer::new(892), RootOptions::new())
+            .unwrap();
+        let foreign_root = store
+            .create_client_root(FakeContainer::new(893), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(894), RootOptions::new())
+            .unwrap();
+        let mut fixture = prepare_sync_flush_deleted_subtree_teardown_fixture(
+            &mut store, &mut host, root_id, 890_200,
+        );
+        let mut foreign_fixture = prepare_sync_flush_deleted_subtree_teardown_fixture(
+            &mut store,
+            &mut host,
+            foreign_root,
+            890_300,
+        );
+        let source_post_passive_handoff = fixture
+            .committed
+            .commit()
+            .pending_passive_handoff()
+            .unwrap();
+        let foreign_post_passive_handoff = foreign_fixture
+            .committed
+            .commit()
+            .pending_passive_handoff()
+            .unwrap();
+        let source_deletion_handoff = fixture
+            .committed
+            .root_finished_work_commit_handoff_for_canary()
+            .unwrap()
+            .clone();
+        let foreign_deletion_handoff = foreign_fixture
+            .committed
+            .root_finished_work_commit_handoff_for_canary()
+            .unwrap()
+            .clone();
+        schedule_sync_update(
+            &mut store,
+            continuation_root,
+            RootElementHandle::from_raw(890_301),
+        );
+        let operations_before_rejections = host.operations();
+        let mut executor = RecordingSyncFlushDeletedSubtreeTeardownExecutor::default();
+
+        let stale_continuation_error =
+            execute_sync_flush_deleted_subtree_teardown_and_post_passive_continuation_for_canary(
+                &mut store,
+                &mut host,
+                &fixture.committed,
+                fixture.diagnostics,
+                fixture.sync_request,
+                &source_deletion_handoff,
+                fixture.deletion_request,
+                fixture.deletion_request,
+                foreign_post_passive_handoff,
+                continuation_root,
+                Lanes::SYNC,
+                &mut fixture.host_work,
+                &mut executor,
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            stale_continuation_error,
+            SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::StalePostPassiveContinuationEvidence {
+                expected_root,
+                actual_root,
+                expected_lanes: Lanes::SYNC,
+                actual_lanes: Lanes::SYNC,
+                ..
+            } if expected_root == root_id && actual_root == foreign_root
+        ));
+        assert!(executor.ref_cleanup_calls().is_empty());
+        assert!(executor.destroy_calls().is_empty());
+        assert_eq!(host.operations(), operations_before_rejections);
+
+        let cross_root_deletion_error =
+            execute_sync_flush_deleted_subtree_teardown_and_post_passive_continuation_for_canary(
+                &mut store,
+                &mut host,
+                &fixture.committed,
+                fixture.diagnostics,
+                fixture.sync_request,
+                &foreign_deletion_handoff,
+                foreign_fixture.deletion_request,
+                foreign_fixture.deletion_request,
+                source_post_passive_handoff,
+                continuation_root,
+                Lanes::SYNC,
+                &mut fixture.host_work,
+                &mut executor,
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            cross_root_deletion_error,
+            SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::DeletedSubtreeTeardown(
+                SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary::MismatchedRootOwnership {
+                    expected_root,
+                    actual_root,
+                }
+            ) if expected_root == root_id && actual_root == foreign_root
+        ));
+        assert!(executor.ref_cleanup_calls().is_empty());
+        assert!(executor.destroy_calls().is_empty());
+        assert_eq!(host.operations(), operations_before_rejections);
+        assert!(
+            fixture
+                .host_work
+                .detached_hosts_mut_for_canary()
+                .instance_metadata(fixture.deleted_host_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert!(
+            foreign_fixture
+                .host_work
+                .detached_hosts_mut_for_canary()
+                .instance_metadata(foreign_fixture.deleted_host_state_node)
+                .unwrap()
+                .is_active()
+        );
+    }
+
+    #[test]
+    fn sync_flush_private_deleted_subtree_post_passive_continuation_rejects_stale_topology_and_caller_built_request()
+     {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let mut host = RecordingHost::default();
+        let root_id = store
+            .create_client_root(FakeContainer::new(895), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(896), RootOptions::new())
+            .unwrap();
+        let mut fixture = prepare_sync_flush_deleted_subtree_teardown_fixture(
+            &mut store, &mut host, root_id, 890_400,
+        );
+        let post_passive_handoff = fixture
+            .committed
+            .commit()
+            .pending_passive_handoff()
+            .unwrap();
+        let deletion_handoff = fixture
+            .committed
+            .root_finished_work_commit_handoff_for_canary()
+            .unwrap()
+            .clone();
+        schedule_sync_update(
+            &mut store,
+            continuation_root,
+            RootElementHandle::from_raw(890_401),
+        );
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .set_current(fixture.previous_current);
+        let operations_before_topology_error = host.operations();
+        let mut executor = RecordingSyncFlushDeletedSubtreeTeardownExecutor::default();
+
+        let stale_topology_error =
+            execute_sync_flush_deleted_subtree_teardown_and_post_passive_continuation_for_canary(
+                &mut store,
+                &mut host,
+                &fixture.committed,
+                fixture.diagnostics,
+                fixture.sync_request,
+                &deletion_handoff,
+                fixture.deletion_request,
+                fixture.deletion_request,
+                post_passive_handoff,
+                continuation_root,
+                Lanes::SYNC,
+                &mut fixture.host_work,
+                &mut executor,
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            stale_topology_error,
+            SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::DeletedSubtreeTeardown(
+                SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary::SyncFlushHostMutation(
+                    SyncFlushHostMutationExecutionErrorForCanary::HostWork(
+                        HostWorkError::CommitCurrentMismatch {
+                            root,
+                            expected,
+                            actual,
+                        }
+                    )
+                )
+            ) if root == root_id
+                && expected == fixture.committed.commit().current()
+                && actual == fixture.previous_current
+        ));
+        assert!(executor.ref_cleanup_calls().is_empty());
+        assert!(executor.destroy_calls().is_empty());
+        assert_eq!(host.operations(), operations_before_topology_error);
+
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let mut host = RecordingHost::default();
+        let root_id = store
+            .create_client_root(FakeContainer::new(897), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(898), RootOptions::new())
+            .unwrap();
+        let mut fixture = prepare_sync_flush_deleted_subtree_teardown_fixture(
+            &mut store, &mut host, root_id, 890_500,
+        );
+        let post_passive_handoff = fixture
+            .committed
+            .commit()
+            .pending_passive_handoff()
+            .unwrap();
+        let deletion_handoff = fixture
+            .committed
+            .root_finished_work_commit_handoff_for_canary()
+            .unwrap()
+            .clone();
+        schedule_sync_update(
+            &mut store,
+            continuation_root,
+            RootElementHandle::from_raw(890_501),
+        );
+        let caller_built_deletion_request = fixture
+            .deletion_request
+            .with_host_node_cleanup_count_for_canary(0);
+        let operations_before_caller_error = host.operations();
+        let mut executor = RecordingSyncFlushDeletedSubtreeTeardownExecutor::default();
+
+        let caller_built_error =
+            execute_sync_flush_deleted_subtree_teardown_and_post_passive_continuation_for_canary(
+                &mut store,
+                &mut host,
+                &fixture.committed,
+                fixture.diagnostics,
+                fixture.sync_request,
+                &deletion_handoff,
+                fixture.deletion_request,
+                caller_built_deletion_request,
+                post_passive_handoff,
+                continuation_root,
+                Lanes::SYNC,
+                &mut fixture.host_work,
+                &mut executor,
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            caller_built_error,
+            SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::DeletedSubtreeTeardown(
+                SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary::DeletedSubtreeTeardown(
+                    TestHostRootDeletionTeardownExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                        root,
+                        request_order: SYNC_FLUSH_DELETED_SUBTREE_TEARDOWN_REQUEST_ORDER,
+                        ..
+                    }
+                )
+            ) if root == root_id
+        ));
+        assert!(executor.ref_cleanup_calls().is_empty());
+        assert!(executor.destroy_calls().is_empty());
+        assert_eq!(host.operations(), operations_before_caller_error);
+    }
+
+    #[test]
+    fn sync_flush_private_deleted_subtree_post_passive_continuation_rejects_replay_before_second_host_calls()
+     {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let mut host = RecordingHost::default();
+        let root_id = store
+            .create_client_root(FakeContainer::new(899), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(900), RootOptions::new())
+            .unwrap();
+        let mut fixture = prepare_sync_flush_deleted_subtree_teardown_fixture(
+            &mut store, &mut host, root_id, 890_600,
+        );
+        let post_passive_handoff = fixture
+            .committed
+            .commit()
+            .pending_passive_handoff()
+            .unwrap();
+        let deletion_handoff = fixture
+            .committed
+            .root_finished_work_commit_handoff_for_canary()
+            .unwrap()
+            .clone();
+        let continuation_element = RootElementHandle::from_raw(890_601);
+        schedule_sync_update(&mut store, continuation_root, continuation_element);
+        let mut executor = RecordingSyncFlushDeletedSubtreeTeardownExecutor::default();
+        let first =
+            execute_sync_flush_deleted_subtree_teardown_and_post_passive_continuation_for_canary(
+                &mut store,
+                &mut host,
+                &fixture.committed,
+                fixture.diagnostics,
+                fixture.sync_request,
+                &deletion_handoff,
+                fixture.deletion_request,
+                fixture.deletion_request,
+                post_passive_handoff,
+                continuation_root,
+                Lanes::SYNC,
+                &mut fixture.host_work,
+                &mut executor,
+            )
+            .unwrap();
+        assert!(
+            first
+                .deleted_subtree_teardown()
+                .private_host_subtree_detachment_applied()
+        );
+        assert!(
+            first
+                .post_passive_continuation()
+                .did_flush_follow_up_sync_work()
+        );
+        assert_eq!(executor.ref_cleanup_calls().len(), 1);
+        assert_eq!(executor.destroy_calls().len(), 1);
+        assert_eq!(
+            current_host_root_element(&store, continuation_root),
+            continuation_element
+        );
+        let operations_after_first_execute = host.operations();
+
+        let replay_error =
+            execute_sync_flush_deleted_subtree_teardown_and_post_passive_continuation_for_canary(
+                &mut store,
+                &mut host,
+                &fixture.committed,
+                fixture.diagnostics,
+                fixture.sync_request,
+                &deletion_handoff,
+                fixture.deletion_request,
+                fixture.deletion_request,
+                post_passive_handoff,
+                continuation_root,
+                Lanes::SYNC,
+                &mut fixture.host_work,
+                &mut executor,
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            replay_error,
+            SyncFlushDeletedSubtreePostPassiveContinuationErrorForCanary::DeletedSubtreeTeardown(
+                SyncFlushDeletedSubtreeTeardownExecutionErrorForCanary::SyncFlushHostMutation(
+                    SyncFlushHostMutationExecutionErrorForCanary::ReplayedHostMutationExecution {
+                        root,
+                        order,
+                        finished_work,
+                    }
+                )
             ) if root == root_id
                 && order == fixture.committed.order()
                 && finished_work == fixture.committed.commit().finished_work()
