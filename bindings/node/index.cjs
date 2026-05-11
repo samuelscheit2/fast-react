@@ -77,6 +77,38 @@ const nativeRootBridgeBatchLifecycleConsumerCleanupHookAcceptedStatus =
   'accepted';
 const nativeRootBridgeBatchLifecycleConsumerCleanupHookRejectedStatus =
   'rejected';
+const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkStatus =
+  'linked-native-root-bridge-batch-lifecycle-consumer-json-batch-roundtrip';
+const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkModel =
+  'fast-react-napi.NativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink';
+const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkLinkedStatus =
+  'linked';
+const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectedStatus =
+  'rejected';
+const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes =
+  Object.freeze({
+    cleanupHookStatusMismatch:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_CLEANUP_STATUS_MISMATCH',
+    consumerRowIdMismatch:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_ROW_ID_MISMATCH',
+    kindTransitionMismatch:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_KIND_TRANSITION_MISMATCH',
+    publicNativeExecutionClaim:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM',
+    rowOrderMismatch:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_ROW_ORDER_MISMATCH',
+    staleOrForeignJsonBatchRow:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_STALE_OR_FOREIGN_JSON_BATCH_ROW'
+  });
+const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCaseIds =
+  Object.freeze([
+    'consumer-row-id-mismatch',
+    'consumer-row-order-mismatch',
+    'consumer-kind-transition-mismatch',
+    'consumer-cleanup-status-mismatch',
+    'stale-or-foreign-json-batch-row',
+    'public-native-execution-claim'
+  ]);
 const nativeRootBridgeJsonTransportBatchResponseSequenceGateStatus =
   'diagnosed-native-root-bridge-json-batch-response-sequence';
 const nativeRootBridgeJsonTransportBatchResponseSequenceBatchId =
@@ -445,6 +477,11 @@ const nativeRootBridgeBatchLifecycleConsumerCleanupHookStatuses =
     nativeRootBridgeBatchLifecycleConsumerCleanupHookAcceptedStatus,
     nativeRootBridgeBatchLifecycleConsumerCleanupHookRejectedStatus
   ]);
+const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkStatuses =
+  Object.freeze([
+    nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkLinkedStatus,
+    nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectedStatus
+  ]);
 const nativeRootBridgeBatchLifecycleConsumerRowFields = Object.freeze([
   'id',
   'batchIndex',
@@ -477,6 +514,42 @@ const nativeRootBridgeBatchLifecycleConsumerRowFields = Object.freeze([
   'publicNativeCompatibility',
   'reactBehaviorError'
 ]);
+const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRowFields =
+  Object.freeze([
+    'id',
+    'consumerRowId',
+    'lifecycleRowId',
+    'responseRowId',
+    'streamMetadataRowId',
+    'streamPayloadRowId',
+    'batchId',
+    'streamId',
+    'batchIndex',
+    'requestId',
+    'kind',
+    'lifecycleTransition',
+    'rootHandleAction',
+    'cleanupHookEvidenceStatus',
+    'requestOrder',
+    'responseOrder',
+    'metadataBatchSequence',
+    'payloadBatchSequence',
+    'metadataChunkKind',
+    'payloadChunkKind',
+    'responseStatus',
+    'payloadAssemblyState',
+    'teardownState',
+    'status',
+    'code',
+    'nativeAddonLoaded',
+    'nativeExecution',
+    'rendererExecution',
+    'reconcilerExecution',
+    'nodeWorkerThreadsExecution',
+    'napiCleanupHookExecution',
+    'publicNativeCompatibility',
+    'reactBehaviorError'
+  ]);
 const nativeRootBridgeJsonTransportParseErrorCodes = Object.freeze({
   expectedObject:
     'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_EXPECTED_OBJECT',
@@ -1442,6 +1515,395 @@ function hasNativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaim(
   );
 }
 
+function freezeNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink(
+  link
+) {
+  Object.defineProperty(link, 'validateJsonBatchRoundtripLinkRows', {
+    value:
+      validateNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRows,
+    enumerable: false,
+    configurable: false,
+    writable: false
+  });
+
+  return Object.freeze(link);
+}
+
+function validateNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRows(
+  evidence
+) {
+  const linkEvidence = evidence ?? {};
+  return createNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink({
+    consumerRows: linkEvidence.consumerRows,
+    lifecycleRows: linkEvidence.lifecycleRows,
+    responseRows: linkEvidence.responseRows,
+    streamRows: linkEvidence.streamRows,
+    smokeRecords: linkEvidence.smokeRecords
+  });
+}
+
+function createNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink({
+  consumerRows,
+  lifecycleRows,
+  responseSequenceGate,
+  rustHandleTableAdmissionSmoke,
+  responseRows,
+  streamRows,
+  smokeRecords
+}) {
+  const normalizedConsumerRows = Array.from(consumerRows ?? []);
+  const normalizedLifecycleRows = Array.from(lifecycleRows ?? []);
+  const normalizedResponseRows = Array.from(
+    responseRows ?? responseSequenceGate?.rows ?? []
+  );
+  const normalizedStreamRows = Array.from(
+    streamRows ?? responseSequenceGate?.streamRoundtripGate?.rows ?? []
+  );
+  const normalizedSmokeRecords = Array.from(
+    smokeRecords ?? rustHandleTableAdmissionSmoke?.smokeRecords ?? []
+  );
+  const batchId =
+    responseSequenceGate?.batchId ??
+    normalizedResponseRows[0]?.batchId ??
+    nativeRootBridgeJsonTransportBatchResponseSequenceBatchId;
+  const streamId =
+    responseSequenceGate?.streamRoundtripGate?.streamId ??
+    normalizedStreamRows[0]?.streamId ??
+    nativeRootBridgeJsonTransportStreamBatchRoundtripStreamId;
+  const rowCount = Math.max(
+    normalizedConsumerRows.length,
+    normalizedLifecycleRows.length,
+    normalizedResponseRows.length,
+    Math.ceil(normalizedStreamRows.length / 2),
+    normalizedSmokeRecords.length
+  );
+  const rows = Object.freeze(
+    Array.from({ length: rowCount }, (_, index) =>
+      freezeNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRow({
+        index,
+        batchId,
+        streamId,
+        consumerRow: normalizedConsumerRows[index],
+        lifecycleRow: normalizedLifecycleRows[index],
+        responseRow: normalizedResponseRows[index],
+        streamMetadataRow: normalizedStreamRows[index * 2],
+        streamPayloadRow: normalizedStreamRows[index * 2 + 1],
+        smokeRecord: normalizedSmokeRecords[index]
+      })
+    )
+  );
+  const rejectedRows = Object.freeze(
+    rows.filter(
+      (row) =>
+        row.status ===
+        nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectedStatus
+    )
+  );
+
+  return freezeNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink({
+    linkStatus:
+      nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkStatus,
+    model: nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkModel,
+    validationModel: nativeRootBridgeRequestValidationModel,
+    handleTableModel: nativeRootBridgeHandleTableModel,
+    consumerStatus: nativeRootBridgeBatchLifecycleConsumerStatus,
+    batchGateStatus: nativeRootBridgeBatchedJsonTransportGateStatus,
+    responseSequenceGateStatus:
+      nativeRootBridgeJsonTransportBatchResponseSequenceGateStatus,
+    streamRoundtripGateStatus:
+      nativeRootBridgeJsonTransportStreamBatchRoundtripGateStatus,
+    batchId,
+    streamId,
+    validateJsonBatchRoundtripLinkRowsName:
+      'validateNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRows',
+    rowStatuses:
+      nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkStatuses,
+    rejectionCaseIds:
+      nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCaseIds,
+    rejectionCodes:
+      nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes,
+    jsonBatchRoundtripLinkRowFields:
+      nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRowFields,
+    requestCount: normalizedConsumerRows.length,
+    linkedRowCount: rows.length - rejectedRows.length,
+    rejectedRowCount: rejectedRows.length,
+    rows,
+    rejectedRows,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  });
+}
+
+function freezeNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRow({
+  index,
+  batchId,
+  streamId,
+  consumerRow,
+  lifecycleRow,
+  responseRow,
+  streamMetadataRow,
+  streamPayloadRow,
+  smokeRecord
+}) {
+  const code =
+    getNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCode({
+      index,
+      batchId,
+      streamId,
+      consumerRow,
+      lifecycleRow,
+      responseRow,
+      streamMetadataRow,
+      streamPayloadRow,
+      smokeRecord
+    });
+  const kind =
+    consumerRow?.kind ??
+    lifecycleRow?.kind ??
+    responseRow?.kind ??
+    smokeRecord?.kind ??
+    'missing';
+  const status =
+    code === null
+      ? nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkLinkedStatus
+      : nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectedStatus;
+
+  return Object.freeze({
+    id: `batch-lifecycle-consumer-json-roundtrip-link-${index}-${kind}`,
+    consumerRowId: consumerRow?.id ?? null,
+    lifecycleRowId: lifecycleRow?.id ?? null,
+    responseRowId: responseRow?.id ?? null,
+    streamMetadataRowId: streamMetadataRow?.id ?? null,
+    streamPayloadRowId: streamPayloadRow?.id ?? null,
+    batchId: responseRow?.batchId ?? streamMetadataRow?.batchId ?? batchId,
+    streamId: streamMetadataRow?.streamId ?? streamPayloadRow?.streamId ?? streamId,
+    batchIndex: consumerRow?.batchIndex ?? lifecycleRow?.batchIndex ?? null,
+    requestId:
+      consumerRow?.requestId ??
+      lifecycleRow?.requestId ??
+      responseRow?.requestId ??
+      null,
+    kind,
+    lifecycleTransition:
+      consumerRow?.lifecycleTransition ?? lifecycleRow?.lifecycleTransition ?? null,
+    rootHandleAction: consumerRow?.rootHandleAction ?? smokeRecord?.rootHandleAction ?? null,
+    cleanupHookEvidenceStatus: consumerRow?.cleanupHookEvidenceStatus ?? null,
+    requestOrder: responseRow?.requestOrder ?? null,
+    responseOrder: responseRow?.responseOrder ?? null,
+    metadataBatchSequence: streamMetadataRow?.batchSequence ?? null,
+    payloadBatchSequence: streamPayloadRow?.batchSequence ?? null,
+    metadataChunkKind: streamMetadataRow?.chunkKind ?? null,
+    payloadChunkKind: streamPayloadRow?.chunkKind ?? null,
+    responseStatus: responseRow?.responseStatus ?? null,
+    payloadAssemblyState: streamPayloadRow?.assemblyState ?? null,
+    teardownState: responseRow?.teardownState ?? streamPayloadRow?.teardownState ?? null,
+    status,
+    code,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  });
+}
+
+function getNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCode({
+  index,
+  batchId,
+  streamId,
+  consumerRow,
+  lifecycleRow,
+  responseRow,
+  streamMetadataRow,
+  streamPayloadRow,
+  smokeRecord
+}) {
+  const rows = [
+    consumerRow,
+    lifecycleRow,
+    responseRow,
+    streamMetadataRow,
+    streamPayloadRow,
+    smokeRecord
+  ];
+
+  if (
+    rows.some((row) =>
+      hasNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripPublicOrNativeClaim(
+        row
+      )
+    )
+  ) {
+    return nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .publicNativeExecutionClaim;
+  }
+
+  if (
+    consumerRow === undefined ||
+    lifecycleRow === undefined ||
+    responseRow === undefined ||
+    streamMetadataRow === undefined ||
+    streamPayloadRow === undefined ||
+    smokeRecord === undefined
+  ) {
+    return nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .staleOrForeignJsonBatchRow;
+  }
+
+  if (
+    consumerRow.batchIndex !== index ||
+    lifecycleRow.batchIndex !== index ||
+    responseRow.requestOrder !== index ||
+    responseRow.responseOrder !== index ||
+    streamMetadataRow.requestOrder !== index ||
+    streamMetadataRow.responseOrder !== index ||
+    streamMetadataRow.chunkOrder !== 0 ||
+    streamMetadataRow.batchSequence !== index * 2 ||
+    streamPayloadRow.requestOrder !== index ||
+    streamPayloadRow.responseOrder !== index ||
+    streamPayloadRow.chunkOrder !== 1 ||
+    streamPayloadRow.batchSequence !== index * 2 + 1 ||
+    smokeRecord.requestId !== consumerRow.requestId
+  ) {
+    return nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .rowOrderMismatch;
+  }
+
+  const expectedKind = consumerRow.kind;
+  const expectedConsumerRowId = `batch-lifecycle-consumer-${index}-${expectedKind}`;
+  const expectedLifecycleRowId = `batch-record-${index}-${expectedKind}`;
+  const expectedResponseRowId = `batch-response-${index}-${expectedKind}`;
+  const expectedMetadataRowId = `stream-batch-chunk-${index * 2}-request-${consumerRow.requestId}-metadata`;
+  const expectedPayloadRowId = `stream-batch-chunk-${index * 2 + 1}-request-${consumerRow.requestId}-payload`;
+
+  if (
+    consumerRow.id !== expectedConsumerRowId ||
+    lifecycleRow.id !== expectedLifecycleRowId ||
+    responseRow.id !== expectedResponseRowId ||
+    streamMetadataRow.id !== expectedMetadataRowId ||
+    streamPayloadRow.id !== expectedPayloadRowId
+  ) {
+    return nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .consumerRowIdMismatch;
+  }
+
+  if (
+    responseRow.batchId !== batchId ||
+    streamMetadataRow.batchId !== batchId ||
+    streamPayloadRow.batchId !== batchId ||
+    streamMetadataRow.streamId !== streamId ||
+    streamPayloadRow.streamId !== streamId ||
+    responseRow.errorRowStatus !==
+      nativeRootBridgeJsonTransportBatchResponseErrorRowStatusNotError ||
+    responseRow.responseStatus !==
+      nativeRootBridgeJsonTransportBatchLifecycleStatusAccepted ||
+    streamMetadataRow.chunkStatus !== 'accepted' ||
+    streamPayloadRow.chunkStatus !== 'accepted' ||
+    streamPayloadRow.assembledResponse !== true ||
+    streamPayloadRow.assemblyState !== 'assembled'
+  ) {
+    return nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .staleOrForeignJsonBatchRow;
+  }
+
+  const expectedLifecycleTransition =
+    getNativeRootBridgeLifecycleTransition(expectedKind);
+  const expectedRootHandleAction =
+    getNativeRootBridgeBatchLifecycleConsumerExpectedRootHandleAction(
+      expectedKind
+    );
+
+  if (
+    !nativeRootBridgeRequestKinds.includes(expectedKind) ||
+    lifecycleRow.kind !== expectedKind ||
+    responseRow.kind !== expectedKind ||
+    smokeRecord.kind !== expectedKind ||
+    lifecycleRow.requestId !== consumerRow.requestId ||
+    responseRow.requestId !== consumerRow.requestId ||
+    streamMetadataRow.requestId !== consumerRow.requestId ||
+    streamPayloadRow.requestId !== consumerRow.requestId ||
+    lifecycleRow.status !== consumerRow.status ||
+    responseRow.responseStatus !== consumerRow.status ||
+    streamMetadataRow.responseStatus !== consumerRow.status ||
+    streamPayloadRow.responseStatus !== consumerRow.status ||
+    lifecycleRow.lifecycleTransition !== consumerRow.lifecycleTransition ||
+    consumerRow.lifecycleTransition !== expectedLifecycleTransition ||
+    smokeRecord.lifecycleTransition !== expectedLifecycleTransition ||
+    consumerRow.rootHandleAction !== smokeRecord.rootHandleAction ||
+    consumerRow.rootHandleAction !== expectedRootHandleAction
+  ) {
+    return nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .kindTransitionMismatch;
+  }
+
+  if (
+    consumerRow.cleanupHookEvidenceStatus !==
+      getNativeRootBridgeBatchLifecycleConsumerExpectedCleanupHookEvidenceStatus(
+        expectedKind
+      ) ||
+    consumerRow.cleanupHookEvidenceRequired !==
+      (expectedKind !== nativeRootBridgeRequestKindCreate) ||
+    (expectedKind === nativeRootBridgeRequestKindCreate &&
+      consumerRow.cleanupHookCanonicalExecutableEvidence !== null) ||
+    (expectedKind !== nativeRootBridgeRequestKindCreate &&
+      consumerRow.cleanupHookCanonicalExecutableEvidence !== true)
+  ) {
+    return nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .cleanupHookStatusMismatch;
+  }
+
+  return null;
+}
+
+function hasNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripPublicOrNativeClaim(
+  row
+) {
+  if (row === undefined || row === null) {
+    return false;
+  }
+
+  return (
+    row.nativeAddonLoaded === true ||
+    row.nativeExecution === true ||
+    row.rendererExecution === true ||
+    row.reconcilerExecution === true ||
+    row.nodeWorkerThreadsExecution === true ||
+    row.napiCleanupHookExecution === true ||
+    row.publicNativeCompatibility === true ||
+    row.reactBehaviorError === true
+  );
+}
+
+function getNativeRootBridgeBatchLifecycleConsumerExpectedRootHandleAction(
+  kind
+) {
+  if (kind === nativeRootBridgeRequestKindCreate) {
+    return 'admit-root-handle';
+  }
+  if (kind === nativeRootBridgeRequestKindRender) {
+    return 'validate-active-root-handle';
+  }
+  return 'retire-root-handle';
+}
+
+function getNativeRootBridgeBatchLifecycleConsumerExpectedCleanupHookEvidenceStatus(
+  kind
+) {
+  if (kind === nativeRootBridgeRequestKindCreate) {
+    return nativeRootBridgeBatchLifecycleConsumerCleanupHookNotRequiredStatus;
+  }
+  return nativeRootBridgeBatchLifecycleConsumerCleanupHookAcceptedStatus;
+}
+
 function createNativeRootBridgeBatchLifecycleConsumer({
   handleAdmissionPreflight,
   jsonTransportSmoke,
@@ -1463,6 +1925,13 @@ function createNativeRootBridgeBatchLifecycleConsumer({
       })
     )
   );
+  const jsonBatchRoundtripLink =
+    createNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink({
+      consumerRows: rows,
+      lifecycleRows: batchGate.lifecycleRows,
+      responseSequenceGate: batchGate.responseSequenceGate,
+      rustHandleTableAdmissionSmoke
+    });
 
   return Object.freeze({
     consumerStatus: nativeRootBridgeBatchLifecycleConsumerStatus,
@@ -1488,6 +1957,7 @@ function createNativeRootBridgeBatchLifecycleConsumer({
       nativeRootBridgeBatchLifecycleConsumerCleanupHookStatuses,
     batchLifecycleConsumerRowFields:
       nativeRootBridgeBatchLifecycleConsumerRowFields,
+    jsonBatchRoundtripLink,
     rows,
     nativeAddonLoaded: false,
     nativeExecution: false,
@@ -1968,6 +2438,41 @@ const nativeRootBridgeWorkerThreadCleanupHookPreflight =
     })
   ]);
 
+const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink =
+  freezeNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink({
+    linkStatus:
+      nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkStatus,
+    model: nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkModel,
+    validationModel: nativeRootBridgeRequestValidationModel,
+    handleTableModel: nativeRootBridgeHandleTableModel,
+    consumerStatus: nativeRootBridgeBatchLifecycleConsumerStatus,
+    batchGateStatus: nativeRootBridgeBatchedJsonTransportGateStatus,
+    responseSequenceGateStatus:
+      nativeRootBridgeJsonTransportBatchResponseSequenceGateStatus,
+    streamRoundtripGateStatus:
+      nativeRootBridgeJsonTransportStreamBatchRoundtripGateStatus,
+    batchId: nativeRootBridgeJsonTransportBatchResponseSequenceBatchId,
+    streamId: nativeRootBridgeJsonTransportStreamBatchRoundtripStreamId,
+    validateJsonBatchRoundtripLinkRowsName:
+      'validateNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRows',
+    rowStatuses:
+      nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkStatuses,
+    rejectionCaseIds:
+      nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCaseIds,
+    rejectionCodes:
+      nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes,
+    jsonBatchRoundtripLinkRowFields:
+      nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRowFields,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  });
+
 const nativeRootBridgeBatchLifecycleConsumer = Object.freeze({
   consumerStatus: nativeRootBridgeBatchLifecycleConsumerStatus,
   model: nativeRootBridgeBatchLifecycleConsumerModel,
@@ -1981,6 +2486,8 @@ const nativeRootBridgeBatchLifecycleConsumer = Object.freeze({
     nativeRootBridgeBatchLifecycleConsumerCleanupHookStatuses,
   batchLifecycleConsumerRowFields:
     nativeRootBridgeBatchLifecycleConsumerRowFields,
+  jsonBatchRoundtripLink:
+    nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink,
   nativeAddonLoaded: false,
   nativeExecution: false,
   rendererExecution: false,

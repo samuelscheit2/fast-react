@@ -845,6 +845,66 @@ assert.deepEqual(
   ['admit-root-handle', 'validate-active-root-handle', 'retire-root-handle']
 );
 assert.equal(
+  shapeGate.batchLifecycleConsumer.jsonBatchRoundtripLink.linkStatus,
+  'linked-native-root-bridge-batch-lifecycle-consumer-json-batch-roundtrip'
+);
+assert.equal(
+  shapeGate.batchLifecycleConsumer.jsonBatchRoundtripLink
+    .responseSequenceGateStatus,
+  'diagnosed-native-root-bridge-json-batch-response-sequence'
+);
+assert.equal(
+  shapeGate.batchLifecycleConsumer.jsonBatchRoundtripLink
+    .streamRoundtripGateStatus,
+  'diagnosed-native-root-bridge-json-stream-batch-roundtrip'
+);
+assert.deepEqual(
+  shapeGate.batchLifecycleConsumer.jsonBatchRoundtripLink.rows.map(
+    (row) => row.consumerRowId
+  ),
+  [
+    'batch-lifecycle-consumer-0-create',
+    'batch-lifecycle-consumer-1-render',
+    'batch-lifecycle-consumer-2-unmount'
+  ]
+);
+assert.deepEqual(
+  shapeGate.batchLifecycleConsumer.jsonBatchRoundtripLink.rows.map(
+    (row) => row.responseRowId
+  ),
+  [
+    'batch-response-0-create',
+    'batch-response-1-render',
+    'batch-response-2-unmount'
+  ]
+);
+assert.deepEqual(
+  shapeGate.batchLifecycleConsumer.jsonBatchRoundtripLink.rows.map(
+    (row) => row.streamPayloadRowId
+  ),
+  [
+    'stream-batch-chunk-1-request-1-payload',
+    'stream-batch-chunk-3-request-2-payload',
+    'stream-batch-chunk-5-request-3-payload'
+  ]
+);
+assert.deepEqual(
+  shapeGate.batchLifecycleConsumer.jsonBatchRoundtripLink.rows.map(
+    (row) => row.cleanupHookEvidenceStatus
+  ),
+  ['not-required', 'accepted', 'accepted']
+);
+assert.deepEqual(
+  shapeGate.batchLifecycleConsumer.jsonBatchRoundtripLink.rows.map(
+    (row) => row.status
+  ),
+  ['linked', 'linked', 'linked']
+);
+assert.equal(
+  shapeGate.batchLifecycleConsumer.jsonBatchRoundtripLink.rejectedRowCount,
+  0
+);
+assert.equal(
   shapeGate.batchLifecycleConsumer.rows.every(
     (row) =>
       row.nativeAddonLoaded === false &&
