@@ -1501,6 +1501,7 @@ pub struct TestRendererUnmountNativeBridgeAdmission {
     diagnostic_id: &'static str,
     status: &'static str,
     root: FiberRootId,
+    renderer_id: TestRendererId,
     route_dependency_id: &'static str,
     deletion_commit_handoff_id: &'static str,
     cleanup_handoff_id: &'static str,
@@ -1551,6 +1552,10 @@ impl TestRendererUnmountNativeBridgeAdmission {
     #[must_use]
     pub const fn root(self) -> FiberRootId {
         self.root
+    }
+
+    const fn renderer_id(self) -> TestRendererId {
+        self.renderer_id
     }
 
     #[must_use]
@@ -3280,6 +3285,7 @@ pub struct TestRendererUpdateNativeBridgeAdmission {
     diagnostic_id: &'static str,
     status: &'static str,
     root: FiberRootId,
+    renderer_id: TestRendererId,
     route_dependency_id: &'static str,
     update_route_admission_id: &'static str,
     lifecycle: TestRendererRootLifecycle,
@@ -3321,6 +3327,10 @@ impl TestRendererUpdateNativeBridgeAdmission {
     #[must_use]
     pub const fn root(self) -> FiberRootId {
         self.root
+    }
+
+    const fn renderer_id(self) -> TestRendererId {
+        self.renderer_id
     }
 
     #[must_use]
@@ -3463,6 +3473,9 @@ pub const TEST_RENDERER_PRIVATE_TO_TREE_NATIVE_EXECUTION_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.totree.private-native-execution-evidence";
 pub const TEST_RENDERER_PRIVATE_TO_TREE_NATIVE_EXECUTION_STATUS: &str =
     "private-totree-native-execution-records-consumed-public-totree-blocked";
+pub const TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.root.private-lifecycle-execution-evidence";
+pub const TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_STATUS: &str = "private-root-lifecycle-host-execution-records-consumed-public-root-native-js-act-scheduler-blocked";
 pub const TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-finished-work-identity";
 pub const TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS: &str =
@@ -4570,6 +4583,7 @@ pub struct TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
     diagnostic_id: &'static str,
     status: &'static str,
     root: FiberRootId,
+    renderer_id: TestRendererId,
     operation: &'static str,
     public_surface: &'static str,
     create_route_admission_record_id: &'static str,
@@ -4621,6 +4635,10 @@ impl TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
     #[must_use]
     pub const fn root(self) -> FiberRootId {
         self.root
+    }
+
+    const fn renderer_id(self) -> TestRendererId {
+        self.renderer_id
     }
 
     #[must_use]
@@ -6399,6 +6417,270 @@ impl TestRendererPrivateToJsonHostOutputShapeDiagnostics {
     #[must_use]
     pub const fn max_host_component_depth(self) -> usize {
         self.max_host_component_depth
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateRootLifecycleExecutionEvidence {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    renderer_id: TestRendererId,
+    operation: &'static str,
+    public_surface: &'static str,
+    source_execution_record_id: &'static str,
+    source_execution_status: &'static str,
+    scheduled_update_sequence: usize,
+    lifecycle: TestRendererRootLifecycle,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_shape: TestRendererPrivateToJsonHostOutputShape,
+    previous_snapshot: Option<TestContainerSnapshot>,
+    snapshot: TestContainerSnapshot,
+    executed_element_type: Option<TestElementType>,
+    executed_props: Option<TestProps>,
+    executed_text: Option<String>,
+    detached_instance_snapshot: Option<TestElementSnapshot>,
+    root_child_count: usize,
+    previous_root_child_count: usize,
+    host_component_count: usize,
+    host_text_count: usize,
+    host_node_cleanup_count: usize,
+    host_update_apply_count: usize,
+    source_renderer_owner_accepted: bool,
+    source_lifecycle_row_accepted: bool,
+    source_reconciler_host_execution_consumed: bool,
+    snapshot_produced_from_executed_state: bool,
+    host_output_snapshot_current: bool,
+    public_root_available: bool,
+    public_serialization_available: bool,
+    public_test_instance_available: bool,
+    public_act_available: bool,
+    public_scheduler_available: bool,
+    native_bridge_available: bool,
+    native_execution_available: bool,
+    js_package_available: bool,
+    compatibility_claimed: bool,
+    public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+}
+
+impl TestRendererPrivateRootLifecycleExecutionEvidence {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn operation(&self) -> &'static str {
+        self.operation
+    }
+
+    #[must_use]
+    pub const fn public_surface(&self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source_execution_record_id(&self) -> &'static str {
+        self.source_execution_record_id
+    }
+
+    #[must_use]
+    pub const fn source_execution_status(&self) -> &'static str {
+        self.source_execution_status
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_sequence(&self) -> usize {
+        self.scheduled_update_sequence
+    }
+
+    #[must_use]
+    pub const fn lifecycle(&self) -> TestRendererRootLifecycle {
+        self.lifecycle
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_shape(&self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_shape
+    }
+
+    #[must_use]
+    pub fn previous_snapshot(&self) -> Option<&TestContainerSnapshot> {
+        self.previous_snapshot.as_ref()
+    }
+
+    #[must_use]
+    pub const fn snapshot(&self) -> &TestContainerSnapshot {
+        &self.snapshot
+    }
+
+    #[must_use]
+    pub fn executed_element_type(&self) -> Option<&TestElementType> {
+        self.executed_element_type.as_ref()
+    }
+
+    #[must_use]
+    pub fn executed_props(&self) -> Option<&TestProps> {
+        self.executed_props.as_ref()
+    }
+
+    #[must_use]
+    pub fn executed_text(&self) -> Option<&str> {
+        self.executed_text.as_deref()
+    }
+
+    #[must_use]
+    pub fn detached_instance_snapshot(&self) -> Option<&TestElementSnapshot> {
+        self.detached_instance_snapshot.as_ref()
+    }
+
+    #[must_use]
+    pub const fn root_child_count(&self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub const fn previous_root_child_count(&self) -> usize {
+        self.previous_root_child_count
+    }
+
+    #[must_use]
+    pub const fn host_component_count(&self) -> usize {
+        self.host_component_count
+    }
+
+    #[must_use]
+    pub const fn host_text_count(&self) -> usize {
+        self.host_text_count
+    }
+
+    #[must_use]
+    pub const fn host_node_cleanup_count(&self) -> usize {
+        self.host_node_cleanup_count
+    }
+
+    #[must_use]
+    pub const fn host_update_apply_count(&self) -> usize {
+        self.host_update_apply_count
+    }
+
+    #[must_use]
+    pub const fn source_renderer_owner_accepted(&self) -> bool {
+        self.source_renderer_owner_accepted
+    }
+
+    #[must_use]
+    pub const fn source_lifecycle_row_accepted(&self) -> bool {
+        self.source_lifecycle_row_accepted
+    }
+
+    #[must_use]
+    pub const fn source_reconciler_host_execution_consumed(&self) -> bool {
+        self.source_reconciler_host_execution_consumed
+    }
+
+    #[must_use]
+    pub const fn snapshot_produced_from_executed_state(&self) -> bool {
+        self.snapshot_produced_from_executed_state
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(&self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn source_owned_execution_accepted(&self) -> bool {
+        self.source_renderer_owner_accepted
+            && self.source_lifecycle_row_accepted
+            && self.source_reconciler_host_execution_consumed
+            && self.snapshot_produced_from_executed_state
+            && self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn public_root_available(&self) -> bool {
+        self.public_root_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(&self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_available(&self) -> bool {
+        self.public_test_instance_available
+    }
+
+    #[must_use]
+    pub const fn public_act_available(&self) -> bool {
+        self.public_act_available
+    }
+
+    #[must_use]
+    pub const fn public_scheduler_available(&self) -> bool {
+        self.public_scheduler_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(&self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(&self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn js_package_available(&self) -> bool {
+        self.js_package_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn public_blockers(&self) -> TestRendererPrivateJsonPublicSurfaceBlockers {
+        self.public_blockers
+    }
+
+    #[must_use]
+    pub const fn public_surfaces_blocked(&self) -> bool {
+        !self.public_root_available
+            && !self.public_serialization_available
+            && !self.public_test_instance_available
+            && !self.public_act_available
+            && !self.public_scheduler_available
+            && !self.native_bridge_available
+            && !self.native_execution_available
+            && !self.js_package_available
+            && !self.compatibility_claimed
+            && self.public_blockers.all_blocked()
     }
 }
 
@@ -10662,6 +10944,27 @@ impl Display for TestRendererPrivateTestInstanceNativeQueryExecutionError {
 impl Error for TestRendererPrivateTestInstanceNativeQueryExecutionError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateRootLifecycleExecutionError {
+    LifecycleExecutionRecordMismatch {
+        operation: &'static str,
+        reason: &'static str,
+    },
+}
+
+impl Display for TestRendererPrivateRootLifecycleExecutionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LifecycleExecutionRecordMismatch { operation, reason } => write!(
+                formatter,
+                "private root lifecycle execution evidence rejected {operation} execution record: {reason}",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererPrivateRootLifecycleExecutionError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererSerializationGateError {
     CommitRootMismatch {
         expected: FiberRootId,
@@ -11118,6 +11421,7 @@ pub enum TestRendererRootError {
     PrivateTestInstanceNativeQueryExecution(
         Box<TestRendererPrivateTestInstanceNativeQueryExecutionError>,
     ),
+    PrivateRootLifecycleExecution(Box<TestRendererPrivateRootLifecycleExecutionError>),
     PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
     PrivateSerializationFinishedWorkIdentity(
         Box<TestRendererPrivateSerializationFinishedWorkIdentityError>,
@@ -11164,6 +11468,7 @@ impl Display for TestRendererRootError {
             Self::PrivateActNestedScopePassiveFlush(error) => Display::fmt(error, formatter),
             Self::PrivateUnmountNativeBridgeAdmission(error) => Display::fmt(error, formatter),
             Self::PrivateTestInstanceNativeQueryExecution(error) => Display::fmt(error, formatter),
+            Self::PrivateRootLifecycleExecution(error) => Display::fmt(error, formatter),
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
             Self::PrivateSerializationFinishedWorkIdentity(error) => Display::fmt(error, formatter),
             Self::StableSiblingInsertionCanary(error) => Display::fmt(error, formatter),
@@ -11221,6 +11526,7 @@ impl Error for TestRendererRootError {
             Self::PrivateActNestedScopePassiveFlush(error) => Some(error),
             Self::PrivateUnmountNativeBridgeAdmission(error) => Some(error),
             Self::PrivateTestInstanceNativeQueryExecution(error) => Some(error),
+            Self::PrivateRootLifecycleExecution(error) => Some(error),
             Self::PrivateJsonSerialization(error) => Some(error),
             Self::PrivateSerializationFinishedWorkIdentity(error) => Some(error),
             Self::StableSiblingInsertionCanary(error) => Some(error),
@@ -11312,6 +11618,12 @@ impl From<TestRendererPrivateUnmountNativeBridgeAdmissionError> for TestRenderer
 impl From<TestRendererPrivateTestInstanceNativeQueryExecutionError> for TestRendererRootError {
     fn from(error: TestRendererPrivateTestInstanceNativeQueryExecutionError) -> Self {
         Self::PrivateTestInstanceNativeQueryExecution(Box::new(error))
+    }
+}
+
+impl From<TestRendererPrivateRootLifecycleExecutionError> for TestRendererRootError {
+    fn from(error: TestRendererPrivateRootLifecycleExecutionError) -> Self {
+        Self::PrivateRootLifecycleExecution(Box::new(error))
     }
 }
 
@@ -12016,6 +12328,7 @@ impl TestRendererRoot {
                 TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_DIAGNOSTIC_ID,
             status: TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_STATUS,
             root: self.root_id,
+            renderer_id: self.renderer.renderer_id,
             operation: "create",
             public_surface: "create()",
             create_route_admission_record_id: admission.record_id(),
@@ -13238,6 +13551,7 @@ impl TestRendererRoot {
             diagnostic_id: TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
             status: TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS,
             root: self.root_id,
+            renderer_id: self.renderer.renderer_id,
             route_dependency_id: TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID,
             update_route_admission_id: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
             lifecycle: self.lifecycle,
@@ -13806,6 +14120,7 @@ impl TestRendererRoot {
             diagnostic_id: TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
             status: TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS,
             root: self.root_id,
+            renderer_id: self.renderer.renderer_id,
             route_dependency_id: TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID,
             deletion_commit_handoff_id:
                 TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID,
@@ -14131,6 +14446,535 @@ impl TestRendererRoot {
         }
 
         Ok(())
+    }
+
+    pub fn describe_private_root_create_lifecycle_execution_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+        execution: TestRendererPrivateCreateNativeBridgeHostOutputHandoff,
+    ) -> Result<TestRendererPrivateRootLifecycleExecutionEvidence, TestRendererRootError> {
+        self.validate_private_root_create_lifecycle_execution_for_canary(output, execution)?;
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(&current_snapshot);
+        let (element_type, props, text) =
+            Self::private_root_lifecycle_single_host_text_snapshot(&current_snapshot, "create")?;
+
+        Ok(Self::private_root_lifecycle_execution_evidence(
+            self.root_id,
+            self.renderer.renderer_id,
+            "create",
+            "create()",
+            execution.diagnostic_id(),
+            execution.status(),
+            self.scheduled_updates.len(),
+            self.lifecycle,
+            TestRendererRootUpdateKind::Create,
+            TestRendererRootUpdateKind::Create,
+            shape,
+            None,
+            current_snapshot,
+            Some(element_type),
+            Some(props),
+            Some(text),
+            None,
+            0,
+            0,
+        ))
+    }
+
+    pub fn describe_private_root_update_lifecycle_execution_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+        execution: TestRendererUpdateNativeBridgeAdmission,
+    ) -> Result<TestRendererPrivateRootLifecycleExecutionEvidence, TestRendererRootError> {
+        self.validate_private_root_update_lifecycle_execution_for_canary(output, execution)?;
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(&current_snapshot);
+        let (element_type, props, text) =
+            Self::private_root_lifecycle_single_host_text_snapshot(&current_snapshot, "update")?;
+        let host_update_apply_count = execution.host_text_update_apply_count()
+            + execution.host_component_update_apply_count();
+
+        Ok(Self::private_root_lifecycle_execution_evidence(
+            self.root_id,
+            self.renderer.renderer_id,
+            "update",
+            "create().update",
+            execution.diagnostic_id(),
+            execution.status(),
+            output.scheduled_update_sequence(),
+            self.lifecycle,
+            execution.scheduled_update_kind(),
+            execution.host_output_update_kind(),
+            shape,
+            Some(output.previous_snapshot().clone()),
+            current_snapshot,
+            Some(element_type),
+            Some(props),
+            Some(text),
+            None,
+            0,
+            host_update_apply_count,
+        ))
+    }
+
+    pub fn describe_private_root_unmount_lifecycle_execution_for_canary(
+        &self,
+        output: &TestRendererUnmountedHostOutput,
+        execution: TestRendererUnmountNativeBridgeAdmission,
+    ) -> Result<TestRendererPrivateRootLifecycleExecutionEvidence, TestRendererRootError> {
+        self.validate_private_root_unmount_lifecycle_execution_for_canary(output, execution)?;
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(&current_snapshot);
+
+        Ok(Self::private_root_lifecycle_execution_evidence(
+            self.root_id,
+            self.renderer.renderer_id,
+            "unmount",
+            "create().unmount",
+            execution.diagnostic_id(),
+            execution.status(),
+            execution.scheduled_update_sequence(),
+            self.lifecycle,
+            execution.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Unmount,
+            shape,
+            Some(output.previous_snapshot().clone()),
+            current_snapshot,
+            None,
+            None,
+            None,
+            Some(output.detached_instance_snapshot().clone()),
+            execution.host_node_cleanup_count(),
+            0,
+        ))
+    }
+
+    fn validate_private_root_create_lifecycle_execution_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+        execution: TestRendererPrivateCreateNativeBridgeHostOutputHandoff,
+    ) -> Result<(), TestRendererRootError> {
+        if execution.diagnostic_id()
+            != TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_DIAGNOSTIC_ID
+            || execution.status()
+                != TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_STATUS
+            || execution.operation() != "create"
+            || execution.public_surface() != "create()"
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "create",
+                "source-row-identity-mismatch",
+            );
+        }
+        if execution.root() != self.root_id || execution.renderer_id() != self.renderer.renderer_id
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "create",
+                "source-owner-mismatch",
+            );
+        }
+        if execution.scheduled_update_kind() != TestRendererRootUpdateKind::Create
+            || execution.host_output_update_kind() != TestRendererRootUpdateKind::Create
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "create",
+                "source-kind-mismatch",
+            );
+        }
+        if !execution.create_route_admission_accepted()
+            || !execution.host_output_handoff_accepted()
+            || !execution.actual_rust_create_host_output_handoff()
+            || !execution.host_output_produced_by_rust()
+            || !execution.minimal_tree_host_output_consumes_root_finished_work()
+            || !execution.minimal_tree_host_output_consumes_root_finished_lanes()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "create",
+                "source-execution-not-accepted",
+            );
+        }
+        if execution.public_create_behavior_available()
+            || execution.public_serialization_available()
+            || execution.public_test_instance_available()
+            || execution.native_addon_loaded()
+            || execution.native_bridge_available()
+            || execution.native_execution()
+            || execution.rust_execution_from_js()
+            || execution.host_output_produced_from_js()
+            || execution.compatibility_claimed()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "create",
+                "public-native-js-compatibility-claim",
+            );
+        }
+        if output.render().root() != self.root_id || output.commit().root() != self.root_id {
+            return Self::private_root_lifecycle_execution_record_error(
+                "create",
+                "host-output-root-mismatch",
+            );
+        }
+        if execution.scheduled_element() != output.render().resulting_element() {
+            return Self::private_root_lifecycle_execution_record_error(
+                "create",
+                "scheduled-element-mismatch",
+            );
+        }
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Self::private_root_lifecycle_execution_record_error(
+                "create",
+                "executed-snapshot-stale",
+            );
+        }
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(output.snapshot());
+        if shape.shape() != TestRendererPrivateToJsonHostOutputShape::SingleHostText
+            || shape.shape() != execution.host_output_shape()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "create",
+                "executed-snapshot-shape-mismatch",
+            );
+        }
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+        if execution.render_finished_work() != fiber_handle!(output.render().finished_work())
+            || execution.commit_current() != fiber_handle!(output.commit().current())
+            || execution.render_lanes_bits() == 0
+            || execution.render_lanes_bits() != output.render().render_lanes().bits()
+            || execution.commit_finished_lanes_bits() != output.commit().finished_lanes().bits()
+            || !execution.commit_current_matches_render_finished_work()
+            || !execution.commit_lanes_match_render_lanes()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "create",
+                "host-output-handoff-mismatch",
+            );
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_root_update_lifecycle_execution_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+        execution: TestRendererUpdateNativeBridgeAdmission,
+    ) -> Result<(), TestRendererRootError> {
+        if execution.diagnostic_id()
+            != TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+            || execution.status() != TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS
+            || execution.route_dependency_id()
+                != TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID
+            || execution.update_route_admission_id()
+                != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "source-row-identity-mismatch",
+            );
+        }
+        if execution.root() != self.root_id || execution.renderer_id() != self.renderer.renderer_id
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "source-owner-mismatch",
+            );
+        }
+        if execution.lifecycle() != self.lifecycle
+            || execution.lifecycle() != TestRendererRootLifecycle::Active
+            || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Update
+            || execution.host_output_update_kind() != TestRendererRootUpdateKind::Update
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "source-kind-or-lifecycle-mismatch",
+            );
+        }
+        if output.scheduled_update_sequence() != self.scheduled_updates.len() {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "source-update-sequence-stale",
+            );
+        }
+        if !execution.update_route_admission_accepted()
+            || !execution.lifecycle_evidence_accepted()
+            || !execution.root_work_loop_handoff_accepted()
+            || !execution.host_output_handoff_accepted()
+            || !execution.text_update_apply_recorded()
+            || execution.host_text_update_apply_count() == 0
+            || !execution.rust_execution_from_js()
+            || !execution.reconciler_execution_from_js()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "source-execution-not-accepted",
+            );
+        }
+        if execution.public_update_compatibility_claimed()
+            || execution.public_serialization_available()
+            || execution.act_flushing_claimed()
+            || execution.native_bridge_available()
+            || execution.native_execution()
+            || execution.compatibility_claimed()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "public-native-js-act-compatibility-claim",
+            );
+        }
+        if output.render().root() != self.root_id || output.commit().root() != self.root_id {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "host-output-root-mismatch",
+            );
+        }
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "executed-snapshot-stale",
+            );
+        }
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(output.snapshot());
+        if shape.shape() != TestRendererPrivateToJsonHostOutputShape::SingleHostText {
+            return Self::private_root_lifecycle_execution_record_error(
+                "update",
+                "executed-snapshot-shape-mismatch",
+            );
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_root_unmount_lifecycle_execution_for_canary(
+        &self,
+        output: &TestRendererUnmountedHostOutput,
+        execution: TestRendererUnmountNativeBridgeAdmission,
+    ) -> Result<(), TestRendererRootError> {
+        if execution.diagnostic_id()
+            != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+            || execution.status() != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS
+            || execution.route_dependency_id()
+                != TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID
+            || execution.deletion_commit_handoff_id()
+                != TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
+            || execution.cleanup_handoff_id()
+                != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_DIAGNOSTIC_ID
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "unmount",
+                "source-row-identity-mismatch",
+            );
+        }
+        if execution.root() != self.root_id || execution.renderer_id() != self.renderer.renderer_id
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "unmount",
+                "source-owner-mismatch",
+            );
+        }
+        if execution.lifecycle() != self.lifecycle
+            || execution.lifecycle() != TestRendererRootLifecycle::UnmountScheduled
+            || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Unmount
+            || !execution.scheduled_element_is_none()
+            || execution.scheduled_update_sequence() != self.scheduled_updates.len()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "unmount",
+                "source-kind-sequence-or-lifecycle-mismatch",
+            );
+        }
+        if !execution.deletion_commit_handoff_accepted()
+            || !execution.cleanup_handoff_accepted()
+            || !execution.lifecycle_evidence_accepted()
+            || !execution.cleanup_blockers_accepted()
+            || !execution.passive_ref_cleanup_order_accepted()
+            || !execution.rust_unmount_cleanup_handoff_executed()
+            || !execution.host_output_produced()
+            || execution.host_node_cleanup_count() == 0
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "unmount",
+                "source-execution-not-accepted",
+            );
+        }
+        if execution.public_unmount_compatibility_claimed()
+            || execution.public_host_teardown_compatibility_claimed()
+            || execution.act_flushing_claimed()
+            || execution.native_bridge_available()
+            || execution.native_execution()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "unmount",
+                "public-native-js-act-compatibility-claim",
+            );
+        }
+        if output.render().root() != self.root_id || output.commit().root() != self.root_id {
+            return Self::private_root_lifecycle_execution_record_error(
+                "unmount",
+                "host-output-root-mismatch",
+            );
+        }
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Self::private_root_lifecycle_execution_record_error(
+                "unmount",
+                "executed-snapshot-stale",
+            );
+        }
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(output.snapshot());
+        if shape.shape() != TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            || !output.snapshot().children().is_empty()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "unmount",
+                "executed-snapshot-shape-mismatch",
+            );
+        }
+        if !output.detached_instance_snapshot().is_detached()
+            || !output.detached_instance_snapshot().children().is_empty()
+        {
+            return Self::private_root_lifecycle_execution_record_error(
+                "unmount",
+                "detached-host-output-mismatch",
+            );
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn private_root_lifecycle_execution_evidence(
+        root: FiberRootId,
+        renderer_id: TestRendererId,
+        operation: &'static str,
+        public_surface: &'static str,
+        source_execution_record_id: &'static str,
+        source_execution_status: &'static str,
+        scheduled_update_sequence: usize,
+        lifecycle: TestRendererRootLifecycle,
+        scheduled_update_kind: TestRendererRootUpdateKind,
+        host_output_update_kind: TestRendererRootUpdateKind,
+        shape: TestRendererPrivateToJsonHostOutputShapeDiagnostics,
+        previous_snapshot: Option<TestContainerSnapshot>,
+        snapshot: TestContainerSnapshot,
+        executed_element_type: Option<TestElementType>,
+        executed_props: Option<TestProps>,
+        executed_text: Option<String>,
+        detached_instance_snapshot: Option<TestElementSnapshot>,
+        host_node_cleanup_count: usize,
+        host_update_apply_count: usize,
+    ) -> TestRendererPrivateRootLifecycleExecutionEvidence {
+        let previous_root_child_count = previous_snapshot
+            .as_ref()
+            .map_or(0, |snapshot| snapshot.children().len());
+        TestRendererPrivateRootLifecycleExecutionEvidence {
+            diagnostic_name: TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_STATUS,
+            root,
+            renderer_id,
+            operation,
+            public_surface,
+            source_execution_record_id,
+            source_execution_status,
+            scheduled_update_sequence,
+            lifecycle,
+            scheduled_update_kind,
+            host_output_update_kind,
+            host_output_shape: shape.shape(),
+            previous_snapshot,
+            root_child_count: snapshot.children().len(),
+            previous_root_child_count,
+            host_component_count: shape.host_component_count(),
+            host_text_count: shape.host_text_count(),
+            snapshot,
+            executed_element_type,
+            executed_props,
+            executed_text,
+            detached_instance_snapshot,
+            host_node_cleanup_count,
+            host_update_apply_count,
+            source_renderer_owner_accepted: true,
+            source_lifecycle_row_accepted: true,
+            source_reconciler_host_execution_consumed: true,
+            snapshot_produced_from_executed_state: true,
+            host_output_snapshot_current: true,
+            public_root_available: false,
+            public_serialization_available: false,
+            public_test_instance_available: false,
+            public_act_available: false,
+            public_scheduler_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            js_package_available: false,
+            compatibility_claimed: false,
+            public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers::blocked(),
+        }
+    }
+
+    fn private_root_lifecycle_single_host_text_snapshot(
+        snapshot: &TestContainerSnapshot,
+        operation: &'static str,
+    ) -> Result<(TestElementType, TestProps, String), TestRendererRootError> {
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(snapshot);
+        if shape.shape() != TestRendererPrivateToJsonHostOutputShape::SingleHostText {
+            return Self::private_root_lifecycle_execution_record_error(
+                operation,
+                "executed-snapshot-shape-mismatch",
+            );
+        }
+        let [TestNodeSnapshot::Element(element)] = snapshot.children() else {
+            return Self::private_root_lifecycle_execution_record_error(
+                operation,
+                "executed-snapshot-shape-mismatch",
+            );
+        };
+        if element.is_hidden() || element.is_detached() {
+            return Self::private_root_lifecycle_execution_record_error(
+                operation,
+                "executed-snapshot-detached-or-hidden",
+            );
+        }
+        let [TestNodeSnapshot::Text(text)] = element.children() else {
+            return Self::private_root_lifecycle_execution_record_error(
+                operation,
+                "executed-snapshot-shape-mismatch",
+            );
+        };
+        if text.is_hidden() {
+            return Self::private_root_lifecycle_execution_record_error(
+                operation,
+                "executed-snapshot-detached-or-hidden",
+            );
+        }
+        Ok((
+            element.element_type().clone(),
+            element.props().clone(),
+            text.text().to_owned(),
+        ))
+    }
+
+    fn private_root_lifecycle_execution_record_error<T>(
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Result<T, TestRendererRootError> {
+        Err(
+            TestRendererPrivateRootLifecycleExecutionError::LifecycleExecutionRecordMismatch {
+                operation,
+                reason,
+            }
+            .into(),
+        )
     }
 
     pub fn describe_private_to_json_facade_result_for_canary(
@@ -21652,6 +22496,433 @@ mod tests {
 
     fn root_element(raw: u64) -> RootElementHandle {
         RootElementHandle::from_raw(raw)
+    }
+
+    fn create_lifecycle_handoff_for_root() -> (
+        TestRendererRoot,
+        TestRendererCommittedHostOutput,
+        TestRendererPrivateCreateNativeBridgeHostOutputHandoff,
+    ) {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            output.render().resulting_element(),
+            "span",
+        );
+        let preflight = root
+            .describe_private_root_create_preflight_from_render_for_canary(
+                input,
+                TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+                Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+                output.render(),
+            )
+            .unwrap();
+        let admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            Some(preflight),
+            Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+        )
+        .unwrap();
+        let handoff = root
+            .describe_private_create_native_bridge_host_output_handoff_for_canary(
+                &admission, &output,
+            )
+            .unwrap();
+
+        (root, output, handoff)
+    }
+
+    fn assert_root_lifecycle_execution_error_reason(
+        error: TestRendererRootError,
+        operation: &'static str,
+        reason: &'static str,
+    ) {
+        let TestRendererRootError::PrivateRootLifecycleExecution(error) = error else {
+            panic!("expected private root lifecycle execution error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateRootLifecycleExecutionError::LifecycleExecutionRecordMismatch {
+                operation: actual_operation,
+                reason: actual_reason,
+            } if *actual_operation == operation && *actual_reason == reason
+        ));
+    }
+
+    fn assert_private_root_lifecycle_execution_blocks_public_surfaces(
+        evidence: &TestRendererPrivateRootLifecycleExecutionEvidence,
+    ) {
+        assert!(evidence.source_renderer_owner_accepted());
+        assert!(evidence.source_lifecycle_row_accepted());
+        assert!(evidence.source_reconciler_host_execution_consumed());
+        assert!(evidence.snapshot_produced_from_executed_state());
+        assert!(evidence.host_output_snapshot_current());
+        assert!(evidence.source_owned_execution_accepted());
+        assert!(!evidence.public_root_available());
+        assert!(!evidence.public_serialization_available());
+        assert!(!evidence.public_test_instance_available());
+        assert!(!evidence.public_act_available());
+        assert!(!evidence.public_scheduler_available());
+        assert!(!evidence.native_bridge_available());
+        assert!(!evidence.native_execution_available());
+        assert!(!evidence.js_package_available());
+        assert!(!evidence.compatibility_claimed());
+        assert!(evidence.public_blockers().all_blocked());
+        assert!(evidence.public_surfaces_blocked());
+    }
+
+    #[test]
+    fn root_private_root_lifecycle_execution_consumes_create_update_unmount_rows() {
+        let (mut root, created, create_handoff) = create_lifecycle_handoff_for_root();
+        let span = element_type("span");
+        let create_evidence = root
+            .describe_private_root_create_lifecycle_execution_for_canary(&created, create_handoff)
+            .unwrap();
+
+        assert_eq!(
+            create_evidence.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            create_evidence.status(),
+            TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_STATUS
+        );
+        assert_eq!(create_evidence.root(), root.root_id());
+        assert_eq!(create_evidence.renderer_id, root.renderer.renderer_id);
+        assert_eq!(create_evidence.operation(), "create");
+        assert_eq!(create_evidence.public_surface(), "create()");
+        assert_eq!(
+            create_evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            create_evidence.source_execution_status(),
+            TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_STATUS
+        );
+        assert_eq!(
+            create_evidence.lifecycle(),
+            TestRendererRootLifecycle::Active
+        );
+        assert_eq!(
+            create_evidence.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert_eq!(
+            create_evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert_eq!(
+            create_evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SingleHostText
+        );
+        assert_eq!(create_evidence.previous_snapshot(), None);
+        assert_eq!(create_evidence.snapshot(), created.snapshot());
+        assert_eq!(create_evidence.executed_element_type(), Some(&span));
+        assert_eq!(create_evidence.executed_props(), Some(&props()));
+        assert_eq!(create_evidence.executed_text(), Some("hello"));
+        assert_eq!(create_evidence.detached_instance_snapshot(), None);
+        assert_eq!(create_evidence.root_child_count(), 1);
+        assert_eq!(create_evidence.previous_root_child_count(), 0);
+        assert_eq!(create_evidence.host_component_count(), 1);
+        assert_eq!(create_evidence.host_text_count(), 1);
+        assert_eq!(create_evidence.host_node_cleanup_count(), 0);
+        assert_eq!(create_evidence.host_update_apply_count(), 0);
+        assert_private_root_lifecycle_execution_blocks_public_surfaces(&create_evidence);
+
+        let updated_props = props().with_attribute("data-state", "new");
+        let (_outcome, updated, update_admission) = root
+            .render_and_admit_private_update_native_bridge_handoff_for_canary(
+                "span",
+                updated_props.clone(),
+                "goodbye",
+            )
+            .unwrap();
+        let update_evidence = root
+            .describe_private_root_update_lifecycle_execution_for_canary(&updated, update_admission)
+            .unwrap();
+
+        assert_eq!(update_evidence.root(), root.root_id());
+        assert_eq!(update_evidence.renderer_id, root.renderer.renderer_id);
+        assert_eq!(update_evidence.operation(), "update");
+        assert_eq!(update_evidence.public_surface(), "create().update");
+        assert_eq!(
+            update_evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            update_evidence.source_execution_status(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS
+        );
+        assert_eq!(
+            update_evidence.scheduled_update_sequence(),
+            updated.scheduled_update_sequence()
+        );
+        assert_eq!(
+            update_evidence.lifecycle(),
+            TestRendererRootLifecycle::Active
+        );
+        assert_eq!(
+            update_evidence.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            update_evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            update_evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SingleHostText
+        );
+        assert_eq!(
+            update_evidence.previous_snapshot(),
+            Some(updated.previous_snapshot())
+        );
+        assert_eq!(
+            container_element_texts(updated.previous_snapshot()),
+            vec!["hello"]
+        );
+        assert_eq!(update_evidence.snapshot(), updated.snapshot());
+        assert_eq!(update_evidence.executed_element_type(), Some(&span));
+        assert_eq!(update_evidence.executed_props(), Some(&updated_props));
+        assert_eq!(update_evidence.executed_text(), Some("goodbye"));
+        assert_eq!(update_evidence.detached_instance_snapshot(), None);
+        assert_eq!(update_evidence.root_child_count(), 1);
+        assert_eq!(update_evidence.previous_root_child_count(), 1);
+        assert_eq!(update_evidence.host_component_count(), 1);
+        assert_eq!(update_evidence.host_text_count(), 1);
+        assert_eq!(update_evidence.host_node_cleanup_count(), 0);
+        assert_eq!(update_evidence.host_update_apply_count(), 2);
+        assert_private_root_lifecycle_execution_blocks_public_surfaces(&update_evidence);
+
+        let unmount_outcome = root.unmount().unwrap();
+        let unmounted = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+        let unmount_handoff = root
+            .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
+            .unwrap();
+        let unmount_admission = root
+            .describe_private_unmount_native_bridge_admission_for_canary(
+                &unmount_outcome,
+                Some(&unmount_handoff),
+            )
+            .unwrap();
+        let unmount_sequence = unmount_admission.scheduled_update_sequence();
+        let unmount_evidence = root
+            .describe_private_root_unmount_lifecycle_execution_for_canary(
+                &unmounted,
+                unmount_admission,
+            )
+            .unwrap();
+
+        assert_eq!(unmount_evidence.root(), root.root_id());
+        assert_eq!(unmount_evidence.renderer_id, root.renderer.renderer_id);
+        assert_eq!(unmount_evidence.operation(), "unmount");
+        assert_eq!(unmount_evidence.public_surface(), "create().unmount");
+        assert_eq!(
+            unmount_evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            unmount_evidence.source_execution_status(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS
+        );
+        assert_eq!(
+            unmount_evidence.scheduled_update_sequence(),
+            unmount_sequence
+        );
+        assert_eq!(
+            unmount_evidence.lifecycle(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
+        assert_eq!(
+            unmount_evidence.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Unmount
+        );
+        assert_eq!(
+            unmount_evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Unmount
+        );
+        assert_eq!(
+            unmount_evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+        );
+        assert_eq!(
+            unmount_evidence.previous_snapshot(),
+            Some(unmounted.previous_snapshot())
+        );
+        assert_eq!(
+            container_element_texts(unmounted.previous_snapshot()),
+            vec!["goodbye"]
+        );
+        assert_eq!(unmount_evidence.snapshot(), unmounted.snapshot());
+        assert!(unmount_evidence.snapshot().children().is_empty());
+        assert_eq!(unmount_evidence.executed_element_type(), None);
+        assert_eq!(unmount_evidence.executed_props(), None);
+        assert_eq!(unmount_evidence.executed_text(), None);
+        let detached = unmount_evidence
+            .detached_instance_snapshot()
+            .expect("expected detached instance evidence");
+        assert!(detached.is_detached());
+        assert!(detached.children().is_empty());
+        assert_eq!(unmount_evidence.root_child_count(), 0);
+        assert_eq!(unmount_evidence.previous_root_child_count(), 1);
+        assert_eq!(unmount_evidence.host_component_count(), 0);
+        assert_eq!(unmount_evidence.host_text_count(), 0);
+        assert_eq!(unmount_evidence.host_node_cleanup_count(), 2);
+        assert_eq!(unmount_evidence.host_update_apply_count(), 0);
+        assert_private_root_lifecycle_execution_blocks_public_surfaces(&unmount_evidence);
+    }
+
+    #[test]
+    fn root_private_root_lifecycle_execution_rejects_stale_or_cross_surface_rows() {
+        let (mut root, created, create_handoff) = create_lifecycle_handoff_for_root();
+        root.update_host_component_with_text_for_canary("span", "later")
+            .unwrap();
+        root.render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let error = root
+            .describe_private_root_create_lifecycle_execution_for_canary(&created, create_handoff)
+            .unwrap_err();
+        assert_root_lifecycle_execution_error_reason(error, "create", "executed-snapshot-stale");
+
+        let (mut root, _created, _create_handoff) = create_lifecycle_handoff_for_root();
+        let (_outcome, updated, update_admission) = root
+            .render_and_admit_private_update_native_bridge_handoff_for_canary(
+                "span",
+                props(),
+                "goodbye",
+            )
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "later")
+            .unwrap();
+        root.render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let error = root
+            .describe_private_root_update_lifecycle_execution_for_canary(&updated, update_admission)
+            .unwrap_err();
+        assert_root_lifecycle_execution_error_reason(
+            error,
+            "update",
+            "source-update-sequence-stale",
+        );
+
+        let (mut root, _created, _create_handoff) = create_lifecycle_handoff_for_root();
+        let (_outcome, updated, update_admission) = root
+            .render_and_admit_private_update_native_bridge_handoff_for_canary(
+                "span",
+                props(),
+                "goodbye",
+            )
+            .unwrap();
+        let mut cross_surface_admission = update_admission;
+        cross_surface_admission.host_output_update_kind = TestRendererRootUpdateKind::Unmount;
+        let error = root
+            .describe_private_root_update_lifecycle_execution_for_canary(
+                &updated,
+                cross_surface_admission,
+            )
+            .unwrap_err();
+        assert_root_lifecycle_execution_error_reason(
+            error,
+            "update",
+            "source-kind-or-lifecycle-mismatch",
+        );
+
+        let mut foreign_owner_admission = update_admission;
+        foreign_owner_admission.renderer_id =
+            TestRendererId(foreign_owner_admission.renderer_id.0 + 1);
+        let error = root
+            .describe_private_root_update_lifecycle_execution_for_canary(
+                &updated,
+                foreign_owner_admission,
+            )
+            .unwrap_err();
+        assert_root_lifecycle_execution_error_reason(error, "update", "source-owner-mismatch");
+    }
+
+    #[test]
+    fn root_private_root_lifecycle_execution_rejects_cloned_unmount_and_public_claims() {
+        let (mut root, _created, _create_handoff) = create_lifecycle_handoff_for_root();
+        let unmount_outcome = root.unmount().unwrap();
+        let unmounted = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+        let unmount_handoff = root
+            .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
+            .unwrap();
+        let unmount_admission = root
+            .describe_private_unmount_native_bridge_admission_for_canary(
+                &unmount_outcome,
+                Some(&unmount_handoff),
+            )
+            .unwrap();
+
+        let mut cloned_stale_admission = unmount_admission;
+        cloned_stale_admission.scheduled_update_sequence += 1;
+        let error = root
+            .describe_private_root_unmount_lifecycle_execution_for_canary(
+                &unmounted,
+                cloned_stale_admission,
+            )
+            .unwrap_err();
+        assert_root_lifecycle_execution_error_reason(
+            error,
+            "unmount",
+            "source-kind-sequence-or-lifecycle-mismatch",
+        );
+
+        let mut foreign_owner_admission = unmount_admission;
+        foreign_owner_admission.renderer_id =
+            TestRendererId(foreign_owner_admission.renderer_id.0 + 1);
+        let error = root
+            .describe_private_root_unmount_lifecycle_execution_for_canary(
+                &unmounted,
+                foreign_owner_admission,
+            )
+            .unwrap_err();
+        assert_root_lifecycle_execution_error_reason(error, "unmount", "source-owner-mismatch");
+
+        let mut native_claim_admission = unmount_admission;
+        native_claim_admission.native_bridge_available = true;
+        let error = root
+            .describe_private_root_unmount_lifecycle_execution_for_canary(
+                &unmounted,
+                native_claim_admission,
+            )
+            .unwrap_err();
+        assert_root_lifecycle_execution_error_reason(
+            error,
+            "unmount",
+            "public-native-js-act-compatibility-claim",
+        );
+
+        let mut act_claim_admission = unmount_admission;
+        act_claim_admission.act_flushing_claimed = true;
+        let error = root
+            .describe_private_root_unmount_lifecycle_execution_for_canary(
+                &unmounted,
+                act_claim_admission,
+            )
+            .unwrap_err();
+        assert_root_lifecycle_execution_error_reason(
+            error,
+            "unmount",
+            "public-native-js-act-compatibility-claim",
+        );
     }
 
     fn sibling_text_snapshots_for_diagnostics() -> (TestContainerSnapshot, TestContainerSnapshot) {
