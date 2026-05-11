@@ -387,8 +387,13 @@ test("private admission 739-745 gate rejects removing Worker 742 delayed Schedul
 test("private admission 739-745 gate rejects removing Worker 745 sibling identity blocker evidence", () => {
   const workspace = createWorkspaceWithMutatedEvidenceFile({
     evidencePath: testRendererRustSourcePath,
+    sliceStart:
+      "pub fn describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(",
+    sliceEnd:
+      "pub fn describe_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(",
     find: "broad_multichild_identity_available: false",
-    replace: "broad_multichild_identity_available: true"
+    replace: "broad_multichild_identity_available: true",
+    expectedReplacements: 1
   });
 
   try {
@@ -703,7 +708,10 @@ function createWorkspaceWithMutatedEvidenceFile({
   evidencePath,
   find,
   replace,
-  replaceAll = false
+  replaceAll = false,
+  sliceStart = null,
+  sliceEnd = null,
+  expectedReplacements = null
 }) {
   const root = mkdtempSync(join(tmpdir(), "private-admission-739-745-"));
   const workspaceRoot = findWorkspaceRoot();
@@ -720,9 +728,21 @@ function createWorkspaceWithMutatedEvidenceFile({
     mkdirSync(dirname(targetPath), { recursive: true });
     let text = readFileSync(sourcePath, "utf8");
     if (path === evidencePath) {
-      text = replaceAll
-        ? replaceEvery(text, find, replace)
-        : replaceFirst(text, find, replace);
+      const replacement =
+        sliceStart === null && sliceEnd === null
+          ? replaceInText({ text, find, replace, replaceAll })
+          : replaceInSourceSlice({
+              text,
+              sliceStart,
+              sliceEnd,
+              find,
+              replace,
+              replaceAll
+            });
+      text = replacement.text;
+      if (expectedReplacements !== null) {
+        assert.equal(replacement.count, expectedReplacements, find);
+      }
     }
     writeFileSync(targetPath, text);
   }
@@ -750,10 +770,55 @@ function findWorkspaceRoot() {
 
 function replaceFirst(text, find, replace) {
   assert.equal(text.includes(find), true, find);
-  return text.replace(find, replace);
+  return {
+    text: text.replace(find, replace),
+    count: 1
+  };
 }
 
 function replaceEvery(text, find, replace) {
   assert.equal(text.includes(find), true, find);
-  return text.split(find).join(replace);
+  const parts = text.split(find);
+  return {
+    text: parts.join(replace),
+    count: parts.length - 1
+  };
+}
+
+function replaceInSourceSlice({
+  text,
+  sliceStart,
+  sliceEnd,
+  find,
+  replace,
+  replaceAll
+}) {
+  const startIndex = sliceStart === null ? 0 : text.indexOf(sliceStart);
+  assert.notEqual(startIndex, -1, sliceStart);
+  const endSearchIndex =
+    sliceStart === null ? startIndex : startIndex + sliceStart.length;
+  const endIndex =
+    sliceEnd === null ? text.length : text.indexOf(sliceEnd, endSearchIndex);
+  assert.notEqual(endIndex, -1, sliceEnd);
+
+  const before = text.slice(0, startIndex);
+  const sourceSlice = text.slice(startIndex, endIndex);
+  const after = text.slice(endIndex);
+  const replacement = replaceInText({
+    text: sourceSlice,
+    find,
+    replace,
+    replaceAll
+  });
+
+  return {
+    text: before + replacement.text + after,
+    count: replacement.count
+  };
+}
+
+function replaceInText({ text, find, replace, replaceAll }) {
+  return replaceAll
+    ? replaceEvery(text, find, replace)
+    : replaceFirst(text, find, replace);
 }
