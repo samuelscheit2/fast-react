@@ -595,6 +595,8 @@ const entrypoints = [
 ];
 const cjsDevelopmentEntrypoint =
   "react-test-renderer/cjs/react-test-renderer.development";
+const cjsProductionEntrypoint =
+  "react-test-renderer/cjs/react-test-renderer.production";
 const cjsEntrypoints = entrypoints.filter((entry) =>
   entry.entrypoint.includes("/cjs/")
 );
@@ -606,7 +608,10 @@ function isPackageRootEntrypoint(entrypoint) {
   );
 }
 function hasCompletePrivateRootLifecycleExecutionSourceRecords(entrypoint) {
-  return entrypoint === cjsDevelopmentEntrypoint;
+  return (
+    entrypoint === cjsDevelopmentEntrypoint ||
+    entrypoint === cjsProductionEntrypoint
+  );
 }
 function hasSiblingTextPrivateAdmission(entrypoint) {
   return isPackageRootEntrypoint(entrypoint) || entrypoint.includes("/cjs/");
@@ -1482,10 +1487,6 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
     );
     assert.equal(missingBoundaryMetadata.records.length, 1, entry.entrypoint);
 
-    if (entry.entrypoint !== cjsDevelopmentEntrypoint) {
-      continue;
-    }
-
     const {
       finishedWorkIdentity,
       lifecycleEvidence,
@@ -1679,6 +1680,68 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
       publicActString.rejectionReason,
       "act-update-lifecycle-evidence-not-object"
     );
+    assert.equal(publicActString.publicActCompatibilityClaimed, false);
+
+    const publicUpdateCompatibilityClaim =
+      diagnostics.describePrivateActUpdateLifecycleBoundary(
+        Object.freeze({
+          ...updateResult,
+          compatibilityClaimed: true
+        }),
+        lifecycleEvidence,
+        finishedWorkIdentity
+      );
+    assert.equal(publicUpdateCompatibilityClaim.accepted, false);
+    assert.equal(
+      publicUpdateCompatibilityClaim.rejectionReason,
+      "native-update-result-public-claim"
+    );
+
+    const schedulerPrerequisiteSmuggle =
+      diagnostics.describePrivateActUpdateLifecycleBoundary(
+        updateResult,
+        Object.freeze({
+          ...lifecycleEvidence,
+          id: "scheduler-mock-flush-helper-metadata"
+        }),
+        finishedWorkIdentity
+      );
+    assert.equal(schedulerPrerequisiteSmuggle.accepted, false);
+    assert.equal(
+      schedulerPrerequisiteSmuggle.rejectionReason,
+      "act-update-lifecycle-evidence-not-source-owned"
+    );
+
+    if (entry.production) {
+      const publicActLifecycleClaim =
+        diagnostics.describePrivateActUpdateLifecycleBoundary(
+          updateResult,
+          Object.freeze({
+            ...lifecycleEvidence,
+            publicActAvailable: true
+          }),
+          finishedWorkIdentity
+        );
+      assert.equal(publicActLifecycleClaim.accepted, false);
+      assert.equal(
+        publicActLifecycleClaim.rejectionReason,
+        "act-update-lifecycle-evidence-public-claim"
+      );
+      const publicSchedulerLifecycleClaim =
+        diagnostics.describePrivateActUpdateLifecycleBoundary(
+          updateResult,
+          Object.freeze({
+            ...lifecycleEvidence,
+            publicSchedulerAvailable: true
+          }),
+          finishedWorkIdentity
+        );
+      assert.equal(publicSchedulerLifecycleClaim.accepted, false);
+      assert.equal(
+        publicSchedulerLifecycleClaim.rejectionReason,
+        "act-update-lifecycle-evidence-public-claim"
+      );
+    }
   }
 });
 
@@ -1690,9 +1753,7 @@ test("react-test-renderer package root private act update lifecycle boundary rej
     (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
   );
   const cjsProductionEntry = entrypoints.find(
-    (candidate) =>
-      candidate.entrypoint ===
-      "react-test-renderer/cjs/react-test-renderer.production"
+    (candidate) => candidate.entrypoint === cjsProductionEntrypoint
   );
   assert.notEqual(packageRootEntry, undefined);
   assert.notEqual(cjsDevelopmentEntry, undefined);
@@ -1806,6 +1867,47 @@ test("react-test-renderer package root private act update lifecycle boundary rej
   assert.equal(cjsCrossEntrypoint.accepted, false);
   assert.equal(
     cjsCrossEntrypoint.rejectionReason,
+    "act-update-execution-not-source-owned"
+  );
+
+  const {
+    finishedWorkIdentity: productionFinishedWorkIdentity,
+    lifecycleEvidence: productionLifecycleEvidence,
+    updateResult: productionUpdateResult
+  } = createPrivateActUpdateLifecycleBoundaryRuntime(
+    cjsProductionModule,
+    cjsProductionBridge
+  );
+  assert.equal(
+    cjsProductionBridge.canConsumePrivateActUpdateLifecycleBoundary(
+      productionUpdateResult,
+      productionLifecycleEvidence,
+      productionFinishedWorkIdentity
+    ),
+    true
+  );
+
+  const cjsDevelopmentRejectsProductionRows =
+    cjsDevelopmentBridge.describePrivateActUpdateLifecycleBoundary(
+      productionUpdateResult,
+      productionLifecycleEvidence,
+      productionFinishedWorkIdentity
+    );
+  assert.equal(cjsDevelopmentRejectsProductionRows.accepted, false);
+  assert.equal(
+    cjsDevelopmentRejectsProductionRows.rejectionReason,
+    "native-update-admission-execution-evidence"
+  );
+
+  const packageRootRejectsProductionRows =
+    packageRootBridge.describePrivateActUpdateLifecycleBoundary(
+      productionUpdateResult,
+      productionLifecycleEvidence,
+      productionFinishedWorkIdentity
+    );
+  assert.equal(packageRootRejectsProductionRows.accepted, false);
+  assert.equal(
+    packageRootRejectsProductionRows.rejectionReason,
     "act-update-execution-not-source-owned"
   );
 });
@@ -6176,7 +6278,7 @@ test("react-test-renderer private TestInstance wrapper requires accepted lifecyc
   }
 });
 
-test("react-test-renderer CJS development private TestInstance bridge records deterministic findAll predicate diagnostics", () => {
+test("react-test-renderer CJS private TestInstance bridge records deterministic findAll predicate diagnostics", () => {
   for (const entry of cjsEntrypoints.filter((candidate) =>
     hasCompletePrivateRootLifecycleExecutionSourceRecords(candidate.entrypoint)
   )) {
@@ -6231,7 +6333,7 @@ test("react-test-renderer CJS development private TestInstance bridge records de
   }
 });
 
-test("react-test-renderer CJS development private TestInstance bridge records deterministic findBy diagnostics", () => {
+test("react-test-renderer CJS private TestInstance bridge records deterministic findBy diagnostics", () => {
   const entry = cjsEntrypoints.find((candidate) =>
     candidate.entrypoint.endsWith("react-test-renderer.development")
   );
@@ -6293,7 +6395,7 @@ test("react-test-renderer CJS development private TestInstance bridge records de
   assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
 });
 
-test("react-test-renderer CJS development private TestInstance query bridge preflights accepted Rust diagnostics records", () => {
+test("react-test-renderer CJS private TestInstance query bridge preflights accepted Rust diagnostics records", () => {
   const entry = cjsEntrypoints.find((candidate) =>
     candidate.entrypoint.endsWith("react-test-renderer.development")
   );
@@ -6383,7 +6485,7 @@ test("react-test-renderer CJS development private TestInstance query bridge pref
   assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
 });
 
-test("react-test-renderer CJS development private TestInstance query consumes accepted native create/update execution records", () => {
+test("react-test-renderer CJS private TestInstance query consumes accepted native create/update execution records", () => {
   const entry = cjsEntrypoints.find((candidate) =>
     candidate.entrypoint.endsWith("react-test-renderer.development")
   );
@@ -6530,7 +6632,7 @@ test("react-test-renderer CJS development private TestInstance query consumes ac
   });
 });
 
-test("react-test-renderer CJS development private TestInstance class-root query evidence stays private", () => {
+test("react-test-renderer CJS private TestInstance class-root query evidence stays private", () => {
   const entry = cjsEntrypoints.find((candidate) =>
     candidate.entrypoint.endsWith("react-test-renderer.development")
   );

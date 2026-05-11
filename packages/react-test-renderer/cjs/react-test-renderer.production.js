@@ -35,6 +35,14 @@ const privateCreateRouteAdmissionMetadataId =
   'fast-react-test-renderer-create-route-admission-metadata';
 const privateCreateRouteAdmissionMetadataStatus =
   'accepted-create-route-rust-root-create-work-loop-admission-metadata';
+const privateRootCreateWorkLoopFinishedWorkPreflightId =
+  'react-test-renderer-root-create-work-loop-finished-work-private-diagnostic';
+const privateRootCreateWorkLoopFinishedWorkPreflightStatus =
+  'private-root-create-work-loop-finished-work-preflight-public-root-blocked';
+const privateRootCreateWorkLoopFinishedWorkPreflightMetadataId =
+  'fast-react-test-renderer-root-work-loop-finished-work-preflight-metadata';
+const privateRootCreateWorkLoopFinishedWorkPreflightMetadataStatus =
+  'accepted-root-work-loop-finished-work-preflight-metadata';
 const privateCreateNativeBridgeHostOutputHandoffDiagnosticId =
   'react-test-renderer-create-native-bridge-host-output-handoff-private-diagnostic';
 const privateCreateNativeBridgeHostOutputHandoffStatus =
@@ -7323,6 +7331,13 @@ function getRejectedPrivateActUpdateLifecycleBoundaryReason(
   if (!Object.isFrozen(rootLifecycleExecutionEvidence)) {
     return 'act-update-lifecycle-evidence-not-frozen';
   }
+  if (
+    rootLifecycleExecutionEvidence.publicActAvailable === true ||
+    rootLifecycleExecutionEvidence.publicSchedulerAvailable === true ||
+    rootLifecycleExecutionEvidence.compatibilityClaimed === true
+  ) {
+    return 'act-update-lifecycle-evidence-public-claim';
+  }
   if (!rootLifecycleExecutionEvidences.has(rootLifecycleExecutionEvidence)) {
     return 'act-update-lifecycle-evidence-not-source-owned';
   }
@@ -7820,6 +7835,19 @@ function createTestRendererRootRequestBridge(options) {
     getRustCanaryOperationMetadata(record) {
       return getRustCanaryOperationMetadataForRequestRecord(record);
     },
+    getRootCreateRouteAdmission(record) {
+      return getRootCreateRouteAdmissionForRootRequest(record);
+    },
+    getRendererRootCreateRouteAdmission(renderer) {
+      const rootHandle = rendererRootHandles.get(renderer);
+      if (rootHandle === undefined) {
+        return null;
+      }
+      const requests = getRootRequestsForHandle(rootHandle);
+      return requests.length === 0
+        ? null
+        : getRootCreateRouteAdmissionForRootRequest(requests[0]);
+    },
     getTestInstanceQueryDiagnostics(record) {
       return getTestInstanceQueryDiagnosticsForRootRequest(record);
     },
@@ -7871,6 +7899,40 @@ function createTestRendererRootRequestBridge(options) {
       return consumeAcceptedRustUpdateRouteRootWorkLoopForRequest(
         record,
         diagnostic
+      );
+    },
+    canConsumeAcceptedRustRootCreateRouteAdmission(record, diagnostic) {
+      try {
+        consumeAcceptedRustRootCreateRouteAdmissionForRequest(
+          record,
+          diagnostic
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    consumeAcceptedRustRootCreateRouteAdmission(record, diagnostic) {
+      return consumeAcceptedRustRootCreateRouteAdmissionForRequest(
+        record,
+        diagnostic
+      );
+    },
+    canConsumePrivateCreateNativeBridgeHostOutputHandoff(record, evidence) {
+      try {
+        consumePrivateCreateNativeBridgeHostOutputHandoffForRequest(
+          record,
+          evidence
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    consumePrivateCreateNativeBridgeHostOutputHandoff(record, evidence) {
+      return consumePrivateCreateNativeBridgeHostOutputHandoffForRequest(
+        record,
+        evidence
       );
     },
     canConsumePrivateUpdateNativeBridgeAdmission(record, evidence) {
@@ -9708,23 +9770,12 @@ function createPrivateCreateRouteAdmissionRecord(createRequest) {
         ? null
         : 'stale-rust-create-route-admission-record';
   const ready = metadataCurrent === true;
-  const workLoopFinishedWorkPreflight = freezeRecord({
-    kind: 'FastReactTestRendererPrivateRootWorkLoopFinishedWorkPreflight',
-    status: ready
-      ? privateCreateRouteAdmissionMetadataStatus
-      : `blocked-private-root-work-loop-finished-work-preflight-${failureReason}`,
-    ready,
-    failureReason,
-    entrypoint,
-    compatibilityTarget,
-    rootRequest: createRequest,
-    rootRequestId: createRequest.requestId,
-    rootRequestSequence: createRequest.requestSequence,
-    publicCreateBehaviorAvailable: false,
-    nativeBridgeAvailable: false,
-    nativeExecution: false,
-    compatibilityClaimed: false
-  });
+  const workLoopFinishedWorkPreflight =
+    createRootCreateWorkLoopFinishedWorkPreflightRecord(
+      createRequest,
+      ready,
+      failureReason
+    );
 
   return freezeRecord({
     kind: 'FastReactTestRendererPrivateCreateRouteAdmission',
@@ -9750,7 +9801,12 @@ function createPrivateCreateRouteAdmissionRecord(createRequest) {
     bridgeMetadataSource:
       'FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.rootCreateRouteAdmission',
     rustAdmissionMetadata: metadata ?? null,
+    rootCreatePreflight: null,
     workLoopFinishedWorkPreflight,
+    rootCreateExecutionEvidence: createRootCreateExecutionEvidence(
+      createRequest,
+      workLoopFinishedWorkPreflight
+    ),
     rustCanaryMetadata: createRequest.rustCanaryMetadata,
     rustCanaryOperationMetadata: createRequest.rustCanaryOperationMetadata,
     consumesJsFacadeCreateMetadata: ready,
@@ -9773,6 +9829,96 @@ function createPrivateCreateRouteAdmissionRecord(createRequest) {
   });
 }
 
+function createRootCreateWorkLoopFinishedWorkPreflightRecord(
+  createRequest,
+  ready,
+  failureReason
+) {
+  const previousCurrent = freezeRecord({
+    arenaId: 1,
+    slot: 1,
+    generation: 1
+  });
+  const finishedWork = freezeRecord({
+    arenaId: 1,
+    slot: 2,
+    generation: 1
+  });
+
+  return freezeRecord({
+    id: privateRootCreateWorkLoopFinishedWorkPreflightId,
+    kind: 'FastReactTestRendererPrivateRootWorkLoopFinishedWorkPreflight',
+    status: ready
+      ? privateRootCreateWorkLoopFinishedWorkPreflightStatus
+      : `blocked-private-root-work-loop-finished-work-preflight-${failureReason}`,
+    ready,
+    failureReason,
+    entrypoint,
+    compatibilityTarget,
+    rootRequest: createRequest,
+    rootRequestId: createRequest.requestId,
+    rootRequestSequence: createRequest.requestSequence,
+    acceptedInputShape: 'HostComponentWithTextChild',
+    supportedChildren: 'single-host-text-child',
+    rootOptionsMetadataAvailable: true,
+    previousCurrent,
+    finishedWork,
+    renderLanesEmpty: false,
+    renderLanesBits: 1,
+    remainingLanesEmpty: true,
+    remainingLanesBits: 0,
+    finishedWorkMatchesRenderPhase: true,
+    recordsAcceptedFinishedWorkMetadata: ready,
+    consumesAcceptedRustWorkLoopFinishedWorkPreflightMetadata: ready,
+    workLoopFinishedWorkMetadata: freezeRecord({
+      metadataId: privateRootCreateWorkLoopFinishedWorkPreflightMetadataId,
+      metadataStatus:
+        privateRootCreateWorkLoopFinishedWorkPreflightMetadataStatus,
+      acceptedWorker: 'worker-534-root-work-loop-finished-work-commit-handoff',
+      acceptedRustModule: 'fast-react-test-renderer',
+      renderPhaseApi:
+        'TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff',
+      renderPhaseRecord: 'HostRootRenderPhaseRecord',
+      finishedWorkRecord: 'HostRootFinishedWorkPendingCommitRecordForCanary',
+      pendingFinishedWorkRecord:
+        'HostRootFinishedWorkPendingCommitRecordForCanary',
+      commitHandoffRecord: 'HostRootFinishedWorkCommitHandoffRecordForCanary',
+      acceptedInputShape: 'HostComponentWithTextChild'
+    }),
+    publicCreateBehaviorAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createRootCreateExecutionEvidence(
+  createRequest,
+  workLoopFinishedWorkPreflight
+) {
+  return freezeRecord({
+    kind: 'FastReactTestRendererPrivateCreateRouteExecutionEvidence',
+    operation: 'create',
+    requestId: createRequest.requestId,
+    requestSequence: createRequest.requestSequence,
+    rootApi: createRequest.rootApi,
+    updateKind: createRequest.updateKind,
+    rustUpdateKind: createRequest.rustUpdateKind,
+    rustOutcome: createRequest.rustOutcome,
+    scheduled: createRequest.scheduled,
+    rootElementHandle: createRequest.rootElementHandle,
+    containerUpdateApi: createRequest.containerUpdateApi,
+    schedulerApi: createRequest.schedulerApi,
+    lifecycleDiagnostic: createRequest.rustLifecycleDiagnostic,
+    workLoopFinishedWorkPreflight,
+    acceptedRustRecords: privateCreateRouteAdmissionGate.acceptedRustRecords,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
 function isCurrentCreateRouteAdmissionMetadata(metadata) {
   return (
     metadata !== undefined &&
@@ -9790,6 +9936,875 @@ function isCurrentCreateRouteAdmissionMetadata(metadata) {
     metadata.executionResultRecord ===
       'TestRendererPrivateCreateRouteAdmissionDiagnostics' &&
     metadata.acceptedInputShape === 'HostComponentWithTextChild'
+  );
+}
+
+function consumeAcceptedRustRootCreateRouteAdmissionForRequest(
+  record,
+  diagnostic
+) {
+  const admission = getRootCreateRouteAdmissionForRootRequest(record);
+  if (admission === null || admission.ready !== true) {
+    throwInvalidRootRequest(
+      `Private create-route admission is closed: ${admission?.failureReason}.`
+    );
+  }
+
+  const normalized =
+    normalizeAcceptedRustRootCreateRouteAdmissionDiagnostic(diagnostic);
+  assertAcceptedRustRootCreateRouteAdmissionMatchesRequest(
+    admission,
+    normalized
+  );
+
+  return freezeRecord({
+    kind: 'FastReactTestRendererPrivateCreateRouteAdmissionConsumption',
+    id: privateCreateRouteAdmissionRecordId,
+    diagnosticName: privateCreateRouteAdmissionDiagnosticName,
+    status: privateCreateRouteAdmissionStatus,
+    entrypoint,
+    compatibilityTarget,
+    rootRequest: record,
+    admission,
+    rootCreatePreflight: admission.rootCreatePreflight,
+    workLoopFinishedWorkPreflight:
+      admission.workLoopFinishedWorkPreflight,
+    sourceDiagnostic: normalized,
+    consumesJsFacadeCreateMetadata: true,
+    consumesAcceptedRustRootCreateExecutionEvidence: true,
+    consumesAcceptedRustRootCreatePreflightDiagnostics: true,
+    consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true,
+    publicRendererRootCreated: false,
+    publicRootAvailable: false,
+    publicCreateBehaviorAvailable: false,
+    publicSerializationAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    reconcilerExecutionFromJs: false,
+    hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+
+function normalizeAcceptedRustRootCreateRouteAdmissionDiagnostic(diagnostic) {
+  if (diagnostic === null || typeof diagnostic !== 'object') {
+    throwInvalidRootRequest(
+      'Expected a Rust test-renderer create-route admission diagnostic object.'
+    );
+  }
+  const metadata = readDiagnosticField(diagnostic, [
+    'rustAdmissionMetadata',
+    'admissionMetadata',
+    'metadata'
+  ]);
+  if (metadata === null || typeof metadata !== 'object') {
+    throwInvalidRootRequest(
+      'Expected a Rust create-route admission metadata object.'
+    );
+  }
+
+  return freezeRecord({
+    id: readDiagnosticField(diagnostic, ['id', 'recordId', 'record_id']),
+    diagnosticName: readDiagnosticField(diagnostic, [
+      'diagnosticName',
+      'diagnostic_name'
+    ]),
+    status: readDiagnosticField(diagnostic, ['status']),
+    operation: readDiagnosticField(diagnostic, ['operation']),
+    publicSurface: readDiagnosticField(diagnostic, [
+      'publicSurface',
+      'public_surface'
+    ]),
+    jsFacadeMetadataSource: readDiagnosticField(diagnostic, [
+      'jsFacadeMetadataSource',
+      'js_facade_metadata_source'
+    ]),
+    rustAdmissionMetadata: freezeRecord({
+      metadataId: readDiagnosticField(metadata, [
+        'metadataId',
+        'metadata_id'
+      ]),
+      metadataStatus: readDiagnosticField(metadata, [
+        'metadataStatus',
+        'metadata_status'
+      ]),
+      recordId: readDiagnosticField(metadata, ['recordId', 'record_id']),
+      diagnosticName: readDiagnosticField(metadata, [
+        'diagnosticName',
+        'diagnostic_name'
+      ]),
+      status: readDiagnosticField(metadata, ['status']),
+      acceptedWorker: readDiagnosticField(metadata, [
+        'acceptedWorker',
+        'accepted_worker'
+      ]),
+      acceptedRustCrate: readDiagnosticField(metadata, [
+        'acceptedRustCrate',
+        'accepted_rust_crate'
+      ]),
+      rootApi: readDiagnosticField(metadata, ['rootApi', 'root_api']),
+      preflightApi: readDiagnosticField(metadata, [
+        'preflightApi',
+        'preflight_api'
+      ]),
+      workLoopRenderPhaseApi: readDiagnosticField(metadata, [
+        'workLoopRenderPhaseApi',
+        'work_loop_render_phase_api'
+      ]),
+      lifecycleRecord: readDiagnosticField(metadata, [
+        'lifecycleRecord',
+        'lifecycle_record'
+      ]),
+      executionResultRecord: readDiagnosticField(metadata, [
+        'executionResultRecord',
+        'execution_result_record'
+      ]),
+      acceptedInputShape: readDiagnosticField(metadata, [
+        'acceptedInputShape',
+        'accepted_input_shape'
+      ])
+    }),
+    workLoopFinishedWorkPreflight:
+      normalizeRootCreateWorkLoopFinishedWorkPreflight(
+        readDiagnosticField(diagnostic, [
+          'workLoopFinishedWorkPreflight',
+          'rootWorkLoopFinishedWorkPreflight',
+          'finishedWorkPreflight'
+        ])
+      ),
+    rootCreateExecutionEvidence: readDiagnosticField(diagnostic, [
+      'rootCreateExecutionEvidence',
+      'root_create_execution_evidence',
+      'executionEvidence'
+    ]),
+    consumesJsFacadeCreateMetadata: readDiagnosticField(diagnostic, [
+      'consumesJsFacadeCreateMetadata',
+      'consumes_js_facade_create_metadata'
+    ]),
+    consumesAcceptedRustRootCreateExecutionEvidence: readDiagnosticField(
+      diagnostic,
+      [
+        'consumesAcceptedRustRootCreateExecutionEvidence',
+        'consumes_accepted_rust_root_create_execution_evidence'
+      ]
+    ),
+    consumesAcceptedRustRootCreatePreflightDiagnostics: readDiagnosticField(
+      diagnostic,
+      [
+        'consumesAcceptedRustRootCreatePreflightDiagnostics',
+        'consumes_accepted_rust_root_create_preflight_diagnostics'
+      ]
+    ),
+    consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata:
+      readDiagnosticField(diagnostic, [
+        'consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata',
+        'consumes_accepted_rust_root_work_loop_finished_work_preflight_metadata'
+      ])
+  });
+}
+
+function assertAcceptedRustRootCreateRouteAdmissionMatchesRequest(
+  admission,
+  diagnostic
+) {
+  if (
+    diagnostic.id !== privateCreateRouteAdmissionRecordId ||
+    diagnostic.diagnosticName !== privateCreateRouteAdmissionDiagnosticName ||
+    diagnostic.status !== privateCreateRouteAdmissionStatus ||
+    diagnostic.operation !== 'create' ||
+    diagnostic.publicSurface !== 'create()'
+  ) {
+    throwInvalidRootRequest(
+      'Rust create-route admission diagnostic identity is not accepted.'
+    );
+  }
+  if (
+    diagnostic.jsFacadeMetadataSource !==
+    'FastReactTestRendererPrivateRootRequestRecord'
+  ) {
+    throwInvalidRootRequest(
+      'Rust create-route admission does not target the JS facade request metadata.'
+    );
+  }
+
+  const metadata = diagnostic.rustAdmissionMetadata;
+  const expectedMetadata = admission.rustAdmissionMetadata;
+  if (
+    expectedMetadata === null ||
+    metadata.metadataId !== expectedMetadata.metadataId ||
+    metadata.metadataStatus !== expectedMetadata.metadataStatus ||
+    metadata.recordId !== expectedMetadata.recordId ||
+    metadata.diagnosticName !== expectedMetadata.diagnosticName ||
+    metadata.status !== expectedMetadata.status ||
+    metadata.acceptedWorker !== expectedMetadata.acceptedWorker ||
+    metadata.acceptedRustCrate !== expectedMetadata.acceptedRustCrate ||
+    metadata.rootApi !== expectedMetadata.rootApi ||
+    metadata.preflightApi !== expectedMetadata.preflightApi ||
+    metadata.workLoopRenderPhaseApi !==
+      expectedMetadata.workLoopRenderPhaseApi ||
+    metadata.lifecycleRecord !== expectedMetadata.lifecycleRecord ||
+    metadata.executionResultRecord !== expectedMetadata.executionResultRecord ||
+    metadata.acceptedInputShape !== expectedMetadata.acceptedInputShape
+  ) {
+    throwInvalidRootRequest(
+      'Rust create-route admission metadata is stale.'
+    );
+  }
+
+  const workLoop = diagnostic.workLoopFinishedWorkPreflight;
+  const expectedWorkLoop = admission.workLoopFinishedWorkPreflight;
+  if (
+    !createRouteFiberHandlesEqual(
+      workLoop.finishedWork,
+      expectedWorkLoop.finishedWork
+    ) ||
+    workLoop.finishedWorkMatchesRenderPhase !== true
+  ) {
+    throwInvalidRootRequest(
+      'Rust create-route admission finished work is stale.'
+    );
+  }
+  if (
+    workLoop.renderLanesBits !== expectedWorkLoop.renderLanesBits ||
+    workLoop.remainingLanesBits !== expectedWorkLoop.remainingLanesBits ||
+    workLoop.renderLanesBits !== 1 ||
+    workLoop.remainingLanesBits !== 0
+  ) {
+    throwInvalidRootRequest(
+      'Rust create-route admission finished lanes are stale.'
+    );
+  }
+
+  const evidence = diagnostic.rootCreateExecutionEvidence;
+  if (
+    evidence === null ||
+    typeof evidence !== 'object' ||
+    evidence.operation !== 'create' ||
+    evidence.requestId !== admission.rootRequest.requestId ||
+    evidence.rootApi !== 'TestRendererRoot::create' ||
+    evidence.updateKind !== 'Create' ||
+    evidence.rustOutcome !== 'Scheduled' ||
+    evidence.scheduled !== true
+  ) {
+    throwInvalidRootRequest(
+      'Rust create-route admission execution evidence does not match the create request.'
+    );
+  }
+  if (
+    diagnostic.consumesJsFacadeCreateMetadata !== true ||
+    diagnostic.consumesAcceptedRustRootCreateExecutionEvidence !== true ||
+    diagnostic.consumesAcceptedRustRootCreatePreflightDiagnostics !== true ||
+    diagnostic
+      .consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata !== true
+  ) {
+    throwInvalidRootRequest(
+      'Rust create-route admission consumption flags are not accepted.'
+    );
+  }
+}
+
+function consumePrivateCreateNativeBridgeHostOutputHandoffForRequest(
+  record,
+  evidence,
+  acceptedCreateRouteAdmission
+) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+  if (record.operation !== 'create') {
+    throwInvalidRootRequest(
+      'Private create native bridge host-output handoff only accepts create requests.'
+    );
+  }
+
+  const handoff =
+    readDiagnosticField(evidence, [
+      'privateCreateNativeBridgeHostOutputHandoff',
+      'createNativeBridgeHostOutputHandoff',
+      'createHostOutputHandoff',
+      'hostOutputHandoff'
+    ]) ?? evidence;
+  if (handoff === null || typeof handoff !== 'object') {
+    throwInvalidRootRequest(
+      'Expected private create native bridge host-output handoff evidence.'
+    );
+  }
+
+  const createRouteAdmissionEvidence = readDiagnosticField(handoff, [
+    'createRouteAdmission',
+    'privateCreateRouteAdmission',
+    'rootCreateRouteAdmission',
+    'admission'
+  ]);
+  const createRouteAdmission =
+    acceptedCreateRouteAdmission ??
+    consumeAcceptedRustRootCreateRouteAdmissionForRequest(
+      record,
+      createRouteAdmissionEvidence
+    );
+  const normalized =
+    normalizePrivateCreateNativeBridgeHostOutputHandoff(handoff);
+  assertPrivateCreateNativeBridgeHostOutputHandoffMatchesRequest(
+    record,
+    createRouteAdmission,
+    normalized
+  );
+
+  return freezeRecord({
+    kind: 'FastReactTestRendererPrivateCreateNativeBridgeHostOutputHandoff',
+    id: privateCreateNativeBridgeHostOutputHandoffDiagnosticId,
+    status: privateCreateNativeBridgeHostOutputHandoffStatus,
+    entrypoint,
+    compatibilityTarget,
+    request: record,
+    requestId: record.requestId,
+    requestSequence: record.requestSequence,
+    rootId: record.rootId,
+    rootSequence: record.rootSequence,
+    createRouteAdmission,
+    sourceDiagnostic: normalized,
+    operation: 'create',
+    publicSurface: 'create()',
+    hostOutputUpdateKind: 'Create',
+    hostOutputShape: 'SingleHostText',
+    hostOutput: normalized.hostOutput,
+    serializationGateStatus: normalized.serializationGateStatus,
+    workLoopFinishedWorkPreflight:
+      normalized.workLoopFinishedWorkPreflight,
+    renderFinishedWork: normalized.renderFinishedWork,
+    commitCurrent: normalized.commitCurrent,
+    renderLanesBits: normalized.renderLanesBits,
+    commitFinishedLanesBits: normalized.commitFinishedLanesBits,
+    commitRemainingLanesBits: normalized.commitRemainingLanesBits,
+    commitPendingLanesBits: normalized.commitPendingLanesBits,
+    renderFinishedWorkMatchesCreateRoutePreflight: true,
+    commitCurrentMatchesRenderFinishedWork: true,
+    commitLanesMatchRenderLanes: true,
+    minimalTreeHostOutputConsumesRootFinishedWork: true,
+    minimalTreeHostOutputConsumesRootFinishedLanes: true,
+    createRouteAdmissionAccepted: true,
+    hostOutputHandoffAccepted: true,
+    actualRustCreateHostOutputHandoff: true,
+    hostOutputProducedByRust: true,
+    publicCreateBehaviorAvailable: false,
+    publicSerializationAvailable: false,
+    publicTestInstanceAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+
+function normalizePrivateCreateNativeBridgeHostOutputHandoff(handoff) {
+  const hostOutput = readDiagnosticField(handoff, [
+    'hostOutput',
+    'host_output'
+  ]);
+  if (hostOutput === null || typeof hostOutput !== 'object') {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff requires host-output diagnostics.'
+    );
+  }
+
+  return freezeRecord({
+    id: readDiagnosticField(handoff, [
+      'id',
+      'diagnosticId',
+      'diagnostic_id'
+    ]),
+    status: readDiagnosticField(handoff, ['status']),
+    operation: readDiagnosticField(handoff, ['operation']),
+    publicSurface: readDiagnosticField(handoff, [
+      'publicSurface',
+      'public_surface'
+    ]),
+    rootRequestId: readDiagnosticField(handoff, [
+      'rootRequestId',
+      'root_request_id',
+      'requestId',
+      'request_id'
+    ]),
+    rootRequestSequence: readDiagnosticField(handoff, [
+      'rootRequestSequence',
+      'root_request_sequence',
+      'requestSequence',
+      'request_sequence'
+    ]),
+    rootApi: readDiagnosticField(handoff, ['rootApi', 'root_api']),
+    updateKind: readDiagnosticField(handoff, [
+      'hostOutputUpdateKind',
+      'host_output_update_kind',
+      'scheduledUpdateKind',
+      'scheduled_update_kind',
+      'updateKind',
+      'update_kind'
+    ]),
+    rustOutcome: readDiagnosticField(handoff, [
+      'rustOutcome',
+      'rust_outcome'
+    ]),
+    scheduled: readDiagnosticField(handoff, ['scheduled']),
+    createRouteAdmissionRecordId: readDiagnosticField(handoff, [
+      'createRouteAdmissionRecordId',
+      'create_route_admission_record_id'
+    ]),
+    createRouteAdmissionStatus: readDiagnosticField(handoff, [
+      'createRouteAdmissionStatus',
+      'create_route_admission_status'
+    ]),
+    hostOutputShape: readDiagnosticField(handoff, [
+      'hostOutputShape',
+      'host_output_shape'
+    ]),
+    hostOutputSnapshotCurrent:
+      readDiagnosticField(handoff, [
+        'hostOutputSnapshotCurrent',
+        'host_output_snapshot_current'
+      ]) ?? true,
+    hostOutput: freezeRecord({
+      containerChildCount: readDiagnosticField(hostOutput, [
+        'containerChildCount',
+        'container_child_count'
+      ]),
+      instanceCount: readDiagnosticField(hostOutput, [
+        'instanceCount',
+        'instance_count'
+      ]),
+      textCount: readDiagnosticField(hostOutput, [
+        'textCount',
+        'text_count'
+      ]),
+      realHostOutputAvailable: readDiagnosticField(hostOutput, [
+        'realHostOutputAvailable',
+        'real_host_output_available'
+      ])
+    }),
+    serializationGateStatus: readDiagnosticField(handoff, [
+      'serializationGateStatus',
+      'serialization_gate_status'
+    ]),
+    workLoopFinishedWorkPreflight:
+      normalizeRootCreateWorkLoopFinishedWorkPreflight(
+        readDiagnosticField(handoff, [
+          'workLoopFinishedWorkPreflight',
+          'rootWorkLoopFinishedWorkPreflight',
+          'finishedWorkPreflight',
+          'work_loop_finished_work_preflight'
+        ])
+      ),
+    renderFinishedWork: normalizeCreateRouteFiberHandle(
+      readDiagnosticField(handoff, [
+        'renderFinishedWork',
+        'render_finished_work'
+      ]),
+      'renderFinishedWork'
+    ),
+    commitCurrent: normalizeCreateRouteFiberHandle(
+      readDiagnosticField(handoff, ['commitCurrent', 'commit_current']),
+      'commitCurrent'
+    ),
+    renderLanesBits: readDiagnosticField(handoff, [
+      'renderLanesBits',
+      'render_lanes_bits'
+    ]),
+    commitFinishedLanesBits: readDiagnosticField(handoff, [
+      'commitFinishedLanesBits',
+      'commit_finished_lanes_bits',
+      'finishedLanesBits',
+      'finished_lanes_bits'
+    ]),
+    commitRemainingLanesBits: readDiagnosticField(handoff, [
+      'commitRemainingLanesBits',
+      'commit_remaining_lanes_bits'
+    ]),
+    commitPendingLanesBits: readDiagnosticField(handoff, [
+      'commitPendingLanesBits',
+      'commit_pending_lanes_bits'
+    ]),
+    renderFinishedWorkMatchesCreateRoutePreflight:
+      readBooleanDiagnosticField(handoff, [
+        'renderFinishedWorkMatchesCreateRoutePreflight',
+        'render_finished_work_matches_create_route_preflight'
+      ]),
+    commitCurrentMatchesRenderFinishedWork: readBooleanDiagnosticField(
+      handoff,
+      [
+        'commitCurrentMatchesRenderFinishedWork',
+        'commit_current_matches_render_finished_work'
+      ]
+    ),
+    minimalTreeHostOutputConsumesRootFinishedWork:
+      readBooleanDiagnosticField(handoff, [
+        'minimalTreeHostOutputConsumesRootFinishedWork',
+        'minimal_tree_host_output_consumes_root_finished_work'
+      ]),
+    commitLanesMatchRenderLanes: readBooleanDiagnosticField(handoff, [
+      'commitLanesMatchRenderLanes',
+      'commit_lanes_match_render_lanes'
+    ]),
+    minimalTreeHostOutputConsumesRootFinishedLanes:
+      readBooleanDiagnosticField(handoff, [
+        'minimalTreeHostOutputConsumesRootFinishedLanes',
+        'minimal_tree_host_output_consumes_root_finished_lanes'
+      ]),
+    createRouteAdmissionAccepted: readDiagnosticField(handoff, [
+      'createRouteAdmissionAccepted',
+      'create_route_admission_accepted'
+    ]),
+    hostOutputHandoffAccepted: readDiagnosticField(handoff, [
+      'hostOutputHandoffAccepted',
+      'host_output_handoff_accepted'
+    ]),
+    actualRustCreateHostOutputHandoff: readDiagnosticField(handoff, [
+      'actualRustCreateHostOutputHandoff',
+      'actual_rust_create_host_output_handoff'
+    ]),
+    hostOutputProducedByRust: readDiagnosticField(handoff, [
+      'hostOutputProducedByRust',
+      'host_output_produced_by_rust'
+    ]),
+    publicCreateBehaviorAvailable: readDiagnosticField(handoff, [
+      'publicCreateBehaviorAvailable',
+      'public_create_behavior_available'
+    ]),
+    publicSerializationAvailable: readDiagnosticField(handoff, [
+      'publicSerializationAvailable',
+      'public_serialization_available'
+    ]),
+    publicTestInstanceAvailable: readDiagnosticField(handoff, [
+      'publicTestInstanceAvailable',
+      'public_test_instance_available'
+    ]),
+    nativeAddonLoaded: readDiagnosticField(handoff, [
+      'nativeAddonLoaded',
+      'native_addon_loaded'
+    ]),
+    nativeBridgeAvailable: readDiagnosticField(handoff, [
+      'nativeBridgeAvailable',
+      'native_bridge_available'
+    ]),
+    nativeExecution: readDiagnosticField(handoff, [
+      'nativeExecution',
+      'native_execution'
+    ]),
+    rustExecutionFromJs: readDiagnosticField(handoff, [
+      'rustExecutionFromJs',
+      'rust_execution_from_js'
+    ]),
+    hostOutputProducedFromJs: readDiagnosticField(handoff, [
+      'hostOutputProducedFromJs',
+      'host_output_produced_from_js'
+    ]),
+    compatibilityClaimed: readDiagnosticField(handoff, [
+      'compatibilityClaimed',
+      'compatibility_claimed'
+    ])
+  });
+}
+
+function assertPrivateCreateNativeBridgeHostOutputHandoffMatchesRequest(
+  record,
+  createRouteAdmission,
+  handoff
+) {
+  if (
+    handoff.id !== privateCreateNativeBridgeHostOutputHandoffDiagnosticId ||
+    handoff.status !== privateCreateNativeBridgeHostOutputHandoffStatus ||
+    handoff.operation !== 'create' ||
+    handoff.publicSurface !== 'create()'
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff identity is not accepted.'
+    );
+  }
+  if (
+    handoff.rootRequestId !== undefined &&
+    handoff.rootRequestId !== record.requestId
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff request id is stale.'
+    );
+  }
+  if (
+    handoff.rootRequestSequence !== undefined &&
+    handoff.rootRequestSequence !== record.requestSequence
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff request sequence is stale.'
+    );
+  }
+  if (
+    handoff.rootApi !== undefined &&
+    handoff.rootApi !== 'TestRendererRoot::create'
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff root API is stale.'
+    );
+  }
+  if (
+    handoff.updateKind !== 'Create' ||
+    handoff.rustOutcome !== 'Scheduled' ||
+    handoff.scheduled !== true
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff does not match a scheduled create.'
+    );
+  }
+  if (
+    handoff.createRouteAdmissionRecordId !== undefined &&
+    handoff.createRouteAdmissionRecordId !== createRouteAdmission.id
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff admission id is stale.'
+    );
+  }
+  if (
+    handoff.createRouteAdmissionStatus !== undefined &&
+    handoff.createRouteAdmissionStatus !== createRouteAdmission.status
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff admission status is stale.'
+    );
+  }
+  if (
+    handoff.hostOutputShape !== 'SingleHostText' ||
+    handoff.hostOutputSnapshotCurrent !== true ||
+    handoff.hostOutput.containerChildCount !== 1 ||
+    handoff.hostOutput.instanceCount !== 1 ||
+    handoff.hostOutput.textCount !== 1 ||
+    handoff.hostOutput.realHostOutputAvailable !== true
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff host output is not the accepted minimal tree.'
+    );
+  }
+  const routeWorkLoop =
+    createRouteAdmission.sourceDiagnostic?.workLoopFinishedWorkPreflight;
+  if (
+    routeWorkLoop === undefined ||
+    !createRouteFiberHandlesEqual(
+      handoff.workLoopFinishedWorkPreflight.finishedWork,
+      routeWorkLoop.finishedWork
+    ) ||
+    !createRouteFiberHandlesEqual(
+      handoff.renderFinishedWork,
+      routeWorkLoop.finishedWork
+    ) ||
+    !createRouteFiberHandlesEqual(
+      handoff.commitCurrent,
+      handoff.renderFinishedWork
+    ) ||
+    handoff.renderFinishedWorkMatchesCreateRoutePreflight !== true ||
+    handoff.commitCurrentMatchesRenderFinishedWork !== true ||
+    handoff.minimalTreeHostOutputConsumesRootFinishedWork !== true
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff is not tied to the accepted root finished work.'
+    );
+  }
+  if (
+    !isNonNegativeInteger(routeWorkLoop.renderLanesBits) ||
+    !isNonNegativeInteger(handoff.renderLanesBits) ||
+    !isNonNegativeInteger(handoff.commitFinishedLanesBits) ||
+    !isNonNegativeInteger(handoff.commitRemainingLanesBits) ||
+    !isNonNegativeInteger(handoff.commitPendingLanesBits) ||
+    handoff.renderLanesBits <= 0 ||
+    handoff.renderLanesBits !== routeWorkLoop.renderLanesBits ||
+    handoff.commitFinishedLanesBits !== handoff.renderLanesBits ||
+    handoff.commitRemainingLanesBits !== routeWorkLoop.remainingLanesBits ||
+    handoff.commitRemainingLanesBits !== 0 ||
+    handoff.commitPendingLanesBits !== 0 ||
+    handoff.commitLanesMatchRenderLanes !== true ||
+    handoff.minimalTreeHostOutputConsumesRootFinishedLanes !== true
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff is not tied to the accepted root finished lanes.'
+    );
+  }
+  if (
+    handoff.createRouteAdmissionAccepted !== true ||
+    handoff.hostOutputHandoffAccepted !== true ||
+    handoff.actualRustCreateHostOutputHandoff !== true ||
+    handoff.hostOutputProducedByRust !== true
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff acceptance flags are not accepted.'
+    );
+  }
+  if (
+    handoff.publicCreateBehaviorAvailable !== false ||
+    handoff.publicSerializationAvailable !== false ||
+    handoff.publicTestInstanceAvailable !== false ||
+    handoff.nativeAddonLoaded !== false ||
+    handoff.nativeBridgeAvailable !== false ||
+    handoff.nativeExecution !== false ||
+    handoff.rustExecutionFromJs !== false ||
+    handoff.hostOutputProducedFromJs !== false ||
+    handoff.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff cannot open public, native, or serialization compatibility.'
+    );
+  }
+}
+
+function normalizeRootCreateWorkLoopFinishedWorkPreflight(row) {
+  if (row === null || typeof row !== 'object') {
+    throwInvalidRootRequest(
+      'Expected Rust root-create preflight work-loop finished-work metadata.'
+    );
+  }
+  const metadata = readDiagnosticField(row, [
+    'workLoopFinishedWorkMetadata',
+    'workLoopFinishedWorkPreflightMetadata',
+    'metadata'
+  ]);
+  if (metadata === null || typeof metadata !== 'object') {
+    throwInvalidRootRequest(
+      'Expected Rust root-create work-loop finished-work preflight metadata object.'
+    );
+  }
+
+  return freezeRecord({
+    id: readDiagnosticField(row, ['id', 'rowId', 'row_id']),
+    status: readDiagnosticField(row, ['status']),
+    ready: readDiagnosticField(row, ['ready']),
+    acceptedInputShape: readDiagnosticField(row, [
+      'acceptedInputShape',
+      'accepted_input_shape'
+    ]),
+    supportedChildren: readDiagnosticField(row, [
+      'supportedChildren',
+      'supported_children'
+    ]),
+    rootOptionsMetadataAvailable: readDiagnosticField(row, [
+      'rootOptionsMetadataAvailable',
+      'root_options_metadata_available'
+    ]),
+    previousCurrent: normalizeCreateRouteFiberHandle(
+      readDiagnosticField(row, ['previousCurrent', 'previous_current']),
+      'previousCurrent'
+    ),
+    finishedWork: normalizeCreateRouteFiberHandle(
+      readDiagnosticField(row, ['finishedWork', 'finished_work']),
+      'finishedWork'
+    ),
+    renderLanesEmpty: readDiagnosticField(row, [
+      'renderLanesEmpty',
+      'render_lanes_empty'
+    ]),
+    renderLanesBits: readDiagnosticField(row, [
+      'renderLanesBits',
+      'render_lanes_bits'
+    ]),
+    remainingLanesEmpty: readDiagnosticField(row, [
+      'remainingLanesEmpty',
+      'remaining_lanes_empty'
+    ]),
+    remainingLanesBits: readDiagnosticField(row, [
+      'remainingLanesBits',
+      'remaining_lanes_bits'
+    ]),
+    finishedWorkMatchesRenderPhase: readDiagnosticField(row, [
+      'finishedWorkMatchesRenderPhase',
+      'finished_work_matches_render_phase'
+    ]),
+    recordsAcceptedFinishedWorkMetadata: readDiagnosticField(row, [
+      'recordsAcceptedFinishedWorkMetadata',
+      'records_accepted_finished_work_metadata'
+    ]),
+    consumesAcceptedRustWorkLoopFinishedWorkPreflightMetadata:
+      readDiagnosticField(row, [
+        'consumesAcceptedRustWorkLoopFinishedWorkPreflightMetadata',
+        'consumes_accepted_rust_work_loop_finished_work_preflight_metadata'
+      ]),
+    workLoopFinishedWorkMetadata: freezeRecord({
+      metadataId: readDiagnosticField(metadata, [
+        'metadataId',
+        'metadata_id'
+      ]),
+      metadataStatus: readDiagnosticField(metadata, [
+        'metadataStatus',
+        'metadata_status'
+      ]),
+      acceptedWorker: readDiagnosticField(metadata, [
+        'acceptedWorker',
+        'accepted_worker'
+      ]),
+      acceptedRustModule: readDiagnosticField(metadata, [
+        'acceptedRustModule',
+        'accepted_rust_module'
+      ]),
+      renderPhaseApi: readDiagnosticField(metadata, [
+        'renderPhaseApi',
+        'render_phase_api'
+      ]),
+      renderPhaseRecord: readDiagnosticField(metadata, [
+        'renderPhaseRecord',
+        'render_phase_record'
+      ]),
+      finishedWorkRecord: readDiagnosticField(metadata, [
+        'finishedWorkRecord',
+        'finished_work_record'
+      ]),
+      pendingFinishedWorkRecord: readDiagnosticField(metadata, [
+        'pendingFinishedWorkRecord',
+        'pending_finished_work_record'
+      ]),
+      commitHandoffRecord: readDiagnosticField(metadata, [
+        'commitHandoffRecord',
+        'commit_handoff_record'
+      ]),
+      acceptedInputShape: readDiagnosticField(metadata, [
+        'acceptedInputShape',
+        'accepted_input_shape'
+      ])
+    })
+  });
+}
+
+function normalizeCreateRouteFiberHandle(handle, fieldName) {
+  if (handle === null || typeof handle !== 'object') {
+    throwInvalidRootRequest(
+      `Expected private create-route fiber handle diagnostics: ${fieldName}.`
+    );
+  }
+
+  const arenaId = readDiagnosticField(handle, ['arenaId', 'arena_id']);
+  const slot = readDiagnosticField(handle, ['slot']);
+  const generation = readDiagnosticField(handle, [
+    'generation',
+    'generation_id'
+  ]);
+  if (
+    !isNonNegativeInteger(arenaId) ||
+    !isNonNegativeInteger(slot) ||
+    !isNonNegativeInteger(generation)
+  ) {
+    throwInvalidRootRequest(
+      `Expected numeric private create-route fiber handle diagnostics: ${fieldName}.`
+    );
+  }
+
+  return freezeRecord({ arenaId, slot, generation });
+}
+
+function createRouteFiberHandlesEqual(left, right) {
+  return (
+    left !== null &&
+    right !== null &&
+    typeof left === 'object' &&
+    typeof right === 'object' &&
+    left.arenaId === right.arenaId &&
+    left.slot === right.slot &&
+    left.generation === right.generation
   );
 }
 
@@ -10364,6 +11379,21 @@ function consumeRootExecutionResult(record, result, handoff) {
       record,
       rustLifecycleDiagnostic
     );
+  const privateCreateNativeBridgeHostOutputHandoffEvidence =
+    readDiagnosticField(result, [
+      'privateCreateNativeBridgeHostOutputHandoff',
+      'createNativeBridgeHostOutputHandoff',
+      'createHostOutputHandoff',
+      'hostOutputHandoff'
+    ]);
+  const privateCreateNativeBridgeHostOutputHandoff =
+    record.operation === 'create' &&
+    privateCreateNativeBridgeHostOutputHandoffEvidence !== undefined
+      ? consumePrivateCreateNativeBridgeHostOutputHandoffForRequest(
+          record,
+          privateCreateNativeBridgeHostOutputHandoffEvidence
+        )
+      : null;
   const privateUpdateNativeBridgeAdmission =
     record.operation === 'update' && result.hostOutputProduced === true
       ? consumePrivateUpdateNativeBridgeAdmissionForRequest(
@@ -10400,6 +11430,9 @@ function consumeRootExecutionResult(record, result, handoff) {
     rustOutcome: record.rustOutcome,
     scheduled: record.scheduled,
     rustLifecycleDiagnostic: consumedLifecycleDiagnostic,
+    privateCreateNativeBridgeHostOutputHandoff,
+    privateCreateNativeBridgeHostOutputHandoffAvailable:
+      record.privateCreateNativeBridgeHostOutputHandoffAvailable,
     privateUnmountDeletionCommitHandoff:
       record.privateUnmountDeletionCommitHandoff,
     privateUnmountDeletionCommitHandoffAvailable:
@@ -10428,6 +11461,7 @@ function consumeRootExecutionResult(record, result, handoff) {
     rustExecution: result.rustExecution === false ? false : true,
     reconcilerExecution: record.scheduled,
     hostOutputProduced:
+      privateCreateNativeBridgeHostOutputHandoff !== null ||
       privateUpdateNativeBridgeAdmission !== null ||
       (privateUnmountNativeBridgeAdmission !== null &&
         privateUnmountNativeBridgeAdmission.hostOutputProduced === true),
