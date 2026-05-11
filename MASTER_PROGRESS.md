@@ -29,6 +29,19 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 863
+
+- Worker 863 added private root-level HostText and HostComponent update
+  mutation execution after a prior root mount, requiring source-owned
+  render/update/commit evidence, committed host-node ownership, root/lane
+  identity, consumed payload evidence, and replay rejection before
+  `commit_text_update` or `commit_update` can run. Public React DOM,
+  test-renderer, hydration, refs/effects, native, package behavior, and broad
+  DOM property compatibility remain blocked.
+- Worker 863 was accepted after focused root-work-loop, host-work update,
+  sync-flush replay, reconciler check, formatting, and `git diff --check`
+  verification recorded in git history and the worker report.
+
 ### Workers 862 and 864-870
 
 - Worker 862 added private root-work-loop unmount execution for committed

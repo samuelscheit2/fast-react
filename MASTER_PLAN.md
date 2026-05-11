@@ -46,13 +46,15 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Accepted/merged baseline includes Workers 803-837,
-842-846, 848-852, 855-860, 862, and 864-870. Worker 853's competing
+842-846, 848-852, 855-860, and 862-870. Worker 853's competing
 test-renderer branch was rejected as redundant after Worker 844 was accepted;
 do not use it as accepted input.
 
 Current active queue:
 
-- Worker 863: root host update mutation execution.
+- Worker 872: test-renderer JS lifecycle consumer.
+- Worker 873: native lifecycle no-stale execution.
+- Worker 874: React DOM lifecycle boundary hardening.
 
 Accepted private evidence still keeps public root/render, `act`, `flushSync`,
 Scheduler timing, hydration, resources/forms, serialization, native execution,
@@ -64,9 +66,9 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Keep Worker 863 in the active queue until reviewed and merged; do not treat
-   its output as accepted input yet.
-2. Use accepted Workers 855, 860, 862, and 864-867 as private Rust execution
+1. Keep Workers 872, 873, and 874 in the active queue until reviewed and
+   merged; do not treat their output as accepted input yet.
+2. Use accepted Workers 855, 860, and 862-867 as private Rust execution
    inputs for narrow root/sync-flush/function/deletion host mutation follow-ups
    only when source-owned finished work, detached-host, lane/root, topology, and
    cleanup evidence is preserved.
@@ -82,10 +84,10 @@ canonical evidence requirements.
 ## Next Queue Candidates
 
 - Rust root/sync-flush/function/deletion execution can extend accepted Workers
-  855, 860, 862, and 864-867 toward managed-child, HostText, update, and
-  deletion shapes only as private test-host canaries with source-owned commit,
-  host-node, root/lane, topology, replay, ref/passive, and cleanup validation.
-  Public React DOM/test-renderer roots and public `flushSync` remain blocked.
+  855, 860, and 862-867 toward managed-child, HostText, update, and deletion
+  shapes only as private test-host canaries with source-owned commit, host-node,
+  root/lane, topology, replay, ref/passive, and cleanup validation. Public
+  React DOM/test-renderer roots and public `flushSync` remain blocked.
 - Test-renderer package-root/native work should use accepted Worker 844
   package-root native execution parity plus Workers 859 and 868 Rust private
   lifecycle/native consumer hardening. Worker 853 remains rejected/redundant.
