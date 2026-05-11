@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   PRIVATE_ADMISSION_810_GATE_STATUS,
+  PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES,
   PRIVATE_ADMISSION_810_PUBLIC_BLOCKER_FIELDS,
   PRIVATE_ADMISSION_810_REQUIRED_DIAGNOSTIC_IDS,
   PRIVATE_ADMISSION_810_REQUIRED_EVIDENCE_KINDS,
@@ -87,6 +88,7 @@ test("private admission 810 gate recognizes private source-owned diagnostics whi
   assert.equal(gate.status, PRIVATE_ADMISSION_810_GATE_STATUS);
   assert.equal(gate.privateDiagnosticsRecognized, true);
   assert.equal(gate.evidenceRecognized, true);
+  assert.equal(gate.durableEvidenceTokensRecognized, true);
   assert.equal(gate.diagnosticIdsRecognized, true);
   assert.equal(gate.statusesRecognized, true);
   assert.equal(gate.evidenceKindsRecognized, true);
@@ -101,6 +103,7 @@ test("private admission 810 gate recognizes private source-owned diagnostics whi
   assert.deepEqual(gate.queueWorkers, expectedWorkers);
   assert.deepEqual(gate.recognizedWorkerIds, expectedWorkers);
   assert.deepEqual(gate.publicBlockerClaimViolationIds, []);
+  assert.deepEqual(gate.nonDurableEvidenceTokenViolationIds, []);
   assert.deepEqual(gate.staticReadOnlyViolationIds, []);
   assert.deepEqual(gate.sourceValidatorOwnershipViolationIds, []);
   assert.deepEqual(gate.delayedRendererRootPublicClaimIds, []);
@@ -221,6 +224,65 @@ test("private admission 810 gate rejects missing Scheduler-owned source validato
     worker791,
     "worker-791-scheduler-source",
     false
+  );
+});
+
+test("private admission 810 gate rejects source-syntax evidence tokens", () => {
+  assert.deepEqual(
+    PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES.map(
+      (shape) => shape.id
+    ),
+    [
+      "object-api-expression",
+      "weak-collection-source-shape",
+      "define-property-source-shape",
+      "source-collection-method-expression",
+      "source-declaration-snippet",
+      "field-value-expression",
+      "block-or-statement-syntax"
+    ]
+  );
+
+  const gate = evaluatePrivateAdmission810Gate({
+    rowOverrides: {
+      [worker791]: {
+        evidence: withAdditionalEvidenceTokens(
+          rowByWorker(worker791),
+          "worker-791-scheduler-source",
+          [
+            "Object.defineProperty(wrappedFunction, privateActQueueFlushDiagnosticsExport",
+            "const schedulerMockExpiredActRootWorkSources = new WeakSet();",
+            "delayedRendererRootWorkMetadataSources.set(metadata",
+            "publicSchedulerTimingCompatibilityClaimed: false"
+          ]
+        )
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_810_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.evidenceRecognized, true);
+  assert.equal(gate.durableEvidenceTokensRecognized, false);
+  assert.deepEqual(gate.nonDurableEvidenceTokenViolationIds, [
+    `${worker791}.worker-791-scheduler-source`
+  ]);
+  assertViolationIds(gate, ["non-durable-evidence-token-shape"]);
+
+  const evidenceRow = gate.rowsByWorker[worker791].evidence.find(
+    (row) => row.role === "worker-791-scheduler-source"
+  );
+  assert.notEqual(evidenceRow, undefined);
+  assert.equal(evidenceRow.recognized, false);
+  assert.deepEqual(evidenceRow.missingTokens, []);
+  assert.deepEqual(
+    evidenceRow.nonDurableTokens.map((entry) => entry.shapeId),
+    [
+      "object-api-expression",
+      "weak-collection-source-shape",
+      "source-collection-method-expression",
+      "field-value-expression"
+    ]
   );
 });
 
@@ -378,6 +440,7 @@ function assertLedgerRow(
     assert.equal(evidenceRow.recognized, true, evidenceRow.role);
     assert.deepEqual(evidenceRow.missingTokens, [], evidenceRow.path);
     assert.deepEqual(evidenceRow.forbiddenTokensPresent, [], evidenceRow.path);
+    assert.deepEqual(evidenceRow.nonDurableTokens, [], evidenceRow.path);
   }
 }
 
@@ -424,13 +487,17 @@ function rowByWorker(workerId) {
 }
 
 function withMissingEvidenceToken(row, role, token) {
+  return withAdditionalEvidenceTokens(row, role, [token]);
+}
+
+function withAdditionalEvidenceTokens(row, role, tokens) {
   return row.evidence.map((evidenceRow) => {
     if (evidenceRow.role !== role) {
       return evidenceRow;
     }
     return {
       ...evidenceRow,
-      tokens: [...evidenceRow.tokens, token]
+      tokens: [...evidenceRow.tokens, ...tokens]
     };
   });
 }

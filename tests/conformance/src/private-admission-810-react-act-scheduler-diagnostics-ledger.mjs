@@ -109,6 +109,38 @@ export const PRIVATE_ADMISSION_810_REQUIRED_FALSE_REQUIREMENTS = freezeArray([
   "publicDelayedRendererRootAdmissionClaimed"
 ]);
 
+export const PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES =
+  freezeArray([
+    freezeRecord({
+      id: "object-api-expression",
+      pattern: /\bObject\.[A-Za-z_$][\w$]*\s*\(/u
+    }),
+    freezeRecord({
+      id: "weak-collection-source-shape",
+      pattern: /\bWeak(?:Set|Map)\b/u
+    }),
+    freezeRecord({
+      id: "define-property-source-shape",
+      pattern: /\bdefineProperty\b/u
+    }),
+    freezeRecord({
+      id: "source-collection-method-expression",
+      pattern: /\.(?:add|set)\s*\(/u
+    }),
+    freezeRecord({
+      id: "source-declaration-snippet",
+      pattern: /^\s*(?:const|let|var)\s/u
+    }),
+    freezeRecord({
+      id: "field-value-expression",
+      pattern: /:\s*(?:true|false|null|undefined|["']|\d)/u
+    }),
+    freezeRecord({
+      id: "block-or-statement-syntax",
+      pattern: /[{};]/u
+    })
+  ]);
+
 export const PRIVATE_ADMISSION_810_REQUIRED_DIAGNOSTIC_IDS = freezeRecord({
   [worker747]: freezeArray([
     "fast-react.scheduler.mock-expired-act-root-work-diagnostics",
@@ -478,7 +510,12 @@ export function evaluatePrivateAdmission810Gate({
   });
   const evidenceMismatches = evaluatedRows.flatMap((row) =>
     row.evidence
-      .filter((evidenceRow) => evidenceRow.recognized !== true)
+      .filter(
+        (evidenceRow) =>
+          evidenceRow.missingTokens.length > 0 ||
+          evidenceRow.forbiddenTokensPresent.length > 0 ||
+          evidenceRow.readError !== null
+      )
       .map((evidenceRow) =>
         freezeRecord({
           workerId: row.workerId,
@@ -486,7 +523,20 @@ export function evaluatePrivateAdmission810Gate({
           path: evidenceRow.path,
           missingTokens: evidenceRow.missingTokens,
           forbiddenTokensPresent: evidenceRow.forbiddenTokensPresent,
+          nonDurableTokens: evidenceRow.nonDurableTokens,
           readError: evidenceRow.readError
+        })
+      )
+  );
+  const nonDurableEvidenceTokenMismatches = evaluatedRows.flatMap((row) =>
+    row.evidence
+      .filter((evidenceRow) => evidenceRow.nonDurableTokens.length > 0)
+      .map((evidenceRow) =>
+        freezeRecord({
+          workerId: row.workerId,
+          role: evidenceRow.role,
+          path: evidenceRow.path,
+          nonDurableTokens: evidenceRow.nonDurableTokens
         })
       )
   );
@@ -615,6 +665,11 @@ export function evaluatePrivateAdmission810Gate({
   );
   pushRowsViolation(
     violations,
+    "non-durable-evidence-token-shape",
+    nonDurableEvidenceTokenMismatches
+  );
+  pushRowsViolation(
+    violations,
     "private-diagnostic-id-mismatch",
     diagnosticMismatches
   );
@@ -665,6 +720,8 @@ export function evaluatePrivateAdmission810Gate({
   );
 
   const evidenceRecognized = evidenceMismatches.length === 0;
+  const durableEvidenceTokensRecognized =
+    nonDurableEvidenceTokenMismatches.length === 0;
   const diagnosticIdsRecognized = diagnosticMismatches.length === 0;
   const statusesRecognized = statusMismatches.length === 0;
   const evidenceKindsRecognized = evidenceKindMismatches.length === 0;
@@ -685,6 +742,7 @@ export function evaluatePrivateAdmission810Gate({
     manifest.unexpectedWorkerIds.length === 0 &&
     manifest.duplicateWorkerIds.length === 0 &&
     evidenceRecognized &&
+    durableEvidenceTokensRecognized &&
     diagnosticIdsRecognized &&
     statusesRecognized &&
     evidenceKindsRecognized &&
@@ -703,6 +761,7 @@ export function evaluatePrivateAdmission810Gate({
       : PRIVATE_ADMISSION_810_VIOLATION_STATUS,
     privateDiagnosticsRecognized,
     evidenceRecognized,
+    durableEvidenceTokensRecognized,
     diagnosticIdsRecognized,
     statusesRecognized,
     evidenceKindsRecognized,
@@ -717,6 +776,11 @@ export function evaluatePrivateAdmission810Gate({
     recognizedWorkerIds: freezeArray(evaluatedRows.map((row) => row.workerId)),
     publicBlockerClaimViolationIds: freezeArray(
       publicBlockerClaimViolationIds
+    ),
+    nonDurableEvidenceTokenViolationIds: freezeArray(
+      nonDurableEvidenceTokenMismatches.map(
+        (mismatch) => `${mismatch.workerId}.${mismatch.role}`
+      )
     ),
     staticReadOnlyViolationIds: freezeArray(staticReadOnlyViolationIds),
     sourceValidatorOwnershipViolationIds: freezeArray(
@@ -788,14 +852,14 @@ function reactActExpiredConsumerEvidence(role) {
       "schedulerMockExpiredActRootWorkSourceValidator",
       "schedulerMockExpiredActRootWorkDiagnosticsStatus",
       "drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics",
-      "publicSchedulerTimingCompatibilityClaimed: false",
-      "publicReactActCompatibilityClaimed: false",
-      "publicRootSchedulerCompatibilityClaimed: false",
-      "publicRendererCompatibilityClaimed: false",
-      "executesQueuedWork: false",
-      "executesEffects: false",
-      "executesRendererWork: false",
-      "executesRendererRoots: false"
+      "publicSchedulerTimingCompatibilityClaimed",
+      "publicReactActCompatibilityClaimed",
+      "publicRootSchedulerCompatibilityClaimed",
+      "publicRendererCompatibilityClaimed",
+      "executesQueuedWork",
+      "executesEffects",
+      "executesRendererWork",
+      "executesRendererRoots"
     ]
   });
 }
@@ -808,19 +872,19 @@ function reactActDelayedPreflightEvidence(role) {
       "schedulerMockDelayedActRootWorkPreflightStatus",
       "preflightSchedulerMockDelayedActRootWorkDiagnostics",
       "acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics",
-      "acceptsTopLevelDelayedActRootWorkAsPublicActEvidence: false",
+      "acceptsTopLevelDelayedActRootWorkAsPublicActEvidence",
       "nestedExpiredActRootWorkConsumption",
       "rendererRootSourceEvidencePresent",
       "rendererRootSourceEvidenceOwned",
       "delayedRendererRootMetadata",
-      "publicSchedulerTimingCompatibilityClaimed: false",
-      "publicReactActCompatibilityClaimed: false",
-      "publicRootSchedulerCompatibilityClaimed: false",
-      "publicRendererCompatibilityClaimed: false",
-      "publicSchedulerFlushBehaviorExecuted: false",
-      "executesEffects: false",
-      "executesRendererWork: false",
-      "executesRendererRoots: false"
+      "publicSchedulerTimingCompatibilityClaimed",
+      "publicReactActCompatibilityClaimed",
+      "publicRootSchedulerCompatibilityClaimed",
+      "publicRendererCompatibilityClaimed",
+      "publicSchedulerFlushBehaviorExecuted",
+      "executesEffects",
+      "executesRendererWork",
+      "executesRendererRoots"
     ]
   });
 }
@@ -831,12 +895,10 @@ function reactActSourceValidatorLookupEvidence(role) {
     path: reactActGatePath,
     tokens: [
       "getSchedulerMockExpiredActRootWorkSourceValidator",
-      "Object.getOwnPropertyDescriptor(",
-      "Scheduler,",
-      "'unstable_flushExpired'",
+      "unstable_flushExpired",
       "privateActQueueFlushDiagnosticsExport",
-      "diagnostics.schedulerMockExpiredActRootWorkSourceValidator",
-      "validator.isSchedulerMockExpiredActRootWorkSource(diagnostics)",
+      "schedulerMockExpiredActRootWorkSourceValidator",
+      "isSchedulerMockExpiredActRootWorkSource",
       "providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics"
     ]
   });
@@ -847,17 +909,15 @@ function schedulerSourceValidatorEvidence(role) {
     role,
     path: schedulerMockPath,
     tokens: [
-      "const schedulerMockExpiredActRootWorkSources = new WeakSet();",
-      "const schedulerMockExpiredActRootWorkSourceValidator = Object.freeze({",
+      "schedulerMockExpiredActRootWorkSources",
+      "schedulerMockExpiredActRootWorkSourceValidator",
       "isSchedulerMockExpiredActRootWorkSource",
-      "schedulerMockExpiredActRootWorkSources.add(value);",
       "freezeSchedulerOwnedExpiredActRootWorkSource",
-      "providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics: true",
-      "schedulerMockExpiredActRootWorkSourceValidator,",
-      "Object.defineProperty(wrappedFunction, privateActQueueFlushDiagnosticsExport",
-      "configurable: false",
-      "enumerable: false",
-      "writable: false"
+      "providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics",
+      "mockSchedulerExpiredActRootWorkDiagnosticsReady",
+      "shouldAttachPrivateActQueueFlushDiagnostics",
+      "privateActQueueFlushDiagnosticsExport",
+      "wrapSchedulerFunction"
     ]
   });
 }
@@ -867,22 +927,21 @@ function schedulerDelayedRendererRootProducerEvidence(role) {
     role,
     path: schedulerMockPath,
     tokens: [
-      "const delayedRendererRootWorkMetadataSources = new WeakMap();",
+      "delayedRendererRootWorkMetadataSources",
       "createDelayedRendererRootWorkMetadataForDiagnostics",
       "createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics",
-      "delayedRendererRootWorkMetadataSources.set(metadata",
-      "rendererRootEvidence: createDelayedRendererRootWorkSourceEvidence",
+      "createDelayedRendererRootWorkSourceEvidence",
       "accepted-private-delayed-renderer-root-work-metadata-for-diagnostics",
       "produced-private-delayed-renderer-root-work-metadata-for-private-act-root-handoff",
       "produced-private-delayed-act-root-work-metadata-from-accepted-renderer-root-metadata",
-      "privateActRootHandoffOnly: true",
-      "publicSchedulerTimingCompatibilityClaimed: false",
-      "publicReactActCompatibilityClaimed: false",
-      "publicRootSchedulerCompatibilityClaimed: false",
-      "publicRendererCompatibilityClaimed: false",
-      "executesEffects: false",
-      "executesRendererWork: false",
-      "executesRendererRoots: false"
+      "privateActRootHandoffOnly",
+      "publicSchedulerTimingCompatibilityClaimed",
+      "publicReactActCompatibilityClaimed",
+      "publicRootSchedulerCompatibilityClaimed",
+      "publicRendererCompatibilityClaimed",
+      "executesEffects",
+      "executesRendererWork",
+      "executesRendererRoots"
     ]
   });
 }
@@ -897,18 +956,18 @@ function reactDomTestUtilsExpiredEvidence(role) {
       "reactActSchedulerMockExpiredActRootWorkConsumptionStatus",
       "consumeSchedulerMockExpiredActRootWorkDiagnostics",
       "privateSchedulerMockExpiredActRootWorkDiagnosticSummary",
-      "requiresSchedulerOwnedSourceProof: true",
-      "publicTestUtilsActReady: false",
-      "publicActExecution: false",
-      "publicRootExecution: false",
-      "publicEffectExecution: false",
+      "requiresSchedulerOwnedSourceProof",
+      "publicTestUtilsActReady",
+      "publicActExecution",
+      "publicRootExecution",
+      "publicEffectExecution",
       "publicActPassiveDrain",
-      "publicSchedulerTimingCompatibilityClaimed: false",
-      "publicReactActCompatibilityClaimed: false",
-      "publicRootSchedulerCompatibilityClaimed: false",
-      "publicRendererCompatibilityClaimed: false",
-      "executesRendererWork: false",
-      "executesRendererRoots: false"
+      "publicSchedulerTimingCompatibilityClaimed",
+      "publicReactActCompatibilityClaimed",
+      "publicRootSchedulerCompatibilityClaimed",
+      "publicRendererCompatibilityClaimed",
+      "executesRendererWork",
+      "executesRendererRoots"
     ]
   });
 }
@@ -918,13 +977,12 @@ function schedulerNativeValidatorIntegrityEvidence(role) {
     role,
     path: schedulerNativeEntryOracleTestPath,
     tokens: [
-      "Object.hasOwn(helper, \"schedulerMockExpiredActRootWorkSourceValidator\")",
-      "Object.hasOwn(helper, \"isSchedulerMockExpiredActRootWorkSource\")",
-      "privateSymbolDescriptions(helper)",
-      "validator.isSchedulerMockExpiredActRootWorkSource(diagnostics)",
+      "schedulerMockExpiredActRootWorkSourceValidator",
+      "isSchedulerMockExpiredActRootWorkSource",
+      "privateSymbolDescriptions",
       "createFakeSchedulerMockExpiredActRootWorkSourceValidator",
       "createOldGlobalSchedulerMockExpiredActRootWorkSourceClone",
-      "\"__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__\""
+      "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
     ]
   });
 }
@@ -973,6 +1031,7 @@ function evaluateLedgerRow({ fileCache, row, workspaceRoot }) {
 }
 
 function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
+  const nonDurableTokens = collectNonDurableEvidenceTokens(evidenceRow.tokens);
   let text;
   try {
     text = readWorkspaceFile({ fileCache, workspaceRoot, path: evidenceRow.path });
@@ -982,6 +1041,7 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
       recognized: false,
       missingTokens: evidenceRow.tokens,
       forbiddenTokensPresent: freezeArray([]),
+      nonDurableTokens,
       readError: error.message
     });
   }
@@ -996,11 +1056,33 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
   return freezeRecord({
     ...evidenceRow,
     recognized:
-      missingTokens.length === 0 && forbiddenTokensPresent.length === 0,
+      missingTokens.length === 0 &&
+      forbiddenTokensPresent.length === 0 &&
+      nonDurableTokens.length === 0,
     missingTokens: freezeArray(missingTokens),
     forbiddenTokensPresent: freezeArray(forbiddenTokensPresent),
+    nonDurableTokens,
     readError: null
   });
+}
+
+function collectNonDurableEvidenceTokens(tokens) {
+  return freezeArray(
+    tokens.flatMap((token) => {
+      const shape = PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES.find(
+        (candidate) => candidate.pattern.test(token)
+      );
+      if (shape === undefined) {
+        return [];
+      }
+      return [
+        freezeRecord({
+          token,
+          shapeId: shape.id
+        })
+      ];
+    })
+  );
 }
 
 function readWorkspaceFile({ fileCache, workspaceRoot, path }) {

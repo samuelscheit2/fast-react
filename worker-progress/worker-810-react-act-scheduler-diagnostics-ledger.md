@@ -13,6 +13,13 @@
 - Public React `act`, React DOM test-utils act routing, root behavior,
   Scheduler timing/flush helpers, renderer/effects execution, package
   compatibility, and public compatibility claims remain explicitly blocked.
+- Audit follow-up replaced source syntax/expression evidence tokens with
+  durable identifiers, status IDs, field names, and source-owned validator
+  names only.
+- The ledger now rejects non-durable evidence token shapes such as object API
+  call snippets, weak collection implementation shapes, source collection
+  method expressions, source declarations, field-value expressions, and block
+  or statement syntax.
 
 ## Changed Files
 
@@ -29,6 +36,16 @@
 - `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
 - `node tests/smoke/import-entrypoints.mjs` - passed.
 - `git diff --check` - passed.
+- Audit follow-up: attempted to read
+  `/root/audit_810_react_act_scheduler_diagnostics_ledger`; the path is not
+  present on this machine (`/root` does not exist).
+- Audit follow-up: `node --check tests/conformance/src/private-admission-810-react-act-scheduler-diagnostics-ledger.mjs` - passed.
+- Audit follow-up: `node --check tests/conformance/test/private-admission-810-react-act-scheduler-diagnostics-ledger.test.mjs` - passed.
+- Audit follow-up: `node --test tests/conformance/test/private-admission-810-react-act-scheduler-diagnostics-ledger.test.mjs` - passed, 7 tests.
+- Audit follow-up: `node --test tests/conformance/test/react-act-oracle.test.mjs tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs tests/conformance/test/scheduler-mock-oracle.test.mjs tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs tests/conformance/test/scheduler-native-entry-oracle.test.mjs tests/conformance/test/scheduler-mock-expired-lane-flush.test.mjs` - passed, 82 tests.
+- Audit follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
+- Audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
+- Audit follow-up: `git diff --check` - passed.
 
 ## Evidence Gathered
 
@@ -43,6 +60,13 @@
   and expired-lane tests.
 - The ledger evidence rows avoid prose/test-title/error-message tokens and use
   source identifiers, status IDs, diagnostic IDs, and field names instead.
+- Audit follow-up confirmed the ledger source evidence token lists no longer
+  contain the flagged source-syntax snippets, including object descriptor calls,
+  weak collection declarations, source collection mutations, field-value
+  expressions, or helper-call expressions.
+- Focused negative coverage now injects those token shapes as row overrides and
+  verifies the gate reports `non-durable-evidence-token-shape` while keeping
+  source token presence checks separate.
 
 ## Risks Or Blockers
 
