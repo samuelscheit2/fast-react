@@ -64,6 +64,18 @@ claims false.
 - `git log --oneline -1`
 - `git status --short --branch`
 - `git diff --check HEAD~1..HEAD`
+- Audit follow-up:
+  - `sed -n '1,240p' /root/audit_807_native_no_load_ledger` (audit file
+    path was unavailable in this worker filesystem)
+  - `list_agents` for `/root/audit_807_native_no_load_ledger`
+  - `nl -ba tests/conformance/src/private-admission-807-native-no-load-ledger.mjs | sed -n '120,350p'`
+  - `node --check tests/conformance/src/private-admission-807-native-no-load-ledger.mjs`
+  - `node --check tests/conformance/test/private-admission-807-native-no-load-ledger.test.mjs`
+  - `node --test tests/conformance/test/private-admission-807-native-no-load-ledger.test.mjs`
+  - `rg -n "must |transitive CommonJS|transitive ESM|dynamic ESM|placeholder imports|ERR_PACKAGE_PATH_NOT_EXPORTED|Some\\(\\\"FAST|\\.code ===|must not|requires Module.registerHooks|caught by|surface the blocked|throw before" tests/conformance/src/private-admission-807-native-no-load-ledger.mjs`
+  - `npm run check:package-surface`
+  - `node tests/smoke/import-entrypoints.mjs`
+  - `git diff --check`
 
 ## Evidence Gathered
 
@@ -83,6 +95,10 @@ claims false.
     public-only native export map and blocked private subpaths.
   - `crates/fast-react-napi/src/lib.rs` for cleanup-hook identity mismatch and
     tamper rejection identifiers.
+- Audit follow-up replaced prose/assertion/error-predicate evidence tokens with
+  source-owned function names, fixture filenames/specifiers, fixture field
+  names, package export variables/fields, Rust constants, tamper-case field
+  names, and blocker field names. The focused ledger test still passes 5 tests.
 
 ## Risks Or Blockers
 

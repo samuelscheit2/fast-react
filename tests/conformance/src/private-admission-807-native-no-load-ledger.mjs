@@ -136,10 +136,13 @@ const privateAdmission807Rows = freezeArray([
           "specifier === 'node:worker_threads'",
           "moduleLoadHooks = Module.registerHooks({",
           "blockForbiddenLoad('module-resolve', specifier);",
+          "Module._extensions['.node'] = function blockedNodeExtension(module, filename)",
           "Module._load = function guardedModuleLoad",
           "blockForbiddenLoad('module-load', request);",
+          "const native = require('../index.cjs');",
+          "native.loadNativeBinding({",
           "assertModuleGuardsRestored();",
-          "placeholder imports and loadNativeBinding() must not resolve or load native artifacts"
+          "const forbiddenLoads = [];"
         ],
         forbiddenTokens: ["new Worker(", "parentPort", "workerData"]
       }),
@@ -184,12 +187,18 @@ const privateAdmission807Rows = freezeArray([
           "await import('node:worker_threads');",
           "await import('./native-addon-probe.node');",
           "function runForbiddenLoadFixtureMatrix()",
-          "'transitive CommonJS worker_threads require'",
-          "'transitive CommonJS node:worker_threads require'",
-          "'transitive CommonJS .node extension resolution'",
-          "'transitive ESM worker_threads import'",
-          "'dynamic ESM node:worker_threads import'",
-          "'dynamic ESM .node import'",
+          "cjsWorkerEntry: path.join(tempDir, 'cjs-worker-entry.cjs')",
+          "cjsNodeWorkerEntry: path.join(tempDir, 'cjs-node-worker-entry.cjs')",
+          "cjsNativeAddonEntry: path.join(tempDir, 'cjs-native-addon-entry.cjs')",
+          "esmWorkerEntry: pathToFileURL(",
+          "esmDynamicNodeWorkerEntry: pathToFileURL(",
+          "esmDynamicNativeAddonEntry: pathToFileURL(",
+          "() => require(fixtures.cjsWorkerEntry)",
+          "() => require(fixtures.cjsNodeWorkerEntry)",
+          "() => require(fixtures.cjsNativeAddonEntry)",
+          "() => import(fixtures.esmWorkerEntry)",
+          "() => import(fixtures.esmDynamicNodeWorkerEntry)",
+          "() => import(fixtures.esmDynamicNativeAddonEntry)",
           "{ kind: 'module-load', request: 'worker_threads' }",
           "{ kind: 'module-load', request: 'node:worker_threads' }",
           "{ kind: 'node-extension', request: fixtures.nativeAddonPath }",
@@ -203,14 +212,19 @@ const privateAdmission807Rows = freezeArray([
         role: "worker-801-module-guard-teardown-test",
         path: nativeNoLoadGuardTestPath,
         tokens: [
+          "const originalLoad = Module._load;",
+          "const originalNodeExtension = Module._extensions['.node'];",
+          "let moduleLoadHooks = null;",
           "function restoreModuleGuards()",
+          "moduleGuardsRestored = true;",
           "Module._load = originalLoad;",
           "Module._extensions['.node'] = originalNodeExtension;",
           "moduleLoadHooks.deregister();",
+          "moduleLoadHooks = null;",
           "function assertModuleGuardsRestored()",
-          "native no-load guard must restore Module._load",
-          "native no-load guard must restore the .node extension loader",
-          "native no-load guard must deregister module hooks during teardown"
+          "Module._load,",
+          "Module._extensions['.node'],",
+          "moduleLoadHooks,"
         ]
       }),
       evidenceData({
@@ -252,9 +266,13 @@ const privateAdmission807Rows = freezeArray([
           "'src/worker-thread-teardown-executable-preflight.js'",
           "const blockedNativeExtensionSubpaths = [",
           "...packageFileSubpaths('@fast-react/native', nativeBlockedDirectFiles)",
+          "async function runNativePackageProbe(tempRoot)",
+          "const blockedExtensionSubpaths = ${JSON.stringify(",
           "assert.deepEqual(nativePackageJson.exports, expectedNativePackageExports);",
           "assert.deepEqual(packageJson.exports, expectedPackageExports);",
-          "(error) => error?.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED'"
+          "for (const specifier of blockedExtensionSubpaths)",
+          "require(specifier)",
+          "import(specifier)"
         ]
       }),
       evidenceData({
@@ -318,11 +336,18 @@ const privateAdmission807Rows = freezeArray([
         path: fastReactNapiSourcePath,
         tokens: [
           "NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_IDENTITY_MISMATCH_CODE",
-          "FAST_REACT_NAPI_CLEANUP_HOOK_IDENTITY_MISMATCH",
+          "NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_FUNCTION_IDENTITY_TOKEN",
+          "NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_FUNCTION_IDENTITY_TOKEN",
+          "NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_ARGUMENT_IDENTITY_TOKEN",
+          "NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_ARGUMENT_IDENTITY_TOKEN",
           "fn cleanup_hook_expected_identity_for_executable_preflight_row(",
           "if !expected_identity.matches_evidence(evidence)",
           "fn native_root_bridge_worker_thread_cleanup_hook_preflight_rejects_identity_tampering()",
-          "Some(\"FAST_REACT_NAPI_CLEANUP_HOOK_IDENTITY_MISMATCH\")",
+          "struct CleanupHookIdentityTamperCase",
+          "cleanup_hook_function_identity_token: &'static str",
+          "cleanup_hook_argument_identity_token: &'static str",
+          "NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Rejected",
+          "tampered.code()",
           "assert!(!tampered.node_worker_threads_execution());",
           "assert!(!tampered.napi_cleanup_hook_execution());"
         ]
