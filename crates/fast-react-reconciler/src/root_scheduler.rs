@@ -1221,6 +1221,20 @@ pub(crate) enum RootExpiredLaneSyncSchedulerContinuationStatus {
     RenderedAndCommitted,
 }
 
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary {
+    StaleCallbackNode,
+    NoExpiredLanes,
+    NoExpiredWorkSelected,
+    BlockedByPendingPassive,
+    NoContinuationWork,
+    BlockedByLaneMismatch,
+    BlockedByFinishedWorkHandoffMismatch,
+    BlockedByQueueLaneHandoffMismatch,
+    RenderedAndCommitted,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct RootSyncSchedulerFinishedWorkHandoffIdentityForCanary {
     root: FiberRootId,
@@ -1806,6 +1820,240 @@ impl RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
                         && commit.remaining_lanes() == queue_handoff.remaining_lanes()
                 })
             })
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootExpiredLaneSyncSchedulerQueueLaneContinuationRecordForCanary {
+    root: FiberRootId,
+    current_time: LaneTimestamp,
+    requested_callback_node: RootSchedulerCallbackHandle,
+    current_callback_node: RootSchedulerCallbackHandle,
+    expired_lanes_before: Lanes,
+    expired_lanes_after: Lanes,
+    selected_priority_lanes: Lanes,
+    selected_render_lanes: Lanes,
+    handoff: Option<RootSyncFlushRecord>,
+    continuation: Option<RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary>,
+    status: RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "crate-private expired-lane queue/lane continuation canaries consume this evidence"
+)]
+impl RootExpiredLaneSyncSchedulerQueueLaneContinuationRecordForCanary {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn current_time(&self) -> LaneTimestamp {
+        self.current_time
+    }
+
+    #[must_use]
+    pub(crate) const fn requested_callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.requested_callback_node
+    }
+
+    #[must_use]
+    pub(crate) const fn current_callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.current_callback_node
+    }
+
+    #[must_use]
+    pub(crate) const fn expired_lanes_before(&self) -> Lanes {
+        self.expired_lanes_before
+    }
+
+    #[must_use]
+    pub(crate) const fn expired_lanes_after(&self) -> Lanes {
+        self.expired_lanes_after
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_priority_lanes(&self) -> Lanes {
+        self.selected_priority_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_render_lanes(&self) -> Lanes {
+        self.selected_render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_expired_lanes(&self) -> Lanes {
+        self.selected_render_lanes
+            .intersect(self.expired_lanes_after)
+    }
+
+    #[must_use]
+    pub(crate) const fn handoff(&self) -> Option<RootSyncFlushRecord> {
+        self.handoff
+    }
+
+    #[must_use]
+    pub(crate) fn continuation(
+        &self,
+    ) -> Option<&RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary> {
+        self.continuation.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn status(
+        &self,
+    ) -> RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn did_execute_expired_queue_lane_scheduler_continuation(&self) -> bool {
+        matches!(
+            self.status,
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::RenderedAndCommitted
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn rejected_stale_callback_node(&self) -> bool {
+        matches!(
+            self.status,
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::StaleCallbackNode
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn skipped_without_expired_lanes(&self) -> bool {
+        matches!(
+            self.status,
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::NoExpiredLanes
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn skipped_by_priority_selection(&self) -> bool {
+        matches!(
+            self.status,
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::NoExpiredWorkSelected
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_lane_mismatch(&self) -> bool {
+        matches!(
+            self.status,
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByLaneMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_queue_lane_handoff(&self) -> bool {
+        matches!(
+            self.status,
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn queue_handoff_error(
+        &self,
+    ) -> Option<&HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary> {
+        self.continuation
+            .as_ref()
+            .and_then(|record| record.queue_handoff_error())
+    }
+
+    #[must_use]
+    pub(crate) fn queue_commit_handoff(
+        &self,
+    ) -> Option<&HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary> {
+        self.continuation
+            .as_ref()
+            .and_then(|record| record.queue_commit_handoff())
+    }
+
+    #[must_use]
+    pub(crate) fn commit(&self) -> Option<&HostRootCommitRecord> {
+        self.continuation
+            .as_ref()
+            .and_then(|record| record.commit())
+    }
+
+    #[must_use]
+    pub(crate) fn proves_expired_default_plus_sync_lane_selection_for_canary(&self) -> bool {
+        let default_plus_sync = Lanes::SYNC.merge(Lanes::DEFAULT);
+        self.expired_lanes_after == Lanes::DEFAULT
+            && self.selected_expired_lanes() == Lanes::DEFAULT
+            && self.selected_priority_lanes == default_plus_sync
+            && self.selected_render_lanes == default_plus_sync
+            && self.handoff.is_some_and(|handoff| {
+                handoff.root() == self.root
+                    && handoff.lanes() == default_plus_sync
+                    && handoff.render_phase().root() == self.root
+                    && handoff.render_phase().render_lanes() == default_plus_sync
+                    && handoff.status() == RootSyncFlushRecordStatus::RenderedAwaitingCommit
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn consumed_accepted_queue_lane_scheduler_continuation_record(&self) -> bool {
+        self.continuation.as_ref().is_some_and(|record| {
+            self.did_execute_expired_queue_lane_scheduler_continuation()
+                && record.did_execute_queue_lane_scheduler_continuation()
+                && self
+                    .handoff
+                    .is_some_and(|handoff| handoff == record.handoff())
+                && record.accepted_queue_lane_handoff_evidence_for_canary()
+        })
+    }
+
+    #[must_use]
+    pub(crate) fn routed_through_expired_queue_lane_scheduler_and_commit_evidence_for_canary(
+        &self,
+    ) -> bool {
+        self.proves_expired_default_plus_sync_lane_selection_for_canary()
+            && self.consumed_accepted_queue_lane_scheduler_continuation_record()
+            && self.continuation.as_ref().is_some_and(|record| {
+                record.routed_through_root_scheduler_queue_lane_and_commit_evidence_for_canary()
+            })
+            && self.async_callback_execution_blocked()
+            && self.public_update_scheduling_blocked()
+            && !self.public_root_compatibility_claimed()
+            && !self.executes_public_effects()
+    }
+
+    #[must_use]
+    pub(crate) fn treats_host_root_update_as_current_only_with_queue_lane_handoff_for_canary(
+        &self,
+    ) -> bool {
+        self.routed_through_expired_queue_lane_scheduler_and_commit_evidence_for_canary()
+            && self.continuation.as_ref().is_some_and(|record| {
+                record.treats_host_root_update_as_current_only_with_queue_lane_handoff_for_canary()
+            })
+    }
+
+    #[must_use]
+    pub(crate) const fn async_callback_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_update_scheduling_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_public_effects(&self) -> bool {
+        false
     }
 }
 
@@ -4822,6 +5070,154 @@ pub(crate) fn execute_expired_lane_sync_scheduler_continuation_for_root_for_cana
     ))
 }
 
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    dead_code,
+    reason = "private expired-lane queue/lane scheduler continuation is exercised by focused canaries"
+)]
+pub(crate) fn execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    root_id: FiberRootId,
+    current_time: LaneTimestamp,
+    requested_callback_node: RootSchedulerCallbackHandle,
+    handoff: RootSyncFlushRecord,
+    queue_handoff: Option<&HostRootUpdateQueueLaneHandoffRecordForCanary>,
+) -> Result<
+    RootExpiredLaneSyncSchedulerQueueLaneContinuationRecordForCanary,
+    RootSyncSchedulerContinuationExecutionError,
+> {
+    let current_callback_node = store
+        .root(root_id)
+        .map_err(RootSchedulerError::from)?
+        .scheduling()
+        .callback_node();
+    let expired_lanes_before = store
+        .root(root_id)
+        .map_err(RootSchedulerError::from)?
+        .lanes()
+        .expired_lanes();
+
+    if current_callback_node != requested_callback_node {
+        return Ok(
+            expired_lane_sync_scheduler_queue_lane_continuation_record_for_canary(
+                root_id,
+                current_time,
+                requested_callback_node,
+                current_callback_node,
+                expired_lanes_before,
+                expired_lanes_before,
+                Lanes::NO,
+                Lanes::NO,
+                None,
+                None,
+                RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::StaleCallbackNode,
+            ),
+        );
+    }
+
+    store
+        .root_mut(root_id)
+        .map_err(RootSchedulerError::from)?
+        .lanes_mut()
+        .mark_starved_lanes_as_expired(current_time);
+    let expired_lanes_after = store
+        .root(root_id)
+        .map_err(RootSchedulerError::from)?
+        .lanes()
+        .expired_lanes();
+    let lane_selection = select_lanes_for_scheduled_task(store, root_id)?;
+    let selected_priority_lanes = lane_selection.priority_lanes();
+    let selected_render_lanes = lane_selection.render_lanes();
+
+    if expired_lanes_after.is_empty() {
+        return Ok(
+            expired_lane_sync_scheduler_queue_lane_continuation_record_for_canary(
+                root_id,
+                current_time,
+                requested_callback_node,
+                current_callback_node,
+                expired_lanes_before,
+                expired_lanes_after,
+                selected_priority_lanes,
+                selected_render_lanes,
+                None,
+                None,
+                RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::NoExpiredLanes,
+            ),
+        );
+    }
+
+    if selected_render_lanes.is_empty() || !selected_render_lanes.contains_any(expired_lanes_after)
+    {
+        return Ok(
+            expired_lane_sync_scheduler_queue_lane_continuation_record_for_canary(
+                root_id,
+                current_time,
+                requested_callback_node,
+                current_callback_node,
+                expired_lanes_before,
+                expired_lanes_after,
+                selected_priority_lanes,
+                selected_render_lanes,
+                None,
+                None,
+                RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::NoExpiredWorkSelected,
+            ),
+        );
+    }
+
+    if handoff.root() != root_id
+        || handoff.render_phase().root() != root_id
+        || handoff.lanes() != selected_render_lanes
+        || handoff.render_phase().render_lanes() != selected_render_lanes
+    {
+        return Ok(
+            expired_lane_sync_scheduler_queue_lane_continuation_record_for_canary(
+                root_id,
+                current_time,
+                requested_callback_node,
+                current_callback_node,
+                expired_lanes_before,
+                expired_lanes_after,
+                selected_priority_lanes,
+                selected_render_lanes,
+                Some(handoff),
+                None,
+                RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByLaneMismatch,
+            ),
+        );
+    }
+
+    let continuation = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+        store,
+        handoff,
+        requested_callback_node,
+        queue_handoff,
+    )?;
+    let status = expired_lane_sync_scheduler_status_from_queue_lane_continuation_for_canary(
+        continuation.status(),
+    );
+
+    Ok(
+        expired_lane_sync_scheduler_queue_lane_continuation_record_for_canary(
+            root_id,
+            current_time,
+            requested_callback_node,
+            current_callback_node,
+            expired_lanes_before,
+            expired_lanes_after,
+            selected_priority_lanes,
+            selected_render_lanes,
+            Some(handoff),
+            Some(continuation),
+            status,
+        ),
+    )
+}
+
 fn expired_lane_sync_scheduler_status_from_sync_continuation(
     status: RootSyncSchedulerContinuationExecutionStatus,
 ) -> RootExpiredLaneSyncSchedulerContinuationStatus {
@@ -4847,6 +5243,35 @@ fn expired_lane_sync_scheduler_status_from_sync_continuation(
     }
 }
 
+#[cfg(test)]
+fn expired_lane_sync_scheduler_status_from_queue_lane_continuation_for_canary(
+    status: RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary,
+) -> RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary {
+    match status {
+        RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::StaleCallbackNode => {
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::StaleCallbackNode
+        }
+        RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::BlockedByPendingPassive => {
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByPendingPassive
+        }
+        RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::NoSyncWork => {
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::NoContinuationWork
+        }
+        RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::BlockedByLaneMismatch => {
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByLaneMismatch
+        }
+        RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::BlockedByFinishedWorkHandoffMismatch => {
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch
+        }
+        RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::BlockedByQueueLaneHandoffMismatch => {
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        }
+        RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::RenderedAndCommitted => {
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::RenderedAndCommitted
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn expired_lane_sync_scheduler_continuation_record(
     root: FiberRootId,
@@ -4862,6 +5287,39 @@ fn expired_lane_sync_scheduler_continuation_record(
     status: RootExpiredLaneSyncSchedulerContinuationStatus,
 ) -> RootExpiredLaneSyncSchedulerContinuationRecord {
     RootExpiredLaneSyncSchedulerContinuationRecord {
+        root,
+        current_time,
+        requested_callback_node,
+        current_callback_node,
+        expired_lanes_before,
+        expired_lanes_after,
+        selected_priority_lanes,
+        selected_render_lanes,
+        handoff,
+        continuation,
+        status,
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private expired-lane queue/lane scheduler evidence mirrors the canary assertion shape"
+)]
+fn expired_lane_sync_scheduler_queue_lane_continuation_record_for_canary(
+    root: FiberRootId,
+    current_time: LaneTimestamp,
+    requested_callback_node: RootSchedulerCallbackHandle,
+    current_callback_node: RootSchedulerCallbackHandle,
+    expired_lanes_before: Lanes,
+    expired_lanes_after: Lanes,
+    selected_priority_lanes: Lanes,
+    selected_render_lanes: Lanes,
+    handoff: Option<RootSyncFlushRecord>,
+    continuation: Option<RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary>,
+    status: RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary,
+) -> RootExpiredLaneSyncSchedulerQueueLaneContinuationRecordForCanary {
+    RootExpiredLaneSyncSchedulerQueueLaneContinuationRecordForCanary {
         root,
         current_time,
         requested_callback_node,
@@ -5910,6 +6368,63 @@ mod tests {
         .unwrap();
 
         (accepted, handoff, queue_handoff)
+    }
+
+    fn expired_default_sync_queue_lane_scheduler_handoff(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        default_element: RootElementHandle,
+        sync_element: RootElementHandle,
+    ) -> (
+        UpdateContainerResult,
+        UpdateContainerResult,
+        RootSyncFlushRecord,
+        HostRootUpdateQueueLaneHandoffRecordForCanary,
+    ) {
+        let default_update = update_container(store, root_id, default_element, None).unwrap();
+        ensure_root_is_scheduled(store, default_update.schedule()).unwrap();
+        assert!(
+            store
+                .root_mut(root_id)
+                .unwrap()
+                .lanes_mut()
+                .set_expiration_time(Lane::DEFAULT, 10)
+        );
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_starved_lanes_as_expired(10);
+
+        let sync_update = update_container_sync(store, root_id, sync_element, None).unwrap();
+        ensure_root_is_scheduled(store, sync_update.schedule()).unwrap();
+        let lane_selection = select_lanes_for_scheduled_task(store, root_id).unwrap();
+        let selected_lanes = lane_selection.render_lanes();
+
+        assert_eq!(
+            lane_selection.priority_lanes(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert_eq!(selected_lanes, Lanes::SYNC.merge(Lanes::DEFAULT));
+
+        let render = render_host_root_for_lanes(store, root_id, selected_lanes).unwrap();
+        let handoff = RootSyncFlushRecord {
+            order: 0,
+            root: root_id,
+            lanes: selected_lanes,
+            status: RootSyncFlushRecordStatus::RenderedAwaitingCommit,
+            render_phase: render,
+        };
+        let queue_handoff = host_root_update_queue_lane_handoff_for_canary(
+            store,
+            root_id,
+            &[default_update.clone(), sync_update.clone()],
+            render,
+        )
+        .unwrap();
+        record_root_finished_work_for_scheduler_handoff_for_canary(store, render).unwrap();
+
+        (default_update, sync_update, handoff, queue_handoff)
     }
 
     fn attach_function_component_child(
@@ -9930,6 +10445,730 @@ mod tests {
             store.root(root_id).unwrap().lanes().pending_lanes(),
             Lanes::NO
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_accepts_source_owned_handoff() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let default_element = RootElementHandle::from_raw(9061);
+        let sync_element = RootElementHandle::from_raw(9062);
+        let (default_update, sync_update, handoff, queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                root_id,
+                default_element,
+                sync_element,
+            );
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&queue_handoff),
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::RenderedAndCommitted
+        );
+        assert_eq!(execution.root(), root_id);
+        assert_eq!(execution.current_time(), 10);
+        assert_eq!(
+            execution.requested_callback_node(),
+            RootSchedulerCallbackHandle::NONE
+        );
+        assert_eq!(
+            execution.current_callback_node(),
+            RootSchedulerCallbackHandle::NONE
+        );
+        assert_eq!(execution.expired_lanes_before(), Lanes::DEFAULT);
+        assert_eq!(execution.expired_lanes_after(), Lanes::DEFAULT);
+        assert_eq!(
+            execution.selected_priority_lanes(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert_eq!(
+            execution.selected_render_lanes(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert_eq!(execution.selected_expired_lanes(), Lanes::DEFAULT);
+        assert!(execution.did_execute_expired_queue_lane_scheduler_continuation());
+        assert!(execution.proves_expired_default_plus_sync_lane_selection_for_canary());
+        assert!(execution.consumed_accepted_queue_lane_scheduler_continuation_record());
+        assert!(
+            execution.routed_through_expired_queue_lane_scheduler_and_commit_evidence_for_canary()
+        );
+        assert!(
+            execution.treats_host_root_update_as_current_only_with_queue_lane_handoff_for_canary()
+        );
+        assert!(execution.async_callback_execution_blocked());
+        assert!(execution.public_update_scheduling_blocked());
+        assert!(!execution.public_root_compatibility_claimed());
+        assert!(!execution.executes_public_effects());
+
+        let continuation = execution.continuation().unwrap();
+        assert_eq!(
+            continuation.status(),
+            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::RenderedAndCommitted
+        );
+        assert_eq!(continuation.handoff(), handoff);
+        assert_eq!(
+            continuation.selected_lanes(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert!(continuation.accepted_root_scheduler_execution_evidence_for_canary());
+        assert!(continuation.accepted_root_commit_execution_evidence_for_canary());
+        assert!(continuation.accepted_queue_lane_handoff_evidence_for_canary());
+        assert!(
+            continuation.routed_through_root_scheduler_queue_lane_and_commit_evidence_for_canary()
+        );
+
+        let queue_commit_handoff = execution.queue_commit_handoff().unwrap();
+        assert_eq!(queue_commit_handoff.queue_handoff(), &queue_handoff);
+        assert_eq!(
+            queue_commit_handoff.update_sequence_ids(),
+            &[default_update.update(), sync_update.update()]
+        );
+        assert_eq!(
+            queue_commit_handoff.selected_lanes(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert_eq!(
+            queue_commit_handoff.finished_lanes(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert_eq!(queue_commit_handoff.remaining_lanes(), Lanes::NO);
+        assert_eq!(queue_commit_handoff.applied_update_count(), 2);
+        assert_eq!(queue_commit_handoff.skipped_update_count(), 0);
+        assert_eq!(queue_commit_handoff.resulting_element(), sync_element);
+        assert!(queue_commit_handoff.proves_queue_lane_handoff_gated_current_switch());
+
+        let rows = queue_commit_handoff.queue_handoff().update_records();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].sequence(), 0);
+        assert_eq!(rows[0].update(), default_update.update());
+        assert_eq!(rows[0].lane(), Lane::DEFAULT);
+        assert_eq!(rows[0].source_lanes(), Lanes::DEFAULT);
+        assert_eq!(rows[1].sequence(), 1);
+        assert_eq!(rows[1].update(), sync_update.update());
+        assert_eq!(rows[1].lane(), Lane::SYNC);
+        assert_eq!(rows[1].source_lanes(), Lanes::SYNC);
+        for row in rows {
+            assert_eq!(
+                store
+                    .update_queues()
+                    .update(row.update())
+                    .unwrap()
+                    .lane()
+                    .remove_lane(Lane::OFFSCREEN),
+                row.source_lanes()
+            );
+        }
+
+        let commit = execution.commit().unwrap();
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.previous_current(), current);
+        assert_eq!(commit.current(), handoff.render_phase().finished_work());
+        assert_eq!(
+            commit.finished_work(),
+            handoff.render_phase().finished_work()
+        );
+        assert_eq!(commit.finished_lanes(), Lanes::SYNC.merge(Lanes::DEFAULT));
+        assert_eq!(commit.remaining_lanes(), Lanes::NO);
+        assert_eq!(commit.pending_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            handoff.render_phase().finished_work()
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_missing_queue_proof() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (_default_update, _sync_update, handoff, _queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(9063),
+                RootElementHandle::from_raw(9064),
+            );
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                None,
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        );
+        assert!(execution.blocked_by_queue_lane_handoff());
+        assert!(execution.proves_expired_default_plus_sync_lane_selection_for_canary());
+        assert_eq!(
+            execution.queue_handoff_error(),
+            Some(
+                &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::MissingQueueHandoff {
+                    root: root_id,
+                    finished_work: handoff.render_phase().finished_work()
+                }
+            )
+        );
+        assert!(execution.queue_commit_handoff().is_none());
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(
+            store.root(root_id).unwrap().finished_work(),
+            Some(handoff.render_phase().finished_work())
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_stale_queue_after_update()
+     {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (default_update, sync_update, handoff, queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(9065),
+                RootElementHandle::from_raw(9066),
+            );
+        let stale_extra =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(9067), None).unwrap();
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&queue_handoff),
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        );
+        assert!(execution.blocked_by_queue_lane_handoff());
+        assert_eq!(
+            execution.queue_handoff_error(),
+            Some(
+                &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueLane(
+                    HostRootUpdateQueueLaneHandoffErrorForCanary::QueueOrderMismatch {
+                        root: root_id,
+                        queue: queue_handoff.current_update_queue(),
+                        expected_updates: vec![default_update.update(), sync_update.update()],
+                        actual_updates: vec![
+                            default_update.update(),
+                            sync_update.update(),
+                            stale_extra.update()
+                        ]
+                    }
+                )
+            )
+        );
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_stale_scheduler_pass() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (_default_update, _sync_update, handoff, queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(9068),
+                RootElementHandle::from_raw(9069),
+            );
+        let second_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC.merge(Lanes::DEFAULT))
+                .unwrap();
+        record_root_finished_work_for_scheduler_handoff_for_canary(&mut store, second_render)
+            .unwrap();
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&queue_handoff),
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch
+        );
+        assert_eq!(execution.handoff(), Some(handoff));
+        assert!(!execution.consumed_accepted_queue_lane_scheduler_continuation_record());
+        assert!(
+            !execution.routed_through_expired_queue_lane_scheduler_and_commit_evidence_for_canary()
+        );
+        let continuation = execution.continuation().unwrap();
+        assert!(continuation.blocked_by_finished_work_handoff_mismatch());
+        assert_eq!(
+            continuation
+                .finished_work_handoff_identity()
+                .unwrap()
+                .root_finished_work_before_commit(),
+            Some(second_render.finished_work())
+        );
+        assert!(execution.queue_handoff_error().is_none());
+        assert!(execution.queue_commit_handoff().is_none());
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_forged_row_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (default_update, _sync_update, handoff, queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(9070),
+                RootElementHandle::from_raw(9071),
+            );
+        let mut forged = queue_handoff.clone();
+        forged.update_records[0].lane = Lane::TRANSITION_1;
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&forged),
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        );
+        assert_eq!(
+            execution.queue_handoff_error(),
+            Some(
+                &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueLane(
+                    HostRootUpdateQueueLaneHandoffErrorForCanary::WrongLaneMetadata {
+                        root: root_id,
+                        queue: queue_handoff.current_update_queue(),
+                        update: default_update.update(),
+                        expected_lane: Lane::TRANSITION_1,
+                        actual_lanes: Lanes::DEFAULT
+                    }
+                )
+            )
+        );
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_wrong_selected_lanes() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (_default_update, _sync_update, handoff, queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(9072),
+                RootElementHandle::from_raw(9073),
+            );
+        let mut forged = queue_handoff.clone();
+        forged.selected_next_lanes_before_render = Lanes::DEFAULT;
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&forged),
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        );
+        assert_eq!(
+            execution.queue_handoff_error(),
+            Some(
+                &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::SelectedLanesMismatch {
+                    root: root_id,
+                    expected: Lanes::SYNC.merge(Lanes::DEFAULT),
+                    actual: Lanes::DEFAULT
+                }
+            )
+        );
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_wrong_finished_lanes() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (_default_update, _sync_update, handoff, queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(9074),
+                RootElementHandle::from_raw(9075),
+            );
+        let mut forged = queue_handoff.clone();
+        forged.finished_lanes = Lanes::DEFAULT;
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&forged),
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        );
+        assert_eq!(
+            execution.queue_handoff_error(),
+            Some(
+                &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::FinishedLanesMismatch {
+                    root: root_id,
+                    expected: Lanes::SYNC.merge(Lanes::DEFAULT),
+                    actual: Lanes::DEFAULT
+                }
+            )
+        );
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_cross_root_evidence() {
+        let host = RecordingHost::default();
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let first = store
+            .create_client_root(FakeContainer::new(9076), RootOptions::new())
+            .unwrap();
+        let second = store
+            .create_client_root(FakeContainer::new(9077), RootOptions::new())
+            .unwrap();
+        let (_first_default, _first_sync, _first_handoff, first_queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                first,
+                RootElementHandle::from_raw(9078),
+                RootElementHandle::from_raw(9079),
+            );
+        let second_current = store.root(second).unwrap().current();
+        let (_second_default, _second_sync, second_handoff, _second_queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                second,
+                RootElementHandle::from_raw(9080),
+                RootElementHandle::from_raw(9081),
+            );
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                second,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                second_handoff,
+                Some(&first_queue_handoff),
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        );
+        assert_eq!(
+            execution.queue_handoff_error(),
+            Some(
+                &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueRootMismatch {
+                    expected: second,
+                    actual: first
+                }
+            )
+        );
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(second).unwrap().current(), second_current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_caller_built_rows() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (default_update, sync_update, handoff, queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(9082),
+                RootElementHandle::from_raw(9083),
+            );
+        let mut forged = queue_handoff.clone();
+        forged.update_records.swap(0, 1);
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&forged),
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        );
+        assert_eq!(
+            execution.queue_handoff_error(),
+            Some(
+                &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandoffNotSourceOwned {
+                    root: root_id,
+                    queue: queue_handoff.current_update_queue(),
+                    expected_updates: vec![default_update.update(), sync_update.update()],
+                    actual_updates: vec![sync_update.update(), default_update.update()],
+                    records_in_sequence_order: false
+                }
+            )
+        );
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_skipped_lane_as_committed()
+     {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let default_update =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(9082), None).unwrap();
+        ensure_root_is_scheduled(&mut store, default_update.schedule()).unwrap();
+        assert!(
+            store
+                .root_mut(root_id)
+                .unwrap()
+                .lanes_mut()
+                .set_expiration_time(Lane::DEFAULT, 10)
+        );
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_starved_lanes_as_expired(10);
+        let skipped_transition = update_container_transition_for_canary(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(9083),
+            None,
+        )
+        .unwrap();
+        let sync_update =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(9084), None)
+                .unwrap();
+        ensure_root_is_scheduled(&mut store, sync_update.schedule()).unwrap();
+
+        let lane_selection = select_lanes_for_scheduled_task(&store, root_id).unwrap();
+        assert_eq!(
+            lane_selection.render_lanes(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, lane_selection.render_lanes()).unwrap();
+        assert_eq!(render.render_lanes(), Lanes::SYNC.merge(Lanes::DEFAULT));
+        assert_eq!(render.remaining_lanes(), Lanes::from(Lane::TRANSITION_1));
+        let current_queue_base_updates = store
+            .update_queues()
+            .base_updates(render.current_update_queue())
+            .unwrap();
+        assert_eq!(
+            current_queue_base_updates,
+            vec![
+                default_update.update(),
+                skipped_transition.update(),
+                sync_update.update()
+            ]
+        );
+        let handoff = RootSyncFlushRecord {
+            order: 0,
+            root: root_id,
+            lanes: render.render_lanes(),
+            status: RootSyncFlushRecordStatus::RenderedAwaitingCommit,
+            render_phase: render,
+        };
+        let forged = HostRootUpdateQueueLaneHandoffRecordForCanary {
+            root: root_id,
+            current: render.current(),
+            finished_work: render.finished_work(),
+            current_update_queue: render.current_update_queue(),
+            work_in_progress_update_queue: render.work_in_progress_update_queue(),
+            pending_lanes_before_render: render.render_lanes().merge(render.remaining_lanes()),
+            selected_next_lanes_before_render: render.render_lanes(),
+            finished_lanes: render.render_lanes(),
+            remaining_lanes: render.remaining_lanes(),
+            pending_lanes_after_render: store.root(root_id).unwrap().lanes().pending_lanes(),
+            update_records: vec![
+                HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                    sequence: 0,
+                    update: default_update.update(),
+                    lane: Lane::DEFAULT,
+                    source_lanes: Lanes::DEFAULT,
+                    pending_lanes_after_enqueue: default_update.pending_lanes_after_enqueue(),
+                    selected_next_lanes_after_enqueue: default_update.selected_next_lanes(),
+                },
+                HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                    sequence: 1,
+                    update: skipped_transition.update(),
+                    lane: Lane::TRANSITION_1,
+                    source_lanes: Lanes::from(Lane::TRANSITION_1),
+                    pending_lanes_after_enqueue: skipped_transition.pending_lanes_after_enqueue(),
+                    selected_next_lanes_after_enqueue: skipped_transition.selected_next_lanes(),
+                },
+                HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                    sequence: 2,
+                    update: sync_update.update(),
+                    lane: Lane::SYNC,
+                    source_lanes: Lanes::SYNC,
+                    pending_lanes_after_enqueue: sync_update.pending_lanes_after_enqueue(),
+                    selected_next_lanes_after_enqueue: sync_update.selected_next_lanes(),
+                },
+            ],
+            current_queue_base_updates,
+            applied_update_count: render.applied_update_count(),
+            skipped_update_count: render.skipped_update_count(),
+            resulting_element: render.resulting_element(),
+        };
+        record_root_finished_work_for_scheduler_handoff_for_canary(&mut store, render).unwrap();
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&forged),
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        );
+        assert_eq!(
+            execution.queue_handoff_error(),
+            Some(
+                &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueLane(
+                    HostRootUpdateQueueLaneHandoffErrorForCanary::SkippedLaneCommitted {
+                        root: root_id,
+                        update: skipped_transition.update(),
+                        skipped_lanes: Lanes::from(Lane::TRANSITION_1),
+                        finished_lanes: Lanes::SYNC.merge(Lanes::DEFAULT),
+                        remaining_lanes: Lanes::from(Lane::TRANSITION_1)
+                    }
+                )
+            )
+        );
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_replay_after_commit() {
+        let (mut store, root_id, host) = root_store();
+        let (_default_update, _sync_update, handoff, queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(9085),
+                RootElementHandle::from_raw(9086),
+            );
+        let first =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&queue_handoff),
+            )
+            .unwrap();
+        let committed_current = first.commit().unwrap().current();
+
+        let replay =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&queue_handoff),
+            )
+            .unwrap();
+
+        assert!(first.did_execute_expired_queue_lane_scheduler_continuation());
+        assert_eq!(
+            replay.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::NoExpiredLanes
+        );
+        assert!(replay.skipped_without_expired_lanes());
+        assert!(replay.handoff().is_none());
+        assert!(replay.continuation().is_none());
+        assert!(replay.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), committed_current);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
