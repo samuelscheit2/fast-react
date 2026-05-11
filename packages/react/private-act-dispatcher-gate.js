@@ -116,6 +116,201 @@ const schedulerMockDelayedRendererRootWorkMetadataStatus =
   'accepted-private-delayed-renderer-root-work-metadata-for-diagnostics';
 const schedulerMockDelayedRendererRootWorkProducerStatus =
   'produced-private-delayed-renderer-root-work-metadata-for-private-act-root-handoff';
+const privateSchedulerDrivenPassiveEffectDiagnosticsKind =
+  'fast-react.react.private-scheduler-driven-passive-effect-diagnostics';
+const privateSchedulerDrivenPassiveEffectDiagnosticsBrand = Symbol.for(
+  privateSchedulerDrivenPassiveEffectDiagnosticsKind
+);
+const privateSchedulerDrivenPassiveEffectDiagnosticsVersion = 1;
+const schedulerDrivenPassiveEffectDiagnosticsStatus =
+  'accepted-private-scheduler-driven-passive-effect-execution-diagnostics';
+const schedulerDrivenPassiveEffectConsumptionStatus =
+  'consumed-accepted-private-scheduler-driven-passive-effect-execution-diagnostics';
+const privateSchedulerDrivenPassiveEffectWorkerIds = Object.freeze([
+  'worker-836-reconciler-private-act-queue-execution-path',
+  'worker-837-scheduler-driven-passive-effect-execution'
+]);
+const privateSchedulerDrivenPassiveEffectRustSources = Object.freeze([
+  'crates/fast-react-reconciler/src/root_scheduler.rs',
+  'crates/fast-react-reconciler/src/scheduler_bridge.rs',
+  'crates/fast-react-reconciler/src/passive_effects.rs'
+]);
+const privateSchedulerDrivenPassiveEffectRecords = Object.freeze([
+  'SchedulerActQueueRequest',
+  'SyncFlushActPrivateExecutionDiagnosticsForCanary',
+  'SchedulerPassiveEffectsFlushRequest',
+  'PassiveEffectSchedulerFlushGateRecord',
+  'PendingPassiveCommitHandoff',
+  'PassiveEffectSchedulerFlushExecutionRecord',
+  'PassiveEffectsFlushResult',
+  'PassiveEffectFlushRecord',
+  'PassiveEffectDestroyCallbackExecutionRecord',
+  'PassiveEffectMountCreateCallbackExecutionRecord'
+]);
+const schedulerDrivenPassiveEffectDiagnosticsKeys = Object.freeze([
+  'kind',
+  'version',
+  'status',
+  'accepted',
+  'compatibilityTarget',
+  'schedulerCompatibilityTarget',
+  'source',
+  'workerIds',
+  'rustSources',
+  'records',
+  'schedulerMockExpiredActRootWorkDiagnostics',
+  'schedulerMockExpiredActRootWorkDiagnosticsStatus',
+  'schedulerMockExpiredActRootWorkDiagnosticKind',
+  'rootId',
+  'rootLabel',
+  'finishedWorkId',
+  'lanes',
+  'pendingUnmountCount',
+  'pendingMountCount',
+  'pendingRecordCount',
+  'rootCommitPassiveExecution',
+  'pendingPassiveHandoff',
+  'schedulerRequest',
+  'schedulerGate',
+  'schedulerExecution',
+  'passiveEffects',
+  'consumesSchedulerMockExpiredActRootWorkDiagnostics',
+  'requiresSchedulerOwnedSourceProof',
+  'requiresSourceOwnedPassiveEvidence',
+  'linksRootCommitPassiveExecutionToActFlushDiagnostics',
+  'consumesRootCommitPassiveExecution',
+  'consumesSchedulerPassiveFlushRequest',
+  'consumesPendingPassiveHandoff',
+  'privateSchedulerDrivenPassiveExecution',
+  'didExecutePrivateCallbackExecutors',
+  'schedulerDrivenPassiveExecution',
+  'queueFlushingReady',
+  'rendererRootsReady',
+  'passiveEffectsReady',
+  'continuationFlushingReady',
+  'publicCompatibilityClaimed',
+  'publicSchedulerTimingCompatibilityClaimed',
+  'publicReactActCompatibilityClaimed',
+  'publicRootSchedulerCompatibilityClaimed',
+  'publicRendererCompatibilityClaimed',
+  'drainsPublicSchedulerTaskQueue',
+  'drainsPublicReactActQueue',
+  'publicActPassiveDrain',
+  'publicEffectExecution',
+  'publicRootExecution',
+  'executesQueuedWork',
+  'executesEffects',
+  'executesPassiveEffects',
+  'executesRendererWork',
+  'executesRendererRoots',
+  'compatibilityClaimed'
+]);
+const schedulerDrivenPassiveEffectRootCommitKeys = Object.freeze([
+  'recordKind',
+  'source',
+  'rootId',
+  'rootLabel',
+  'lane',
+  'laneLabel',
+  'finishedWorkId',
+  'pendingPassiveEffectCount',
+  'hasPendingPassiveHandoff',
+  'consumesCommittedFiberEffects',
+  'linksRootCommitPassiveExecutionToActFlush',
+  'publicRootExecution',
+  'publicEffectExecution',
+  'publicActCompatibilityClaimed',
+  'compatibilityClaimed'
+]);
+const schedulerDrivenPassiveEffectHandoffKeys = Object.freeze([
+  'recordKind',
+  'source',
+  'rootId',
+  'rootLabel',
+  'finishedWorkId',
+  'lanes',
+  'pendingUnmountCount',
+  'pendingMountCount',
+  'pendingRecordCount',
+  'callerSupplied',
+  'sourceOwned',
+  'publicRootExecution',
+  'publicEffectExecution',
+  'publicActCompatibilityClaimed',
+  'compatibilityClaimed'
+]);
+const schedulerDrivenPassiveEffectRequestKeys = Object.freeze([
+  'recordKind',
+  'source',
+  'order',
+  'rootId',
+  'rootLabel',
+  'finishedWorkId',
+  'lanes',
+  'pendingUnmountCount',
+  'pendingMountCount',
+  'pendingRecordCount',
+  'schedulerPriority',
+  'executesPublicEffects',
+  'publicActCompatibilityClaimed',
+  'publicSchedulerPackageBehaviorChanged',
+  'compatibilityClaimed'
+]);
+const schedulerDrivenPassiveEffectGateKeys = Object.freeze([
+  'recordKind',
+  'source',
+  'status',
+  'rootId',
+  'rootLabel',
+  'finishedWorkId',
+  'lanes',
+  'pendingUnmountCount',
+  'pendingMountCount',
+  'pendingRecordCount',
+  'schedulerRequest',
+  'publicActCompatibilityClaimed',
+  'compatibilityClaimed'
+]);
+const schedulerDrivenPassiveEffectExecutionKeys = Object.freeze([
+  'recordKind',
+  'source',
+  'executionOrder',
+  'rootId',
+  'rootLabel',
+  'finishedWorkId',
+  'lanes',
+  'pendingUnmountCount',
+  'pendingMountCount',
+  'pendingRecordCount',
+  'schedulerGate',
+  'schedulerRequest',
+  'passiveEffects',
+  'didFlushPendingPassive',
+  'didExecutePrivateCallbackExecutors',
+  'executesPublicEffects',
+  'publicActCompatibilityClaimed',
+  'publicSchedulerPackageBehaviorChanged',
+  'compatibilityClaimed'
+]);
+const schedulerDrivenPassiveEffectResultKeys = Object.freeze([
+  'recordKind',
+  'source',
+  'status',
+  'rootId',
+  'rootLabel',
+  'finishedWorkId',
+  'lanes',
+  'consumedPendingPassive',
+  'recordsCount',
+  'destroyCallbackExecutionCount',
+  'mountCreateCallbackExecutionCount',
+  'didExecuteDestroyCallbacks',
+  'didExecuteMountCreateCallbacks',
+  'schedulerDrivenPassiveExecutionEnabled',
+  'publicEffectExecutionEnabled',
+  'publicActCompatibilityClaimed',
+  'compatibilityClaimed'
+]);
 const acceptedSchedulerMockExpiredActRootWorkRecords = Object.freeze([
   'RootLaneSchedulingSnapshot',
   'UpdateContainerResult',
@@ -324,6 +519,7 @@ const privateActQueueTestCallbackBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-callback'
 );
 let currentSchedulerMockExpiredActRootWorkSourceValidator = null;
+const privateSchedulerDrivenPassiveEffectDiagnostics = new WeakSet();
 
 installSchedulerMockSourceProofLoadHook();
 
@@ -587,6 +783,14 @@ function isAcceptedActQueueMetadata(metadata) {
       privateSchedulerMockDelayedActRootWorkDiagnosticsVersion &&
     metadata.acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics ===
       true &&
+    metadata.schedulerDrivenPassiveEffectDiagnosticsReady === true &&
+    metadata.consumesSchedulerDrivenPassiveEffectDiagnostics === true &&
+    metadata.schedulerDrivenPassiveEffectDiagnosticKind ===
+      privateSchedulerDrivenPassiveEffectDiagnosticsKind &&
+    metadata.schedulerDrivenPassiveEffectDiagnosticVersion ===
+      privateSchedulerDrivenPassiveEffectDiagnosticsVersion &&
+    metadata.privateSchedulerDrivenPassiveExecution === true &&
+    metadata.schedulerDrivenPassiveExecution === false &&
     metadata.publicSchedulerTimingCompatibilityClaimed === false &&
     metadata.publicReactActCompatibilityClaimed === false &&
     metadata.publicRootSchedulerCompatibilityClaimed === false &&
@@ -630,6 +834,10 @@ function isAcceptedActQueueMetadata(metadata) {
     hasExactStringSet(
       metadata.acceptedSchedulerMockExpiredActRootWorkRecords,
       acceptedSchedulerMockExpiredActRootWorkRecords
+    ) &&
+    hasExactStringSet(
+      metadata.acceptedSchedulerDrivenPassiveEffectRecords,
+      privateSchedulerDrivenPassiveEffectRecords
     )
   );
 }
@@ -690,6 +898,16 @@ function createActQueueMetadata(overrides = {}) {
       privateSchedulerMockDelayedActRootWorkDiagnosticsVersion,
     acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics:
       true,
+    schedulerDrivenPassiveEffectDiagnosticsReady: true,
+    consumesSchedulerDrivenPassiveEffectDiagnostics: true,
+    schedulerDrivenPassiveEffectDiagnosticKind:
+      privateSchedulerDrivenPassiveEffectDiagnosticsKind,
+    schedulerDrivenPassiveEffectDiagnosticVersion:
+      privateSchedulerDrivenPassiveEffectDiagnosticsVersion,
+    acceptedSchedulerDrivenPassiveEffectRecords:
+      privateSchedulerDrivenPassiveEffectRecords,
+    privateSchedulerDrivenPassiveExecution: true,
+    schedulerDrivenPassiveExecution: false,
     publicSchedulerTimingCompatibilityClaimed: false,
     publicReactActCompatibilityClaimed: false,
     publicRootSchedulerCompatibilityClaimed: false,
@@ -3158,6 +3376,648 @@ function preflightSchedulerMockDelayedActRootWorkDiagnostics(report) {
   });
 }
 
+function getSchedulerDrivenPassiveEffectRootCommitRecord(
+  schedulerReport
+) {
+  if (
+    !isObjectLike(schedulerReport) ||
+    !Array.isArray(schedulerReport.rootWorkRecords)
+  ) {
+    return null;
+  }
+
+  return (
+    schedulerReport.rootWorkRecords.find(
+      (record) =>
+        isObjectLike(record) &&
+        record.recordKind ===
+          'HostRootFinishedWorkCommitHandoffRecordForCanary'
+    ) ?? null
+  );
+}
+
+function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+  schedulerMockExpiredActRootWorkDiagnostics,
+  options = {}
+) {
+  const schedulerReport = schedulerMockExpiredActRootWorkDiagnostics;
+  const rootCommitRecord =
+    getSchedulerDrivenPassiveEffectRootCommitRecord(schedulerReport) ??
+    (isObjectLike(schedulerReport) &&
+    isObjectLike(schedulerReport.expiredActRootWorkMetadata)
+      ? schedulerReport.expiredActRootWorkMetadata
+      : {});
+  const rootId = options.rootId ?? rootCommitRecord.rootId ?? 837;
+  const rootLabel =
+    options.rootLabel ?? rootCommitRecord.rootLabel ?? 'mock-root-837';
+  const lanes =
+    options.lanes ??
+    rootCommitRecord.lane ??
+    rootCommitRecord.lanes ??
+    'SyncLane';
+  const laneLabel = rootCommitRecord.laneLabel ?? lanes;
+  const finishedWorkId =
+    options.finishedWorkId ?? `${String(rootLabel)}:finished-work`;
+  const pendingUnmountCount = options.pendingUnmountCount ?? 1;
+  const pendingMountCount = options.pendingMountCount ?? 1;
+  const pendingRecordCount = pendingUnmountCount + pendingMountCount;
+  const schedulerRequest = Object.freeze({
+    recordKind: 'SchedulerPassiveEffectsFlushRequest',
+    source: 'crates/fast-react-reconciler/src/scheduler_bridge.rs',
+    order: options.schedulerRequestOrder ?? 1,
+    rootId,
+    rootLabel,
+    finishedWorkId,
+    lanes,
+    pendingUnmountCount,
+    pendingMountCount,
+    pendingRecordCount,
+    schedulerPriority: 'Normal',
+    executesPublicEffects: false,
+    publicActCompatibilityClaimed: false,
+    publicSchedulerPackageBehaviorChanged: false,
+    compatibilityClaimed: false,
+    ...(options.schedulerRequestOverrides ?? {})
+  });
+  const schedulerGate = Object.freeze({
+    recordKind: 'PassiveEffectSchedulerFlushGateRecord',
+    source: 'crates/fast-react-reconciler/src/root_scheduler.rs',
+    status: 'Scheduled',
+    rootId,
+    rootLabel,
+    finishedWorkId,
+    lanes,
+    pendingUnmountCount,
+    pendingMountCount,
+    pendingRecordCount,
+    schedulerRequest,
+    publicActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    ...(options.schedulerGateOverrides ?? {})
+  });
+  const pendingPassiveHandoff = Object.freeze({
+    recordKind: 'PendingPassiveCommitHandoff',
+    source: 'crates/fast-react-reconciler/src/root_commit.rs',
+    rootId,
+    rootLabel,
+    finishedWorkId,
+    lanes,
+    pendingUnmountCount,
+    pendingMountCount,
+    pendingRecordCount,
+    callerSupplied: false,
+    sourceOwned: true,
+    publicRootExecution: false,
+    publicEffectExecution: false,
+    publicActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    ...(options.pendingPassiveHandoffOverrides ?? {})
+  });
+  const passiveEffects = Object.freeze({
+    recordKind: 'PassiveEffectsFlushResult',
+    source: 'crates/fast-react-reconciler/src/passive_effects.rs',
+    status: 'Flushed',
+    rootId,
+    rootLabel,
+    finishedWorkId,
+    lanes,
+    consumedPendingPassive: true,
+    recordsCount: pendingRecordCount,
+    destroyCallbackExecutionCount: pendingUnmountCount,
+    mountCreateCallbackExecutionCount: pendingMountCount,
+    didExecuteDestroyCallbacks: true,
+    didExecuteMountCreateCallbacks: true,
+    schedulerDrivenPassiveExecutionEnabled: true,
+    publicEffectExecutionEnabled: false,
+    publicActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    ...(options.passiveEffectsOverrides ?? {})
+  });
+  const schedulerExecution = Object.freeze({
+    recordKind: 'PassiveEffectSchedulerFlushExecutionRecord',
+    source: 'crates/fast-react-reconciler/src/passive_effects.rs',
+    executionOrder: schedulerRequest.order,
+    rootId,
+    rootLabel,
+    finishedWorkId,
+    lanes,
+    pendingUnmountCount,
+    pendingMountCount,
+    pendingRecordCount,
+    schedulerGate,
+    schedulerRequest,
+    passiveEffects,
+    didFlushPendingPassive: true,
+    didExecutePrivateCallbackExecutors: true,
+    executesPublicEffects: false,
+    publicActCompatibilityClaimed: false,
+    publicSchedulerPackageBehaviorChanged: false,
+    compatibilityClaimed: false,
+    ...(options.schedulerExecutionOverrides ?? {})
+  });
+  const rootCommitPassiveExecution = Object.freeze({
+    recordKind: 'HostRootFinishedWorkCommitHandoffRecordForCanary',
+    source: 'crates/fast-react-reconciler/src/root_commit.rs',
+    rootId,
+    rootLabel,
+    lane: lanes,
+    laneLabel,
+    finishedWorkId,
+    pendingPassiveEffectCount: pendingRecordCount,
+    hasPendingPassiveHandoff: true,
+    consumesCommittedFiberEffects: true,
+    linksRootCommitPassiveExecutionToActFlush: true,
+    publicRootExecution: false,
+    publicEffectExecution: false,
+    publicActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    ...(options.rootCommitPassiveExecutionOverrides ?? {})
+  });
+  const diagnostics = {
+    kind: privateSchedulerDrivenPassiveEffectDiagnosticsKind,
+    version: privateSchedulerDrivenPassiveEffectDiagnosticsVersion,
+    status: schedulerDrivenPassiveEffectDiagnosticsStatus,
+    accepted: true,
+    compatibilityTarget,
+    schedulerCompatibilityTarget,
+    source: 'packages/react/private-act-dispatcher-gate.js',
+    workerIds: privateSchedulerDrivenPassiveEffectWorkerIds,
+    rustSources: privateSchedulerDrivenPassiveEffectRustSources,
+    records: privateSchedulerDrivenPassiveEffectRecords,
+    schedulerMockExpiredActRootWorkDiagnostics: schedulerReport,
+    schedulerMockExpiredActRootWorkDiagnosticsStatus:
+      isObjectLike(schedulerReport) ? schedulerReport.status : undefined,
+    schedulerMockExpiredActRootWorkDiagnosticKind:
+      isObjectLike(schedulerReport) ? schedulerReport.kind : undefined,
+    rootId,
+    rootLabel,
+    finishedWorkId,
+    lanes,
+    pendingUnmountCount,
+    pendingMountCount,
+    pendingRecordCount,
+    rootCommitPassiveExecution,
+    pendingPassiveHandoff,
+    schedulerRequest,
+    schedulerGate,
+    schedulerExecution,
+    passiveEffects,
+    consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
+    requiresSchedulerOwnedSourceProof: true,
+    requiresSourceOwnedPassiveEvidence: true,
+    linksRootCommitPassiveExecutionToActFlushDiagnostics: true,
+    consumesRootCommitPassiveExecution: true,
+    consumesSchedulerPassiveFlushRequest: true,
+    consumesPendingPassiveHandoff: true,
+    privateSchedulerDrivenPassiveExecution: true,
+    didExecutePrivateCallbackExecutors: true,
+    schedulerDrivenPassiveExecution: false,
+    queueFlushingReady: false,
+    rendererRootsReady: false,
+    passiveEffectsReady: false,
+    continuationFlushingReady: false,
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicActPassiveDrain: false,
+    publicEffectExecution: false,
+    publicRootExecution: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesPassiveEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false,
+    compatibilityClaimed: false,
+    ...(options.diagnosticsOverrides ?? {})
+  };
+
+  Object.defineProperty(
+    diagnostics,
+    privateSchedulerDrivenPassiveEffectDiagnosticsBrand,
+    {
+      configurable: false,
+      enumerable: false,
+      value: true,
+      writable: false
+    }
+  );
+
+  const frozenDiagnostics = Object.freeze(diagnostics);
+  privateSchedulerDrivenPassiveEffectDiagnostics.add(frozenDiagnostics);
+  return frozenDiagnostics;
+}
+
+function matchesSchedulerDrivenPassiveEffectRootFields(
+  value,
+  diagnostics
+) {
+  return (
+    isObjectLike(value) &&
+    value.rootId === diagnostics.rootId &&
+    value.rootLabel === diagnostics.rootLabel &&
+    value.finishedWorkId === diagnostics.finishedWorkId &&
+    (value.lanes === undefined || value.lanes === diagnostics.lanes) &&
+    (value.lane === undefined || value.lane === diagnostics.lanes)
+  );
+}
+
+function hasSchedulerDrivenPassiveEffectPublicBlockers(value) {
+  return (
+    isObjectLike(value) &&
+    (value.publicRootExecution === undefined ||
+      value.publicRootExecution === false) &&
+    (value.publicEffectExecution === undefined ||
+      value.publicEffectExecution === false) &&
+    (value.publicActCompatibilityClaimed === undefined ||
+      value.publicActCompatibilityClaimed === false) &&
+    (value.publicSchedulerPackageBehaviorChanged === undefined ||
+      value.publicSchedulerPackageBehaviorChanged === false) &&
+    (value.executesPublicEffects === undefined ||
+      value.executesPublicEffects === false) &&
+    (value.publicEffectExecutionEnabled === undefined ||
+      value.publicEffectExecutionEnabled === false) &&
+    (value.compatibilityClaimed === undefined ||
+      value.compatibilityClaimed === false)
+  );
+}
+
+function isAcceptedSchedulerDrivenPassiveRootCommit(
+  record,
+  diagnostics,
+  schedulerRootCommitRecord
+) {
+  return (
+    matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
+    hasExactOwnStringKeys(
+      record,
+      schedulerDrivenPassiveEffectRootCommitKeys
+    ) &&
+    record.recordKind ===
+      'HostRootFinishedWorkCommitHandoffRecordForCanary' &&
+    record.source === 'crates/fast-react-reconciler/src/root_commit.rs' &&
+    record.rootId === schedulerRootCommitRecord.rootId &&
+    record.rootLabel === schedulerRootCommitRecord.rootLabel &&
+    record.lane === schedulerRootCommitRecord.lane &&
+    record.laneLabel === schedulerRootCommitRecord.laneLabel &&
+    record.pendingPassiveEffectCount === diagnostics.pendingRecordCount &&
+    record.hasPendingPassiveHandoff === true &&
+    record.consumesCommittedFiberEffects === true &&
+    record.linksRootCommitPassiveExecutionToActFlush === true &&
+    hasSchedulerDrivenPassiveEffectPublicBlockers(record)
+  );
+}
+
+function isAcceptedSchedulerDrivenPassiveHandoff(record, diagnostics) {
+  return (
+    matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
+    hasExactOwnStringKeys(record, schedulerDrivenPassiveEffectHandoffKeys) &&
+    record.recordKind === 'PendingPassiveCommitHandoff' &&
+    record.source === 'crates/fast-react-reconciler/src/root_commit.rs' &&
+    record.pendingUnmountCount === diagnostics.pendingUnmountCount &&
+    record.pendingMountCount === diagnostics.pendingMountCount &&
+    record.pendingRecordCount === diagnostics.pendingRecordCount &&
+    record.callerSupplied === false &&
+    record.sourceOwned === true &&
+    hasSchedulerDrivenPassiveEffectPublicBlockers(record)
+  );
+}
+
+function isAcceptedSchedulerDrivenPassiveRequest(record, diagnostics) {
+  return (
+    matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
+    hasExactOwnStringKeys(record, schedulerDrivenPassiveEffectRequestKeys) &&
+    record.recordKind === 'SchedulerPassiveEffectsFlushRequest' &&
+    record.source === 'crates/fast-react-reconciler/src/scheduler_bridge.rs' &&
+    isPositiveInteger(record.order) &&
+    record.pendingUnmountCount === diagnostics.pendingUnmountCount &&
+    record.pendingMountCount === diagnostics.pendingMountCount &&
+    record.pendingRecordCount === diagnostics.pendingRecordCount &&
+    record.schedulerPriority === 'Normal' &&
+    hasSchedulerDrivenPassiveEffectPublicBlockers(record)
+  );
+}
+
+function isAcceptedSchedulerDrivenPassiveGate(record, diagnostics) {
+  return (
+    matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
+    hasExactOwnStringKeys(record, schedulerDrivenPassiveEffectGateKeys) &&
+    record.recordKind === 'PassiveEffectSchedulerFlushGateRecord' &&
+    record.source === 'crates/fast-react-reconciler/src/root_scheduler.rs' &&
+    record.status === 'Scheduled' &&
+    record.pendingUnmountCount === diagnostics.pendingUnmountCount &&
+    record.pendingMountCount === diagnostics.pendingMountCount &&
+    record.pendingRecordCount === diagnostics.pendingRecordCount &&
+    record.schedulerRequest === diagnostics.schedulerRequest &&
+    hasSchedulerDrivenPassiveEffectPublicBlockers(record)
+  );
+}
+
+function isAcceptedSchedulerDrivenPassiveResult(record, diagnostics) {
+  return (
+    matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
+    hasExactOwnStringKeys(record, schedulerDrivenPassiveEffectResultKeys) &&
+    record.recordKind === 'PassiveEffectsFlushResult' &&
+    record.source === 'crates/fast-react-reconciler/src/passive_effects.rs' &&
+    record.status === 'Flushed' &&
+    record.consumedPendingPassive === true &&
+    record.recordsCount === diagnostics.pendingRecordCount &&
+    record.destroyCallbackExecutionCount ===
+      diagnostics.pendingUnmountCount &&
+    record.mountCreateCallbackExecutionCount ===
+      diagnostics.pendingMountCount &&
+    isPositiveInteger(record.destroyCallbackExecutionCount) &&
+    isPositiveInteger(record.mountCreateCallbackExecutionCount) &&
+    record.didExecuteDestroyCallbacks === true &&
+    record.didExecuteMountCreateCallbacks === true &&
+    record.schedulerDrivenPassiveExecutionEnabled === true &&
+    hasSchedulerDrivenPassiveEffectPublicBlockers(record)
+  );
+}
+
+function isAcceptedSchedulerDrivenPassiveExecution(record, diagnostics) {
+  return (
+    matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
+    hasExactOwnStringKeys(record, schedulerDrivenPassiveEffectExecutionKeys) &&
+    record.recordKind ===
+      'PassiveEffectSchedulerFlushExecutionRecord' &&
+    record.source === 'crates/fast-react-reconciler/src/passive_effects.rs' &&
+    record.executionOrder === diagnostics.schedulerRequest.order &&
+    record.pendingUnmountCount === diagnostics.pendingUnmountCount &&
+    record.pendingMountCount === diagnostics.pendingMountCount &&
+    record.pendingRecordCount === diagnostics.pendingRecordCount &&
+    record.schedulerGate === diagnostics.schedulerGate &&
+    record.schedulerRequest === diagnostics.schedulerRequest &&
+    record.passiveEffects === diagnostics.passiveEffects &&
+    record.didFlushPendingPassive === true &&
+    record.didExecutePrivateCallbackExecutors === true &&
+    hasSchedulerDrivenPassiveEffectPublicBlockers(record)
+  );
+}
+
+function getRejectedSchedulerDrivenPassiveEffectDiagnosticsReason(
+  diagnostics
+) {
+  if (!isObjectLike(diagnostics)) {
+    return 'scheduler-driven-passive-diagnostics';
+  }
+  if (!Object.isFrozen(diagnostics)) {
+    return 'scheduler-driven-passive-diagnostics-not-frozen';
+  }
+  if (
+    !Object.hasOwn(
+      diagnostics,
+      privateSchedulerDrivenPassiveEffectDiagnosticsBrand
+    ) ||
+    diagnostics[privateSchedulerDrivenPassiveEffectDiagnosticsBrand] !==
+      true
+  ) {
+    return 'scheduler-driven-passive-diagnostics-brand';
+  }
+  if (
+    !privateSchedulerDrivenPassiveEffectDiagnostics.has(diagnostics)
+  ) {
+    return 'scheduler-driven-passive-diagnostics-passive-ownership';
+  }
+  if (
+    !hasExactOwnStringKeys(
+      diagnostics,
+      schedulerDrivenPassiveEffectDiagnosticsKeys
+    ) ||
+    diagnostics.kind !==
+      privateSchedulerDrivenPassiveEffectDiagnosticsKind ||
+    diagnostics.version !==
+      privateSchedulerDrivenPassiveEffectDiagnosticsVersion ||
+    diagnostics.status !== schedulerDrivenPassiveEffectDiagnosticsStatus ||
+    diagnostics.accepted !== true ||
+    diagnostics.compatibilityTarget !== compatibilityTarget ||
+    diagnostics.schedulerCompatibilityTarget !== schedulerCompatibilityTarget
+  ) {
+    return 'scheduler-driven-passive-diagnostics-shape';
+  }
+  if (
+    !hasExactStringList(
+      diagnostics.workerIds,
+      privateSchedulerDrivenPassiveEffectWorkerIds
+    ) ||
+    !hasExactStringList(
+      diagnostics.rustSources,
+      privateSchedulerDrivenPassiveEffectRustSources
+    ) ||
+    !hasExactStringList(
+      diagnostics.records,
+      privateSchedulerDrivenPassiveEffectRecords
+    )
+  ) {
+    return 'scheduler-driven-passive-diagnostics-source-metadata';
+  }
+  if (
+    !hasBlockedPublicCompatibilityClaims(diagnostics) ||
+    !hasBlockedPublicQueueAndExecutionClaims(diagnostics) ||
+    diagnostics.publicActPassiveDrain !== false ||
+    diagnostics.publicEffectExecution !== false ||
+    diagnostics.publicRootExecution !== false ||
+    diagnostics.executesPassiveEffects !== false ||
+    diagnostics.schedulerDrivenPassiveExecution !== false ||
+    diagnostics.privateSchedulerDrivenPassiveExecution !== true ||
+    diagnostics.didExecutePrivateCallbackExecutors !== true
+  ) {
+    return 'scheduler-driven-passive-diagnostics-public-claim';
+  }
+  if (
+    diagnostics.consumesSchedulerMockExpiredActRootWorkDiagnostics !==
+      true ||
+    diagnostics.requiresSchedulerOwnedSourceProof !== true ||
+    diagnostics.requiresSourceOwnedPassiveEvidence !== true ||
+    diagnostics.linksRootCommitPassiveExecutionToActFlushDiagnostics !==
+      true ||
+    diagnostics.consumesRootCommitPassiveExecution !== true ||
+    diagnostics.consumesSchedulerPassiveFlushRequest !== true ||
+    diagnostics.consumesPendingPassiveHandoff !== true
+  ) {
+    return 'scheduler-driven-passive-diagnostics-policy';
+  }
+
+  const schedulerRejection =
+    getRejectedSchedulerMockExpiredActRootWorkDiagnosticsReason(
+      diagnostics.schedulerMockExpiredActRootWorkDiagnostics
+    );
+  if (schedulerRejection !== null) {
+    return schedulerRejection ===
+      'scheduler-expired-act-root-diagnostics-source-proof'
+      ? 'scheduler-driven-passive-diagnostics-scheduler-source-proof'
+      : 'scheduler-driven-passive-diagnostics-scheduler-report';
+  }
+  if (
+    diagnostics.schedulerMockExpiredActRootWorkDiagnosticsStatus !==
+      diagnostics.schedulerMockExpiredActRootWorkDiagnostics.status ||
+    diagnostics.schedulerMockExpiredActRootWorkDiagnosticKind !==
+      diagnostics.schedulerMockExpiredActRootWorkDiagnostics.kind
+  ) {
+    return 'scheduler-driven-passive-diagnostics-scheduler-link';
+  }
+
+  const schedulerRootCommitRecord =
+    getSchedulerDrivenPassiveEffectRootCommitRecord(
+      diagnostics.schedulerMockExpiredActRootWorkDiagnostics
+    );
+  if (schedulerRootCommitRecord === null) {
+    return 'scheduler-driven-passive-diagnostics-root-commit';
+  }
+  if (
+    diagnostics.rootId !== schedulerRootCommitRecord.rootId ||
+    diagnostics.rootLabel !== schedulerRootCommitRecord.rootLabel ||
+    diagnostics.lanes !== schedulerRootCommitRecord.lane ||
+    typeof diagnostics.finishedWorkId !== 'string' ||
+    diagnostics.finishedWorkId.length === 0 ||
+    !isPositiveInteger(diagnostics.pendingUnmountCount) ||
+    !isPositiveInteger(diagnostics.pendingMountCount) ||
+    diagnostics.pendingRecordCount !==
+      diagnostics.pendingUnmountCount + diagnostics.pendingMountCount
+  ) {
+    return 'scheduler-driven-passive-diagnostics-root-link';
+  }
+  if (
+    !isAcceptedSchedulerDrivenPassiveRootCommit(
+      diagnostics.rootCommitPassiveExecution,
+      diagnostics,
+      schedulerRootCommitRecord
+    )
+  ) {
+    return 'scheduler-driven-passive-diagnostics-root-commit';
+  }
+  if (
+    !isAcceptedSchedulerDrivenPassiveHandoff(
+      diagnostics.pendingPassiveHandoff,
+      diagnostics
+    )
+  ) {
+    return 'scheduler-driven-passive-diagnostics-pending-passive';
+  }
+  if (
+    !isAcceptedSchedulerDrivenPassiveRequest(
+      diagnostics.schedulerRequest,
+      diagnostics
+    )
+  ) {
+    return 'scheduler-driven-passive-diagnostics-scheduler-request';
+  }
+  if (
+    !isAcceptedSchedulerDrivenPassiveGate(
+      diagnostics.schedulerGate,
+      diagnostics
+    )
+  ) {
+    return 'scheduler-driven-passive-diagnostics-scheduler-gate';
+  }
+  if (
+    !isAcceptedSchedulerDrivenPassiveResult(
+      diagnostics.passiveEffects,
+      diagnostics
+    )
+  ) {
+    return 'scheduler-driven-passive-diagnostics-passive-effects';
+  }
+  if (
+    !isAcceptedSchedulerDrivenPassiveExecution(
+      diagnostics.schedulerExecution,
+      diagnostics
+    )
+  ) {
+    return 'scheduler-driven-passive-diagnostics-scheduler-execution';
+  }
+
+  return null;
+}
+
+function isAcceptedSchedulerDrivenPassiveEffectDiagnostics(diagnostics) {
+  return (
+    getRejectedSchedulerDrivenPassiveEffectDiagnosticsReason(
+      diagnostics
+    ) === null
+  );
+}
+
+function consumeSchedulerDrivenPassiveEffectDiagnostics(diagnostics) {
+  const rejectionReason =
+    getRejectedSchedulerDrivenPassiveEffectDiagnosticsReason(diagnostics);
+  if (rejectionReason !== null) {
+    throw createSchedulerDrivenPassiveEffectDiagnosticsGateError(
+      rejectionReason
+    );
+  }
+
+  const schedulerConsumption =
+    consumeSchedulerMockExpiredActRootWorkDiagnostics(
+      diagnostics.schedulerMockExpiredActRootWorkDiagnostics
+    );
+
+  return Object.freeze({
+    status: schedulerDrivenPassiveEffectConsumptionStatus,
+    accepted: true,
+    schedulerDrivenPassiveEffectDiagnosticsStatus: diagnostics.status,
+    schedulerDrivenPassiveEffectDiagnosticKind: diagnostics.kind,
+    schedulerDrivenPassiveEffectDiagnosticVersion: diagnostics.version,
+    schedulerMockExpiredActRootWorkConsumptionStatus:
+      schedulerConsumption.status,
+    schedulerMockExpiredActRootWorkDiagnosticsStatus:
+      schedulerConsumption.schedulerMockExpiredActRootWorkDiagnosticsStatus,
+    schedulerMockExpiredActRootWorkDiagnosticKind:
+      schedulerConsumption.schedulerMockExpiredActRootWorkDiagnosticKind,
+    rootId: diagnostics.rootId,
+    rootLabel: diagnostics.rootLabel,
+    finishedWorkId: diagnostics.finishedWorkId,
+    lanes: diagnostics.lanes,
+    pendingUnmountCount: diagnostics.pendingUnmountCount,
+    pendingMountCount: diagnostics.pendingMountCount,
+    pendingRecordCount: diagnostics.pendingRecordCount,
+    workerIds: diagnostics.workerIds,
+    rustSources: diagnostics.rustSources,
+    records: diagnostics.records,
+    rootCommitPassiveExecution:
+      diagnostics.rootCommitPassiveExecution,
+    pendingPassiveHandoff: diagnostics.pendingPassiveHandoff,
+    schedulerRequest: diagnostics.schedulerRequest,
+    schedulerGate: diagnostics.schedulerGate,
+    schedulerExecution: diagnostics.schedulerExecution,
+    passiveEffects: diagnostics.passiveEffects,
+    schedulerMockExpiredActRootWorkConsumption: schedulerConsumption,
+    consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
+    requiresSchedulerOwnedSourceProof: true,
+    requiresSourceOwnedPassiveEvidence: true,
+    linksRootCommitPassiveExecutionToActFlushDiagnostics: true,
+    consumesRootCommitPassiveExecution: true,
+    consumesSchedulerPassiveFlushRequest: true,
+    consumesPendingPassiveHandoff: true,
+    privateSchedulerDrivenPassiveExecution: true,
+    didExecutePrivateCallbackExecutors: true,
+    schedulerDrivenPassiveExecution: false,
+    queueFlushingReady: false,
+    rendererRootsReady: false,
+    passiveEffectsReady: false,
+    continuationFlushingReady: false,
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicActPassiveDrain: false,
+    publicEffectExecution: false,
+    publicRootExecution: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesPassiveEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false,
+    compatibilityClaimed: false
+  });
+}
+
 function getDispatcherActQueueMetadata(dispatcher) {
   if (!isObjectLike(dispatcher)) {
     return null;
@@ -3269,6 +4129,34 @@ function createSchedulerMockDelayedActRootWorkDiagnosticsGateError(
   error.acceptsTopLevelDelayedActRootWorkAsPublicActEvidence = false;
   error.executesQueuedWork = false;
   error.executesEffects = false;
+  error.executesRendererWork = false;
+  error.executesRendererRoots = false;
+  return error;
+}
+
+function createSchedulerDrivenPassiveEffectDiagnosticsGateError(
+  reason
+) {
+  const error = createUnimplementedError(
+    entrypoint,
+    `${privateActDispatcherGateExport}.consumeSchedulerDrivenPassiveEffectDiagnostics`,
+    'rejected scheduler-driven passive effect diagnostics',
+    'Only source-owned private scheduler-driven passive effect diagnostics linked to accepted Scheduler act/root evidence can pass this package-private gate.'
+  );
+  error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  error.publicRootSchedulerCompatibilityClaimed = false;
+  error.publicRendererCompatibilityClaimed = false;
+  error.drainsPublicSchedulerTaskQueue = false;
+  error.drainsPublicReactActQueue = false;
+  error.publicActPassiveDrain = false;
+  error.publicEffectExecution = false;
+  error.publicRootExecution = false;
+  error.executesQueuedWork = false;
+  error.executesEffects = false;
+  error.executesPassiveEffects = false;
   error.executesRendererWork = false;
   error.executesRendererRoots = false;
   return error;
@@ -3524,6 +4412,8 @@ module.exports = Object.freeze({
   schedulerMockExpiredActRootWorkConsumptionStatus,
   schedulerMockDelayedActRootWorkDiagnosticsStatus,
   schedulerMockDelayedActRootWorkPreflightStatus,
+  schedulerDrivenPassiveEffectDiagnosticsStatus,
+  schedulerDrivenPassiveEffectConsumptionStatus,
   requiredRecords: acceptedActQueueRecordKinds,
   requiredTaskKinds: acceptedActQueueTaskKinds,
   requiredContinuationStatuses: acceptedActQueueContinuationStatuses,
@@ -3581,6 +4471,16 @@ module.exports = Object.freeze({
     privateSchedulerMockDelayedActRootWorkDiagnosticsVersion,
   acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics:
     true,
+  schedulerDrivenPassiveEffectDiagnosticsReady: true,
+  consumesSchedulerDrivenPassiveEffectDiagnostics: true,
+  schedulerDrivenPassiveEffectDiagnosticKind:
+    privateSchedulerDrivenPassiveEffectDiagnosticsKind,
+  schedulerDrivenPassiveEffectDiagnosticVersion:
+    privateSchedulerDrivenPassiveEffectDiagnosticsVersion,
+  acceptedSchedulerDrivenPassiveEffectRecords:
+    privateSchedulerDrivenPassiveEffectRecords,
+  privateSchedulerDrivenPassiveExecution: true,
+  schedulerDrivenPassiveExecution: false,
   publicSchedulerTimingCompatibilityClaimed: false,
   publicReactActCompatibilityClaimed: false,
   publicRootSchedulerCompatibilityClaimed: false,
@@ -3590,6 +4490,7 @@ module.exports = Object.freeze({
   executesRendererWork: false,
   executesRendererRoots: false,
   consumeRendererBackedActDrainDiagnostics,
+  consumeSchedulerDrivenPassiveEffectDiagnostics,
   consumeSchedulerPrivateActContinuationDiagnostics,
   consumeSchedulerPostTaskYieldActRootHandoffDiagnostics,
   consumeSchedulerMockExpiredActRootWorkDiagnostics,
@@ -3599,12 +4500,14 @@ module.exports = Object.freeze({
   createInternalActQueueTestQueue,
   createInternalActQueueTestTask,
   createRendererBackedActDrainDiagnostics,
+  createSchedulerDrivenPassiveEffectDiagnosticsForCanary,
   getPrivateActQueueMetadata,
   isAcceptedActQueueMetadata,
   isAcceptedInternalActQueueTestCallback,
   isAcceptedInternalActQueueTestQueue,
   isAcceptedInternalActQueueTestTask,
   isAcceptedRendererBackedActDrainDiagnostics,
+  isAcceptedSchedulerDrivenPassiveEffectDiagnostics,
   isAcceptedSchedulerMockDelayedActRootWorkDiagnostics,
   isAcceptedSchedulerMockExpiredActRootWorkDiagnostics,
   isAcceptedSchedulerPrivateActQueueFlushDiagnostics,
