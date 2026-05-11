@@ -29,6 +29,26 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 873 and 874
+
+- Worker 873 added private source-owned generation and consume-once guards to
+  the Rust native JSON batch lifecycle executor, binding lifecycle acceptance to
+  executor generation, handle-table root/value state, environment/root/value
+  generation identity, and rejection of reused, stale, foreign, or replayed
+  rows before consumer handoff. Native addon loading, worker threads, cleanup
+  hook execution, renderer/reconciler output, public native compatibility, and
+  package exports remain blocked.
+- Worker 874 added a private React DOM lifecycle request boundary for facade
+  render, update, nested update, and unmount paths, validating the next active
+  root-owned source record and WeakMap-backed lifecycle container snapshots
+  before fake-DOM mutation or native handoff metadata. Public `createRoot`,
+  `hydrateRoot`, browser DOM/root execution, native/Rust execution,
+  resources/forms, refs/events, and compatibility remain blocked.
+- The pair was accepted after focused native lifecycle, cleanup-hook,
+  React DOM private bridge, React DOM conformance, package-surface,
+  import-smoke, workspace, formatting, Rust check, and `git diff --check`
+  verification recorded in git history and worker reports.
+
 ### Worker 863
 
 - Worker 863 added private root-level HostText and HostComponent update
