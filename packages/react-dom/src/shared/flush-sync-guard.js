@@ -389,7 +389,8 @@ function consumePublicReactDomFlushSyncBlockedCurrentnessReport(report) {
     returnValueCompatibilityClaimed: false,
     acceptedWorkerIds: report.acceptedWorkerIds,
     excludedWorkerIds: report.excludedWorkerIds,
-    privatePrerequisites: report.privatePrerequisites,
+    privatePrerequisites:
+      createPublicFlushSyncBlockedCurrentnessPrivatePrerequisites(),
     publicFlushSyncReady: false,
     privateRoutingReady: false,
     privateSyncFlushRowsOpenPublicCallbackExecution: false,
@@ -647,88 +648,10 @@ function createPublicFlushSyncBlockedCurrentnessPrivatePrerequisites(
 function isAcceptedPublicFlushSyncBlockedCurrentnessPrivatePrerequisites(
   prerequisites
 ) {
-  return (
-    isObjectLike(prerequisites) &&
-    Object.isFrozen(prerequisites) &&
-    prerequisites.acceptedPrivateSyncFlushRootHandoffDiagnosticsReady ===
-      true &&
-    prerequisites.privateSyncFlushRootHandoffStatus ===
-      privateSyncFlushRootHandoffStatus &&
-    sameStringArray(
-      prerequisites.acceptedPrivateSyncFlushRootHandoffPrerequisiteIds,
-      privateSyncFlushRootHandoffPrerequisiteIds
-    ) &&
-    sameStringArray(
-      prerequisites.acceptedPrivateSyncFlushWorkerIds,
-      publicFlushSyncBlockedCurrentnessAcceptedWorkerIds
-    ) &&
-    isAcceptedPrivateSyncFlushRows(
-      prerequisites.acceptedPrivateSyncFlushRows
-    ) &&
-    prerequisites.consumesAcceptedPrivateSyncFlushRows === true &&
-    prerequisites.publicRootBlockedLifecycleContextReady === true &&
-    prerequisites.publicRootBlockedLifecycleWorkerId ===
-      publicRootBlockedLifecycleWorkerId &&
-    prerequisites.publicRootBlockedLifecycleProgressPath ===
-      publicRootBlockedLifecycleProgressPath &&
-    prerequisites.excludesUnacceptedPrivateRootPrerequisites === true &&
-    prerequisites.consumesWorker910Evidence === false &&
-    prerequisites.acceptsFutureWorkerEvidence === false &&
-    prerequisites.publicFlushSyncReady === false &&
-    prerequisites.privateRoutingReady === false &&
-    prerequisites.privateSyncFlushRowsOpenPublicCallbackExecution === false &&
-    !hasAnyNonFalseField(
-      prerequisites,
-      publicFlushSyncBlockedCurrentnessPackageClaimFields
-    ) &&
-    !hasAnyNonFalseField(
-      prerequisites,
-      publicFlushSyncBlockedCurrentnessPublicClaimFields
-    ) &&
-    !hasAnyNonFalseField(
-      prerequisites,
-      publicFlushSyncBlockedCurrentnessExecutionClaimFields
-    )
+  return sameFrozenValue(
+    prerequisites,
+    createPublicFlushSyncBlockedCurrentnessPrivatePrerequisites()
   );
-}
-
-function isAcceptedPrivateSyncFlushRows(rows) {
-  if (
-    !Array.isArray(rows) ||
-    !Object.isFrozen(rows) ||
-    rows.length !== publicFlushSyncBlockedCurrentnessAcceptedPrivateRows.length
-  ) {
-    return false;
-  }
-
-  for (
-    let index = 0;
-    index < publicFlushSyncBlockedCurrentnessAcceptedPrivateRows.length;
-    index++
-  ) {
-    const row = rows[index];
-    const expected = publicFlushSyncBlockedCurrentnessAcceptedPrivateRows[index];
-    if (
-      !isObjectLike(row) ||
-      !Object.isFrozen(row) ||
-      row.id !== expected.id ||
-      row.workerId !== expected.workerId ||
-      row.status !== expected.status ||
-      row.source !== expected.source ||
-      row.sourceOwned !== true ||
-      row.publicCallbackExecution !== false ||
-      row.publicActExecution !== false ||
-      row.publicFlushSyncExecution !== false ||
-      row.publicRootExecution !== false ||
-      row.publicEffectExecution !== false ||
-      row.executesRendererWork !== false ||
-      row.compatibilityClaimed !== false
-    ) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 function isAcceptedPublicFlushSyncExportShapes(exportShapes) {
@@ -1189,6 +1112,39 @@ function hasAnyNonFalseField(record, fields) {
 }
 
 function sameStringArray(actual, expected) {
+  return (
+    Array.isArray(actual) &&
+    Array.isArray(expected) &&
+    actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index])
+  );
+}
+
+function sameFrozenValue(actual, expected) {
+  if (!isObjectLike(actual) || !isObjectLike(expected)) {
+    return actual === expected;
+  }
+  if (!Object.isFrozen(actual) || !Object.isFrozen(expected)) {
+    return false;
+  }
+  if (Array.isArray(actual) || Array.isArray(expected)) {
+    return (
+      Array.isArray(actual) &&
+      Array.isArray(expected) &&
+      actual.length === expected.length &&
+      actual.every((value, index) => sameFrozenValue(value, expected[index]))
+    );
+  }
+
+  const actualKeys = Reflect.ownKeys(actual);
+  const expectedKeys = Reflect.ownKeys(expected);
+  return (
+    samePropertyKeyArray(actualKeys, expectedKeys) &&
+    actualKeys.every((key) => sameFrozenValue(actual[key], expected[key]))
+  );
+}
+
+function samePropertyKeyArray(actual, expected) {
   return (
     Array.isArray(actual) &&
     Array.isArray(expected) &&

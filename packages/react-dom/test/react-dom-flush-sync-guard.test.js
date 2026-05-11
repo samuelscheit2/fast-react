@@ -196,6 +196,18 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
   );
   assertFlushSyncCurrentnessRejected(
     guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      publicProfilingFlushSyncCompatibilityClaimed: 'yes'
+    }),
+    'public-react-dom-flush-sync-currentness-public-claim'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      publicActTimingCompatibilityClaimed: 'yes'
+    }),
+    'public-react-dom-flush-sync-currentness-public-claim'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
       profilingCompatibilityClaimed: true
     }),
     'public-react-dom-flush-sync-currentness-package-compatibility-claim'
@@ -203,6 +215,18 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
   assertFlushSyncCurrentnessRejected(
     guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
       packageCompatibilityClaimed: 'yes'
+    }),
+    'public-react-dom-flush-sync-currentness-package-compatibility-claim'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      publicPackageCompatibilityClaimed: 'yes'
+    }),
+    'public-react-dom-flush-sync-currentness-package-compatibility-claim'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      profilingPackageCompatibilityClaimed: 'yes'
     }),
     'public-react-dom-flush-sync-currentness-package-compatibility-claim'
   );
@@ -263,6 +287,83 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
       privatePrerequisites: {
         ...report.privatePrerequisites,
         privateSyncFlushRowsOpenPublicCallbackExecution: 'yes'
+      }
+    }),
+    'public-react-dom-flush-sync-currentness-private-prerequisite-boundary'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      privatePrerequisites: {
+        ...report.privatePrerequisites,
+        acceptedPrivateSyncFlushRows: replacePrivatePrerequisiteRow(
+          report,
+          0,
+          {
+            evidenceFresh: false
+          }
+        )
+      }
+    }),
+    'public-react-dom-flush-sync-currentness-private-prerequisite-boundary'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      privatePrerequisites: {
+        ...report.privatePrerequisites,
+        acceptedPrivateSyncFlushRows: replacePrivatePrerequisiteRow(
+          report,
+          2,
+          {
+            publicRootStillBlocked: false
+          }
+        )
+      }
+    }),
+    'public-react-dom-flush-sync-currentness-private-prerequisite-boundary'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      privatePrerequisites: {
+        ...report.privatePrerequisites,
+        acceptedPrivateSyncFlushRows: replacePrivatePrerequisiteRow(
+          report,
+          0,
+          {
+            consumesWorker910Evidence: true
+          }
+        )
+      }
+    }),
+    'public-react-dom-flush-sync-currentness-private-prerequisite-boundary'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      privatePrerequisites: {
+        ...report.privatePrerequisites,
+        acceptedPrivateSyncFlushRows: replacePrivatePrerequisiteRow(
+          report,
+          1,
+          {
+            executesPublicDomMutation: true
+          }
+        )
+      }
+    }),
+    'public-react-dom-flush-sync-currentness-private-prerequisite-boundary'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      privatePrerequisites: {
+        ...report.privatePrerequisites,
+        acceptedPrivateSyncFlushRows: replacePrivatePrerequisiteRow(
+          report,
+          1,
+          {
+            publicPackageCompatibilityClaimed: 'yes',
+            profilingCompatibilityClaimed: 'yes',
+            publicFlushSyncCompatibilityClaimed: 'yes'
+          }
+        )
       }
     }),
     'public-react-dom-flush-sync-currentness-private-prerequisite-boundary'
@@ -340,5 +441,17 @@ function replaceCurrentnessScenario(report, index, overrides) {
           ...overrides
         }
       : scenario
+  );
+}
+
+function replacePrivatePrerequisiteRow(report, index, overrides) {
+  return report.privatePrerequisites.acceptedPrivateSyncFlushRows.map(
+    (row, rowIndex) =>
+      rowIndex === index
+        ? {
+            ...row,
+            ...overrides
+          }
+        : row
   );
 }

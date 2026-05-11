@@ -14,6 +14,10 @@
   prerequisite smuggling, Worker 910 evidence, future-worker evidence, and
   forged non-boolean claims.
 - Public `react-dom` and `react-dom/profiling` exports were not changed.
+- Audit fix: nested private prerequisite rows are now validated against the
+  exact canonical frozen prerequisite tree, including all own keys and all
+  nested row values. Consumption returns a recomputed canonical
+  `privatePrerequisites` record instead of returning caller-provided nested rows.
 
 ## Changed Files
 
@@ -26,6 +30,10 @@
 - Currentness path:
   `createPublicReactDomFlushSyncBlockedCurrentnessReport()` ->
   `consumePublicReactDomFlushSyncBlockedCurrentnessReport(report)`.
+- Stricter nested prerequisite validation path:
+  `validatePublicReactDomFlushSyncBlockedCurrentnessReport(report)` ->
+  `isAcceptedPublicFlushSyncBlockedCurrentnessPrivatePrerequisites(...)` ->
+  `sameFrozenValue(actual, createPublicFlushSyncBlockedCurrentnessPrivatePrerequisites())`.
 - Currentness status:
   `blocked-public-react-dom-flush-sync-unsupported-placeholder-currentness`.
 - Consumption status:
@@ -37,6 +45,10 @@
   `worker-901-react-dom-render-lifecycle-boundary-consumer`.
 - Excluded evidence remains explicit:
   `worker-910-hydration-recoverable-error-boundary-admission`.
+- Regression probes reject forged nested private rows with `evidenceFresh:
+  false`, `publicRootStillBlocked: false`, `consumesWorker910Evidence: true`,
+  `executesPublicDomMutation: true`, and string-valued
+  public/package/profiling compatibility claims.
 
 ## Checks
 
@@ -52,6 +64,8 @@
 - `node --test tests/conformance/test/react-dom-flush-sync-batching-oracle.test.mjs` -
   passed.
 - `node --test tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs` -
+  passed.
+- `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs` -
   passed.
 - `npm run check --workspace @fast-react/react-dom` - passed. npm emitted the
   existing unsupported `minimum-release-age` config warning.
