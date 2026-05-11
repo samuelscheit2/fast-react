@@ -179,6 +179,8 @@ const privateRootHydrateRecordType =
 const privateRootUpdateRecordType = 'fast.react_dom.private_root_update_record';
 const privateRootAdmissionRecordType =
   'fast.react_dom.private_root_admission_record';
+const privateRootLifecycleRequestBoundaryRecordType =
+  'fast.react_dom.private_root_lifecycle_request_boundary_record';
 const privateRootCreateRenderAdmissionRecordType =
   'fast.react_dom.private_root_create_render_admission_record';
 const privateRootNativeHandoffRecordType =
@@ -294,6 +296,8 @@ const ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION = 'unsupported-hydration';
 
 const ROOT_BRIDGE_REQUEST_ADMITTED =
   'admitted-private-root-bridge-request-record';
+const ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED =
+  'accepted-private-root-lifecycle-request-boundary';
 const ROOT_BRIDGE_EXECUTION_BLOCKED = 'blocked-private-root-bridge-execution';
 const ROOT_BRIDGE_COMPATIBILITY_BLOCKED =
   'blocked-private-root-bridge-compatibility';
@@ -2900,6 +2904,7 @@ const rootNativeHandoffRecords = new WeakMap();
 const rootRenderNativeHandoffPayloads = new WeakMap();
 const rootRenderNativeHandoffRecords = new WeakMap();
 const rootBridgeAdmissionPayloads = new WeakMap();
+const rootLifecycleRequestBoundaryPayloads = new WeakMap();
 const rootCreateRenderAdmissionPayloads = new WeakMap();
 const rootCreateRenderAdmissionRecords = new WeakMap();
 const rootCreateSideEffectPayloads = new WeakMap();
@@ -3016,6 +3021,12 @@ function createPrivateRootBridgeShell(options) {
     },
     admitRequest(record) {
       return admitRootBridgeRequestWithBridge(bridgeState, record);
+    },
+    createLifecycleRequestBoundary(admissionRecord) {
+      return createPrivateRootLifecycleRequestBoundaryWithBridge(
+        bridgeState,
+        admissionRecord
+      );
     },
     admitCreateRenderPath(createRecord, sideEffectRecord, renderRecord) {
       return admitPrivateCreateRenderPathWithBridge(
@@ -10049,6 +10060,13 @@ function admitRootBridgeRequestRecord(record) {
   return admitRootBridgeRequestWithBridge(null, record);
 }
 
+function createPrivateRootLifecycleRequestBoundary(admissionRecord) {
+  return createPrivateRootLifecycleRequestBoundaryWithBridge(
+    null,
+    admissionRecord
+  );
+}
+
 function admitPrivateCreateRenderPath(
   createRecord,
   sideEffectRecord,
@@ -10273,6 +10291,74 @@ function admitRootBridgeRequestWithBridge(bridgeState, record) {
   }
 
   return createRootBridgeAdmissionRecord(record, validation);
+}
+
+function createPrivateRootLifecycleRequestBoundaryWithBridge(
+  bridgeState,
+  admissionRecord
+) {
+  const validation =
+    validateActivePrivateRootLifecycleAdmission(admissionRecord);
+  if (bridgeState !== null && validation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const lifecycle = admissionRecord.lifecyclePrerequisites;
+  const rootBridgeState = validation.bridgeState;
+  const sequence = rootBridgeState.nextLifecycleRequestBoundarySequence++;
+  const boundaryId =
+    `${rootBridgeState.lifecycleRequestBoundaryIdPrefix}:${sequence}`;
+  const latestRecord = validation.rootHandleState.latestLifecycleRequestRecord;
+  const boundaryRecord = freezeRecord({
+    $$typeof: privateRootLifecycleRequestBoundaryRecordType,
+    kind: 'FastReactDomPrivateRootLifecycleRequestBoundaryRecord',
+    operation: 'root-lifecycle-request-boundary',
+    boundaryId,
+    boundarySequence: sequence,
+    boundaryStatus: ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
+    sourceAdmissionId: admissionRecord.requestId,
+    sourceAdmissionStatus: admissionRecord.admissionStatus,
+    sourceRequestId: validation.sourceRecord.requestId,
+    sourceRequestSequence: validation.sourceRecord.requestSequence,
+    sourceRequestType: validation.sourceRecord.requestType,
+    sourceOperation: validation.sourceRecord.operation,
+    rootId: admissionRecord.rootId,
+    rootKind: admissionRecord.rootKind,
+    rootTag: admissionRecord.rootTag,
+    sourceLifecycleStatusBefore: lifecycle.lifecycleStatusBefore,
+    sourceLifecycleStatusAfter: lifecycle.lifecycleStatusAfter,
+    lifecycleTransition: lifecycle.lifecycleTransition,
+    activeLifecycleStatus: validation.rootHandleState.lifecycleStatus,
+    latestSourceRequestId: latestRecord.requestId,
+    latestSourceRequestSequence: latestRecord.requestSequence,
+    lifecycleRequestVersion:
+      validation.rootHandleState.lifecycleRequestVersion,
+    sourceOwned: true,
+    activeRootLifecycle: true,
+    requestBoundaryCurrent: true,
+    publicRootExecution: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootLifecycleRequestBoundaryPayloads.set(
+    boundaryRecord,
+    freezeRecord({
+      admissionRecord,
+      bridgeState: validation.bridgeState,
+      lifecycleRequestVersion:
+        validation.rootHandleState.lifecycleRequestVersion,
+      rootHandleState: validation.rootHandleState,
+      sourceRecord: validation.sourceRecord
+    })
+  );
+  return boundaryRecord;
 }
 
 function admitPrivateCreateRenderPathWithBridge(
@@ -11868,6 +11954,8 @@ function createPrivateRootHandle(owner, container, rootOptions, bridgeState) {
     container,
     containerInfo: freezeRecord(describeContainer(container)),
     createRenderAdmissionRecord: null,
+    latestLifecycleRequestRecord: null,
+    lifecycleRequestVersion: 0,
     lifecycleStatus: ROOT_LIFECYCLE_CREATED,
     nativeRootHandle,
     nativeRootId,
@@ -11936,6 +12024,26 @@ function isSourceOwnedPrivateRootBridgeAdmissionRecord(value) {
     payload.operation === value.operation &&
     lifecycle != null &&
     payload.lifecycleTransition === lifecycle.lifecycleTransition
+  );
+}
+
+function getPrivateRootLifecycleRequestBoundaryPayload(record) {
+  return rootLifecycleRequestBoundaryPayloads.get(record) || null;
+}
+
+function isPrivateRootLifecycleRequestBoundaryRecord(value) {
+  return rootLifecycleRequestBoundaryPayloads.has(value);
+}
+
+function isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+  admissionRecord,
+  boundaryRecord
+) {
+  return (
+    validateActivePrivateRootLifecycleRequestBoundary(
+      admissionRecord,
+      boundaryRecord
+    ) !== null
   );
 }
 
@@ -12483,6 +12591,8 @@ function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
     ),
     rootOptions
   });
+  handleState.latestLifecycleRequestRecord = record;
+  handleState.lifecycleRequestVersion += 1;
 
   return record;
 }
@@ -12659,6 +12769,8 @@ function createRootUpdateRecordWithBridge(
         : null,
     rootHandle
   });
+  handleState.latestLifecycleRequestRecord = record;
+  handleState.lifecycleRequestVersion += 1;
 
   return record;
 }
@@ -13327,6 +13439,111 @@ function createRootBridgeAdmissionRecord(record, validation) {
     })
   );
   return admissionRecord;
+}
+
+function validateActivePrivateRootLifecycleAdmission(admissionRecord) {
+  if (
+    !isSourceOwnedPrivateRootBridgeAdmissionRecord(admissionRecord) ||
+    admissionRecord.executionStatus !== ROOT_BRIDGE_EXECUTION_BLOCKED ||
+    admissionRecord.compatibilityStatus !==
+      ROOT_BRIDGE_COMPATIBILITY_BLOCKED
+  ) {
+    throwInvalidRootBridgeRequest(
+      'Private root lifecycle request boundaries require a source-owned root bridge admission record.'
+    );
+  }
+
+  const payload = rootBridgeAdmissionPayloads.get(admissionRecord);
+  const rootHandleState = payload.rootHandleState;
+  const sourceRecord = payload.sourceRecord;
+  if (
+    rootHandleState === null ||
+    rootHandleState.lifecycleStatus === ROOT_LIFECYCLE_UNMOUNTED ||
+    rootHandleState.latestLifecycleRequestRecord !== sourceRecord
+  ) {
+    throwInvalidRootBridgeRequest(
+      'Private root lifecycle request boundaries require the active source root request.'
+    );
+  }
+
+  return payload;
+}
+
+function validateActivePrivateRootLifecycleRequestBoundary(
+  admissionRecord,
+  boundaryRecord
+) {
+  const admissionPayload = rootBridgeAdmissionPayloads.get(admissionRecord);
+  const boundaryPayload =
+    rootLifecycleRequestBoundaryPayloads.get(boundaryRecord);
+  if (
+    admissionPayload === undefined ||
+    boundaryPayload === undefined ||
+    boundaryRecord == null ||
+    typeof boundaryRecord !== 'object'
+  ) {
+    return null;
+  }
+
+  const rootHandleState = admissionPayload.rootHandleState;
+  const sourceRecord = admissionPayload.sourceRecord;
+  const lifecycle = admissionRecord.lifecyclePrerequisites;
+  if (
+    rootHandleState === null ||
+    boundaryPayload.admissionRecord !== admissionRecord ||
+    boundaryPayload.bridgeState !== admissionPayload.bridgeState ||
+    boundaryPayload.rootHandleState !== rootHandleState ||
+    boundaryPayload.sourceRecord !== sourceRecord ||
+    rootHandleState.lifecycleStatus === ROOT_LIFECYCLE_UNMOUNTED ||
+    rootHandleState.latestLifecycleRequestRecord !== sourceRecord ||
+    rootHandleState.lifecycleRequestVersion !==
+      boundaryPayload.lifecycleRequestVersion ||
+    boundaryRecord.$$typeof !==
+      privateRootLifecycleRequestBoundaryRecordType ||
+    boundaryRecord.kind !==
+      'FastReactDomPrivateRootLifecycleRequestBoundaryRecord' ||
+    boundaryRecord.operation !== 'root-lifecycle-request-boundary' ||
+    boundaryRecord.boundaryStatus !==
+      ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED ||
+    boundaryRecord.sourceAdmissionId !== admissionRecord.requestId ||
+    boundaryRecord.sourceAdmissionStatus !==
+      admissionRecord.admissionStatus ||
+    boundaryRecord.sourceRequestId !== sourceRecord.requestId ||
+    boundaryRecord.sourceRequestSequence !== sourceRecord.requestSequence ||
+    boundaryRecord.sourceRequestType !== sourceRecord.requestType ||
+    boundaryRecord.sourceOperation !== sourceRecord.operation ||
+    boundaryRecord.rootId !== admissionRecord.rootId ||
+    boundaryRecord.rootKind !== admissionRecord.rootKind ||
+    boundaryRecord.rootTag !== admissionRecord.rootTag ||
+    boundaryRecord.sourceLifecycleStatusBefore !==
+      lifecycle.lifecycleStatusBefore ||
+    boundaryRecord.sourceLifecycleStatusAfter !==
+      lifecycle.lifecycleStatusAfter ||
+    boundaryRecord.lifecycleTransition !== lifecycle.lifecycleTransition ||
+    boundaryRecord.activeLifecycleStatus !==
+      rootHandleState.lifecycleStatus ||
+    boundaryRecord.latestSourceRequestId !== sourceRecord.requestId ||
+    boundaryRecord.latestSourceRequestSequence !==
+      sourceRecord.requestSequence ||
+    boundaryRecord.lifecycleRequestVersion !==
+      rootHandleState.lifecycleRequestVersion ||
+    boundaryRecord.sourceOwned !== true ||
+    boundaryRecord.activeRootLifecycle !== true ||
+    boundaryRecord.requestBoundaryCurrent !== true ||
+    boundaryRecord.publicRootExecution !== false ||
+    boundaryRecord.nativeExecution !== false ||
+    boundaryRecord.reconcilerExecution !== false ||
+    boundaryRecord.domMutation !== false ||
+    boundaryRecord.markerWrites !== false ||
+    boundaryRecord.listenerInstallation !== false ||
+    boundaryRecord.hydration !== false ||
+    boundaryRecord.eventDispatch !== false ||
+    boundaryRecord.compatibilityClaimed !== false
+  ) {
+    return null;
+  }
+
+  return boundaryPayload;
 }
 
 function createNativeRequestRecordMirror(record, rootHandleState, payload) {
@@ -16603,6 +16820,10 @@ function createBridgeState(options) {
       options && options.nativeHandoffIdPrefix,
       'native-handoff'
     ),
+    lifecycleRequestBoundaryIdPrefix: getIdPrefix(
+      options && options.lifecycleRequestBoundaryIdPrefix,
+      'lifecycle-request-boundary'
+    ),
     hostOutputUpdateIdPrefix: getIdPrefix(
       options && options.hostOutputUpdateIdPrefix,
       'host-output-update'
@@ -16612,6 +16833,7 @@ function createBridgeState(options) {
       'root-commit-host-component-update'
     ),
     nextRequestSequence: 1,
+    nextLifecycleRequestBoundarySequence: 1,
     portalBoundaryIdPrefix: getIdPrefix(
       options && options.portalBoundaryIdPrefix,
       'portal-boundary'
@@ -24424,6 +24646,7 @@ module.exports = {
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED,
   ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_COMMIT_APPLIED,
   ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
+  ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
   ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED,
   ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_BLOCKED_CAPABILITIES,
@@ -24467,6 +24690,7 @@ module.exports = {
   createPortalPrepareMountListenerIntentRecord,
   createPortalRootBoundaryRecord,
   createPrivateRootBridgeShell,
+  createPrivateRootLifecycleRequestBoundary,
   preflightPrivateRootLiveContainer,
   createPrivateRootPublicFacadeAdapter,
   createPrivateRootPublicFacadePreflight,
@@ -24494,6 +24718,7 @@ module.exports = {
   getPrivateRootDangerousHtmlTextResetCommitMetadataPayload,
   getPrivateRootHostOutputUpdateHandoffPayload,
   getPrivateRootInitialHostOutputHandoffPayload,
+  getPrivateRootLifecycleRequestBoundaryPayload,
   getPrivateRootCommitRefMetadataPayload,
   getPrivateRootPortalBoundaryPayload,
   getPrivateRootPortalChildReconciliationDiagnosticPayload,
@@ -24541,6 +24766,8 @@ module.exports = {
   isPrivateRootRenderNativeHandoffRecord,
   isPrivateRootBridgeAdmissionRecord,
   isSourceOwnedPrivateRootBridgeAdmissionRecord,
+  isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission,
+  isPrivateRootLifecycleRequestBoundaryRecord,
   isPrivateRootCommitHostComponentUpdateHandoffRecord,
   isPrivateRootDangerousHtmlTextResetCommitHandoffRecord,
   isPrivateRootDangerousHtmlTextResetCommitMetadataRecord,
@@ -24591,6 +24818,7 @@ module.exports = {
   isPrivateRootHandle,
   isPrivateRootOwner,
   privateRootAdmissionRecordType,
+  privateRootLifecycleRequestBoundaryRecordType,
   privateRootCreateRenderAdmissionRecordType,
   privateRootCreateSideEffectCleanupRecordType,
   privateRootCreateSideEffectRecordType,
