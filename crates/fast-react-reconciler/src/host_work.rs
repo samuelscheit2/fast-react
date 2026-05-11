@@ -27,12 +27,19 @@ use crate::complete_work::{
     host_component_managed_child_complete_work_record_for_canary,
     host_component_managed_child_sibling_order_complete_work_record_for_canary,
 };
+#[cfg(test)]
+use crate::function_component::FunctionComponentSingleChildUpdateReconciliationRecord;
 use crate::host_nodes::{
     HostNodeAppliedTextUpdate, HostNodeMetadata, HostNodePropertyUpdate,
     HostNodePropertyUpdateExecution, HostNodeScope, HostNodeStore, HostNodeTextUpdate,
     HostNodeValidationError, HostNodeViolation,
 };
-use crate::passive_effects::PassiveEffectsFlushResult;
+use crate::passive_effects::{
+    DeletedSubtreeRefCleanupReturnExecutor, DeletedSubtreeRefPassiveCleanupExecutionError,
+    DeletedSubtreeRefPassiveCleanupExecutionResult, PassiveEffectDestroyCallbackExecutor,
+    PassiveEffectsFlushResult,
+    execute_deleted_subtree_ref_and_passive_cleanup_after_commit_for_canary,
+};
 #[cfg(test)]
 use crate::root_commit::HostRootTextUpdateCommitExecutionRequestForCanary;
 use crate::root_commit::{
@@ -40,6 +47,7 @@ use crate::root_commit::{
     HostRootDeletionCleanupRecord, HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary,
     HostRootDeletionSubtreeHostDetachmentPlanForCanary,
     HostRootFinishedWorkCommitHandoffErrorForCanary,
+    HostRootFinishedWorkCommitHandoffRecordForCanary,
     HostRootFinishedWorkPendingCommitRecordForCanary,
     HostRootManagedChildCommitHandoffRecordForCanary,
     HostRootManagedChildSiblingOrderCommitHandoffRecordForCanary, HostRootMutationApplyRecord,
@@ -94,6 +102,10 @@ pub(crate) enum HostWorkError {
     MissingHostComponentTextChild {
         root: FiberRootId,
         component: FiberId,
+    },
+    MissingHostWorkRootChild {
+        root: FiberRootId,
+        work_in_progress: FiberId,
     },
     FunctionComponentParentTopologyMismatch(Box<FunctionComponentParentTopologyMismatchRecord>),
     UnexpectedExistingChild {
@@ -215,6 +227,15 @@ impl Display for HostWorkError {
                 "root {} HostComponent fiber {} has no HostText child for private root component/text update",
                 root.raw(),
                 component.slot().get()
+            ),
+            Self::MissingHostWorkRootChild {
+                root,
+                work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostWorkResult for HostRoot work-in-progress {} has no completed root child",
+                root.raw(),
+                work_in_progress.slot().get()
             ),
             Self::FunctionComponentParentTopologyMismatch(record) => write!(
                 formatter,
@@ -345,6 +366,7 @@ impl Error for HostWorkError {
             Self::MissingTestRootElement { .. }
             | Self::ExpectedFiberTag { .. }
             | Self::MissingStateNode { .. }
+            | Self::MissingHostWorkRootChild { .. }
             | Self::FunctionComponentParentTopologyMismatch(_)
             | Self::UnexpectedExistingChild { .. }
             | Self::ExpectedMultipleRootChildren { .. }
@@ -1030,6 +1052,8 @@ pub(crate) struct HostWorkResult {
     completed_child: Option<FiberId>,
     completed_children: Vec<FiberId>,
     detached_hosts: DetachedHostRecords,
+    sync_flush_host_work_epoch: usize,
+    consumed_sync_flush_host_mutations: Vec<SyncFlushHostMutationExecutionIdentityForCanary>,
 }
 
 impl HostWorkResult {
@@ -1167,6 +1191,69 @@ impl HostWorkResult {
     pub(crate) fn into_detached_hosts_for_canary(self) -> DetachedHostRecords {
         self.detached_hosts
     }
+
+    fn sync_flush_host_mutation_execution_identity(
+        &self,
+        request: SyncFlushHostMutationExecutionRequestForCanary,
+    ) -> SyncFlushHostMutationExecutionIdentityForCanary {
+        SyncFlushHostMutationExecutionIdentityForCanary {
+            root: request.root(),
+            order: request.order(),
+            render_lanes: request.render_lanes(),
+            finished_lanes: request.finished_lanes(),
+            finished_work: request.finished_work(),
+            committed_current: request.committed_current(),
+            mutation_record_count: request.mutation_record_count(),
+            mutation_apply_record_count: request.mutation_apply_record_count(),
+            host_root_placement_apply_count: request.host_root_placement_apply_count(),
+            host_work_epoch: self.sync_flush_host_work_epoch,
+        }
+    }
+
+    fn has_consumed_sync_flush_host_mutation_execution(
+        &self,
+        identity: SyncFlushHostMutationExecutionIdentityForCanary,
+    ) -> bool {
+        self.consumed_sync_flush_host_mutations
+            .iter()
+            .any(|consumed| *consumed == identity)
+    }
+
+    fn mark_sync_flush_host_mutation_execution_consumed(
+        &mut self,
+        identity: SyncFlushHostMutationExecutionIdentityForCanary,
+    ) {
+        self.consumed_sync_flush_host_mutations.push(identity);
+    }
+
+    fn retarget_finished_work_for_canary(
+        &mut self,
+        render: HostRootRenderPhaseRecord,
+        completed_children: Vec<FiberId>,
+    ) {
+        let completed_child = completed_children.first().copied();
+        self.sync_flush_host_work_epoch += 1;
+        self.root = render.root();
+        self.work_in_progress = render.work_in_progress();
+        self.root_child = completed_child;
+        self.root_children = completed_children.clone();
+        self.completed_child = completed_child;
+        self.completed_children = completed_children;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SyncFlushHostMutationExecutionIdentityForCanary {
+    root: FiberRootId,
+    order: usize,
+    render_lanes: Lanes,
+    finished_lanes: Lanes,
+    finished_work: FiberId,
+    committed_current: FiberId,
+    mutation_record_count: usize,
+    mutation_apply_record_count: usize,
+    host_root_placement_apply_count: usize,
+    host_work_epoch: usize,
 }
 
 const TEST_HOST_SAFE_PROPERTY_PROP_NAME: &str = "testHostProperty";
@@ -1710,6 +1797,7 @@ pub(crate) struct SyncFlushHostMutationExecutionDiagnosticForCanary {
     applied_host_call_count: usize,
     private_host_store_update_count: usize,
     recorded_only_count: usize,
+    deletion_cleanup_apply_count: usize,
 }
 
 impl SyncFlushHostMutationExecutionDiagnosticForCanary {
@@ -1754,6 +1842,11 @@ impl SyncFlushHostMutationExecutionDiagnosticForCanary {
     }
 
     #[must_use]
+    pub(crate) const fn deletion_cleanup_apply_count(&self) -> usize {
+        self.deletion_cleanup_apply_count
+    }
+
+    #[must_use]
     pub(crate) const fn private_opt_in_host_mutation_execution_requested(&self) -> bool {
         self.request
             .private_opt_in_host_mutation_execution_requested()
@@ -1761,7 +1854,10 @@ impl SyncFlushHostMutationExecutionDiagnosticForCanary {
 
     #[must_use]
     pub(crate) const fn private_test_host_mutation_executed(&self) -> bool {
-        self.applied_host_call_count + self.private_host_store_update_count > 0
+        self.applied_host_call_count
+            + self.private_host_store_update_count
+            + self.deletion_cleanup_apply_count
+            > 0
     }
 
     #[must_use]
@@ -1806,6 +1902,11 @@ pub(crate) enum SyncFlushHostMutationExecutionErrorForCanary {
         root: FiberRootId,
         expected_finished_work: FiberId,
         actual_finished_work: FiberId,
+    },
+    ReplayedHostMutationExecution {
+        root: FiberRootId,
+        order: usize,
+        finished_work: FiberId,
     },
     MissingHostMutationMetadata {
         root: FiberRootId,
@@ -1858,6 +1959,17 @@ impl Display for SyncFlushHostMutationExecutionErrorForCanary {
                 expected_finished_work.slot().get(),
                 actual_finished_work.slot().get()
             ),
+            Self::ReplayedHostMutationExecution {
+                root,
+                order,
+                finished_work,
+            } => write!(
+                formatter,
+                "sync-flush host mutation execution rejected replay for root {} order {} finished work fiber slot {}",
+                root.raw(),
+                order,
+                finished_work.slot().get()
+            ),
             Self::MissingHostMutationMetadata {
                 root,
                 finished_work,
@@ -1880,6 +1992,7 @@ impl Error for SyncFlushHostMutationExecutionErrorForCanary {
             | Self::MismatchedRootOwnership { .. }
             | Self::MismatchedSyncFlushLanes { .. }
             | Self::MismatchedFinishedWork { .. }
+            | Self::ReplayedHostMutationExecution { .. }
             | Self::MissingHostMutationMetadata { .. } => None,
         }
     }
@@ -2154,6 +2267,42 @@ impl TestHostRootHostUpdateExecutionDiagnosticForCanary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TestHostRootHostUpdateFinishedWorkExecutionForCanary {
+    pending_update: crate::root_commit::HostRootSingleHostUpdateApplyRecordForCanary,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+    committed_update: crate::root_commit::HostRootSingleHostUpdateApplyRecordForCanary,
+    diagnostic: TestHostRootHostUpdateExecutionDiagnosticForCanary,
+}
+
+impl TestHostRootHostUpdateFinishedWorkExecutionForCanary {
+    #[must_use]
+    pub(crate) const fn pending_update(
+        &self,
+    ) -> crate::root_commit::HostRootSingleHostUpdateApplyRecordForCanary {
+        self.pending_update
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_handoff(
+        &self,
+    ) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        &self.finished_work_handoff
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_update(
+        &self,
+    ) -> crate::root_commit::HostRootSingleHostUpdateApplyRecordForCanary {
+        self.committed_update
+    }
+
+    #[must_use]
+    pub(crate) const fn diagnostic(&self) -> &TestHostRootHostUpdateExecutionDiagnosticForCanary {
+        &self.diagnostic
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TestHostRootHostUpdateExecutionErrorForCanary {
     FinishedWorkHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
     HostUpdateRecord(HostRootSingleHostUpdateApplyRecordErrorForCanary),
@@ -2253,7 +2402,7 @@ pub(crate) enum TestHostRootDeletionCleanupStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TestHostRootDeletionCleanupApplyRecord {
+pub(crate) struct TestHostRootDeletionCleanupApplyRecord {
     cleanup: HostRootDeletionCleanupRecord,
     status: TestHostRootDeletionCleanupStatus,
     previous_metadata: Option<HostNodeMetadata>,
@@ -2261,23 +2410,23 @@ struct TestHostRootDeletionCleanupApplyRecord {
 
 impl TestHostRootDeletionCleanupApplyRecord {
     #[must_use]
-    const fn cleanup(self) -> HostRootDeletionCleanupRecord {
+    pub(crate) const fn cleanup(self) -> HostRootDeletionCleanupRecord {
         self.cleanup
     }
 
     #[must_use]
-    const fn status(self) -> TestHostRootDeletionCleanupStatus {
+    pub(crate) const fn status(self) -> TestHostRootDeletionCleanupStatus {
         self.status
     }
 
     #[must_use]
-    const fn previous_metadata(self) -> Option<HostNodeMetadata> {
+    pub(crate) const fn previous_metadata(self) -> Option<HostNodeMetadata> {
         self.previous_metadata
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct TestHostRootDeletionCleanupApplyResult {
+pub(crate) struct TestHostRootDeletionCleanupApplyResult {
     root: FiberRootId,
     finished_work: FiberId,
     records: Vec<TestHostRootDeletionCleanupApplyRecord>,
@@ -2285,22 +2434,22 @@ struct TestHostRootDeletionCleanupApplyResult {
 
 impl TestHostRootDeletionCleanupApplyResult {
     #[must_use]
-    const fn root(&self) -> FiberRootId {
+    pub(crate) const fn root(&self) -> FiberRootId {
         self.root
     }
 
     #[must_use]
-    const fn finished_work(&self) -> FiberId {
+    pub(crate) const fn finished_work(&self) -> FiberId {
         self.finished_work
     }
 
     #[must_use]
-    fn records(&self) -> &[TestHostRootDeletionCleanupApplyRecord] {
+    pub(crate) fn records(&self) -> &[TestHostRootDeletionCleanupApplyRecord] {
         &self.records
     }
 
     #[must_use]
-    fn applied_record_count(&self) -> usize {
+    pub(crate) fn applied_record_count(&self) -> usize {
         self.records
             .iter()
             .filter(|record| {
@@ -2313,13 +2462,26 @@ impl TestHostRootDeletionCleanupApplyResult {
     }
 
     #[must_use]
-    fn detached_instance_count(&self) -> usize {
+    pub(crate) fn detached_instance_count(&self) -> usize {
         self.records
             .iter()
             .filter(|record| {
                 record.status()
                     == TestHostRootDeletionCleanupStatus::Applied(
                         TestHostRootDeletionCleanupAction::DetachDeletedInstance,
+                    )
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn invalidated_text_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.status()
+                    == TestHostRootDeletionCleanupStatus::Applied(
+                        TestHostRootDeletionCleanupAction::InvalidateDeletedText,
                     )
             })
             .count()
@@ -2700,6 +2862,353 @@ impl From<HostWorkError> for TestHostRootManagedChildExecutionErrorForCanary {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TestHostRootDeletionTeardownExecutionRequestForCanary {
+    root: FiberRootId,
+    source_handoff_order: usize,
+    commit_order: usize,
+    request_order: usize,
+    previous_current: FiberId,
+    finished_work: FiberId,
+    committed_current: FiberId,
+    finished_lanes: Lanes,
+    remaining_lanes: Lanes,
+    pending_lanes: Lanes,
+    deletion_list_count: usize,
+    deleted_root_count: usize,
+    ref_cleanup_return_count: usize,
+    passive_destroy_count: usize,
+    host_node_cleanup_count: usize,
+    host_detachment_plan: HostRootDeletionSubtreeHostDetachmentPlanForCanary,
+}
+
+impl TestHostRootDeletionTeardownExecutionRequestForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn source_handoff_order(self) -> usize {
+        self.source_handoff_order
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_order(self) -> usize {
+        self.commit_order
+    }
+
+    #[must_use]
+    pub(crate) const fn request_order(self) -> usize {
+        self.request_order
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_current(self) -> FiberId {
+        self.committed_current
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes(self) -> Lanes {
+        self.pending_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn deletion_list_count(self) -> usize {
+        self.deletion_list_count
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root_count(self) -> usize {
+        self.deleted_root_count
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_cleanup_return_count(self) -> usize {
+        self.ref_cleanup_return_count
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_destroy_count(self) -> usize {
+        self.passive_destroy_count
+    }
+
+    #[must_use]
+    pub(crate) const fn host_node_cleanup_count(self) -> usize {
+        self.host_node_cleanup_count
+    }
+
+    #[must_use]
+    pub(crate) const fn host_detachment_plan(
+        self,
+    ) -> HostRootDeletionSubtreeHostDetachmentPlanForCanary {
+        self.host_detachment_plan
+    }
+
+    #[must_use]
+    fn matches_source_handoff(
+        self,
+        handoff: &HostRootFinishedWorkCommitHandoffRecordForCanary,
+    ) -> bool {
+        let commit = handoff.commit();
+        let order_gate = commit.deletion_cleanup_order_gate_for_canary();
+        self.root == commit.root()
+            && self.source_handoff_order == handoff.pending().handoff_order()
+            && self.commit_order == handoff.commit_order()
+            && self.previous_current == commit.previous_current()
+            && self.finished_work == commit.finished_work()
+            && self.committed_current == commit.current()
+            && self.finished_lanes == commit.finished_lanes()
+            && self.remaining_lanes == commit.remaining_lanes()
+            && self.pending_lanes == commit.pending_lanes()
+            && self.deletion_list_count == commit.deletion_lists().len()
+            && self.deleted_root_count
+                == commit
+                    .deletion_lists()
+                    .first()
+                    .map(|list| list.deleted().len())
+                    .unwrap_or(0)
+            && self.ref_cleanup_return_count == order_gate.ref_cleanup_return_count()
+            && self.passive_destroy_count == order_gate.passive_destroy_count()
+            && self.host_node_cleanup_count == order_gate.host_node_cleanup_count()
+            && commit
+                .deletion_subtree_host_detachment_plan_for_canary()
+                .is_ok_and(|plan| plan == self.host_detachment_plan)
+    }
+
+    #[must_use]
+    const fn has_required_source_evidence(self) -> bool {
+        self.deletion_list_count > 0
+            && self.deleted_root_count > 0
+            && self.ref_cleanup_return_count > 0
+            && self.passive_destroy_count > 0
+            && self.host_node_cleanup_count > 0
+    }
+
+    #[must_use]
+    pub(crate) const fn private_test_control_execution_requested(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_unmount_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_ref_or_effect_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) const fn with_host_node_cleanup_count_for_canary(mut self, count: usize) -> Self {
+        self.host_node_cleanup_count = count;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TestHostRootDeletionTeardownExecutionDiagnosticForCanary {
+    request: TestHostRootDeletionTeardownExecutionRequestForCanary,
+    ref_passive_cleanup: DeletedSubtreeRefPassiveCleanupExecutionResult,
+    host_detachment_status: TestHostRootMutationApplyStatus,
+    execution_snapshot: TestHostRootDeletionRefPassiveCleanupExecutionSnapshot,
+}
+
+impl TestHostRootDeletionTeardownExecutionDiagnosticForCanary {
+    #[must_use]
+    pub(crate) const fn request(&self) -> TestHostRootDeletionTeardownExecutionRequestForCanary {
+        self.request
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.request.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.request.finished_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn host_detachment_status(&self) -> TestHostRootMutationApplyStatus {
+        self.host_detachment_status
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_passive_cleanup(
+        &self,
+    ) -> &DeletedSubtreeRefPassiveCleanupExecutionResult {
+        &self.ref_passive_cleanup
+    }
+
+    #[must_use]
+    pub(crate) const fn execution_snapshot(
+        &self,
+    ) -> &TestHostRootDeletionRefPassiveCleanupExecutionSnapshot {
+        &self.execution_snapshot
+    }
+
+    #[must_use]
+    pub(crate) fn ref_cleanup_return_callbacks_invoked(&self) -> bool {
+        self.ref_passive_cleanup
+            .ref_cleanup_return_callbacks_invoked()
+    }
+
+    #[must_use]
+    pub(crate) fn passive_destroy_callbacks_invoked(&self) -> bool {
+        self.ref_passive_cleanup.passive_destroy_callbacks_invoked()
+    }
+
+    #[must_use]
+    pub(crate) const fn private_host_subtree_detachment_applied(&self) -> bool {
+        matches!(
+            self.host_detachment_status,
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn public_unmount_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_ref_or_effect_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum TestHostRootDeletionTeardownExecutionErrorForCanary {
+    StaleFinishedWorkEvidence {
+        root: FiberRootId,
+        commit_order: usize,
+        request_order: usize,
+    },
+    MismatchedRootOwnership {
+        expected_root: FiberRootId,
+        actual_root: FiberRootId,
+    },
+    MismatchedFinishedWork {
+        root: FiberRootId,
+        expected_finished_work: FiberId,
+        actual_finished_work: FiberId,
+    },
+    MissingDeletionTeardownMetadata {
+        root: FiberRootId,
+        finished_work: FiberId,
+    },
+    RefPassiveCleanup(DeletedSubtreeRefPassiveCleanupExecutionError),
+    HostWork(HostWorkError),
+}
+
+impl Display for TestHostRootDeletionTeardownExecutionErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StaleFinishedWorkEvidence {
+                root,
+                commit_order,
+                request_order,
+            } => write!(
+                formatter,
+                "deleted-subtree teardown execution rejected stale finished-work evidence for root {} commit order {} request order {}",
+                root.raw(),
+                commit_order,
+                request_order
+            ),
+            Self::MismatchedRootOwnership {
+                expected_root,
+                actual_root,
+            } => write!(
+                formatter,
+                "deleted-subtree teardown execution root ownership mismatch: expected root {}, found root {}",
+                expected_root.raw(),
+                actual_root.raw()
+            ),
+            Self::MismatchedFinishedWork {
+                root,
+                expected_finished_work,
+                actual_finished_work,
+            } => write!(
+                formatter,
+                "deleted-subtree teardown execution finished-work mismatch for root {}: expected fiber slot {}, found fiber slot {}",
+                root.raw(),
+                expected_finished_work.slot().get(),
+                actual_finished_work.slot().get()
+            ),
+            Self::MissingDeletionTeardownMetadata {
+                root,
+                finished_work,
+            } => write!(
+                formatter,
+                "deleted-subtree teardown execution for root {} finished work fiber slot {} is missing deletion teardown metadata",
+                root.raw(),
+                finished_work.slot().get()
+            ),
+            Self::RefPassiveCleanup(error) => Display::fmt(error, formatter),
+            Self::HostWork(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+impl Error for TestHostRootDeletionTeardownExecutionErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::RefPassiveCleanup(error) => Some(error),
+            Self::HostWork(error) => Some(error),
+            Self::StaleFinishedWorkEvidence { .. }
+            | Self::MismatchedRootOwnership { .. }
+            | Self::MismatchedFinishedWork { .. }
+            | Self::MissingDeletionTeardownMetadata { .. } => None,
+        }
+    }
+}
+
+impl From<HostWorkError> for TestHostRootDeletionTeardownExecutionErrorForCanary {
+    fn from(error: HostWorkError) -> Self {
+        Self::HostWork(error)
+    }
+}
+
+impl From<DeletedSubtreeRefPassiveCleanupExecutionError>
+    for TestHostRootDeletionTeardownExecutionErrorForCanary
+{
+    fn from(error: DeletedSubtreeRefPassiveCleanupExecutionError) -> Self {
+        Self::RefPassiveCleanup(error)
+    }
+}
+
+impl From<HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary>
+    for TestHostRootDeletionTeardownExecutionErrorForCanary
+{
+    fn from(error: HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary) -> Self {
+        Self::HostWork(HostWorkError::from(error))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct TestHostRootDeletionSubtreeHostDetachmentApplyResult {
     root: FiberRootId,
     finished_work: FiberId,
@@ -2740,7 +3249,7 @@ impl TestHostRootDeletionSubtreeHostDetachmentApplyResult {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TestHostRootDeletionRefPassiveCleanupExecutionPhase {
+pub(crate) enum TestHostRootDeletionRefPassiveCleanupExecutionPhase {
     RefCleanupReturnGate,
     PassiveDestroyCallback,
     HostSubtreeDetach,
@@ -2748,7 +3257,7 @@ enum TestHostRootDeletionRefPassiveCleanupExecutionPhase {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TestHostRootDeletionRefPassiveCleanupExecutionRecord {
+pub(crate) struct TestHostRootDeletionRefPassiveCleanupExecutionRecord {
     sequence: usize,
     phase: TestHostRootDeletionRefPassiveCleanupExecutionPhase,
     fiber: FiberId,
@@ -2761,48 +3270,48 @@ struct TestHostRootDeletionRefPassiveCleanupExecutionRecord {
 
 impl TestHostRootDeletionRefPassiveCleanupExecutionRecord {
     #[must_use]
-    const fn sequence(self) -> usize {
+    pub(crate) const fn sequence(self) -> usize {
         self.sequence
     }
 
     #[must_use]
-    const fn phase(self) -> TestHostRootDeletionRefPassiveCleanupExecutionPhase {
+    pub(crate) const fn phase(self) -> TestHostRootDeletionRefPassiveCleanupExecutionPhase {
         self.phase
     }
 
     #[must_use]
-    const fn fiber(self) -> FiberId {
+    pub(crate) const fn fiber(self) -> FiberId {
         self.fiber
     }
 
     #[must_use]
-    const fn deleted_root(self) -> FiberId {
+    pub(crate) const fn deleted_root(self) -> FiberId {
         self.deleted_root
     }
 
     #[must_use]
-    const fn ref_cleanup_return_sequence(self) -> Option<usize> {
+    pub(crate) const fn ref_cleanup_return_sequence(self) -> Option<usize> {
         self.ref_cleanup_return_sequence
     }
 
     #[must_use]
-    const fn passive_destroy_execution_order(self) -> Option<usize> {
+    pub(crate) const fn passive_destroy_execution_order(self) -> Option<usize> {
         self.passive_destroy_execution_order
     }
 
     #[must_use]
-    const fn host_detachment_cleanup_order_sequence(self) -> Option<usize> {
+    pub(crate) const fn host_detachment_cleanup_order_sequence(self) -> Option<usize> {
         self.host_detachment_cleanup_order_sequence
     }
 
     #[must_use]
-    const fn host_cleanup_sequence(self) -> Option<usize> {
+    pub(crate) const fn host_cleanup_sequence(self) -> Option<usize> {
         self.host_cleanup_sequence
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct TestHostRootDeletionRefPassiveCleanupExecutionSnapshot {
+pub(crate) struct TestHostRootDeletionRefPassiveCleanupExecutionSnapshot {
     records: Vec<TestHostRootDeletionRefPassiveCleanupExecutionRecord>,
     ref_cleanup_return_gate_count: usize,
     passive_destroy_execution_count: usize,
@@ -2812,52 +3321,52 @@ struct TestHostRootDeletionRefPassiveCleanupExecutionSnapshot {
 
 impl TestHostRootDeletionRefPassiveCleanupExecutionSnapshot {
     #[must_use]
-    fn records(&self) -> &[TestHostRootDeletionRefPassiveCleanupExecutionRecord] {
+    pub(crate) fn records(&self) -> &[TestHostRootDeletionRefPassiveCleanupExecutionRecord] {
         &self.records
     }
 
     #[must_use]
-    fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.records.len()
     }
 
     #[must_use]
-    const fn ref_cleanup_return_gate_count(&self) -> usize {
+    pub(crate) const fn ref_cleanup_return_gate_count(&self) -> usize {
         self.ref_cleanup_return_gate_count
     }
 
     #[must_use]
-    const fn passive_destroy_execution_count(&self) -> usize {
+    pub(crate) const fn passive_destroy_execution_count(&self) -> usize {
         self.passive_destroy_execution_count
     }
 
     #[must_use]
-    const fn host_subtree_detachment_count(&self) -> usize {
+    pub(crate) const fn host_subtree_detachment_count(&self) -> usize {
         self.host_subtree_detachment_count
     }
 
     #[must_use]
-    const fn host_cleanup_apply_count(&self) -> usize {
+    pub(crate) const fn host_cleanup_apply_count(&self) -> usize {
         self.host_cleanup_apply_count
     }
 
     #[must_use]
-    const fn private_passive_destroy_callbacks_invoked(&self) -> bool {
+    pub(crate) const fn private_passive_destroy_callbacks_invoked(&self) -> bool {
         self.passive_destroy_execution_count > 0
     }
 
     #[must_use]
-    const fn private_host_subtree_detachment_applied(&self) -> bool {
+    pub(crate) const fn private_host_subtree_detachment_applied(&self) -> bool {
         self.host_subtree_detachment_count > 0
     }
 
     #[must_use]
-    const fn public_unmount_compatibility_claimed(&self) -> bool {
+    pub(crate) const fn public_unmount_compatibility_claimed(&self) -> bool {
         false
     }
 
     #[must_use]
-    const fn public_ref_or_effect_compatibility_claimed(&self) -> bool {
+    pub(crate) const fn public_ref_or_effect_compatibility_claimed(&self) -> bool {
         false
     }
 }
@@ -2908,6 +3417,200 @@ pub(crate) fn apply_test_host_root_commit_mutations_for_canary(
     host_work: &mut HostWorkResult,
 ) -> Result<TestHostRootMutationApplyResult, HostWorkError> {
     apply_test_host_root_commit_mutations(store, host, commit, host_work.detached_hosts_mut())
+}
+
+#[cfg(test)]
+pub(crate) fn complete_test_function_component_single_host_update_work_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    render: HostRootRenderPhaseRecord,
+    update: FunctionComponentSingleChildUpdateReconciliationRecord,
+    source: &TestHostTree,
+    mut detached_hosts: DetachedHostRecords,
+) -> Result<HostWorkResult, HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    expect_tag(
+        store,
+        update.function_component(),
+        FiberTag::FunctionComponent,
+    )?;
+    let function_node = store.fiber_arena().get(update.function_component())?;
+    let root_child = store.fiber_arena().get(render.work_in_progress())?.child();
+    if root_child != Some(update.function_component())
+        || function_node.return_fiber() != Some(render.work_in_progress())
+        || function_node.sibling().is_some()
+        || function_node.alternate() != Some(update.current())
+    {
+        return Err(HostWorkError::FunctionComponentParentTopologyMismatch(
+            Box::new(FunctionComponentParentTopologyMismatchRecord {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                function_component: update.function_component(),
+                actual_root_child: root_child,
+                actual_parent: function_node.return_fiber(),
+                actual_sibling: function_node.sibling(),
+            }),
+        ));
+    }
+
+    let source_node =
+        source
+            .root(update.child_element())
+            .ok_or(HostWorkError::MissingTestRootElement {
+                handle: update.child_element(),
+            })?;
+    match source_node {
+        TestHostNode::Element(element) => {
+            if update.child_tag() != FiberTag::HostComponent {
+                return Err(HostWorkError::ExpectedFiberTag {
+                    fiber: update.work_in_progress_child(),
+                    expected: update.child_tag(),
+                    actual: FiberTag::HostComponent,
+                });
+            }
+            complete_host_component_update(
+                store,
+                render.root(),
+                update.current_child(),
+                update.work_in_progress_child(),
+                element,
+                update.previous_child_props(),
+                &mut detached_hosts,
+            )?;
+        }
+        TestHostNode::Text(text) => {
+            if update.child_tag() != FiberTag::HostText {
+                return Err(HostWorkError::ExpectedFiberTag {
+                    fiber: update.work_in_progress_child(),
+                    expected: update.child_tag(),
+                    actual: FiberTag::HostText,
+                });
+            }
+            complete_host_text_update(
+                store,
+                render.root(),
+                update.current_child(),
+                update.work_in_progress_child(),
+                text,
+                &mut detached_hosts,
+            )?;
+        }
+    }
+
+    complete_function_component_parent(store, update.function_component())?;
+    complete_host_root(store, render.work_in_progress())?;
+
+    Ok(HostWorkResult {
+        root: render.root(),
+        work_in_progress: render.work_in_progress(),
+        root_child,
+        root_children: root_child.into_iter().collect(),
+        completed_child: Some(update.work_in_progress_child()),
+        completed_children: vec![update.work_in_progress_child()],
+        detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
+    })
+}
+
+#[cfg(test)]
+pub(crate) fn apply_single_test_host_update_with_finished_work_handoff_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    pending: Option<HostRootFinishedWorkPendingCommitRecordForCanary>,
+    commit_order: usize,
+    host_work: &mut HostWorkResult,
+) -> Result<
+    TestHostRootHostUpdateFinishedWorkExecutionForCanary,
+    TestHostRootHostUpdateExecutionErrorForCanary,
+> {
+    let pending_update = record_host_root_single_host_update_apply_for_canary(store, render)?;
+    let mutation = pending_update.mutation();
+    let Some(payload) =
+        accepted_test_host_update_payload_for_canary(host_work.detached_hosts(), mutation)
+    else {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::UnsupportedPayload {
+                root: pending_update.root(),
+                finished_work: pending_update.finished_work(),
+                fiber: pending_update.fiber(),
+                kind: pending_update.kind(),
+            },
+        );
+    };
+
+    let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        pending,
+        commit_order,
+    )?;
+    let committed_update = handoff
+        .commit()
+        .single_host_update_apply_record_for_canary()?;
+    if committed_update.mutation() != mutation {
+        return Err(
+            HostRootSingleHostUpdateApplyRecordErrorForCanary::ExpectedSingleHostUpdateRecord {
+                root: handoff.commit().root(),
+                finished_work: handoff.commit().finished_work(),
+                mutation_record_count: handoff.commit().mutation_apply_log().len(),
+                host_update_record_count: 0,
+            }
+            .into(),
+        );
+    }
+
+    let apply = apply_test_host_root_commit_mutations(
+        store,
+        host,
+        handoff.commit(),
+        host_work.detached_hosts_mut(),
+    )?;
+    let applied_status = apply
+        .records()
+        .iter()
+        .find(|record| record.mutation() == mutation)
+        .map(|record| record.status());
+    let Some(status) = applied_status else {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::HostUpdateNotApplied {
+                root: handoff.commit().root(),
+                finished_work: handoff.commit().finished_work(),
+                fiber: mutation.fiber(),
+                status: None,
+            },
+        );
+    };
+    if !host_update_apply_status_matches_mutation_kind(status, mutation.kind()) {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::HostUpdateNotApplied {
+                root: handoff.commit().root(),
+                finished_work: handoff.commit().finished_work(),
+                fiber: mutation.fiber(),
+                status: Some(status),
+            },
+        );
+    }
+
+    let diagnostic = TestHostRootHostUpdateExecutionDiagnosticForCanary {
+        root: handoff.commit().root(),
+        finished_work: handoff.commit().finished_work(),
+        source_handoff_order: handoff.pending().handoff_order(),
+        commit_order: handoff.commit_order(),
+        mutation,
+        payload,
+        status,
+        applied_host_call_count: apply.applied_host_call_count(),
+        private_host_store_update_count: apply.private_host_store_update_count(),
+        blockers: TEST_HOST_ROOT_HOST_UPDATE_EXECUTION_BLOCKERS,
+    };
+
+    Ok(TestHostRootHostUpdateFinishedWorkExecutionForCanary {
+        pending_update,
+        finished_work_handoff: handoff,
+        committed_update,
+        diagnostic,
+    })
 }
 
 pub(crate) fn sync_flush_host_mutation_execution_request_for_canary(
@@ -3045,8 +3748,37 @@ pub(crate) fn execute_sync_flush_host_mutations_for_canary(
         );
     }
 
+    let execution_identity = host_work.sync_flush_host_mutation_execution_identity(request);
+    if host_work.has_consumed_sync_flush_host_mutation_execution(execution_identity) {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::ReplayedHostMutationExecution {
+                root: request.root(),
+                order: request.order(),
+                finished_work: request.finished_work(),
+            },
+        );
+    }
+
+    host_work.mark_sync_flush_host_mutation_execution_consumed(execution_identity);
+
     let apply =
         apply_test_host_root_commit_mutations_for_canary(store, host, record.commit(), host_work)?;
+    let deletion_cleanup_apply_count = if record
+        .commit()
+        .host_node_deletion_cleanup_log()
+        .records()
+        .is_empty()
+    {
+        0
+    } else {
+        apply_test_host_root_deletion_cleanup(
+            store,
+            host,
+            record.commit(),
+            host_work.detached_hosts_mut(),
+        )?
+        .applied_record_count()
+    };
 
     if apply.root() != request.root() {
         return Err(
@@ -3072,6 +3804,7 @@ pub(crate) fn execute_sync_flush_host_mutations_for_canary(
         applied_host_call_count: apply.applied_host_call_count(),
         private_host_store_update_count: apply.private_host_store_update_count(),
         recorded_only_count: apply.recorded_only_count(),
+        deletion_cleanup_apply_count,
     })
 }
 
@@ -3734,6 +4467,108 @@ fn apply_test_host_root_deletion_cleanup(
     })
 }
 
+pub(crate) fn preflight_test_host_root_deletion_apply_and_cleanup_for_canary(
+    store: &FiberRootStore<RecordingHost>,
+    commit: &HostRootCommitRecord,
+    host_work: &HostWorkResult,
+) -> Result<(), HostWorkError> {
+    let root = store.root(commit.root())?;
+    if root.current() != commit.current() {
+        return Err(HostWorkError::CommitCurrentMismatch {
+            root: commit.root(),
+            expected: commit.current(),
+            actual: root.current(),
+        });
+    }
+
+    let detached_hosts = host_work.detached_hosts();
+    for &mutation in commit.mutation_apply_log().records() {
+        if matches!(
+            mutation.kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromContainer
+                | HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent
+        ) {
+            owned_detached_host_child_for_apply_record(store, detached_hosts, mutation)?;
+        }
+    }
+
+    for &cleanup in commit.host_node_deletion_cleanup_log().records() {
+        preflight_test_host_root_deletion_cleanup_record(store, cleanup, detached_hosts)?;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn apply_test_host_root_deletion_cleanup_for_canary(
+    store: &FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    commit: &HostRootCommitRecord,
+    host_work: &mut HostWorkResult,
+) -> Result<TestHostRootDeletionCleanupApplyResult, HostWorkError> {
+    apply_test_host_root_deletion_cleanup(store, host, commit, host_work.detached_hosts_mut())
+}
+
+fn preflight_test_host_root_deletion_cleanup_record(
+    store: &FiberRootStore<RecordingHost>,
+    cleanup: HostRootDeletionCleanupRecord,
+    detached_hosts: &DetachedHostRecords,
+) -> Result<(), HostWorkError> {
+    if cleanup.state_node().is_none() {
+        return Ok(());
+    }
+
+    store.host_tokens().validate(
+        cleanup.token(),
+        cleanup.root(),
+        cleanup.fiber(),
+        cleanup.token_phase(),
+        cleanup.token_target(),
+    )?;
+
+    match cleanup.token_target() {
+        HostFiberTokenTarget::Instance => {
+            let metadata = detached_hosts.instance_metadata(cleanup.state_node())?;
+            validate_deletion_cleanup_metadata(cleanup, metadata)
+        }
+        HostFiberTokenTarget::TextInstance => {
+            let metadata = detached_hosts.text_metadata(cleanup.state_node())?;
+            validate_deletion_cleanup_metadata(cleanup, metadata)
+        }
+        HostFiberTokenTarget::HydratableInstance
+        | HostFiberTokenTarget::ActivityBoundary
+        | HostFiberTokenTarget::SuspenseBoundary => Ok(()),
+    }
+}
+
+fn validate_deletion_cleanup_metadata(
+    cleanup: HostRootDeletionCleanupRecord,
+    metadata: HostNodeMetadata,
+) -> Result<(), HostWorkError> {
+    let violation = if metadata.target() != cleanup.token_target() {
+        Some(HostNodeViolation::WrongTarget)
+    } else if metadata.root_id() != cleanup.root() {
+        Some(HostNodeViolation::WrongRoot)
+    } else if metadata.fiber_id() != cleanup.fiber() {
+        Some(HostNodeViolation::WrongFiber)
+    } else if !metadata.is_active() {
+        Some(HostNodeViolation::Stale)
+    } else {
+        None
+    };
+
+    if let Some(violation) = violation {
+        return Err(HostNodeValidationError::new(
+            cleanup.state_node(),
+            HostFiberTokenPhase::Deletion,
+            cleanup.token_target(),
+            violation,
+        )
+        .into());
+    }
+
+    Ok(())
+}
+
 fn apply_test_host_root_deletion_subtree_host_detachment_for_canary(
     store: &FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -3776,6 +4611,249 @@ fn apply_test_host_root_deletion_subtree_host_detachment_for_canary(
         plan,
         status: TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild),
     })
+}
+
+pub(crate) fn test_host_root_deletion_teardown_execution_request_for_canary(
+    handoff: &HostRootFinishedWorkCommitHandoffRecordForCanary,
+    request_order: usize,
+) -> Result<
+    TestHostRootDeletionTeardownExecutionRequestForCanary,
+    TestHostRootDeletionTeardownExecutionErrorForCanary,
+> {
+    if !handoff.proves_private_root_finished_work_commit_metadata_handoff() {
+        return Err(
+            TestHostRootDeletionTeardownExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root: handoff.commit().root(),
+                commit_order: handoff.commit_order(),
+                request_order,
+            },
+        );
+    }
+
+    let commit = handoff.commit();
+    let order_gate = commit.deletion_cleanup_order_gate_for_canary();
+    if commit.deletion_lists().is_empty()
+        || commit
+            .deletion_lists()
+            .iter()
+            .all(|list| list.deleted().is_empty())
+        || commit.host_node_deletion_cleanup_log().records().is_empty()
+        || order_gate.ref_cleanup_return_count() == 0
+        || order_gate.passive_destroy_count() == 0
+        || order_gate.host_node_cleanup_count() == 0
+    {
+        return Err(
+            TestHostRootDeletionTeardownExecutionErrorForCanary::MissingDeletionTeardownMetadata {
+                root: commit.root(),
+                finished_work: commit.finished_work(),
+            },
+        );
+    }
+
+    let host_detachment_plan = commit.deletion_subtree_host_detachment_plan_for_canary()?;
+    let request = TestHostRootDeletionTeardownExecutionRequestForCanary {
+        root: commit.root(),
+        source_handoff_order: handoff.pending().handoff_order(),
+        commit_order: handoff.commit_order(),
+        request_order,
+        previous_current: commit.previous_current(),
+        finished_work: commit.finished_work(),
+        committed_current: commit.current(),
+        finished_lanes: commit.finished_lanes(),
+        remaining_lanes: commit.remaining_lanes(),
+        pending_lanes: commit.pending_lanes(),
+        deletion_list_count: commit.deletion_lists().len(),
+        deleted_root_count: commit.deletion_lists()[0].deleted().len(),
+        ref_cleanup_return_count: order_gate.ref_cleanup_return_count(),
+        passive_destroy_count: order_gate.passive_destroy_count(),
+        host_node_cleanup_count: order_gate.host_node_cleanup_count(),
+        host_detachment_plan,
+    };
+    debug_assert!(request.matches_source_handoff(handoff));
+    debug_assert!(request.has_required_source_evidence());
+    Ok(request)
+}
+
+pub(crate) fn execute_test_host_root_deletion_teardown_after_commit_for_canary<E>(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    handoff: &HostRootFinishedWorkCommitHandoffRecordForCanary,
+    source_request: TestHostRootDeletionTeardownExecutionRequestForCanary,
+    request: TestHostRootDeletionTeardownExecutionRequestForCanary,
+    detached_hosts: &mut DetachedHostRecords,
+    executor: &mut E,
+) -> Result<
+    TestHostRootDeletionTeardownExecutionDiagnosticForCanary,
+    TestHostRootDeletionTeardownExecutionErrorForCanary,
+>
+where
+    E: DeletedSubtreeRefCleanupReturnExecutor + PassiveEffectDestroyCallbackExecutor,
+{
+    let commit = handoff.commit();
+    if commit.root() != source_request.root() {
+        return Err(
+            TestHostRootDeletionTeardownExecutionErrorForCanary::MismatchedRootOwnership {
+                expected_root: source_request.root(),
+                actual_root: commit.root(),
+            },
+        );
+    }
+
+    if commit.finished_work() != source_request.finished_work() {
+        return Err(
+            TestHostRootDeletionTeardownExecutionErrorForCanary::MismatchedFinishedWork {
+                root: source_request.root(),
+                expected_finished_work: source_request.finished_work(),
+                actual_finished_work: commit.finished_work(),
+            },
+        );
+    }
+
+    if source_request != request || !source_request.matches_source_handoff(handoff) {
+        return Err(
+            TestHostRootDeletionTeardownExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root: request.root(),
+                commit_order: request.commit_order(),
+                request_order: request.request_order(),
+            },
+        );
+    }
+
+    if !source_request.has_required_source_evidence() {
+        return Err(
+            TestHostRootDeletionTeardownExecutionErrorForCanary::MissingDeletionTeardownMetadata {
+                root: source_request.root(),
+                finished_work: source_request.finished_work(),
+            },
+        );
+    }
+
+    let root = store.root(request.root()).map_err(HostWorkError::from)?;
+    if root.current() != request.committed_current() {
+        return Err(HostWorkError::CommitCurrentMismatch {
+            root: request.root(),
+            expected: request.committed_current(),
+            actual: root.current(),
+        }
+        .into());
+    }
+
+    let ref_passive_cleanup =
+        execute_deleted_subtree_ref_and_passive_cleanup_after_commit_for_canary(
+            store, commit, executor,
+        )?;
+    let detach_apply = apply_test_host_root_deletion_subtree_host_detachment_for_canary(
+        store,
+        host,
+        commit,
+        detached_hosts,
+    )?;
+    let cleanup_apply = apply_test_host_root_deletion_cleanup(store, host, commit, detached_hosts)?;
+    let host_detachment_status = detach_apply.status();
+    let execution_snapshot =
+        materialize_test_host_root_deletion_ref_passive_cleanup_execution_from_private_cleanup_for_canary(
+            &ref_passive_cleanup,
+            &detach_apply,
+            &cleanup_apply,
+        );
+
+    Ok(TestHostRootDeletionTeardownExecutionDiagnosticForCanary {
+        request,
+        ref_passive_cleanup,
+        host_detachment_status,
+        execution_snapshot,
+    })
+}
+
+fn materialize_test_host_root_deletion_ref_passive_cleanup_execution_from_private_cleanup_for_canary(
+    ref_passive_cleanup: &DeletedSubtreeRefPassiveCleanupExecutionResult,
+    detach_apply: &TestHostRootDeletionSubtreeHostDetachmentApplyResult,
+    cleanup_apply: &TestHostRootDeletionCleanupApplyResult,
+) -> TestHostRootDeletionRefPassiveCleanupExecutionSnapshot {
+    let mut records = Vec::new();
+    let mut ref_cleanup_return_gate_count = 0;
+    let mut passive_destroy_execution_count = 0;
+
+    for cleanup_record in ref_passive_cleanup.records() {
+        match cleanup_record.phase() {
+            HostRootDeletionCleanupOrderPhase::RefCleanupReturn => {
+                if let Some(execution_order) = cleanup_record.ref_cleanup_return_execution_order() {
+                    ref_cleanup_return_gate_count += 1;
+                    records.push(TestHostRootDeletionRefPassiveCleanupExecutionRecord {
+                        sequence: records.len(),
+                        phase: TestHostRootDeletionRefPassiveCleanupExecutionPhase::RefCleanupReturnGate,
+                        fiber: cleanup_record.fiber(),
+                        deleted_root: cleanup_record.deleted_root(),
+                        ref_cleanup_return_sequence: Some(execution_order),
+                        passive_destroy_execution_order: None,
+                        host_detachment_cleanup_order_sequence: None,
+                        host_cleanup_sequence: None,
+                    });
+                }
+            }
+            HostRootDeletionCleanupOrderPhase::PassiveDestroy => {
+                if let Some(execution_order) = cleanup_record.passive_destroy_execution_order() {
+                    passive_destroy_execution_count += 1;
+                    records.push(TestHostRootDeletionRefPassiveCleanupExecutionRecord {
+                        sequence: records.len(),
+                        phase: TestHostRootDeletionRefPassiveCleanupExecutionPhase::PassiveDestroyCallback,
+                        fiber: cleanup_record.fiber(),
+                        deleted_root: cleanup_record.deleted_root(),
+                        ref_cleanup_return_sequence: None,
+                        passive_destroy_execution_order: Some(execution_order),
+                        host_detachment_cleanup_order_sequence: None,
+                        host_cleanup_sequence: None,
+                    });
+                }
+            }
+            HostRootDeletionCleanupOrderPhase::HostNodeCleanup => {}
+        }
+    }
+
+    let plan = detach_apply.plan();
+    let host_subtree_detachment_count = usize::from(matches!(
+        detach_apply.status(),
+        TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+    ));
+    if host_subtree_detachment_count == 1 {
+        records.push(TestHostRootDeletionRefPassiveCleanupExecutionRecord {
+            sequence: records.len(),
+            phase: TestHostRootDeletionRefPassiveCleanupExecutionPhase::HostSubtreeDetach,
+            fiber: plan.host_child(),
+            deleted_root: plan.deleted_root(),
+            ref_cleanup_return_sequence: None,
+            passive_destroy_execution_order: None,
+            host_detachment_cleanup_order_sequence: Some(plan.cleanup_order_sequence()),
+            host_cleanup_sequence: None,
+        });
+    }
+
+    for cleanup_record in cleanup_apply.records() {
+        if matches!(
+            cleanup_record.status(),
+            TestHostRootDeletionCleanupStatus::Applied(_)
+        ) {
+            let cleanup = cleanup_record.cleanup();
+            records.push(TestHostRootDeletionRefPassiveCleanupExecutionRecord {
+                sequence: records.len(),
+                phase: TestHostRootDeletionRefPassiveCleanupExecutionPhase::HostNodeCleanup,
+                fiber: cleanup.fiber(),
+                deleted_root: cleanup.deleted_root(),
+                ref_cleanup_return_sequence: None,
+                passive_destroy_execution_order: None,
+                host_detachment_cleanup_order_sequence: None,
+                host_cleanup_sequence: Some(cleanup.sequence()),
+            });
+        }
+    }
+
+    TestHostRootDeletionRefPassiveCleanupExecutionSnapshot {
+        records,
+        ref_cleanup_return_gate_count,
+        passive_destroy_execution_count,
+        host_subtree_detachment_count,
+        host_cleanup_apply_count: cleanup_apply.applied_record_count(),
+    }
 }
 
 fn materialize_test_host_root_deletion_ref_passive_cleanup_execution_for_canary(
@@ -4823,7 +5901,94 @@ pub(crate) fn mount_test_host_work(
         completed_child: root_child,
         completed_children: root_child.into_iter().collect(),
         detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
     })
+}
+
+pub(crate) fn update_test_host_work_root_text_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+    text: &TestHostText,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let current = host_work
+        .completed_child()
+        .ok_or(HostWorkError::MissingHostWorkRootChild {
+            root: host_work.root(),
+            work_in_progress: host_work.work_in_progress(),
+        })?;
+    expect_tag(store, current, FiberTag::HostText)?;
+
+    let diff = update_test_host_text_work(
+        store,
+        render.root(),
+        current,
+        text,
+        render.render_lanes(),
+        host_work.detached_hosts_mut(),
+    )?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[diff.work_in_progress()])?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, vec![diff.work_in_progress()]);
+    Ok(())
+}
+
+pub(crate) fn update_test_host_work_root_component_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+    element: &TestHostElement,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let current = host_work
+        .completed_child()
+        .ok_or(HostWorkError::MissingHostWorkRootChild {
+            root: host_work.root(),
+            work_in_progress: host_work.work_in_progress(),
+        })?;
+    expect_tag(store, current, FiberTag::HostComponent)?;
+
+    let payload = update_test_host_component_work(
+        store,
+        render.root(),
+        current,
+        element,
+        render.render_lanes(),
+        host_work.detached_hosts_mut(),
+    )?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[payload.work_in_progress()])?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, vec![payload.work_in_progress()]);
+    Ok(())
+}
+
+pub(crate) fn delete_test_host_work_root_child_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let deleted = host_work
+        .completed_child()
+        .ok_or(HostWorkError::MissingHostWorkRootChild {
+            root: host_work.root(),
+            work_in_progress: host_work.work_in_progress(),
+        })?;
+    store
+        .fiber_arena_mut()
+        .mark_child_for_deletion(render.work_in_progress(), deleted)?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[])?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, Vec::new());
+    Ok(())
 }
 
 pub(crate) fn mount_test_host_sibling_work(
@@ -4904,6 +6069,8 @@ pub(crate) fn mount_test_host_sibling_work_with_detached_hosts_for_canary(
         completed_child: root_child,
         completed_children: root_children,
         detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
     })
 }
 
@@ -4957,6 +6124,8 @@ pub(crate) fn mount_test_function_component_single_host_child_work(
         completed_child: Some(host_child),
         completed_children: vec![host_child],
         detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
     })
 }
 
@@ -5034,6 +6203,8 @@ pub(crate) fn update_test_host_root_work_with_detached_hosts_for_canary(
         completed_child: Some(completed_child),
         completed_children: vec![completed_child],
         detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
     })
 }
 
@@ -5120,6 +6291,8 @@ pub(crate) fn update_test_host_root_component_with_text_child_work_with_detached
         completed_child: Some(payload.work_in_progress()),
         completed_children: vec![payload.work_in_progress(), diff.work_in_progress()],
         detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
     })
 }
 

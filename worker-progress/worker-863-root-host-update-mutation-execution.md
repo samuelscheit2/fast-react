@@ -108,6 +108,50 @@ git diff --check
 - `cargo fmt --all --check`: passed.
 - `git diff --check`: passed.
 
+## Integration Follow-Up - Local Main Merge
+
+Merged current local `main` (`5d352f904473449ed8deb34da05281de6b5d4200`)
+into the worker branch and resolved conflicts in `host_work.rs` and
+`root_work_loop.rs`.
+
+The resolution preserves Worker 864's `HostWorkResult` sync-flush execution
+identity fields and replay guard, while keeping this worker's consumed
+HostComponent/HostText update payload guard before root update host calls. The
+root-update `HostWorkResult` constructors now initialize the sync-flush replay
+identity state from main.
+
+The resolution also keeps Worker 866's function-component update host execution
+helpers/tests and Worker 867's deletion teardown evidence gates. The
+root-work-loop test conflict was resolved by retaining both main's
+function-component update rejection canaries and this worker's five
+root-level HostComponent/HostText update canaries.
+
+### Integration Commands Run
+
+```sh
+git merge main --no-edit
+cargo fmt --all
+cargo test -p fast-react-reconciler --all-features root_work_loop_host_update
+cargo test -p fast-react-reconciler --all-features host_work_host_text_update
+cargo test -p fast-react-reconciler --all-features root_commit_host_component_update
+cargo test -p fast-react-reconciler --all-features host_work_host_component_update
+cargo test -p fast-react-reconciler --all-features sync_flush_private_host_mutation_execution
+cargo check -p fast-react-reconciler --all-features
+cargo fmt --all --check
+git diff --check
+```
+
+### Integration Verification Results
+
+- `root_work_loop_host_update`: passed, 5 tests.
+- `host_work_host_text_update`: passed, 3 tests.
+- `root_commit_host_component_update`: passed, 1 test.
+- `host_work_host_component_update`: passed, 4 tests.
+- `sync_flush_private_host_mutation_execution`: passed, 7 tests.
+- `cargo check -p fast-react-reconciler --all-features`: passed.
+- `cargo fmt --all --check`: passed.
+- `git diff --check`: passed.
+
 ## Risks Or Blockers
 
 - The execution remains private test-host canary code only.
