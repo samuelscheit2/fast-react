@@ -226,7 +226,7 @@ function createPrivateActQueueFlushDiagnostics(
         return sourceDiagnostics.drainExpiredMockSchedulerWork();
       }
       if (
-        isDelayedActRootWorkMetadataObject(lanePriorityRootSchedulerMetadata)
+        isDelayedActRootWorkMetadataCandidate(lanePriorityRootSchedulerMetadata)
       ) {
         return drainDelayedMockSchedulerWorkWithActRootMetadataForDiagnostics(
           sourceScheduler,
@@ -236,7 +236,7 @@ function createPrivateActQueueFlushDiagnostics(
         );
       }
       if (
-        isExpiredActRootWorkMetadataObject(lanePriorityRootSchedulerMetadata)
+        isExpiredActRootWorkMetadataCandidate(lanePriorityRootSchedulerMetadata)
       ) {
         return drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
           sourceScheduler,
@@ -417,7 +417,7 @@ function wrapSchedulerFunction(
     wrappedFunction = function (privateMetadata) {
       if (
         arguments.length > 0 &&
-        isDelayedActRootWorkMetadataObject(privateMetadata)
+        isDelayedActRootWorkMetadataCandidate(privateMetadata)
       ) {
         return drainDelayedMockSchedulerWorkWithActRootMetadataForDiagnostics(
           sourceScheduler,
@@ -431,7 +431,7 @@ function wrapSchedulerFunction(
       }
       if (
         arguments.length > 0 &&
-        isExpiredActRootWorkMetadataObject(privateMetadata)
+        isExpiredActRootWorkMetadataCandidate(privateMetadata)
       ) {
         return drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
           sourceScheduler,
@@ -831,9 +831,11 @@ function validateExpiredLanePriorityRootSchedulerMetadata(
     return invalid('metadata-not-object');
   }
   if (
-    lanePriorityRootSchedulerMetadata[
-      privateSchedulerMockExpiredLaneFlushMetadataBrand
-    ] !== true
+    !hasOwnLockedDataProperty(
+      lanePriorityRootSchedulerMetadata,
+      privateSchedulerMockExpiredLaneFlushMetadataBrand,
+      true
+    )
   ) {
     return invalid('metadata-missing-internal-brand');
   }
@@ -1980,9 +1982,11 @@ function validateDelayedRendererRootWorkMetadata(
     return invalid('renderer-root-metadata-not-object');
   }
   if (
-    rendererRootMetadata[
-      privateSchedulerMockDelayedRendererRootWorkMetadataBrand
-    ] !== true
+    !hasOwnLockedDataProperty(
+      rendererRootMetadata,
+      privateSchedulerMockDelayedRendererRootWorkMetadataBrand,
+      true
+    )
   ) {
     return invalid('renderer-root-metadata-missing-internal-brand');
   }
@@ -3497,7 +3501,19 @@ function getRejectedDelayedRendererRootProducerSourceReason(
 function isDelayedActRootWorkMetadataObject(value) {
   return (
     isObjectLike(value) &&
-    value[privateSchedulerMockDelayedActRootWorkMetadataBrand] === true
+    hasOwnLockedDataProperty(
+      value,
+      privateSchedulerMockDelayedActRootWorkMetadataBrand,
+      true
+    )
+  );
+}
+
+function isDelayedActRootWorkMetadataCandidate(value) {
+  return (
+    isDelayedActRootWorkMetadataObject(value) ||
+    (isObjectLike(value) &&
+      value.kind === privateSchedulerMockDelayedActRootWorkMetadataKind)
   );
 }
 
@@ -3942,7 +3958,13 @@ function validateExpiredActRootWorkMetadata(
   if (typeof taskRecord.task.callback !== 'function') {
     return invalid('callback-handle-not-function');
   }
-  if (taskRecord.task.callback[privateActQueueTestCallbackBrand] !== true) {
+  if (
+    !hasOwnLockedDataProperty(
+      taskRecord.task.callback,
+      privateActQueueTestCallbackBrand,
+      true
+    )
+  ) {
     return invalid('callback-handle-not-branded-internal-test-callback');
   }
 
@@ -3999,7 +4021,19 @@ function validateExpiredActRootWorkMetadata(
 function isExpiredActRootWorkMetadataObject(value) {
   return (
     isObjectLike(value) &&
-    value[privateSchedulerMockExpiredActRootWorkMetadataBrand] === true
+    hasOwnLockedDataProperty(
+      value,
+      privateSchedulerMockExpiredActRootWorkMetadataBrand,
+      true
+    )
+  );
+}
+
+function isExpiredActRootWorkMetadataCandidate(value) {
+  return (
+    isExpiredActRootWorkMetadataObject(value) ||
+    (isObjectLike(value) &&
+      value.kind === privateSchedulerMockExpiredActRootWorkMetadataKind)
   );
 }
 
@@ -4093,7 +4127,7 @@ function validateExpiredActRootWorkActQueue(queue) {
   if (!isObjectLike(queue)) {
     return invalid('act-queue-not-object');
   }
-  if (queue[privateActQueueTestQueueBrand] !== true) {
+  if (!hasOwnLockedDataProperty(queue, privateActQueueTestQueueBrand, true)) {
     return invalid('act-queue-missing-internal-brand');
   }
   if (queue.kind !== privateActQueueTestQueueKind) {
@@ -4160,7 +4194,7 @@ function getRejectedExpiredActRootWorkActTaskReason(task, index) {
   if (!isObjectLike(task)) {
     return 'act-record-' + index + '-not-object';
   }
-  if (task[privateActQueueTestTaskBrand] !== true) {
+  if (!hasOwnLockedDataProperty(task, privateActQueueTestTaskBrand, true)) {
     return 'act-record-' + index + '-missing-internal-brand';
   }
   if (task.kind !== privateActQueueTestTaskKind) {
@@ -4233,7 +4267,13 @@ function getRejectedExpiredActRootWorkCallbackReason(callback, role) {
   if (typeof callback !== 'function') {
     return role + '-not-function';
   }
-  if (callback[privateActQueueTestCallbackBrand] !== true) {
+  if (
+    !hasOwnLockedDataProperty(
+      callback,
+      privateActQueueTestCallbackBrand,
+      true
+    )
+  ) {
     return role + '-not-branded-internal-test-callback';
   }
   if (callback.kind !== privateActQueueTestCallbackKind) {
@@ -5281,7 +5321,13 @@ function summarizeMockSchedulerCallback(callback) {
     });
   }
   if (typeof callback === 'function') {
-    if (callback[privateActQueueTestCallbackBrand] === true) {
+    if (
+      hasOwnLockedDataProperty(
+        callback,
+        privateActQueueTestCallbackBrand,
+        true
+      )
+    ) {
       return Object.freeze({
         status: 'branded-internal-test-callback',
         kind: callback.kind,
@@ -5327,6 +5373,17 @@ function isObjectLike(value) {
   return (
     (typeof value === 'object' && value !== null) ||
     typeof value === 'function'
+  );
+}
+
+function hasOwnLockedDataProperty(value, key, expectedValue) {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return (
+    descriptor !== undefined &&
+    descriptor.configurable === false &&
+    descriptor.enumerable === false &&
+    descriptor.writable === false &&
+    descriptor.value === expectedValue
   );
 }
 

@@ -1703,6 +1703,38 @@ test('scheduler mock rejects unsupported delayed act/root metadata', () => {
       'metadata-not-produced-by-private-delayed-root-producer',
       nodeEnv
     );
+    for (const { label, metadata } of [
+      {
+        label: 'inherited-delayed-act-root-metadata',
+        metadata: Object.freeze(Object.create(producedMetadata))
+      },
+      {
+        label: 'delayed-act-root-metadata-with-inherited-brand',
+        metadata: cloneWithInheritedBrand(
+          producedMetadata,
+          delayedActRootWorkMetadataBrand
+        )
+      },
+      {
+        label: 'delayed-act-root-metadata-with-tampered-brand-descriptor',
+        metadata: cloneWithTamperedBrandDescriptor(
+          producedMetadata,
+          delayedActRootWorkMetadataBrand
+        )
+      }
+    ]) {
+      assertDelayedDescriptionRejection(
+        diagnostics,
+        metadata,
+        'metadata-missing-internal-brand',
+        `${nodeEnv}:${label}`
+      );
+      assertDelayedActRootWorkRejection(
+        () => Scheduler.unstable_flushExpired(metadata),
+        'metadata-missing-internal-brand',
+        `${nodeEnv}:${label}`
+      );
+    }
     assert.equal(Scheduler.unstable_now(), 0, nodeEnv);
     assert.equal(producerExpiredMetadata.rootWorkRecords.length, 2, nodeEnv);
     const rendererSourceMetadata =
@@ -1729,6 +1761,35 @@ test('scheduler mock rejects unsupported delayed act/root metadata', () => {
       'renderer-root-metadata-source-proof',
       nodeEnv
     );
+    for (const { label, metadata } of [
+      {
+        label: 'inherited-delayed-renderer-root-source-metadata',
+        metadata: Object.freeze(Object.create(rendererSourceMetadata))
+      },
+      {
+        label: 'delayed-renderer-root-source-with-inherited-brand',
+        metadata: cloneWithInheritedBrand(
+          rendererSourceMetadata,
+          delayedRendererRootWorkMetadataBrand
+        )
+      },
+      {
+        label: 'delayed-renderer-root-source-with-tampered-brand-descriptor',
+        metadata: cloneWithTamperedBrandDescriptor(
+          rendererSourceMetadata,
+          delayedRendererRootWorkMetadataBrand
+        )
+      }
+    ]) {
+      assertDelayedActRootWorkRejection(
+        () =>
+          diagnostics.createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics(
+            metadata
+          ),
+        'renderer-root-metadata-missing-internal-brand',
+        `${nodeEnv}:${label}`
+      );
+    }
     const rendererProducedMetadata =
       diagnostics.createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics(
         rendererSourceMetadata
@@ -1746,6 +1807,39 @@ test('scheduler mock rejects unsupported delayed act/root metadata', () => {
       'metadata-not-produced-by-private-delayed-root-producer',
       nodeEnv
     );
+    for (const { label, metadata } of [
+      {
+        label: 'inherited-renderer-produced-delayed-act-root-metadata',
+        metadata: Object.freeze(Object.create(rendererProducedMetadata))
+      },
+      {
+        label: 'renderer-produced-delayed-act-root-with-inherited-brand',
+        metadata: cloneWithInheritedBrand(
+          rendererProducedMetadata,
+          delayedActRootWorkMetadataBrand
+        )
+      },
+      {
+        label:
+          'renderer-produced-delayed-act-root-with-tampered-brand-descriptor',
+        metadata: cloneWithTamperedBrandDescriptor(
+          rendererProducedMetadata,
+          delayedActRootWorkMetadataBrand
+        )
+      }
+    ]) {
+      assertDelayedDescriptionRejection(
+        diagnostics,
+        metadata,
+        'metadata-missing-internal-brand',
+        `${nodeEnv}:${label}`
+      );
+      assertDelayedActRootWorkRejection(
+        () => Scheduler.unstable_flushExpired(metadata),
+        'metadata-missing-internal-brand',
+        `${nodeEnv}:${label}`
+      );
+    }
 
     Scheduler.reset();
   }
@@ -1951,6 +2045,30 @@ function cloneDelayedRendererRootWorkMetadata(metadata) {
     writable: false
   });
   return Object.freeze(clone);
+}
+
+function cloneWithInheritedBrand(value, brand) {
+  const clone = { ...value };
+  const prototype = {};
+  Object.defineProperty(prototype, brand, {
+    configurable: false,
+    enumerable: false,
+    value: true,
+    writable: false
+  });
+  Object.setPrototypeOf(clone, prototype);
+  return Object.freeze(clone);
+}
+
+function cloneWithTamperedBrandDescriptor(value, brand) {
+  const clone = { ...value };
+  Object.defineProperty(clone, brand, {
+    configurable: true,
+    enumerable: true,
+    value: true,
+    writable: true
+  });
+  return clone;
 }
 
 function createAcceptedRootWorkRecord(recordKind, overrides = {}) {

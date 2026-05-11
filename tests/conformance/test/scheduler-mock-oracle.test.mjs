@@ -41,6 +41,15 @@ const schedulerMockWorkspaceEntrypoints = [
 ];
 const privateActDispatcherGateModule =
   "packages/react/private-act-dispatcher-gate.js";
+const privateActQueueTestQueueBrand = Symbol.for(
+  "fast-react.react.private-act-queue-test-queue"
+);
+const privateActQueueTestTaskBrand = Symbol.for(
+  "fast-react.react.private-act-queue-test-task"
+);
+const privateActQueueTestCallbackBrand = Symbol.for(
+  "fast-react.react.private-act-queue-test-callback"
+);
 const privateSchedulerMockExpiredWorkMetadataKind =
   "fast-react.scheduler.mock-expired-work-diagnostics";
 const privateSchedulerMockExpiredWorkMetadataBrand = Symbol.for(
@@ -63,6 +72,9 @@ const privateSchedulerMockExpiredActRootWorkDiagnosticsBrand = Symbol.for(
 );
 const privateSchedulerMockExpiredActRootWorkSourceProof = Symbol.for(
   "fast-react.scheduler.mock-expired-act-root-work-source-proof"
+);
+const privateSchedulerMockExpiredActRootWorkSourceValidatorAlias = Symbol.for(
+  "fast-react.scheduler.mock-expired-act-root-work-source-validator"
 );
 
 const EXPECTED_MOCK_EXPORT_KEYS = [
@@ -359,6 +371,11 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
       Scheduler
     );
     assertPrivateActQueueFlushDiagnostics(diagnostics, nodeEnv);
+    assertSchedulerMockPrivateDiagnosticsHelperDescriptors(
+      Scheduler,
+      diagnostics,
+      { nodeEnv, frozenHelpers: true }
+    );
 
     for (const [key] of REACT_TEST_RENDERER_SCHEDULER_FLUSH_HELPER_METADATA) {
       assert.equal(
@@ -377,6 +394,16 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
         `${nodeEnv}:${key}`
       );
     }
+
+    const SchedulerCjs = loadFreshSchedulerMockCjs(nodeEnv);
+    const cjsDiagnostics = readSchedulerMockPrivateActQueueFlushDiagnostics(
+      SchedulerCjs
+    );
+    assertSchedulerMockPrivateDiagnosticsHelperDescriptors(
+      SchedulerCjs,
+      cjsDiagnostics,
+      { nodeEnv: `${nodeEnv}:cjs`, frozenHelpers: false }
+    );
 
     Scheduler.reset();
     const scheduledEvents = [];
@@ -667,6 +694,97 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
       nodeEnv
     );
     assert.equal(unbrandedContinuationInvoked, false, nodeEnv);
+
+    const acceptedInheritedBrandQueue =
+      reactGate.createInternalActQueueTestQueue([
+        reactGate.createInternalActQueueTestTask({
+          label: "inherited-brand-queue-record",
+          recordKind: "SchedulerActQueueRequest",
+          taskKind: "RootSchedule"
+        })
+      ]);
+    assertPrivateActQueueFlushRejection(
+      diagnostics,
+      Object.freeze(Object.create(acceptedInheritedBrandQueue)),
+      "queue-missing-internal-brand",
+      `${nodeEnv}:inherited-queue`
+    );
+    assertPrivateActQueueFlushRejection(
+      diagnostics,
+      cloneWithInheritedBrand(
+        acceptedInheritedBrandQueue,
+        privateActQueueTestQueueBrand
+      ),
+      "queue-missing-internal-brand",
+      `${nodeEnv}:queue-with-inherited-brand`
+    );
+    assertPrivateActQueueFlushRejection(
+      diagnostics,
+      cloneWithTamperedBrandDescriptor(
+        acceptedInheritedBrandQueue,
+        privateActQueueTestQueueBrand
+      ),
+      "queue-missing-internal-brand",
+      `${nodeEnv}:queue-with-tampered-brand-descriptor`
+    );
+
+    const acceptedInheritedBrandTask = reactGate.createInternalActQueueTestTask({
+      label: "inherited-brand-task",
+      recordKind: "SchedulerActQueueRequest",
+      taskKind: "RootSchedule"
+    });
+    const queueWithInheritedTask = reactGate.createInternalActQueueTestQueue([]);
+    queueWithInheritedTask.records.push(
+      Object.freeze(Object.create(acceptedInheritedBrandTask))
+    );
+    assertPrivateActQueueFlushRejection(
+      diagnostics,
+      queueWithInheritedTask,
+      "record-0-missing-internal-brand",
+      `${nodeEnv}:queue-with-inherited-task`
+    );
+    const queueWithInheritedTaskBrand =
+      reactGate.createInternalActQueueTestQueue([]);
+    queueWithInheritedTaskBrand.records.push(
+      cloneWithInheritedBrand(
+        acceptedInheritedBrandTask,
+        privateActQueueTestTaskBrand
+      )
+    );
+    assertPrivateActQueueFlushRejection(
+      diagnostics,
+      queueWithInheritedTaskBrand,
+      "record-0-missing-internal-brand",
+      `${nodeEnv}:queue-with-inherited-task-brand`
+    );
+
+    const acceptedInheritedBrandCallback =
+      reactGate.createInternalActQueueTestCallback(() => {
+        throw new Error("inherited private callback brand should not run");
+      }, "inherited-brand-callback");
+    const callbackWithInheritedBrand = function () {
+      throw new Error("inherited private callback brand should not run");
+    };
+    Object.setPrototypeOf(
+      callbackWithInheritedBrand,
+      acceptedInheritedBrandCallback
+    );
+    Object.freeze(callbackWithInheritedBrand);
+    const queueWithInheritedCallback =
+      reactGate.createInternalActQueueTestQueue([
+        reactGate.createInternalActQueueTestTask({
+          label: "inherited-brand-callback-task",
+          recordKind: "SchedulerActQueueRequest",
+          taskKind: "SchedulerCallback",
+          callback: callbackWithInheritedBrand
+        })
+      ]);
+    assertPrivateActQueueFlushRejection(
+      diagnostics,
+      queueWithInheritedCallback,
+      "record-0-callback-missing-internal-brand",
+      `${nodeEnv}:queue-with-inherited-callback-brand`
+    );
 
     assert.equal(Scheduler.unstable_flushAllWithoutAsserting(), true, nodeEnv);
     assert.deepEqual(scheduledEvents, ["mock-scheduler-callback"], nodeEnv);
@@ -1750,6 +1868,64 @@ test("scheduler mock private act/root work handoff rejects unbranded callbacks a
       brandedCallback
     );
     Scheduler.unstable_advanceTime(251);
+    for (const { label, metadata, reason } of [
+      {
+        label: "expired-inherited-metadata",
+        metadata: Object.freeze(
+          Object.create(
+            createExpiredActRootWorkMetadata(
+              Scheduler,
+              brandedHandle,
+              createAcceptedActRootWorkQueue(reactGate)
+            )
+          )
+        ),
+        reason: "metadata-missing-internal-brand"
+      },
+      {
+        label: "expired-inherited-brand",
+        metadata: cloneWithInheritedBrand(
+          createExpiredActRootWorkMetadata(
+            Scheduler,
+            brandedHandle,
+            createAcceptedActRootWorkQueue(reactGate)
+          ),
+          privateSchedulerMockExpiredActRootWorkMetadataBrand
+        ),
+        reason: "metadata-missing-internal-brand"
+      },
+      {
+        label: "expired-tampered-brand-descriptor",
+        metadata: cloneWithTamperedBrandDescriptor(
+          createExpiredActRootWorkMetadata(
+            Scheduler,
+            brandedHandle,
+            createAcceptedActRootWorkQueue(reactGate)
+          ),
+          privateSchedulerMockExpiredActRootWorkMetadataBrand
+        ),
+        reason: "metadata-missing-internal-brand"
+      }
+    ]) {
+      const described =
+        diagnostics.describeExpiredActRootWorkMetadataForDiagnostics(
+          metadata
+        );
+      assert.equal(described.accepted, false, `${nodeEnv}:${label}`);
+      assert.equal(
+        described.rejectionReason,
+        reason,
+        `${nodeEnv}:${label}`
+      );
+      assertExpiredActRootWorkRejection(
+        () =>
+          diagnostics.drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
+            metadata
+          ),
+        reason,
+        `${nodeEnv}:${label}`
+      );
+    }
     for (const { label, overrides, reason } of [
       {
         label: "expired-public-scheduler-timing-claim",
@@ -2797,6 +2973,14 @@ function loadFreshSchedulerMock(nodeEnv) {
   }
 }
 
+function loadFreshSchedulerMockCjs(nodeEnv) {
+  const cjsEntrypoint =
+    nodeEnv === "production"
+      ? "packages/scheduler/cjs/scheduler-unstable_mock.production.js"
+      : "packages/scheduler/cjs/scheduler-unstable_mock.development.js";
+  return loadFreshWorkspaceModule(cjsEntrypoint);
+}
+
 function createAcceptedActRootWorkQueue(reactGate) {
   return reactGate.createInternalActQueueTestQueue([
     reactGate.createInternalActQueueTestTask({
@@ -2913,6 +3097,110 @@ function assertExpiredActRootWorkRejection(fn, expectedReason, label) {
   );
 }
 
+function assertPrivateActQueueFlushRejection(
+  diagnostics,
+  queue,
+  expectedReason,
+  label
+) {
+  const described = diagnostics.describeAcceptedInternalActQueue(queue);
+  assert.equal(described.accepted, false, label);
+  assert.equal(described.rejectionReason, expectedReason, label);
+  assert.throws(
+    () => diagnostics.drainAcceptedInternalActQueue(queue),
+    (error) => {
+      assert.equal(error.name, "FastReactSchedulerPrivateActQueueFlushError");
+      assert.equal(
+        error.code,
+        "FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_REJECTED"
+      );
+      assert.equal(error.entrypoint, "scheduler/unstable_mock");
+      assert.equal(error.compatibilityTarget, "scheduler@0.27.0");
+      assert.equal(error.publicSchedulerTimingCompatibilityClaimed, false);
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      assert.match(error.message, new RegExp(expectedReason, "u"));
+      return true;
+    },
+    label
+  );
+}
+
+function assertSchedulerMockPrivateDiagnosticsHelperDescriptors(
+  Scheduler,
+  diagnostics,
+  { nodeEnv, frozenHelpers }
+) {
+  for (const [key] of REACT_TEST_RENDERER_SCHEDULER_FLUSH_HELPER_METADATA) {
+    const helper = Scheduler[key];
+    const descriptor = Object.getOwnPropertyDescriptor(
+      helper,
+      SCHEDULER_MOCK_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT
+    );
+    assert.equal(descriptor?.value, diagnostics, `${nodeEnv}:${key}`);
+    assert.equal(descriptor.configurable, false, `${nodeEnv}:${key}`);
+    assert.equal(descriptor.enumerable, false, `${nodeEnv}:${key}`);
+    assert.equal(descriptor.writable, false, `${nodeEnv}:${key}`);
+    assert.equal(Object.isFrozen(diagnostics), true, `${nodeEnv}:${key}`);
+    assert.deepEqual(
+      Object.getOwnPropertySymbols(helper),
+      [],
+      `${nodeEnv}:${key}`
+    );
+    assert.equal(
+      Object.hasOwn(helper, "schedulerMockExpiredActRootWorkSourceValidator"),
+      false,
+      `${nodeEnv}:${key}`
+    );
+    assert.equal(
+      Object.hasOwn(helper, "isSchedulerMockExpiredActRootWorkSource"),
+      false,
+      `${nodeEnv}:${key}`
+    );
+    assert.equal(
+      Object.hasOwn(
+        helper,
+        privateSchedulerMockExpiredActRootWorkSourceValidatorAlias
+      ),
+      false,
+      `${nodeEnv}:${key}`
+    );
+    assert.equal(
+      Object.hasOwn(helper, privateSchedulerMockExpiredActRootWorkSourceProof),
+      false,
+      `${nodeEnv}:${key}`
+    );
+    assert.equal(
+      Object.hasOwn(
+        helper,
+        privateSchedulerMockExpiredActRootWorkDiagnosticsBrand
+      ),
+      false,
+      `${nodeEnv}:${key}`
+    );
+    assert.equal(
+      Object.hasOwn(helper, privateSchedulerMockExpiredActRootWorkMetadataBrand),
+      false,
+      `${nodeEnv}:${key}`
+    );
+    if (frozenHelpers) {
+      assert.equal(
+        Reflect.defineProperty(
+          helper,
+          privateSchedulerMockExpiredActRootWorkSourceValidatorAlias,
+          {
+            configurable: false,
+            enumerable: false,
+            value: diagnostics.schedulerMockExpiredActRootWorkSourceValidator,
+            writable: false
+          }
+        ),
+        false,
+        `${nodeEnv}:${key}`
+      );
+    }
+  }
+}
+
 function assertSchedulerMockSourceValidatorRejectsForgedSources(
   sourceValidator,
   flushHelper,
@@ -2927,6 +3215,13 @@ function assertSchedulerMockSourceValidatorRejectsForgedSources(
   assert.equal(
     sourceValidator.isSchedulerMockExpiredActRootWorkSource(
       Object.freeze({ ...acceptedSource })
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    sourceValidator.isSchedulerMockExpiredActRootWorkSource(
+      Object.freeze(Object.create(acceptedSource))
     ),
     false,
     label
@@ -2965,6 +3260,30 @@ function assertSchedulerMockSourceValidatorRejectsForgedSources(
     false,
     label
   );
+}
+
+function cloneWithInheritedBrand(value, brand) {
+  const clone = { ...value };
+  const prototype = {};
+  Object.defineProperty(prototype, brand, {
+    configurable: false,
+    enumerable: false,
+    value: true,
+    writable: false
+  });
+  Object.setPrototypeOf(clone, prototype);
+  return Object.freeze(clone);
+}
+
+function cloneWithTamperedBrandDescriptor(value, brand) {
+  const clone = { ...value };
+  Object.defineProperty(clone, brand, {
+    configurable: true,
+    enumerable: true,
+    value: true,
+    writable: true
+  });
+  return clone;
 }
 
 function createFakeSchedulerMockExpiredActRootWorkSourceValidator() {

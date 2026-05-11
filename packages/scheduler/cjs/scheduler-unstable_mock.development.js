@@ -268,6 +268,17 @@ function isObjectLike(value) {
   );
 }
 
+function hasOwnLockedDataProperty(value, key, expectedValue) {
+  var descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return (
+    descriptor !== undefined &&
+    descriptor.configurable === false &&
+    descriptor.enumerable === false &&
+    descriptor.writable === false &&
+    descriptor.value === expectedValue
+  );
+}
+
 function includesString(value, expectedValues) {
   return typeof value === 'string' && expectedValues.indexOf(value) !== -1;
 }
@@ -279,7 +290,13 @@ function getRejectedPrivateActQueueCallbackReason(callback, index, role) {
   if (typeof callback !== 'function') {
     return 'record-' + index + '-' + role + '-not-function';
   }
-  if (callback[privateActQueueTestCallbackBrand] !== true) {
+  if (
+    !hasOwnLockedDataProperty(
+      callback,
+      privateActQueueTestCallbackBrand,
+      true
+    )
+  ) {
     return 'record-' + index + '-' + role + '-missing-internal-brand';
   }
   if (callback.kind !== privateActQueueTestCallbackKind) {
@@ -317,7 +334,7 @@ function getRejectedPrivateActQueueTaskReason(task, index) {
   if (!isObjectLike(task)) {
     return 'record-' + index + '-not-object';
   }
-  if (task[privateActQueueTestTaskBrand] !== true) {
+  if (!hasOwnLockedDataProperty(task, privateActQueueTestTaskBrand, true)) {
     return 'record-' + index + '-missing-internal-brand';
   }
   if (task.kind !== privateActQueueTestTaskKind) {
@@ -374,7 +391,7 @@ function getRejectedPrivateActQueueReason(queue) {
   if (!isObjectLike(queue)) {
     return 'queue-not-object';
   }
-  if (queue[privateActQueueTestQueueBrand] !== true) {
+  if (!hasOwnLockedDataProperty(queue, privateActQueueTestQueueBrand, true)) {
     return 'queue-missing-internal-brand';
   }
   if (queue.kind !== privateActQueueTestQueueKind) {
@@ -494,7 +511,13 @@ function summarizeMockSchedulerCallback(callback) {
     });
   }
   if (typeof callback === 'function') {
-    if (callback[privateActQueueTestCallbackBrand] === true) {
+    if (
+      hasOwnLockedDataProperty(
+        callback,
+        privateActQueueTestCallbackBrand,
+        true
+      )
+    ) {
       return Object.freeze({
         status: 'branded-internal-test-callback',
         kind: callback.kind,
