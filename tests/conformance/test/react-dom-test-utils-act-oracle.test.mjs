@@ -2411,6 +2411,52 @@ test("Fast React test-utils private act route preflights Scheduler mock delayed 
   }
 });
 
+test("Fast React test-utils private act route rejects Scheduler-first source-proof cache hits", () => {
+  for (const nodeEnv of ["development", "production"]) {
+    const {
+      Scheduler: expiredScheduler,
+      report: expiredReport
+    } = createSchedulerMockExpiredActRootWorkDiagnostics(nodeEnv, {
+      schedulerFirstCacheHit: true
+    });
+    let gateModule = loadFreshCjs(fastReactDomTestUtilsActGatePath);
+
+    assert.equal(
+      expiredReport[privateSchedulerMockExpiredActRootWorkDiagnosticsBrand],
+      true,
+      nodeEnv
+    );
+    assertReactDomExpiredSchedulerDiagnosticsRejected(
+      gateModule,
+      expiredReport,
+      "scheduler-expired-act-root-diagnostics-metadata",
+      `${nodeEnv}:expired-scheduler-first-cache-hit`
+    );
+    expiredScheduler.reset();
+
+    const {
+      Scheduler: delayedScheduler,
+      report: delayedReport
+    } = createSchedulerMockDelayedRendererRootWorkDiagnostics(nodeEnv, {
+      schedulerFirstCacheHit: true
+    });
+    gateModule = loadFreshCjs(fastReactDomTestUtilsActGatePath);
+
+    assert.equal(
+      delayedReport[privateSchedulerMockDelayedActRootWorkDiagnosticsBrand],
+      true,
+      nodeEnv
+    );
+    assertReactDomDelayedSchedulerDiagnosticsRejected(
+      gateModule,
+      delayedReport,
+      "scheduler-delayed-act-root-diagnostics-metadata",
+      `${nodeEnv}:delayed-scheduler-first-cache-hit`
+    );
+    delayedScheduler.reset();
+  }
+});
+
 test("CommonJS descriptors are mutable while dynamic import namespace bindings reject writes", () => {
   const result = resultFor("default-node-development", "descriptor-mutability");
   assert.deepEqual(dataDescriptorFields(result.requireBefore.descriptor), {
@@ -2615,9 +2661,12 @@ function resultFor(modeId, scenarioId) {
   return observationFor(modeId, scenarioId).result;
 }
 
-function createSchedulerMockExpiredActRootWorkDiagnostics(nodeEnv) {
-  const Scheduler = loadFreshSchedulerMock(nodeEnv);
-  const reactGate = loadFreshCjs(fastReactPrivateActDispatcherGatePath);
+function createSchedulerMockExpiredActRootWorkDiagnostics(
+  nodeEnv,
+  options = {}
+) {
+  const { Scheduler, reactGate } =
+    loadSchedulerMockAndReactGateForSourceProof(nodeEnv, options);
 
   Scheduler.reset();
   const diagnostics =
@@ -2701,9 +2750,12 @@ function createSchedulerMockExpiredActRootWorkDiagnostics(nodeEnv) {
   };
 }
 
-function createSchedulerMockDelayedRendererRootWorkDiagnostics(nodeEnv) {
-  const Scheduler = loadFreshSchedulerMock(nodeEnv);
-  const reactGate = loadFreshCjs(fastReactPrivateActDispatcherGatePath);
+function createSchedulerMockDelayedRendererRootWorkDiagnostics(
+  nodeEnv,
+  options = {}
+) {
+  const { Scheduler, reactGate } =
+    loadSchedulerMockAndReactGateForSourceProof(nodeEnv, options);
   const diagnostics =
     Scheduler.unstable_flushExpired[privateActQueueFlushDiagnosticsExport];
 
@@ -3162,6 +3214,21 @@ function isObjectLikeForTest(value) {
     (typeof value === "object" && value !== null) ||
     typeof value === "function"
   );
+}
+
+function loadSchedulerMockAndReactGateForSourceProof(
+  nodeEnv,
+  { schedulerFirstCacheHit = false } = {}
+) {
+  if (schedulerFirstCacheHit) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const reactGate = loadFreshCjs(fastReactPrivateActDispatcherGatePath);
+    return { Scheduler, reactGate };
+  }
+
+  const reactGate = loadFreshCjs(fastReactPrivateActDispatcherGatePath);
+  const Scheduler = loadFreshSchedulerMock(nodeEnv);
+  return { Scheduler, reactGate };
 }
 
 function loadFreshSchedulerMock(nodeEnv) {
