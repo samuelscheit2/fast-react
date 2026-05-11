@@ -17,6 +17,12 @@ use fast_react_host_config::HostTypes;
 use crate::root_callbacks::{
     RootUpdateCallbackInvocationExecutionGateSnapshot, RootUpdateCallbackInvocationTestControl,
 };
+#[cfg(test)]
+use crate::root_commit::{
+    HostRootFinishedWorkCommitHandoffErrorForCanary,
+    HostRootFinishedWorkCommitHandoffRecordForCanary,
+    commit_completed_host_root_render_with_finished_work_handoff_for_canary,
+};
 use crate::{
     ConcurrentUpdateError, FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     RootElementHandle, RootUpdateCallbackHandle, RootUpdateCallbackVisibility, RootUpdatePayload,
@@ -1999,6 +2005,21 @@ fn validate_host_root_update_queue_lane_handoff_record_for_canary<H: HostTypes>(
             },
         );
     }
+    let pending_updates = store
+        .update_queues()
+        .pending_updates(handoff.current_update_queue)?;
+    if !pending_updates.is_empty() {
+        let mut actual_updates = current_queue_base_updates;
+        actual_updates.extend(pending_updates);
+        return Err(
+            HostRootUpdateQueueLaneHandoffErrorForCanary::QueueOrderMismatch {
+                root: handoff.root,
+                queue: handoff.current_update_queue,
+                expected_updates: handoff.current_queue_base_updates.clone(),
+                actual_updates,
+            },
+        );
+    }
 
     Ok(())
 }
@@ -2122,6 +2143,503 @@ fn validate_accepted_update_matches_render_source_for_handoff<H: HostTypes>(
                 actual_lanes,
             },
         );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
+    queue_handoff: HostRootUpdateQueueLaneHandoffRecordForCanary,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+    update_sequence_ids: Vec<UpdateId>,
+    selected_lanes: Lanes,
+    finished_lanes: Lanes,
+    remaining_lanes: Lanes,
+    applied_update_count: usize,
+    skipped_update_count: usize,
+    resulting_element: RootElementHandle,
+}
+
+#[cfg(test)]
+impl HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
+    #[must_use]
+    fn queue_handoff(&self) -> &HostRootUpdateQueueLaneHandoffRecordForCanary {
+        &self.queue_handoff
+    }
+
+    #[must_use]
+    const fn finished_work_handoff(&self) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        &self.finished_work_handoff
+    }
+
+    #[must_use]
+    const fn commit(&self) -> &HostRootCommitRecord {
+        self.finished_work_handoff.commit()
+    }
+
+    #[must_use]
+    fn update_sequence_ids(&self) -> &[UpdateId] {
+        &self.update_sequence_ids
+    }
+
+    #[must_use]
+    const fn selected_lanes(&self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    const fn finished_lanes(&self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    const fn remaining_lanes(&self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    const fn applied_update_count(&self) -> usize {
+        self.applied_update_count
+    }
+
+    #[must_use]
+    const fn skipped_update_count(&self) -> usize {
+        self.skipped_update_count
+    }
+
+    #[must_use]
+    const fn resulting_element(&self) -> RootElementHandle {
+        self.resulting_element
+    }
+
+    #[must_use]
+    fn proves_queue_lane_handoff_gated_current_switch(&self) -> bool {
+        self.queue_handoff.proves_source_owned_lane_handoff()
+            && self
+                .finished_work_handoff
+                .proves_private_root_finished_work_commit_metadata_handoff()
+            && self.update_sequence_ids == self.queue_handoff.update_sequence_ids()
+            && self.update_sequence_ids == self.queue_handoff.current_queue_base_updates()
+            && self.selected_lanes == self.queue_handoff.selected_next_lanes_before_render()
+            && self.finished_lanes == self.queue_handoff.finished_lanes()
+            && self.remaining_lanes == self.queue_handoff.remaining_lanes()
+            && self.applied_update_count == self.queue_handoff.applied_update_count()
+            && self.skipped_update_count == self.queue_handoff.skipped_update_count()
+            && self.resulting_element == self.queue_handoff.resulting_element()
+            && self.commit().root() == self.queue_handoff.root()
+            && self.commit().previous_current() == self.queue_handoff.current()
+            && self.commit().current() == self.queue_handoff.finished_work()
+            && self.commit().finished_work() == self.queue_handoff.finished_work()
+            && self.commit().finished_lanes() == self.queue_handoff.finished_lanes()
+            && self.commit().remaining_lanes() == self.queue_handoff.remaining_lanes()
+            && self.commit().pending_lanes() == self.queue_handoff.remaining_lanes()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary {
+    MissingQueueHandoff {
+        root: FiberRootId,
+        finished_work: FiberId,
+    },
+    QueueLane(HostRootUpdateQueueLaneHandoffErrorForCanary),
+    FinishedWork(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
+    QueueRootMismatch {
+        expected: FiberRootId,
+        actual: FiberRootId,
+    },
+    QueueFiberIdentityMismatch {
+        root: FiberRootId,
+        expected_current: FiberId,
+        actual_current: FiberId,
+        expected_finished_work: FiberId,
+        actual_finished_work: FiberId,
+    },
+    QueueHandleMismatch {
+        root: FiberRootId,
+        expected_current_queue: UpdateQueueHandle,
+        actual_current_queue: UpdateQueueHandle,
+        expected_work_in_progress_queue: UpdateQueueHandle,
+        actual_work_in_progress_queue: UpdateQueueHandle,
+    },
+    SelectedLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    FinishedLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    RemainingLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    AppliedSkippedCountMismatch {
+        root: FiberRootId,
+        expected_applied: usize,
+        actual_applied: usize,
+        expected_skipped: usize,
+        actual_skipped: usize,
+    },
+    ResultingElementMismatch {
+        root: FiberRootId,
+        expected: RootElementHandle,
+        actual: RootElementHandle,
+    },
+    QueueHandoffNotSourceOwned {
+        root: FiberRootId,
+        queue: UpdateQueueHandle,
+        expected_updates: Vec<UpdateId>,
+        actual_updates: Vec<UpdateId>,
+        records_in_sequence_order: bool,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingQueueHandoff {
+                root,
+                finished_work,
+            } => write!(
+                formatter,
+                "root {} cannot commit finished HostRoot work {} without source-owned queue/lane handoff evidence",
+                root.raw(),
+                finished_work.slot().get()
+            ),
+            Self::QueueLane(error) => Display::fmt(error, formatter),
+            Self::FinishedWork(error) => Display::fmt(error, formatter),
+            Self::QueueRootMismatch { expected, actual } => write!(
+                formatter,
+                "HostRoot queue/lane commit consumer expected root {}, got queue evidence for root {}",
+                expected.raw(),
+                actual.raw()
+            ),
+            Self::QueueFiberIdentityMismatch {
+                root,
+                expected_current,
+                actual_current,
+                expected_finished_work,
+                actual_finished_work,
+            } => write!(
+                formatter,
+                "root {} queue/lane commit consumer fiber identity mismatch current {}/{} finished {}/{}",
+                root.raw(),
+                actual_current.slot().get(),
+                expected_current.slot().get(),
+                actual_finished_work.slot().get(),
+                expected_finished_work.slot().get()
+            ),
+            Self::QueueHandleMismatch {
+                root,
+                expected_current_queue,
+                actual_current_queue,
+                expected_work_in_progress_queue,
+                actual_work_in_progress_queue,
+            } => write!(
+                formatter,
+                "root {} queue/lane commit consumer queue mismatch current {}/{} work-in-progress {}/{}",
+                root.raw(),
+                actual_current_queue.raw(),
+                expected_current_queue.raw(),
+                actual_work_in_progress_queue.raw(),
+                expected_work_in_progress_queue.raw()
+            ),
+            Self::SelectedLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} queue/lane commit consumer selected lanes {:?}/{:?} do not match",
+                root.raw(),
+                actual,
+                expected
+            ),
+            Self::FinishedLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} queue/lane commit consumer finished lanes {:?}/{:?} do not match",
+                root.raw(),
+                actual,
+                expected
+            ),
+            Self::RemainingLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} queue/lane commit consumer remaining lanes {:?}/{:?} do not match",
+                root.raw(),
+                actual,
+                expected
+            ),
+            Self::AppliedSkippedCountMismatch {
+                root,
+                expected_applied,
+                actual_applied,
+                expected_skipped,
+                actual_skipped,
+            } => write!(
+                formatter,
+                "root {} queue/lane commit consumer applied/skipped counts {}/{} expected {}/{}",
+                root.raw(),
+                actual_applied,
+                actual_skipped,
+                expected_applied,
+                expected_skipped
+            ),
+            Self::ResultingElementMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} queue/lane commit consumer resulting element {}/{} does not match",
+                root.raw(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::QueueHandoffNotSourceOwned {
+                root,
+                queue,
+                expected_updates,
+                actual_updates,
+                records_in_sequence_order,
+            } => write!(
+                formatter,
+                "root {} queue {} queue/lane commit consumer rejected caller-built handoff rows {:?}; expected {:?}; sequence order ok: {}",
+                root.raw(),
+                queue.raw(),
+                actual_updates,
+                expected_updates,
+                records_in_sequence_order
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::QueueLane(error) => Some(error),
+            Self::FinishedWork(error) => Some(error),
+            Self::MissingQueueHandoff { .. }
+            | Self::QueueRootMismatch { .. }
+            | Self::QueueFiberIdentityMismatch { .. }
+            | Self::QueueHandleMismatch { .. }
+            | Self::SelectedLanesMismatch { .. }
+            | Self::FinishedLanesMismatch { .. }
+            | Self::RemainingLanesMismatch { .. }
+            | Self::AppliedSkippedCountMismatch { .. }
+            | Self::ResultingElementMismatch { .. }
+            | Self::QueueHandoffNotSourceOwned { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootUpdateQueueLaneHandoffErrorForCanary>
+    for HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary
+{
+    fn from(error: HostRootUpdateQueueLaneHandoffErrorForCanary) -> Self {
+        Self::QueueLane(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::FinishedWork(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private canary diagnostics preserve queue and finished-work rejection details"
+)]
+fn commit_host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    root_id: FiberRootId,
+    render: HostRootRenderPhaseRecord,
+    queue_handoff: Option<&HostRootUpdateQueueLaneHandoffRecordForCanary>,
+    queue_handoff_order: usize,
+    commit_order: usize,
+) -> Result<
+    HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary,
+    HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary,
+> {
+    let Some(queue_handoff) = queue_handoff else {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::MissingQueueHandoff {
+                root: root_id,
+                finished_work: render.finished_work(),
+            },
+        );
+    };
+
+    validate_host_root_update_queue_lane_handoff_matches_render_for_commit_for_canary(
+        root_id,
+        render,
+        queue_handoff,
+    )?;
+    validate_host_root_update_queue_lane_handoff_record_for_canary(store, queue_handoff)?;
+
+    let finished_work_handoff =
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            store,
+            render,
+            queue_handoff_order,
+            commit_order,
+        )?;
+    let record = HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
+        queue_handoff: queue_handoff.clone(),
+        finished_work_handoff,
+        update_sequence_ids: queue_handoff.update_sequence_ids(),
+        selected_lanes: queue_handoff.selected_next_lanes_before_render(),
+        finished_lanes: queue_handoff.finished_lanes(),
+        remaining_lanes: queue_handoff.remaining_lanes(),
+        applied_update_count: queue_handoff.applied_update_count(),
+        skipped_update_count: queue_handoff.skipped_update_count(),
+        resulting_element: queue_handoff.resulting_element(),
+    };
+
+    Ok(record)
+}
+
+#[cfg(test)]
+fn validate_host_root_update_queue_lane_handoff_matches_render_for_commit_for_canary(
+    root_id: FiberRootId,
+    render: HostRootRenderPhaseRecord,
+    queue_handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
+) -> Result<(), HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary> {
+    if queue_handoff.root() != root_id {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueRootMismatch {
+                expected: root_id,
+                actual: queue_handoff.root(),
+            },
+        );
+    }
+
+    if queue_handoff.current() != render.current()
+        || queue_handoff.finished_work() != render.finished_work()
+    {
+        return Err(HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueFiberIdentityMismatch {
+            root: root_id,
+            expected_current: render.current(),
+            actual_current: queue_handoff.current(),
+            expected_finished_work: render.finished_work(),
+            actual_finished_work: queue_handoff.finished_work(),
+        });
+    }
+
+    if queue_handoff.current_update_queue() != render.current_update_queue()
+        || queue_handoff.work_in_progress_update_queue() != render.work_in_progress_update_queue()
+    {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandleMismatch {
+                root: root_id,
+                expected_current_queue: render.current_update_queue(),
+                actual_current_queue: queue_handoff.current_update_queue(),
+                expected_work_in_progress_queue: render.work_in_progress_update_queue(),
+                actual_work_in_progress_queue: queue_handoff.work_in_progress_update_queue(),
+            },
+        );
+    }
+
+    if queue_handoff.selected_next_lanes_before_render() != render.render_lanes() {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::SelectedLanesMismatch {
+                root: root_id,
+                expected: render.render_lanes(),
+                actual: queue_handoff.selected_next_lanes_before_render(),
+            },
+        );
+    }
+
+    if queue_handoff.finished_lanes() != render.render_lanes() {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::FinishedLanesMismatch {
+                root: root_id,
+                expected: render.render_lanes(),
+                actual: queue_handoff.finished_lanes(),
+            },
+        );
+    }
+
+    if queue_handoff.remaining_lanes() != render.remaining_lanes() {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::RemainingLanesMismatch {
+                root: root_id,
+                expected: render.remaining_lanes(),
+                actual: queue_handoff.remaining_lanes(),
+            },
+        );
+    }
+
+    if queue_handoff.applied_update_count() != render.applied_update_count()
+        || queue_handoff.skipped_update_count() != render.skipped_update_count()
+    {
+        return Err(HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::AppliedSkippedCountMismatch {
+            root: root_id,
+            expected_applied: render.applied_update_count(),
+            actual_applied: queue_handoff.applied_update_count(),
+            expected_skipped: render.skipped_update_count(),
+            actual_skipped: queue_handoff.skipped_update_count(),
+        });
+    }
+
+    if queue_handoff.resulting_element() != render.resulting_element() {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::ResultingElementMismatch {
+                root: root_id,
+                expected: render.resulting_element(),
+                actual: queue_handoff.resulting_element(),
+            },
+        );
+    }
+
+    for record in queue_handoff.update_records() {
+        if !record.committed_by_finished_lanes(render.render_lanes())
+            || render.remaining_lanes().contains_any(record.source_lanes())
+        {
+            return Err(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::SkippedLaneCommitted {
+                    root: root_id,
+                    update: record.update(),
+                    skipped_lanes: record.source_lanes(),
+                    finished_lanes: render.render_lanes(),
+                    remaining_lanes: render.remaining_lanes(),
+                }
+                .into(),
+            );
+        }
+    }
+
+    if !queue_handoff.proves_source_owned_lane_handoff() {
+        return Err(HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandoffNotSourceOwned {
+            root: root_id,
+            queue: queue_handoff.current_update_queue(),
+            expected_updates: queue_handoff.current_queue_base_updates().to_vec(),
+            actual_updates: queue_handoff.update_sequence_ids(),
+            records_in_sequence_order: queue_handoff.records_in_update_sequence_order(),
+        });
     }
 
     Ok(())
@@ -2787,6 +3305,409 @@ mod tests {
         assert_eq!(render.applied_update_count(), 1);
         assert_eq!(render.skipped_update_count(), 1);
         assert_eq!(render.remaining_lanes(), Lanes::DEFAULT);
+    }
+
+    #[test]
+    fn root_updates_queue_lane_handoff_gates_finished_work_commit_current_switch() {
+        let (mut store, root_id, host) = root_store();
+        let first_element = RootElementHandle::from_raw(8981);
+        let second_element = RootElementHandle::from_raw(8982);
+
+        let first = update_container(&mut store, root_id, first_element, None).unwrap();
+        let second = update_container_sync(&mut store, root_id, second_element, None).unwrap();
+        let selected_lanes = second.selected_next_lanes();
+        let render = render_host_root_for_lanes(&mut store, root_id, selected_lanes).unwrap();
+        let handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second.clone()],
+            render,
+        )
+        .unwrap();
+
+        let commit_handoff = commit_host_root_update_queue_lane_handoff_for_canary(
+            &mut store,
+            root_id,
+            render,
+            Some(&handoff),
+            898,
+            899,
+        )
+        .unwrap();
+
+        assert_eq!(commit_handoff.queue_handoff(), &handoff);
+        assert_eq!(
+            commit_handoff.update_sequence_ids(),
+            vec![first.update(), second.update()]
+        );
+        assert_eq!(commit_handoff.selected_lanes(), selected_lanes);
+        assert_eq!(commit_handoff.finished_lanes(), selected_lanes);
+        assert_eq!(commit_handoff.remaining_lanes(), Lanes::NO);
+        assert_eq!(commit_handoff.applied_update_count(), 2);
+        assert_eq!(commit_handoff.skipped_update_count(), 0);
+        assert_eq!(commit_handoff.resulting_element(), second_element);
+        assert!(commit_handoff.proves_queue_lane_handoff_gated_current_switch());
+
+        let finished_work_handoff = commit_handoff.finished_work_handoff();
+        assert!(finished_work_handoff.proves_private_root_finished_work_commit_metadata_handoff());
+        assert_eq!(
+            finished_work_handoff.pending().root_finished_work(),
+            Some(render.finished_work())
+        );
+        assert_eq!(
+            finished_work_handoff.pending().root_finished_lanes(),
+            selected_lanes
+        );
+        let commit = commit_handoff.commit();
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.previous_current(), render.current());
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(commit.finished_lanes(), selected_lanes);
+        assert_eq!(commit.remaining_lanes(), Lanes::NO);
+        assert_eq!(commit.pending_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_updates_queue_lane_commit_consumer_rejects_missing_queue_handoff() {
+        let (mut store, root_id, _host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(8983), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let error = commit_host_root_update_queue_lane_handoff_for_canary(
+            &mut store, root_id, render, None, 900, 901,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::MissingQueueHandoff {
+                root: root_id,
+                finished_work: render.finished_work()
+            }
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render.finished_work())
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    }
+
+    #[test]
+    fn root_updates_queue_lane_commit_consumer_rejects_stale_handoff_after_another_update() {
+        let (mut store, root_id, _host) = root_store();
+        let first =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8984), None).unwrap();
+        let second =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8985), None)
+                .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, second.selected_next_lanes()).unwrap();
+        let handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second.clone()],
+            render,
+        )
+        .unwrap();
+        let stale_extra =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8986), None).unwrap();
+
+        let error = commit_host_root_update_queue_lane_handoff_for_canary(
+            &mut store,
+            root_id,
+            render,
+            Some(&handoff),
+            902,
+            903,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueLane(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::QueueOrderMismatch {
+                    root: root_id,
+                    queue: first.queue(),
+                    expected_updates: vec![first.update(), second.update()],
+                    actual_updates: vec![first.update(), second.update(), stale_extra.update()]
+                }
+            )
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), render.current());
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    }
+
+    #[test]
+    fn root_updates_queue_lane_commit_consumer_rejects_wrong_finished_lanes() {
+        let (mut store, root_id, _host) = root_store();
+        let first =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8987), None).unwrap();
+        let second =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8988), None)
+                .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, second.selected_next_lanes()).unwrap();
+        let mut handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first, second],
+            render,
+        )
+        .unwrap();
+        handoff.finished_lanes = Lanes::DEFAULT;
+
+        let error = commit_host_root_update_queue_lane_handoff_for_canary(
+            &mut store,
+            root_id,
+            render,
+            Some(&handoff),
+            904,
+            905,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::FinishedLanesMismatch {
+                root: root_id,
+                expected: render.render_lanes(),
+                actual: Lanes::DEFAULT
+            }
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), render.current());
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    }
+
+    #[test]
+    fn root_updates_queue_lane_commit_consumer_rejects_cross_root_queue_handoff() {
+        let (mut store, root_id, _host) = root_store();
+        let other_root = store
+            .create_client_root(FakeContainer::new(898), RootOptions::new())
+            .unwrap();
+        let source_update =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8989), None).unwrap();
+        let source_render =
+            render_host_root_for_lanes(&mut store, root_id, source_update.selected_next_lanes())
+                .unwrap();
+        let source_handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            std::slice::from_ref(&source_update),
+            source_render,
+        )
+        .unwrap();
+        let other_update = update_container(
+            &mut store,
+            other_root,
+            RootElementHandle::from_raw(8990),
+            None,
+        )
+        .unwrap();
+        let other_render =
+            render_host_root_for_lanes(&mut store, other_root, other_update.selected_next_lanes())
+                .unwrap();
+
+        let error = commit_host_root_update_queue_lane_handoff_for_canary(
+            &mut store,
+            other_root,
+            other_render,
+            Some(&source_handoff),
+            906,
+            907,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueRootMismatch {
+                expected: other_root,
+                actual: root_id
+            }
+        );
+        assert_eq!(
+            store.root(other_root).unwrap().current(),
+            other_render.current()
+        );
+        assert_eq!(store.root(other_root).unwrap().finished_work(), None);
+    }
+
+    #[test]
+    fn root_updates_queue_lane_commit_consumer_rejects_caller_built_cloned_handoff_rows() {
+        let (mut store, root_id, _host) = root_store();
+        let first =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8991), None).unwrap();
+        let second =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8992), None)
+                .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, second.selected_next_lanes()).unwrap();
+        let handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second.clone()],
+            render,
+        )
+        .unwrap();
+        let mut caller_built = handoff.clone();
+        caller_built.update_records[0] = caller_built.update_records[1];
+
+        let error = commit_host_root_update_queue_lane_handoff_for_canary(
+            &mut store,
+            root_id,
+            render,
+            Some(&caller_built),
+            908,
+            909,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandoffNotSourceOwned {
+                root: root_id,
+                queue: handoff.current_update_queue(),
+                expected_updates: vec![first.update(), second.update()],
+                actual_updates: vec![second.update(), second.update()],
+                records_in_sequence_order: false
+            }
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), render.current());
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    }
+
+    #[test]
+    fn root_updates_queue_lane_commit_consumer_rejects_replayed_handoff_after_commit() {
+        let (mut store, root_id, _host) = root_store();
+        let first =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8993), None).unwrap();
+        let second =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8994), None)
+                .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, second.selected_next_lanes()).unwrap();
+        let handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first, second],
+            render,
+        )
+        .unwrap();
+        let first_commit = commit_host_root_update_queue_lane_handoff_for_canary(
+            &mut store,
+            root_id,
+            render,
+            Some(&handoff),
+            910,
+            911,
+        )
+        .unwrap();
+
+        let error = commit_host_root_update_queue_lane_handoff_for_canary(
+            &mut store,
+            root_id,
+            render,
+            Some(&handoff),
+            912,
+            913,
+        )
+        .unwrap_err();
+
+        assert!(first_commit.proves_queue_lane_handoff_gated_current_switch());
+        assert_eq!(
+            error,
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueLane(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::ReplayedHandoffRecord {
+                    root: root_id,
+                    expected_current: render.current(),
+                    actual_current: render.finished_work()
+                }
+            )
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+    }
+
+    #[test]
+    fn root_updates_queue_lane_commit_consumer_rejects_skipped_lane_as_committed() {
+        let (mut store, root_id, _host) = root_store();
+        let skipped_default =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8995), None).unwrap();
+        let committed_sync =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8996), None)
+                .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        let forged_handoff = HostRootUpdateQueueLaneHandoffRecordForCanary {
+            root: root_id,
+            current: render.current(),
+            finished_work: render.finished_work(),
+            current_update_queue: render.current_update_queue(),
+            work_in_progress_update_queue: render.work_in_progress_update_queue(),
+            pending_lanes_before_render: Lanes::SYNC.merge(Lanes::DEFAULT),
+            selected_next_lanes_before_render: Lanes::SYNC,
+            finished_lanes: Lanes::SYNC,
+            remaining_lanes: Lanes::DEFAULT,
+            pending_lanes_after_render: Lanes::SYNC.merge(Lanes::DEFAULT),
+            update_records: vec![
+                HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                    sequence: 0,
+                    update: skipped_default.update(),
+                    lane: skipped_default.lane(),
+                    source_lanes: Lanes::DEFAULT,
+                    pending_lanes_after_enqueue: skipped_default.pending_lanes_after_enqueue(),
+                    selected_next_lanes_after_enqueue: skipped_default.selected_next_lanes(),
+                },
+                HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                    sequence: 1,
+                    update: committed_sync.update(),
+                    lane: committed_sync.lane(),
+                    source_lanes: Lanes::SYNC,
+                    pending_lanes_after_enqueue: committed_sync.pending_lanes_after_enqueue(),
+                    selected_next_lanes_after_enqueue: committed_sync.selected_next_lanes(),
+                },
+            ],
+            current_queue_base_updates: vec![skipped_default.update(), committed_sync.update()],
+            applied_update_count: render.applied_update_count(),
+            skipped_update_count: render.skipped_update_count(),
+            resulting_element: render.resulting_element(),
+        };
+
+        let error = commit_host_root_update_queue_lane_handoff_for_canary(
+            &mut store,
+            root_id,
+            render,
+            Some(&forged_handoff),
+            914,
+            915,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueLane(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::SkippedLaneCommitted {
+                    root: root_id,
+                    update: skipped_default.update(),
+                    skipped_lanes: Lanes::DEFAULT,
+                    finished_lanes: Lanes::SYNC,
+                    remaining_lanes: Lanes::DEFAULT
+                }
+            )
+        );
+        assert_eq!(render.applied_update_count(), 1);
+        assert_eq!(render.skipped_update_count(), 1);
+        assert_eq!(store.root(root_id).unwrap().current(), render.current());
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
     }
 
     #[test]
