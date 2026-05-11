@@ -9,6 +9,10 @@ Complete.
 - Added `test/conformance-test-discovery.test.mjs` to fail closed when
   executable conformance test gates are not covered by the workspace
   `scripts.test` command.
+- Repaired wrapper coverage detection after audit: covered wrappers are now
+  scanned with a conservative static-import lexer instead of raw regex matching,
+  so commented-out imports and import-looking string/template literals do not
+  mark gates as covered.
 - Updated `tests/conformance/package.json` so `npm run test:conformance`
   directly runs `test/react-act-public-blocked-gate.mjs`, which was outside
   the previous `test/*.test.mjs` glob and had no covered wrapper test.
@@ -33,11 +37,12 @@ Complete.
 - PASS: `git diff --check`
 - FAIL, pre-existing comparison: `node --test test/*.test.mjs src/react-test-renderer-serialization-local-gate.test.mjs`
   from `tests/conformance` fails in existing react-test-renderer serialization
-  and private-admission 727/739/804 areas.
+  and private-admission 727/739/804 areas, while the discovery test itself
+  passes in that run.
 - FAIL, same pre-existing areas: `npm test --workspace @fast-react/conformance`
   now runs the discovery gate and public blocked gate, but still fails on the
   same react-test-renderer serialization/private-admission baseline failures as
-  the old command shape.
+  the old command shape. The repaired discovery gate passes in that run.
 
 ## Residual Risks
 

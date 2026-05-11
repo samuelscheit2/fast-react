@@ -92,20 +92,74 @@ test("discovery helper accepts standalone gates imported by covered wrapper test
     "test/react-dom-root-render-e2e-conformance-gate.mjs",
     "test/react-dom-root-render-e2e-conformance-gate.test.mjs"
   ];
+  const wrapperEntry = "test/react-dom-root-render-e2e-conformance-gate.test.mjs";
+  const importedEntries = discoverRequiredStaticImportsFromSource({
+    entry: wrapperEntry,
+    source: 'import "./react-dom-root-render-e2e-conformance-gate.mjs";\n',
+    requiredEntries
+  });
   const analysis = analyzeConformanceTestScriptCoverage({
     testScript: "node --test test/*.test.mjs",
     requiredEntries,
-    importedEntriesByEntry: new Map([
-      [
-        "test/react-dom-root-render-e2e-conformance-gate.test.mjs",
-        ["test/react-dom-root-render-e2e-conformance-gate.mjs"]
-      ]
-    ])
+    importedEntriesByEntry: new Map([[wrapperEntry, importedEntries]])
   });
 
   assert.deepEqual(analysis.uncoveredEntries, []);
   assert.deepEqual(analysis.importCoveredEntries, [
     "test/react-dom-root-render-e2e-conformance-gate.mjs"
+  ]);
+});
+
+test("static wrapper import discovery ignores commented-out imports", () => {
+  const requiredEntries = [
+    "test/commented-gate.mjs",
+    "test/root-render-gate.mjs",
+    "test/root-render-gate.test.mjs"
+  ];
+  const wrapperEntry = "test/root-render-gate.test.mjs";
+  const importedEntries = discoverRequiredStaticImportsFromSource({
+    entry: wrapperEntry,
+    source: [
+      '// import "./commented-gate.mjs";',
+      'import "./root-render-gate.mjs";'
+    ].join("\n"),
+    requiredEntries
+  });
+  const analysis = analyzeConformanceTestScriptCoverage({
+    testScript: "node --test test/*.test.mjs",
+    requiredEntries,
+    importedEntriesByEntry: new Map([[wrapperEntry, importedEntries]])
+  });
+
+  assert.deepEqual(importedEntries, ["test/root-render-gate.mjs"]);
+  assert.deepEqual(analysis.uncoveredEntries, ["test/commented-gate.mjs"]);
+});
+
+test("static wrapper import discovery ignores import-looking string literals", () => {
+  const requiredEntries = [
+    "test/root-render-gate.mjs",
+    "test/root-render-gate.test.mjs",
+    "test/string-literal-gate.mjs"
+  ];
+  const wrapperEntry = "test/root-render-gate.test.mjs";
+  const importedEntries = discoverRequiredStaticImportsFromSource({
+    entry: wrapperEntry,
+    source: [
+      'const text = "import \\"./string-literal-gate.mjs\\"";',
+      "const template = `import \"./string-literal-gate.mjs\"`;",
+      'import "./root-render-gate.mjs";'
+    ].join("\n"),
+    requiredEntries
+  });
+  const analysis = analyzeConformanceTestScriptCoverage({
+    testScript: "node --test test/*.test.mjs",
+    requiredEntries,
+    importedEntriesByEntry: new Map([[wrapperEntry, importedEntries]])
+  });
+
+  assert.deepEqual(importedEntries, ["test/root-render-gate.mjs"]);
+  assert.deepEqual(analysis.uncoveredEntries, [
+    "test/string-literal-gate.mjs"
   ]);
 });
 
@@ -150,28 +204,303 @@ async function discoverStaticImportsForEntries({
 
   for (const entry of entries) {
     const source = await fs.readFile(path.join(root, entry), "utf8");
-    const importedEntries = parseStaticRelativeMjsImports(source)
-      .map((specifier) =>
-        normalizeEntry(path.posix.join(path.posix.dirname(entry), specifier))
-      )
-      .filter((importedEntry) => requiredEntrySet.has(importedEntry))
-      .sort(compareEntries);
+    const importedEntries = discoverRequiredStaticImportsFromSource({
+      entry,
+      source,
+      requiredEntrySet
+    });
     importsByEntry.set(entry, importedEntries);
   }
 
   return importsByEntry;
 }
 
+function discoverRequiredStaticImportsFromSource({
+  entry,
+  source,
+  requiredEntries,
+  requiredEntrySet = new Set(requiredEntries)
+}) {
+  return parseStaticRelativeMjsImports(source)
+    .map((specifier) =>
+      normalizeEntry(path.posix.join(path.posix.dirname(entry), specifier))
+    )
+    .filter((importedEntry) => requiredEntrySet.has(importedEntry))
+    .sort(compareEntries);
+}
+
 function parseStaticRelativeMjsImports(source) {
   const imports = [];
-  const importPattern =
-    /\bimport\s+(?:[^'";]*?\s+from\s+)?["'](\.{1,2}\/[^"']+\.mjs)["']/gu;
+  let parenDepth = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
 
-  for (const match of source.matchAll(importPattern)) {
-    imports.push(match[1]);
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    const nextCharacter = source[index + 1];
+
+    if (character === "/" && nextCharacter === "/") {
+      index = skipLineComment(source, index);
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "*") {
+      index = skipBlockComment(source, index);
+      continue;
+    }
+
+    if (character === "'" || character === "\"") {
+      index = skipStringLiteral(source, index);
+      continue;
+    }
+
+    if (character === "`") {
+      index = skipTemplateLiteral(source, index);
+      continue;
+    }
+
+    if (
+      parenDepth === 0 &&
+      braceDepth === 0 &&
+      bracketDepth === 0 &&
+      source.startsWith("import", index) &&
+      isLineStartBefore(source, index) &&
+      isIdentifierBoundary(source[index - 1]) &&
+      isIdentifierBoundary(source[index + "import".length])
+    ) {
+      const result = readStaticImportDeclaration(source, index);
+      if (result) {
+        if (
+          result.specifier.startsWith("./") ||
+          result.specifier.startsWith("../")
+        ) {
+          imports.push(result.specifier);
+        }
+        index = result.endIndex;
+        continue;
+      }
+    }
+
+    if (character === "(") {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    } else if (character === "{") {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[") {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    }
   }
 
   return imports;
+}
+
+function readStaticImportDeclaration(source, startIndex) {
+  let index = startIndex + "import".length;
+  index = skipWhitespaceAndComments(source, index);
+
+  if (source[index] === "(" || source[index] === ".") {
+    return null;
+  }
+
+  if (source[index] === "'" || source[index] === "\"") {
+    const literal = readStringLiteral(source, index);
+    return {
+      specifier: literal.value,
+      endIndex: skipImportDeclarationTail(source, literal.endIndex)
+    };
+  }
+
+  let localParenDepth = 0;
+  let localBraceDepth = 0;
+  let localBracketDepth = 0;
+
+  while (index < source.length) {
+    const character = source[index];
+    const nextCharacter = source[index + 1];
+
+    if (
+      localParenDepth === 0 &&
+      localBraceDepth === 0 &&
+      localBracketDepth === 0 &&
+      source.startsWith("from", index) &&
+      isIdentifierBoundary(source[index - 1]) &&
+      isIdentifierBoundary(source[index + "from".length])
+    ) {
+      const specifierStart = skipWhitespaceAndComments(
+        source,
+        index + "from".length
+      );
+      if (source[specifierStart] !== "'" && source[specifierStart] !== "\"") {
+        return null;
+      }
+      const literal = readStringLiteral(source, specifierStart);
+      return {
+        specifier: literal.value,
+        endIndex: skipImportDeclarationTail(source, literal.endIndex)
+      };
+    }
+
+    if (character === "/" && nextCharacter === "/") {
+      index = skipLineComment(source, index) + 1;
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "*") {
+      index = skipBlockComment(source, index) + 1;
+      continue;
+    }
+
+    if (character === "'" || character === "\"") {
+      index = skipStringLiteral(source, index) + 1;
+      continue;
+    }
+
+    if (character === "`") {
+      index = skipTemplateLiteral(source, index) + 1;
+      continue;
+    }
+
+    if (character === ";") {
+      return null;
+    }
+
+    if (character === "(") {
+      localParenDepth += 1;
+    } else if (character === ")" && localParenDepth > 0) {
+      localParenDepth -= 1;
+    } else if (character === "{") {
+      localBraceDepth += 1;
+    } else if (character === "}" && localBraceDepth > 0) {
+      localBraceDepth -= 1;
+    } else if (character === "[") {
+      localBracketDepth += 1;
+    } else if (character === "]" && localBracketDepth > 0) {
+      localBracketDepth -= 1;
+    }
+
+    index += 1;
+  }
+
+  return null;
+}
+
+function skipWhitespaceAndComments(source, startIndex) {
+  let index = startIndex;
+
+  while (index < source.length) {
+    if (/\s/u.test(source[index])) {
+      index += 1;
+    } else if (source[index] === "/" && source[index + 1] === "/") {
+      index = skipLineComment(source, index) + 1;
+    } else if (source[index] === "/" && source[index + 1] === "*") {
+      index = skipBlockComment(source, index) + 1;
+    } else {
+      return index;
+    }
+  }
+
+  return index;
+}
+
+function skipImportDeclarationTail(source, startIndex) {
+  let index = startIndex;
+
+  while (index < source.length) {
+    if (source[index] === ";") {
+      return index;
+    }
+
+    if (source[index] === "/" && source[index + 1] === "//") {
+      return skipLineComment(source, index);
+    }
+
+    if (source[index] === "/" && source[index + 1] === "*") {
+      index = skipBlockComment(source, index) + 1;
+    } else {
+      index += 1;
+    }
+  }
+
+  return source.length - 1;
+}
+
+function readStringLiteral(source, startIndex) {
+  const quote = source[startIndex];
+  let value = "";
+
+  for (let index = startIndex + 1; index < source.length; index += 1) {
+    const character = source[index];
+
+    if (character === "\\") {
+      if (index + 1 < source.length) {
+        index += 1;
+        value += source[index];
+      }
+    } else if (character === quote) {
+      return {
+        value,
+        endIndex: index
+      };
+    } else {
+      value += character;
+    }
+  }
+
+  return {
+    value,
+    endIndex: source.length - 1
+  };
+}
+
+function skipStringLiteral(source, startIndex) {
+  return readStringLiteral(source, startIndex).endIndex;
+}
+
+function skipTemplateLiteral(source, startIndex) {
+  for (let index = startIndex + 1; index < source.length; index += 1) {
+    const character = source[index];
+
+    if (character === "\\") {
+      index += 1;
+    } else if (character === "`") {
+      return index;
+    }
+  }
+
+  return source.length - 1;
+}
+
+function skipLineComment(source, startIndex) {
+  const endIndex = source.indexOf("\n", startIndex + 2);
+  return endIndex === -1 ? source.length - 1 : endIndex;
+}
+
+function skipBlockComment(source, startIndex) {
+  const endIndex = source.indexOf("*/", startIndex + 2);
+  return endIndex === -1 ? source.length - 1 : endIndex + 1;
+}
+
+function isIdentifierBoundary(character) {
+  return character === undefined || !/[A-Za-z0-9_$]/u.test(character);
+}
+
+function isLineStartBefore(source, index) {
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (source[cursor] === "\n" || source[cursor] === "\r") {
+      return true;
+    }
+
+    if (!/\s/u.test(source[cursor])) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 async function discoverMjsFiles(directory, { include, relativePrefix }) {
