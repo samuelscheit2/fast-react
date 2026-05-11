@@ -29,6 +29,42 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 904, 901, and 899
+
+- Worker 904 added a private Rust test-only HostRoot queue/lane scheduler
+  continuation gate that composes Worker 898 queue/lane proof with root
+  scheduler finished-work and commit continuation evidence. The gate requires
+  scheduler identity, finished-work identity, store-backed row lane metadata,
+  sequence IDs, applied/skipped counts, resulting element, and
+  root/current/finished-work identity, rejecting missing, stale, forged,
+  wrong-lane, cross-root, caller-built, replayed, skipped-lane, and
+  scheduler-only evidence. Public Scheduler timing, public roots, React
+  DOM/test-renderer roots, broad hooks, `act`, and package compatibility remain
+  blocked.
+- Worker 901 added the React DOM private render lifecycle boundary consumer fix
+  for nested host-output updates, validating lifecycle/source overrides before
+  callbacks or render/update records are created. It rejects `renderCallback`,
+  `updateCallback`, `callback`, source-record aliases, boundary/snapshot
+  aliases, callback value smuggling, caller-built, cross-entrypoint,
+  cross-root, replayed boundary evidence, and stale snapshots before fake-DOM
+  mutation or native handoff. Public `createRoot`, `root.render`,
+  `hydrateRoot`, browser DOM, native/Rust execution, resources/forms,
+  refs/events, Scheduler, and package compatibility remain blocked.
+- Worker 899 added Rust test-renderer private direct multi-child fiber
+  inspection for a direct `HostComponent -> [HostText, HostText]` topology,
+  consuming source-owned row identity bound to root, renderer, update sequence,
+  render/commit/store-current handles, direct child fiber handles, lanes,
+  topology, lifecycle/finished-work identity, and blockers. Same-shape
+  cross-root replay is rejected before direct inspection accepts the row.
+  Public serialization, `ReactTestInstance`, native/package behavior, `act`,
+  Scheduler, React DOM/native execution, and broad renderer compatibility
+  remain blocked.
+- The latest accepted state was recorded in current main
+  `cc34b057ec8a3652f03c1769a6a7405e37273e8c` after the Worker 904, Worker
+  901, and Worker 899 merge batch, with focused Rust/JS checks, package-surface
+  and import-smoke checks where applicable, formatting, and `git diff --check`
+  verification recorded in worker reports and git history.
+
 ### Workers 891, 898, and 900
 
 - Worker 891 added a private React DOM `root.unmount()` lifecycle execution
@@ -51,7 +87,7 @@ sequencing belong in `MASTER_PLAN.md`.
   gate rejects test/progress/prose evidence paths and preserves public
   hydrateRoot, root, browser DOM, event, native, reconciler, and package
   blockers.
-- The latest accepted state was recorded in current main
+- The accepted state for this batch was recorded in main
   `d566f7927eeeca172d32c9836711c3c612f2eca1` after focused React DOM private
   root lifecycle, public-facade blocker, Rust queue-lane commit consumer,
   hydrateRoot private admission 820 ledger, package-surface, import-smoke,
