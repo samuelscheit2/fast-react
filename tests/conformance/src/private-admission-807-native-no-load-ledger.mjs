@@ -310,12 +310,13 @@ const privateAdmission807Rows = freezeArray([
         role: "worker-790-cleanup-hook-js-mirror-blockers",
         path: nativeIndexPath,
         sliceStart:
-          "const nativeRootBridgeWorkerThreadCleanupHookPreflight = Object.freeze({",
-        sliceEnd: "const nativeRootBridgeRequestShape = Object.freeze({",
+          "function freezeNativeRootBridgeWorkerThreadCleanupHookPreflight(rows)",
+        sliceEnd:
+          "const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink",
         tokens: [
           "canonicalExecutableEvidenceRequired: true",
-          "canonicalExecutableEvidenceAccepted: true",
-          "staleOrForgedCleanupEvidenceRejectionCount: 2",
+          "canonicalExecutableEvidenceAccepted",
+          "staleOrForgedCleanupEvidenceRejectionCount",
           "cleanupHookIdentityPrivate: true",
           "id: 'cleanup-hook-stale-worker-transport-evidence-rejected'",
           "code: nativeRootBridgeWorkerThreadCleanupHookStaleEvidenceCode",

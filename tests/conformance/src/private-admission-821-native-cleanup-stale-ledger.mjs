@@ -15,13 +15,17 @@ const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
 export const PRIVATE_ADMISSION_821_GATE_ID =
   "private-admission-821-native-cleanup-stale-ledger-1";
 export const PRIVATE_ADMISSION_821_GATE_STATUS =
-  "recognized-accepted-native-cleanup-stale-matrix-public-native-blocked";
+  "recognized-accepted-native-cleanup-stale-currentness-matrix-public-native-blocked";
 export const PRIVATE_ADMISSION_821_VIOLATION_STATUS =
-  "blocked-accepted-native-cleanup-stale-matrix-with-violations";
+  "blocked-accepted-native-cleanup-stale-currentness-matrix-with-violations";
 
 const worker815 = "worker-815-native-worker-thread-cleanup-stale-matrix";
+const worker908 = "worker-908-napi-cleanup-generation-currentness";
 
-export const PRIVATE_ADMISSION_821_WORKERS = freezeArray([worker815]);
+export const PRIVATE_ADMISSION_821_WORKERS = freezeArray([
+  worker815,
+  worker908
+]);
 
 export const PRIVATE_ADMISSION_821_REQUIRED_NATIVE_CLEANUP_EVIDENCE_IDS =
   freezeRecord({
@@ -39,6 +43,17 @@ export const PRIVATE_ADMISSION_821_REQUIRED_NATIVE_CLEANUP_EVIDENCE_IDS =
       "cleanup-hook-create-value-stale-after-teardown-rejected",
       "cleanup-hook-root-source-with-value-order-identity-rejected",
       "cleanup-hook-value-source-with-root-order-identity-rejected"
+    ]),
+    [worker908]: freezeArray([
+      "cleanup-generation-currentness-canary-1-root",
+      "cleanup-generation-currentness-canary-1-value",
+      "cleanup-generation-currentness-stale-generation-rejected",
+      "cleanup-generation-currentness-forged-cleanup-row-rejected",
+      "cleanup-generation-currentness-stale-or-foreign-rejected",
+      "cleanup-generation-currentness-replayed-or-retired-rejected",
+      "cleanup-generation-currentness-missing-cleanup-hook-identity-rejected",
+      "cleanup-generation-currentness-caller-built-metadata-rejected",
+      "cleanup-generation-currentness-public-native-claim-rejected"
     ])
   });
 
@@ -62,6 +77,15 @@ export const PRIVATE_ADMISSION_821_REQUIRED_CLEANUP_BLOCKER_IDS =
       "cleanup-hook-value-id-tamper-rejected",
       "cleanup-hook-value-function-token-tamper-rejected",
       "cleanup-hook-value-argument-token-tamper-rejected"
+    ]),
+    [worker908]: freezeArray([
+      "cleanup-generation-currentness-stale-generation-rejected",
+      "cleanup-generation-currentness-forged-cleanup-row-rejected",
+      "cleanup-generation-currentness-stale-or-foreign-rejected",
+      "cleanup-generation-currentness-replayed-or-retired-rejected",
+      "cleanup-generation-currentness-missing-cleanup-hook-identity-rejected",
+      "cleanup-generation-currentness-caller-built-metadata-rejected",
+      "cleanup-generation-currentness-public-native-claim-rejected"
     ])
   });
 
@@ -76,6 +100,17 @@ export const PRIVATE_ADMISSION_821_REQUIRED_STATUSES = freezeRecord({
     "FAST_REACT_NAPI_CLEANUP_HOOK_IDENTITY_MISMATCH",
     "FAST_REACT_NAPI_STALE_HANDLE",
     "FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"
+  ]),
+  [worker908]: freezeArray([
+    "accepted-native-root-bridge-cleanup-generation-currentness-canary",
+    "consumed-native-root-bridge-cleanup-generation-evidence",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA",
+    "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM"
   ])
 });
 
@@ -92,6 +127,21 @@ export const PRIVATE_ADMISSION_821_REQUIRED_FUNCTION_NAMES = freezeRecord({
     "assertBlockedNativeRootBridgeHandoff",
     "assertBlockedNativeRootBridgeHandoffClaims",
     "createValidNativeRootBridgeRequestRecord"
+  ]),
+  [worker908]: freezeArray([
+    "native_root_bridge_cleanup_generation_currentness_canary_for_private_sources",
+    "validate_native_root_bridge_cleanup_generation_currentness_rows",
+    "native_root_bridge_cleanup_generation_currentness_row_for_handoff",
+    "native_root_bridge_cleanup_generation_currentness_validate_handle_fields",
+    "native_root_bridge_cleanup_generation_currentness_render_row",
+    "native_root_bridge_cleanup_generation_currentness_preflight_row_for_role",
+    "native_root_bridge_cleanup_generation_currentness_cleanup_hook_identity_current",
+    "native_root_bridge_cleanup_generation_currentness_cleanup_hook_row_identity_current",
+    "has_native_root_bridge_cleanup_generation_currentness_public_native_claim",
+    "accepted_cleanup_generation_currentness_sources",
+    "assert_cleanup_generation_currentness_rejection",
+    "assert_cleanup_generation_currentness_canary_inert",
+    "assert_cleanup_generation_currentness_row_inert"
   ])
 });
 
@@ -120,6 +170,43 @@ export const PRIVATE_ADMISSION_821_REQUIRED_FIELD_NAMES = freezeRecord({
     "reactBehaviorError",
     "compatibilityClaimed",
     "packageCompatibilityClaimed"
+  ]),
+  [worker908]: freezeArray([
+    "json_batch_lifecycle_executor_generation",
+    "json_batch_lifecycle_executor_source_rows_validated",
+    "json_batch_lifecycle_executor_replay_guard_consumed",
+    "cleanup_generation_consumed",
+    "cleanup_handoff_current",
+    "cleanup_handoff_error_code",
+    "accepted_cleanup_handoff_count",
+    "current_executor_generation",
+    "cleanup_executor_generation",
+    "lifecycle_consumer_row_id",
+    "cleanup_handoff_row_id",
+    "source_environment_id",
+    "source_root_handle",
+    "source_root_id",
+    "source_handle_kind",
+    "source_handle",
+    "handle_table_current_generation",
+    "cleanup_current_generation",
+    "cleanup_hook_evidence_row_id",
+    "cleanup_hook_source_row_id",
+    "cleanup_hook_id",
+    "cleanup_hook_function_identity_token",
+    "cleanup_hook_argument_identity_token",
+    "source_owned_cleanup_handoff",
+    "cleanup_hook_order_private",
+    "cleanup_hook_identity_private",
+    "canonical_executable_evidence",
+    "node_worker_threads_execution",
+    "napi_cleanup_hook_execution",
+    "native_addon_loaded",
+    "native_execution",
+    "renderer_execution",
+    "reconciler_execution",
+    "public_native_compatibility",
+    "react_behavior_error"
   ])
 });
 
@@ -140,6 +227,21 @@ export const PRIVATE_ADMISSION_821_REQUIRED_SOURCE_CONSTANTS = freezeRecord({
     "NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_FUNCTION_IDENTITY_TOKEN",
     "NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_ARGUMENT_IDENTITY_TOKEN",
     "NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_ARGUMENT_IDENTITY_TOKEN"
+  ]),
+  [worker908]: freezeArray([
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STATUS",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_REPLAYED_EVIDENCE_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CANARY_STATUS",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CANARY_MODEL",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE",
+    "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE"
   ])
 });
 
@@ -150,6 +252,12 @@ export const PRIVATE_ADMISSION_821_REQUIRED_PRIOR_LEDGER_CONTEXT =
       PRIVATE_ADMISSION_807_GATE_STATUS,
       "worker-790-native-cleanup-hook-identity-tamper-gate",
       "worker-801-native-no-load-transitive-matrix"
+    ]),
+    [worker908]: freezeArray([
+      PRIVATE_ADMISSION_807_GATE_ID,
+      PRIVATE_ADMISSION_807_GATE_STATUS,
+      "worker-815-native-worker-thread-cleanup-stale-matrix",
+      "worker-892-native-lifecycle-cleanup-generation-gate"
     ])
   });
 
@@ -207,6 +315,8 @@ const nativeNoLoadGuardTestPath =
 const fastReactNapiSourcePath = "crates/fast-react-napi/src/lib.rs";
 const worker815ProgressPath =
   "worker-progress/worker-815-native-worker-thread-cleanup-stale-matrix.md";
+const worker908ProgressPath =
+  "worker-progress/worker-908-napi-cleanup-generation-currentness.md";
 
 const privateAdmission821Rows = freezeArray([
   rowData({
@@ -398,8 +508,9 @@ const privateAdmission821Rows = freezeArray([
       evidenceData({
         role: "worker-815-native-no-load-guard-cleanup-mirror",
         path: nativeNoLoadGuardTestPath,
-        sliceStart: "workerThreadCleanupHookPreflight",
-        sliceEnd: "jsonTransportSmoke",
+        sliceStart:
+          "preflighted-native-root-bridge-worker-thread-cleanup-hook-order",
+        sliceEnd: "assertPrivateCleanupHookPreflightCallable(native);",
         tokens: [
           "workerThreadCleanupHookPreflight",
           "preflighted-native-root-bridge-worker-thread-cleanup-hook-order",
@@ -432,6 +543,241 @@ const privateAdmission821Rows = freezeArray([
           "nativeAddonLoaded",
           "rendererExecution",
           "publicNativeCompatibility"
+        ]
+      })
+    ]
+  }),
+  rowData({
+    workerId: worker908,
+    ledgerRole: "accepted-native-cleanup-generation-currentness-evidence",
+    privateAdmission:
+      "accepted-private-native-cleanup-generation-currentness-canary",
+    implementationPaths: freezeArray([
+      fastReactNapiSourcePath,
+      worker908ProgressPath
+    ]),
+    nativeCleanupEvidenceIds:
+      PRIVATE_ADMISSION_821_REQUIRED_NATIVE_CLEANUP_EVIDENCE_IDS[worker908],
+    cleanupBlockerIds:
+      PRIVATE_ADMISSION_821_REQUIRED_CLEANUP_BLOCKER_IDS[worker908],
+    requiredStatuses: PRIVATE_ADMISSION_821_REQUIRED_STATUSES[worker908],
+    requiredFunctionNames:
+      PRIVATE_ADMISSION_821_REQUIRED_FUNCTION_NAMES[worker908],
+    requiredFieldNames: PRIVATE_ADMISSION_821_REQUIRED_FIELD_NAMES[worker908],
+    requiredSourceConstants:
+      PRIVATE_ADMISSION_821_REQUIRED_SOURCE_CONSTANTS[worker908],
+    priorLedgerContext:
+      PRIVATE_ADMISSION_821_REQUIRED_PRIOR_LEDGER_CONTEXT[worker908],
+    evidence: [
+      evidenceData({
+        role: "worker-908-fast-react-napi-currentness-constants",
+        path: fastReactNapiSourcePath,
+        sliceStart: "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STATUS",
+        sliceEnd:
+          "NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_LINKED_STATUS",
+        tokens: [
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STATUS",
+          "consumed-native-root-bridge-cleanup-generation-evidence",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_REPLAYED_EVIDENCE_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CANARY_STATUS",
+          "accepted-native-root-bridge-cleanup-generation-currentness-canary",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CANARY_MODEL",
+          "fast-react-napi.NativeRootBridgeCleanupGenerationCurrentnessCanary",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION_CODE",
+          "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE",
+          "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE",
+          "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED_CODE",
+          "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE",
+          "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE",
+          "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE",
+          "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM"
+        ]
+      }),
+      evidenceData({
+        role: "worker-908-fast-react-napi-currentness-canary-model",
+        path: fastReactNapiSourcePath,
+        sliceStart:
+          "pub(crate) struct NativeRootBridgeCleanupGenerationCurrentnessCanary",
+        sliceEnd: "pub(crate) struct NativeRootBridgeBatchLifecycleConsumer",
+        tokens: [
+          "NativeRootBridgeCleanupGenerationCurrentnessCanary",
+          "NativeRootBridgeCleanupGenerationCurrentnessCanaryRow",
+          "lifecycle_consumer_status",
+          "cleanup_generation_consumer_status",
+          "cleanup_hook_preflight_status",
+          "current_executor_generation",
+          "cleanup_executor_generation",
+          "cleanup_handoff_current",
+          "cleanup_handoff_error_code",
+          "accepted_cleanup_handoff_count",
+          "lifecycle_consumer_row_id",
+          "cleanup_handoff_row_id",
+          "handle_table_current_generation",
+          "cleanup_current_generation",
+          "cleanup_hook_evidence_row_id",
+          "cleanup_hook_source_row_id",
+          "cleanup_hook_id",
+          "cleanup_hook_function_identity_token",
+          "cleanup_hook_argument_identity_token",
+          "source_owned_cleanup_handoff",
+          "cleanup_hook_order_private",
+          "cleanup_hook_identity_private",
+          "canonical_executable_evidence",
+          "node_worker_threads_execution: false",
+          "napi_cleanup_hook_execution: false",
+          "native_addon_loaded: false",
+          "native_execution: false",
+          "renderer_execution: false",
+          "reconciler_execution: false",
+          "public_native_compatibility: false",
+          "react_behavior_error: false"
+        ]
+      }),
+      evidenceData({
+        role: "worker-908-fast-react-napi-currentness-validation",
+        path: fastReactNapiSourcePath,
+        sliceStart:
+          "validate_native_root_bridge_cleanup_generation_currentness_rows",
+        sliceEnd: "const fn bridge_handle_kind_code",
+        tokens: [
+          "validate_native_root_bridge_cleanup_generation_currentness_rows",
+          "has_native_root_bridge_cleanup_generation_currentness_public_native_claim",
+          "native_root_bridge_cleanup_generation_currentness_cleanup_hook_identity_current",
+          "cleanup_generation_consumer.cleanup_generation_consumed()",
+          "cleanup_generation_consumer.source_rows_validated()",
+          "cleanup_generation_consumer.cleanup_hook_preflight_accepted()",
+          "json_batch_lifecycle_executor_source_rows_validated()",
+          "json_batch_lifecycle_executor_replay_guard_consumed()",
+          "json_batch_lifecycle_executor_generation()",
+          "cleanup_generation_consumer.executor_generation()",
+          "current_lifecycle_consumer.rows().iter().any(|row| {",
+          "cleanup_handoff_rows.len()",
+          "row_ids.insert(cleanup_row.id())",
+          "cleanup_row.source_handle_kind()",
+          "native_root_bridge_cleanup_generation_currentness_row_for_handoff",
+          "cleanup_row.source_owned_executor_row()",
+          "cleanup_row.cleanup_hook_identity_private()",
+          "cleanup_row.cleanup_hook_order_private()",
+          "cleanup_row.canonical_executable_evidence()",
+          "current_render_row.source_environment_id()",
+          "cleanup_row.batch_index() != current_render_row.batch_index()",
+          "cleanup_row.request_id() != current_render_row.request_id()",
+          "cleanup_row.kind() != current_render_row.kind()",
+          "cleanup_row.source_environment_id() != source_environment_id",
+          "cleanup_row.source_root_handle() != source_root_handle",
+          "cleanup_row.source_root_id() != source_root_id",
+          "cleanup_row.cleanup_hook_evidence_row_id() != cleanup_hook_row.id()",
+          "cleanup_row.cleanup_hook_source_row_id() != cleanup_hook_row.source_row_id()",
+          "native_root_bridge_cleanup_generation_currentness_validate_handle_fields",
+          "expected_current_generation",
+          "checked_add(1)",
+          "cleanup_hook_row.source_current_generation()",
+          "expected_identity.matches_evidence(evidence)",
+          "expected_identity.matches_order(evidence)",
+          "node_worker_threads_execution()",
+          "napi_cleanup_hook_execution()",
+          "native_addon_loaded()",
+          "renderer_execution()",
+          "reconciler_execution()",
+          "public_native_compatibility()",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE"
+        ]
+      }),
+      evidenceData({
+        role: "worker-908-fast-react-napi-currentness-tests",
+        path: fastReactNapiSourcePath,
+        sliceStart:
+          "native_root_bridge_cleanup_generation_currentness_canary_accepts_current_private_handoff",
+        sliceEnd:
+          "native_root_bridge_batch_lifecycle_json_roundtrip_link_rejects_forged_rows",
+        tokens: [
+          "native_root_bridge_cleanup_generation_currentness_canary_accepts_current_private_handoff",
+          "native_root_bridge_cleanup_generation_currentness_canary_rejects_stale_generation_after_new_native_step",
+          "native_root_bridge_cleanup_generation_currentness_canary_rejects_forged_or_cloned_cleanup_rows",
+          "native_root_bridge_cleanup_generation_currentness_canary_rejects_cross_environment_and_cross_table_rows",
+          "native_root_bridge_cleanup_generation_currentness_canary_rejects_replay_and_retired_lifecycle",
+          "native_root_bridge_cleanup_generation_currentness_canary_rejects_missing_identity_caller_metadata_and_public_claims",
+          "cleanup-generation-currentness-canary-1-root",
+          "cleanup-generation-currentness-canary-1-value",
+          "batch-lifecycle-consumer-1-render",
+          "cleanup-generation-consumer-1-root",
+          "cleanup-generation-consumer-1-value",
+          "BridgeEnvironmentId::from_raw(764)",
+          "handle_table_current_generation()",
+          "cleanup_current_generation()",
+          "cleanup-hook-worker-root-before-value-release",
+          "cleanup-hook-worker-value-after-root-release",
+          "worker-render-root-stale-executable-preflight",
+          "worker-render-value-stale-executable-preflight",
+          "worker-root-handle-cleanup-hook",
+          "worker-value-handle-cleanup-hook",
+          "private-cleanup-hook-fn:worker-root-handle-teardown",
+          "private-cleanup-hook-fn:worker-value-handle-teardown",
+          "private-cleanup-hook-arg:worker-764-root-slot-1",
+          "private-cleanup-hook-arg:worker-764-value-slot-3",
+          "assert_cleanup_generation_currentness_row_inert(row)",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE",
+          "NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE",
+          "with_source_environment_id_for_test",
+          "with_source_handle_for_test",
+          "with_cleanup_hook_identity_private_for_test",
+          "with_source_owned_executor_row_for_test",
+          "with_native_execution_claim_for_test"
+        ],
+        forbiddenTokens: [
+          "rust_root_execution_boundary_called",
+          "publicSchedulerCompatibilityClaimed",
+          "publicReactActCompatibilityClaimed",
+          "publicRootRenderCompatibilityClaimed"
+        ]
+      }),
+      evidenceData({
+        role: "worker-908-progress-currentness-handoff",
+        path: worker908ProgressPath,
+        tokens: [
+          "worker-progress/worker-908-napi-cleanup-generation-currentness.md",
+          "crates/fast-react-napi/src/lib.rs",
+          "cleanup-generation currentness canary",
+          "json_batch_lifecycle_executor_generation",
+          "json_batch_lifecycle_executor_replay_guard_consumed",
+          "cleanup_generation_consumed",
+          "source_environment_id",
+          "source_root_handle",
+          "source_root_id",
+          "executor_handle_current_generation",
+          "cleanup_hook_source_current_generation",
+          "function identity token",
+          "argument identity token",
+          "stale cleanup handoff after another accepted native generation step",
+          "cleanup-generation replay and lifecycle retirement after unmount",
+          "public native execution claims",
+          "napi_add_env_cleanup_hook",
+          "native_root_bridge_cleanup_generation_currentness",
+          "source_owned_cleanup_handoff",
+          "does not load native addons",
+          "worker-thread teardown",
+          "renderer/reconciler",
+          "change package exports",
+          "compatibility."
         ]
       })
     ]
