@@ -3139,6 +3139,8 @@ test('private form action rejected-error preflight records rejected async action
   assert.equal(summary.rejectsForeignRejections, true);
   assert.equal(summary.rejectsMalformedRejections, true);
   assert.equal(summary.rejectsPublicErrorRouting, true);
+  assert.equal(summary.rejectsPublicDomMutation, true);
+  assert.equal(summary.rejectsPackageCompatibilityClaims, true);
   assert.equal(summary.acceptsRealForms, false);
   assert.equal(summary.constructsFormData, false);
   assert.equal(summary.createsSyntheticEvents, false);
@@ -3150,6 +3152,7 @@ test('private form action rejected-error preflight records rejected async action
   assert.equal(summary.queuesReactUpdates, false);
   assert.equal(summary.resetsForms, false);
   assert.equal(summary.publicFormSubmissionEnabled, false);
+  assert.equal(summary.publicDomMutationEnabled, false);
   assert.equal(summary.publicFormActionCompatibilityClaimed, false);
   assert.deepEqual(
     summary.sideEffects,
@@ -3288,6 +3291,7 @@ test('private form action rejected-error preflight records rejected async action
     false
   );
   assert.equal(record.resetActionPublicBlockers.realFormReset, false);
+  assertRejectedErrorPreflightPublicBlockersFailClosed(record);
   assert.equal(
     record.publicFormActionBoundary.publicFormSubmissionReachable,
     false
@@ -3306,6 +3310,9 @@ test('private form action rejected-error preflight records rejected async action
   assert.equal(
     record.publicFormActionBoundary.publicErrorRoutingReachable,
     false
+  );
+  assertRejectedErrorPreflightPublicBoundaryFailClosed(
+    record.publicFormActionBoundary
   );
   assert.deepEqual(
     record.sideEffects,
@@ -3354,6 +3361,22 @@ test('private form action rejected-error preflight records rejected async action
       compatibilityTarget,
       reason:
         'source rejected async callback execution was already consumed by this preflight gate'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          sourceAsyncCallbackExecutionId: rejectedExecution.executionId
+        }),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source rejected async callback execution was already consumed by a rejected-error preflight gate'
     }
   );
   assert.throws(
@@ -3570,6 +3593,58 @@ test('private form action rejected-error preflight records rejected async action
       reason: 'public reset request must remain blocked'
     }
   );
+  for (const {field, reason} of [
+    {
+      field: 'publicSubmitDispatchRequested',
+      reason: 'public submit dispatch must remain blocked'
+    },
+    {
+      field: 'publicFormSubmissionRequested',
+      reason: 'public form submission must remain blocked'
+    },
+    {
+      field: 'publicActionInvocationRequested',
+      reason: 'action invocation must remain blocked'
+    },
+    {
+      field: 'domMutationRequested',
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      field: 'publicDomMutationRequested',
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      field: 'compatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    },
+    {
+      field: 'publicFormActionCompatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    },
+    {
+      field: 'packageCompatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    }
+  ]) {
+    assert.throws(
+      () =>
+        formActions
+          .createFormActionRejectedErrorPreflightDiagnosticGate()
+          .recordRejectedErrorPreflight(rejectedExecution, {
+            explicitFormActionRejectedErrorPreflight: true,
+            [field]: true
+          }),
+      {
+        code:
+          formActions
+            .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+        compatibilityTarget,
+        reason
+      },
+      field
+    );
+  }
   assert.throws(
     () =>
       formActions.createUnsupportedFormActionRejectedErrorPreflightError({}),
@@ -17649,6 +17724,88 @@ function replaceDispatcherWithSpies(moduleExports) {
     };
   }
   return dispatchCalls;
+}
+
+function assertRejectedErrorPreflightPublicBlockersFailClosed(record) {
+  assert.deepEqual(record.resetActionPublicBlockers, {
+    status: 'blocked-public-form-action-reset-and-rejected-error-routing',
+    metadataOnly: true,
+    sourceAsyncCallbackExecutionId: record.sourceAsyncCallbackExecutionId,
+    sourceSubmitResetExecutionId: record.sourceSubmitResetExecutionId,
+    sourceResetIntentRequestId: record.sourceResetIntentRequestId,
+    publicFormActionsEnabled: false,
+    publicFormSubmissionReachable: false,
+    publicSubmitDispatchReachable: false,
+    publicRequestFormResetReachable: false,
+    publicActionInvocationReachable: false,
+    publicErrorRoutingReachable: false,
+    publicDomMutationReachable: false,
+    publicRootTouched: false,
+    formDataConstructed: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    reactUpdateQueued: false,
+    afterMutationEffectsVisited: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    rootErrorUpdateScheduled: false,
+    publicRootErrorCallbackInvoked: false,
+    errorBoundaryScheduled: false,
+    domMutation: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+  assert.equal(Object.isFrozen(record.resetActionPublicBlockers), true);
+}
+
+function assertRejectedErrorPreflightPublicBoundaryFailClosed(boundary) {
+  assert.deepEqual(boundary, {
+    status:
+      'blocked-public-form-action-rejected-error-preflight-compatibility',
+    publicFormActionsEnabled: false,
+    publicRequestFormResetReachable: false,
+    publicFormSubmissionReachable: false,
+    publicSubmitDispatchReachable: false,
+    publicActionInvocationReachable: false,
+    publicErrorRoutingReachable: false,
+    publicDomMutationReachable: false,
+    publicRootTouched: false,
+    realFormAccepted: false,
+    realFormInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    privateAsyncActionCallbackPubliclyReachable: false,
+    hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    reactUpdateQueued: false,
+    afterMutationEffectsVisited: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    rootErrorUpdateScheduled: false,
+    publicRootErrorCallbackInvoked: false,
+    errorBoundaryScheduled: false,
+    domMutation: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+  assert.equal(Object.isFrozen(boundary), true);
 }
 
 function createPrivateGateScenario() {

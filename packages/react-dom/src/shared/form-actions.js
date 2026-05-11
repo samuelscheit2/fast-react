@@ -108,6 +108,7 @@ const formActionSubmitResetExecutionRecordPayloads = new WeakMap();
 const formActionCallbackActionPreflightRecordPayloads = new WeakMap();
 const formActionAsyncCallbackExecutionRecordPayloads = new WeakMap();
 const formActionRejectedErrorPreflightRecordPayloads = new WeakMap();
+const consumedFormActionRejectedErrorPreflightExecutions = new WeakSet();
 
 const blockedRawAdmissionFields = freezeArray([
   'form',
@@ -1234,6 +1235,8 @@ function describePrivateFormActionRejectedErrorPreflightGate() {
     rejectsLiveForms: true,
     rejectsPublicDispatch: true,
     rejectsPublicErrorRouting: true,
+    rejectsPublicDomMutation: true,
+    rejectsPackageCompatibilityClaims: true,
     acceptsRealForms: false,
     acceptsRawEvents: false,
     acceptsActionFunctions: false,
@@ -1253,6 +1256,7 @@ function describePrivateFormActionRejectedErrorPreflightGate() {
     callsResetFormInstance: false,
     resetsForms: false,
     publicFormSubmissionEnabled: false,
+    publicDomMutationEnabled: false,
     publicFormActionCompatibilityClaimed: false,
     sideEffects: formActionRejectedErrorPreflightBlockedSideEffects,
     missingPrerequisites:
@@ -1912,6 +1916,11 @@ function recordFormActionRejectedErrorPreflightWithGate(
     assertAcceptedFormActionAsyncCallbackExecutionRecordForRejectedErrorPreflight(
       asyncCallbackExecutionRecord
     );
+  const normalizedAdmission =
+    normalizeFormActionRejectedErrorPreflightAdmission(
+      asyncExecution,
+      admission
+    );
 
   if (
     gateState.consumedRejectedExecutions.has(asyncCallbackExecutionRecord)
@@ -1920,12 +1929,16 @@ function recordFormActionRejectedErrorPreflightWithGate(
       'source rejected async callback execution was already consumed by this preflight gate'
     );
   }
-
-  const normalizedAdmission =
-    normalizeFormActionRejectedErrorPreflightAdmission(
-      asyncExecution,
-      admission
+  if (
+    consumedFormActionRejectedErrorPreflightExecutions.has(
+      asyncCallbackExecutionRecord
+    )
+  ) {
+    throwInvalidRejectedErrorPreflightRecord(
+      'source rejected async callback execution was already consumed by a rejected-error preflight gate'
     );
+  }
+
   const preflightSequence = gateState.nextRequestSequence++;
   const preflightId = `${gateState.requestIdPrefix}:${preflightSequence}`;
   const acceptedMetadataIds =
@@ -1945,6 +1958,9 @@ function recordFormActionRejectedErrorPreflightWithGate(
     createRejectedErrorResetActionPublicBlockers(asyncExecution);
 
   gateState.consumedRejectedExecutions.add(asyncCallbackExecutionRecord);
+  consumedFormActionRejectedErrorPreflightExecutions.add(
+    asyncCallbackExecutionRecord
+  );
 
   const payload = freezeRecord({
     schemaVersion: formActionRejectedErrorPreflightGateSchemaVersion,
@@ -2839,12 +2855,27 @@ function normalizeFormActionRejectedErrorPreflightAdmission(
       'public submit dispatch must remain blocked'
     );
   }
+  if (admission.publicSubmitDispatchRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'public submit dispatch must remain blocked'
+    );
+  }
+  if (admission.publicFormSubmissionRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'public form submission must remain blocked'
+    );
+  }
   if (admission.publicErrorRoutingRequested === true) {
     throwInvalidRejectedErrorPreflightAdmission(
       'public error routing must remain blocked'
     );
   }
   if (admission.actionInvocationRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'action invocation must remain blocked'
+    );
+  }
+  if (admission.publicActionInvocationRequested === true) {
     throwInvalidRejectedErrorPreflightAdmission(
       'action invocation must remain blocked'
     );
@@ -2874,6 +2905,23 @@ function normalizeFormActionRejectedErrorPreflightAdmission(
       'public reset request must remain blocked'
     );
   }
+  if (
+    admission.domMutationRequested === true ||
+    admission.publicDomMutationRequested === true
+  ) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'DOM mutation must remain blocked'
+    );
+  }
+  if (
+    admission.compatibilityClaimed === true ||
+    admission.publicFormActionCompatibilityClaimed === true ||
+    admission.packageCompatibilityClaimed === true
+  ) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'package compatibility must remain unclaimed'
+    );
+  }
 
   return freezeRecord({
     explicitFormActionRejectedErrorPreflight: true,
@@ -2895,13 +2943,18 @@ function normalizeFormActionRejectedErrorPreflightAdmission(
     sourceCallbackActionPreflightId:
       asyncExecution.sourceCallbackActionPreflightId,
     publicDispatchRequested: false,
+    publicSubmitDispatchRequested: false,
+    publicFormSubmissionRequested: false,
     publicErrorRoutingRequested: false,
     actionInvocationRequested: false,
+    publicActionInvocationRequested: false,
     formDataConstructionRequested: false,
     hostTransitionRequested: false,
     reactUpdateRequested: false,
     resetExecutionRequested: false,
     publicRequestFormResetRequested: false,
+    domMutationRequested: false,
+    publicDomMutationRequested: false,
     rawTargetCaptured: false,
     rawEventCaptured: false,
     rawActionCaptured: false,
@@ -2920,10 +2973,18 @@ function normalizeFormActionRejectedErrorPreflightAdmission(
     publicErrorRoutingStarted: false,
     rootErrorCallbackInvoked: false,
     hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
     resetStateQueued: false,
+    resetUpdateEnqueued: false,
     reactUpdateQueued: false,
+    afterMutationEffectsVisited: false,
     resetFormInstanceCalled: false,
+    formResetCommitted: false,
     realFormReset: false,
+    domMutation: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
     compatibilityClaimed: false
   });
 }
@@ -4466,6 +4527,7 @@ function createRejectedErrorResetActionPublicBlockers(asyncExecution) {
     publicRequestFormResetReachable: false,
     publicActionInvocationReachable: false,
     publicErrorRoutingReachable: false,
+    publicDomMutationReachable: false,
     publicRootTouched: false,
     formDataConstructed: false,
     actionInvoked: false,
@@ -4474,13 +4536,18 @@ function createRejectedErrorResetActionPublicBlockers(asyncExecution) {
     previousDispatcherCalled: false,
     resetFiberResolved: false,
     resetStateQueued: false,
+    resetUpdateEnqueued: false,
     reactUpdateQueued: false,
+    afterMutationEffectsVisited: false,
     resetFormInstanceCalled: false,
     formResetCommitted: false,
     realFormReset: false,
     rootErrorUpdateScheduled: false,
     publicRootErrorCallbackInvoked: false,
     errorBoundaryScheduled: false,
+    domMutation: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
     compatibilityClaimed: false
   });
 }
@@ -4601,7 +4668,9 @@ function createPublicFormActionRejectedErrorPreflightBoundary() {
     publicRequestFormResetReachable: false,
     publicFormSubmissionReachable: false,
     publicSubmitDispatchReachable: false,
+    publicActionInvocationReachable: false,
     publicErrorRoutingReachable: false,
+    publicDomMutationReachable: false,
     publicRootTouched: false,
     realFormAccepted: false,
     realFormInspected: false,
@@ -4614,13 +4683,21 @@ function createPublicFormActionRejectedErrorPreflightBoundary() {
     publicActionInvoked: false,
     privateAsyncActionCallbackPubliclyReachable: false,
     hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
     reactUpdateQueued: false,
+    afterMutationEffectsVisited: false,
     resetFormInstanceCalled: false,
     formResetCommitted: false,
     realFormReset: false,
     rootErrorUpdateScheduled: false,
     publicRootErrorCallbackInvoked: false,
     errorBoundaryScheduled: false,
+    domMutation: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
     compatibilityClaimed: false
   });
 }
