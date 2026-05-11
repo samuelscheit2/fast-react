@@ -8,7 +8,7 @@ use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
     ElementTypeHandle, FiberFlags, FiberId, FiberNode, FiberTag, FiberTopologyError, Lanes,
-    PropsHandle, StateHandle, UpdateQueueHandle,
+    PropsHandle, StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::HostTypes;
 
@@ -148,6 +148,7 @@ pub struct TestRendererCommittedFiberNodeInspection {
     child_lanes: Lanes,
     flags: FiberFlags,
     subtree_flags: FiberFlags,
+    state_node: StateNodeHandle,
     state_node_present: bool,
 }
 
@@ -233,10 +234,26 @@ impl TestRendererCommittedFiberNodeInspection {
     }
 
     #[must_use]
+    pub const fn state_node(self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
     pub const fn state_node_present(self) -> bool {
         self.state_node_present
     }
 }
+
+const TEST_RENDERER_COMMITTED_FIBER_INSPECTION_COMPATIBILITY_BLOCKERS: &[&str] = &[
+    "public serialization",
+    "react-test-renderer public compatibility",
+    "React DOM compatibility",
+    "native execution",
+    "broad renderer compatibility",
+    "act compatibility",
+    "Scheduler compatibility",
+    "package compatibility",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererCommittedFiberTreeInspection {
@@ -358,6 +375,71 @@ impl TestRendererCommittedFiberTreeInspection {
             None
         }
     }
+
+    #[must_use]
+    pub fn is_direct_multi_child_host_component_shape(&self) -> bool {
+        self.shape_name == "HostRoot->HostComponent->[HostText,HostText]"
+    }
+
+    #[must_use]
+    pub fn public_compatibility_blockers(&self) -> &[&'static str] {
+        TEST_RENDERER_COMMITTED_FIBER_INSPECTION_COMPATIBILITY_BLOCKERS
+    }
+
+    #[must_use]
+    pub const fn public_serialization_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn test_renderer_public_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn react_dom_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn native_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn broad_renderer_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn act_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn scheduler_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn package_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn public_serialization_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn test_renderer_public_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
 }
 
 pub fn inspect_test_renderer_committed_fiber_tree<H: HostTypes>(
@@ -462,19 +544,28 @@ impl TestRendererCommittedFiberTreeInspectionBuilder {
 
     fn finish_host_component_shape(
         self,
-        component: InspectedHostComponentWithText,
+        component: InspectedHostComponentWithTextChildren,
     ) -> Result<TestRendererCommittedFiberTreeInspection, TestRendererCommittedFiberInspectionError>
     {
+        let shape_name = if component.texts.len() == 1 {
+            "HostRoot->HostComponent->HostText"
+        } else {
+            "HostRoot->HostComponent->[HostText,HostText]"
+        };
+        let mut nodes = Vec::with_capacity(1 + component.texts.len());
+        nodes.push(component.component);
+        nodes.extend(component.texts.iter().copied());
+
         Ok(self.finish(
-            "HostRoot->HostComponent->HostText",
-            vec![component.component, component.text],
+            shape_name,
+            nodes,
             vec![component.component],
             vec![component.component],
             None,
             vec![component.component],
-            vec![component.text],
+            component.texts.clone(),
             component.component,
-            component.text,
+            component.texts[0],
         ))
     }
 
@@ -606,7 +697,7 @@ struct InspectedNestedHostComponent {
 
 #[derive(Debug, Clone)]
 enum InspectedHostComponentShape {
-    Text(InspectedHostComponentWithText),
+    Text(InspectedHostComponentWithTextChildren),
     Nested(InspectedNestedHostComponent),
 }
 
@@ -672,23 +763,75 @@ fn inspect_host_component_shape<H: HostTypes>(
     expect_state_node_present(component_node)?;
 
     let component_children = expect_child_count(store, component_id, 1)?;
-    let child_id = component_children[0];
-    let child_node = store.fiber_arena().get(child_id)?;
-    match child_node.tag() {
-        FiberTag::HostText => Ok(InspectedHostComponentShape::Text(
-            inspect_host_component_with_text(store, component_id)?,
-        )),
-        FiberTag::HostComponent => Ok(InspectedHostComponentShape::Nested(
-            inspect_nested_host_component_with_texts(store, component_id, child_id)?,
-        )),
-        actual => Err(
-            TestRendererCommittedFiberInspectionError::ExpectedFiberTag {
-                fiber: child_node.id(),
-                expected: FiberTag::HostText,
-                actual,
+    match component_children.as_slice() {
+        [child_id] => {
+            let child_node = store.fiber_arena().get(*child_id)?;
+            match child_node.tag() {
+                FiberTag::HostText => Ok(InspectedHostComponentShape::Text(
+                    inspect_host_component_with_text_children(store, component_id, &[*child_id])?,
+                )),
+                FiberTag::HostComponent => Ok(InspectedHostComponentShape::Nested(
+                    inspect_nested_host_component_with_texts(store, component_id, *child_id)?,
+                )),
+                actual => Err(
+                    TestRendererCommittedFiberInspectionError::ExpectedFiberTag {
+                        fiber: child_node.id(),
+                        expected: FiberTag::HostText,
+                        actual,
+                    },
+                ),
+            }
+        }
+        _ => Err(
+            TestRendererCommittedFiberInspectionError::UnsupportedShape {
+                fiber: component_id,
+                tag: FiberTag::HostComponent,
+                reason: "HostComponent generic private inspection admits only one direct child",
             },
         ),
     }
+}
+
+#[derive(Debug, Clone)]
+struct InspectedHostComponentWithTextChildren {
+    component: TestRendererCommittedFiberNodeInspection,
+    texts: Vec<TestRendererCommittedFiberNodeInspection>,
+}
+
+fn inspect_host_component_with_text_children<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    component_id: FiberId,
+    text_ids: &[FiberId],
+) -> Result<InspectedHostComponentWithTextChildren, TestRendererCommittedFiberInspectionError> {
+    let component_node = store.fiber_arena().get(component_id)?;
+    expect_fiber_tag(component_node, FiberTag::HostComponent)?;
+    expect_state_node_present(component_node)?;
+    let host_component = inspect_node(component_node);
+
+    let actual_text_ids = expect_child_count(store, component_id, text_ids.len())?;
+    if actual_text_ids != text_ids {
+        return Err(
+            TestRendererCommittedFiberInspectionError::UnsupportedShape {
+                fiber: component_id,
+                tag: FiberTag::HostComponent,
+                reason: "HostComponent text child source order does not match the current sibling chain",
+            },
+        );
+    }
+
+    let mut texts = Vec::with_capacity(text_ids.len());
+    for text_id in text_ids {
+        let text_node = store.fiber_arena().get(*text_id)?;
+        expect_fiber_tag(text_node, FiberTag::HostText)?;
+        expect_state_node_present(text_node)?;
+        expect_child_count(store, *text_id, 0)?;
+        texts.push(inspect_node(text_node));
+    }
+
+    Ok(InspectedHostComponentWithTextChildren {
+        component: host_component,
+        texts,
+    })
 }
 
 fn inspect_host_component_with_text<H: HostTypes>(
@@ -770,6 +913,7 @@ fn inspect_node(node: &FiberNode) -> TestRendererCommittedFiberNodeInspection {
         child_lanes: node.child_lanes(),
         flags: node.flags(),
         subtree_flags: node.subtree_flags(),
+        state_node: node.state_node(),
         state_node_present: !node.state_node().is_none(),
     }
 }
@@ -955,6 +1099,217 @@ mod tests {
         second_text: Option<FiberId>,
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct DirectMultiChildSource {
+        root: FiberRootId,
+        root_token: StateNodeHandle,
+        previous_current: FiberId,
+        committed_current: FiberId,
+        resulting_element: RootElementHandle,
+        render_lanes: Lanes,
+        finished_work_after_commit: Option<FiberId>,
+        finished_lanes_after_commit: Lanes,
+        component: FiberId,
+        component_element_type: ElementTypeHandle,
+        component_props: PropsHandle,
+        component_state_node: StateNodeHandle,
+        component_lanes: Lanes,
+        component_child_lanes: Lanes,
+        first_text: FiberId,
+        first_text_props: PropsHandle,
+        first_text_state_node: StateNodeHandle,
+        first_text_lanes: Lanes,
+        second_text: FiberId,
+        second_text_props: PropsHandle,
+        second_text_state_node: StateNodeHandle,
+        second_text_lanes: Lanes,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct DirectMultiChildRows {
+        host_root: TestRendererCommittedFiberNodeInspection,
+        component: TestRendererCommittedFiberNodeInspection,
+        first_text: TestRendererCommittedFiberNodeInspection,
+        second_text: TestRendererCommittedFiberNodeInspection,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct ReconcilerDirectMultiChildFiberInspection {
+        source: DirectMultiChildSource,
+        inspection: TestRendererCommittedFiberTreeInspection,
+        store_current: FiberId,
+        finished_work_after_commit: Option<FiberId>,
+        finished_lanes_after_commit: Lanes,
+        rows: DirectMultiChildRows,
+    }
+
+    impl ReconcilerDirectMultiChildFiberInspection {
+        fn shape_name(&self) -> &'static str {
+            self.inspection.shape_name()
+        }
+
+        const fn source(&self) -> DirectMultiChildSource {
+            self.source
+        }
+
+        const fn store_current(&self) -> FiberId {
+            self.store_current
+        }
+
+        const fn previous_current(&self) -> FiberId {
+            self.source.previous_current
+        }
+
+        const fn render_lanes(&self) -> Lanes {
+            self.source.render_lanes
+        }
+
+        const fn finished_work_after_commit(&self) -> Option<FiberId> {
+            self.finished_work_after_commit
+        }
+
+        const fn finished_lanes_after_commit(&self) -> Lanes {
+            self.finished_lanes_after_commit
+        }
+
+        const fn host_root(&self) -> TestRendererCommittedFiberNodeInspection {
+            self.rows.host_root
+        }
+
+        const fn host_component(&self) -> TestRendererCommittedFiberNodeInspection {
+            self.rows.component
+        }
+
+        const fn first_text(&self) -> TestRendererCommittedFiberNodeInspection {
+            self.rows.first_text
+        }
+
+        const fn second_text(&self) -> TestRendererCommittedFiberNodeInspection {
+            self.rows.second_text
+        }
+
+        fn blockers(&self) -> &[&'static str] {
+            self.inspection.public_compatibility_blockers()
+        }
+
+        const fn public_serialization_blocked(&self) -> bool {
+            true
+        }
+
+        const fn test_renderer_public_compatibility_blocked(&self) -> bool {
+            true
+        }
+
+        const fn react_dom_compatibility_blocked(&self) -> bool {
+            true
+        }
+
+        const fn native_execution_blocked(&self) -> bool {
+            true
+        }
+
+        const fn broad_renderer_compatibility_blocked(&self) -> bool {
+            true
+        }
+
+        const fn act_compatibility_blocked(&self) -> bool {
+            true
+        }
+
+        const fn scheduler_compatibility_blocked(&self) -> bool {
+            true
+        }
+
+        const fn package_compatibility_blocked(&self) -> bool {
+            true
+        }
+
+        const fn public_serialization_compatibility_claimed(&self) -> bool {
+            false
+        }
+
+        const fn test_renderer_public_compatibility_claimed(&self) -> bool {
+            false
+        }
+
+        const fn react_dom_compatibility_claimed(&self) -> bool {
+            false
+        }
+
+        fn validate_against_store(
+            &self,
+            store: &FiberRootStore<Host>,
+        ) -> Result<(), ReconcilerDirectMultiChildFiberInspectionError> {
+            let root = store
+                .root(self.source.root)
+                .map_err(TestRendererCommittedFiberInspectionError::from)?;
+            if root.current() != self.store_current {
+                return Err(
+                    ReconcilerDirectMultiChildFiberInspectionError::CurrentRootMismatch {
+                        expected: self.store_current,
+                        actual: root.current(),
+                    },
+                );
+            }
+            if root.finished_work() != self.finished_work_after_commit {
+                return Err(
+                    ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                        field: "finished_work_after_commit",
+                    },
+                );
+            }
+            if root.finished_lanes() != self.finished_lanes_after_commit {
+                return Err(
+                    ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                        field: "finished_lanes_after_commit",
+                    },
+                );
+            }
+
+            let inspection = inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary(
+                store,
+                self.source,
+            )?;
+            if inspection != self.inspection {
+                return Err(
+                    ReconcilerDirectMultiChildFiberInspectionError::StaleOrClonedInspectionRows,
+                );
+            }
+
+            validate_direct_multi_child_inspection(store, self.source, &inspection)?;
+            Ok(())
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    enum ReconcilerDirectMultiChildFiberInspectionError {
+        FiberInspection(TestRendererCommittedFiberInspectionError),
+        ExpectedShape { actual: &'static str },
+        CurrentRootMismatch { expected: FiberId, actual: FiberId },
+        SourceMismatch { field: &'static str },
+        StaleOrClonedInspectionRows,
+    }
+
+    impl From<TestRendererCommittedFiberInspectionError>
+        for ReconcilerDirectMultiChildFiberInspectionError
+    {
+        fn from(error: TestRendererCommittedFiberInspectionError) -> Self {
+            Self::FiberInspection(error)
+        }
+    }
+
+    impl From<FiberTopologyError> for ReconcilerDirectMultiChildFiberInspectionError {
+        fn from(error: FiberTopologyError) -> Self {
+            Self::FiberInspection(TestRendererCommittedFiberInspectionError::from(error))
+        }
+    }
+
+    impl From<HostRootStateStoreError> for ReconcilerDirectMultiChildFiberInspectionError {
+        fn from(error: HostRootStateStoreError) -> Self {
+            Self::FiberInspection(TestRendererCommittedFiberInspectionError::from(error))
+        }
+    }
+
     fn prepare_render(
         store: &mut FiberRootStore<Host>,
         root_id: FiberRootId,
@@ -1045,6 +1400,438 @@ mod tests {
             first_text: Some(first_text),
             component,
             component_text,
+        }
+    }
+
+    fn commit_direct_multi_child_host_component_shape(
+        store: &mut FiberRootStore<Host>,
+        root_id: FiberRootId,
+        render: HostRootRenderPhaseRecord,
+    ) -> DirectMultiChildSource {
+        commit_direct_multi_child_host_component_shape_with_order(store, root_id, render, false)
+    }
+
+    fn commit_direct_multi_child_host_component_shape_with_order(
+        store: &mut FiberRootStore<Host>,
+        root_id: FiberRootId,
+        render: HostRootRenderPhaseRecord,
+        reversed_text_order: bool,
+    ) -> DirectMultiChildSource {
+        let resulting_element = RootElementHandle::from_raw(90);
+        let host_root = render.work_in_progress();
+        let component_element_type = ElementTypeHandle::from_raw(91);
+        let component_props = PropsHandle::from_raw(92);
+        let first_text_props = PropsHandle::from_raw(93);
+        let second_text_props = PropsHandle::from_raw(94);
+        let component_state_node = StateNodeHandle::from_raw(191);
+        let first_text_state_node = StateNodeHandle::from_raw(192);
+        let second_text_state_node = StateNodeHandle::from_raw(193);
+        let component_lanes = Lanes::SYNC;
+        let component_child_lanes = Lanes::DEFAULT;
+        let first_text_lanes = Lanes::DEFAULT;
+        let second_text_lanes = Lanes::TRANSITION;
+
+        let component = create_host_component_fiber(
+            store,
+            host_root,
+            component_element_type.raw(),
+            component_props.raw(),
+            component_state_node.raw(),
+        );
+        let first_text = create_host_text_fiber(
+            store,
+            host_root,
+            first_text_props.raw(),
+            first_text_state_node.raw(),
+        );
+        let second_text = create_host_text_fiber(
+            store,
+            host_root,
+            second_text_props.raw(),
+            second_text_state_node.raw(),
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(component).unwrap();
+            node.set_lanes(component_lanes);
+            node.set_child_lanes(component_child_lanes);
+        }
+        store
+            .fiber_arena_mut()
+            .get_mut(first_text)
+            .unwrap()
+            .set_lanes(first_text_lanes);
+        store
+            .fiber_arena_mut()
+            .get_mut(second_text)
+            .unwrap()
+            .set_lanes(second_text_lanes);
+
+        let component_children = if reversed_text_order {
+            vec![second_text, first_text]
+        } else {
+            vec![first_text, second_text]
+        };
+        store
+            .fiber_arena_mut()
+            .set_children(component, &component_children)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[component])
+            .unwrap();
+        let commit = commit_finished_host_root(store, render).unwrap();
+        let root = store.root(root_id).unwrap();
+
+        DirectMultiChildSource {
+            root: root_id,
+            root_token: root_id.state_node_handle(),
+            previous_current: commit.previous_current(),
+            committed_current: commit.current(),
+            resulting_element,
+            render_lanes: commit.finished_lanes(),
+            finished_work_after_commit: root.finished_work(),
+            finished_lanes_after_commit: root.finished_lanes(),
+            component,
+            component_element_type,
+            component_props,
+            component_state_node,
+            component_lanes,
+            component_child_lanes,
+            first_text,
+            first_text_props,
+            first_text_state_node,
+            first_text_lanes,
+            second_text,
+            second_text_props,
+            second_text_state_node,
+            second_text_lanes,
+        }
+    }
+
+    fn commit_direct_multi_child_host_component_shape_with_missing_text_state(
+        store: &mut FiberRootStore<Host>,
+        root_id: FiberRootId,
+        render: HostRootRenderPhaseRecord,
+    ) -> DirectMultiChildSource {
+        let source = commit_direct_multi_child_host_component_shape(store, root_id, render);
+        store
+            .fiber_arena_mut()
+            .get_mut(source.second_text)
+            .unwrap()
+            .set_state_node(StateNodeHandle::NONE);
+        source
+    }
+
+    fn commit_direct_multi_child_host_component_shape_with_extra_text(
+        store: &mut FiberRootStore<Host>,
+        root_id: FiberRootId,
+        render: HostRootRenderPhaseRecord,
+    ) -> DirectMultiChildSource {
+        let host_root = render.work_in_progress();
+        let component = create_host_component_fiber(store, host_root, 101, 102, 201);
+        let first_text = create_host_text_fiber(store, host_root, 103, 202);
+        let second_text = create_host_text_fiber(store, host_root, 104, 203);
+        let extra_text = create_host_text_fiber(store, host_root, 105, 204);
+        store
+            .fiber_arena_mut()
+            .set_children(component, &[first_text, second_text, extra_text])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[component])
+            .unwrap();
+        let commit = commit_finished_host_root(store, render).unwrap();
+        let root = store.root(root_id).unwrap();
+
+        DirectMultiChildSource {
+            root: root_id,
+            root_token: root_id.state_node_handle(),
+            previous_current: commit.previous_current(),
+            committed_current: commit.current(),
+            resulting_element: RootElementHandle::from_raw(100),
+            render_lanes: commit.finished_lanes(),
+            finished_work_after_commit: root.finished_work(),
+            finished_lanes_after_commit: root.finished_lanes(),
+            component,
+            component_element_type: ElementTypeHandle::from_raw(101),
+            component_props: PropsHandle::from_raw(102),
+            component_state_node: StateNodeHandle::from_raw(201),
+            component_lanes: Lanes::NO,
+            component_child_lanes: Lanes::NO,
+            first_text,
+            first_text_props: PropsHandle::from_raw(103),
+            first_text_state_node: StateNodeHandle::from_raw(202),
+            first_text_lanes: Lanes::NO,
+            second_text,
+            second_text_props: PropsHandle::from_raw(104),
+            second_text_state_node: StateNodeHandle::from_raw(203),
+            second_text_lanes: Lanes::NO,
+        }
+    }
+
+    fn inspect_reconciler_direct_multi_child_fiber_shape_for_canary(
+        store: &FiberRootStore<Host>,
+        source: DirectMultiChildSource,
+    ) -> Result<
+        ReconcilerDirectMultiChildFiberInspection,
+        ReconcilerDirectMultiChildFiberInspectionError,
+    > {
+        let inspection =
+            inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary(store, source)?;
+        let rows = validate_direct_multi_child_inspection(store, source, &inspection)?;
+        let root = store
+            .root(source.root)
+            .map_err(TestRendererCommittedFiberInspectionError::from)?;
+
+        Ok(ReconcilerDirectMultiChildFiberInspection {
+            source,
+            inspection,
+            store_current: root.current(),
+            finished_work_after_commit: root.finished_work(),
+            finished_lanes_after_commit: root.finished_lanes(),
+            rows,
+        })
+    }
+
+    fn inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary(
+        store: &FiberRootStore<Host>,
+        source: DirectMultiChildSource,
+    ) -> Result<
+        TestRendererCommittedFiberTreeInspection,
+        ReconcilerDirectMultiChildFiberInspectionError,
+    > {
+        let root = store
+            .root(source.root)
+            .map_err(TestRendererCommittedFiberInspectionError::from)?;
+        let current = root.current();
+        let host_root_node = store.fiber_arena().get(current)?;
+        expect_fiber_tag(host_root_node, FiberTag::HostRoot)?;
+        validate_host_root_state_node(source.root, host_root_node)?;
+        let resulting_element = store
+            .host_root_states()
+            .get(host_root_node.memoized_state())?
+            .element();
+        let host_root = inspect_node(host_root_node);
+        let root_children = expect_child_count(store, current, 1)?;
+        let [component_id] = root_children.as_slice() else {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "direct.root_child_count",
+                },
+            );
+        };
+        if *component_id != source.component {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "direct.root_child_identity",
+                },
+            );
+        }
+
+        let component = inspect_host_component_with_text_children(
+            store,
+            source.component,
+            &[source.first_text, source.second_text],
+        )?;
+        let builder = TestRendererCommittedFiberTreeInspectionBuilder::new(
+            source.root,
+            current,
+            resulting_element,
+            host_root,
+        );
+        Ok(builder.finish_host_component_shape(component)?)
+    }
+
+    fn validate_direct_multi_child_inspection(
+        store: &FiberRootStore<Host>,
+        source: DirectMultiChildSource,
+        inspection: &TestRendererCommittedFiberTreeInspection,
+    ) -> Result<DirectMultiChildRows, ReconcilerDirectMultiChildFiberInspectionError> {
+        let root = store
+            .root(source.root)
+            .map_err(TestRendererCommittedFiberInspectionError::from)?;
+        if root.current() != source.committed_current {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::CurrentRootMismatch {
+                    expected: source.committed_current,
+                    actual: root.current(),
+                },
+            );
+        }
+        if root.finished_work() != source.finished_work_after_commit {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "source.finished_work_after_commit",
+                },
+            );
+        }
+        if root.finished_lanes() != source.finished_lanes_after_commit {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "source.finished_lanes_after_commit",
+                },
+            );
+        }
+        if !inspection.is_direct_multi_child_host_component_shape() {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::ExpectedShape {
+                    actual: inspection.shape_name(),
+                },
+            );
+        }
+        if inspection.root() != source.root {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "inspection.root",
+                },
+            );
+        }
+        if inspection.current() != source.committed_current {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "inspection.current",
+                },
+            );
+        }
+        if inspection.resulting_element() != source.resulting_element {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "inspection.resulting_element",
+                },
+            );
+        }
+        if inspection.root_children().len() != 1
+            || inspection.host_children().len() != 1
+            || inspection.host_components().len() != 1
+            || inspection.host_texts().len() != 2
+            || inspection.has_function_component_wrapper()
+            || inspection.nested_host_component().is_some()
+        {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "inspection.child_sets",
+                },
+            );
+        }
+
+        let host_root = inspection.host_root();
+        let component = inspection.host_component();
+        let first_text = inspection.host_texts()[0];
+        let second_text = inspection.host_texts()[1];
+
+        expect_current_row(store, host_root, "host_root.row")?;
+        expect_current_row(store, component, "component.row")?;
+        expect_current_row(store, first_text, "first_text.row")?;
+        expect_current_row(store, second_text, "second_text.row")?;
+
+        if host_root.fiber() != source.committed_current
+            || host_root.tag() != FiberTag::HostRoot
+            || host_root.parent().is_some()
+            || host_root.child() != Some(source.component)
+            || host_root.sibling().is_some()
+            || host_root.alternate() != Some(source.previous_current)
+            || host_root.state_node() != source.root_token
+            || source.root_token != source.root.state_node_handle()
+        {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "host_root.identity",
+                },
+            );
+        }
+
+        let previous_current = store.fiber_arena().get(source.previous_current)?;
+        if previous_current.alternate() != Some(source.committed_current) {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "host_root.alternate_current",
+                },
+            );
+        }
+
+        if component.fiber() != source.component
+            || component.tag() != FiberTag::HostComponent
+            || component.parent() != Some(host_root.fiber())
+            || component.child() != Some(source.first_text)
+            || component.sibling().is_some()
+            || component.index() != 0
+            || component.element_type() != source.component_element_type
+            || component.pending_props() != source.component_props
+            || component.memoized_props() != source.component_props
+            || component.state_node() != source.component_state_node
+            || component.lanes() != source.component_lanes
+            || component.child_lanes() != source.component_child_lanes
+        {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "component.identity",
+                },
+            );
+        }
+
+        if first_text.fiber() != source.first_text
+            || first_text.tag() != FiberTag::HostText
+            || first_text.parent() != Some(source.component)
+            || first_text.child().is_some()
+            || first_text.sibling() != Some(source.second_text)
+            || first_text.index() != 0
+            || first_text.pending_props() != source.first_text_props
+            || first_text.memoized_props() != source.first_text_props
+            || first_text.state_node() != source.first_text_state_node
+            || first_text.lanes() != source.first_text_lanes
+        {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "first_text.identity",
+                },
+            );
+        }
+
+        if second_text.fiber() != source.second_text
+            || second_text.tag() != FiberTag::HostText
+            || second_text.parent() != Some(source.component)
+            || second_text.child().is_some()
+            || second_text.sibling().is_some()
+            || second_text.index() != 1
+            || second_text.pending_props() != source.second_text_props
+            || second_text.memoized_props() != source.second_text_props
+            || second_text.state_node() != source.second_text_state_node
+            || second_text.lanes() != source.second_text_lanes
+        {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "second_text.identity",
+                },
+            );
+        }
+
+        let component_children = store.fiber_arena().child_ids(source.component)?;
+        if component_children != [source.first_text, source.second_text] {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "component.child_order",
+                },
+            );
+        }
+
+        Ok(DirectMultiChildRows {
+            host_root,
+            component,
+            first_text,
+            second_text,
+        })
+    }
+
+    fn expect_current_row(
+        store: &FiberRootStore<Host>,
+        row: TestRendererCommittedFiberNodeInspection,
+        field: &'static str,
+    ) -> Result<(), ReconcilerDirectMultiChildFiberInspectionError> {
+        let current = inspect_node(store.fiber_arena().get(row.fiber())?);
+        if current == row {
+            Ok(())
+        } else {
+            Err(ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch { field })
         }
     }
 
@@ -1190,6 +1977,159 @@ mod tests {
         assert_eq!(text.pending_props(), PropsHandle::from_raw(42));
         assert_eq!(text.memoized_props(), PropsHandle::from_raw(42));
         assert!(text.state_node_present());
+    }
+
+    #[test]
+    fn reconciler_private_fiber_inspection_describes_direct_multi_child_host_component_shape() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
+        let source = commit_direct_multi_child_host_component_shape(&mut store, root_id, render);
+
+        let inspection =
+            inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary(&store, source)
+                .unwrap();
+        let host_root = inspection.host_root();
+        let component = inspection.host_component();
+        let first_text = inspection.host_texts()[0];
+        let second_text = inspection.host_texts()[1];
+
+        assert_eq!(
+            inspection.shape_name(),
+            "HostRoot->HostComponent->[HostText,HostText]"
+        );
+        assert!(inspection.is_direct_multi_child_host_component_shape());
+        assert_eq!(
+            inspection.fiber_tag_order(),
+            [
+                FiberTag::HostRoot,
+                FiberTag::HostComponent,
+                FiberTag::HostText,
+                FiberTag::HostText
+            ]
+        );
+        assert_eq!(inspection.root_child_tags(), [FiberTag::HostComponent]);
+        assert_eq!(inspection.host_child_tags(), [FiberTag::HostComponent]);
+        assert_eq!(inspection.root_children().len(), 1);
+        assert_eq!(inspection.host_children().len(), 1);
+        assert_eq!(inspection.host_components().len(), 1);
+        assert_eq!(inspection.host_texts().len(), 2);
+        assert!(inspection.function_component().is_none());
+        assert!(!inspection.has_function_component_wrapper());
+        assert!(inspection.nested_host_component().is_none());
+        assert_eq!(inspection.host_text(), first_text);
+        assert_eq!(host_root.fiber(), source.committed_current);
+        assert_eq!(host_root.alternate(), Some(source.previous_current));
+        assert_eq!(host_root.state_node(), source.root_token);
+        assert_eq!(component.fiber(), source.component);
+        assert_eq!(component.parent(), Some(host_root.fiber()));
+        assert_eq!(component.child(), Some(first_text.fiber()));
+        assert_eq!(component.sibling(), None);
+        assert_eq!(component.index(), 0);
+        assert_eq!(component.element_type(), source.component_element_type);
+        assert_eq!(component.pending_props(), source.component_props);
+        assert_eq!(component.memoized_props(), source.component_props);
+        assert_eq!(component.state_node(), source.component_state_node);
+        assert_eq!(component.lanes(), source.component_lanes);
+        assert_eq!(component.child_lanes(), source.component_child_lanes);
+        assert_eq!(first_text.fiber(), source.first_text);
+        assert_eq!(first_text.parent(), Some(component.fiber()));
+        assert_eq!(first_text.sibling(), Some(second_text.fiber()));
+        assert_eq!(first_text.index(), 0);
+        assert_eq!(first_text.pending_props(), source.first_text_props);
+        assert_eq!(first_text.memoized_props(), source.first_text_props);
+        assert_eq!(first_text.state_node(), source.first_text_state_node);
+        assert_eq!(first_text.lanes(), source.first_text_lanes);
+        assert_eq!(second_text.fiber(), source.second_text);
+        assert_eq!(second_text.parent(), Some(component.fiber()));
+        assert_eq!(second_text.sibling(), None);
+        assert_eq!(second_text.index(), 1);
+        assert_eq!(second_text.pending_props(), source.second_text_props);
+        assert_eq!(second_text.memoized_props(), source.second_text_props);
+        assert_eq!(second_text.state_node(), source.second_text_state_node);
+        assert_eq!(second_text.lanes(), source.second_text_lanes);
+    }
+
+    #[test]
+    fn generic_committed_fiber_inspection_rejects_direct_multi_child_host_component_shape() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
+        let source = commit_direct_multi_child_host_component_shape(&mut store, root_id, render);
+
+        let error = inspect_test_renderer_committed_fiber_tree(&store, root_id).unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestRendererCommittedFiberInspectionError::UnexpectedChildCount {
+                fiber,
+                tag: FiberTag::HostComponent,
+                expected: 1,
+                actual: 2
+            } if fiber == source.component
+        ));
+    }
+
+    #[test]
+    fn reconciler_direct_multi_child_fiber_inspection_records_source_currentness_and_blockers() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
+        let source = commit_direct_multi_child_host_component_shape(&mut store, root_id, render);
+
+        let proof =
+            inspect_reconciler_direct_multi_child_fiber_shape_for_canary(&store, source).unwrap();
+
+        assert_eq!(proof.source(), source);
+        assert_eq!(
+            proof.shape_name(),
+            "HostRoot->HostComponent->[HostText,HostText]"
+        );
+        assert_eq!(proof.store_current(), source.committed_current);
+        assert_eq!(proof.previous_current(), source.previous_current);
+        assert_eq!(proof.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(proof.finished_work_after_commit(), None);
+        assert_eq!(proof.finished_lanes_after_commit(), Lanes::NO);
+        assert_eq!(proof.host_root().state_node(), source.root_token);
+        assert_eq!(
+            proof.host_component().state_node(),
+            source.component_state_node
+        );
+        assert_eq!(
+            proof.host_component().pending_props(),
+            source.component_props
+        );
+        assert_eq!(proof.host_component().lanes(), source.component_lanes);
+        assert_eq!(
+            proof.first_text().state_node(),
+            source.first_text_state_node
+        );
+        assert_eq!(proof.first_text().pending_props(), source.first_text_props);
+        assert_eq!(proof.first_text().sibling(), Some(source.second_text));
+        assert_eq!(proof.first_text().lanes(), source.first_text_lanes);
+        assert_eq!(
+            proof.second_text().state_node(),
+            source.second_text_state_node
+        );
+        assert_eq!(
+            proof.second_text().pending_props(),
+            source.second_text_props
+        );
+        assert_eq!(proof.second_text().sibling(), None);
+        assert_eq!(proof.second_text().lanes(), source.second_text_lanes);
+        assert_eq!(
+            proof.blockers(),
+            TEST_RENDERER_COMMITTED_FIBER_INSPECTION_COMPATIBILITY_BLOCKERS
+        );
+        assert!(proof.public_serialization_blocked());
+        assert!(proof.test_renderer_public_compatibility_blocked());
+        assert!(proof.react_dom_compatibility_blocked());
+        assert!(proof.native_execution_blocked());
+        assert!(proof.broad_renderer_compatibility_blocked());
+        assert!(proof.act_compatibility_blocked());
+        assert!(proof.scheduler_compatibility_blocked());
+        assert!(proof.package_compatibility_blocked());
+        assert!(!proof.public_serialization_compatibility_claimed());
+        assert!(!proof.test_renderer_public_compatibility_claimed());
+        assert!(!proof.react_dom_compatibility_claimed());
+        proof.validate_against_store(&store).unwrap();
     }
 
     #[test]
@@ -1407,6 +2347,218 @@ mod tests {
         assert!(inner.state_node_present());
         assert!(first_text.state_node_present());
         assert!(second_text.state_node_present());
+    }
+
+    #[test]
+    fn reconciler_direct_multi_child_fiber_inspection_rejects_empty_root() {
+        let (store, root_id) = root_store();
+
+        let error = inspect_test_renderer_committed_fiber_tree(&store, root_id).unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestRendererCommittedFiberInspectionError::UnexpectedChildCount {
+                tag: FiberTag::HostRoot,
+                expected: 1,
+                actual: 0,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn reconciler_direct_multi_child_fiber_inspection_rejects_wrong_root_current() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
+        let source = commit_direct_multi_child_host_component_shape(&mut store, root_id, render);
+        let proof =
+            inspect_reconciler_direct_multi_child_fiber_shape_for_canary(&store, source).unwrap();
+        let other_root = store.create_client_root((), RootOptions::new()).unwrap();
+        let wrong_current = store.root(other_root).unwrap().current();
+
+        store.root_mut(root_id).unwrap().set_current(wrong_current);
+        let error = proof.validate_against_store(&store).unwrap_err();
+
+        assert!(matches!(
+            error,
+            ReconcilerDirectMultiChildFiberInspectionError::CurrentRootMismatch {
+                expected,
+                actual
+            } if expected == source.committed_current && actual == wrong_current
+        ));
+    }
+
+    #[test]
+    fn reconciler_direct_multi_child_fiber_inspection_rejects_reversed_text_siblings() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
+        let source = commit_direct_multi_child_host_component_shape_with_order(
+            &mut store, root_id, render, true,
+        );
+
+        let error = inspect_reconciler_direct_multi_child_fiber_shape_for_canary(&store, source)
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            ReconcilerDirectMultiChildFiberInspectionError::FiberInspection(
+                TestRendererCommittedFiberInspectionError::UnsupportedShape {
+                    fiber,
+                    tag: FiberTag::HostComponent,
+                    ..
+                }
+            ) if fiber == source.component
+        ));
+    }
+
+    #[test]
+    fn reconciler_direct_multi_child_fiber_inspection_rejects_missing_state_node() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
+        let source = commit_direct_multi_child_host_component_shape_with_missing_text_state(
+            &mut store, root_id, render,
+        );
+
+        let error = inspect_reconciler_direct_multi_child_fiber_shape_for_canary(&store, source)
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            ReconcilerDirectMultiChildFiberInspectionError::FiberInspection(
+                TestRendererCommittedFiberInspectionError::MissingStateNode {
+                    fiber,
+                    tag: FiberTag::HostText
+                }
+            ) if fiber == source.second_text
+        ));
+    }
+
+    #[test]
+    fn reconciler_direct_multi_child_fiber_inspection_rejects_extra_child() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(100));
+        let source = commit_direct_multi_child_host_component_shape_with_extra_text(
+            &mut store, root_id, render,
+        );
+
+        let error = inspect_reconciler_direct_multi_child_fiber_shape_for_canary(&store, source)
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            ReconcilerDirectMultiChildFiberInspectionError::FiberInspection(
+                TestRendererCommittedFiberInspectionError::UnexpectedChildCount {
+                    fiber,
+                    tag: FiberTag::HostComponent,
+                    expected: 2,
+                    actual: 3
+                    ..
+                }
+            ) if fiber == source.component
+        ));
+    }
+
+    #[test]
+    fn reconciler_direct_multi_child_fiber_inspection_rejects_nested_component_shape() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(80));
+        let nested = commit_nested_host_shape(&mut store, render, true);
+        let root = store.root(root_id).unwrap();
+        let host_root = root.current();
+        let source = DirectMultiChildSource {
+            root: root_id,
+            root_token: root_id.state_node_handle(),
+            previous_current: store
+                .fiber_arena()
+                .get(host_root)
+                .unwrap()
+                .alternate()
+                .unwrap(),
+            committed_current: host_root,
+            resulting_element: RootElementHandle::from_raw(80),
+            render_lanes: Lanes::DEFAULT,
+            finished_work_after_commit: root.finished_work(),
+            finished_lanes_after_commit: root.finished_lanes(),
+            component: nested.outer,
+            component_element_type: ElementTypeHandle::from_raw(81),
+            component_props: PropsHandle::from_raw(82),
+            component_state_node: StateNodeHandle::from_raw(181),
+            component_lanes: Lanes::NO,
+            component_child_lanes: Lanes::NO,
+            first_text: nested.first_text,
+            first_text_props: PropsHandle::from_raw(85),
+            first_text_state_node: StateNodeHandle::from_raw(185),
+            first_text_lanes: Lanes::NO,
+            second_text: nested.second_text.unwrap(),
+            second_text_props: PropsHandle::from_raw(86),
+            second_text_state_node: StateNodeHandle::from_raw(186),
+            second_text_lanes: Lanes::NO,
+        };
+
+        let error = inspect_reconciler_direct_multi_child_fiber_shape_for_canary(&store, source)
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            ReconcilerDirectMultiChildFiberInspectionError::FiberInspection(
+                TestRendererCommittedFiberInspectionError::UnexpectedChildCount {
+                    fiber,
+                    tag: FiberTag::HostComponent,
+                    expected: 2,
+                    actual: 1
+                }
+            ) if fiber == nested.outer
+        ));
+    }
+
+    #[test]
+    fn reconciler_direct_multi_child_fiber_inspection_rejects_stale_cloned_rows() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
+        let source = commit_direct_multi_child_host_component_shape(&mut store, root_id, render);
+        let proof =
+            inspect_reconciler_direct_multi_child_fiber_shape_for_canary(&store, source).unwrap();
+        let cloned_rows = proof.clone();
+        let second_render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
+        let _second_source =
+            commit_direct_multi_child_host_component_shape(&mut store, root_id, second_render);
+
+        let error = cloned_rows.validate_against_store(&store).unwrap_err();
+
+        assert!(matches!(
+            error,
+            ReconcilerDirectMultiChildFiberInspectionError::CurrentRootMismatch {
+                expected,
+                actual
+            } if expected == source.committed_current && actual != source.committed_current
+        ));
+    }
+
+    #[test]
+    fn committed_fiber_inspection_keeps_public_compatibility_flags_blocked() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
+        let source = commit_direct_multi_child_host_component_shape(&mut store, root_id, render);
+
+        let inspection =
+            inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary(&store, source)
+                .unwrap();
+
+        assert_eq!(
+            inspection.public_compatibility_blockers(),
+            TEST_RENDERER_COMMITTED_FIBER_INSPECTION_COMPATIBILITY_BLOCKERS
+        );
+        assert!(inspection.public_serialization_blocked());
+        assert!(inspection.test_renderer_public_compatibility_blocked());
+        assert!(inspection.react_dom_compatibility_blocked());
+        assert!(inspection.native_execution_blocked());
+        assert!(inspection.broad_renderer_compatibility_blocked());
+        assert!(inspection.act_compatibility_blocked());
+        assert!(inspection.scheduler_compatibility_blocked());
+        assert!(inspection.package_compatibility_blocked());
+        assert!(!inspection.public_serialization_compatibility_claimed());
+        assert!(!inspection.test_renderer_public_compatibility_claimed());
+        assert!(!inspection.react_dom_compatibility_claimed());
     }
 
     #[test]
