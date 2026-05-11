@@ -762,13 +762,7 @@ fn inspect_host_component_shape<H: HostTypes>(
     expect_fiber_tag(component_node, FiberTag::HostComponent)?;
     expect_state_node_present(component_node)?;
 
-    let component_children = expect_child_count_range(
-        store,
-        component_id,
-        1,
-        2,
-        "HostComponent private inspection admits only one nested HostComponent or one/two HostText children",
-    )?;
+    let component_children = expect_child_count(store, component_id, 1)?;
     match component_children.as_slice() {
         [child_id] => {
             let child_node = store.fiber_arena().get(*child_id)?;
@@ -788,18 +782,11 @@ fn inspect_host_component_shape<H: HostTypes>(
                 ),
             }
         }
-        [first_text_id, second_text_id] => Ok(InspectedHostComponentShape::Text(
-            inspect_host_component_with_text_children(
-                store,
-                component_id,
-                &[*first_text_id, *second_text_id],
-            )?,
-        )),
         _ => Err(
             TestRendererCommittedFiberInspectionError::UnsupportedShape {
                 fiber: component_id,
                 tag: FiberTag::HostComponent,
-                reason: "HostComponent private inspection admits only one or two direct children",
+                reason: "HostComponent generic private inspection admits only one direct child",
             },
         ),
     }
@@ -1279,7 +1266,10 @@ mod tests {
                 );
             }
 
-            let inspection = inspect_test_renderer_committed_fiber_tree(store, self.source.root)?;
+            let inspection = inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary(
+                store,
+                self.source,
+            )?;
             if inspection != self.inspection {
                 return Err(
                     ReconcilerDirectMultiChildFiberInspectionError::StaleOrClonedInspectionRows,
@@ -1310,6 +1300,12 @@ mod tests {
 
     impl From<FiberTopologyError> for ReconcilerDirectMultiChildFiberInspectionError {
         fn from(error: FiberTopologyError) -> Self {
+            Self::FiberInspection(TestRendererCommittedFiberInspectionError::from(error))
+        }
+    }
+
+    impl From<HostRootStateStoreError> for ReconcilerDirectMultiChildFiberInspectionError {
+        fn from(error: HostRootStateStoreError) -> Self {
             Self::FiberInspection(TestRendererCommittedFiberInspectionError::from(error))
         }
     }
@@ -1580,7 +1576,8 @@ mod tests {
         ReconcilerDirectMultiChildFiberInspection,
         ReconcilerDirectMultiChildFiberInspectionError,
     > {
-        let inspection = inspect_test_renderer_committed_fiber_tree(store, source.root)?;
+        let inspection =
+            inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary(store, source)?;
         let rows = validate_direct_multi_child_inspection(store, source, &inspection)?;
         let root = store
             .root(source.root)
@@ -1594,6 +1591,55 @@ mod tests {
             finished_lanes_after_commit: root.finished_lanes(),
             rows,
         })
+    }
+
+    fn inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary(
+        store: &FiberRootStore<Host>,
+        source: DirectMultiChildSource,
+    ) -> Result<
+        TestRendererCommittedFiberTreeInspection,
+        ReconcilerDirectMultiChildFiberInspectionError,
+    > {
+        let root = store
+            .root(source.root)
+            .map_err(TestRendererCommittedFiberInspectionError::from)?;
+        let current = root.current();
+        let host_root_node = store.fiber_arena().get(current)?;
+        expect_fiber_tag(host_root_node, FiberTag::HostRoot)?;
+        validate_host_root_state_node(source.root, host_root_node)?;
+        let resulting_element = store
+            .host_root_states()
+            .get(host_root_node.memoized_state())?
+            .element();
+        let host_root = inspect_node(host_root_node);
+        let root_children = expect_child_count(store, current, 1)?;
+        let [component_id] = root_children.as_slice() else {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "direct.root_child_count",
+                },
+            );
+        };
+        if *component_id != source.component {
+            return Err(
+                ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
+                    field: "direct.root_child_identity",
+                },
+            );
+        }
+
+        let component = inspect_host_component_with_text_children(
+            store,
+            source.component,
+            &[source.first_text, source.second_text],
+        )?;
+        let builder = TestRendererCommittedFiberTreeInspectionBuilder::new(
+            source.root,
+            current,
+            resulting_element,
+            host_root,
+        );
+        Ok(builder.finish_host_component_shape(component)?)
     }
 
     fn validate_direct_multi_child_inspection(
@@ -1934,12 +1980,14 @@ mod tests {
     }
 
     #[test]
-    fn committed_fiber_inspection_describes_direct_multi_child_host_component_shape() {
+    fn reconciler_private_fiber_inspection_describes_direct_multi_child_host_component_shape() {
         let (mut store, root_id) = root_store();
         let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
         let source = commit_direct_multi_child_host_component_shape(&mut store, root_id, render);
 
-        let inspection = inspect_test_renderer_committed_fiber_tree(&store, root_id).unwrap();
+        let inspection =
+            inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary(&store, source)
+                .unwrap();
         let host_root = inspection.host_root();
         let component = inspection.host_component();
         let first_text = inspection.host_texts()[0];
@@ -1999,6 +2047,25 @@ mod tests {
         assert_eq!(second_text.memoized_props(), source.second_text_props);
         assert_eq!(second_text.state_node(), source.second_text_state_node);
         assert_eq!(second_text.lanes(), source.second_text_lanes);
+    }
+
+    #[test]
+    fn generic_committed_fiber_inspection_rejects_direct_multi_child_host_component_shape() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
+        let source = commit_direct_multi_child_host_component_shape(&mut store, root_id, render);
+
+        let error = inspect_test_renderer_committed_fiber_tree(&store, root_id).unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestRendererCommittedFiberInspectionError::UnexpectedChildCount {
+                fiber,
+                tag: FiberTag::HostComponent,
+                expected: 1,
+                actual: 2
+            } if fiber == source.component
+        ));
     }
 
     #[test]
@@ -2334,9 +2401,13 @@ mod tests {
 
         assert!(matches!(
             error,
-            ReconcilerDirectMultiChildFiberInspectionError::SourceMismatch {
-                field: "component.identity" | "component.child_order"
-            }
+            ReconcilerDirectMultiChildFiberInspectionError::FiberInspection(
+                TestRendererCommittedFiberInspectionError::UnsupportedShape {
+                    fiber,
+                    tag: FiberTag::HostComponent,
+                    ..
+                }
+            ) if fiber == source.component
         ));
     }
 
@@ -2376,9 +2447,11 @@ mod tests {
         assert!(matches!(
             error,
             ReconcilerDirectMultiChildFiberInspectionError::FiberInspection(
-                TestRendererCommittedFiberInspectionError::UnsupportedShape {
+                TestRendererCommittedFiberInspectionError::UnexpectedChildCount {
                     fiber,
                     tag: FiberTag::HostComponent,
+                    expected: 2,
+                    actual: 3
                     ..
                 }
             ) if fiber == source.component
@@ -2427,9 +2500,14 @@ mod tests {
 
         assert!(matches!(
             error,
-            ReconcilerDirectMultiChildFiberInspectionError::ExpectedShape {
-                actual: "HostRoot->HostComponent->HostComponent->[HostText,HostText]"
-            }
+            ReconcilerDirectMultiChildFiberInspectionError::FiberInspection(
+                TestRendererCommittedFiberInspectionError::UnexpectedChildCount {
+                    fiber,
+                    tag: FiberTag::HostComponent,
+                    expected: 2,
+                    actual: 1
+                }
+            ) if fiber == nested.outer
         ));
     }
 
@@ -2460,9 +2538,11 @@ mod tests {
     fn committed_fiber_inspection_keeps_public_compatibility_flags_blocked() {
         let (mut store, root_id) = root_store();
         let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(90));
-        commit_direct_multi_child_host_component_shape(&mut store, root_id, render);
+        let source = commit_direct_multi_child_host_component_shape(&mut store, root_id, render);
 
-        let inspection = inspect_test_renderer_committed_fiber_tree(&store, root_id).unwrap();
+        let inspection =
+            inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary(&store, source)
+                .unwrap();
 
         assert_eq!(
             inspection.public_compatibility_blockers(),

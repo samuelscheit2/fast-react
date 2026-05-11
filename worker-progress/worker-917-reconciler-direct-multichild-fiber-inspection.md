@@ -76,3 +76,32 @@
 - Extend reconciler complete-work/source handoff coverage if a future worker
   needs direct HostComponent sibling text execution rather than inspection-only
   evidence.
+
+## Audit Fix
+
+- Restored the generic `inspect_test_renderer_committed_fiber_tree` boundary so
+  a direct `HostRoot->HostComponent->[HostText,HostText]` current tree fails
+  closed with `UnexpectedChildCount` at the HostComponent.
+- Kept the reconciler-owned direct multi-child proof by routing it through a
+  private test-only helper,
+  `inspect_reconciler_direct_multi_child_committed_fiber_tree_for_canary`,
+  which is not exported and is not consumed by fast-react-test-renderer.
+- Added
+  `generic_committed_fiber_inspection_rejects_direct_multi_child_host_component_shape`
+  as the local regression for the cross-surface fail-closed boundary.
+- Verified Worker 899's guard by running
+  `cargo test -p fast-react-test-renderer --all-features direct_multi_child`;
+  it passed 4/4 and confirmed generic reconciler direct inspection remains
+  unavailable while source-owned row identity is consumed.
+
+## Audit Fix Commands
+
+- `cargo fmt --all`
+- `cargo test -p fast-react-reconciler --all-features private_fiber_inspection`
+- `cargo test -p fast-react-test-renderer --all-features direct_multi_child`
+- `cargo test -p fast-react-reconciler --all-features direct_multi_child`
+- `cargo test -p fast-react-reconciler --all-features multichild`
+- `cargo check -p fast-react-reconciler --all-features`
+- `cargo test -p fast-react-reconciler --all-features`
+- `cargo fmt --all --check`
+- `git diff --check`
