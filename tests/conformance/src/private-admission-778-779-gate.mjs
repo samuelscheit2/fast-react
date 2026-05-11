@@ -115,12 +115,23 @@ export const PRIVATE_ADMISSION_778_779_REQUIRED_PUBLIC_BLOCKERS =
       "publicActionInvocationReachable",
       "publicErrorRoutingReachable",
       "publicRootTouched",
+      "realFormAccepted",
+      "realFormInspected",
       "formDataConstructed",
       "syntheticEventCreated",
+      "callbackDispatchExecuted",
       "submitCallbackInvoked",
+      "actionFunctionCaptured",
       "actionInvoked",
       "publicActionInvoked",
+      "privateAsyncActionCallbackPubliclyReachable",
+      "hostTransitionStarted",
       "reactUpdateQueued",
+      "previousDispatcherCalled",
+      "resetFiberResolved",
+      "resetStateQueued",
+      "resetFormInstanceCalled",
+      "formResetCommitted",
       "rootErrorUpdateScheduled",
       "publicRootErrorCallbackInvoked",
       "errorBoundaryScheduled",
@@ -151,31 +162,32 @@ const privateAdmission778779Rows = freezeArray([
         role: "worker-778-source-gate",
         path: "packages/react-dom/src/resource-form-internals-gate.js",
         tokens: [
+          "privateResourceHintRootMapStoragePreflightGateId",
           "resource-hint-root-map-storage-preflight-private-gate-1",
+          "privateResourceHintRootMapStoragePreflightRecordType",
           "fast.react_dom.private_resource_hint_root_map_storage_preflight_record",
+          "privateResourceHintRootMapStoragePreflightStatus",
           "preflighted-private-resource-hint-root-map-storage-record",
+          "privateResourceHintRootMapStoragePreflightExecutionStatus",
           "diagnosed-private-resource-hint-root-map-storage-preflight",
+          "privateResourceHintRootMapStoragePreflightCompatibilityBlockedStatus",
           "blocked-private-resource-hint-root-map-storage-preflight-compatibility",
-          "blocked-public-resource-root-map-storage",
-          "publicResourceHintDomInsertion: false",
-          "publicResourceMapCommitBehavior: false",
-          "rootResourceStorageMutated: false",
-          "hoistableStylesMapMutated: false",
-          "hoistableScriptsMapMutated: false",
-          "explicitRootMapStoragePreflight must be true"
-        ]
-      }),
-      evidenceData({
-        role: "worker-778-package-test",
-        path: "packages/react-dom/test/resource-form-unsupported-gates.test.js",
-        tokens: [
-          "private resource root-map storage preflight records canonical rows only",
-          "root-map-storage-canonical-storage:1",
+          "createResourceHintRootMapStoragePreflightGate",
+          "recordResourceHintRootMapStoragePreflightWithGate",
+          "describePrivateResourceHintRootMapStoragePreflightGate",
+          "resourceHintRootMapStoragePreflightBlockedSideEffects",
+          "createPublicResourceRootMapStorageBoundary",
+          "normalizeResourceHintRootMapStoragePreflightAdmission",
+          "assertNoRootMapStoragePreflightTargets",
+          "assertNoPublicResourceDispatchClaims",
+          "createRootMapStorageValidationBoundary",
           "validated-private-resource-root-map-storage-preflight",
-          "root-map-storage-preflight-0",
-          "hoistableStyles",
-          "hoistableScripts",
-          "private resource root-map storage preflight rejects stale duplicate and foreign rows"
+          "resourceHintRootMapStoragePreflightContracts",
+          "publicResourceHintDomInsertion",
+          "publicResourceMapCommitBehavior",
+          "rootResourceStorageMutated",
+          "hoistableStylesMapMutated",
+          "hoistableScriptsMapMutated"
         ]
       })
     ],
@@ -208,18 +220,41 @@ const privateAdmission778779Rows = freezeArray([
         role: "worker-779-source-gate",
         path: "packages/react-dom/src/shared/form-actions.js",
         tokens: [
+          "privateFormActionRejectedErrorPreflightGateId",
           "form-action-rejected-error-preflight-private-gate-1",
+          "privateFormActionRejectedErrorPreflightRecordType",
           "fast.react_dom.private_form_action_rejected_error_preflight_record",
+          "privateFormActionRejectedErrorPreflightStatus",
           "private-form-action-rejected-error-preflight-metadata-only",
+          "privateFormActionRejectedErrorPreflightRecordedStatus",
           "recorded-private-form-action-rejected-error-preflight",
           "preflighted-private-form-action-rejected-error-metadata",
           "blocked-public-form-action-reset-and-rejected-error-routing",
           "blocked-public-form-action-rejected-error-preflight-compatibility",
-          "publicSubmitDispatchReachable: false",
-          "publicErrorRoutingReachable: false",
-          "actionInvoked: false",
-          "rootErrorUpdateScheduled: false",
-          "realFormReset: false"
+          "createFormActionRejectedErrorPreflightDiagnosticGate",
+          "recordFormActionRejectedErrorPreflightWithGate",
+          "describePrivateFormActionRejectedErrorPreflightGate",
+          "formActionRejectedErrorPreflightBlockedSideEffects",
+          "formActionRejectedErrorPreflightDiagnosticSideEffects",
+          "createRejectedErrorResetActionPublicBlockers",
+          "createPublicFormActionRejectedErrorPreflightBoundary",
+          "normalizeFormActionRejectedErrorPreflightAdmission",
+          "assertNoRejectedErrorPreflightRawAdmissionFields",
+          "privateFormActionRejectedErrorPreflightInvalidAdmissionCode",
+          "privateFormActionRejectedErrorPreflightInvalidRecordCode",
+          "publicSubmitDispatchReachable",
+          "realFormAccepted",
+          "realFormInspected",
+          "callbackDispatchExecuted",
+          "actionFunctionCaptured",
+          "hostTransitionStarted",
+          "previousDispatcherCalled",
+          "resetFiberResolved",
+          "resetStateQueued",
+          "resetFormInstanceCalled",
+          "formResetCommitted",
+          "rootErrorUpdateScheduled",
+          "realFormReset"
         ]
       }),
       evidenceData({
@@ -227,11 +262,12 @@ const privateAdmission778779Rows = freezeArray([
         path: "tests/conformance/src/react-dom-form-actions-unsupported-gates.mjs",
         tokens: [
           "assertPrivateFormActionRejectedErrorPreflightGate",
-          "conformance-rejected-error-preflight",
+          "createFormActionRejectedErrorPreflightDiagnosticGate",
           "privateFormActionRejectedErrorPreflightStatus",
-          "public submit dispatch must remain blocked",
-          "public error routing must remain blocked",
-          "source rejected async callback execution was already consumed by this preflight gate"
+          "privateFormActionRejectedErrorPreflightRecordedStatus",
+          "formActionRejectedErrorPreflightDiagnosticSideEffects",
+          "privateFormActionRejectedErrorPreflightInvalidAdmissionCode",
+          "privateFormActionRejectedErrorPreflightInvalidRecordCode"
         ]
       })
     ],
@@ -262,7 +298,9 @@ export const PRIVATE_ADMISSION_778_779_WORKERS = freezeArray(
 
 export function evaluatePrivateAdmission778779Gate({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT,
-  rowOverrides = {}
+  rowOverrides = {},
+  compatibilityClaimed = false,
+  publicCompatibilityClaimed = false
 } = {}) {
   const fileCache = new Map();
   const rows = PRIVATE_ADMISSION_778_779_ROWS.map((baseRow) =>
@@ -332,9 +370,16 @@ export function evaluatePrivateAdmission778779Gate({
     })
   );
   const publicCompatibilityViolations = evaluatedRows.flatMap((evaluatedRow) =>
-    evaluatedRow.publicCompatibilityViolations.map(
-      (claimId) => `${evaluatedRow.workerId}.${claimId}`
-    )
+    [
+      ...evaluatedRow.publicCompatibilityViolations,
+      ...evaluatedRow.rowPublicCompatibilityClaimViolations
+    ].map((claimId) => `${evaluatedRow.workerId}.${claimId}`)
+  );
+  const rowCompatibilityClaimViolations = evaluatedRows.flatMap(
+    (evaluatedRow) =>
+      evaluatedRow.rowCompatibilityClaimViolations.map(
+        (claimId) => `${evaluatedRow.workerId}.${claimId}`
+      )
   );
   const publicBlockerViolations = evaluatedRows.flatMap((evaluatedRow) =>
     evaluatedRow.publicBlockerViolations.map(
@@ -349,6 +394,13 @@ export function evaluatePrivateAdmission778779Gate({
   const staticLedgerViolations = evaluatedRows
     .filter((evaluatedRow) => evaluatedRow.staticReadOnlyRecognized !== true)
     .map((evaluatedRow) => evaluatedRow.workerId);
+  const topLevelCompatibilityViolations = [];
+  if (compatibilityClaimed !== false) {
+    topLevelCompatibilityViolations.push("gate.compatibilityClaimed");
+  }
+  if (publicCompatibilityClaimed !== false) {
+    topLevelCompatibilityViolations.push("gate.publicCompatibilityClaimed");
+  }
   const violations = [];
 
   if (
@@ -405,6 +457,14 @@ export function evaluatePrivateAdmission778779Gate({
     );
   }
 
+  if (rowCompatibilityClaimViolations.length > 0) {
+    violations.push(
+      createViolation("private-diagnostic-claimed-compatibility", {
+        claimIds: rowCompatibilityClaimViolations
+      })
+    );
+  }
+
   if (publicCompatibilityViolations.length > 0) {
     violations.push(
       createViolation("public-compatibility-claim-detected", {
@@ -433,6 +493,14 @@ export function evaluatePrivateAdmission778779Gate({
     violations.push(
       createViolation("static-ledger-mode-mismatch", {
         workerIds: staticLedgerViolations
+      })
+    );
+  }
+
+  if (topLevelCompatibilityViolations.length > 0) {
+    violations.push(
+      createViolation("top-level-compatibility-claim-detected", {
+        claimIds: freezeArray(topLevelCompatibilityViolations)
       })
     );
   }
@@ -480,7 +548,9 @@ export function evaluatePrivateAdmission778779Gate({
     blockedPublicClaimsRecognized:
       publicClaimKeyMismatches.length === 0 &&
       publicCompatibilityViolations.length === 0,
-    staticReadOnlyRecognized: staticLedgerViolations.length === 0,
+    staticReadOnlyRecognized:
+      staticLedgerViolations.length === 0 &&
+      topLevelCompatibilityViolations.length === 0,
     runtimeExecutionClaimed: sideEffectClaimViolations.some((claimId) =>
       claimId.endsWith(".runtimeExecutionClaimed")
     ),
@@ -491,12 +561,19 @@ export function evaluatePrivateAdmission778779Gate({
       claimId.endsWith(".exportsChanged")
     ),
     compatibilityClaimed:
+      compatibilityClaimed !== false ||
+      publicCompatibilityClaimed !== false ||
+      rowCompatibilityClaimViolations.length > 0 ||
       publicCompatibilityViolations.length > 0 ||
       publicBlockerViolations.length > 0 ||
       sideEffectClaimViolations.length > 0,
     publicCompatibilityClaimed:
+      publicCompatibilityClaimed !== false ||
       publicCompatibilityViolations.length > 0 ||
       publicBlockerViolations.length > 0,
+    rowCompatibilityClaimViolationIds: freezeArray(
+      rowCompatibilityClaimViolations
+    ),
     publicCompatibilityViolationIds: freezeArray(
       publicCompatibilityViolations
     ),
@@ -552,6 +629,7 @@ function row(data) {
     localGateCoverage: "private-admission-778-779-resource-form-ledger",
     runtimeCapabilityAdded: data.runtimeCapabilityAdded,
     compatibilityClaimed: false,
+    publicCompatibilityClaimed: false,
     promotion: "rejected",
     privateEvidenceOnly: true,
     sourceTokenChecksOnly: true,
@@ -631,6 +709,12 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
   )
     .filter(([, value]) => value !== false)
     .map(([claimId]) => claimId);
+  const rowCompatibilityClaimViolations =
+    row.compatibilityClaimed === false ? [] : ["compatibilityClaimed"];
+  const rowPublicCompatibilityClaimViolations =
+    row.publicCompatibilityClaimed === false
+      ? []
+      : ["publicCompatibilityClaimed"];
   const publicBlockerViolations = row.requiredPublicBlockerFields.filter(
     (field) => row.compatibilityBlockers[field] !== false
   );
@@ -643,7 +727,9 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
     row.runtimeExecutionClaimed === false &&
     row.publicRuntimeExecutionClaimed === false &&
     row.packageCompatibilityClaimed === false &&
-    row.exportsChanged === false;
+    row.exportsChanged === false &&
+    row.compatibilityClaimed === false &&
+    row.publicCompatibilityClaimed === false;
 
   return freezeRecord({
     ...row,
@@ -654,6 +740,12 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
     blockerFieldsRecognized,
     claimKeysRecognized,
     publicCompatibilityViolations: freezeArray(publicCompatibilityViolations),
+    rowCompatibilityClaimViolations: freezeArray(
+      rowCompatibilityClaimViolations
+    ),
+    rowPublicCompatibilityClaimViolations: freezeArray(
+      rowPublicCompatibilityClaimViolations
+    ),
     publicBlockerViolations: freezeArray(publicBlockerViolations),
     sideEffectClaimViolations: freezeArray(sideEffectClaimViolations),
     staticReadOnlyRecognized,
@@ -664,6 +756,8 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
       blockerFieldsRecognized === true &&
       claimKeysRecognized === true &&
       publicCompatibilityViolations.length === 0 &&
+      rowCompatibilityClaimViolations.length === 0 &&
+      rowPublicCompatibilityClaimViolations.length === 0 &&
       publicBlockerViolations.length === 0 &&
       sideEffectClaimViolations.length === 0 &&
       staticReadOnlyRecognized === true

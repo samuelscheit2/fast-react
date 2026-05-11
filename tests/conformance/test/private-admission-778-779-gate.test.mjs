@@ -124,6 +124,13 @@ test("private admission 778-779 gate recognizes accepted diagnostics without pub
   );
   assert.equal(formRow.compatibilityBlockers.actionInvoked, false);
   assert.equal(formRow.compatibilityBlockers.publicActionInvoked, false);
+  assert.equal(formRow.compatibilityBlockers.realFormAccepted, false);
+  assert.equal(formRow.compatibilityBlockers.realFormInspected, false);
+  assert.equal(formRow.compatibilityBlockers.callbackDispatchExecuted, false);
+  assert.equal(formRow.compatibilityBlockers.actionFunctionCaptured, false);
+  assert.equal(formRow.compatibilityBlockers.hostTransitionStarted, false);
+  assert.equal(formRow.compatibilityBlockers.resetFormInstanceCalled, false);
+  assert.equal(formRow.compatibilityBlockers.formResetCommitted, false);
   assert.equal(formRow.compatibilityBlockers.rootErrorUpdateScheduled, false);
   assert.equal(formRow.compatibilityBlockers.realFormReset, false);
 
@@ -185,6 +192,81 @@ test("private admission 778-779 gate rejects public resource and form compatibil
   ]);
   assertViolationIds(gate, [
     "public-compatibility-claim-detected",
+    "public-compatibility-blocker-leak",
+    "required-private-admission-row-not-recognized"
+  ]);
+});
+
+test("private admission 778-779 gate rejects row and top-level compatibility booleans", () => {
+  const gate = evaluatePrivateAdmission778779Gate({
+    compatibilityClaimed: true,
+    publicCompatibilityClaimed: true,
+    rowOverrides: {
+      [worker778]: {
+        compatibilityClaimed: true
+      },
+      [worker779]: {
+        publicCompatibilityClaimed: true
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_778_779_VIOLATION_STATUS);
+  assert.equal(gate.compatibilityClaimed, true);
+  assert.equal(gate.publicCompatibilityClaimed, true);
+  assert.equal(gate.staticReadOnlyRecognized, false);
+  assert.deepEqual(gate.rowCompatibilityClaimViolationIds, [
+    `${worker778}.compatibilityClaimed`
+  ]);
+  assert.deepEqual(gate.publicCompatibilityViolationIds, [
+    `${worker779}.publicCompatibilityClaimed`
+  ]);
+  assertViolationIds(gate, [
+    "private-diagnostic-claimed-compatibility",
+    "public-compatibility-claim-detected",
+    "static-ledger-mode-mismatch",
+    "top-level-compatibility-claim-detected",
+    "required-private-admission-row-not-recognized"
+  ]);
+});
+
+test("private admission 778-779 gate rejects public form boundary blocker leaks", () => {
+  const gate = evaluatePrivateAdmission778779Gate({
+    rowOverrides: {
+      [worker779]: {
+        compatibilityBlockers: {
+          realFormAccepted: true,
+          realFormInspected: true,
+          callbackDispatchExecuted: true,
+          actionFunctionCaptured: true,
+          privateAsyncActionCallbackPubliclyReachable: true,
+          hostTransitionStarted: true,
+          previousDispatcherCalled: true,
+          resetFiberResolved: true,
+          resetStateQueued: true,
+          resetFormInstanceCalled: true,
+          formResetCommitted: true
+        }
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_778_779_VIOLATION_STATUS);
+  assert.equal(gate.blockedPublicSurfacesRecognized, false);
+  assert.deepEqual(gate.publicBlockerViolationIds, [
+    `${worker779}.realFormAccepted`,
+    `${worker779}.realFormInspected`,
+    `${worker779}.callbackDispatchExecuted`,
+    `${worker779}.actionFunctionCaptured`,
+    `${worker779}.privateAsyncActionCallbackPubliclyReachable`,
+    `${worker779}.hostTransitionStarted`,
+    `${worker779}.previousDispatcherCalled`,
+    `${worker779}.resetFiberResolved`,
+    `${worker779}.resetStateQueued`,
+    `${worker779}.resetFormInstanceCalled`,
+    `${worker779}.formResetCommitted`
+  ]);
+  assertViolationIds(gate, [
     "public-compatibility-blocker-leak",
     "required-private-admission-row-not-recognized"
   ]);
