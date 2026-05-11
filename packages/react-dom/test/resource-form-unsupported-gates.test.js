@@ -3024,6 +3024,494 @@ test('private form action async callback execution records pending/reset metadat
   );
 });
 
+test('private form action rejected-error preflight records rejected async action metadata only', async () => {
+  const scenario =
+    createPrivateFormActionCallbackPreflightScenario('rejected-error');
+  const asyncExecutionGate =
+    formActions.createFormActionAsyncCallbackExecutionDiagnosticGate({
+      requestIdPrefix: 'rejected-error-async-execution'
+    });
+  const rejectedExecution =
+    await asyncExecutionGate.recordAsyncCallbackExecution(
+      scenario.preflight,
+      {
+        explicitFormActionAsyncCallbackExecution: true,
+        async asyncActionCallback() {
+          await Promise.resolve();
+          throw new Error('private rejected action preflight boom');
+        }
+      }
+    );
+  const preflightGate =
+    formActions.createFormActionRejectedErrorPreflightDiagnosticGate({
+      requestIdPrefix: 'rejected-error-preflight'
+    });
+  const record = preflightGate.recordRejectedErrorPreflight(
+    rejectedExecution,
+    {
+      explicitFormActionRejectedErrorPreflight: true,
+      sourceAsyncCallbackExecutionId: rejectedExecution.executionId
+    }
+  );
+  const summary =
+    formActions.describePrivateFormActionRejectedErrorPreflightGate();
+
+  assert.equal(
+    summary.gateId,
+    formActions.privateFormActionRejectedErrorPreflightGateId
+  );
+  assert.equal(
+    summary.status,
+    formActions.privateFormActionRejectedErrorPreflightStatus
+  );
+  assert.equal(
+    summary.acceptedAsyncCallbackExecutionRecordType,
+    formActions.privateFormActionAsyncCallbackExecutionRecordType
+  );
+  assert.equal(
+    summary.acceptedAsyncCallbackExecutionStatus,
+    formActions.privateFormActionAsyncCallbackExecutionRecordedStatus
+  );
+  assert.equal(summary.consumesRejectedAsyncActionErrorMetadata, true);
+  assert.equal(summary.recordsActionErrorPreflight, true);
+  assert.equal(summary.recordsResetActionPublicBlockers, true);
+  assert.equal(summary.preflightOnly, true);
+  assert.equal(summary.rejectsStaleRejections, true);
+  assert.equal(summary.rejectsForeignRejections, true);
+  assert.equal(summary.rejectsMalformedRejections, true);
+  assert.equal(summary.rejectsPublicErrorRouting, true);
+  assert.equal(summary.acceptsRealForms, false);
+  assert.equal(summary.constructsFormData, false);
+  assert.equal(summary.createsSyntheticEvents, false);
+  assert.equal(summary.dispatchesSubmitCallbacks, false);
+  assert.equal(summary.invokesActions, false);
+  assert.equal(summary.invokesPrivateAsyncActionCallbacks, false);
+  assert.equal(summary.routesErrors, false);
+  assert.equal(summary.startsHostTransition, false);
+  assert.equal(summary.queuesReactUpdates, false);
+  assert.equal(summary.resetsForms, false);
+  assert.equal(summary.publicFormSubmissionEnabled, false);
+  assert.equal(summary.publicFormActionCompatibilityClaimed, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    formActions.formActionRejectedErrorPreflightBlockedSideEffects
+  );
+  assert.deepEqual(
+    resourceFormGate.describePrivateFormActionRejectedErrorPreflightBoundary(
+      null
+    ),
+    summary
+  );
+
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(
+    formActions.isPrivateFormActionRejectedErrorPreflightRecord(record),
+    true
+  );
+  assert.equal(
+    formActions.getPrivateFormActionRejectedErrorPreflightRecordPayload(
+      record
+    ),
+    record
+  );
+  assert.equal(
+    record.status,
+    formActions.privateFormActionRejectedErrorPreflightRecordedStatus
+  );
+  assert.equal(record.preflightId, 'rejected-error-preflight:1');
+  assert.equal(
+    record.sourceAsyncCallbackExecutionId,
+    rejectedExecution.executionId
+  );
+  assert.equal(
+    record.sourceCallbackActionPreflightId,
+    scenario.preflight.preflightId
+  );
+  assert.equal(record.sourceSubmitDispatchId, scenario.dispatch.dispatchId);
+  assert.equal(
+    record.sourceSubmitResetExecutionId,
+    scenario.execution.executionId
+  );
+  assert.equal(
+    record.acceptedMetadataIds.asyncCallbackExecutionId,
+    rejectedExecution.executionId
+  );
+  assert.equal(record.admission.metadataOnly, true);
+  assert.equal(record.admission.preflightOnly, true);
+  assert.equal(record.admission.publicDispatchRequested, false);
+  assert.equal(record.admission.publicErrorRoutingRequested, false);
+  assert.equal(record.admission.actionInvocationRequested, false);
+  assert.equal(record.admission.resetExecutionRequested, false);
+  assert.equal(record.admission.publicRequestFormResetRequested, false);
+  assert.equal(record.admission.rawErrorCaptured, false);
+
+  assert.equal(
+    record.sourceAsyncCallbackExecution.callbackExecutionStatus,
+    'failed-private-form-action-async-callback-rejected'
+  );
+  assert.equal(record.sourceAsyncCallbackExecution.rejected, true);
+  assert.equal(record.sourceAsyncCallbackExecution.failClosed, true);
+  assert.equal(record.sourceAsyncCallbackExecution.publicActionInvoked, false);
+  assert.equal(record.sourceAsyncCallbackExecution.reactUpdateQueued, false);
+  assert.equal(record.sourceAsyncCallbackExecution.realFormReset, false);
+  assert.equal(
+    record.rejectedAsyncActionError.status,
+    'preflighted-private-form-action-rejected-error-metadata'
+  );
+  assert.equal(record.rejectedAsyncActionError.metadataOnly, true);
+  assert.equal(record.rejectedAsyncActionError.rejected, true);
+  assert.equal(record.rejectedAsyncActionError.failClosed, true);
+  assert.deepEqual(record.rejectedAsyncActionError.errorInfo, {
+    type: 'error',
+    name: 'Error',
+    message: 'private rejected action preflight boom'
+  });
+  assert.equal(record.rejectedAsyncActionError.rawErrorCaptured, false);
+  assert.equal(
+    record.rejectedAsyncActionError.publicErrorRoutingStarted,
+    false
+  );
+  assert.equal(
+    record.rejectedAsyncActionError.publicRootErrorCallbackInvoked,
+    false
+  );
+  assert.equal(
+    record.actionErrorPreflight.status,
+    'preflighted-private-form-action-rejected-action-error-blocked'
+  );
+  assert.equal(
+    record.actionErrorPreflight.actionInvocationWouldBeScheduled,
+    true
+  );
+  assert.equal(record.actionErrorPreflight.rejected, true);
+  assert.equal(record.actionErrorPreflight.failClosed, true);
+  assert.equal(record.actionErrorPreflight.formDataConstructed, false);
+  assert.equal(record.actionErrorPreflight.actionInvoked, false);
+  assert.equal(record.actionErrorPreflight.publicActionInvoked, false);
+  assert.equal(record.actionErrorPreflight.hostTransitionStarted, false);
+  assert.equal(record.actionErrorPreflight.reactUpdateQueued, false);
+  assert.equal(record.actionErrorPreflight.rootErrorUpdateScheduled, false);
+  assert.equal(
+    record.actionErrorPreflight.publicRootErrorCallbackInvoked,
+    false
+  );
+  assert.equal(record.actionErrorPreflight.errorBoundaryScheduled, false);
+  assert.equal(
+    record.resetActionPublicBlockers.publicFormActionsEnabled,
+    false
+  );
+  assert.equal(
+    record.resetActionPublicBlockers.publicFormSubmissionReachable,
+    false
+  );
+  assert.equal(
+    record.resetActionPublicBlockers.publicSubmitDispatchReachable,
+    false
+  );
+  assert.equal(
+    record.resetActionPublicBlockers.publicRequestFormResetReachable,
+    false
+  );
+  assert.equal(
+    record.resetActionPublicBlockers.publicActionInvocationReachable,
+    false
+  );
+  assert.equal(
+    record.resetActionPublicBlockers.publicErrorRoutingReachable,
+    false
+  );
+  assert.equal(record.resetActionPublicBlockers.actionInvoked, false);
+  assert.equal(record.resetActionPublicBlockers.publicActionInvoked, false);
+  assert.equal(record.resetActionPublicBlockers.resetStateQueued, false);
+  assert.equal(record.resetActionPublicBlockers.reactUpdateQueued, false);
+  assert.equal(
+    record.resetActionPublicBlockers.resetFormInstanceCalled,
+    false
+  );
+  assert.equal(record.resetActionPublicBlockers.realFormReset, false);
+  assert.equal(
+    record.publicFormActionBoundary.publicFormSubmissionReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicSubmitDispatchReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicRequestFormResetReachable,
+    false
+  );
+  assert.equal(record.publicFormActionBoundary.actionInvoked, false);
+  assert.equal(record.publicFormActionBoundary.publicActionInvoked, false);
+  assert.equal(record.publicFormActionBoundary.realFormReset, false);
+  assert.equal(
+    record.publicFormActionBoundary.publicErrorRoutingReachable,
+    false
+  );
+  assert.deepEqual(
+    record.sideEffects,
+    formActions.formActionRejectedErrorPreflightDiagnosticSideEffects
+  );
+  assert.equal(record.sideEffects.sourceAsyncCallbackExecutionAccepted, true);
+  assert.equal(record.sideEffects.sourceRejectedAsyncErrorAccepted, true);
+  assert.equal(record.sideEffects.rejectedAsyncErrorMetadataRecorded, true);
+  assert.equal(record.sideEffects.actionErrorPreflightRecorded, true);
+  assert.equal(record.sideEffects.resetActionPublicBlockersRecorded, true);
+  assert.equal(record.sideEffects.privateAsyncActionCallbackInvoked, false);
+  assert.equal(record.sideEffects.actionInvoked, false);
+  assert.equal(record.sideEffects.publicActionInvoked, false);
+  assert.equal(record.sideEffects.publicErrorRoutingStarted, false);
+  assert.equal(record.sideEffects.reactUpdateQueued, false);
+  assert.equal(record.sideEffects.realFormReset, false);
+
+  const error =
+    formActions.createUnsupportedFormActionRejectedErrorPreflightError(record);
+  assert.equal(
+    error.code,
+    formActions.privateFormActionRejectedErrorPreflightGateErrorCode
+  );
+  assert.equal(error.preflightId, record.preflightId);
+  assert.deepEqual(
+    error.rejectedAsyncActionError,
+    record.rejectedAsyncActionError
+  );
+  assert.deepEqual(
+    error.resetActionPublicBlockers,
+    record.resetActionPublicBlockers
+  );
+  assert.match(
+    error.message,
+    /private form action rejected-error preflight records rejected action error metadata only/u
+  );
+
+  assert.throws(
+    () =>
+      preflightGate.recordRejectedErrorPreflight(rejectedExecution, {
+        explicitFormActionRejectedErrorPreflight: true
+      }),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source rejected async callback execution was already consumed by this preflight gate'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(
+          {
+            ...rejectedExecution,
+            callbackExecution: {
+              ...rejectedExecution.callbackExecution
+            }
+          },
+          {
+            explicitFormActionRejectedErrorPreflight: true
+          }
+        ),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source async callback execution must be an accepted rejected fake callback execution'
+    }
+  );
+
+  const fulfilledExecution =
+    await formActions
+      .createFormActionAsyncCallbackExecutionDiagnosticGate({
+        requestIdPrefix: 'rejected-error-fulfilled-source'
+      })
+      .recordAsyncCallbackExecution(scenario.preflight, {
+        explicitFormActionAsyncCallbackExecution: true,
+        async asyncActionCallback() {
+          return 'ok';
+        }
+      });
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(fulfilledExecution, {
+          explicitFormActionRejectedErrorPreflight: true
+        }),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source async callback execution must be an accepted rejected fake callback execution'
+    }
+  );
+
+  let blockedCallbackCalls = 0;
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          asyncActionCallback() {
+            blockedCallbackCalls++;
+          }
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'asyncActionCallback must not be passed to the rejected-error preflight gate'
+    }
+  );
+  assert.equal(blockedCallbackCalls, 0);
+
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          sourceAsyncCallbackExecutionId: 'stale-rejected-execution'
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'sourceAsyncCallbackExecutionId must match the rejected async callback execution record'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          publicDispatchRequested: true
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'public submit dispatch must remain blocked'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          publicErrorRoutingRequested: true
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'public error routing must remain blocked'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          actionInvocationRequested: true
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'action invocation must remain blocked'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          publicRequestFormResetRequested: true
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'public reset request must remain blocked'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions.createUnsupportedFormActionRejectedErrorPreflightError({}),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
+test('private form action rejected-error preflight blocks public submit dispatch directly', async () => {
+  const scenario = createPrivateFormActionCallbackPreflightScenario(
+    'rejected-error-submit-dispatch-blocker'
+  );
+  const rejectedExecution =
+    await formActions
+      .createFormActionAsyncCallbackExecutionDiagnosticGate({
+        requestIdPrefix: 'rejected-error-submit-dispatch-async-execution'
+      })
+      .recordAsyncCallbackExecution(scenario.preflight, {
+        explicitFormActionAsyncCallbackExecution: true,
+        async asyncActionCallback() {
+          throw new Error('public submit dispatch blocked');
+        }
+      });
+  const record =
+    formActions
+      .createFormActionRejectedErrorPreflightDiagnosticGate({
+        requestIdPrefix: 'rejected-error-submit-dispatch-preflight'
+      })
+      .recordRejectedErrorPreflight(rejectedExecution, {
+        explicitFormActionRejectedErrorPreflight: true,
+        sourceAsyncCallbackExecutionId: rejectedExecution.executionId
+      });
+
+  assert.equal(
+    record.resetActionPublicBlockers.publicSubmitDispatchReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicSubmitDispatchReachable,
+    false
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          publicDispatchRequested: true
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'public submit dispatch must remain blocked'
+    }
+  );
+});
 
 test('private controlled input value-tracker gate records deterministic metadata only', () => {
   const first = createPrivateControlledValueTrackerScenario();
@@ -15069,6 +15557,15 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
     summary.privateFormActionAsyncCallbackExecutionBoundary,
     formActions.describePrivateFormActionAsyncCallbackExecutionGate()
   );
+  assert.deepEqual(
+    summary.privateFormActionRejectedErrorPreflightBoundary,
+    resourceFormGate
+      .describePrivateFormActionRejectedErrorPreflightBoundary(null)
+  );
+  assert.deepEqual(
+    summary.privateFormActionRejectedErrorPreflightBoundary,
+    formActions.describePrivateFormActionRejectedErrorPreflightGate()
+  );
 
   assert.deepEqual(summary.publicRootBoundary, {
     gateId: rootFacadeGate.REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_GATE_ID,
@@ -15250,6 +15747,7 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	      submitResetExecutionMetadataRecorded: true,
 	      callbackActionPreflightMetadataRecorded: true,
 	      asyncCallbackExecutionMetadataRecorded: true,
+	      rejectedErrorPreflightMetadataRecorded: true,
 	      realFormAccepted: false,
 	      rawTargetCaptured: false,
 	      formInspected: false,
@@ -15284,7 +15782,9 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	      callbackActionPreflightGate:
 	        formActions.describePrivateFormActionCallbackActionPreflightGate(),
 	      asyncCallbackExecutionGate:
-	        formActions.describePrivateFormActionAsyncCallbackExecutionGate()
+	        formActions.describePrivateFormActionAsyncCallbackExecutionGate(),
+	      rejectedErrorPreflightGate:
+	        formActions.describePrivateFormActionRejectedErrorPreflightGate()
 	    },
 	    formActionEventExtractionBoundary: {
       gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
@@ -15335,6 +15835,7 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	      submitResetExecutionGateAvailable: true,
 	      callbackActionPreflightGateAvailable: true,
 	      asyncCallbackExecutionGateAvailable: true,
+	      rejectedErrorPreflightGateAvailable: true,
 	      rejectsLiveForms: true,
 	      rejectsUnsupportedSubmitControls: true,
 	      callbackDispatchExecutionBlocked: true,
@@ -15376,6 +15877,7 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	      admitsPrivateAsyncActionCallbacks: true,
 	      executesPrivateAsyncActionCallbacks: true,
 	      failClosedErrorsRecorded: true,
+	      rejectedErrorPreflightGateAvailable: true,
 	      rejectsLiveForms: true,
 	      rejectsPublicDispatch: true,
 	      realFormAccepted: false,
@@ -15400,6 +15902,53 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	      compatibilityClaimed: false,
 	      asyncCallbackExecutionGate:
 	        formActions.describePrivateFormActionAsyncCallbackExecutionGate()
+	    },
+	    formActionRejectedErrorPreflightBoundary: {
+	      gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+	      behaviorArea: null,
+	      supportedBehaviorArea: 'form-action',
+	      appliesToRequest: false,
+	      metadataGateAvailable: true,
+	      sourceRecordsAccepted: true,
+	      acceptedSourceRecordType:
+	        formActions.privateFormActionAsyncCallbackExecutionRecordType,
+	      acceptedSourceStatus:
+	        formActions.privateFormActionAsyncCallbackExecutionRecordedStatus,
+	      acceptedRejectedCallbackStatus:
+	        'failed-private-form-action-async-callback-rejected',
+	      rejectedErrorMetadataRecorded: true,
+	      actionErrorPreflightRecorded: true,
+	      resetActionPublicBlockersRecorded: true,
+	      preflightOnly: true,
+	      rejectsLiveForms: true,
+	      rejectsPublicDispatch: true,
+	      rejectsPublicErrorRouting: true,
+	      realFormAccepted: false,
+	      rawTargetCaptured: false,
+	      rawEventCaptured: false,
+	      rawErrorCaptured: false,
+	      nativeEventInspected: false,
+	      formInspected: false,
+	      submitControlInspected: false,
+	      formDataConstructed: false,
+	      syntheticEventCreated: false,
+	      listenerDispatchStarted: false,
+	      callbackDispatchExecuted: false,
+	      submitCallbackInvoked: false,
+	      privateAsyncActionCallbackInvoked: false,
+	      actionInvoked: false,
+	      publicActionInvoked: false,
+	      publicErrorRoutingStarted: false,
+	      publicRootErrorCallbackInvoked: false,
+	      transitionStarted: false,
+	      resetStateQueued: false,
+	      reactUpdateQueued: false,
+	      resetFormInstanceCalled: false,
+	      realFormReset: false,
+	      publicRootTouched: false,
+	      compatibilityClaimed: false,
+	      rejectedErrorPreflightGate:
+	        formActions.describePrivateFormActionRejectedErrorPreflightGate()
 	    },
 	    controlledValueTrackerBoundary: {
       gateStatus: resourceFormGate.privateControlledValueTrackerBlockedStatus,
@@ -15467,6 +16016,9 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
 	      formActionAsyncCallbackApplies:
 	        record.sourceAdapterBoundary
 	          .formActionAsyncCallbackExecutionBoundary !== null,
+	      formActionRejectedErrorPreflightApplies:
+	        record.sourceAdapterBoundary
+	          .formActionRejectedErrorPreflightBoundary !== null,
 	      trackerBoundaryApplies:
 	        record.sourceAdapterBoundary.controlledValueTrackerBoundary
           .appliesToRequest
@@ -15484,6 +16036,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
 	        formActionEventExtractionApplies: false,
 	        formActionSubmitDispatchApplies: false,
 	        formActionAsyncCallbackApplies: false,
+	        formActionRejectedErrorPreflightApplies: false,
 	        trackerBoundaryApplies: false
 	      },
       {
@@ -15498,6 +16051,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
 	        formActionEventExtractionApplies: true,
 	        formActionSubmitDispatchApplies: true,
 	        formActionAsyncCallbackApplies: true,
+	        formActionRejectedErrorPreflightApplies: true,
 	        trackerBoundaryApplies: false
 	      },
       {
@@ -15512,6 +16066,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
 	        formActionEventExtractionApplies: false,
 	        formActionSubmitDispatchApplies: false,
 	        formActionAsyncCallbackApplies: false,
+	        formActionRejectedErrorPreflightApplies: false,
 	        trackerBoundaryApplies: true
 	      }
     ]
