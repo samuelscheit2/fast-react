@@ -124,6 +124,7 @@ impl SchedulerActContinuationRecord {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SchedulerActQueueRequest {
+    queue_order: usize,
     kind: SchedulerActQueueTaskKind,
     node: RootSchedulerCallbackHandle,
     root: Option<FiberRootId>,
@@ -132,6 +133,11 @@ pub struct SchedulerActQueueRequest {
 }
 
 impl SchedulerActQueueRequest {
+    #[must_use]
+    pub const fn queue_order(self) -> usize {
+        self.queue_order
+    }
+
     #[must_use]
     pub const fn kind(self) -> SchedulerActQueueTaskKind {
         self.kind
@@ -333,6 +339,7 @@ pub struct SchedulerBridge {
     act_scope_boundary_records: Vec<SchedulerActScopeBoundaryRecord>,
     act_continuation_records: Vec<SchedulerActContinuationRecord>,
     act_queue_requests: Vec<SchedulerActQueueRequest>,
+    act_queue_consumed_request_count: usize,
     callback_requests: Vec<SchedulerCallbackRequest>,
     passive_effects_flush_requests: Vec<SchedulerPassiveEffectsFlushRequest>,
     cancellation_records: Vec<SchedulerCancellationRecord>,
@@ -350,6 +357,7 @@ impl SchedulerBridge {
             act_scope_boundary_records: Vec::new(),
             act_continuation_records: Vec::new(),
             act_queue_requests: Vec::new(),
+            act_queue_consumed_request_count: 0,
             callback_requests: Vec::new(),
             passive_effects_flush_requests: Vec::new(),
             cancellation_records: Vec::new(),
@@ -453,6 +461,7 @@ impl SchedulerBridge {
 
     pub fn request_act_root_schedule_task(&mut self) -> SchedulerActQueueRequest {
         let request = SchedulerActQueueRequest {
+            queue_order: self.act_queue_requests.len(),
             kind: SchedulerActQueueTaskKind::RootSchedule,
             node: RootSchedulerCallbackHandle::NONE,
             root: None,
@@ -514,6 +523,7 @@ impl SchedulerBridge {
         callback_priority: RootCallbackPriority,
     ) -> SchedulerActQueueRequest {
         let request = SchedulerActQueueRequest {
+            queue_order: self.act_queue_requests.len(),
             kind: SchedulerActQueueTaskKind::RenderCallback,
             node: FAKE_ACT_CALLBACK_NODE,
             root: Some(root),
@@ -540,6 +550,27 @@ impl SchedulerBridge {
     #[must_use]
     pub fn act_queue_requests(&self) -> &[SchedulerActQueueRequest] {
         &self.act_queue_requests
+    }
+
+    #[must_use]
+    pub(crate) const fn act_queue_consumed_request_count(&self) -> usize {
+        self.act_queue_consumed_request_count
+    }
+
+    #[must_use]
+    pub(crate) fn pending_act_queue_request_count(&self) -> usize {
+        self.act_queue_requests
+            .len()
+            .saturating_sub(self.act_queue_consumed_request_count)
+    }
+
+    pub(crate) fn consume_next_act_queue_request(&mut self) -> Option<SchedulerActQueueRequest> {
+        let request = self
+            .act_queue_requests
+            .get(self.act_queue_consumed_request_count)
+            .copied()?;
+        self.act_queue_consumed_request_count += 1;
+        Some(request)
     }
 
     #[must_use]
@@ -638,10 +669,17 @@ mod tests {
 
         assert!(bridge.is_act_queue_active());
         assert_eq!(bridge.act_scope_depth, 1);
+        assert_eq!(request.queue_order(), 0);
         assert_eq!(request.kind(), SchedulerActQueueTaskKind::RootSchedule);
         assert_eq!(request.node(), RootSchedulerCallbackHandle::NONE);
         assert_eq!(request.root(), None);
         assert_eq!(bridge.act_queue_requests(), &[request]);
+        assert_eq!(bridge.act_queue_consumed_request_count(), 0);
+        assert_eq!(bridge.pending_act_queue_request_count(), 1);
+        assert_eq!(bridge.consume_next_act_queue_request(), Some(request));
+        assert_eq!(bridge.act_queue_consumed_request_count(), 1);
+        assert_eq!(bridge.pending_act_queue_request_count(), 0);
+        assert_eq!(bridge.consume_next_act_queue_request(), None);
         assert!(bridge.microtask_requests().is_empty());
     }
 
@@ -709,6 +747,7 @@ mod tests {
         );
 
         assert_eq!(request.kind(), SchedulerActQueueTaskKind::RenderCallback);
+        assert_eq!(request.queue_order(), 0);
         assert_eq!(request.node(), SchedulerBridge::fake_act_callback_node());
         assert_eq!(request.root(), Some(root));
         assert_eq!(
