@@ -72,6 +72,7 @@ test("private-admission-821-accepted", () => {
   assert.equal(gate.status, PRIVATE_ADMISSION_821_GATE_STATUS);
   assert.equal(gate.privateDiagnosticsRecognized, true);
   assert.equal(gate.evidenceRecognized, true);
+  assert.equal(gate.evidenceContextsRecognized, true);
   assert.equal(gate.nativeCleanupEvidenceRecognized, true);
   assert.equal(gate.cleanupBlockersRecognized, true);
   assert.equal(gate.statusesRecognized, true);
@@ -512,6 +513,84 @@ test("private-admission-821-rejects-worker-940-reentry-guard-drift", () => {
     "worker-940-fast-react-napi-reentry-guard-validation",
     false
   );
+});
+
+test("private-admission-821-rejects-worker-940-caller-shaped-evidence-contexts", () => {
+  const sourceRow = rowByWorker(worker940);
+  const roleSpoofGate = evaluatePrivateAdmission821Gate({
+    rowOverrides: {
+      [worker940]: {
+        evidence: withEvidenceRowOverride(
+          sourceRow,
+          "worker-940-fast-react-napi-reentry-guard-validation",
+          {
+            role: "caller-spoofed-worker-940-reentry-validation"
+          }
+        )
+      }
+    }
+  });
+
+  assert.equal(roleSpoofGate.status, PRIVATE_ADMISSION_821_VIOLATION_STATUS);
+  assert.equal(roleSpoofGate.privateDiagnosticsRecognized, false);
+  assert.equal(roleSpoofGate.evidenceRecognized, true);
+  assert.equal(roleSpoofGate.evidenceContextsRecognized, false);
+  assertViolationIds(roleSpoofGate, [
+    "native-cleanup-stale-evidence-context-mismatch"
+  ]);
+
+  const testSliceGate = evaluatePrivateAdmission821Gate({
+    rowOverrides: {
+      [worker940]: {
+        evidence: withEvidenceRowOverride(
+          sourceRow,
+          "worker-940-fast-react-napi-reentry-guard-validation",
+          {
+            sliceStart:
+              "native_root_bridge_cleanup_generation_currentness_canary_rejects_duplicate_cleanup_reentry",
+            sliceEnd:
+              "native_root_bridge_batch_lifecycle_json_roundtrip_link_rejects_forged_rows"
+          }
+        )
+      }
+    }
+  });
+
+  assert.equal(testSliceGate.status, PRIVATE_ADMISSION_821_VIOLATION_STATUS);
+  assert.equal(testSliceGate.privateDiagnosticsRecognized, false);
+  assert.equal(testSliceGate.evidenceContextsRecognized, false);
+  assertViolationIds(testSliceGate, [
+    "native-cleanup-stale-evidence-context-mismatch"
+  ]);
+
+  const worker908SourceRow = rowByWorker(worker908);
+  const crossWorkerEvidence = worker908SourceRow.evidence.find(
+    (evidenceRow) =>
+      evidenceRow.role === "worker-908-fast-react-napi-currentness-validation"
+  );
+  assert.notEqual(crossWorkerEvidence, undefined);
+  const crossWorkerGate = evaluatePrivateAdmission821Gate({
+    rowOverrides: {
+      [worker940]: {
+        evidence: withEvidenceRowOverride(
+          sourceRow,
+          "worker-940-fast-react-napi-reentry-guard-validation",
+          {
+            path: crossWorkerEvidence.path,
+            sliceStart: crossWorkerEvidence.sliceStart,
+            sliceEnd: crossWorkerEvidence.sliceEnd
+          }
+        )
+      }
+    }
+  });
+
+  assert.equal(crossWorkerGate.status, PRIVATE_ADMISSION_821_VIOLATION_STATUS);
+  assert.equal(crossWorkerGate.privateDiagnosticsRecognized, false);
+  assert.equal(crossWorkerGate.evidenceContextsRecognized, false);
+  assertViolationIds(crossWorkerGate, [
+    "native-cleanup-stale-evidence-context-mismatch"
+  ]);
 });
 
 test("private-admission-821-rejects-missing-cleanup-blockers", () => {

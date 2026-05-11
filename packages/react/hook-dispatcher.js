@@ -34,6 +34,7 @@ const useRefHookCurrentnessReports = new WeakSet();
 const useRefHookSurfaceCurrentnessRowsByReport = new WeakMap();
 const unsupportedPlaceholderHookCurrentnessReports = new WeakSet();
 const unsupportedPlaceholderHookSurfaceCurrentnessRowsByReport = new WeakMap();
+const unsupportedPlaceholderHookCurrentnessReportOverrideKeys = new WeakMap();
 
 const effectRegistrationFieldNames = Object.freeze([
   'hook',
@@ -2803,13 +2804,17 @@ function isUnsupportedPlaceholderHookProbeError(error, hookName) {
 }
 
 function createUnsupportedPlaceholderHookCurrentnessReport(overrides = {}) {
-  const normalized = overrides ?? {};
+  const normalized = captureOwnDataOptions(overrides, arguments.length > 0);
+  const optionValues = normalized.values;
   const hasSurfaceCurrentnessRowsOverride =
-    Object.prototype.hasOwnProperty.call(normalized, 'surfaceCurrentnessRows');
+    Object.prototype.hasOwnProperty.call(
+      optionValues,
+      'surfaceCurrentnessRows'
+    );
   const surfaceCurrentnessRows = hasSurfaceCurrentnessRowsOverride
-    ? freezeSurfaceCurrentnessRows(normalized.surfaceCurrentnessRows)
+    ? freezeSurfaceCurrentnessRows(optionValues.surfaceCurrentnessRows)
     : createUnsupportedPlaceholderHookSurfaceCurrentnessRows(
-        normalized.surfaceCurrentnessRowOverrides
+        optionValues.surfaceCurrentnessRowOverrides
       );
   const report = freezeRecord({
     kind: unsupportedPlaceholderHookCurrentnessReportKind,
@@ -2817,84 +2822,84 @@ function createUnsupportedPlaceholderHookCurrentnessReport(overrides = {}) {
     status: unsupportedPlaceholderHookCurrentnessStatus,
     compatibilityTarget: 'react@19.2.6',
     hookNames: freezeArray(
-      normalized.hookNames ?? unsupportedPlaceholderHookNames
+      optionValues.hookNames ?? unsupportedPlaceholderHookNames
     ),
     publicShapeBlockers: freezeRecordArray(
-      normalized.publicShapeBlockers ??
+      optionValues.publicShapeBlockers ??
         unsupportedPlaceholderHookPublicShapeBlockers
     ),
     sourceReport: freezeRecord({
       ...unsupportedPlaceholderHookSourceReport,
-      ...(normalized.sourceReport ?? {})
+      ...(optionValues.sourceReport ?? {})
     }),
     blockerCurrentness: freezeRecord({
       ...unsupportedPlaceholderHookBlockerCurrentness,
-      ...(normalized.blockerCurrentness ?? {})
+      ...(optionValues.blockerCurrentness ?? {})
     }),
     callbackInvocationReport: freezeRecord({
       ...unsupportedPlaceholderHookCallbackInvocationReport,
-      ...(normalized.callbackInvocationReport ?? {})
+      ...(optionValues.callbackInvocationReport ?? {})
     }),
     externalStoreInvocationReport: freezeRecord({
       ...unsupportedPlaceholderHookExternalStoreInvocationReport,
-      ...(normalized.externalStoreInvocationReport ?? {})
+      ...(optionValues.externalStoreInvocationReport ?? {})
     }),
     idGenerationReport: freezeRecord({
       ...unsupportedPlaceholderHookIdGenerationReport,
-      ...(normalized.idGenerationReport ?? {})
+      ...(optionValues.idGenerationReport ?? {})
     }),
     surfaceCurrentnessFieldNames: freezeArray(
-      normalized.surfaceCurrentnessFieldNames ??
+      optionValues.surfaceCurrentnessFieldNames ??
         unsupportedPlaceholderHookSurfaceCurrentnessFieldNames
     ),
     surfaceCurrentnessRows,
     cjsSurfaceCurrentnessBlocked:
-      normalized.cjsSurfaceCurrentnessBlocked ?? true,
+      optionValues.cjsSurfaceCurrentnessBlocked ?? true,
     reactServerSurfaceCurrentnessBlocked:
-      normalized.reactServerSurfaceCurrentnessBlocked ?? true,
+      optionValues.reactServerSurfaceCurrentnessBlocked ?? true,
     publicExportsPlaceholderBlocked:
-      normalized.publicExportsPlaceholderBlocked ?? true,
-    compatibilityClaimed: normalized.compatibilityClaimed ?? false,
+      optionValues.publicExportsPlaceholderBlocked ?? true,
+    compatibilityClaimed: optionValues.compatibilityClaimed ?? false,
     publicCompatibilityClaimed:
-      normalized.publicCompatibilityClaimed ?? false,
-    publicHookCompatibility: normalized.publicHookCompatibility ?? false,
+      optionValues.publicCompatibilityClaimed ?? false,
+    publicHookCompatibility: optionValues.publicHookCompatibility ?? false,
     exposesPublicHookImplementation:
-      normalized.exposesPublicHookImplementation ?? false,
-    dispatcherRouting: normalized.dispatcherRouting ?? false,
+      optionValues.exposesPublicHookImplementation ?? false,
+    dispatcherRouting: optionValues.dispatcherRouting ?? false,
     dispatcherPrerequisitesReady:
-      normalized.dispatcherPrerequisitesReady ?? false,
-    schedulerIntegration: normalized.schedulerIntegration ?? false,
+      optionValues.dispatcherPrerequisitesReady ?? false,
+    schedulerIntegration: optionValues.schedulerIntegration ?? false,
     schedulerPrerequisitesReady:
-      normalized.schedulerPrerequisitesReady ?? false,
-    rootLaneIntegration: normalized.rootLaneIntegration ?? false,
-    rootScheduling: normalized.rootScheduling ?? false,
-    rendererIntegration: normalized.rendererIntegration ?? false,
-    rendererCompatibility: normalized.rendererCompatibility ?? false,
-    invokesCallbacks: normalized.invokesCallbacks ?? false,
+      optionValues.schedulerPrerequisitesReady ?? false,
+    rootLaneIntegration: optionValues.rootLaneIntegration ?? false,
+    rootScheduling: optionValues.rootScheduling ?? false,
+    rendererIntegration: optionValues.rendererIntegration ?? false,
+    rendererCompatibility: optionValues.rendererCompatibility ?? false,
+    invokesCallbacks: optionValues.invokesCallbacks ?? false,
     invokesActionStateAction:
-      normalized.invokesActionStateAction ?? false,
+      optionValues.invokesActionStateAction ?? false,
     invokesOptimisticReducer:
-      normalized.invokesOptimisticReducer ?? false,
+      optionValues.invokesOptimisticReducer ?? false,
     invokesEffectEventCallback:
-      normalized.invokesEffectEventCallback ?? false,
+      optionValues.invokesEffectEventCallback ?? false,
     invokesDebugValueFormatter:
-      normalized.invokesDebugValueFormatter ?? false,
+      optionValues.invokesDebugValueFormatter ?? false,
     callbackExecutionClaimed:
-      normalized.callbackExecutionClaimed ?? false,
+      optionValues.callbackExecutionClaimed ?? false,
     invokesExternalStoreSubscribe:
-      normalized.invokesExternalStoreSubscribe ?? false,
+      optionValues.invokesExternalStoreSubscribe ?? false,
     invokesExternalStoreGetSnapshot:
-      normalized.invokesExternalStoreGetSnapshot ?? false,
+      optionValues.invokesExternalStoreGetSnapshot ?? false,
     invokesExternalStoreGetServerSnapshot:
-      normalized.invokesExternalStoreGetServerSnapshot ?? false,
+      optionValues.invokesExternalStoreGetServerSnapshot ?? false,
     externalStoreSubscriptionClaimed:
-      normalized.externalStoreSubscriptionClaimed ?? false,
+      optionValues.externalStoreSubscriptionClaimed ?? false,
     externalStoreSnapshotReadClaimed:
-      normalized.externalStoreSnapshotReadClaimed ?? false,
-    generatesIds: normalized.generatesIds ?? false,
-    allocatesTreeIds: normalized.allocatesTreeIds ?? false,
+      optionValues.externalStoreSnapshotReadClaimed ?? false,
+    generatesIds: optionValues.generatesIds ?? false,
+    allocatesTreeIds: optionValues.allocatesTreeIds ?? false,
     claimsHydrationIdPrefix:
-      normalized.claimsHydrationIdPrefix ?? false
+      optionValues.claimsHydrationIdPrefix ?? false
   });
 
   if (!hasSurfaceCurrentnessRowsOverride) {
@@ -2905,6 +2910,10 @@ function createUnsupportedPlaceholderHookCurrentnessReport(overrides = {}) {
   }
 
   unsupportedPlaceholderHookCurrentnessReports.add(report);
+  unsupportedPlaceholderHookCurrentnessReportOverrideKeys.set(
+    report,
+    normalized.overrideKeys
+  );
   return report;
 }
 
@@ -3525,6 +3534,13 @@ function validateUnsupportedPlaceholderHookCurrentnessReport(report) {
     return 'unsupported-placeholder-hook-currentness-id-generation-claim';
   }
 
+  const overrideKeys =
+    unsupportedPlaceholderHookCurrentnessReportOverrideKeys.get(report) ||
+    freezeArray([]);
+  if (overrideKeys.length > 0) {
+    return 'unsupported-placeholder-hook-currentness-caller-overrides';
+  }
+
   return null;
 }
 
@@ -3769,6 +3785,35 @@ function hasBlockedUnsupportedPlaceholderHookIdGeneration(report) {
 
 function freezeArray(values) {
   return Object.freeze(values.slice());
+}
+
+function captureOwnDataOptions(options, callerProvided) {
+  const values = Object.create(null);
+  const callerProvidedObject =
+    callerProvided && options !== null && options !== undefined;
+  const ownKeys = [];
+
+  if (callerProvidedObject) {
+    try {
+      const descriptors = Object.getOwnPropertyDescriptors(Object(options));
+      for (const key of Reflect.ownKeys(descriptors)) {
+        ownKeys.push(key);
+        const descriptor = descriptors[key];
+        if (Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+          values[key] = descriptor.value;
+        }
+      }
+    } catch {
+      ownKeys.push('unreadable-caller-options');
+    }
+  }
+
+  return freezeRecord({
+    values,
+    overrideKeys: callerProvidedObject
+      ? freezeArray(['caller-options-object', ...ownKeys])
+      : freezeArray([])
+  });
 }
 
 function freezeRecord(record) {

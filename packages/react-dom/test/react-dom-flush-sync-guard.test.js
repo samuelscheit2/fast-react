@@ -184,6 +184,65 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
   );
   assertFlushSyncCurrentnessRejected(
     guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
+      scenarios: report.scenarios
+    }),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
+  const nonEnumerableScenarioOverride = {};
+  Object.defineProperty(nonEnumerableScenarioOverride, 'scenarios', {
+    configurable: true,
+    enumerable: false,
+    value: report.scenarios
+  });
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(
+      nonEnumerableScenarioOverride
+    ),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
+  const deletingScenarioOverride = {};
+  Object.defineProperty(deletingScenarioOverride, 'scenarios', {
+    configurable: true,
+    enumerable: false,
+    get() {
+      delete deletingScenarioOverride.scenarios;
+      return report.scenarios;
+    }
+  });
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(
+      deletingScenarioOverride
+    ),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(
+      Object.create({ scenarios: report.scenarios })
+    ),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
+  const proxyScenarioOverride = new Proxy(
+    {},
+    {
+      ownKeys() {
+        return [];
+      },
+      getOwnPropertyDescriptor() {
+        return undefined;
+      },
+      get(_target, key) {
+        return key === 'scenarios' ? report.scenarios : undefined;
+      }
+    }
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(
+      proxyScenarioOverride
+    ),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
       publicFlushSyncCompatibilityClaimed: true
     }),
     'public-react-dom-flush-sync-currentness-public-claim'

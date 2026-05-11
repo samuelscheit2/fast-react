@@ -1007,6 +1007,15 @@ export const PRIVATE_ADMISSION_821_ROWS = freezeArray(
   )
 );
 
+export const PRIVATE_ADMISSION_821_REQUIRED_EVIDENCE_CONTEXTS = freezeRecord(
+  Object.fromEntries(
+    PRIVATE_ADMISSION_821_ROWS.map((sourceRow) => [
+      sourceRow.workerId,
+      evidenceContextsForRow(sourceRow)
+    ])
+  )
+);
+
 export function evaluatePrivateAdmission821Gate({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT,
   rowOverrides = {},
@@ -1055,6 +1064,9 @@ export function evaluatePrivateAdmission821Gate({
           sliceError: evidenceRow.sliceError
         })
       )
+  );
+  const evidenceContextMismatches = evaluatedRows.flatMap(
+    (row) => row.evidenceContextMismatches
   );
   const nativeCleanupEvidenceMismatches = compareRequiredArrayByWorker({
     rows: evaluatedRows,
@@ -1235,6 +1247,11 @@ export function evaluatePrivateAdmission821Gate({
   );
   pushRowsViolation(
     violations,
+    "native-cleanup-stale-evidence-context-mismatch",
+    evidenceContextMismatches
+  );
+  pushRowsViolation(
+    violations,
     "native-cleanup-stale-evidence-id-mismatch",
     nativeCleanupEvidenceMismatches
   );
@@ -1320,6 +1337,7 @@ export function evaluatePrivateAdmission821Gate({
   );
 
   const evidenceRecognized = evidenceMismatches.length === 0;
+  const evidenceContextsRecognized = evidenceContextMismatches.length === 0;
   const nativeCleanupEvidenceRecognized =
     nativeCleanupEvidenceMismatches.length === 0;
   const cleanupBlockersRecognized = cleanupBlockerMismatches.length === 0;
@@ -1341,6 +1359,7 @@ export function evaluatePrivateAdmission821Gate({
     manifest.unexpectedWorkerIds.length === 0 &&
     manifest.duplicateWorkerIds.length === 0 &&
     evidenceRecognized &&
+    evidenceContextsRecognized &&
     nativeCleanupEvidenceRecognized &&
     cleanupBlockersRecognized &&
     statusesRecognized &&
@@ -1359,6 +1378,7 @@ export function evaluatePrivateAdmission821Gate({
       : PRIVATE_ADMISSION_821_VIOLATION_STATUS,
     privateDiagnosticsRecognized,
     evidenceRecognized,
+    evidenceContextsRecognized,
     nativeCleanupEvidenceRecognized,
     cleanupBlockersRecognized,
     statusesRecognized,
@@ -1418,6 +1438,51 @@ function rowData(data) {
     priorLedgerContext: freezeArray(data.priorLedgerContext),
     evidence: freezeArray(data.evidence)
   });
+}
+
+function evidenceContextsForRow(row) {
+  return freezeRecord(
+    Object.fromEntries(
+      row.evidence.map((evidenceRow) => [
+        evidenceRow.role,
+        freezeRecord({
+          path: evidenceRow.path,
+          sliceStart: evidenceRow.sliceStart,
+          sliceEnd: evidenceRow.sliceEnd
+        })
+      ])
+    )
+  );
+}
+
+function createEvidenceContextMismatches(row) {
+  const expected =
+    PRIVATE_ADMISSION_821_REQUIRED_EVIDENCE_CONTEXTS[row.workerId] ??
+    freezeRecord({});
+  const actual = evidenceContextsForRow(row);
+  const expectedRoles = Object.keys(expected);
+  const actualRoles = Object.keys(actual);
+  const rolesMatch = sameStringSet(expectedRoles, actualRoles);
+  const contextsMatch =
+    rolesMatch &&
+    expectedRoles.every(
+      (role) =>
+        actual[role]?.path === expected[role].path &&
+        actual[role]?.sliceStart === expected[role].sliceStart &&
+        actual[role]?.sliceEnd === expected[role].sliceEnd
+    );
+
+  if (contextsMatch) {
+    return [];
+  }
+
+  return [
+    freezeRecord({
+      workerId: row.workerId,
+      expectedEvidenceContexts: expected,
+      actualEvidenceContexts: actual
+    })
+  ];
 }
 
 function evidenceData({
@@ -1507,6 +1572,8 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
   const evidenceRecognized = evaluatedEvidence.every(
     (evidenceRow) => evidenceRow.recognized === true
   );
+  const evidenceContextMismatches = createEvidenceContextMismatches(row);
+  const evidenceContextsRecognized = evidenceContextMismatches.length === 0;
   const nativeCleanupEvidenceRecognized = sameStringSet(
     PRIVATE_ADMISSION_821_REQUIRED_NATIVE_CLEANUP_EVIDENCE_IDS[
       row.workerId
@@ -1567,6 +1634,8 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
     ...row,
     evidence: freezeArray(evaluatedEvidence),
     evidenceRecognized,
+    evidenceContextsRecognized,
+    evidenceContextMismatches: freezeArray(evidenceContextMismatches),
     nativeCleanupEvidenceRecognized,
     cleanupBlockersRecognized,
     statusesRecognized,
@@ -1579,6 +1648,7 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
     staticReadOnlyRecognized,
     recognized:
       evidenceRecognized === true &&
+      evidenceContextsRecognized === true &&
       nativeCleanupEvidenceRecognized === true &&
       cleanupBlockersRecognized === true &&
       statusesRecognized === true &&
