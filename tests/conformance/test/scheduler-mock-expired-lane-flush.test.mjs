@@ -208,6 +208,48 @@ test('scheduler mock rejects unsupported priority levels and stale callback hand
     assert.deepEqual(events, [], nodeEnv);
     assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
 
+    for (const { label, metadata } of [
+      {
+        label: 'inherited-expired-lane-metadata',
+        metadata: Object.freeze(
+          Object.create(createExpiredLaneMetadata(Scheduler, handle))
+        )
+      },
+      {
+        label: 'expired-lane-metadata-with-inherited-brand',
+        metadata: cloneWithInheritedBrand(
+          createExpiredLaneMetadata(Scheduler, handle),
+          expiredLaneFlushMetadataBrand
+        )
+      },
+      {
+        label: 'expired-lane-metadata-with-tampered-brand-descriptor',
+        metadata: cloneWithTamperedBrandDescriptor(
+          createExpiredLaneMetadata(Scheduler, handle),
+          expiredLaneFlushMetadataBrand
+        )
+      }
+    ]) {
+      const described =
+        diagnostics.describeExpiredLanePriorityRootSchedulerMetadataForDiagnostics(
+          metadata
+        );
+      assert.equal(described.accepted, false, `${nodeEnv}:${label}`);
+      assert.equal(
+        described.rejectionReason,
+        'metadata-missing-internal-brand',
+        `${nodeEnv}:${label}`
+      );
+      assertExpiredLaneFlushRejection(
+        () =>
+          diagnostics.drainExpiredMockSchedulerWorkWithLaneMetadataForDiagnostics(
+            metadata
+          ),
+        'metadata-missing-internal-brand',
+        `${nodeEnv}:${label}`
+      );
+    }
+
     Scheduler.unstable_cancelCallback(handle);
     const staleMetadata = createExpiredLaneMetadata(Scheduler, handle);
     const stale =
@@ -383,6 +425,30 @@ function createExpiredLaneMetadata(Scheduler, callbackHandle, overrides = {}) {
     writable: false
   });
   return Object.freeze(metadata);
+}
+
+function cloneWithInheritedBrand(value, brand) {
+  const clone = { ...value };
+  const prototype = {};
+  Object.defineProperty(prototype, brand, {
+    configurable: false,
+    enumerable: false,
+    value: true,
+    writable: false
+  });
+  Object.setPrototypeOf(clone, prototype);
+  return Object.freeze(clone);
+}
+
+function cloneWithTamperedBrandDescriptor(value, brand) {
+  const clone = { ...value };
+  Object.defineProperty(clone, brand, {
+    configurable: true,
+    enumerable: true,
+    value: true,
+    writable: true
+  });
+  return clone;
 }
 
 function assertExpiredLaneFlushRejection(fn, expectedReason, label) {
