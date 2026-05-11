@@ -7,6 +7,7 @@ const {
   isValidElement
 } = require('./element-factory.js');
 const { createUnimplementedError } = require('./placeholder-utils.js');
+const { lazy } = require('./wrapper-object.js');
 
 const REACT_PORTAL_TYPE = Symbol.for('react.portal');
 const REACT_LAZY_TYPE = Symbol.for('react.lazy');
@@ -160,6 +161,15 @@ const childrenTraversalValidChildShapeRows = freezeRecordArray([
       'fulfilled thenables unwrap, synchronously fulfilled thenables mutate status, rejected thenables throw, and pending thenables are thrown',
     fastReactImplemented: true,
     compatibilityClaimed: false
+  },
+  {
+    id: 'direct-react-lazy-children',
+    reactSourceAnchor: 'ReactChildren.mapIntoArray REACT_LAZY_TYPE branch',
+    oracleScenario: 'children-lazy-values',
+    behavior:
+      'React.lazy child wrappers resolve through _init(_payload) during direct helper traversal; fulfilled defaults are traversed, and pending, rejected, or loader-thrown cases throw',
+    fastReactImplemented: true,
+    compatibilityClaimed: false
   }
 ]);
 
@@ -248,11 +258,11 @@ const childrenTraversalThrownErrorRows = freezeRecordArray([
 
 const childrenTraversalUnsupportedEdgeCaseRows = freezeRecordArray([
   {
-    id: 'lazy-child-traversal',
-    reactSourceAnchor: 'ReactChildren.mapIntoArray REACT_LAZY_TYPE branch',
+    id: 'lazy-rendering-suspense-and-component-execution',
+    reactSourceAnchor: 'ReactChildren direct helper traversal only',
     oracleScenario: null,
     behavior:
-      'React source resolves lazy child payloads during helper traversal, but Fast React keeps this blocked until lazy behavior is separately oracle-backed',
+      'direct React.lazy child traversal does not prove renderer lazy component rendering, Suspense wakeups, component execution, owner stacks, refs, or root scheduling',
     fastReactImplemented: false,
     blocked: true,
     compatibilityClaimed: false
@@ -279,6 +289,24 @@ const childrenTraversalUnsupportedEdgeCaseRows = freezeRecordArray([
   }
 ]);
 
+const childrenTraversalLazyEvidence = freezeRecord({
+  id: 'direct-react-lazy-child-traversal',
+  reactSourceAnchor: 'ReactChildren.mapIntoArray REACT_LAZY_TYPE branch',
+  wrapperSource: 'packages/react/wrapper-object.js React.lazy',
+  oracleScenario: 'children-lazy-values',
+  fulfilledCase:
+    'React.lazy loader synchronously resolves to a module.default child tree that direct Children helpers traverse',
+  pendingCase:
+    'pending React.lazy loader thenables are thrown by direct Children helpers',
+  rejectedCase:
+    'synchronously rejected React.lazy loader thenables throw their rejection reason',
+  loaderErrorCase:
+    'loader-thrown errors propagate through direct Children helpers and leave the lazy payload uninitialized',
+  callerShapedLazyEvidenceAccepted: false,
+  rendererOrSuspenseCompatibilityClaimed: false,
+  compatibilityClaimed: false
+});
+
 const childrenTraversalBehaviorCurrentnessFieldNames = freezeArray([
   'nullishTopLevelCurrent',
   'booleanChildrenCoerceToNull',
@@ -296,6 +324,10 @@ const childrenTraversalBehaviorCurrentnessFieldNames = freezeArray([
   'onlyErrorShapeCurrent',
   'missingCallbackTypeErrorCurrent',
   'callbackAndIteratorErrorPropagationCurrent',
+  'lazyFulfilledTraversalCurrent',
+  'lazyPendingThenableThrowCurrent',
+  'lazyRejectedErrorThrowCurrent',
+  'lazyLoaderErrorPropagationCurrent',
   'lazyTraversalSupported',
   'lazyTraversalBlocked',
   'rendererTraversalBlocked',
@@ -343,6 +375,7 @@ const childrenTraversalCurrentnessReportFieldNames = freezeArray([
   'iterableHandlingRows',
   'thrownErrorRows',
   'unsupportedEdgeCaseRows',
+  'lazyEvidence',
   'behaviorCurrentness',
   ...childrenTraversalPublicCompatibilityFalseFlags,
   ...childrenTraversalPrerequisiteFalseFlags,
@@ -363,6 +396,7 @@ const privateChildrenTraversalCurrentnessMetadata = freezeRecord({
   iterableHandlingRows: childrenTraversalIterableHandlingRows,
   thrownErrorRows: childrenTraversalThrownErrorRows,
   unsupportedEdgeCaseRows: childrenTraversalUnsupportedEdgeCaseRows,
+  lazyEvidence: childrenTraversalLazyEvidence,
   behaviorCurrentnessFieldNames: childrenTraversalBehaviorCurrentnessFieldNames,
   publicCompatibilityFalseFlags: childrenTraversalPublicCompatibilityFalseFlags,
   prerequisiteFalseFlags: childrenTraversalPrerequisiteFalseFlags,
@@ -454,6 +488,15 @@ function mapIntoArray(
           case REACT_PORTAL_TYPE:
             invokeCallback = true;
             break;
+          case REACT_LAZY_TYPE:
+            return mapIntoArray(
+              children._init(children._payload),
+              array,
+              escapedPrefix,
+              nameSoFar,
+              callback,
+              options
+            );
           default:
             break;
         }
@@ -749,6 +792,7 @@ function createChildrenTraversalCurrentnessReport(overrides = {}) {
     iterableHandlingRows: childrenTraversalIterableHandlingRows,
     thrownErrorRows: childrenTraversalThrownErrorRows,
     unsupportedEdgeCaseRows: childrenTraversalUnsupportedEdgeCaseRows,
+    lazyEvidence: childrenTraversalLazyEvidence,
     behaviorCurrentness: createChildrenTraversalBehaviorCurrentness()
   };
 
@@ -807,11 +851,15 @@ function consumeChildrenTraversalCurrentnessReport(report) {
       'key-path-escaping',
       'iterable-handling',
       'thrown-error-shapes',
+      'lazy-child-traversal',
       'unsupported-edge-blockers'
     ]),
     sourceReport: report.sourceReport,
+    lazyEvidence: report.lazyEvidence,
     behaviorCurrentness: report.behaviorCurrentness,
-    lazyTraversalBlocked: true,
+    lazyTraversalSupported: true,
+    directLazyTraversalSupported: true,
+    lazyTraversalBlocked: false,
     rendererTraversalBlocked: true,
     ownerDispatcherRootPrerequisitesBlocked: true,
     publicCompatibilityClaimed: false,
@@ -882,6 +930,10 @@ function validateChildrenTraversalCurrentnessReport(report) {
     return 'children-traversal-currentness-unsupported-edge-blockers';
   }
 
+  if (report.lazyEvidence !== childrenTraversalLazyEvidence) {
+    return 'children-traversal-currentness-lazy-evidence';
+  }
+
   if (
     !isAcceptedChildrenTraversalBehaviorCurrentness(
       report.behaviorCurrentness
@@ -927,7 +979,7 @@ function isAcceptedChildrenTraversalBehaviorCurrentness(currentness) {
 
   for (const fieldName of childrenTraversalBehaviorCurrentnessFieldNames) {
     const expected =
-      fieldName === 'lazyTraversalSupported' ||
+      fieldName === 'lazyTraversalBlocked' ||
       fieldName === 'compatibilityClaimed'
         ? false
         : true;
@@ -1037,6 +1089,61 @@ function createChildrenTraversalBehaviorCurrentness() {
       return helpers.toArray(pending);
     });
 
+    let lazyFulfilledLoaderCalls = 0;
+    const lazyFulfilledChild = lazy(function loadLazyFulfilledChild() {
+      lazyFulfilledLoaderCalls += 1;
+      return createSynchronousThenable({
+        default: [
+          createElement('span', { key: 'lazy-fulfilled' }),
+          'lazy-ready',
+          false
+        ]
+      });
+    });
+    const lazyFulfilledToArray = helpers.toArray(lazyFulfilledChild);
+    const lazyFulfilledCount = helpers.count(lazyFulfilledChild);
+    const lazyFulfilledMapCalls = [];
+    const lazyFulfilledMap = helpers.map(lazyFulfilledChild, function (
+      child,
+      index
+    ) {
+      lazyFulfilledMapCalls.push({
+        kind: childKind(child),
+        index
+      });
+      return child;
+    });
+
+    let lazyPendingLoaderCalls = 0;
+    const lazyPendingThenable = { then: noop };
+    const lazyPendingChild = lazy(function loadLazyPendingChild() {
+      lazyPendingLoaderCalls += 1;
+      return lazyPendingThenable;
+    });
+    const lazyPendingAttempt = captureOperation(function () {
+      return helpers.toArray(lazyPendingChild);
+    });
+
+    let lazyRejectedLoaderCalls = 0;
+    const lazyRejectedReason = new Error('lazy child rejected');
+    const lazyRejectedChild = lazy(function loadLazyRejectedChild() {
+      lazyRejectedLoaderCalls += 1;
+      return createRejectedThenable(lazyRejectedReason);
+    });
+    const lazyRejectedAttempt = captureOperation(function () {
+      return helpers.toArray(lazyRejectedChild);
+    });
+
+    let lazyLoaderErrorCalls = 0;
+    const lazyLoaderError = new Error('lazy child loader exploded');
+    const lazyThrowingChild = lazy(function loadLazyThrowingChild() {
+      lazyLoaderErrorCalls += 1;
+      throw lazyLoaderError;
+    });
+    const lazyLoaderErrorAttempt = captureOperation(function () {
+      return helpers.toArray(lazyThrowingChild);
+    });
+
     const invalidObjectAttempt = captureOperation(function () {
       return helpers.count({ a: 1, b: 2 });
     });
@@ -1059,18 +1166,6 @@ function createChildrenTraversalBehaviorCurrentness() {
               throw new Error('iterator exploded');
             }
           };
-        }
-      });
-    });
-
-    let lazyInitCalled = false;
-    const lazyAttempt = captureOperation(function () {
-      return helpers.toArray({
-        $$typeof: REACT_LAZY_TYPE,
-        _payload: 'lazy-payload',
-        _init: function initLazy() {
-          lazyInitCalled = true;
-          return 'lazy-value';
         }
       });
     });
@@ -1143,9 +1238,45 @@ function createChildrenTraversalBehaviorCurrentness() {
         callbackThrowsAttempt.errorMessage === 'callback exploded' &&
         iteratorThrowsAttempt.status === 'throws' &&
         iteratorThrowsAttempt.errorMessage === 'iterator exploded',
-      lazyTraversalSupported: false,
-      lazyTraversalBlocked:
-        lazyAttempt.status === 'throws' && lazyInitCalled === false,
+      lazyFulfilledTraversalCurrent:
+        lazyFulfilledLoaderCalls === 1 &&
+        lazyFulfilledChild._payload._status === 1 &&
+        lazyFulfilledCount === 3 &&
+        arraysEqual(childKeys(lazyFulfilledToArray), [
+          '.$lazy-fulfilled',
+          null
+        ]) &&
+        arraysEqual(childKeys(lazyFulfilledMap), [
+          '.$lazy-fulfilled',
+          null
+        ]) &&
+        arraysEqual(
+          lazyFulfilledMapCalls.map(function (call) {
+            return `${call.kind}:${call.index}`;
+          }),
+          ['element:0', 'string:1', 'null:2']
+        ),
+      lazyPendingThenableThrowCurrent:
+        lazyPendingLoaderCalls === 1 &&
+        lazyPendingAttempt.status === 'throws' &&
+        lazyPendingAttempt.thrownValue === lazyPendingThenable &&
+        lazyPendingChild._payload._status === 0 &&
+        lazyPendingChild._payload._result === lazyPendingThenable,
+      lazyRejectedErrorThrowCurrent:
+        lazyRejectedLoaderCalls === 1 &&
+        lazyRejectedAttempt.status === 'throws' &&
+        lazyRejectedAttempt.thrownValue === lazyRejectedReason &&
+        lazyRejectedAttempt.errorMessage === 'lazy child rejected' &&
+        lazyRejectedChild._payload._status === 2 &&
+        lazyRejectedChild._payload._result === lazyRejectedReason,
+      lazyLoaderErrorPropagationCurrent:
+        lazyLoaderErrorCalls === 1 &&
+        lazyLoaderErrorAttempt.status === 'throws' &&
+        lazyLoaderErrorAttempt.thrownValue === lazyLoaderError &&
+        lazyLoaderErrorAttempt.errorMessage === 'lazy child loader exploded' &&
+        lazyThrowingChild._payload._status === -1,
+      lazyTraversalSupported: true,
+      lazyTraversalBlocked: false,
       rendererTraversalBlocked: true,
       ownerDispatcherRootPrerequisitesBlocked: true,
       compatibilityClaimed: false
@@ -1197,6 +1328,32 @@ function childKeys(children) {
   return children.map(function (child) {
     return isValidElement(child) ? child.key : null;
   });
+}
+
+function childKind(child) {
+  if (child === null) {
+    return 'null';
+  }
+  if (isValidElement(child)) {
+    return 'element';
+  }
+  return typeof child;
+}
+
+function createSynchronousThenable(value) {
+  return {
+    then: function then(resolve) {
+      resolve(value);
+    }
+  };
+}
+
+function createRejectedThenable(reason) {
+  return {
+    then: function then(_resolve, reject) {
+      reject(reason);
+    }
+  };
 }
 
 function withoutConsoleWarn(fn) {

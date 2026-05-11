@@ -99,6 +99,18 @@ export const CHILDREN_HELPER_SCENARIOS = [
     ]
   },
   {
+    id: "children-lazy-values",
+    area: "Children lazy traversal",
+    entrypoints: ["react"],
+    captures: [
+      "fulfilled React.lazy child wrapper traversal",
+      "pending React.lazy child wrapper thrown thenable",
+      "rejected React.lazy child wrapper thrown reason",
+      "loader-thrown error propagation",
+      "direct traversal only without renderer, Suspense, owner, root, portal, or ref claims"
+    ]
+  },
+  {
     id: "children-error-behavior",
     area: "Children thrown errors",
     entrypoints: ["react"],

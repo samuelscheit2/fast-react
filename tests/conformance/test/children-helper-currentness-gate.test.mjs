@@ -115,7 +115,8 @@ test("private Children traversal currentness report records source-owned anchors
       "element-fragment-and-portal-leaves",
       "arrays-and-nested-arrays",
       "function-and-symbol-children",
-      "direct-thenable-children"
+      "direct-thenable-children",
+      "direct-react-lazy-children"
     ]
   );
   assert.deepEqual(
@@ -141,11 +142,28 @@ test("private Children traversal currentness report records source-owned anchors
   assert.deepEqual(
     metadata.unsupportedEdgeCaseRows.map((row) => row.id),
     [
-      "lazy-child-traversal",
+      "lazy-rendering-suspense-and-component-execution",
       "renderer-traversal-and-fragment-rendering",
       "real-portal-creation"
     ]
   );
+  assert.deepEqual(metadata.lazyEvidence, {
+    id: "direct-react-lazy-child-traversal",
+    reactSourceAnchor: "ReactChildren.mapIntoArray REACT_LAZY_TYPE branch",
+    wrapperSource: "packages/react/wrapper-object.js React.lazy",
+    oracleScenario: "children-lazy-values",
+    fulfilledCase:
+      "React.lazy loader synchronously resolves to a module.default child tree that direct Children helpers traverse",
+    pendingCase:
+      "pending React.lazy loader thenables are thrown by direct Children helpers",
+    rejectedCase:
+      "synchronously rejected React.lazy loader thenables throw their rejection reason",
+    loaderErrorCase:
+      "loader-thrown errors propagate through direct Children helpers and leave the lazy payload uninitialized",
+    callerShapedLazyEvidenceAccepted: false,
+    rendererOrSuspenseCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
   assert.deepEqual(metadata.publicCompatibilityFalseFlags, [
     "compatibilityClaimed",
     "publicCompatibilityClaimed",
@@ -190,6 +208,7 @@ test("private Children traversal currentness is accepted only from the helper so
   assert.equal(report.iterableHandlingRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.iterableHandlingRows);
   assert.equal(report.thrownErrorRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.thrownErrorRows);
   assert.equal(report.unsupportedEdgeCaseRows, childrenHelper.privateChildrenTraversalCurrentnessMetadata.unsupportedEdgeCaseRows);
+  assert.equal(report.lazyEvidence, childrenHelper.privateChildrenTraversalCurrentnessMetadata.lazyEvidence);
   assert.deepEqual(report.behaviorCurrentness, {
     nullishTopLevelCurrent: true,
     booleanChildrenCoerceToNull: true,
@@ -207,8 +226,12 @@ test("private Children traversal currentness is accepted only from the helper so
     onlyErrorShapeCurrent: true,
     missingCallbackTypeErrorCurrent: true,
     callbackAndIteratorErrorPropagationCurrent: true,
-    lazyTraversalSupported: false,
-    lazyTraversalBlocked: true,
+    lazyFulfilledTraversalCurrent: true,
+    lazyPendingThenableThrowCurrent: true,
+    lazyRejectedErrorThrowCurrent: true,
+    lazyLoaderErrorPropagationCurrent: true,
+    lazyTraversalSupported: true,
+    lazyTraversalBlocked: false,
     rendererTraversalBlocked: true,
     ownerDispatcherRootPrerequisitesBlocked: true,
     compatibilityClaimed: false
@@ -238,11 +261,15 @@ test("private Children traversal currentness is accepted only from the helper so
     "key-path-escaping",
     "iterable-handling",
     "thrown-error-shapes",
+    "lazy-child-traversal",
     "unsupported-edge-blockers"
   ]);
   assert.equal(consumption.sourceReport, report.sourceReport);
+  assert.equal(consumption.lazyEvidence, report.lazyEvidence);
   assert.equal(consumption.behaviorCurrentness, report.behaviorCurrentness);
-  assert.equal(consumption.lazyTraversalBlocked, true);
+  assert.equal(consumption.lazyTraversalSupported, true);
+  assert.equal(consumption.directLazyTraversalSupported, true);
+  assert.equal(consumption.lazyTraversalBlocked, false);
   assert.equal(consumption.rendererTraversalBlocked, true);
   assert.equal(consumption.ownerDispatcherRootPrerequisitesBlocked, true);
   assert.equal(consumption.publicCompatibilityClaimed, false);
@@ -351,8 +378,34 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   );
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
+      lazyEvidence: {
+        ...report.lazyEvidence,
+        wrapperSource: "caller-shaped react.lazy-like object",
+        callerShapedLazyEvidenceAccepted: true
+      }
+    }),
+    "children-traversal-currentness-lazy-evidence"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
       behaviorCurrentness: {
         keyPathEscapingCurrent: false
+      }
+    }),
+    "children-traversal-currentness-behavior-probes"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      behaviorCurrentness: {
+        lazyFulfilledTraversalCurrent: false
+      }
+    }),
+    "children-traversal-currentness-behavior-probes"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      behaviorCurrentness: {
+        lazyTraversalBlocked: true
       }
     }),
     "children-traversal-currentness-behavior-probes"
@@ -402,6 +455,18 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
       rendererTraversalClaimed: true
+    }),
+    "children-traversal-currentness-unsupported-edge-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      portalCreationClaimed: true
+    }),
+    "children-traversal-currentness-unsupported-edge-claim"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      refLifecycleClaimed: true
     }),
     "children-traversal-currentness-unsupported-edge-claim"
   );

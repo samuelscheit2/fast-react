@@ -321,6 +321,123 @@ const scenarios = {
     };
   },
 
+  "children-lazy-values": (target) => {
+    const React = loadReact(target);
+
+    let fulfilledLoaderCalls = 0;
+    const fulfilledThenable = createSynchronousThenable({
+      default: [
+        React.createElement("span", { key: "lazy-fulfilled" }),
+        "lazy-ready",
+        false
+      ]
+    });
+    const fulfilledLazy = React.lazy(function loadLazyFulfilledChild() {
+      fulfilledLoaderCalls += 1;
+      return fulfilledThenable;
+    });
+    const fulfilledMapCalls = [];
+    const fulfilledToArray = captureOperation("fulfilled lazy toArray", () =>
+      describeChildArray(React.Children.toArray(fulfilledLazy))
+    );
+    const fulfilledCount = captureOperation("fulfilled lazy count", () =>
+      describeValue(React.Children.count(fulfilledLazy))
+    );
+    const fulfilledMap = captureOperation("fulfilled lazy map identity", () =>
+      describeChildArray(
+        React.Children.map(fulfilledLazy, (child, index) => {
+          fulfilledMapCalls.push({
+            child: describeChildValue(child),
+            index
+          });
+          return child;
+        })
+      )
+    );
+
+    let pendingLoaderCalls = 0;
+    let pendingThrownSameAsThenable = false;
+    const pendingThenable = { then() {} };
+    const pendingLazy = React.lazy(function loadLazyPendingChild() {
+      pendingLoaderCalls += 1;
+      return pendingThenable;
+    });
+    const pendingToArray = captureOperation("pending lazy toArray", () => {
+      try {
+        return describeChildArray(React.Children.toArray(pendingLazy));
+      } catch (error) {
+        pendingThrownSameAsThenable = error === pendingThenable;
+        throw error;
+      }
+    });
+
+    let rejectedLoaderCalls = 0;
+    let rejectedThrownSameAsReason = false;
+    const rejectedReason = new Error("lazy child rejected");
+    const rejectedLazy = React.lazy(function loadLazyRejectedChild() {
+      rejectedLoaderCalls += 1;
+      return createRejectedThenable(rejectedReason);
+    });
+    const rejectedToArray = captureOperation("rejected lazy toArray", () => {
+      try {
+        return describeChildArray(React.Children.toArray(rejectedLazy));
+      } catch (error) {
+        rejectedThrownSameAsReason = error === rejectedReason;
+        throw error;
+      }
+    });
+
+    let loaderErrorCalls = 0;
+    let loaderThrownSameAsReason = false;
+    const loaderError = new Error("lazy child loader exploded");
+    const loaderThrowsLazy = React.lazy(function loadLazyThrowingChild() {
+      loaderErrorCalls += 1;
+      throw loaderError;
+    });
+    const loaderThrowsToArray = captureOperation(
+      "loader-thrown lazy toArray",
+      () => {
+        try {
+          return describeChildArray(React.Children.toArray(loaderThrowsLazy));
+        } catch (error) {
+          loaderThrownSameAsReason = error === loaderError;
+          throw error;
+        }
+      }
+    );
+
+    return {
+      fulfilled: {
+        loaderCalls: fulfilledLoaderCalls,
+        toArray: fulfilledToArray,
+        count: fulfilledCount,
+        mapIdentity: fulfilledMap,
+        mapCalls: fulfilledMapCalls,
+        lazyAfter: describeLazyTraversalState(fulfilledLazy),
+        thenableAfter: describePlainObject(fulfilledThenable)
+      },
+      pending: {
+        loaderCalls: pendingLoaderCalls,
+        toArray: pendingToArray,
+        thrownSameAsThenable: pendingThrownSameAsThenable,
+        lazyAfter: describeLazyTraversalState(pendingLazy),
+        thenableAfter: describePlainObject(pendingThenable)
+      },
+      rejected: {
+        loaderCalls: rejectedLoaderCalls,
+        toArray: rejectedToArray,
+        thrownSameAsReason: rejectedThrownSameAsReason,
+        lazyAfter: describeLazyTraversalState(rejectedLazy)
+      },
+      loaderThrows: {
+        loaderCalls: loaderErrorCalls,
+        toArray: loaderThrowsToArray,
+        thrownSameAsReason: loaderThrownSameAsReason,
+        lazyAfter: describeLazyTraversalState(loaderThrowsLazy)
+      }
+    };
+  },
+
   "children-error-behavior": (target) => {
     const React = loadReact(target);
     const iteratorThrows = {
@@ -561,6 +678,42 @@ function describePlainObject(value) {
     properties: Object.fromEntries(
       Object.keys(value).map((key) => [key, describeValue(value[key])])
     )
+  };
+}
+
+function describeLazyTraversalState(lazyType) {
+  const payload =
+    lazyType && typeof lazyType === "object" ? lazyType._payload : undefined;
+  return {
+    lazySummary: describeValue(lazyType),
+    lazyOwnKeys:
+      lazyType && typeof lazyType === "object" ? describeOwnKeys(lazyType) : null,
+    payloadSummary: describeValue(payload),
+    payloadKeys: payload && typeof payload === "object" ? Object.keys(payload) : null,
+    payloadStatus:
+      payload && typeof payload === "object"
+        ? describeValue(payload._status)
+        : { type: "missing" },
+    payloadResult:
+      payload && typeof payload === "object"
+        ? describeValue(payload._result)
+        : { type: "missing" }
+  };
+}
+
+function createSynchronousThenable(value) {
+  return {
+    then(resolve) {
+      resolve(value);
+    }
+  };
+}
+
+function createRejectedThenable(reason) {
+  return {
+    then(_resolve, reject) {
+      reject(reason);
+    }
   };
 }
 
