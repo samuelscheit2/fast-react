@@ -81,6 +81,10 @@ pub(crate) enum HostWorkError {
         fiber: FiberId,
         tag: FiberTag,
     },
+    MissingHostWorkRootChild {
+        root: FiberRootId,
+        work_in_progress: FiberId,
+    },
     FunctionComponentParentTopologyMismatch(Box<FunctionComponentParentTopologyMismatchRecord>),
     UnexpectedExistingChild {
         parent: FiberId,
@@ -165,6 +169,15 @@ impl Display for HostWorkError {
                 "{:?} fiber {} has no detached host state node",
                 tag,
                 fiber.slot().get()
+            ),
+            Self::MissingHostWorkRootChild {
+                root,
+                work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostWorkResult for HostRoot work-in-progress {} has no completed root child",
+                root.raw(),
+                work_in_progress.slot().get()
             ),
             Self::FunctionComponentParentTopologyMismatch(record) => write!(
                 formatter,
@@ -271,6 +284,7 @@ impl Error for HostWorkError {
             Self::MissingTestRootElement { .. }
             | Self::ExpectedFiberTag { .. }
             | Self::MissingStateNode { .. }
+            | Self::MissingHostWorkRootChild { .. }
             | Self::FunctionComponentParentTopologyMismatch(_)
             | Self::UnexpectedExistingChild { .. }
             | Self::ExpectedMultipleRootChildren { .. }
@@ -979,6 +993,20 @@ impl HostWorkResult {
     pub(crate) fn into_detached_hosts_for_canary(self) -> DetachedHostRecords {
         self.detached_hosts
     }
+
+    fn retarget_finished_work_for_canary(
+        &mut self,
+        render: HostRootRenderPhaseRecord,
+        completed_children: Vec<FiberId>,
+    ) {
+        let completed_child = completed_children.first().copied();
+        self.root = render.root();
+        self.work_in_progress = render.work_in_progress();
+        self.root_child = completed_child;
+        self.root_children = completed_children.clone();
+        self.completed_child = completed_child;
+        self.completed_children = completed_children;
+    }
 }
 
 const TEST_HOST_SAFE_PROPERTY_PROP_NAME: &str = "testHostProperty";
@@ -1522,6 +1550,7 @@ pub(crate) struct SyncFlushHostMutationExecutionDiagnosticForCanary {
     applied_host_call_count: usize,
     private_host_store_update_count: usize,
     recorded_only_count: usize,
+    deletion_cleanup_apply_count: usize,
 }
 
 impl SyncFlushHostMutationExecutionDiagnosticForCanary {
@@ -1566,6 +1595,11 @@ impl SyncFlushHostMutationExecutionDiagnosticForCanary {
     }
 
     #[must_use]
+    pub(crate) const fn deletion_cleanup_apply_count(&self) -> usize {
+        self.deletion_cleanup_apply_count
+    }
+
+    #[must_use]
     pub(crate) const fn private_opt_in_host_mutation_execution_requested(&self) -> bool {
         self.request
             .private_opt_in_host_mutation_execution_requested()
@@ -1573,7 +1607,10 @@ impl SyncFlushHostMutationExecutionDiagnosticForCanary {
 
     #[must_use]
     pub(crate) const fn private_test_host_mutation_executed(&self) -> bool {
-        self.applied_host_call_count + self.private_host_store_update_count > 0
+        self.applied_host_call_count
+            + self.private_host_store_update_count
+            + self.deletion_cleanup_apply_count
+            > 0
     }
 
     #[must_use]
@@ -2853,6 +2890,22 @@ pub(crate) fn execute_sync_flush_host_mutations_for_canary(
 
     let apply =
         apply_test_host_root_commit_mutations_for_canary(store, host, record.commit(), host_work)?;
+    let deletion_cleanup_apply_count = if record
+        .commit()
+        .host_node_deletion_cleanup_log()
+        .records()
+        .is_empty()
+    {
+        0
+    } else {
+        apply_test_host_root_deletion_cleanup(
+            store,
+            host,
+            record.commit(),
+            host_work.detached_hosts_mut(),
+        )?
+        .applied_record_count()
+    };
 
     if apply.root() != request.root() {
         return Err(
@@ -2878,6 +2931,7 @@ pub(crate) fn execute_sync_flush_host_mutations_for_canary(
         applied_host_call_count: apply.applied_host_call_count(),
         private_host_store_update_count: apply.private_host_store_update_count(),
         recorded_only_count: apply.recorded_only_count(),
+        deletion_cleanup_apply_count,
     })
 }
 
@@ -4609,6 +4663,91 @@ pub(crate) fn mount_test_host_work(
         completed_children: root_child.into_iter().collect(),
         detached_hosts,
     })
+}
+
+pub(crate) fn update_test_host_work_root_text_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+    text: &TestHostText,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let current = host_work
+        .completed_child()
+        .ok_or(HostWorkError::MissingHostWorkRootChild {
+            root: host_work.root(),
+            work_in_progress: host_work.work_in_progress(),
+        })?;
+    expect_tag(store, current, FiberTag::HostText)?;
+
+    let diff = update_test_host_text_work(
+        store,
+        render.root(),
+        current,
+        text,
+        render.render_lanes(),
+        host_work.detached_hosts_mut(),
+    )?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[diff.work_in_progress()])?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, vec![diff.work_in_progress()]);
+    Ok(())
+}
+
+pub(crate) fn update_test_host_work_root_component_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+    element: &TestHostElement,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let current = host_work
+        .completed_child()
+        .ok_or(HostWorkError::MissingHostWorkRootChild {
+            root: host_work.root(),
+            work_in_progress: host_work.work_in_progress(),
+        })?;
+    expect_tag(store, current, FiberTag::HostComponent)?;
+
+    let payload = update_test_host_component_work(
+        store,
+        render.root(),
+        current,
+        element,
+        render.render_lanes(),
+        host_work.detached_hosts_mut(),
+    )?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[payload.work_in_progress()])?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, vec![payload.work_in_progress()]);
+    Ok(())
+}
+
+pub(crate) fn delete_test_host_work_root_child_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_work: &mut HostWorkResult,
+    render: HostRootRenderPhaseRecord,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    let deleted = host_work
+        .completed_child()
+        .ok_or(HostWorkError::MissingHostWorkRootChild {
+            root: host_work.root(),
+            work_in_progress: host_work.work_in_progress(),
+        })?;
+    store
+        .fiber_arena_mut()
+        .mark_child_for_deletion(render.work_in_progress(), deleted)?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[])?;
+    complete_host_root(store, render.work_in_progress())?;
+    host_work.retarget_finished_work_for_canary(render, Vec::new());
+    Ok(())
 }
 
 pub(crate) fn mount_test_host_sibling_work(
