@@ -1886,6 +1886,16 @@ test('private hydration recoverable error boundary admission consumes current hy
   assert.equal(admission.targetClaimExecuted, false);
   assert.equal(admission.replayExecutionRecord, scenario.replayExecutionRecord);
   assert.equal(admission.replayExecutionAccepted, true);
+  assert.equal(
+    admission.replayBlockerCurrentness,
+    scenario.eventReplayPreflightRecord.replayBlockerCurrentness
+  );
+  assert.equal(admission.replayBlockerCurrentnessAccepted, true);
+  assert.equal(admission.replayBlockerReportAccepted, true);
+  assert.equal(admission.replayBlockerReportCurrent, true);
+  assert.equal(admission.replayBlockerReportSourceOwned, true);
+  assert.equal(admission.rootListenerReplayAliasRejected, true);
+  assert.equal(admission.rootListenerStateDoesNotProveReplay, true);
   assert.equal(admission.replayTargetDispatchExecutionBlocked, true);
   assert.equal(
     admission.sourceHydrateRootPreflightKind,
@@ -1894,6 +1904,20 @@ test('private hydration recoverable error boundary admission consumes current hy
   assert.equal(
     admission.sourceEventReplayPreflightKind,
     'FastReactDomPrivateHydrateRootPublicFacadeEventReplayPreflightRecord'
+  );
+  assert.equal(
+    admission.sourceReplayBlockerCurrentnessKind,
+    'FastReactDomPrivateHydrateRootReplayBlockerCurrentnessRecord'
+  );
+  assert.equal(
+    admission.sourceReplayBlockerCurrentnessStatus,
+    rootBridge
+      .ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_REPLAY_BLOCKER_CURRENT
+  );
+  assert.equal(
+    admission.sourceReplayBlockerCurrentnessId,
+    scenario.eventReplayPreflightRecord.replayBlockerCurrentness
+      .replayBlockerCurrentnessId
   );
   assert.equal(
     admission.sourceExecutionPreflightKind,
@@ -1931,6 +1955,9 @@ test('private hydration recoverable error boundary admission consumes current hy
       row.markerPathCurrent,
       row.targetPathCurrent,
       row.replayExecutionAccepted,
+      row.replayBlockerCurrentnessAccepted,
+      row.replayBlockerReportAccepted,
+      row.replayBlockerReportCurrent,
       row.queuedRecoverableError,
       row.onRecoverableErrorInvoked,
       row.compatibilityClaimed
@@ -1941,6 +1968,9 @@ test('private hydration recoverable error boundary admission consumes current hy
           .privateHydrationRecoverableErrorBoundaryAdmissionMetadataId,
         'container.childNodes[0]',
         'container.childNodes[1]',
+        true,
+        true,
+        true,
         true,
         true,
         true,
@@ -1967,6 +1997,15 @@ test('private hydration recoverable error boundary admission consumes current hy
   assert.equal(
     payload.sourceLedger.lifecycleRequestBoundary,
     scenario.lifecycleRequestBoundary
+  );
+  assert.equal(
+    payload.sourceLedger.replayBlockerCurrentnessRecord,
+    scenario.eventReplayPreflightRecord.replayBlockerCurrentness
+  );
+  assert.equal(
+    payload.sourceLedger.replayBlockerSourceLedgerPayload
+      .eventReplayPreflightRecord,
+    scenario.eventReplayPreflightRecord
   );
   assert.equal(
     payload.currentTargetPathEvidence.targetPathResolution.node,
@@ -2000,6 +2039,23 @@ test('private hydration recoverable error boundary admission rejects stale clone
     code:
       hydrationGate.INVALID_HYDRATION_RECOVERABLE_ERROR_BOUNDARY_ADMISSION_CODE
   };
+  const createAdmissionWithRawOptions = (options) =>
+    hydrationGate.createHydrationRecoverableErrorBoundaryAdmissionRecord(
+      scenario.hydrationBoundaryRecord,
+      scenario.hydrateRecord.acceptedPrivateMetadataDiagnostics,
+      scenario.recoverableErrorPreflight,
+      scenario.targetClaimingDiagnostic,
+      scenario.replayExecutionRecord,
+      options
+    );
+  const createAdmissionOptions = () => ({
+    enableRecoverableErrorBoundaryAdmission: true,
+    eventReplayPreflightRecord: scenario.eventReplayPreflightRecord,
+    executionPreflightRecord: scenario.executionPreflightRecord,
+    hydrateRootPreflightRecord: scenario.hydrateRecord,
+    hydrationOptions: scenario.hydrationOptions,
+    lifecycleRequestBoundary: scenario.lifecycleRequestBoundary
+  });
 
   assert.throws(
     () =>
@@ -2103,18 +2159,25 @@ test('private hydration recoverable error boundary admission rejects stale clone
     ...scenario.hydrateRecord,
     lifecycleRequestBoundary: clonedLifecycleRequestBoundary
   });
+  const clonedReplayBlockerCurrentnessRecord = Object.freeze({
+    ...scenario.eventReplayPreflightRecord.replayBlockerCurrentness,
+    lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+  });
   const clonedEventReplayPreflightRecord = Object.freeze({
     ...scenario.eventReplayPreflightRecord,
-    lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+    lifecycleRequestBoundary: clonedLifecycleRequestBoundary,
+    replayBlockerCurrentness: clonedReplayBlockerCurrentnessRecord
   });
   const clonedExecutionPreflightRecord = Object.freeze({
     ...scenario.executionPreflightRecord,
     eventReplayPreflight: clonedEventReplayPreflightRecord,
-    lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+    lifecycleRequestBoundary: clonedLifecycleRequestBoundary,
+    replayBlockerCurrentness: clonedReplayBlockerCurrentnessRecord
   });
   const sourceLedgerGetterNames = [
     'getPrivateHydrateRootPublicFacadePreflightRecordPayload',
     'getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload',
+    'getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload',
     'getPrivateHydrateRootPublicFacadeExecutionPreflightPayload',
     'getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload'
   ];
@@ -2130,6 +2193,13 @@ test('private hydration recoverable error boundary admission rejects stale clone
       rootBridge.getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(
         scenario.eventReplayPreflightRecord
       )
+    ],
+    [
+      'getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload',
+      rootBridge
+        .getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload(
+          scenario.eventReplayPreflightRecord.replayBlockerCurrentness
+        )
     ],
     [
       'getPrivateHydrateRootPublicFacadeExecutionPreflightPayload',
@@ -2254,6 +2324,7 @@ test('private hydration recoverable error boundary admission rejects stale clone
     clonedHydrateRootPreflightRecord,
     clonedEventReplayPreflightRecord,
     clonedExecutionPreflightRecord,
+    clonedReplayBlockerCurrentnessRecord,
     clonedLifecycleRequestBoundary
   ]) {
     assert.equal(
@@ -2306,6 +2377,81 @@ test('private hydration recoverable error boundary admission rejects stale clone
       }),
     invalidAdmission
   );
+  for (const sourceLedgerAliasKey of [
+    'hydrateRootSourceLedgerContext',
+    'sourceLedger',
+    'sourceLedgerPayload',
+    'sourceLedgerReader'
+  ]) {
+    assert.throws(
+      () =>
+        createHydrationRecoverableBoundaryAdmission(scenario, {
+          options: {
+            [sourceLedgerAliasKey]: Object.freeze({source: 'caller-owned'})
+          }
+        }),
+      invalidAdmission
+    );
+  }
+  for (const publicClaimKey of [
+    'browserDomEventCompatibilityClaimed',
+    'nativeExecution',
+    'publicHydrationCompatibilityClaimed',
+    'publicHydrationReplayCompatibilityClaimed',
+    'publicPackageCompatibilityClaimed',
+    'rootListenerReplayAlias'
+  ]) {
+    assert.throws(
+      () =>
+        createHydrationRecoverableBoundaryAdmission(scenario, {
+          options: {
+            [publicClaimKey]: true
+          }
+        }),
+      invalidAdmission
+    );
+  }
+  const hiddenCompatibilityAlias = createAdmissionOptions();
+  Object.defineProperty(
+    hiddenCompatibilityAlias,
+    'publicHydrationCompatibilityClaimed',
+    {
+      configurable: true,
+      enumerable: false,
+      value: true
+    }
+  );
+  assert.throws(
+    () => createAdmissionWithRawOptions(hiddenCompatibilityAlias),
+    invalidAdmission
+  );
+  const symbolCompatibilityAlias = createAdmissionOptions();
+  symbolCompatibilityAlias[Symbol('hidden-public-hydration-claim')] = true;
+  assert.throws(
+    () => createAdmissionWithRawOptions(Object.freeze(symbolCompatibilityAlias)),
+    invalidAdmission
+  );
+  for (const proxyClaimKey of [
+    'browserDomEventCompatibilityClaimed',
+    'nativeExecution',
+    'packageCompatibility',
+    'publicHydrationReplayCompatibilityClaimed'
+  ]) {
+    assert.throws(
+      () =>
+        createAdmissionWithRawOptions(
+          new Proxy(createAdmissionOptions(), {
+            get(target, key) {
+              return key === proxyClaimKey ? true : target[key];
+            },
+            ownKeys(target) {
+              return Reflect.ownKeys(target);
+            }
+          })
+        ),
+      invalidAdmission
+    );
+  }
 
   const staleMarker = createHydrationRecoverableBoundaryAdmissionScenario({
     actualText: 'server stale marker text',
@@ -2710,6 +2856,67 @@ function createEventTarget(fields) {
   });
 });
 
+test('hydrateRoot source ledger rejects copied root-bridge cache registration', () => {
+  const script = `
+'use strict';
+
+const assert = require('node:assert/strict');
+const Module = require('node:module');
+const path = require('node:path');
+
+const packageRoot = ${JSON.stringify(packageRoot)};
+const rootBridgePath = path.join(packageRoot, 'src/client/root-bridge.js');
+const rootBridgeCacheKey = require.resolve(rootBridgePath);
+const realRootBridge = require(rootBridgePath);
+const fakeRootBridgeCacheExports = Object.freeze({
+  ...realRootBridge,
+  readPrivateHydrateRootPublicFacadeSourceLedgerPayload() {
+    return null;
+  },
+  registerPrivateHydrateRootSourceLedgerRootBridgeModule(
+    registerRootBridgeModule
+  ) {
+    return typeof registerRootBridgeModule === 'function'
+      ? registerRootBridgeModule(
+          fakeRootBridgeCacheExports,
+          Object.freeze({source: 'copied-fake-root-bridge-token'})
+        )
+      : false;
+  }
+});
+const fakeRootBridgeModule = new Module(rootBridgeCacheKey, module.parent);
+fakeRootBridgeModule.filename = rootBridgeCacheKey;
+fakeRootBridgeModule.path = path.dirname(rootBridgeCacheKey);
+fakeRootBridgeModule.loaded = true;
+fakeRootBridgeModule.children = require.cache[rootBridgeCacheKey].children;
+Object.defineProperty(fakeRootBridgeModule, 'exports', {
+  configurable: false,
+  enumerable: true,
+  value: fakeRootBridgeCacheExports,
+  writable: false
+});
+require.cache[rootBridgeCacheKey] = fakeRootBridgeModule;
+assert.equal(require(rootBridgePath), fakeRootBridgeCacheExports);
+
+const hydrationGate = require(path.join(
+  packageRoot,
+  'src/client/hydration-boundary-gate.js'
+));
+assert.equal(require(rootBridgePath), fakeRootBridgeCacheExports);
+assert.equal(
+  hydrationGate.requestPrivateHydrateRootSourceLedgerRootBridgeModuleRegistration(
+    fakeRootBridgeCacheExports
+  ),
+  false
+);
+`;
+
+  childProcess.execFileSync(process.execPath, ['-e', script], {
+    cwd: packageRoot,
+    stdio: 'pipe'
+  });
+});
+
 test('hydrateRoot source ledger rejects forged context and cache poisoning', () => {
   const script = `
 'use strict';
@@ -2745,6 +2952,9 @@ const fakeRootBridgeCacheExports = Object.freeze({
   getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(record) {
     return sourceLedgerFakePayloads.get(record) || null;
   },
+  getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload(record) {
+    return sourceLedgerFakePayloads.get(record) || null;
+  },
   getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(record) {
     return sourceLedgerFakePayloads.get(record) || null;
   },
@@ -2755,6 +2965,9 @@ const fakeRootBridgeCacheExports = Object.freeze({
     return sourceLedgerFakePayloads.has(record);
   },
   isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(record) {
+    return sourceLedgerFakePayloads.has(record);
+  },
+  isPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessRecord(record) {
     return sourceLedgerFakePayloads.has(record);
   },
   isPrivateHydrateRootPublicFacadeExecutionPreflightRecord(record) {
@@ -2827,6 +3040,12 @@ const hydrateRootSourceLedger = require(path.join(
   packageRoot,
   'src/client/hydrate-root-source-ledger.js'
 ));
+assert.equal(
+  hydrationGate.requestPrivateHydrateRootSourceLedgerRootBridgeModuleRegistration(
+    fakeRootBridgeCacheExports
+  ),
+  false
+);
 assert.equal(require(rootBridgePath), fakeRootBridgeCacheExports);
 assert.equal(
   Object.getOwnPropertyDescriptor(
@@ -2904,14 +3123,20 @@ const clonedHydrateRootPreflightRecord = Object.freeze({
   ...scenario.hydrateRecord,
   lifecycleRequestBoundary: clonedLifecycleRequestBoundary
 });
+const clonedReplayBlockerCurrentnessRecord = Object.freeze({
+  ...scenario.eventReplayPreflightRecord.replayBlockerCurrentness,
+  lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+});
 const clonedEventReplayPreflightRecord = Object.freeze({
   ...scenario.eventReplayPreflightRecord,
-  lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+  lifecycleRequestBoundary: clonedLifecycleRequestBoundary,
+  replayBlockerCurrentness: clonedReplayBlockerCurrentnessRecord
 });
 const clonedExecutionPreflightRecord = Object.freeze({
   ...scenario.executionPreflightRecord,
   eventReplayPreflight: clonedEventReplayPreflightRecord,
-  lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+  lifecycleRequestBoundary: clonedLifecycleRequestBoundary,
+  replayBlockerCurrentness: clonedReplayBlockerCurrentnessRecord
 });
 const spoofedHydrateRootPayload = Object.freeze({
   ...rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
@@ -2974,6 +3199,12 @@ sourceLedgerFakePayloads.set(
   )
 );
 sourceLedgerFakePayloads.set(
+  scenario.eventReplayPreflightRecord.replayBlockerCurrentness,
+  rootBridge.getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload(
+    scenario.eventReplayPreflightRecord.replayBlockerCurrentness
+  )
+);
+sourceLedgerFakePayloads.set(
   scenario.executionPreflightRecord,
   rootBridge.getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(
     scenario.executionPreflightRecord
@@ -3001,7 +3232,20 @@ sourceLedgerFakePayloads.set(
       .getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(
         scenario.eventReplayPreflightRecord
       ),
-    lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+    lifecycleRequestBoundary: clonedLifecycleRequestBoundary,
+    replayBlockerCurrentness: clonedReplayBlockerCurrentnessRecord
+  })
+);
+sourceLedgerFakePayloads.set(
+  clonedReplayBlockerCurrentnessRecord,
+  Object.freeze({
+    ...rootBridge
+      .getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload(
+        scenario.eventReplayPreflightRecord.replayBlockerCurrentness
+      ),
+    eventReplayPreflightRecord: clonedEventReplayPreflightRecord,
+    lifecycleRequestBoundary: clonedLifecycleRequestBoundary,
+    record: clonedReplayBlockerCurrentnessRecord
   })
 );
 sourceLedgerFakePayloads.set(
@@ -3012,7 +3256,8 @@ sourceLedgerFakePayloads.set(
         scenario.executionPreflightRecord
       ),
     eventReplayPreflight: clonedEventReplayPreflightRecord,
-    lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+    lifecycleRequestBoundary: clonedLifecycleRequestBoundary,
+    replayBlockerCurrentness: clonedReplayBlockerCurrentnessRecord
   })
 );
 sourceLedgerFakePayloads.set(
@@ -3041,6 +3286,9 @@ const postLoadFakeRootBridgeCacheExports = Object.freeze({
   getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(record) {
     return sourceLedgerFakePayloads.get(record) || null;
   },
+  getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload(record) {
+    return sourceLedgerFakePayloads.get(record) || null;
+  },
   getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(record) {
     return sourceLedgerFakePayloads.get(record) || null;
   },
@@ -3051,6 +3299,9 @@ const postLoadFakeRootBridgeCacheExports = Object.freeze({
     return sourceLedgerFakePayloads.has(record);
   },
   isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(record) {
+    return sourceLedgerFakePayloads.has(record);
+  },
+  isPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessRecord(record) {
     return sourceLedgerFakePayloads.has(record);
   },
   isPrivateHydrateRootPublicFacadeExecutionPreflightRecord(record) {
@@ -3082,6 +3333,12 @@ require.cache[rootBridgeCacheKey] =
     postLoadFakeRootBridgeCacheExports
   );
 assert.equal(require(rootBridgePath), postLoadFakeRootBridgeCacheExports);
+assert.equal(
+  hydrationGate.requestPrivateHydrateRootSourceLedgerRootBridgeModuleRegistration(
+    postLoadFakeRootBridgeCacheExports
+  ),
+  false
+);
 
 const forgedPreflightState = {
   bridge: Object.freeze({kind: 'forged-bridge'}),
@@ -3089,6 +3346,7 @@ const forgedPreflightState = {
   executionPreflightRecords: [],
   lifecycleRequestBoundaryRecords: [],
   preflight: Object.freeze({kind: 'forged-preflight'}),
+  replayBlockerCurrentnessRecords: [],
   records: []
 };
 const forgedRecoverableErrorPreflight =
@@ -3124,14 +3382,20 @@ const forgedClonedHydrateRootPreflightRecord = Object.freeze({
   lifecycleRequestBoundary: forgedClonedLifecycleRequestBoundary,
   recoverableErrorPreflight: forgedRecoverableErrorPreflight
 });
+const forgedClonedReplayBlockerCurrentnessRecord = Object.freeze({
+  ...scenario.eventReplayPreflightRecord.replayBlockerCurrentness,
+  lifecycleRequestBoundary: forgedClonedLifecycleRequestBoundary
+});
 const forgedClonedEventReplayPreflightRecord = Object.freeze({
   ...scenario.eventReplayPreflightRecord,
-  lifecycleRequestBoundary: forgedClonedLifecycleRequestBoundary
+  lifecycleRequestBoundary: forgedClonedLifecycleRequestBoundary,
+  replayBlockerCurrentness: forgedClonedReplayBlockerCurrentnessRecord
 });
 const forgedClonedExecutionPreflightRecord = Object.freeze({
   ...scenario.executionPreflightRecord,
   eventReplayPreflight: forgedClonedEventReplayPreflightRecord,
-  lifecycleRequestBoundary: forgedClonedLifecycleRequestBoundary
+  lifecycleRequestBoundary: forgedClonedLifecycleRequestBoundary,
+  replayBlockerCurrentness: forgedClonedReplayBlockerCurrentnessRecord
 });
 forgedPreflightState.records.push(forgedClonedHydrateRootPreflightRecord);
 forgedPreflightState.eventReplayPreflightRecords.push(
@@ -3143,10 +3407,14 @@ forgedPreflightState.executionPreflightRecords.push(
 forgedPreflightState.lifecycleRequestBoundaryRecords.push(
   forgedClonedLifecycleRequestBoundary
 );
+forgedPreflightState.replayBlockerCurrentnessRecords.push(
+  forgedClonedReplayBlockerCurrentnessRecord
+);
 Object.freeze(forgedPreflightState.records);
 Object.freeze(forgedPreflightState.eventReplayPreflightRecords);
 Object.freeze(forgedPreflightState.executionPreflightRecords);
 Object.freeze(forgedPreflightState.lifecycleRequestBoundaryRecords);
+Object.freeze(forgedPreflightState.replayBlockerCurrentnessRecords);
 Object.freeze(forgedPreflightState);
 
 assert.equal(
@@ -3159,6 +3427,7 @@ for (const clonedSourceLedgerRecord of [
   clonedHydrateRootPreflightRecord,
   clonedEventReplayPreflightRecord,
   clonedExecutionPreflightRecord,
+  clonedReplayBlockerCurrentnessRecord,
   clonedLifecycleRequestBoundary
 ]) {
   assert.equal(

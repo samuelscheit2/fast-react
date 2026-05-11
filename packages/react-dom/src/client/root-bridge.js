@@ -101,7 +101,10 @@ const {
   revertRootListenersForPrivateRoot
 } = require('../events/root-listeners.js');
 const {
+  EVENT_DISPATCH_BLOCKED_CODE,
+  EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
   HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND,
+  HYDRATION_REPLAY_BLOCKED_CODE,
   createPortalEventOwnerRootGateRecord:
     createPluginPortalEventOwnerRootGateRecord,
   getDispatchListenerErrorRouteRecordPayload,
@@ -391,6 +394,8 @@ const privateHydrateRootPublicFacadeTargetClaimingPreflightRecordType =
   'fast.react_dom.private_hydrate_root_public_facade_target_claiming_preflight_record';
 const privateHydrateRootPublicFacadeEventReplayPreflightRecordType =
   'fast.react_dom.private_hydrate_root_public_facade_event_replay_preflight_record';
+const privateHydrateRootPublicFacadeReplayBlockerCurrentnessRecordType =
+  'fast.react_dom.private_hydrate_root_public_facade_replay_blocker_currentness_record';
 const privateHydrateRootPublicFacadeExecutionPreflightRecordType =
   'fast.react_dom.private_hydrate_root_public_facade_execution_preflight_record';
 const privateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecordType =
@@ -519,6 +524,8 @@ const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TARGET_CLAIMING_PREFLIGHTED =
   'preflighted-private-hydrate-root-public-facade-target-claiming-gate';
 const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EVENT_REPLAY_PREFLIGHTED =
   'preflighted-private-hydrate-root-public-facade-event-replay-gate';
+const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_REPLAY_BLOCKER_CURRENT =
+  'accepted-private-hydrate-root-replay-blocker-currentness';
 const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EXECUTION_PREFLIGHTED =
   'preflighted-private-hydrate-root-public-facade-execution-gate';
 const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TEXT_NODE_CLAIM_PATCH_EXECUTED =
@@ -870,6 +877,12 @@ const ROOT_BRIDGE_HYDRATE_ROOT_EVENT_REPLAY_PREFLIGHT_ACCEPTED_CAPABILITIES =
       accepted: true,
       reason:
         'The private hydration gate validated one blocked replay target-dispatch execution record without dispatching events.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-replay-blocker-currentness',
+      accepted: true,
+      reason:
+        'The private event replay preflight binds the replay blocker report to the exact hydrateRoot lifecycle and source-ledger chain.'
     }),
     freezeRecord({
       id: 'hydrate-root-event-replay-state-unchanged',
@@ -3145,6 +3158,8 @@ const rootHydratePublicFacadeSourceLedgerStatesByBridge =
   new WeakMap();
 const rootHydratePublicFacadeEventReplayPreflightPayloads =
   new WeakMap();
+const rootHydratePublicFacadeReplayBlockerCurrentnessPayloads =
+  new WeakMap();
 const rootHydratePublicFacadeExecutionPreflightPayloads =
   new WeakMap();
 const rootHydratePublicFacadeTextNodeClaimPatchExecutionPayloads =
@@ -3782,6 +3797,7 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
     nextExecutionPreflightSequence: 1,
     nextLifecycleRequestBoundarySequence: 1,
     nextPreflightSequence: 1,
+    nextReplayBlockerCurrentnessSequence: 1,
     nextTargetClaimingPreflightSequence: 1,
     nextTextNodeClaimPatchExecutionSequence: 1,
     preflight: null,
@@ -3790,6 +3806,7 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
       'hydrate-root-public-facade-preflight'
     ),
     recoverableErrorPreflightRecords: [],
+    replayBlockerCurrentnessRecords: [],
     records: [],
     targetClaimingPreflightRecords: [],
     textNodeClaimPatchExecutionRecords: [],
@@ -4226,9 +4243,11 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     hydrationRequested: requestRecord.hydrationRequested,
     canHydrate: requestRecord.canHydrate,
     publicRootCreated: false,
+    publicRootExecution: false,
     publicRootObjectExposed: false,
     publicCreateRootEnabled: false,
     publicHydrateRootEnabled: false,
+    publicHydrateRootSupported: false,
     publicRootCompatibilitySurface: false,
     containerMarked: requestRecord.containerMarked,
     listenersAttached: requestRecord.listenersAttached,
@@ -4265,6 +4284,7 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     record,
     {
       bridge: preflightState.bridge,
+      eventReplayBlockers: requestRecord.eventReplayBlockers,
       hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
       ledgerKind: 'hydrate-root-public-facade-preflight-record',
       lifecycleRequestBoundary,
@@ -4458,9 +4478,11 @@ function createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
     hydrationRequested: requestRecord.hydrationRequested,
     canHydrate: false,
     publicRootCreated: false,
+    publicRootExecution: false,
     publicRootObjectExposed: false,
     publicCreateRootEnabled: false,
     publicHydrateRootEnabled: false,
+    publicHydrateRootSupported: false,
     publicRootCompatibilitySurface: false,
     containerMarked: false,
     listenersAttached: false,
@@ -4798,9 +4820,11 @@ function createPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord(
     hydrationRequested: requestRecord.hydrationRequested,
     canHydrate: false,
     publicRootCreated: false,
+    publicRootExecution: false,
     publicRootObjectExposed: false,
     publicCreateRootEnabled: false,
     publicHydrateRootEnabled: false,
+    publicHydrateRootSupported: false,
     publicRootCompatibilitySurface: false,
     containerMarked: false,
     listenersAttached: false,
@@ -4943,6 +4967,23 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     preflightState.nextEventReplayPreflightSequence++;
   const eventReplayPreflightId =
     `${targetClaimingPreflightRecord.preflightId}:event-replay:${eventReplayPreflightSequence}`;
+  const replayBlockerCurrentness =
+    createPrivateHydrateRootReplayBlockerCurrentnessRecord({
+      afterState,
+      beforeState,
+      eventReplayPreflightId,
+      eventReplayPreflightSequence,
+      lifecycleBoundaryPayload,
+      preflightState,
+      replayExecutionRecord,
+      requestRecord,
+      stateUnchanged,
+      targetClaimingPayload,
+      targetClaimingPreflightRecord
+    });
+  preflightState.replayBlockerCurrentnessRecords.push(
+    replayBlockerCurrentness
+  );
   const preconditions = freezeRecord({
     accepted: true,
     stateUnchanged,
@@ -4965,6 +5006,8 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
       targetClaimingPreflightRecord.preconditions
         .canonicalTargetClaimingEvidence,
     canonicalReplayExecutionMetadata: true,
+    replayBlockerCurrentnessAccepted: true,
+    replayBlockerReportCurrent: true,
     replayExecutionRecordImmutable:
       Object.isFrozen(replayExecutionRecord),
     blockedDispatchRecord:
@@ -4994,6 +5037,9 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     markerListenerStateUnchanged: stateUnchanged,
     targetClaimingCanonical: true,
     replayExecutionCanonical: true,
+    replayBlockerCurrentnessAccepted: true,
+    replayBlockerReportBlocked: true,
+    replayBlockerReportCurrent: true,
     targetClaimExecuted: false,
     targetDispatchExecuted: false,
     publicHydrationTargetClaimed: false,
@@ -5080,6 +5126,17 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     afterState,
     preconditions,
     blockerEvidence,
+    replayBlockerCurrentness,
+    replayBlockerCurrentnessId:
+      replayBlockerCurrentness.replayBlockerCurrentnessId,
+    replayBlockerCurrentnessStatus:
+      replayBlockerCurrentness.currentnessStatus,
+    replayBlockerCurrentnessAccepted: true,
+    replayBlockerReport: replayBlockerCurrentness.replayBlockerReport,
+    replayBlockerReportAccepted: true,
+    replayBlockerReportCurrent: true,
+    replayBlockerReportSourceOwned: true,
+    rootListenerReplayAliasRejected: true,
     targetDispatchLinkDiagnostic:
       targetClaimingPayload.targetDispatchLinkDiagnostic,
     targetDispatchLinkStatus:
@@ -5235,9 +5292,11 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     hydrationRequested: requestRecord.hydrationRequested,
     canHydrate: false,
     publicRootCreated: false,
+    publicRootExecution: false,
     publicRootObjectExposed: false,
     publicCreateRootEnabled: false,
     publicHydrateRootEnabled: false,
+    publicHydrateRootSupported: false,
     publicRootCompatibilitySurface: false,
     containerMarked: false,
     listenersAttached: false,
@@ -5276,6 +5335,7 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     ownerDocument,
     preconditions,
     preflight: preflightState.preflight,
+    replayBlockerCurrentness,
     replayExecutionPayload,
     replayExecutionRecord,
     requestRecord,
@@ -5285,6 +5345,59 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
   rootHydratePublicFacadeEventReplayPreflightPayloads.set(
     record,
     eventReplayPreflightPayload
+  );
+  const replayBlockerCurrentnessPayload = freezeRecord({
+    afterState,
+    beforeState,
+    bridge: preflightState.bridge,
+    container,
+    eventReplayBlockers: requestRecord.eventReplayBlockers,
+    eventReplayPreflightRecord: record,
+    lifecycleBoundaryPayload,
+    lifecycleRequestBoundary:
+      eventReplayPreflightPayload.lifecycleRequestBoundary,
+    markerListenerPayload,
+    preflight: preflightState.preflight,
+    replayBlockerCurrentness,
+    replayExecutionPayload,
+    replayExecutionRecord,
+    requestRecord,
+    targetClaimingDiagnostic:
+      targetClaimingPayload.targetClaimingDiagnostic,
+    targetClaimingPayload,
+    targetClaimingPreflight: targetClaimingPreflightRecord,
+    targetDispatchLinkDiagnostic:
+      targetClaimingPayload.targetDispatchLinkDiagnostic
+  });
+  rootHydratePublicFacadeReplayBlockerCurrentnessPayloads.set(
+    replayBlockerCurrentness,
+    replayBlockerCurrentnessPayload
+  );
+  recordHydrateRootPublicFacadeSourceLedgerPayload(
+    requestPayload.bridgeState,
+    replayBlockerCurrentness,
+    {
+      bridge: preflightState.bridge,
+      eventReplayBlockers: requestRecord.eventReplayBlockers,
+      eventReplayPreflightRecord: record,
+      hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+      ledgerKind:
+        'hydrate-root-public-facade-replay-blocker-currentness-record',
+      lifecycleRequestBoundary:
+        eventReplayPreflightPayload.lifecycleRequestBoundary,
+      preflight: preflightState.preflight,
+      replayBlockerCurrentness,
+      replayExecutionPayload,
+      replayExecutionRecord,
+      requestRecord,
+      targetClaimingDiagnostic:
+        targetClaimingPayload.targetClaimingDiagnostic,
+      targetClaimingPayload,
+      targetClaimingPreflight: targetClaimingPreflightRecord,
+      targetDispatchLinkDiagnostic:
+        targetClaimingPayload.targetDispatchLinkDiagnostic,
+      record: replayBlockerCurrentness
+    }
   );
   recordHydrateRootPublicFacadeSourceLedgerPayload(
     requestPayload.bridgeState,
@@ -5297,6 +5410,7 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
       lifecycleRequestBoundary:
         eventReplayPreflightPayload.lifecycleRequestBoundary,
       preflight: preflightState.preflight,
+      replayBlockerCurrentness,
       replayExecutionPayload,
       replayExecutionRecord,
       requestRecord,
@@ -5399,6 +5513,8 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     eventReplayPreflightAccepted: true,
     eventReplayStateUnchanged:
       eventReplayPreflightRecord.preconditions.stateUnchanged,
+    replayBlockerCurrentnessAccepted: true,
+    replayBlockerReportCurrent: true,
     canonicalReplayExecutionMetadata: true,
     replayExecutionRecordFromEventReplayPreflight:
       replayExecutionRecord === eventReplayPayload.replayExecutionRecord,
@@ -5431,6 +5547,9 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     lifecycleRequestBoundaryAccepted: true,
     lifecycleRequestBoundarySourceOwned: true,
     eventReplayStateUnchanged: stateUnchanged,
+    replayBlockerCurrentnessAccepted: true,
+    replayBlockerReportBlocked: true,
+    replayBlockerReportCurrent: true,
     replayExecutionCanonical: true,
     rootCreationBlocked: true,
     rootSchedulingBlocked: true,
@@ -5531,6 +5650,20 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     afterState,
     preconditions,
     blockerEvidence,
+    replayBlockerCurrentness:
+      eventReplayPayload.replayBlockerCurrentness,
+    replayBlockerCurrentnessId:
+      eventReplayPayload.replayBlockerCurrentness
+        .replayBlockerCurrentnessId,
+    replayBlockerCurrentnessStatus:
+      eventReplayPayload.replayBlockerCurrentness.currentnessStatus,
+    replayBlockerCurrentnessAccepted: true,
+    replayBlockerReport:
+      eventReplayPayload.replayBlockerCurrentness.replayBlockerReport,
+    replayBlockerReportAccepted: true,
+    replayBlockerReportCurrent: true,
+    replayBlockerReportSourceOwned: true,
+    rootListenerReplayAliasRejected: true,
     targetDispatchLinkDiagnostic:
       eventReplayPreflightRecord.targetDispatchLinkDiagnostic,
     targetDispatchLinkStatus:
@@ -5737,6 +5870,8 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     ownerDocument,
     preconditions,
     preflight: preflightState.preflight,
+    replayBlockerCurrentness:
+      eventReplayPayload.replayBlockerCurrentness,
     replayExecutionPayload,
     replayExecutionRecord,
     requestRecord,
@@ -5759,6 +5894,8 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
       lifecycleRequestBoundary:
         executionPreflightPayload.lifecycleRequestBoundary,
       preflight: preflightState.preflight,
+      replayBlockerCurrentness:
+        executionPreflightPayload.replayBlockerCurrentness,
       replayExecutionPayload,
       replayExecutionRecord,
       requestRecord,
@@ -6602,11 +6739,18 @@ function assertPrivateHydrateRootPublicFacadeEventReplayPreflightRecordForExecut
     record.preconditions.lifecycleRequestBoundaryAccepted !== true ||
     record.preconditions.lifecycleRequestBoundarySourceOwned !== true ||
     record.preconditions.canonicalReplayExecutionMetadata !== true ||
+    record.preconditions.replayBlockerCurrentnessAccepted !== true ||
     record.blockerEvidence.publicHydrateRootBlocked !== true ||
     record.blockerEvidence.eventReplayBlocked !== true ||
     record.blockerEvidence.eventDispatchBlocked !== true ||
     record.blockerEvidence.replayQueueDrainBlocked !== true ||
     record.blockerEvidence.recoverableErrorCallbackBlocked !== true ||
+    record.blockerEvidence.replayBlockerReportBlocked !== true ||
+    record.replayBlockerCurrentness !== payload.replayBlockerCurrentness ||
+    record.replayBlockerCurrentnessAccepted !== true ||
+    record.replayBlockerReportAccepted !== true ||
+    record.replayBlockerReportCurrent !== true ||
+    record.rootListenerReplayAliasRejected !== true ||
     record.targetClaimExecuted !== false ||
     record.publicHydrationTargetClaimed !== false ||
     record.publicHydrateRootEnabled !== false ||
@@ -6669,9 +6813,16 @@ function assertPrivateHydrateRootPublicFacadeExecutionPreflightRecordForTextNode
     record.preconditions.lifecycleRequestBoundaryAccepted !== true ||
     record.preconditions.lifecycleRequestBoundarySourceOwned !== true ||
     record.preconditions.canonicalReplayExecutionMetadata !== true ||
+    record.preconditions.replayBlockerCurrentnessAccepted !== true ||
     record.blockerEvidence.publicHydrateRootBlocked !== true ||
     record.blockerEvidence.eventReplayBlocked !== true ||
     record.blockerEvidence.eventDispatchBlocked !== true ||
+    record.blockerEvidence.replayBlockerReportBlocked !== true ||
+    record.replayBlockerCurrentness !== payload.replayBlockerCurrentness ||
+    record.replayBlockerCurrentnessAccepted !== true ||
+    record.replayBlockerReportAccepted !== true ||
+    record.replayBlockerReportCurrent !== true ||
+    record.rootListenerReplayAliasRejected !== true ||
     record.publicHydrateRootEnabled !== false ||
     record.publicHydrateRootSupported !== false ||
     record.publicRootObjectExposed !== false ||
@@ -6970,6 +7121,297 @@ function assertHydrateRootTargetClaimingPreflightEvidenceBlocked({
       'hydrateRoot target-claiming preflight cannot accept public hydration, replay, dispatch, or compatibility claims.'
     );
   }
+}
+
+function createPrivateHydrateRootReplayBlockerCurrentnessRecord({
+  afterState,
+  beforeState,
+  eventReplayPreflightId,
+  eventReplayPreflightSequence,
+  lifecycleBoundaryPayload,
+  preflightState,
+  replayExecutionRecord,
+  requestRecord,
+  stateUnchanged,
+  targetClaimingPayload,
+  targetClaimingPreflightRecord
+}) {
+  const eventReplayBlockers =
+    assertHydrateRootReplayBlockerReportBlocked(
+      requestRecord.eventReplayBlockers,
+      {
+        hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+        replayExecutionRecord,
+        requestRecord,
+        targetClaimingPayload
+      }
+    );
+  const replayBlockerCurrentnessSequence =
+    preflightState.nextReplayBlockerCurrentnessSequence++;
+  const replayBlockerCurrentnessId =
+    `${eventReplayPreflightId}:replay-blocker-currentness:${replayBlockerCurrentnessSequence}`;
+  const lifecycleRequestBoundary =
+    targetClaimingPayload.lifecycleRequestBoundary;
+
+  return freezeRecord({
+    $$typeof:
+      privateHydrateRootPublicFacadeReplayBlockerCurrentnessRecordType,
+    kind:
+      'FastReactDomPrivateHydrateRootReplayBlockerCurrentnessRecord',
+    operation: 'hydrate-root-replay-blocker-currentness',
+    facadeCall: 'hydrateRoot',
+    entrypoint: 'react-dom/client',
+    preflightId: targetClaimingPreflightRecord.preflightId,
+    preflightSequence: targetClaimingPreflightRecord.preflightSequence,
+    targetClaimingPreflightId:
+      targetClaimingPreflightRecord.targetClaimingPreflightId,
+    targetClaimingPreflightSequence:
+      targetClaimingPreflightRecord.targetClaimingPreflightSequence,
+    eventReplayPreflightId,
+    eventReplayPreflightSequence,
+    replayBlockerCurrentnessId,
+    replayBlockerCurrentnessSequence,
+    status:
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_REPLAY_BLOCKER_CURRENT,
+    currentnessStatus:
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_REPLAY_BLOCKER_CURRENT,
+    sourceOwned: true,
+    diagnosticOnly: true,
+    readOnly: true,
+    requestId: requestRecord.requestId,
+    requestSequence: requestRecord.requestSequence,
+    requestType: requestRecord.requestType,
+    hydrateId: requestRecord.hydrateId,
+    rootId: requestRecord.rootId,
+    rootKind: requestRecord.rootKind,
+    rootTag: requestRecord.rootTag,
+    rootRecordId: requestRecord.hydrationBoundaryRecord.recordId,
+    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+    acceptedPrivateMetadataDiagnostics:
+      requestRecord.acceptedPrivateMetadataDiagnostics,
+    lifecycleRequestBoundary,
+    lifecycleRequestBoundaryId:
+      lifecycleRequestBoundary.lifecycleRequestBoundaryId,
+    lifecycleRequestBoundaryStatus:
+      lifecycleRequestBoundary.boundaryStatus,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned:
+      lifecycleRequestBoundary.sourceOwned,
+    lifecycleContainerSnapshot:
+      lifecycleRequestBoundary.lifecycleContainerSnapshot,
+    lifecycleContainerSnapshotOwned:
+      lifecycleRequestBoundary.lifecycleContainerSnapshotOwned,
+    lifecycleContainerSnapshotCurrent:
+      lifecycleBoundaryPayload.containerSnapshotCurrent,
+    markerListenerStateCurrent: stateUnchanged,
+    markerListenerStateUnchanged: stateUnchanged,
+    currentStateMatchesTargetClaimingPreflight: true,
+    eventReplayBlockers,
+    replayBlockerReport: eventReplayBlockers,
+    replayBlockerReportKind: eventReplayBlockers.kind,
+    replayBlockerReportStatus: eventReplayBlockers.status,
+    replayBlockerReportAccepted: true,
+    replayBlockerReportSourceOwned: true,
+    replayBlockerReportCurrent: true,
+    targetClaimingDiagnostic:
+      targetClaimingPayload.targetClaimingDiagnostic,
+    targetClaimingStatus:
+      targetClaimingPayload.targetClaimingDiagnostic.status,
+    targetClaimAccepted: true,
+    targetClaimExecuted: false,
+    targetDispatchLinkDiagnostic:
+      targetClaimingPayload.targetDispatchLinkDiagnostic,
+    targetDispatchLinkStatus:
+      targetClaimingPayload.targetDispatchLinkDiagnostic.status,
+    targetDispatchLinkAccepted: true,
+    replayExecutionRecord,
+    replayExecutionGateId: replayExecutionRecord.gateId,
+    replayExecutionStatus: replayExecutionRecord.status,
+    replayExecutionAccepted: true,
+    replayTargetDispatchExecutionBlocked: true,
+    markerGuard: requestRecord.markerGuard,
+    listenerGuard: requestRecord.listenerGuard,
+    rootListenerGateAccepted: eventReplayBlockers.rootListenerGateAccepted,
+    rootListenerInstallationDeferred:
+      eventReplayBlockers.rootListenerInstallationDeferred,
+    rootListenerReplayAliasRejected: true,
+    rootListenerStateDoesNotProveReplay: true,
+    rootListenerDispatchAliasAccepted: false,
+    sourceLedgerRequired: true,
+    hydrateRootPreflightSourceLedgerRequired: true,
+    eventReplayPreflightSourceLedgerRequired: true,
+    executionPreflightSourceLedgerRequired: true,
+    lifecycleSourceLedgerRequired: true,
+    replayBlockerSourceLedgerRequired: true,
+    blockerCount: eventReplayBlockers.blockerCount,
+    blockerContractIds: freezeArray(
+      eventReplayBlockers.blockers.map((blocker) => blocker.id)
+    ),
+    eventDispatchBlockedReason:
+      eventReplayBlockers.eventDispatchBlockedReason,
+    eventTargetResolutionBlockedReason:
+      eventReplayBlockers.eventTargetResolutionBlockedReason,
+    hydrationReplayBlockedReason:
+      eventReplayBlockers.hydrationReplayBlockedReason,
+    beforeState,
+    afterState,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicHydrationReplayCompatibilityClaimed: false,
+    publicHydrateRootSupported: false,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    publicRootCreated: false,
+    publicRootCompatibilitySurface: false,
+    publicPackageCompatibilityClaimed: false,
+    packageCompatibility: false,
+    nativeExecution: false,
+    rustExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    suspenseHydrationScheduled: false,
+    hydration: false,
+    canHydrate: false,
+    domMutation: false,
+    domMutated: false,
+    browserDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    listenersAttached: false,
+    eventDispatch: false,
+    eventReplayInstalled: false,
+    eventReplaySupported: false,
+    hydrationReplaySupported: false,
+    eventsReplayed: false,
+    replayQueuesDrained: false,
+    replayQueueDrained: false,
+    queueMutationAllowed: false,
+    explicitHydrationTargetsQueued: false,
+    continuousEventReplayQueued: false,
+    formReplayQueued: false,
+    recoverableErrorsQueued: false,
+    onRecoverableErrorInvoked: false,
+    publicOnRecoverableErrorInvoked: false
+  });
+}
+
+function assertHydrateRootReplayBlockerReportBlocked(
+  eventReplayBlockers,
+  {
+    hydrationBoundaryRecord,
+    replayExecutionRecord,
+    requestRecord,
+    targetClaimingPayload
+  }
+) {
+  if (
+    !isObjectOrFunction(eventReplayBlockers) ||
+    !Object.isFrozen(eventReplayBlockers) ||
+    eventReplayBlockers.kind !== 'FastReactDomHydrationEventReplayBlockers' ||
+    eventReplayBlockers.status !== 'blocked-after-private-root-and-event-gates' ||
+    eventReplayBlockers.diagnosticOnly !== true ||
+    eventReplayBlockers.readOnly !== true ||
+    eventReplayBlockers.markerParserEvidenceAccepted !== true ||
+    eventReplayBlockers.eventReplayQueueDiagnosticsAccepted !== true ||
+    eventReplayBlockers.eventReplayOwnershipDiagnosticsAccepted !== true ||
+    eventReplayBlockers.replayQueueDiagnosticsAccepted !== true ||
+    eventReplayBlockers.targetResolutionDiagnosticsAccepted !== true ||
+    eventReplayBlockers.rootListenerGateAccepted !== true ||
+    eventReplayBlockers.rootListenerInstallationDeferred !== true ||
+    eventReplayBlockers.eventDispatchGateAccepted !== true ||
+    eventReplayBlockers.eventDispatchBlockedReason !==
+      EVENT_DISPATCH_BLOCKED_CODE ||
+    eventReplayBlockers.eventTargetResolutionBlockedReason !==
+      EVENT_TARGET_RESOLUTION_BLOCKED_CODE ||
+    eventReplayBlockers.hydrationReplayBlockedReason !==
+      HYDRATION_REPLAY_BLOCKED_CODE ||
+    eventReplayBlockers.targetResolutionDiagnostics !==
+      requestRecord.targetResolutionDiagnostics ||
+    eventReplayBlockers.replayQueueDiagnostics !==
+      requestRecord.replayQueueDiagnostics ||
+    eventReplayBlockers.eventReplayQueueDiagnostics !==
+      hydrationBoundaryRecord.eventReplayQueueDiagnostics ||
+    eventReplayBlockers.eventReplayOwnershipDiagnostics !==
+      hydrationBoundaryRecord.eventReplayOwnershipDiagnostics ||
+    eventReplayBlockers.blockers === null ||
+    !Array.isArray(eventReplayBlockers.blockers) ||
+    eventReplayBlockers.blockerCount !== eventReplayBlockers.blockers.length ||
+    eventReplayBlockers.blockedEventReplayTargetCount !==
+      eventReplayBlockers.eventReplayQueueDiagnostics
+        .blockedEventReplayTargetCount ||
+    eventReplayBlockers.queuedEventReplayTargetCount !== 0 ||
+    eventReplayBlockers.replayOwnershipRowCount !==
+      eventReplayBlockers.eventReplayOwnershipDiagnostics.ownershipRowCount ||
+    eventReplayBlockers.markerReplayTargetCandidateCount !==
+      eventReplayBlockers.replayQueueDiagnostics
+        .markerReplayTargetCandidateCount ||
+    replayExecutionRecord.replayExecutionAccepted === true ||
+    hasHydrateRootReplayBlockerPublicClaim(eventReplayBlockers)
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot event replay preflight requires source-owned blocked hydration replay blocker evidence.'
+    );
+  }
+
+  return eventReplayBlockers;
+}
+
+function hasHydrateRootReplayBlockerPublicClaim(record) {
+  if (!isObjectOrFunction(record)) {
+    return false;
+  }
+
+  const blockedBooleanFields = [
+    'browserDomEventCompatibilityClaimed',
+    'browserDomMutation',
+    'canHydrate',
+    'compatibilityClaimed',
+    'continuousEventReplayQueued',
+    'domMutated',
+    'domMutation',
+    'eventDispatch',
+    'eventReplayInstalled',
+    'eventReplaySupported',
+    'eventsReplayed',
+    'explicitHydrationTargetsQueued',
+    'formReplayQueued',
+    'hydration',
+    'hydrationReplaySupported',
+    'listenerInstallation',
+    'listenersAttached',
+    'markerWrites',
+    'nativeExecution',
+    'packageCompatibility',
+    'publicHydrateRootSupported',
+    'publicHydrationCompatibilityClaimed',
+    'publicHydrationReplayCompatibilityClaimed',
+    'publicOnRecoverableErrorInvoked',
+    'publicPackageCompatibilityClaimed',
+    'publicRootCompatibilitySurface',
+    'publicRootCreated',
+    'publicRootExecution',
+    'publicRootObjectExposed',
+    'queueMutationAllowed',
+    'reconcilerExecution',
+    'recoverableErrorsQueued',
+    'replayQueueDrained',
+    'replayQueuesDrained',
+    'rootScheduled',
+    'rustExecution',
+    'suspenseHydrationScheduled'
+  ];
+
+  for (const field of blockedBooleanFields) {
+    if (record[field] === true) {
+      return true;
+    }
+  }
+  return (
+    record.listenerInvocationCount > 0 ||
+    record.rootErrorCallbackInvocationCount > 0 ||
+    record.queuedEventReplayTargetCount > 0
+  );
 }
 
 function assertHydrateRootEventReplayPreflightEvidenceBlocked(
@@ -15744,6 +16186,11 @@ function getPrivateHydrateRootPublicFacadePreflightPayload(preflight) {
     recoverableErrorPreflightRecords: freezeArray(
       payload.recoverableErrorPreflightRecords
     ),
+    replayBlockerCurrentnessRecordCount:
+      payload.replayBlockerCurrentnessRecords.length,
+    replayBlockerCurrentnessRecords: freezeArray(
+      payload.replayBlockerCurrentnessRecords
+    ),
     targetClaimingPreflightRecordCount:
       payload.targetClaimingPreflightRecords.length,
     targetClaimingPreflightRecords: freezeArray(
@@ -15769,6 +16216,7 @@ function getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
 
   return freezeRecord({
     bridge: payload.bridge,
+    eventReplayBlockers: payload.requestRecord.eventReplayBlockers,
     lifecycleRequestBoundary: payload.lifecycleRequestBoundary,
     markerListenerPreflight: payload.markerListenerPreflight,
     nativeHandoffRecord: payload.nativeHandoffRecord,
@@ -15826,6 +16274,21 @@ function isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
   value
 ) {
   return rootHydratePublicFacadeEventReplayPreflightPayloads.has(value);
+}
+
+function getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload(
+  record
+) {
+  return (
+    rootHydratePublicFacadeReplayBlockerCurrentnessPayloads.get(record) ||
+    null
+  );
+}
+
+function isPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessRecord(
+  value
+) {
+  return rootHydratePublicFacadeReplayBlockerCurrentnessPayloads.has(value);
 }
 
 function getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(
@@ -28646,6 +29109,7 @@ const rootBridgeExports = Object.freeze({
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EVENT_REPLAY_PREFLIGHTED,
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_REPLAY_BLOCKER_CURRENT,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EXECUTION_PREFLIGHTED,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_LIFECYCLE_BOUNDARY_ACCEPTED,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED,
@@ -28756,6 +29220,7 @@ const rootBridgeExports = Object.freeze({
   getPrivateRootPublicFacadePreflightRootPayload,
   getPrivateHydrateRootPublicFacadePreflightPayload,
   getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload,
+  getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload,
   getPrivateHydrateRootPublicFacadeExecutionPreflightPayload,
   readPrivateHydrateRootPublicFacadeSourceLedgerPayload,
   getPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionPayload,
@@ -28815,6 +29280,7 @@ const rootBridgeExports = Object.freeze({
   isPrivateRootPublicFacadePreflightRoot,
   isPrivateHydrateRootPublicFacadePreflight,
   isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord,
+  isPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessRecord,
   isPrivateHydrateRootPublicFacadeExecutionPreflightRecord,
   isPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord,
   isPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord,
@@ -28870,6 +29336,7 @@ const rootBridgeExports = Object.freeze({
   privateRootPublicFacadeRootUnmountLifecycleExecutionRecordType,
   privateHydrateRootPublicFacadeMarkerListenerPreflightRecordType,
   privateHydrateRootPublicFacadeEventReplayPreflightRecordType,
+  privateHydrateRootPublicFacadeReplayBlockerCurrentnessRecordType,
   privateHydrateRootPublicFacadeExecutionPreflightRecordType,
   privateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecordType,
   privateHydrateRootPublicFacadeTargetClaimingPreflightRecordType,

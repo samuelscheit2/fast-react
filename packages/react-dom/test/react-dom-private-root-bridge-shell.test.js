@@ -8175,6 +8175,12 @@ test('private react-dom/client hydrateRoot event replay preflight validates bloc
     rootBridge.getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
       eventReplayPreflight.replayExecutionRecord
     );
+  const replayBlockerCurrentness =
+    eventReplayPreflight.replayBlockerCurrentness;
+  const replayBlockerCurrentnessPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessPayload(
+      replayBlockerCurrentness
+    );
 
   assert.equal(Object.isFrozen(eventReplayPreflight), true);
   assert.equal(
@@ -8225,9 +8231,55 @@ test('private react-dom/client hydrateRoot event replay preflight validates bloc
   );
   assert.equal(eventReplayPreflight.preconditions.blockedDispatchRecord, true);
   assert.equal(eventReplayPreflight.preconditions.stateUnchanged, true);
+  assert.equal(
+    eventReplayPreflight.preconditions.replayBlockerCurrentnessAccepted,
+    true
+  );
+  assert.equal(
+    eventReplayPreflight.preconditions.replayBlockerReportCurrent,
+    true
+  );
   assert.equal(eventReplayPreflight.targetDispatchLinkAccepted, true);
   assert.equal(eventReplayPreflight.targetClaimingPayloadAccepted, true);
   assert.equal(eventReplayPreflight.replayExecutionPayloadAccepted, true);
+  assert.equal(eventReplayPreflight.replayBlockerCurrentnessAccepted, true);
+  assert.equal(eventReplayPreflight.replayBlockerReportAccepted, true);
+  assert.equal(eventReplayPreflight.replayBlockerReportCurrent, true);
+  assert.equal(eventReplayPreflight.rootListenerReplayAliasRejected, true);
+  assert.equal(Object.isFrozen(replayBlockerCurrentness), true);
+  assert.equal(
+    rootBridge
+      .isPrivateHydrateRootPublicFacadeReplayBlockerCurrentnessRecord(
+        replayBlockerCurrentness
+      ),
+    true
+  );
+  assert.equal(
+    replayBlockerCurrentness.status,
+    rootBridge
+      .ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_REPLAY_BLOCKER_CURRENT
+  );
+  assert.equal(replayBlockerCurrentness.sourceOwned, true);
+  assert.equal(replayBlockerCurrentness.replayBlockerReportAccepted, true);
+  assert.equal(replayBlockerCurrentness.replayBlockerReportCurrent, true);
+  assert.equal(replayBlockerCurrentness.rootListenerReplayAliasRejected, true);
+  assert.equal(
+    replayBlockerCurrentness.replayExecutionRecord,
+    eventReplayPreflight.replayExecutionRecord
+  );
+  assert.equal(
+    replayBlockerCurrentness.eventReplayBlockers,
+    hydratePreflight.eventReplayBlockers
+  );
+  assert.notEqual(replayBlockerCurrentnessPayload, null);
+  assert.equal(
+    replayBlockerCurrentnessPayload.eventReplayPreflightRecord,
+    eventReplayPreflight
+  );
+  assert.equal(
+    replayBlockerCurrentnessPayload.replayBlockerCurrentness,
+    replayBlockerCurrentness
+  );
   assert.equal(
     eventReplayPreflight.replayExecutionRecord,
     payload.replayExecutionRecord
@@ -8329,6 +8381,7 @@ test('private react-dom/client hydrateRoot event replay preflight validates bloc
       'hydrate-root-lifecycle-request-boundary-required',
       'hydrate-root-target-claiming-preflight-required',
       'hydrate-root-replay-target-dispatch-execution-metadata',
+      'hydrate-root-replay-blocker-currentness',
       'hydrate-root-event-replay-state-unchanged'
     ]
   );
@@ -8353,6 +8406,10 @@ test('private react-dom/client hydrateRoot event replay preflight validates bloc
     eventReplayPreflight
   ]);
   assert.equal(preflightPayload.eventReplayPreflightRecordCount, 1);
+  assert.deepEqual(preflightPayload.replayBlockerCurrentnessRecords, [
+    replayBlockerCurrentness
+  ]);
+  assert.equal(preflightPayload.replayBlockerCurrentnessRecordCount, 1);
   assert.equal(preflightPayload.targetClaimingPreflightRecordCount, 1);
   assert.equal(dispatchRecord.hydrationReplay.queued, false);
   assert.deepEqual(container.__registrations, []);
