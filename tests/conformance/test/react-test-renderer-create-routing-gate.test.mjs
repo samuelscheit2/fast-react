@@ -3037,9 +3037,8 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   );
 
   const wrongUpdateKindReport = privateToJSONReport({
-    hostOutputUpdateKind: "Create",
-    rowId: null,
-    rowShape: null,
+    rowId: privateToJSONUpdateHostOutputRowId,
+    rowShape: "SingleHostText",
     rootChildCount: 1,
     rootNodeKind: "HostComponent",
     nodes: [
@@ -3047,6 +3046,7 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
       textNode(1, 0, "wrong")
     ]
   });
+  wrongUpdateKindReport.hostOutputUpdateKind = "Create";
   assert.equal(
     facade.canCreateAcceptedNativeExecutionDiagnosticResult(
       updateResult,
@@ -3068,7 +3068,10 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   );
   assert.equal(mismatchError.publicSerializationAvailable, false);
   assert.equal(mismatchError.nativeExecution, false);
-  assert.match(mismatchError.message, /source report update kind/u);
+  assert.match(
+    mismatchError.message,
+    /Create diagnostics must not claim update or unmount private row metadata/u
+  );
 
   const rowShapeMismatchError = captureThrown(() =>
     facade.createAcceptedNativeExecutionDiagnosticResult(
@@ -3562,13 +3565,13 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(updateEvidence.result.rendered.rendered[0], "goodbye");
 
   const wrongTreeUpdateKindReport = privateToTreeReport({
-    hostOutputUpdateKind: "Create",
-    rowId: null,
-    rowShape: null,
+    rowId: privateToJSONUpdateHostOutputRowId,
+    rowShape: "SingleHostText",
     rootChildCount: 1,
     text: "wrong",
     compositeNativeExecution: true
   });
+  wrongTreeUpdateKindReport.hostOutputUpdateKind = "Create";
   assert.equal(
     facade.canCreateAcceptedNativeExecutionDiagnosticResult(
       updateResult,

@@ -2406,7 +2406,7 @@ test("react-test-renderer JS private serialization finished-work identity valida
     assert.equal(jsonUpdateIdentity.rootRequestOperation, "update");
     assert.equal(jsonUpdateIdentity.hostOutputUpdateKind, "Update");
 
-    if (entry.entrypoint === packageRootEntrypoint) {
+    if (hasPackageRootOrCjsPrivateAdmission(entry)) {
       const mismatchedIdentityRowIdReport = JSON.parse(
         JSON.stringify(jsonUpdateReport)
       );
@@ -2464,6 +2464,34 @@ test("react-test-renderer JS private serialization finished-work identity valida
         "FastReactTestRendererPrivateToJSONSerializationError"
       );
       assert.match(missingIdentityRowError.message, /hostOutputRow/u);
+
+      const missingIdentityRowMetadataReport = JSON.parse(
+        JSON.stringify(jsonUpdateReport)
+      );
+      delete missingIdentityRowMetadataReport.hostOutputRow;
+      assert.equal(
+        jsonFacade.canValidateAcceptedFinishedWorkIdentity(
+          jsonUpdateEvidence,
+          missingIdentityRowMetadataReport,
+          updateError.rootRequest
+        ),
+        false
+      );
+      const missingIdentityRowMetadataError = captureThrown(() =>
+        jsonFacade.validateAcceptedFinishedWorkIdentity(
+          jsonUpdateEvidence,
+          missingIdentityRowMetadataReport,
+          updateError.rootRequest
+        )
+      );
+      assert.equal(
+        missingIdentityRowMetadataError.name,
+        "FastReactTestRendererPrivateToJSONSerializationError"
+      );
+      assert.match(
+        missingIdentityRowMetadataError.message,
+        /hostOutputRow/u
+      );
 
       const missingIdentityRowShapeReport = JSON.parse(
         JSON.stringify(jsonUpdateReport)

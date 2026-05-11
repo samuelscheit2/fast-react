@@ -19,6 +19,8 @@
 ## Changed Files
 
 - `packages/react-test-renderer/index.js`
+- `packages/react-test-renderer/cjs/react-test-renderer.development.js`
+- `packages/react-test-renderer/cjs/react-test-renderer.production.js`
 - `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`
 - `tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`
 - `worker-progress/worker-844-test-renderer-package-root-native-execution-parity.md`
@@ -35,7 +37,7 @@
 ## Risks
 
 - No Rust source was changed, and no `cargo` verification was run for this
-  package-root-only parity step.
+  JS package/CJS parity step.
 - Native execution remains private diagnostic evidence only. Public serializer,
   TestInstance, native bridge loading/execution, and broad compatibility claims
   are intentionally still blocked.
@@ -69,7 +71,14 @@
 - Follow-up tightened identity-only update/unmount reports to require embedded
   `hostOutputRow` metadata and narrowed package-root `toTree` metadata so
   sibling-text remains a JS admission path, not native execution evidence.
+- Mirrored the embedded-row identity checks and explicit update/unmount row
+  shape checks into the CJS development and production bundles, with package
+  root plus CJS negative coverage for direct-only, missing, mismatched, and
+  incomplete host output row evidence.
 - Verified with `node --check packages/react-test-renderer/index.js`,
+  `node --check packages/react-test-renderer/cjs/react-test-renderer.development.js`,
+  `node --check packages/react-test-renderer/cjs/react-test-renderer.production.js`,
+  package-root/CJS import smoke,
   `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`,
   `node --test tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`,
   `git diff --check`, and `git diff --cached --check`.
