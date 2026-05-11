@@ -354,6 +354,7 @@ function createResourceFormRootExecutionConsumerGate(options) {
   return Object.freeze({
     recordRootExecutionConsumer(
       rootBridgeAdmission,
+      rootLifecycleRequestBoundary,
       resourceRootMapStorageExecutionRecord,
       formFulfilledResetExecutionRecord,
       admission
@@ -361,6 +362,7 @@ function createResourceFormRootExecutionConsumerGate(options) {
       return recordResourceFormRootExecutionConsumerWithGate(
         gateState,
         rootBridgeAdmission,
+        rootLifecycleRequestBoundary,
         resourceRootMapStorageExecutionRecord,
         formFulfilledResetExecutionRecord,
         admission
@@ -372,6 +374,7 @@ function createResourceFormRootExecutionConsumerGate(options) {
 function recordResourceFormRootExecutionConsumerWithGate(
   gateState,
   rootBridgeAdmission,
+  rootLifecycleRequestBoundary,
   resourceRootMapStorageExecutionRecord,
   formFulfilledResetExecutionRecord,
   admission
@@ -379,6 +382,11 @@ function recordResourceFormRootExecutionConsumerWithGate(
   assertRootBridgeAdmissionIsRecordOnly(rootBridgeAdmission);
   const normalizedAdmission =
     normalizeResourceFormRootExecutionConsumerAdmission(admission);
+  const lifecycleBoundary =
+    assertRootLifecycleRequestBoundaryForRootConsumer(
+      rootBridgeAdmission,
+      rootLifecycleRequestBoundary
+    );
   const resourceExecution =
     assertResourceRootMapStorageExecutionForRootConsumer(
       resourceRootMapStorageExecutionRecord,
@@ -414,6 +422,8 @@ function recordResourceFormRootExecutionConsumerWithGate(
     createResourceRootMapStorageConsumerBoundary(resourceExecution);
   const formBoundary =
     createFormFulfilledResetConsumerBoundary(fulfilledResetExecution);
+  const rootLifecycleBoundary =
+    createRootLifecycleConsumerBoundary(lifecycleBoundary);
 
   const payload = freezeRecord({
     $$typeof: resourceFormRootExecutionConsumerRecordType,
@@ -434,9 +444,12 @@ function recordResourceFormRootExecutionConsumerWithGate(
     sourceRootBridgeAdmissionId: rootBridgeAdmission.requestId,
     sourceRootBridgeAdmissionStatus: rootBridgeAdmission.admissionStatus,
     sourceRootBridgeOperation: rootBridgeAdmission.operation,
+    sourceRootLifecycleBoundaryId: lifecycleBoundary.boundaryId,
+    sourceRootLifecycleBoundaryStatus: lifecycleBoundary.boundaryStatus,
     admission: normalizedAdmission,
     rootBridgeBoundary:
       describePrivateRootBridgeBoundary(rootBridgeAdmission),
+    rootLifecycleBoundary,
     publicRootBoundary: describePublicRootBoundary(),
     ledgerBoundary: createResourceFormExecutionAdmissionLedgerBoundary(),
     resourceRootMapStorageBoundary: resourceBoundary,
@@ -448,6 +461,8 @@ function recordResourceFormRootExecutionConsumerWithGate(
       resourceRootMapStorageExecutionTokens:
         resourceBoundary.sourceOwnedTokens,
       formFulfilledResetExecutionTokens: formBoundary.sourceOwnedTokens,
+      rootLifecycleRequestBoundaryTokens:
+        rootLifecycleBoundary.sourceOwnedTokens,
       callerSuppliedAliasesAccepted: false,
       clonedEvidenceAccepted: false,
       testTitleEvidenceAccepted: false,
@@ -545,6 +560,7 @@ function normalizeResourceFormRootExecutionConsumerAdmission(admission) {
   return freezeRecord({
     explicitResourceFormRootExecutionConsumer: true,
     sourceOwnedPrivateRecordsRequired: true,
+    sourceOwnedActiveRootLifecycleRequestBoundaryRequired: true,
     sourceOwnedLedgerBoundaryRequired: true,
     callerSuppliedSourceTokensAccepted: false,
     deterministicFakeResourceEvidenceOnly: true,
@@ -555,6 +571,57 @@ function normalizeResourceFormRootExecutionConsumerAdmission(admission) {
     publicPackageCompatibilityClaimed: false,
     compatibilityClaimed: false
   });
+}
+
+function assertRootLifecycleRequestBoundaryForRootConsumer(
+  rootBridgeAdmission,
+  lifecycleBoundary
+) {
+  if (
+    !rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      rootBridgeAdmission,
+      lifecycleBoundary
+    ) ||
+    !rootBridge.isPrivateRootLifecycleRequestBoundaryRecord(
+      lifecycleBoundary
+    ) ||
+    lifecycleBoundary.$$typeof !==
+      rootBridge.privateRootLifecycleRequestBoundaryRecordType ||
+    lifecycleBoundary.kind !==
+      'FastReactDomPrivateRootLifecycleRequestBoundaryRecord' ||
+    lifecycleBoundary.boundaryStatus !==
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED ||
+    lifecycleBoundary.sourceAdmissionId !== rootBridgeAdmission.requestId ||
+    lifecycleBoundary.sourceAdmissionStatus !==
+      rootBridgeAdmission.admissionStatus ||
+    lifecycleBoundary.rootId !== rootBridgeAdmission.rootId ||
+    lifecycleBoundary.rootKind !== rootBridgeAdmission.rootKind ||
+    lifecycleBoundary.rootTag !== rootBridgeAdmission.rootTag ||
+    lifecycleBoundary.sourceLifecycleStatusBefore !==
+      rootBridgeAdmission.lifecyclePrerequisites.lifecycleStatusBefore ||
+    lifecycleBoundary.sourceLifecycleStatusAfter !==
+      rootBridgeAdmission.lifecyclePrerequisites.lifecycleStatusAfter ||
+    lifecycleBoundary.lifecycleTransition !==
+      rootBridgeAdmission.lifecyclePrerequisites.lifecycleTransition ||
+    lifecycleBoundary.sourceOwned !== true ||
+    lifecycleBoundary.activeRootLifecycle !== true ||
+    lifecycleBoundary.requestBoundaryCurrent !== true ||
+    lifecycleBoundary.publicRootExecution !== false ||
+    lifecycleBoundary.nativeExecution !== false ||
+    lifecycleBoundary.reconcilerExecution !== false ||
+    lifecycleBoundary.domMutation !== false ||
+    lifecycleBoundary.markerWrites !== false ||
+    lifecycleBoundary.listenerInstallation !== false ||
+    lifecycleBoundary.hydration !== false ||
+    lifecycleBoundary.eventDispatch !== false ||
+    lifecycleBoundary.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'root lifecycle request boundary must be source-owned active and match root bridge admission'
+    );
+  }
+
+  return lifecycleBoundary;
 }
 
 function assertResourceRootMapStorageExecutionForRootConsumer(
@@ -899,6 +966,55 @@ function assertFormFulfilledResetExecutionPlanForRootConsumer(payload) {
       'form fulfilled reset execution must remain fake and public-blocked'
     );
   }
+}
+
+function createRootLifecycleConsumerBoundary(lifecycleBoundary) {
+  return freezeRecord({
+    status: privateResourceFormRootExecutionConsumerStatus,
+    sourceWorkerId: 'worker-883-resource-form-lifecycle-boundary-hardening',
+    recordType: lifecycleBoundary.$$typeof,
+    boundaryId: lifecycleBoundary.boundaryId,
+    boundaryStatus: lifecycleBoundary.boundaryStatus,
+    sourceAdmissionId: lifecycleBoundary.sourceAdmissionId,
+    sourceAdmissionStatus: lifecycleBoundary.sourceAdmissionStatus,
+    sourceRequestId: lifecycleBoundary.sourceRequestId,
+    sourceRequestSequence: lifecycleBoundary.sourceRequestSequence,
+    sourceRequestType: lifecycleBoundary.sourceRequestType,
+    sourceOperation: lifecycleBoundary.sourceOperation,
+    rootId: lifecycleBoundary.rootId,
+    rootKind: lifecycleBoundary.rootKind,
+    rootTag: lifecycleBoundary.rootTag,
+    sourceLifecycleStatusBefore:
+      lifecycleBoundary.sourceLifecycleStatusBefore,
+    sourceLifecycleStatusAfter:
+      lifecycleBoundary.sourceLifecycleStatusAfter,
+    lifecycleTransition: lifecycleBoundary.lifecycleTransition,
+    activeLifecycleStatus: lifecycleBoundary.activeLifecycleStatus,
+    lifecycleRequestVersion: lifecycleBoundary.lifecycleRequestVersion,
+    sourceOwnedTokens: freezeArray([
+      lifecycleBoundary.$$typeof,
+      lifecycleBoundary.boundaryStatus,
+      lifecycleBoundary.sourceAdmissionStatus,
+      lifecycleBoundary.sourceOperation,
+      lifecycleBoundary.lifecycleTransition
+    ]),
+    sourceOwnedLifecycleBoundaryConsumed: true,
+    activeRootLifecycleRequired: true,
+    requestBoundaryCurrent: true,
+    staleLifecycleSnapshotsRejected: true,
+    clonedLifecycleSourceRecordsRejected: true,
+    callerBuiltLifecycleSourceRecordsRejected: true,
+    publicRootAliasesRejected: true,
+    publicRootExecution: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
 }
 
 function createResourceRootMapStorageConsumerBoundary(resourceExecution) {
@@ -1855,6 +1971,10 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
     ledgerBoundary: createResourceFormExecutionAdmissionLedgerBoundary(),
     acceptedRootBridgeAdmissionStatus:
       rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+    acceptedRootLifecycleRequestBoundaryRecordType:
+      rootBridge.privateRootLifecycleRequestBoundaryRecordType,
+    acceptedRootLifecycleRequestBoundaryStatus:
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
     acceptedResourceRootMapStorageRecordType:
       internalsGate.privateResourceHintRootMapStorageRecordType,
     acceptedResourceRootMapStorageStatus:
@@ -1866,10 +1986,15 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
     acceptedFormFulfilledResetStatus:
       formActions.privateFormActionFulfilledResetExecutionRecordedStatus,
     consumesRootBridgeAdmission: true,
+    consumesRootLifecycleRequestBoundary: true,
     consumesResourceRootMapStorageExecution: true,
     consumesFormFulfilledResetExecution: true,
+    requiresSourceOwnedActiveRootLifecycleRequestBoundary: true,
     requiresSourceOwnedPrivateRecords: true,
     requiresWorker850AdmissionLedgerBoundary: true,
+    rejectsStaleRootLifecycleSnapshots: true,
+    rejectsCrossRootLifecycleSourceRecords: true,
+    rejectsCallerBuiltLifecycleSourceRecords: true,
     rejectsStaleRootMapStorageRecords: true,
     rejectsCrossRootResourceRecords: true,
     rejectsClonedRecords: true,
