@@ -3707,6 +3707,236 @@ test('private form action rejected-error preflight blocks public submit dispatch
   );
 });
 
+test('private form rejected-error fake metadata negative matrix stays fail-closed after accepted preflight', async () => {
+  const {
+    rejectedExecution
+  } = await createPrivateRejectedFormActionAsyncExecution(
+    'rejected-error-fake-metadata-negative',
+    'private fake metadata negative matrix boom'
+  );
+  const preflightGate =
+    formActions.createFormActionRejectedErrorPreflightDiagnosticGate({
+      requestIdPrefix: 'rejected-error-fake-metadata-negative-preflight'
+    });
+  const record = preflightGate.recordRejectedErrorPreflight(
+    rejectedExecution,
+    {
+      explicitFormActionRejectedErrorPreflight: true,
+      sourceAsyncCallbackExecutionId: rejectedExecution.executionId
+    }
+  );
+
+  assert.equal(
+    record.acceptedMetadataIds.asyncCallbackExecutionId,
+    record.sourceAsyncCallbackExecutionId
+  );
+  assert.equal(
+    record.acceptedMetadataIds.callbackActionPreflightId,
+    record.sourceCallbackActionPreflightId
+  );
+  assert.equal(
+    record.acceptedMetadataIds.submitDispatchId,
+    record.sourceSubmitDispatchId
+  );
+  assert.equal(
+    record.acceptedMetadataIds.submitResetExecutionId,
+    record.sourceSubmitResetExecutionId
+  );
+  assert.equal(
+    record.acceptedMetadataIds.resetIntentRequestId,
+    record.sourceResetIntentRequestId
+  );
+  assert.equal(record.rejectedAsyncActionError.rawErrorCaptured, false);
+  assert.equal(record.rejectedAsyncActionError.errorObjectExposed, false);
+  assert.equal(
+    record.rejectedAsyncActionError.publicErrorRoutingStarted,
+    false
+  );
+  assert.equal(record.actionErrorPreflight.rootErrorUpdateScheduled, false);
+  assert.equal(
+    record.actionErrorPreflight.publicRootErrorCallbackInvoked,
+    false
+  );
+  assertRejectedErrorPreflightPublicBlockersFailClosed(record);
+  assertRejectedErrorPreflightPublicBoundaryFailClosed(
+    record.publicFormActionBoundary
+  );
+
+  for (const value of [
+    rejectedExecution,
+    rejectedExecution.acceptedMetadataIds,
+    rejectedExecution.callbackExecution,
+    record,
+    record.acceptedMetadataIds,
+    record.admission,
+    record.sourceAsyncCallbackExecution,
+    record.rejectedAsyncActionError,
+    record.actionErrorPreflight,
+    record.resetActionPublicBlockers,
+    record.publicFormActionBoundary
+  ]) {
+    assert.equal(Object.isFrozen(value), true);
+  }
+
+  for (const mutate of [
+    () => {
+      rejectedExecution.sourceSubmitDispatchId = 'stale-submit-dispatch';
+    },
+    () => {
+      rejectedExecution.callbackExecution.rejected = false;
+    },
+    () => {
+      record.acceptedMetadataIds.submitDispatchId =
+        'wrong-submit-dispatch';
+    },
+    () => {
+      record.resetActionPublicBlockers.publicSubmitDispatchReachable =
+        true;
+    },
+    () => {
+      record.resetActionPublicBlockers.publicRequestFormResetReachable =
+        true;
+    },
+    () => {
+      record.publicFormActionBoundary.publicFormActionsEnabled = true;
+    },
+    () => {
+      record.rejectedAsyncActionError.publicErrorRoutingStarted = true;
+    },
+    () => {
+      record.actionErrorPreflight.publicRootErrorCallbackInvoked = true;
+    }
+  ]) {
+    assert.throws(mutate, TypeError);
+  }
+
+  const tamperedExecution = {
+    ...rejectedExecution,
+    sourceSubmitDispatchId: 'wrong-submit-dispatch',
+    callbackExecution: {
+      ...rejectedExecution.callbackExecution,
+      rejected: false
+    }
+  };
+  assert.equal(
+    formActions.isPrivateFormActionAsyncCallbackExecutionRecord(
+      tamperedExecution
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(tamperedExecution, {
+          explicitFormActionRejectedErrorPreflight: true
+        }),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source async callback execution must be an accepted rejected fake callback execution'
+    }
+  );
+
+  let callbackCalls = 0;
+  const negativeAdmissions = [
+    {
+      admission: {
+        explicitFormActionRejectedErrorPreflight: true,
+        sourceAsyncCallbackExecutionId: 'stale-async-execution'
+      },
+      reason:
+        'sourceAsyncCallbackExecutionId must match the rejected async callback execution record'
+    },
+    {
+      admission: {
+        explicitFormActionRejectedErrorPreflight: true,
+        asyncActionCallback() {
+          callbackCalls++;
+        }
+      },
+      reason:
+        'asyncActionCallback must not be passed to the rejected-error preflight gate'
+    },
+    {
+      admission: {
+        explicitFormActionRejectedErrorPreflight: true,
+        form: throwingProxy('rejected-error form')
+      },
+      reason: 'form must not be passed to the rejected-error preflight gate'
+    },
+    {
+      admission: {
+        explicitFormActionRejectedErrorPreflight: true,
+        publicDispatchRequested: true
+      },
+      reason: 'public submit dispatch must remain blocked'
+    },
+    {
+      admission: {
+        explicitFormActionRejectedErrorPreflight: true,
+        publicSubmitDispatchRequested: true
+      },
+      reason: 'public submit dispatch must remain blocked'
+    },
+    {
+      admission: {
+        explicitFormActionRejectedErrorPreflight: true,
+        publicRequestFormResetRequested: true
+      },
+      reason: 'public reset request must remain blocked'
+    },
+    {
+      admission: {
+        explicitFormActionRejectedErrorPreflight: true,
+        publicErrorRoutingRequested: true
+      },
+      reason: 'public error routing must remain blocked'
+    },
+    {
+      admission: {
+        explicitFormActionRejectedErrorPreflight: true,
+        domMutationRequested: true
+      },
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      admission: {
+        explicitFormActionRejectedErrorPreflight: true,
+        packageCompatibilityClaimed: true
+      },
+      reason: 'package compatibility must remain unclaimed'
+    },
+    {
+      admission: {
+        explicitFormActionRejectedErrorPreflight: true,
+        publicFormActionCompatibilityClaimed: true
+      },
+      reason: 'package compatibility must remain unclaimed'
+    }
+  ];
+
+  for (const {admission, reason} of negativeAdmissions) {
+    assert.throws(
+      () =>
+        formActions
+          .createFormActionRejectedErrorPreflightDiagnosticGate()
+          .recordRejectedErrorPreflight(rejectedExecution, admission),
+      {
+        code:
+          formActions
+            .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+        compatibilityTarget,
+        reason
+      },
+      reason
+    );
+  }
+  assert.equal(callbackCalls, 0);
+});
+
 test('private controlled input value-tracker gate records deterministic metadata only', () => {
   const first = createPrivateControlledValueTrackerScenario();
   const second = createPrivateControlledValueTrackerScenario();
@@ -14256,6 +14486,193 @@ test('private resource root-map storage preflight records canonical rows only', 
   assert.equal(JSON.stringify(preflight).includes('nonce-module'), false);
 });
 
+test('private resource root-map fake metadata negative matrix stays fail-closed after accepted preflight', () => {
+  const scenario = createRootMapStoragePreflightScenario(
+    'root-map-storage-fake-metadata-negative'
+  );
+  const headChildCount = scenario.fakeDom.head.childNodes.length;
+  const preflight = scenario.storageGate.recordRootMapStoragePreflight(
+    scenario.commit,
+    {
+      explicitRootMapStoragePreflight: true,
+      preflightId: 'fake-metadata-negative-root-map',
+      rootId: 'fake-metadata-resource-root',
+      expectedSourceResourceMapCommitRowIds: [
+        'resource-map-commit-1',
+        'resource-map-commit-3',
+        'resource-map-commit-4'
+      ]
+    }
+  );
+
+  assert.equal(scenario.fakeDom.head.childNodes.length, headChildCount);
+  assert.equal(preflight.rootMapStorageRows.length, 3);
+  assert.equal(preflight.skippedPreloadPropsRows.length, 2);
+
+  for (const row of preflight.rootMapStorageRows) {
+    assert.equal(Object.isFrozen(row), true, row.rowId);
+    assert.equal(row.wouldStoreInRootMap, true, row.rowId);
+    assert.equal(row.canonicalRootMapStorageRow, true, row.rowId);
+    assert.equal(row.rootResourceStorageMutated, false, row.rowId);
+    assert.equal(row.hoistableStylesMapMutated, false, row.rowId);
+    assert.equal(row.hoistableScriptsMapMutated, false, row.rowId);
+    assert.equal(row.preloadPropsMapMutated, false, row.rowId);
+    assert.equal(row.fetchStarted, false, row.rowId);
+    assert.equal(row.loadEventSubscribed, false, row.rowId);
+    assert.equal(row.loadingStateMutated, false, row.rowId);
+    assert.equal(row.scriptExecutionStarted, false, row.rowId);
+    assert.equal(row.publicResourceHintDomInsertion, false, row.rowId);
+    assert.equal(row.publicResourceMapCommitBehavior, false, row.rowId);
+    assert.equal(row.publicScriptModuleResourceDispatch, false, row.rowId);
+    assert.equal(row.compatibilityClaimed, false, row.rowId);
+  }
+
+  for (const row of preflight.skippedPreloadPropsRows) {
+    assert.equal(Object.isFrozen(row), true, row.rowId);
+    assert.equal(row.mapKind, 'preload-props', row.rowId);
+    assert.equal(row.wouldStoreInRootMap, false, row.rowId);
+    assert.equal(row.preloadPropsMapMutated, false, row.rowId);
+    assert.equal(row.publicResourceDispatchBlocked, true, row.rowId);
+    assert.equal(row.publicResourceHintDomInsertion, false, row.rowId);
+    assert.equal(row.publicResourceMapCommitBehavior, false, row.rowId);
+    assert.equal(row.compatibilityClaimed, false, row.rowId);
+  }
+
+  for (const mutate of [
+    () => {
+      preflight.rootMapStorageRows[0].rootResourceStorageMutated = true;
+    },
+    () => {
+      preflight.rootMapStorageRows[1].loadingStateMutated = true;
+    },
+    () => {
+      preflight.rootMapStorageRows[2].scriptExecutionStarted = true;
+    },
+    () => {
+      preflight.skippedPreloadPropsRows[0].wouldStoreInRootMap = true;
+    },
+    () => {
+      scenario.commit.privateResourceMapRecords[1].fetchStarted = true;
+    },
+    () => {
+      scenario.commit.privateResourceMapRecords[3].scriptExecutionStarted =
+        true;
+    }
+  ]) {
+    assert.throws(mutate, TypeError);
+  }
+
+  const tamperedLifecycleCommit = {
+    ...scenario.commit,
+    privateResourceMapRecords:
+      scenario.commit.privateResourceMapRecords.map((row, index) =>
+        index === 3
+          ? {
+              ...row,
+              scriptExecutionStarted: true
+            }
+          : row
+      )
+  };
+  assert.equal(
+    resourceFormGate.isPrivateResourceHintResourceMapCommitRecord(
+      tamperedLifecycleCommit
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintRootMapStoragePreflightGate()
+        .recordRootMapStoragePreflight(tamperedLifecycleCommit, {
+          explicitRootMapStoragePreflight: true
+        }),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintRootMapStoragePreflightInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+
+  const negativeAdmissions = [
+    {
+      admission: {
+        explicitRootMapStoragePreflight: true,
+        expectedSourceResourceMapCommitRowIds: [
+          'resource-map-commit-1',
+          'resource-map-commit-3',
+          'resource-map-commit-0'
+        ]
+      },
+      reason:
+        'stale root-map storage rows: expected source row ids must match canonical storage rows'
+    },
+    {
+      admission: {
+        explicitRootMapStoragePreflight: true,
+        preloadPropsMapMutated: true
+      },
+      reason:
+        'preloadPropsMapMutated must not claim root resource-map storage or preload-props mutation in the root-map storage preflight gate'
+    },
+    {
+      admission: {
+        explicitRootMapStoragePreflight: true,
+        scriptExecutionStarted: true
+      },
+      reason:
+        'scriptExecutionStarted must not claim stylesheet or script lifecycle execution in the root-map storage preflight gate'
+    },
+    {
+      admission: {
+        explicitRootMapStoragePreflight: true,
+        publicHeadMutation: true
+      },
+      reason:
+        'publicHeadMutation must not claim public head or DOM mutation in the root-map storage preflight gate'
+    },
+    {
+      admission: {
+        explicitRootMapStoragePreflight: true,
+        packageExportCompatibilityClaimed: true
+      },
+      reason:
+        'packageExportCompatibilityClaimed must not claim package/export compatibility in the root-map storage preflight gate'
+    },
+    {
+      admission: {
+        explicitRootMapStoragePreflight: true,
+        publicResourceHintDomInsertion: true
+      },
+      reason:
+        'publicResourceHintDomInsertion must not claim public resource dispatch in the root-map storage preflight gate'
+    },
+    {
+      admission: {
+        explicitRootMapStoragePreflight: true,
+        rootResources: throwingProxy('fake root resources')
+      },
+      reason:
+        'rootResources must not be passed to the root-map storage preflight gate'
+    }
+  ];
+
+  for (const {admission, reason} of negativeAdmissions) {
+    assertRootMapStoragePreflightAdmissionRejects(
+      scenario.commit,
+      admission,
+      reason
+    );
+  }
+
+  assert.equal(JSON.stringify(preflight).includes('/style.css'), false);
+  assert.equal(JSON.stringify(preflight).includes('/script.js'), false);
+  assert.equal(JSON.stringify(preflight).includes('/module.mjs'), false);
+  assert.equal(JSON.stringify(preflight).includes('sha256-style'), false);
+  assert.equal(JSON.stringify(preflight).includes('nonce-module'), false);
+});
+
 test('private resource root-map storage preflight rejects stale duplicate and foreign rows', () => {
   const staleScenario = createRootMapStoragePreflightScenario(
     'root-map-storage-stale'
@@ -18071,6 +18488,27 @@ function createPrivateFormActionCallbackPreflightScenario(prefix) {
     resetIntent,
     resetQueueCommit,
     submitIntent
+  };
+}
+
+async function createPrivateRejectedFormActionAsyncExecution(prefix, message) {
+  const scenario = createPrivateFormActionCallbackPreflightScenario(prefix);
+  const rejectedExecution =
+    await formActions
+      .createFormActionAsyncCallbackExecutionDiagnosticGate({
+        requestIdPrefix: `${prefix}-async-execution`
+      })
+      .recordAsyncCallbackExecution(scenario.preflight, {
+        explicitFormActionAsyncCallbackExecution: true,
+        async asyncActionCallback() {
+          await Promise.resolve();
+          throw new Error(message);
+        }
+      });
+
+  return {
+    ...scenario,
+    rejectedExecution
   };
 }
 
