@@ -61,6 +61,9 @@ const privateSchedulerMockExpiredActRootWorkDiagnosticsKind =
 const privateSchedulerMockExpiredActRootWorkDiagnosticsBrand = Symbol.for(
   privateSchedulerMockExpiredActRootWorkDiagnosticsKind
 );
+const privateSchedulerMockExpiredActRootWorkSourceProof = Symbol.for(
+  "fast-react.scheduler.mock-expired-act-root-work-source-proof"
+);
 
 const EXPECTED_MOCK_EXPORT_KEYS = [
   "log",
@@ -1298,6 +1301,12 @@ test("scheduler mock private diagnostics hand expired callbacks to accepted act/
     assert.equal(report.executesEffects, false, nodeEnv);
     assert.equal(report.executesRendererWork, false, nodeEnv);
     assert.equal(report.executesRendererRoots, false, nodeEnv);
+    assertSchedulerMockSourceValidatorRejectsForgedSources(
+      diagnostics.schedulerMockExpiredActRootWorkSourceValidator,
+      Scheduler.unstable_flushExpired,
+      report,
+      nodeEnv
+    );
     assert.deepEqual(
       events,
       [
@@ -1741,6 +1750,58 @@ test("scheduler mock private act/root work handoff rejects unbranded callbacks a
       brandedCallback
     );
     Scheduler.unstable_advanceTime(251);
+    for (const { label, overrides, reason } of [
+      {
+        label: "expired-public-scheduler-timing-claim",
+        overrides: { publicSchedulerTimingCompatibilityClaimed: true },
+        reason: "metadata-public-claim"
+      },
+      {
+        label: "expired-public-flush-helper-claim",
+        overrides: { publicSchedulerFlushHelperCompatibilityClaimed: true },
+        reason: "metadata-public-claim"
+      },
+      {
+        label: "expired-package-claim",
+        overrides: { packageCompatibilityClaimed: true },
+        reason: "metadata-public-claim"
+      },
+      {
+        label: "expired-public-flush-helper-execution",
+        overrides: { invokesPublicSchedulerFlushHelper: true },
+        reason: "metadata-execution-claim"
+      },
+      {
+        label: "expired-public-scheduler-flush-executed",
+        overrides: { publicSchedulerFlushBehaviorExecuted: true },
+        reason: "metadata-execution-claim"
+      }
+    ]) {
+      const metadata = createExpiredActRootWorkMetadata(
+        Scheduler,
+        brandedHandle,
+        createAcceptedActRootWorkQueue(reactGate),
+        overrides
+      );
+      const described =
+        diagnostics.describeExpiredActRootWorkMetadataForDiagnostics(
+          metadata
+        );
+      assert.equal(described.accepted, false, `${nodeEnv}:${label}`);
+      assert.equal(
+        described.rejectionReason,
+        reason,
+        `${nodeEnv}:${label}`
+      );
+      assertExpiredActRootWorkRejection(
+        () =>
+          diagnostics.drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
+            metadata
+          ),
+        reason,
+        `${nodeEnv}:${label}`
+      );
+    }
     const publicClaimMetadata = createExpiredActRootWorkMetadata(
       Scheduler,
       brandedHandle,
@@ -2850,6 +2911,89 @@ function assertExpiredActRootWorkRejection(fn, expectedReason, label) {
     },
     label
   );
+}
+
+function assertSchedulerMockSourceValidatorRejectsForgedSources(
+  sourceValidator,
+  flushHelper,
+  acceptedSource,
+  label
+) {
+  assert.equal(
+    sourceValidator.isSchedulerMockExpiredActRootWorkSource(acceptedSource),
+    true,
+    label
+  );
+  assert.equal(
+    sourceValidator.isSchedulerMockExpiredActRootWorkSource(
+      Object.freeze({ ...acceptedSource })
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    sourceValidator.isSchedulerMockExpiredActRootWorkSource(
+      createOldGlobalSchedulerMockExpiredActRootWorkSourceClone(acceptedSource)
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    sourceValidator.isSchedulerMockExpiredActRootWorkSource(
+      Object.freeze({
+        ...acceptedSource,
+        schedulerMockExpiredActRootWorkSourceValidator:
+          createFakeSchedulerMockExpiredActRootWorkSourceValidator()
+      })
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    Reflect.defineProperty(
+      flushHelper,
+      Symbol(
+        "fast-react.scheduler.mock-expired-act-root-work-source-validator"
+      ),
+      {
+        configurable: false,
+        enumerable: false,
+        value: sourceValidator,
+        writable: false
+      }
+    ),
+    false,
+    label
+  );
+}
+
+function createFakeSchedulerMockExpiredActRootWorkSourceValidator() {
+  return Object.freeze({
+    status: "fast-react.scheduler.mock-expired-act-root-work-source-validator",
+    isSchedulerMockExpiredActRootWorkSource() {
+      return true;
+    }
+  });
+}
+
+function createOldGlobalSchedulerMockExpiredActRootWorkSourceClone(value) {
+  const clone = { ...value };
+  Object.defineProperty(
+    clone,
+    privateSchedulerMockExpiredActRootWorkSourceProof,
+    {
+      configurable: false,
+      enumerable: false,
+      value: Object.freeze({
+        kind: "fast-react.scheduler.mock-expired-act-root-work-source-token",
+        version: 1,
+        compatibilityTarget: "scheduler@0.27.0",
+        reactCompatibilityTarget: "react@19.2.6"
+      }),
+      writable: false
+    }
+  );
+  return Object.freeze(clone);
 }
 
 function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {

@@ -653,6 +653,11 @@ test("local scheduler mock diagnostics stay hidden on mock flush helpers only", 
         true,
         key
       );
+      assertSchedulerMockSourceValidatorOnlyThroughPrivateDiagnostics(
+        SchedulerMock[key],
+        descriptor.value,
+        key
+      );
     }
   }
 
@@ -920,6 +925,124 @@ function privateSymbolDescriptions(target) {
     .filter((key) => typeof key === "symbol")
     .map((symbol) => symbol.description)
     .sort();
+}
+
+function assertSchedulerMockSourceValidatorOnlyThroughPrivateDiagnostics(
+  helper,
+  diagnostics,
+  label
+) {
+  const validator =
+    diagnostics.schedulerMockExpiredActRootWorkSourceValidator;
+
+  assert.equal(Object.isFrozen(helper), true, label);
+  assert.equal(Object.isFrozen(diagnostics), true, label);
+  assert.equal(Object.isFrozen(validator), true, label);
+  assert.equal(
+    Object.hasOwn(helper, "schedulerMockExpiredActRootWorkSourceValidator"),
+    false,
+    label
+  );
+  assert.equal(
+    Object.hasOwn(helper, "isSchedulerMockExpiredActRootWorkSource"),
+    false,
+    label
+  );
+  assert.deepEqual(
+    Reflect.ownKeys(helper).filter(
+      (key) =>
+        typeof key === "string" &&
+        key !== PRIVATE_MOCK_DIAGNOSTICS_KEY &&
+        /(?:source|validator)/iu.test(key)
+    ),
+    [],
+    label
+  );
+  assert.deepEqual(privateSymbolDescriptions(helper), [], label);
+  assert.equal(
+    helper[
+      Symbol.for(
+        "fast-react.scheduler.mock-expired-act-root-work-source-validator"
+      )
+    ],
+    undefined,
+    label
+  );
+  assert.equal(
+    validator.isSchedulerMockExpiredActRootWorkSource(diagnostics),
+    true,
+    label
+  );
+  assert.equal(
+    validator.isSchedulerMockExpiredActRootWorkSource(
+      Object.freeze({ ...diagnostics })
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    validator.isSchedulerMockExpiredActRootWorkSource(
+      createOldGlobalSchedulerMockExpiredActRootWorkSourceClone(diagnostics)
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    validator.isSchedulerMockExpiredActRootWorkSource(
+      Object.freeze({
+        ...diagnostics,
+        schedulerMockExpiredActRootWorkSourceValidator:
+          createFakeSchedulerMockExpiredActRootWorkSourceValidator()
+      })
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    Reflect.defineProperty(
+      helper,
+      Symbol(
+        "fast-react.scheduler.mock-expired-act-root-work-source-validator"
+      ),
+      {
+        configurable: false,
+        enumerable: false,
+        value: validator,
+        writable: false
+      }
+    ),
+    false,
+    label
+  );
+}
+
+function createFakeSchedulerMockExpiredActRootWorkSourceValidator() {
+  return Object.freeze({
+    status: "fast-react.scheduler.mock-expired-act-root-work-source-validator",
+    isSchedulerMockExpiredActRootWorkSource() {
+      return true;
+    }
+  });
+}
+
+function createOldGlobalSchedulerMockExpiredActRootWorkSourceClone(value) {
+  const clone = { ...value };
+  Object.defineProperty(
+    clone,
+    Symbol.for("fast-react.scheduler.mock-expired-act-root-work-source-proof"),
+    {
+      configurable: false,
+      enumerable: false,
+      value: Object.freeze({
+        kind: "fast-react.scheduler.mock-expired-act-root-work-source-token",
+        version: 1,
+        compatibilityTarget: "scheduler@0.27.0",
+        reactCompatibilityTarget: "react@19.2.6"
+      }),
+      writable: false
+    }
+  );
+  return Object.freeze(clone);
 }
 
 function withPostTaskGlobals(options, callback) {
