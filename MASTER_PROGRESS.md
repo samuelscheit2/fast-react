@@ -29,6 +29,37 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1001 Docs Refresh and Workers 967-1000 Accepted Batch
+
+- Worker 1001 reconciled master docs with main `8a3b4042`
+  (`Refresh docs after worker 989`) after the accepted post-Worker-997 merge
+  batch. This was a docs-only refresh with no runtime compatibility claim.
+- Workers 986, 987, 992, and 1000 hardened private/fail-closed blockers for
+  public `flushSync`, Scheduler public timing, test-renderer act/Scheduler
+  currentness, and Scheduler boundary factory inputs. Public callback
+  execution, Scheduler timing, root/act behavior, and package compatibility
+  remain blocked.
+- Worker 998 added private Rust HostText commit currentness; Worker 999 added
+  package-private context/useContext readiness blockers. Public root rendering,
+  renderer context propagation, React DOM/test-renderer/native behavior, and
+  package compatibility remain blocked.
+- Workers 978, 967, and 989 repaired private admission and test-renderer
+  serialization/local false-green gaps, including hidden carriers, current
+  lifecycle/source evidence, ToJSON source ownership, and stateful proxy array
+  sanitizer failures. These remain conformance gate evidence only.
+- Workers 990 and 996 hardened private React DOM controlled input/event,
+  controlled-restore, root-listener, and hydrateRoot replay blocker currentness.
+  Public controlled-input behavior, event dispatch, hydration/replay, browser
+  DOM mutation, native/Rust execution, and package compatibility remain blocked.
+- Worker 994 hardened benchmark accepted-gate command provenance currentness.
+  No benchmark result artifacts or public performance claims were admitted.
+- The accepted state for this batch is main `8a3b4042` after merge commits
+  `aec44049`, `55cdfcef`, `695675b2`, `7e1d1b23`, `f898f16f`, `f2b74b48`,
+  `566e9a14`, `eb99956e`, `7ecfc303`, `3d3bbe26`, `bfb223a6`, and
+  `cf31f851`, followed by the docs refresh commit. Focused verification and
+  audit evidence remain recorded in worker reports, read-only audits,
+  post-merge checks, and git history.
+
 ### Workers 969-997 and Audit Workflow Updates
 
 - Worker 969 refreshed coordination docs after Worker 966. Worker 964 then
@@ -73,7 +104,7 @@ sequencing belong in `MASTER_PLAN.md`.
   Useful audit surfaces may include hostile/source review, regression-command
   reruns with targeted probes, package-surface checks, or source-currentness
   checks, but there is no mandated audit template.
-- The accepted state before this docs refresh is current main `cf31f851`
+- The prior accepted implementation state for this section reached main `cf31f851`
   (`Merge worker 989 conformance private gate false-green sweep`) after the
   Worker 910, 949, 964, 969, 972-974, 976-977, 979-982, 985, 988-989, 991,
   993, 995, and 997 merge path plus audit policy commits. Focused verification
