@@ -21,7 +21,9 @@ use crate::root_callbacks::{
 use crate::root_commit::{
     HostRootFinishedWorkCommitHandoffErrorForCanary,
     HostRootFinishedWorkCommitHandoffRecordForCanary,
+    HostRootFinishedWorkPendingCommitRecordForCanary,
     commit_completed_host_root_render_with_finished_work_handoff_for_canary,
+    commit_finished_host_root_with_finished_work_handoff_for_canary,
 };
 use crate::{
     ConcurrentUpdateError, FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
@@ -1233,152 +1235,152 @@ fn validate_host_root_accepted_callback_order_matches_commit_for_canary(
 
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
-    sequence: usize,
-    update: UpdateId,
-    lane: Lane,
-    source_lanes: Lanes,
-    pending_lanes_after_enqueue: Lanes,
-    selected_next_lanes_after_enqueue: Lanes,
+pub(crate) struct HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+    pub(crate) sequence: usize,
+    pub(crate) update: UpdateId,
+    pub(crate) lane: Lane,
+    pub(crate) source_lanes: Lanes,
+    pub(crate) pending_lanes_after_enqueue: Lanes,
+    pub(crate) selected_next_lanes_after_enqueue: Lanes,
 }
 
 #[cfg(test)]
 impl HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
     #[must_use]
-    const fn sequence(self) -> usize {
+    pub(crate) const fn sequence(self) -> usize {
         self.sequence
     }
 
     #[must_use]
-    const fn update(self) -> UpdateId {
+    pub(crate) const fn update(self) -> UpdateId {
         self.update
     }
 
     #[must_use]
-    const fn lane(self) -> Lane {
+    pub(crate) const fn lane(self) -> Lane {
         self.lane
     }
 
     #[must_use]
-    const fn source_lanes(self) -> Lanes {
+    pub(crate) const fn source_lanes(self) -> Lanes {
         self.source_lanes
     }
 
     #[must_use]
-    const fn pending_lanes_after_enqueue(self) -> Lanes {
+    pub(crate) const fn pending_lanes_after_enqueue(self) -> Lanes {
         self.pending_lanes_after_enqueue
     }
 
     #[must_use]
-    const fn selected_next_lanes_after_enqueue(self) -> Lanes {
+    pub(crate) const fn selected_next_lanes_after_enqueue(self) -> Lanes {
         self.selected_next_lanes_after_enqueue
     }
 
     #[must_use]
-    const fn committed_by_finished_lanes(self, finished_lanes: Lanes) -> bool {
+    pub(crate) const fn committed_by_finished_lanes(self, finished_lanes: Lanes) -> bool {
         self.source_lanes.is_subset_of(finished_lanes)
     }
 }
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct HostRootUpdateQueueLaneHandoffRecordForCanary {
-    root: FiberRootId,
-    current: FiberId,
-    finished_work: FiberId,
-    current_update_queue: UpdateQueueHandle,
-    work_in_progress_update_queue: UpdateQueueHandle,
-    pending_lanes_before_render: Lanes,
-    selected_next_lanes_before_render: Lanes,
-    finished_lanes: Lanes,
-    remaining_lanes: Lanes,
-    pending_lanes_after_render: Lanes,
-    update_records: Vec<HostRootUpdateQueueLaneHandoffUpdateRecordForCanary>,
-    current_queue_base_updates: Vec<UpdateId>,
-    applied_update_count: usize,
-    skipped_update_count: usize,
-    resulting_element: RootElementHandle,
+pub(crate) struct HostRootUpdateQueueLaneHandoffRecordForCanary {
+    pub(crate) root: FiberRootId,
+    pub(crate) current: FiberId,
+    pub(crate) finished_work: FiberId,
+    pub(crate) current_update_queue: UpdateQueueHandle,
+    pub(crate) work_in_progress_update_queue: UpdateQueueHandle,
+    pub(crate) pending_lanes_before_render: Lanes,
+    pub(crate) selected_next_lanes_before_render: Lanes,
+    pub(crate) finished_lanes: Lanes,
+    pub(crate) remaining_lanes: Lanes,
+    pub(crate) pending_lanes_after_render: Lanes,
+    pub(crate) update_records: Vec<HostRootUpdateQueueLaneHandoffUpdateRecordForCanary>,
+    pub(crate) current_queue_base_updates: Vec<UpdateId>,
+    pub(crate) applied_update_count: usize,
+    pub(crate) skipped_update_count: usize,
+    pub(crate) resulting_element: RootElementHandle,
 }
 
 #[cfg(test)]
 impl HostRootUpdateQueueLaneHandoffRecordForCanary {
     #[must_use]
-    const fn root(&self) -> FiberRootId {
+    pub(crate) const fn root(&self) -> FiberRootId {
         self.root
     }
 
     #[must_use]
-    const fn current(&self) -> FiberId {
+    pub(crate) const fn current(&self) -> FiberId {
         self.current
     }
 
     #[must_use]
-    const fn finished_work(&self) -> FiberId {
+    pub(crate) const fn finished_work(&self) -> FiberId {
         self.finished_work
     }
 
     #[must_use]
-    const fn current_update_queue(&self) -> UpdateQueueHandle {
+    pub(crate) const fn current_update_queue(&self) -> UpdateQueueHandle {
         self.current_update_queue
     }
 
     #[must_use]
-    const fn work_in_progress_update_queue(&self) -> UpdateQueueHandle {
+    pub(crate) const fn work_in_progress_update_queue(&self) -> UpdateQueueHandle {
         self.work_in_progress_update_queue
     }
 
     #[must_use]
-    const fn pending_lanes_before_render(&self) -> Lanes {
+    pub(crate) const fn pending_lanes_before_render(&self) -> Lanes {
         self.pending_lanes_before_render
     }
 
     #[must_use]
-    const fn selected_next_lanes_before_render(&self) -> Lanes {
+    pub(crate) const fn selected_next_lanes_before_render(&self) -> Lanes {
         self.selected_next_lanes_before_render
     }
 
     #[must_use]
-    const fn finished_lanes(&self) -> Lanes {
+    pub(crate) const fn finished_lanes(&self) -> Lanes {
         self.finished_lanes
     }
 
     #[must_use]
-    const fn remaining_lanes(&self) -> Lanes {
+    pub(crate) const fn remaining_lanes(&self) -> Lanes {
         self.remaining_lanes
     }
 
     #[must_use]
-    const fn pending_lanes_after_render(&self) -> Lanes {
+    pub(crate) const fn pending_lanes_after_render(&self) -> Lanes {
         self.pending_lanes_after_render
     }
 
     #[must_use]
-    fn update_records(&self) -> &[HostRootUpdateQueueLaneHandoffUpdateRecordForCanary] {
+    pub(crate) fn update_records(&self) -> &[HostRootUpdateQueueLaneHandoffUpdateRecordForCanary] {
         &self.update_records
     }
 
     #[must_use]
-    fn current_queue_base_updates(&self) -> &[UpdateId] {
+    pub(crate) fn current_queue_base_updates(&self) -> &[UpdateId] {
         &self.current_queue_base_updates
     }
 
     #[must_use]
-    const fn applied_update_count(&self) -> usize {
+    pub(crate) const fn applied_update_count(&self) -> usize {
         self.applied_update_count
     }
 
     #[must_use]
-    const fn skipped_update_count(&self) -> usize {
+    pub(crate) const fn skipped_update_count(&self) -> usize {
         self.skipped_update_count
     }
 
     #[must_use]
-    const fn resulting_element(&self) -> RootElementHandle {
+    pub(crate) const fn resulting_element(&self) -> RootElementHandle {
         self.resulting_element
     }
 
     #[must_use]
-    fn update_sequence_ids(&self) -> Vec<UpdateId> {
+    pub(crate) fn update_sequence_ids(&self) -> Vec<UpdateId> {
         self.update_records
             .iter()
             .map(|record| record.update())
@@ -1386,7 +1388,7 @@ impl HostRootUpdateQueueLaneHandoffRecordForCanary {
     }
 
     #[must_use]
-    fn records_in_update_sequence_order(&self) -> bool {
+    pub(crate) fn records_in_update_sequence_order(&self) -> bool {
         self.update_records
             .iter()
             .enumerate()
@@ -1394,7 +1396,7 @@ impl HostRootUpdateQueueLaneHandoffRecordForCanary {
     }
 
     #[must_use]
-    fn records_have_distinct_compatible_lanes(&self) -> bool {
+    pub(crate) fn records_have_distinct_compatible_lanes(&self) -> bool {
         self.update_records
             .iter()
             .enumerate()
@@ -1409,22 +1411,22 @@ impl HostRootUpdateQueueLaneHandoffRecordForCanary {
     }
 
     #[must_use]
-    fn root_current_not_switched_by_handoff(&self) -> bool {
+    pub(crate) fn root_current_not_switched_by_handoff(&self) -> bool {
         self.current != self.finished_work
     }
 
     #[must_use]
-    const fn work_loop_or_commit_consumer_required(&self) -> bool {
+    pub(crate) const fn work_loop_or_commit_consumer_required(&self) -> bool {
         true
     }
 
     #[must_use]
-    const fn public_root_rendering_blocked(&self) -> bool {
+    pub(crate) const fn public_root_rendering_blocked(&self) -> bool {
         true
     }
 
     #[must_use]
-    fn proves_source_owned_lane_handoff(&self) -> bool {
+    pub(crate) fn proves_source_owned_lane_handoff(&self) -> bool {
         !self.update_records.is_empty()
             && self.records_in_update_sequence_order()
             && self.records_have_distinct_compatible_lanes()
@@ -1443,7 +1445,7 @@ impl HostRootUpdateQueueLaneHandoffRecordForCanary {
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum HostRootUpdateQueueLaneHandoffErrorForCanary {
+pub(crate) enum HostRootUpdateQueueLaneHandoffErrorForCanary {
     FiberRootStore(FiberRootStoreError),
     FiberTopology(FiberTopologyError),
     UpdateQueue(UpdateQueueError),
@@ -1763,7 +1765,7 @@ impl From<UpdateQueueError> for HostRootUpdateQueueLaneHandoffErrorForCanary {
 }
 
 #[cfg(test)]
-fn host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
+pub(crate) fn host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
     store: &FiberRootStore<H>,
     root_id: FiberRootId,
     accepted_updates: &[UpdateContainerResult],
@@ -1946,7 +1948,7 @@ fn host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
 }
 
 #[cfg(test)]
-fn validate_host_root_update_queue_lane_handoff_record_for_canary<H: HostTypes>(
+pub(crate) fn validate_host_root_update_queue_lane_handoff_record_for_canary<H: HostTypes>(
     store: &FiberRootStore<H>,
     handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
 ) -> Result<(), HostRootUpdateQueueLaneHandoffErrorForCanary> {
@@ -2150,7 +2152,7 @@ fn validate_accepted_update_matches_render_source_for_handoff<H: HostTypes>(
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
+pub(crate) struct HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
     queue_handoff: HostRootUpdateQueueLaneHandoffRecordForCanary,
     finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
     update_sequence_ids: Vec<UpdateId>,
@@ -2165,57 +2167,59 @@ struct HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
 #[cfg(test)]
 impl HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
     #[must_use]
-    fn queue_handoff(&self) -> &HostRootUpdateQueueLaneHandoffRecordForCanary {
+    pub(crate) fn queue_handoff(&self) -> &HostRootUpdateQueueLaneHandoffRecordForCanary {
         &self.queue_handoff
     }
 
     #[must_use]
-    const fn finished_work_handoff(&self) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+    pub(crate) const fn finished_work_handoff(
+        &self,
+    ) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
         &self.finished_work_handoff
     }
 
     #[must_use]
-    const fn commit(&self) -> &HostRootCommitRecord {
+    pub(crate) const fn commit(&self) -> &HostRootCommitRecord {
         self.finished_work_handoff.commit()
     }
 
     #[must_use]
-    fn update_sequence_ids(&self) -> &[UpdateId] {
+    pub(crate) fn update_sequence_ids(&self) -> &[UpdateId] {
         &self.update_sequence_ids
     }
 
     #[must_use]
-    const fn selected_lanes(&self) -> Lanes {
+    pub(crate) const fn selected_lanes(&self) -> Lanes {
         self.selected_lanes
     }
 
     #[must_use]
-    const fn finished_lanes(&self) -> Lanes {
+    pub(crate) const fn finished_lanes(&self) -> Lanes {
         self.finished_lanes
     }
 
     #[must_use]
-    const fn remaining_lanes(&self) -> Lanes {
+    pub(crate) const fn remaining_lanes(&self) -> Lanes {
         self.remaining_lanes
     }
 
     #[must_use]
-    const fn applied_update_count(&self) -> usize {
+    pub(crate) const fn applied_update_count(&self) -> usize {
         self.applied_update_count
     }
 
     #[must_use]
-    const fn skipped_update_count(&self) -> usize {
+    pub(crate) const fn skipped_update_count(&self) -> usize {
         self.skipped_update_count
     }
 
     #[must_use]
-    const fn resulting_element(&self) -> RootElementHandle {
+    pub(crate) const fn resulting_element(&self) -> RootElementHandle {
         self.resulting_element
     }
 
     #[must_use]
-    fn proves_queue_lane_handoff_gated_current_switch(&self) -> bool {
+    pub(crate) fn proves_queue_lane_handoff_gated_current_switch(&self) -> bool {
         self.queue_handoff.proves_source_owned_lane_handoff()
             && self
                 .finished_work_handoff
@@ -2240,7 +2244,7 @@ impl HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary {
+pub(crate) enum HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary {
     MissingQueueHandoff {
         root: FiberRootId,
         finished_work: FiberId,
@@ -2473,7 +2477,7 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     clippy::result_large_err,
     reason = "private canary diagnostics preserve queue and finished-work rejection details"
 )]
-fn commit_host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
+pub(crate) fn commit_host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     root_id: FiberRootId,
     render: HostRootRenderPhaseRecord,
@@ -2482,6 +2486,86 @@ fn commit_host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
     commit_order: usize,
 ) -> Result<
     HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary,
+    HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary,
+> {
+    let queue_handoff = validate_host_root_update_queue_lane_handoff_for_commit_for_canary(
+        store,
+        root_id,
+        render,
+        queue_handoff,
+    )?;
+
+    let finished_work_handoff =
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            store,
+            render,
+            queue_handoff_order,
+            commit_order,
+        )?;
+
+    Ok(
+        host_root_update_queue_finished_work_commit_handoff_record_for_canary(
+            queue_handoff,
+            finished_work_handoff,
+        ),
+    )
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private canary diagnostics preserve queue, scheduler, and finished-work rejection details"
+)]
+pub(crate) fn commit_host_root_update_queue_lane_handoff_with_finished_work_pending_commit_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    root_id: FiberRootId,
+    render: HostRootRenderPhaseRecord,
+    queue_handoff: Option<&HostRootUpdateQueueLaneHandoffRecordForCanary>,
+    pending_finished_work: Option<HostRootFinishedWorkPendingCommitRecordForCanary>,
+    commit_order: usize,
+) -> Result<
+    HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary,
+    HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary,
+> {
+    let queue_handoff = validate_host_root_update_queue_lane_handoff_for_commit_for_canary(
+        store,
+        root_id,
+        render,
+        queue_handoff,
+    )?;
+
+    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        pending_finished_work,
+        commit_order,
+    )?;
+
+    Ok(
+        host_root_update_queue_finished_work_commit_handoff_record_for_canary(
+            queue_handoff,
+            finished_work_handoff,
+        ),
+    )
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private canary diagnostics preserve queue and finished-work rejection details"
+)]
+pub(crate) fn validate_host_root_update_queue_lane_handoff_for_commit_for_canary<
+    'a,
+    H: HostTypes,
+>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    render: HostRootRenderPhaseRecord,
+    queue_handoff: Option<&'a HostRootUpdateQueueLaneHandoffRecordForCanary>,
+) -> Result<
+    &'a HostRootUpdateQueueLaneHandoffRecordForCanary,
     HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary,
 > {
     let Some(queue_handoff) = queue_handoff else {
@@ -2505,14 +2589,15 @@ fn commit_host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
         queue_handoff,
     )?;
 
-    let finished_work_handoff =
-        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
-            store,
-            render,
-            queue_handoff_order,
-            commit_order,
-        )?;
-    let record = HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
+    Ok(queue_handoff)
+}
+
+#[cfg(test)]
+fn host_root_update_queue_finished_work_commit_handoff_record_for_canary(
+    queue_handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+) -> HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
+    HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary {
         queue_handoff: queue_handoff.clone(),
         finished_work_handoff,
         update_sequence_ids: queue_handoff.update_sequence_ids(),
@@ -2522,9 +2607,7 @@ fn commit_host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
         applied_update_count: queue_handoff.applied_update_count(),
         skipped_update_count: queue_handoff.skipped_update_count(),
         resulting_element: queue_handoff.resulting_element(),
-    };
-
-    Ok(record)
+    }
 }
 
 #[cfg(test)]
