@@ -2696,6 +2696,14 @@ const privateToJSONSiblingTextIdentityPublicSurface =
   'create().update -> create().toJSON';
 const privateToJSONSiblingTextJSAdmissionResultId =
   'react-test-renderer-private-tojson-sibling-text-js-cjs-admission-result';
+const privateToTreeSiblingTextJSAdmissionDiagnosticName =
+  'fast-react-test-renderer.totree.sibling-text.private-js-cjs-admission';
+const privateToTreeSiblingTextJSAdmissionStatus =
+  'private-totree-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked';
+const privateToTreeSiblingTextIdentityPublicSurface =
+  'create().update -> create().toTree';
+const privateToTreeSiblingTextJSAdmissionResultId =
+  'react-test-renderer-private-totree-sibling-text-js-cjs-admission-result';
 const privateRootFinishedLanesHandoffDiagnosticName =
   'react-test-renderer-root-finished-lanes-handoff-private-diagnostic';
 const privateRootFinishedLanesHandoffStatus =
@@ -3251,6 +3259,20 @@ const toTreePrivateFacadeGate = Object.freeze({
   rejectsMissingRootFinishedLanesHandoff: true,
   rejectsStaleRootFinishedLanesHandoff: true,
   rejectsPublicNativePackageRootFinishedLanesHandoffClaims: true,
+  privateSiblingTextFinishedWorkIdentityGateAvailable: true,
+  privateSiblingTextFinishedWorkIdentityDiagnosticName:
+    privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+  privateSiblingTextFinishedWorkIdentityStatus:
+    privateToJSONSiblingTextFinishedWorkIdentityStatus,
+  privateSiblingTextJSAdmissionDiagnosticName:
+    privateToTreeSiblingTextJSAdmissionDiagnosticName,
+  privateSiblingTextJSAdmissionStatus:
+    privateToTreeSiblingTextJSAdmissionStatus,
+  siblingTextJSAdmissionConsumesDedicatedIdentity: true,
+  siblingTextJSAdmissionConsumesRootFinishedLanesHandoff: true,
+  rejectsGenericSiblingTextFinishedWorkIdentity: true,
+  rejectsBroadMultichildFinishedWorkIdentity: true,
+  privateSiblingTextHostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
   privateNativeExecutionFunctionComponentShapeAvailable: true,
   nativeExecutionCompositeAcceptedFiberShape:
     privateToTreeCompositeAcceptedFiberShape,
@@ -3285,6 +3307,8 @@ const toTreePrivateFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary',
     'TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary',
     'TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary',
     'TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary',
     'TestRendererPrivateTreeMetadataReport',
     'TestRendererPrivateToTreeNativeExecutionEvidence',
@@ -3301,6 +3325,9 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_to_tree_update_native_execution_requires_finished_work_identity_gate',
     'root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate',
     'root_private_to_tree_native_execution_evidence_records_composite_host_shape',
+    'root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate',
+    'root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity',
+    'root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate',
     'root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
@@ -14833,6 +14860,20 @@ function createPrivateToTreeFacade(rootRequest) {
     privateRootFinishedLanesHandoffDiagnosticName,
     privateRootFinishedLanesHandoffStatus,
     requiresRootFinishedLanesHandoffEvidence: true,
+    privateSiblingTextFinishedWorkIdentityGateAvailable: true,
+    privateSiblingTextFinishedWorkIdentityDiagnosticName:
+      privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+    privateSiblingTextFinishedWorkIdentityStatus:
+      privateToJSONSiblingTextFinishedWorkIdentityStatus,
+    privateSiblingTextJSAdmissionDiagnosticName:
+      privateToTreeSiblingTextJSAdmissionDiagnosticName,
+    privateSiblingTextJSAdmissionStatus:
+      privateToTreeSiblingTextJSAdmissionStatus,
+    siblingTextJSAdmissionConsumesDedicatedIdentity: true,
+    siblingTextJSAdmissionConsumesRootFinishedLanesHandoff: true,
+    rejectsGenericSiblingTextFinishedWorkIdentity: true,
+    rejectsBroadMultichildFinishedWorkIdentity: true,
+    privateSiblingTextHostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
     privateNativeExecutionFunctionComponentShapeAvailable: true,
     nativeExecutionCompositeAcceptedFiberShape:
       privateToTreeCompositeAcceptedFiberShape,
@@ -14884,6 +14925,35 @@ function createPrivateToTreeFacade(rootRequest) {
         executionRecord,
         report,
         finishedWorkIdentityEvidence
+      );
+    },
+    canCreateAcceptedSiblingTextDiagnosticResult(
+      report,
+      siblingTextFinishedWorkIdentityEvidence,
+      sourceRootRequest = undefined
+    ) {
+      try {
+        createPrivateToTreeSiblingTextJSAdmissionDiagnosticResult(
+          rootRequest,
+          report,
+          siblingTextFinishedWorkIdentityEvidence,
+          sourceRootRequest
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    createAcceptedSiblingTextDiagnosticResult(
+      report,
+      siblingTextFinishedWorkIdentityEvidence,
+      sourceRootRequest = undefined
+    ) {
+      return createPrivateToTreeSiblingTextJSAdmissionDiagnosticResult(
+        rootRequest,
+        report,
+        siblingTextFinishedWorkIdentityEvidence,
+        sourceRootRequest
       );
     },
     canValidateAcceptedFinishedWorkIdentity(
@@ -15562,6 +15632,9 @@ function validatePrivateToTreeMultiChildHostOutputDiagnostic(
     kind: 'multi-child',
     hostOutputUpdateKind,
     rootChildCount,
+    sourceFiberCount: componentWrapped
+      ? privateToTreeCompositeMultiChildAcceptedFiberShape.length
+      : privateToTreeMultiChildAcceptedFiberShape.length,
     componentWrapped,
     committedFiberInspection,
     componentProps,
@@ -16955,19 +17028,132 @@ function createPrivateToJSONSiblingTextJSAdmissionDiagnosticResult(
   });
 }
 
+function createPrivateToTreeSiblingTextJSAdmissionDiagnosticResult(
+  rootRequest,
+  report,
+  siblingTextFinishedWorkIdentityEvidence,
+  sourceRootRequest = undefined
+) {
+  const finishedWorkIdentity =
+    createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
+      rootRequest,
+      siblingTextFinishedWorkIdentityEvidence,
+      report,
+      sourceRootRequest,
+      {
+        publicSurface: 'create().toTree',
+        sourceReportKind: 'toTree',
+        requireRootFinishedLanesHandoff: true
+      }
+    );
+  const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+  if (
+    diagnostic.kind !== 'multi-child' ||
+    diagnostic.hostOutputUpdateKind !==
+      finishedWorkIdentity.hostOutputUpdateKind ||
+    diagnostic.rootChildCount !== finishedWorkIdentity.rootChildCount ||
+    diagnostic.componentWrapped !== true
+  ) {
+    throwPrivateToTreeMetadataError(
+      'sibling-text-report-row-or-shape-mismatch'
+    );
+  }
+
+  return freezeRecord({
+    id: privateToTreeSiblingTextJSAdmissionResultId,
+    diagnosticName: privateToTreeSiblingTextJSAdmissionDiagnosticName,
+    status: privateToTreeSiblingTextJSAdmissionStatus,
+    entrypoint,
+    publicSurface: privateToTreeSiblingTextIdentityPublicSurface,
+    sourceFinishedWorkIdentityDiagnosticName:
+      privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+    sourceFinishedWorkIdentityStatus:
+      privateToJSONSiblingTextFinishedWorkIdentityStatus,
+    sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    sourceJsonDiagnosticName: privateToJSONAcceptedDiagnosticName,
+    rootRequest: finishedWorkIdentity.rootRequest,
+    rootRequestId: finishedWorkIdentity.rootRequestId,
+    rootRequestSequence: finishedWorkIdentity.rootRequestSequence,
+    rootRequestOperation: 'update',
+    rootId: finishedWorkIdentity.rootId,
+    rootFinishedLanesHandoff: finishedWorkIdentity.rootFinishedLanesHandoff,
+    rootFinishedLanesHandoffDiagnosticName:
+      finishedWorkIdentity.rootFinishedLanesHandoffDiagnosticName,
+    rootFinishedLanesHandoffStatus:
+      finishedWorkIdentity.rootFinishedLanesHandoffStatus,
+    rootFinishedLanesHandoffAccepted: true,
+    consumesPrivateRootFinishedLanesHandoffGate: true,
+    hostOutputUpdateKind: 'Update',
+    hostOutputShape: 'SiblingText',
+    rootNodeKind: finishedWorkIdentity.rootNodeKind,
+    rootChildCount: 2,
+    sourceNodeCount: 3,
+    sourceFiberCount: diagnostic.sourceFiberCount,
+    hostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
+    hostOutputRow: freezeRecord({
+      id: privateToJSONSiblingTextHostOutputRowId,
+      status: privateToJSONUpdateUnmountRowStatus,
+      hostOutputUpdateKind: 'Update',
+      hostOutputShape: 'SiblingText'
+    }),
+    result: serializePrivateToTreeMetadataDiagnostic(report),
+    finishedWorkIdentity,
+    consumesPrivateSiblingTextFinishedWorkIdentityGate: true,
+    consumesWorker738ReportRow: true,
+    consumesPrivateToTreeEvidence: true,
+    consumesAcceptedHostOutputRow: true,
+    hostOutputSnapshotCurrent: true,
+    siblingTextJSAdmissionAvailable: true,
+    functionComponentAboveHostOutputShape: true,
+    genericFinishedWorkIdentityGateAccepted: false,
+    broadMultichildIdentityAvailable: false,
+    publicToJSONAvailable: false,
+    publicToTreeAvailable: false,
+    publicTestInstanceAvailable: false,
+    publicSerializationAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeLoadingAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
   rootRequest,
   evidence,
   report,
-  sourceRootRequest = undefined
+  sourceRootRequest = undefined,
+  options = undefined
 ) {
+  const publicSurface =
+    options !== undefined &&
+    options !== null &&
+    typeof options.publicSurface === 'string'
+      ? options.publicSurface
+      : privateToJSONSiblingTextIdentityPublicSurface;
+  const sourceReportKind =
+    options !== undefined &&
+    options !== null &&
+    options.sourceReportKind === 'toTree'
+      ? 'toTree'
+      : 'toJSON';
+  const requireRootFinishedLanesHandoff =
+    options !== undefined &&
+    options !== null &&
+    options.requireRootFinishedLanesHandoff === true;
+  const throwSiblingTextFinishedWorkIdentityError =
+    publicSurface === 'create().toTree'
+      ? throwPrivateToTreeMetadataError
+      : throwPrivateToJSONSerializationError;
   if (!isRootRequestRecord(rootRequest)) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'Expected a private root request for sibling-text finished-work identity evidence.'
     );
   }
   if (evidence === null || typeof evidence !== 'object') {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'Expected accepted sibling-text finished-work identity evidence.'
     );
   }
@@ -16977,19 +17163,22 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     readPrivateToJSONField(evidence, 'status') !==
       privateToJSONSiblingTextFinishedWorkIdentityStatus
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-diagnostic-mismatch'
     );
   }
 
   const normalized =
-    normalizePrivateToJSONSiblingTextFinishedWorkIdentityEvidence(evidence);
+    normalizePrivateToJSONSiblingTextFinishedWorkIdentityEvidence(
+      evidence,
+      publicSurface
+    );
   if (
     normalized.diagnosticName !==
       privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName ||
     normalized.status !== privateToJSONSiblingTextFinishedWorkIdentityStatus
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-diagnostic-mismatch'
     );
   }
@@ -17002,7 +17191,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.sourceSerializationDiagnosticName !==
       privateToJSONAcceptedDiagnosticName
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-source-mismatch'
     );
   }
@@ -17010,7 +17199,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
   const identityRootRequest =
     sourceRootRequest === undefined ? rootRequest : sourceRootRequest;
   if (!isRootRequestRecord(identityRootRequest)) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'Expected a private update root request for sibling-text finished-work identity evidence.'
     );
   }
@@ -17018,7 +17207,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     identityRootRequest.rootHandle !== rootRequest.rootHandle ||
     identityRootRequest.rootId !== rootRequest.rootId
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
@@ -17026,7 +17215,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     identityRootRequest.operation !== 'update' ||
     identityRootRequest.scheduled !== true
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-source-mismatch'
     );
   }
@@ -17035,7 +17224,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
       identityRootRequest.rootHandle
     ) !== identityRootRequest
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
@@ -17043,14 +17232,14 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.rootRequestId !== undefined &&
     normalized.rootRequestId !== identityRootRequest.requestId
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
   if (
     normalized.rootRequestSequence !== identityRootRequest.requestSequence
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
@@ -17058,15 +17247,27 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.rootId !== undefined &&
     normalized.rootId !== identityRootRequest.rootId
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-stale'
     );
   }
 
-  validatePrivateToJSONSiblingTextIdentitySourceReport(
-    normalized,
-    report
-  );
+  if (sourceReportKind === 'toTree') {
+    validatePrivateToTreeSiblingTextIdentitySourceReport(normalized, report);
+  } else {
+    validatePrivateToJSONSiblingTextIdentitySourceReport(
+      normalized,
+      report
+    );
+  }
+  const rootFinishedLanesHandoff = requireRootFinishedLanesHandoff
+    ? validatePrivateRootFinishedLanesHandoffEvidence(
+        publicSurface,
+        identityRootRequest,
+        normalized,
+        evidence
+      )
+    : null;
 
   if (
     normalized.worker738ReportRowId !== privateToJSONSiblingTextHostOutputRowId ||
@@ -17076,7 +17277,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.rootChildCount !== 2 ||
     normalized.sourceNodeCount !== 3
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-report-row-or-shape-mismatch'
     );
   }
@@ -17099,7 +17300,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
       normalized.commitCurrent
     )
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-route-finished-work-identity-mismatch'
     );
   }
@@ -17121,7 +17322,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.reportFinishedWorkMatchesCommitCurrent !== true ||
     normalized.committedFiberInspectionCurrentMatchesCommit !== true
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-mismatch'
     );
   }
@@ -17139,7 +17340,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     normalized.commitLanesMatchRenderLanes !== true ||
     normalized.reportLanesMatchCommitLanes !== true
   ) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'sibling-text-finished-work-identity-lane-mismatch'
     );
   }
@@ -17161,13 +17362,13 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     'identityAdmissionAvailable'
   ]) {
     if (normalized[fieldName] !== true) {
-      throwPrivateToJSONSerializationError(
+      throwSiblingTextFinishedWorkIdentityError(
         'sibling-text-finished-work-evidence-not-consumed'
       );
     }
   }
   if (normalized.broadMultichildIdentityAvailable !== false) {
-    throwPrivateToJSONSerializationError(
+    throwSiblingTextFinishedWorkIdentityError(
       'broad-multichild-identity-unexpectedly-open'
     );
   }
@@ -17186,7 +17387,7 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     'compatibilityClaimed'
   ]) {
     if (normalized[fieldName] !== false) {
-      throwPrivateToJSONSerializationError(
+      throwSiblingTextFinishedWorkIdentityError(
         'public-or-native-package-js-compatibility-claim'
       );
     }
@@ -17206,6 +17407,16 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     rootRequestId: identityRootRequest.requestId,
     rootRequestSequence: identityRootRequest.requestSequence,
     rootId: identityRootRequest.rootId,
+    rootFinishedLanesHandoff,
+    rootFinishedLanesHandoffDiagnosticName:
+      rootFinishedLanesHandoff === null
+        ? null
+        : rootFinishedLanesHandoff.diagnosticName,
+    rootFinishedLanesHandoffStatus:
+      rootFinishedLanesHandoff === null ? null : rootFinishedLanesHandoff.status,
+    rootFinishedLanesHandoffAccepted: rootFinishedLanesHandoff !== null,
+    consumesPrivateRootFinishedLanesHandoffGate:
+      rootFinishedLanesHandoff !== null,
     hostOutputUpdateKind: 'Update',
     hostOutputShape: 'SiblingText',
     rootNodeKind: normalized.rootNodeKind,
@@ -17962,9 +18173,9 @@ function normalizePrivateSerializationFinishedWorkIdentityEvidence(
 }
 
 function normalizePrivateToJSONSiblingTextFinishedWorkIdentityEvidence(
-  evidence
+  evidence,
+  publicSurface = privateToJSONSiblingTextIdentityPublicSurface
 ) {
-  const publicSurface = privateToJSONSiblingTextIdentityPublicSurface;
   return freezeRecord({
     diagnosticName: readPrivateToJSONField(
       evidence,
@@ -18007,7 +18218,8 @@ function normalizePrivateToJSONSiblingTextFinishedWorkIdentityEvidence(
       'rootRequestSequence',
       'root_request_sequence',
       'rootScheduledUpdateSequence',
-      'root_scheduled_update_sequence'
+      'root_scheduled_update_sequence',
+      publicSurface
     ),
     rootId:
       readPrivateToJSONField(evidence, 'rootId', 'root_id') ??
@@ -18030,12 +18242,18 @@ function normalizePrivateToJSONSiblingTextFinishedWorkIdentityEvidence(
     rootChildCount: readPrivateToJSONSiblingTextIdentityInteger(
       evidence,
       'rootChildCount',
-      'root_child_count'
+      'root_child_count',
+      undefined,
+      undefined,
+      publicSurface
     ),
     sourceNodeCount: readPrivateToJSONSiblingTextIdentityInteger(
       evidence,
       'sourceNodeCount',
-      'source_node_count'
+      'source_node_count',
+      undefined,
+      undefined,
+      publicSurface
     ),
     routeRenderCurrent: normalizePrivateSerializationFinishedWorkHandle(
       publicSurface,
@@ -18336,7 +18554,8 @@ function readPrivateToJSONSiblingTextIdentityInteger(
   camelName,
   snakeName,
   alternateCamelName,
-  alternateSnakeName
+  alternateSnakeName,
+  publicSurface = privateToJSONSiblingTextIdentityPublicSurface
 ) {
   const value =
     readPrivateToJSONField(record, camelName, snakeName) ??
@@ -18346,7 +18565,8 @@ function readPrivateToJSONSiblingTextIdentityInteger(
       alternateSnakeName
     );
   if (!isNonNegativeInteger(value)) {
-    throwPrivateToJSONSerializationError(
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
       `Expected sibling-text finished-work identity ${camelName} to be a non-negative integer.`
     );
   }
@@ -19354,6 +19574,43 @@ function validatePrivateToJSONSiblingTextIdentitySourceReport(
   );
   if (publicBlockers !== undefined) {
     assertPrivateToJSONPublicBlockers(publicBlockers);
+  }
+}
+
+function validatePrivateToTreeSiblingTextIdentitySourceReport(
+  identity,
+  report
+) {
+  if (report === null || typeof report !== 'object') {
+    throwPrivateToTreeMetadataError(
+      'Expected private sibling-text toTree source report.'
+    );
+  }
+  if (
+    readPrivateToJSONField(report, 'diagnosticName', 'diagnostic_name') !==
+      privateToTreeAcceptedDiagnosticName ||
+    readPrivateToJSONField(
+      report,
+      'sourceJsonDiagnosticName',
+      'source_json_diagnostic_name'
+    ) !== privateToJSONAcceptedDiagnosticName
+  ) {
+    throwPrivateToTreeMetadataError(
+      'sibling-text-finished-work-identity-source-mismatch'
+    );
+  }
+  const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+  if (
+    diagnostic.kind !== 'multi-child' ||
+    diagnostic.hostOutputUpdateKind !== identity.hostOutputUpdateKind ||
+    diagnostic.rootChildCount !== identity.rootChildCount ||
+    diagnostic.componentWrapped !== true ||
+    diagnostic.sourceFiberCount !==
+      privateToTreeCompositeMultiChildAcceptedFiberShape.length
+  ) {
+    throwPrivateToTreeMetadataError(
+      'sibling-text-report-row-or-shape-mismatch'
+    );
   }
 }
 

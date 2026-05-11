@@ -188,6 +188,10 @@ const privateToJSONSiblingTextJSAdmissionDiagnosticName =
   "fast-react-test-renderer.tojson.sibling-text.private-js-cjs-admission";
 const privateToJSONSiblingTextJSAdmissionStatus =
   "private-tojson-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked";
+const privateToTreeSiblingTextJSAdmissionDiagnosticName =
+  "fast-react-test-renderer.totree.sibling-text.private-js-cjs-admission";
+const privateToTreeSiblingTextJSAdmissionStatus =
+  "private-totree-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked";
 const privateRootFinishedLanesHandoffDiagnosticName =
   "react-test-renderer-root-finished-lanes-handoff-private-diagnostic";
 const privateRootFinishedLanesHandoffStatus =
@@ -10286,6 +10290,46 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     entrypoint
   );
   assert.equal(gate.requiresRootFinishedLanesHandoffEvidence, true, entrypoint);
+  if (entrypoint.includes("/cjs/")) {
+    assert.equal(
+      gate.privateSiblingTextFinishedWorkIdentityGateAvailable,
+      true,
+      entrypoint
+    );
+    assert.equal(
+      gate.privateSiblingTextFinishedWorkIdentityDiagnosticName,
+      privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+      entrypoint
+    );
+    assert.equal(
+      gate.privateSiblingTextFinishedWorkIdentityStatus,
+      privateToJSONSiblingTextFinishedWorkIdentityStatus,
+      entrypoint
+    );
+    assert.equal(
+      gate.privateSiblingTextJSAdmissionDiagnosticName,
+      privateToTreeSiblingTextJSAdmissionDiagnosticName,
+      entrypoint
+    );
+    assert.equal(
+      gate.privateSiblingTextJSAdmissionStatus,
+      privateToTreeSiblingTextJSAdmissionStatus,
+      entrypoint
+    );
+    assert.equal(gate.siblingTextJSAdmissionConsumesDedicatedIdentity, true, entrypoint);
+    assert.equal(
+      gate.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
+      true,
+      entrypoint
+    );
+    assert.equal(gate.rejectsGenericSiblingTextFinishedWorkIdentity, true, entrypoint);
+    assert.equal(gate.rejectsBroadMultichildFinishedWorkIdentity, true, entrypoint);
+    assert.equal(
+      gate.privateSiblingTextHostOutputRowId,
+      privateToJSONSiblingTextHostOutputRowId,
+      entrypoint
+    );
+  }
   const nativeToTreeEvidence =
     gate.privateNativeExecutionEvidenceAvailable === true;
   const packageRootUnmountIdentity =
@@ -10389,7 +10433,13 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
       ? [
           "TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary",
           "TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary",
-          "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary"
+          "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary",
+          ...(entrypoint.includes("/cjs/")
+            ? [
+                "TestRendererRoot::describe_private_to_tree_after_sibling_text_update_native_execution_for_canary",
+                "TestRendererRoot::describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary"
+              ]
+            : [])
         ]
       : []),
     "TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary",
@@ -10419,6 +10469,13 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
           ...(developmentCompositeToTreeEvidence
             ? [
                 "root_private_to_tree_native_execution_evidence_records_composite_host_shape"
+              ]
+            : []),
+          ...(entrypoint.includes("/cjs/")
+            ? [
+                "root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate",
+                "root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity",
+                "root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate"
               ]
             : [])
         ]
@@ -10553,6 +10610,50 @@ function assertPrivateToTreeFacade(record, entrypoint) {
     true,
     entrypoint
   );
+  if (entrypoint.includes("/cjs/")) {
+    assert.equal(
+      record.privateSiblingTextFinishedWorkIdentityGateAvailable,
+      true,
+      entrypoint
+    );
+    assert.equal(
+      record.privateSiblingTextFinishedWorkIdentityDiagnosticName,
+      privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+      entrypoint
+    );
+    assert.equal(
+      record.privateSiblingTextFinishedWorkIdentityStatus,
+      privateToJSONSiblingTextFinishedWorkIdentityStatus,
+      entrypoint
+    );
+    assert.equal(
+      record.privateSiblingTextJSAdmissionDiagnosticName,
+      privateToTreeSiblingTextJSAdmissionDiagnosticName,
+      entrypoint
+    );
+    assert.equal(
+      record.privateSiblingTextJSAdmissionStatus,
+      privateToTreeSiblingTextJSAdmissionStatus,
+      entrypoint
+    );
+    assert.equal(
+      record.siblingTextJSAdmissionConsumesDedicatedIdentity,
+      true,
+      entrypoint
+    );
+    assert.equal(
+      record.siblingTextJSAdmissionConsumesRootFinishedLanesHandoff,
+      true,
+      entrypoint
+    );
+    assert.equal(record.rejectsGenericSiblingTextFinishedWorkIdentity, true, entrypoint);
+    assert.equal(record.rejectsBroadMultichildFinishedWorkIdentity, true, entrypoint);
+    assert.equal(
+      record.privateSiblingTextHostOutputRowId,
+      privateToJSONSiblingTextHostOutputRowId,
+      entrypoint
+    );
+  }
   const nativeToTreeEvidence =
     record.privateNativeExecutionEvidenceAvailable === true;
   const developmentCompositeToTreeEvidence =
@@ -10629,6 +10730,18 @@ function assertPrivateToTreeFacade(record, entrypoint) {
     );
     assert.equal(
       typeof record.createAcceptedNativeExecutionDiagnosticResult,
+      "function",
+      entrypoint
+    );
+  }
+  if (entrypoint.includes("/cjs/")) {
+    assert.equal(
+      typeof record.canCreateAcceptedSiblingTextDiagnosticResult,
+      "function",
+      entrypoint
+    );
+    assert.equal(
+      typeof record.createAcceptedSiblingTextDiagnosticResult,
       "function",
       entrypoint
     );
