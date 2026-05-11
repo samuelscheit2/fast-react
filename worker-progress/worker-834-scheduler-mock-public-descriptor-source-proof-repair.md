@@ -29,6 +29,11 @@ Complete; ready for handoff.
 - Added focused cache-slot replacement coverage proving a cloned expired
   act/root report stays rejected after `require.cache` is replaced with a fake
   module record containing a fake validator.
+- Re-audit follow-up: stopped treating the mutable `require.cache` slot as a
+  source-proof module record source and required trusted records to have the
+  executed Scheduler mock CJS child module shape. The focused cache-slot
+  regression now uses an actual `Module` instance replacement with fake exports
+  and a fake validator.
 
 ## Verification So Far
 
@@ -67,15 +72,17 @@ Complete; ready for handoff.
   `require.cache[packages/scheduler/unstable_mock.js]` with a fake module
   record and fake validator does not let the same cloned report satisfy source
   proof.
+- Re-audit coverage confirms the same rejection when the cache replacement is
+  a forged CommonJS `Module` instance rather than a plain object.
 
 ## Risks Or Blockers
 
 - No blocker remains in this worker scope.
 - The React gate now trusts Scheduler-owned source-validator records only from
-  real loaded CommonJS `Module` records. That keeps public Scheduler exports
-  oracle-compatible, but it remains a package-private CommonJS contract and
-  should be rerun if the Scheduler mock entrypoint is converted away from
-  CommonJS module records.
+  real loaded CommonJS `Module` records with the executed Scheduler mock CJS
+  child module shape. That keeps public Scheduler exports oracle-compatible,
+  but it remains a package-private CommonJS contract and should be rerun if the
+  Scheduler mock entrypoint is converted away from CommonJS module records.
 
 ## Recommended Next Tasks
 

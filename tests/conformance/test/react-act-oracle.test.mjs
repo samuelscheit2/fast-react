@@ -32,6 +32,7 @@ import {
 
 const oracle = readCheckedReactActOracle();
 const require = createRequire(import.meta.url);
+const CommonJsModule = require("node:module");
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -4187,16 +4188,16 @@ function assertSchedulerMockExpiredDiagnosticsRejectedWithFakeCacheModuleRecord(
   const originalModuleRecord = require.cache[resolvedSchedulerMockEntrypoint];
   const fakeDiagnostics =
     createFakeSchedulerPrivateDiagnostics(originalDiagnostics);
-  const fakeModuleRecord = {
-    id: resolvedSchedulerMockEntrypoint,
-    filename: resolvedSchedulerMockEntrypoint,
-    loaded: true,
-    exports: {
-      unstable_flushExpired:
-        createFakeSchedulerFlushHelperWithPrivateDiagnostics(
-          originalDiagnostics
-        )
-    }
+  const fakeModuleRecord = new CommonJsModule(
+    resolvedSchedulerMockEntrypoint
+  );
+  fakeModuleRecord.filename = resolvedSchedulerMockEntrypoint;
+  fakeModuleRecord.loaded = true;
+  fakeModuleRecord.exports = {
+    unstable_flushExpired:
+      createFakeSchedulerFlushHelperWithPrivateDiagnostics(
+        originalDiagnostics
+      )
   };
 
   Object.defineProperty(

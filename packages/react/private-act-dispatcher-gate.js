@@ -437,12 +437,6 @@ function getSchedulerMockSourceProofModuleRecords(resolvedModulePath) {
       moduleRecords.push(childModule);
     }
   }
-
-  const cachedModule = require.cache[resolvedModulePath];
-  if (cachedModule !== undefined && cachedModule !== null) {
-    moduleRecords.push(cachedModule);
-  }
-
   return moduleRecords;
 }
 
@@ -502,7 +496,47 @@ function isTrustedSchedulerMockSourceProofModuleRecord(
     moduleRecord instanceof module.constructor &&
     moduleRecord.id === resolvedModulePath &&
     moduleRecord.filename === resolvedModulePath &&
-    moduleRecord.loaded === true
+    moduleRecord.loaded === true &&
+    hasSchedulerMockSourceProofModulePaths(moduleRecord) &&
+    hasSchedulerMockSourceProofCjsChildModule(moduleRecord)
+  );
+}
+
+function hasSchedulerMockSourceProofModulePaths(moduleRecord) {
+  return (
+    Array.isArray(moduleRecord.paths) &&
+    moduleRecord.paths.length > 0 &&
+    moduleRecord.paths.every((nodeModulePath) =>
+      typeof nodeModulePath === 'string'
+    )
+  );
+}
+
+function hasSchedulerMockSourceProofCjsChildModule(moduleRecord) {
+  return (
+    Array.isArray(moduleRecord.children) &&
+    moduleRecord.children.some((childModule) =>
+      isSchedulerMockSourceProofCjsChildModule(childModule, moduleRecord)
+    )
+  );
+}
+
+function isSchedulerMockSourceProofCjsChildModule(
+  childModule,
+  parentModuleRecord
+) {
+  return (
+    isObjectLike(childModule) &&
+    childModule instanceof module.constructor &&
+    childModule.parent === parentModuleRecord &&
+    childModule.loaded === true &&
+    typeof childModule.id === 'string' &&
+    (childModule.id.endsWith(
+      '/scheduler-unstable_mock.development.js'
+    ) ||
+      childModule.id.endsWith('/scheduler-unstable_mock.production.js')) &&
+    isObjectLike(childModule.exports) &&
+    typeof childModule.exports.unstable_flushExpired === 'function'
   );
 }
 
