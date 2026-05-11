@@ -1240,6 +1240,328 @@ export async function assertPrivateFormActionAsyncCallbackExecutionGate() {
   );
 }
 
+export async function assertPrivateFormActionRejectedErrorPreflightGate() {
+  const resourceFormGate = requireReactDomPackageFile(
+    "src/resource-form-gates.js"
+  );
+  const formActions = requireReactDomPackageFile(
+    "src/shared/form-actions.js"
+  );
+  const dispatcherGate = resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: "conformance-rejected-error-source"
+  });
+  const extractionGate = resourceFormGate.createFormActionEventExtractionGate({
+    requestIdPrefix: "conformance-rejected-error-extraction"
+  });
+  const queueCommitGate =
+    resourceFormGate.createFormActionResetQueueCommitGate({
+      requestIdPrefix: "conformance-rejected-error-queue"
+    });
+  const blockerGate =
+    formActions.createFormActionFormDataBlockerDiagnosticGate({
+      requestIdPrefix: "conformance-rejected-error-blocker"
+    });
+  const dispatchGate =
+    formActions.createFormActionSubmitDispatchDiagnosticGate({
+      requestIdPrefix: "conformance-rejected-error-dispatch"
+    });
+  const resetExecutionGate =
+    formActions.createFormActionSubmitResetExecutionDiagnosticGate({
+      requestIdPrefix: "conformance-rejected-error-reset"
+    });
+  const callbackPreflightGate =
+    formActions.createFormActionCallbackActionPreflightDiagnosticGate({
+      requestIdPrefix: "conformance-rejected-error-callback-preflight"
+    });
+  const asyncExecutionGate =
+    formActions.createFormActionAsyncCallbackExecutionDiagnosticGate({
+      requestIdPrefix: "conformance-rejected-error-async-execution"
+    });
+  const rejectedErrorPreflightGate =
+    formActions.createFormActionRejectedErrorPreflightDiagnosticGate({
+      requestIdPrefix: "conformance-rejected-error-preflight"
+    });
+
+  const submission = dispatcherGate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: "submit",
+    submissionTrigger: "requestSubmit",
+    actionKind: "function",
+    actionSource: "form",
+    submitControlKind: "button",
+    formActionKind: "function",
+    submitterActionKind: "none",
+    defaultPrevented: false,
+    transitionScheduled: false
+  });
+  const extraction =
+    extractionGate.recordEventExtractionFromSubmissionIntent(submission);
+  const reset = dispatcherGate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: "r",
+    resetSource: "action-completion",
+    formOwnership: "react-owned",
+    transitionContext: "action"
+  });
+  const resetQueueCommit = queueCommitGate.recordResetQueueCommit(reset, {
+    explicitAdmission: true,
+    queueSource: "action-completion",
+    queueKind: "metadata-only-reset-state-queue",
+    commitKind: "after-mutation-form-reset-order",
+    hostTag: "form"
+  });
+  const blocker = blockerGate.recordFormDataBlockerDiagnostic(
+    extraction,
+    resetQueueCommit,
+    {
+      explicitFormActionFormDataBlocker: true,
+      formTargetShape: { targetKind: "form", hostTag: "form" },
+      submitterShape: { controlKind: "button", hostTag: "button" }
+    }
+  );
+  const dispatch = dispatchGate.recordSubmitDispatchDiagnostic(blocker, {
+    explicitFormActionSubmitDispatch: true,
+    submitControlKind: "button"
+  });
+  const resetExecution = resetExecutionGate.recordSubmitResetExecution(
+    dispatch,
+    {
+      explicitFormActionSubmitResetExecution: true,
+      fakeFormPath: {
+        pathId: "conformance-rejected-error-fake-reset",
+        pathKind: "action-completion-submit-reset",
+        hostTag: "form",
+        resetMode: "record-only-fake-reset"
+      }
+    }
+  );
+  const callbackPreflight =
+    callbackPreflightGate.recordCallbackActionInvocationPreflight(
+      dispatch,
+      resetExecution,
+      {
+        explicitFormActionCallbackActionPreflight: true
+      }
+    );
+  const rejectedExecution =
+    await asyncExecutionGate.recordAsyncCallbackExecution(
+      callbackPreflight,
+      {
+        explicitFormActionAsyncCallbackExecution: true,
+        async asyncActionCallback() {
+          await Promise.resolve();
+          throw new Error("conformance rejected action boom");
+        }
+      }
+    );
+  const record =
+    rejectedErrorPreflightGate.recordRejectedErrorPreflight(
+      rejectedExecution,
+      {
+        explicitFormActionRejectedErrorPreflight: true,
+        sourceAsyncCallbackExecutionId: rejectedExecution.executionId
+      }
+    );
+  const summary =
+    formActions.describePrivateFormActionRejectedErrorPreflightGate();
+
+  assert.equal(
+    summary.gateId,
+    formActions.privateFormActionRejectedErrorPreflightGateId
+  );
+  assert.equal(
+    summary.status,
+    formActions.privateFormActionRejectedErrorPreflightStatus
+  );
+  assert.equal(summary.consumesRejectedAsyncActionErrorMetadata, true);
+  assert.equal(summary.recordsActionErrorPreflight, true);
+  assert.equal(summary.recordsResetActionPublicBlockers, true);
+  assert.equal(summary.preflightOnly, true);
+  assert.equal(summary.rejectsStaleRejections, true);
+  assert.equal(summary.rejectsForeignRejections, true);
+  assert.equal(summary.rejectsMalformedRejections, true);
+  assert.equal(summary.rejectsPublicErrorRouting, true);
+  assert.equal(summary.constructsFormData, false);
+  assert.equal(summary.invokesActions, false);
+  assert.equal(summary.invokesPrivateAsyncActionCallbacks, false);
+  assert.equal(summary.routesErrors, false);
+  assert.equal(summary.queuesReactUpdates, false);
+  assert.equal(summary.resetsForms, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    formActions.formActionRejectedErrorPreflightBlockedSideEffects
+  );
+  assert.deepEqual(
+    resourceFormGate.describePrivateFormActionRejectedErrorPreflightBoundary(
+      null
+    ),
+    summary
+  );
+
+  assert.equal(
+    formActions.isPrivateFormActionRejectedErrorPreflightRecord(record),
+    true
+  );
+  assert.equal(
+    formActions.getPrivateFormActionRejectedErrorPreflightRecordPayload(
+      record
+    ),
+    record
+  );
+  assert.equal(
+    record.status,
+    formActions.privateFormActionRejectedErrorPreflightRecordedStatus
+  );
+  assert.equal(
+    record.sourceAsyncCallbackExecutionId,
+    rejectedExecution.executionId
+  );
+  assert.equal(
+    record.sourceCallbackActionPreflightId,
+    callbackPreflight.preflightId
+  );
+  assert.equal(record.rejectedAsyncActionError.rejected, true);
+  assert.equal(record.rejectedAsyncActionError.failClosed, true);
+  assert.equal(
+    record.rejectedAsyncActionError.errorInfo.message,
+    "conformance rejected action boom"
+  );
+  assert.equal(record.rejectedAsyncActionError.rawErrorCaptured, false);
+  assert.equal(record.actionErrorPreflight.actionInvoked, false);
+  assert.equal(record.actionErrorPreflight.publicActionInvoked, false);
+  assert.equal(record.actionErrorPreflight.reactUpdateQueued, false);
+  assert.equal(record.actionErrorPreflight.rootErrorUpdateScheduled, false);
+  assert.equal(
+    record.actionErrorPreflight.publicRootErrorCallbackInvoked,
+    false
+  );
+  assert.equal(
+    record.resetActionPublicBlockers.publicFormActionsEnabled,
+    false
+  );
+  assert.equal(
+    record.resetActionPublicBlockers.publicRequestFormResetReachable,
+    false
+  );
+  assert.equal(
+    record.resetActionPublicBlockers.publicActionInvocationReachable,
+    false
+  );
+  assert.equal(
+    record.resetActionPublicBlockers.publicErrorRoutingReachable,
+    false
+  );
+  assert.equal(record.resetActionPublicBlockers.actionInvoked, false);
+  assert.equal(record.resetActionPublicBlockers.reactUpdateQueued, false);
+  assert.equal(record.resetActionPublicBlockers.realFormReset, false);
+  assert.equal(record.publicFormActionBoundary.actionInvoked, false);
+  assert.equal(record.publicFormActionBoundary.realFormReset, false);
+  assert.deepEqual(
+    record.sideEffects,
+    formActions.formActionRejectedErrorPreflightDiagnosticSideEffects
+  );
+
+  assert.throws(
+    () =>
+      rejectedErrorPreflightGate.recordRejectedErrorPreflight(
+        rejectedExecution,
+        {
+          explicitFormActionRejectedErrorPreflight: true
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "source rejected async callback execution was already consumed by this preflight gate"
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight({ ...rejectedExecution }, {
+          explicitFormActionRejectedErrorPreflight: true
+        }),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "source async callback execution must be an accepted rejected fake callback execution"
+    }
+  );
+  const fulfilledExecution =
+    await formActions
+      .createFormActionAsyncCallbackExecutionDiagnosticGate({
+        requestIdPrefix: "conformance-rejected-error-fulfilled"
+      })
+      .recordAsyncCallbackExecution(callbackPreflight, {
+        explicitFormActionAsyncCallbackExecution: true,
+        async asyncActionCallback() {
+          return "ok";
+        }
+      });
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(fulfilledExecution, {
+          explicitFormActionRejectedErrorPreflight: true
+        }),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "source async callback execution must be an accepted rejected fake callback execution"
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          sourceAsyncCallbackExecutionId: "stale-rejected-execution"
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "sourceAsyncCallbackExecutionId must match the rejected async callback execution record"
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionRejectedErrorPreflightDiagnosticGate()
+        .recordRejectedErrorPreflight(rejectedExecution, {
+          explicitFormActionRejectedErrorPreflight: true,
+          publicErrorRoutingRequested: true
+        }),
+    {
+      code:
+        formActions
+          .privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason: "public error routing must remain blocked"
+    }
+  );
+  assert.throws(
+    () =>
+      formActions.createUnsupportedFormActionRejectedErrorPreflightError({}),
+    {
+      code:
+        formActions.privateFormActionRejectedErrorPreflightInvalidRecordCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET
+    }
+  );
+}
+
 export function assertPrivateFormResetQueueCommitGate(
   resourceFormGate,
   reset

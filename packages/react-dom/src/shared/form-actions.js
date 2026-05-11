@@ -14,6 +14,7 @@ const formActionSubmitDispatchGateSchemaVersion = 1;
 const formActionSubmitResetExecutionGateSchemaVersion = 1;
 const formActionCallbackActionPreflightGateSchemaVersion = 1;
 const formActionAsyncCallbackExecutionGateSchemaVersion = 1;
+const formActionRejectedErrorPreflightGateSchemaVersion = 1;
 const privateFormActionFormDataBlockerGateId =
   'form-action-formdata-blocker-private-gate-1';
 const privateFormActionSubmitDispatchGateId =
@@ -24,6 +25,8 @@ const privateFormActionCallbackActionPreflightGateId =
   'form-action-callback-action-preflight-private-gate-1';
 const privateFormActionAsyncCallbackExecutionGateId =
   'form-action-async-callback-execution-private-gate-1';
+const privateFormActionRejectedErrorPreflightGateId =
+  'form-action-rejected-error-preflight-private-gate-1';
 const privateFormActionFormDataBlockerRecordType =
   'fast.react_dom.private_form_action_formdata_blocker_record';
 const privateFormActionSubmitDispatchRecordType =
@@ -34,6 +37,8 @@ const privateFormActionCallbackActionPreflightRecordType =
   'fast.react_dom.private_form_action_callback_action_preflight_record';
 const privateFormActionAsyncCallbackExecutionRecordType =
   'fast.react_dom.private_form_action_async_callback_execution_record';
+const privateFormActionRejectedErrorPreflightRecordType =
+  'fast.react_dom.private_form_action_rejected_error_preflight_record';
 const privateFormActionFormDataBlockerStatus =
   'private-form-action-formdata-blocker-metadata-only';
 const privateFormActionSubmitDispatchStatus =
@@ -44,6 +49,8 @@ const privateFormActionCallbackActionPreflightStatus =
   'private-form-action-callback-action-preflight-metadata-only';
 const privateFormActionAsyncCallbackExecutionStatus =
   'private-form-action-async-callback-execution-fake-callback-only';
+const privateFormActionRejectedErrorPreflightStatus =
+  'private-form-action-rejected-error-preflight-metadata-only';
 const privateFormActionFormDataBlockerRecordedStatus =
   'recorded-private-form-action-formdata-blocker';
 const privateFormActionSubmitDispatchRecordedStatus =
@@ -54,6 +61,8 @@ const privateFormActionCallbackActionPreflightRecordedStatus =
   'recorded-private-form-action-callback-action-preflight';
 const privateFormActionAsyncCallbackExecutionRecordedStatus =
   'executed-private-form-action-async-callback-fake-path';
+const privateFormActionRejectedErrorPreflightRecordedStatus =
+  'recorded-private-form-action-rejected-error-preflight';
 const privateFormActionFormDataBlockerGateErrorCode =
   'FAST_REACT_DOM_FORM_ACTION_FORMDATA_BLOCKER_GATE';
 const privateFormActionSubmitDispatchGateErrorCode =
@@ -64,6 +73,8 @@ const privateFormActionCallbackActionPreflightGateErrorCode =
   'FAST_REACT_DOM_FORM_ACTION_CALLBACK_ACTION_PREFLIGHT_GATE';
 const privateFormActionAsyncCallbackExecutionGateErrorCode =
   'FAST_REACT_DOM_FORM_ACTION_ASYNC_CALLBACK_EXECUTION_GATE';
+const privateFormActionRejectedErrorPreflightGateErrorCode =
+  'FAST_REACT_DOM_FORM_ACTION_REJECTED_ERROR_PREFLIGHT_GATE';
 const privateFormActionFormDataBlockerInvalidAdmissionCode =
   'FAST_REACT_DOM_FORM_ACTION_FORMDATA_BLOCKER_INVALID_ADMISSION';
 const privateFormActionSubmitDispatchInvalidAdmissionCode =
@@ -74,6 +85,8 @@ const privateFormActionCallbackActionPreflightInvalidAdmissionCode =
   'FAST_REACT_DOM_FORM_ACTION_CALLBACK_ACTION_PREFLIGHT_INVALID_ADMISSION';
 const privateFormActionAsyncCallbackExecutionInvalidAdmissionCode =
   'FAST_REACT_DOM_FORM_ACTION_ASYNC_CALLBACK_EXECUTION_INVALID_ADMISSION';
+const privateFormActionRejectedErrorPreflightInvalidAdmissionCode =
+  'FAST_REACT_DOM_FORM_ACTION_REJECTED_ERROR_PREFLIGHT_INVALID_ADMISSION';
 const privateFormActionFormDataBlockerInvalidRecordCode =
   'FAST_REACT_DOM_FORM_ACTION_FORMDATA_BLOCKER_INVALID_RECORD';
 const privateFormActionSubmitDispatchInvalidRecordCode =
@@ -84,6 +97,8 @@ const privateFormActionCallbackActionPreflightInvalidRecordCode =
   'FAST_REACT_DOM_FORM_ACTION_CALLBACK_ACTION_PREFLIGHT_INVALID_RECORD';
 const privateFormActionAsyncCallbackExecutionInvalidRecordCode =
   'FAST_REACT_DOM_FORM_ACTION_ASYNC_CALLBACK_EXECUTION_INVALID_RECORD';
+const privateFormActionRejectedErrorPreflightInvalidRecordCode =
+  'FAST_REACT_DOM_FORM_ACTION_REJECTED_ERROR_PREFLIGHT_INVALID_RECORD';
 const formActionsOracleKind =
   'react-19.2.6-react-dom-form-actions-oracle';
 
@@ -92,6 +107,7 @@ const formActionSubmitDispatchRecordPayloads = new WeakMap();
 const formActionSubmitResetExecutionRecordPayloads = new WeakMap();
 const formActionCallbackActionPreflightRecordPayloads = new WeakMap();
 const formActionAsyncCallbackExecutionRecordPayloads = new WeakMap();
+const formActionRejectedErrorPreflightRecordPayloads = new WeakMap();
 
 const blockedRawAdmissionFields = freezeArray([
   'form',
@@ -166,6 +182,27 @@ const blockedAsyncCallbackExecutionAdmissionFields = freezeArray([
   'publicDispatcher',
   'reactUpdate',
   'updateQueue'
+]);
+
+const blockedRejectedErrorPreflightAdmissionFields = freezeArray([
+  ...blockedAsyncCallbackExecutionAdmissionFields,
+  'asyncActionCallback',
+  'callback',
+  'error',
+  'reason',
+  'thrownValue',
+  'rejectedThenable',
+  'actionQueue',
+  'actionNode',
+  'errorBoundary',
+  'boundaryFiber',
+  'rootErrorCallback',
+  'onCaughtError',
+  'onUncaughtError',
+  'onRecoverableError',
+  'publicErrorRoute',
+  'throwException',
+  'createRootErrorUpdate'
 ]);
 
 const formActionFormDataBlockerBlockedSideEffects = freezeRecord({
@@ -446,6 +483,64 @@ const formActionAsyncCallbackExecutionNonThenableSideEffects =
     failClosedErrorRecorded: true
   });
 
+const formActionRejectedErrorPreflightBlockedSideEffects = freezeRecord({
+  sourceAsyncCallbackExecutionAccepted: false,
+  sourceRejectedAsyncErrorAccepted: false,
+  acceptedMetadataIdsRecorded: false,
+  rejectedAsyncErrorMetadataRecorded: false,
+  actionErrorPreflightRecorded: false,
+  resetActionPublicBlockersRecorded: false,
+  asyncCallbackThenableRejected: false,
+  failClosedErrorConsumed: false,
+  rawTargetCaptured: false,
+  rawEventCaptured: false,
+  rawActionCaptured: false,
+  rawSubmitControlCaptured: false,
+  rawErrorCaptured: false,
+  liveFormAccepted: false,
+  nativeEventInspected: false,
+  realFormInspected: false,
+  submitControlInspected: false,
+  formPropsRead: false,
+  submitControlPropsRead: false,
+  formDataConstructed: false,
+  syntheticEventCreated: false,
+  dispatchQueueCaptured: false,
+  listenerDispatchStarted: false,
+  callbackDispatchExecuted: false,
+  submitCallbackInvoked: false,
+  privateAsyncActionCallbackInvoked: false,
+  actionFunctionCaptured: false,
+  actionInvoked: false,
+  publicActionInvoked: false,
+  publicErrorRoutingStarted: false,
+  publicRootErrorCallbackInvoked: false,
+  errorBoundaryScheduled: false,
+  hostTransitionStarted: false,
+  previousDispatcherCalled: false,
+  resetFiberResolved: false,
+  resetStateQueued: false,
+  reactUpdateQueued: false,
+  resetFormInstanceCalled: false,
+  formResetCommitted: false,
+  realFormReset: false,
+  publicRootTouched: false,
+  compatibilityClaimed: false
+});
+
+const formActionRejectedErrorPreflightDiagnosticSideEffects =
+  freezeRecord({
+    ...formActionRejectedErrorPreflightBlockedSideEffects,
+    sourceAsyncCallbackExecutionAccepted: true,
+    sourceRejectedAsyncErrorAccepted: true,
+    acceptedMetadataIdsRecorded: true,
+    rejectedAsyncErrorMetadataRecorded: true,
+    actionErrorPreflightRecorded: true,
+    resetActionPublicBlockersRecorded: true,
+    asyncCallbackThenableRejected: true,
+    failClosedErrorConsumed: true
+  });
+
 const formActionFormDataBlockerMissingPrerequisites = freezeArray([
   prerequisite(
     'no-live-form-target-read',
@@ -616,6 +711,34 @@ const formActionAsyncCallbackExecutionMissingPrerequisites = freezeArray([
   )
 ]);
 
+const formActionRejectedErrorPreflightMissingPrerequisites = freezeArray([
+  prerequisite(
+    'rejected-private-async-callback-only',
+    'react-dom-form',
+    'Rejected form action error preflight consumes only an accepted private fake async callback rejection.'
+  ),
+  prerequisite(
+    'no-public-error-routing',
+    'react-dom-client',
+    'Rejected action errors are recorded as metadata without scheduling root error updates or invoking public error callbacks.'
+  ),
+  prerequisite(
+    'no-action-function-invocation',
+    'react-dom-form',
+    'Action invocation remains blocked while rejected action error metadata is preflighted.'
+  ),
+  prerequisite(
+    'no-react-update-or-reset-commit',
+    'react-dom-form',
+    'Reset metadata remains blocked; no React updates, reset commits, or live form resets are performed.'
+  ),
+  prerequisite(
+    'no-public-form-action-compatibility',
+    'react-dom-client',
+    'Public form action compatibility remains unclaimed.'
+  )
+]);
+
 const defaultFormActionFormDataBlockerGate =
   createFormActionFormDataBlockerDiagnosticGate();
 const defaultFormActionSubmitDispatchGate =
@@ -626,6 +749,8 @@ const defaultFormActionCallbackActionPreflightGate =
   createFormActionCallbackActionPreflightDiagnosticGate();
 const defaultFormActionAsyncCallbackExecutionGate =
   createFormActionAsyncCallbackExecutionDiagnosticGate();
+const defaultFormActionRejectedErrorPreflightGate =
+  createFormActionRejectedErrorPreflightDiagnosticGate();
 
 function createFormActionFormDataBlockerDiagnosticGate(options) {
   const gateState = createGateStateWithDefaultPrefix(
@@ -723,6 +848,24 @@ function createFormActionAsyncCallbackExecutionDiagnosticGate(options) {
   });
 }
 
+function createFormActionRejectedErrorPreflightDiagnosticGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'form-action-rejected-error-preflight'
+  );
+  gateState.consumedRejectedExecutions = new WeakSet();
+
+  return Object.freeze({
+    recordRejectedErrorPreflight(asyncCallbackExecutionRecord, admission) {
+      return recordFormActionRejectedErrorPreflightWithGate(
+        gateState,
+        asyncCallbackExecutionRecord,
+        admission
+      );
+    }
+  });
+}
+
 function recordFormActionFormDataBlockerDiagnostic(
   eventExtractionRecord,
   resetQueueCommitRecord,
@@ -771,6 +914,14 @@ async function recordFormActionAsyncCallbackExecution(
 ) {
   return defaultFormActionAsyncCallbackExecutionGate
     .recordAsyncCallbackExecution(preflightRecord, admission);
+}
+
+function recordFormActionRejectedErrorPreflight(
+  asyncCallbackExecutionRecord,
+  admission
+) {
+  return defaultFormActionRejectedErrorPreflightGate
+    .recordRejectedErrorPreflight(asyncCallbackExecutionRecord, admission);
 }
 
 function describePrivateFormActionFormDataBlockerGate() {
@@ -1049,6 +1200,68 @@ function describePrivateFormActionAsyncCallbackExecutionGate() {
   });
 }
 
+function describePrivateFormActionRejectedErrorPreflightGate() {
+  return freezeRecord({
+    schemaVersion: formActionRejectedErrorPreflightGateSchemaVersion,
+    gateId: privateFormActionRejectedErrorPreflightGateId,
+    compatibilityTarget,
+    status: privateFormActionRejectedErrorPreflightStatus,
+    unsupportedCode: unimplementedCode,
+    oracleEvidence: freezeRecord({
+      oracleKind: formActionsOracleKind,
+      schemaVersion: 1,
+      compatibilityClaimed: false,
+      fastReactComparedToReactDom: false,
+      contractCount: 1
+    }),
+    acceptedAsyncCallbackExecutionRecordType:
+      privateFormActionAsyncCallbackExecutionRecordType,
+    acceptedAsyncCallbackExecutionGateId:
+      privateFormActionAsyncCallbackExecutionGateId,
+    acceptedAsyncCallbackExecutionStatus:
+      privateFormActionAsyncCallbackExecutionRecordedStatus,
+    acceptedRejectedCallbackStatus:
+      'failed-private-form-action-async-callback-rejected',
+    recordsAcceptedMetadataIds: true,
+    consumesRejectedAsyncActionErrorMetadata: true,
+    recordsActionErrorPreflight: true,
+    recordsResetActionPublicBlockers: true,
+    preflightOnly: true,
+    rejectsFulfilledAsyncCallbacks: true,
+    rejectsStaleRejections: true,
+    rejectsForeignRejections: true,
+    rejectsMalformedRejections: true,
+    rejectsLiveForms: true,
+    rejectsPublicDispatch: true,
+    rejectsPublicErrorRouting: true,
+    acceptsRealForms: false,
+    acceptsRawEvents: false,
+    acceptsActionFunctions: false,
+    acceptsPrivateAsyncActionCallbacks: false,
+    readsFormProps: false,
+    readsSubmitControlProps: false,
+    constructsFormData: false,
+    createsSyntheticEvents: false,
+    dispatchesSubmitCallbacks: false,
+    invokesActions: false,
+    invokesPrivateAsyncActionCallbacks: false,
+    routesErrors: false,
+    startsHostTransition: false,
+    callsPreviousDispatchers: false,
+    queuesReactUpdates: false,
+    commitsFormResets: false,
+    callsResetFormInstance: false,
+    resetsForms: false,
+    publicFormSubmissionEnabled: false,
+    publicFormActionCompatibilityClaimed: false,
+    sideEffects: formActionRejectedErrorPreflightBlockedSideEffects,
+    missingPrerequisites:
+      formActionRejectedErrorPreflightMissingPrerequisites,
+    asyncCallbackExecutionGate:
+      describePrivateFormActionAsyncCallbackExecutionGate()
+  });
+}
+
 function createUnsupportedFormActionFormDataBlockerError(record) {
   const payload = assertPrivateFormActionFormDataBlockerRecord(record);
   const error = createUnsupportedError(
@@ -1170,6 +1383,34 @@ function createUnsupportedFormActionAsyncCallbackExecutionError(record) {
   return error;
 }
 
+function createUnsupportedFormActionRejectedErrorPreflightError(record) {
+  const payload =
+    assertPrivateFormActionRejectedErrorPreflightRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was recorded',
+    'The private form action rejected-error preflight records rejected action error metadata only.'
+  );
+
+  error.code = privateFormActionRejectedErrorPreflightGateErrorCode;
+  error.preflightId = payload.preflightId;
+  error.preflightSequence = payload.preflightSequence;
+  error.requestType = payload.requestType;
+  error.status = payload.status;
+  error.sourceAsyncCallbackExecutionId =
+    payload.sourceAsyncCallbackExecutionId;
+  error.rejectedAsyncActionError =
+    payload.rejectedAsyncActionError;
+  error.actionErrorPreflight = payload.actionErrorPreflight;
+  error.resetActionPublicBlockers =
+    payload.resetActionPublicBlockers;
+  error.publicFormActionBoundary = payload.publicFormActionBoundary;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
 function getPrivateFormActionFormDataBlockerRecordPayload(record) {
   return formActionFormDataBlockerRecordPayloads.get(record) || null;
 }
@@ -1190,6 +1431,10 @@ function getPrivateFormActionAsyncCallbackExecutionRecordPayload(record) {
   return formActionAsyncCallbackExecutionRecordPayloads.get(record) || null;
 }
 
+function getPrivateFormActionRejectedErrorPreflightRecordPayload(record) {
+  return formActionRejectedErrorPreflightRecordPayloads.get(record) || null;
+}
+
 function isPrivateFormActionFormDataBlockerRecord(value) {
   return formActionFormDataBlockerRecordPayloads.has(value);
 }
@@ -1208,6 +1453,10 @@ function isPrivateFormActionCallbackActionPreflightRecord(value) {
 
 function isPrivateFormActionAsyncCallbackExecutionRecord(value) {
   return formActionAsyncCallbackExecutionRecordPayloads.has(value);
+}
+
+function isPrivateFormActionRejectedErrorPreflightRecord(value) {
+  return formActionRejectedErrorPreflightRecordPayloads.has(value);
 }
 
 function recordFormActionFormDataBlockerWithGate(
@@ -1654,6 +1903,110 @@ async function recordFormActionAsyncCallbackExecutionWithGate(
   return payload;
 }
 
+function recordFormActionRejectedErrorPreflightWithGate(
+  gateState,
+  asyncCallbackExecutionRecord,
+  admission
+) {
+  const asyncExecution =
+    assertAcceptedFormActionAsyncCallbackExecutionRecordForRejectedErrorPreflight(
+      asyncCallbackExecutionRecord
+    );
+
+  if (
+    gateState.consumedRejectedExecutions.has(asyncCallbackExecutionRecord)
+  ) {
+    throwInvalidRejectedErrorPreflightRecord(
+      'source rejected async callback execution was already consumed by this preflight gate'
+    );
+  }
+
+  const normalizedAdmission =
+    normalizeFormActionRejectedErrorPreflightAdmission(
+      asyncExecution,
+      admission
+    );
+  const preflightSequence = gateState.nextRequestSequence++;
+  const preflightId = `${gateState.requestIdPrefix}:${preflightSequence}`;
+  const acceptedMetadataIds =
+    createRejectedErrorPreflightAcceptedMetadataIds(asyncExecution);
+  const rejectedAsyncActionError =
+    createRejectedAsyncActionErrorMetadata(
+      asyncExecution,
+      normalizedAdmission
+    );
+  const actionErrorPreflight =
+    createRejectedActionErrorPreflight(
+      asyncExecution,
+      normalizedAdmission,
+      rejectedAsyncActionError
+    );
+  const resetActionPublicBlockers =
+    createRejectedErrorResetActionPublicBlockers(asyncExecution);
+
+  gateState.consumedRejectedExecutions.add(asyncCallbackExecutionRecord);
+
+  const payload = freezeRecord({
+    schemaVersion: formActionRejectedErrorPreflightGateSchemaVersion,
+    $$typeof: privateFormActionRejectedErrorPreflightRecordType,
+    kind: 'FastReactDomPrivateFormActionRejectedErrorPreflightRecord',
+    gateId: privateFormActionRejectedErrorPreflightGateId,
+    compatibilityTarget,
+    status: privateFormActionRejectedErrorPreflightRecordedStatus,
+    unsupportedCode: unimplementedCode,
+    preflightId,
+    preflightSequence,
+    requestType: 'form-action-rejected-error-preflight.diagnostic',
+    contractId: 'form-action-rejected-error-preflight',
+    oracleKind: formActionsOracleKind,
+    oracleSchemaVersion: 1,
+    sourceAsyncCallbackExecutionId: asyncExecution.executionId,
+    sourceAsyncCallbackExecutionSequence:
+      asyncExecution.executionSequence,
+    sourceAsyncCallbackExecutionStatus: asyncExecution.status,
+    sourceCallbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId,
+    sourceCallbackActionPreflightSequence:
+      asyncExecution.sourceCallbackActionPreflightSequence,
+    sourceSubmitDispatchId: asyncExecution.sourceSubmitDispatchId,
+    sourceSubmitDispatchSequence:
+      asyncExecution.sourceSubmitDispatchSequence,
+    sourceSubmitResetExecutionId:
+      asyncExecution.sourceSubmitResetExecutionId,
+    sourceSubmitResetExecutionSequence:
+      asyncExecution.sourceSubmitResetExecutionSequence,
+    sourceFormDataBlockerId: asyncExecution.sourceFormDataBlockerId,
+    sourceFormDataBlockerSequence:
+      asyncExecution.sourceFormDataBlockerSequence,
+    sourceEventExtractionId: asyncExecution.sourceEventExtractionId,
+    sourceEventExtractionSequence:
+      asyncExecution.sourceEventExtractionSequence,
+    sourceResetQueueCommitRequestId:
+      asyncExecution.sourceResetQueueCommitRequestId,
+    sourceResetQueueCommitRequestSequence:
+      asyncExecution.sourceResetQueueCommitRequestSequence,
+    sourceResetIntentRequestId:
+      asyncExecution.sourceResetIntentRequestId,
+    sourceResetIntentRequestSequence:
+      asyncExecution.sourceResetIntentRequestSequence,
+    acceptedMetadataIds,
+    admission: normalizedAdmission,
+    sourceAsyncCallbackExecution:
+      createRejectedErrorSourceAsyncCallbackExecution(asyncExecution),
+    rejectedAsyncActionError,
+    actionErrorPreflight,
+    resetActionPublicBlockers,
+    publicFormActionBoundary:
+      createPublicFormActionRejectedErrorPreflightBoundary(),
+    sideEffects: formActionRejectedErrorPreflightDiagnosticSideEffects,
+    missingPrerequisites:
+      formActionRejectedErrorPreflightMissingPrerequisites
+  });
+
+  formActionRejectedErrorPreflightRecordPayloads.set(payload, payload);
+  return payload;
+}
+
 function assertAcceptedFormActionEventExtractionRecord(record) {
   const payload =
     internalsGate.getPrivateFormActionEventExtractionRecordPayload(record);
@@ -1911,6 +2264,52 @@ function assertAcceptedFormActionCallbackActionPreflightRecordForAsyncCallbackEx
   );
 }
 
+function assertAcceptedFormActionAsyncCallbackExecutionRecordForRejectedErrorPreflight(
+  record
+) {
+  const payload =
+    getPrivateFormActionAsyncCallbackExecutionRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.status === privateFormActionAsyncCallbackExecutionRecordedStatus &&
+    payload.admission?.deterministicFakeCallbackOnly === true &&
+    payload.pendingStatusMetadata?.metadataOnly === true &&
+    payload.pendingStatusMetadata?.formDataConstructed === false &&
+    payload.resetMetadata?.resetIntentMetadataConsumed === true &&
+    payload.resetMetadata?.resetStateQueued === false &&
+    payload.resetMetadata?.realFormReset === false &&
+    payload.callbackExecution?.status ===
+      'failed-private-form-action-async-callback-rejected' &&
+    payload.callbackExecution?.thenableObserved === true &&
+    payload.callbackExecution?.rejected === true &&
+    payload.callbackExecution?.failClosed === true &&
+    payload.callbackExecution?.errorInfo !== null &&
+    payload.callbackExecution?.formDataConstructed === false &&
+    payload.callbackExecution?.publicActionInvoked === false &&
+    payload.callbackExecution?.hostTransitionStarted === false &&
+    payload.callbackExecution?.reactUpdateQueued === false &&
+    payload.callbackExecution?.resetStateQueued === false &&
+    payload.callbackExecution?.resetFormInstanceCalled === false &&
+    payload.callbackExecution?.realFormReset === false &&
+    payload.publicFormActionBoundary?.publicFormActionsEnabled === false &&
+    payload.publicFormActionBoundary
+      ?.privateAsyncActionCallbackPubliclyReachable === false &&
+    payload.publicFormActionBoundary?.actionInvoked === false &&
+    payload.publicFormActionBoundary?.realFormReset === false &&
+    payload.sideEffects?.asyncCallbackThenableRejected === true &&
+    payload.sideEffects?.failClosedErrorRecorded === true &&
+    payload.sideEffects?.actionInvoked === false &&
+    payload.sideEffects?.reactUpdateQueued === false &&
+    payload.sideEffects?.realFormReset === false
+  ) {
+    return payload;
+  }
+
+  throwInvalidRejectedErrorPreflightRecord(
+    'source async callback execution must be an accepted rejected fake callback execution'
+  );
+}
+
 function assertSupportedSubmitControlForDispatch(blocker) {
   const controlKind = blocker.submitterShape?.controlKind;
   if (
@@ -1981,6 +2380,18 @@ function assertPrivateFormActionAsyncCallbackExecutionRecord(record) {
 
   throwInvalidAsyncCallbackExecutionRecord(
     'expected a private form action async callback execution record'
+  );
+}
+
+function assertPrivateFormActionRejectedErrorPreflightRecord(record) {
+  const payload =
+    getPrivateFormActionRejectedErrorPreflightRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  throwInvalidRejectedErrorPreflightRecord(
+    'expected a private form action rejected-error preflight record'
   );
 }
 
@@ -2393,6 +2804,130 @@ function normalizeFormActionAsyncCallbackExecutionAdmission(
   };
 }
 
+function normalizeFormActionRejectedErrorPreflightAdmission(
+  asyncExecution,
+  admission
+) {
+  if (admission == null || typeof admission !== 'object') {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'admission metadata must be an object'
+    );
+  }
+
+  if (admission.explicitFormActionRejectedErrorPreflight !== true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'explicitFormActionRejectedErrorPreflight must be true'
+    );
+  }
+
+  assertNoRejectedErrorPreflightRawAdmissionFields(admission);
+
+  const sourceAsyncCallbackExecutionId =
+    getRejectedErrorPreflightStringProperty(
+      admission,
+      'sourceAsyncCallbackExecutionId',
+      asyncExecution.executionId
+    );
+  if (sourceAsyncCallbackExecutionId !== asyncExecution.executionId) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'sourceAsyncCallbackExecutionId must match the rejected async callback execution record'
+    );
+  }
+
+  if (admission.publicDispatchRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'public submit dispatch must remain blocked'
+    );
+  }
+  if (admission.publicErrorRoutingRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'public error routing must remain blocked'
+    );
+  }
+  if (admission.actionInvocationRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'action invocation must remain blocked'
+    );
+  }
+  if (admission.formDataConstructionRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'form data construction must remain blocked'
+    );
+  }
+  if (admission.hostTransitionRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'host transition start must remain blocked'
+    );
+  }
+  if (admission.reactUpdateRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'react update queueing must remain blocked'
+    );
+  }
+  if (admission.resetExecutionRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'reset execution must remain blocked'
+    );
+  }
+  if (admission.publicRequestFormResetRequested === true) {
+    throwInvalidRejectedErrorPreflightAdmission(
+      'public reset request must remain blocked'
+    );
+  }
+
+  return freezeRecord({
+    explicitFormActionRejectedErrorPreflight: true,
+    metadataOnly: true,
+    preflightOnly: true,
+    diagnosticKind:
+      getRejectedErrorPreflightStringProperty(
+        admission,
+        'diagnosticKind',
+        'metadata-only-rejected-action-error-preflight'
+      ),
+    errorChannel:
+      getRejectedErrorPreflightStringProperty(
+        admission,
+        'errorChannel',
+        'private-async-action-rejection'
+      ),
+    sourceAsyncCallbackExecutionId,
+    sourceCallbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId,
+    publicDispatchRequested: false,
+    publicErrorRoutingRequested: false,
+    actionInvocationRequested: false,
+    formDataConstructionRequested: false,
+    hostTransitionRequested: false,
+    reactUpdateRequested: false,
+    resetExecutionRequested: false,
+    publicRequestFormResetRequested: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    rawActionCaptured: false,
+    rawSubmitControlCaptured: false,
+    rawErrorCaptured: false,
+    liveFormAccepted: false,
+    realFormInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    publicErrorRoutingStarted: false,
+    rootErrorCallbackInvoked: false,
+    hostTransitionStarted: false,
+    resetStateQueued: false,
+    reactUpdateQueued: false,
+    resetFormInstanceCalled: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
 function assertNoRawAdmissionFields(admission) {
   for (const field of blockedRawAdmissionFields) {
     if (hasOwnProp(admission, field)) {
@@ -2438,6 +2973,16 @@ function assertNoAsyncCallbackExecutionRawAdmissionFields(admission) {
     if (hasOwnProp(admission, field)) {
       throwInvalidAsyncCallbackExecutionAdmission(
         `${field} must not be passed to the async callback execution gate`
+      );
+    }
+  }
+}
+
+function assertNoRejectedErrorPreflightRawAdmissionFields(admission) {
+  for (const field of blockedRejectedErrorPreflightAdmissionFields) {
+    if (hasOwnProp(admission, field)) {
+      throwInvalidRejectedErrorPreflightAdmission(
+        `${field} must not be passed to the rejected-error preflight gate`
       );
     }
   }
@@ -3771,6 +4316,175 @@ function createAsyncCallbackExecutionSideEffects(outcome) {
   return formActionAsyncCallbackExecutionNonThenableSideEffects;
 }
 
+function createRejectedErrorPreflightAcceptedMetadataIds(asyncExecution) {
+  return freezeRecord({
+    ...asyncExecution.acceptedMetadataIds,
+    asyncCallbackExecutionId: asyncExecution.executionId,
+    asyncCallbackExecutionSequence: asyncExecution.executionSequence,
+    asyncCallbackExecutionGateId: asyncExecution.gateId,
+    callbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId
+  });
+}
+
+function createRejectedErrorSourceAsyncCallbackExecution(asyncExecution) {
+  const callbackExecution = asyncExecution.callbackExecution;
+  return freezeRecord({
+    executionId: asyncExecution.executionId,
+    executionSequence: asyncExecution.executionSequence,
+    status: asyncExecution.status,
+    requestType: asyncExecution.requestType,
+    sourceCallbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId,
+    sourceSubmitDispatchId: asyncExecution.sourceSubmitDispatchId,
+    sourceSubmitResetExecutionId:
+      asyncExecution.sourceSubmitResetExecutionId,
+    pendingStatusRecorded:
+      asyncExecution.pendingStatusMetadata.pendingStatusRecorded,
+    resetMetadataConsumed:
+      asyncExecution.resetMetadata.resetIntentMetadataConsumed,
+    callbackExecutionStatus: callbackExecution.status,
+    callbackOutcome: callbackExecution.callbackOutcome,
+    thenableObserved: callbackExecution.thenableObserved,
+    initialThenableStatus: callbackExecution.initialThenableStatus,
+    finalThenableStatus: callbackExecution.finalThenableStatus,
+    rejected: callbackExecution.rejected,
+    failClosed: callbackExecution.failClosed,
+    errorInfo: callbackExecution.errorInfo,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    hostTransitionStarted: false,
+    reactUpdateQueued: false,
+    resetStateQueued: false,
+    resetFormInstanceCalled: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createRejectedAsyncActionErrorMetadata(
+  asyncExecution,
+  admission
+) {
+  const callbackExecution = asyncExecution.callbackExecution;
+  return freezeRecord({
+    status: 'preflighted-private-form-action-rejected-error-metadata',
+    metadataOnly: true,
+    preflightOnly: true,
+    errorChannel: admission.errorChannel,
+    sourceAsyncCallbackExecutionId: asyncExecution.executionId,
+    sourceCallbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId,
+    sourceSubmitDispatchId: asyncExecution.sourceSubmitDispatchId,
+    sourceSubmitResetExecutionId:
+      asyncExecution.sourceSubmitResetExecutionId,
+    callbackOutcome: callbackExecution.callbackOutcome,
+    thenableObserved: callbackExecution.thenableObserved,
+    initialThenableStatus: callbackExecution.initialThenableStatus,
+    finalThenableStatus: callbackExecution.finalThenableStatus,
+    rejected: callbackExecution.rejected,
+    failClosed: callbackExecution.failClosed,
+    errorInfo: callbackExecution.errorInfo,
+    rawErrorCaptured: false,
+    errorObjectExposed: false,
+    publicErrorRoutingStarted: false,
+    publicRootErrorCallbackInvoked: false,
+    errorBoundaryScheduled: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createRejectedActionErrorPreflight(
+  asyncExecution,
+  admission,
+  rejectedAsyncActionError
+) {
+  const preflight = asyncExecution.sourceCallbackActionPreflight;
+  return freezeRecord({
+    status: 'preflighted-private-form-action-rejected-action-error-blocked',
+    metadataOnly: true,
+    preflightOnly: true,
+    diagnosticKind: admission.diagnosticKind,
+    sourceAsyncCallbackExecutionId: asyncExecution.executionId,
+    sourceCallbackActionPreflightId:
+      asyncExecution.sourceCallbackActionPreflightId,
+    sourceSubmitDispatchId: asyncExecution.sourceSubmitDispatchId,
+    sourceSubmitResetExecutionId:
+      asyncExecution.sourceSubmitResetExecutionId,
+    rejectedErrorMetadataStatus: rejectedAsyncActionError.status,
+    actionInvocationWouldBeScheduled:
+      preflight.actionInvocationWouldBeScheduled,
+    pendingStatusWouldBeSet: preflight.pendingStatusWouldBeSet,
+    resetWouldRunBeforeActionInvocation:
+      preflight.resetWouldRunBeforeActionInvocation,
+    blockedFormDataConsumed: preflight.blockedFormDataConsumed,
+    resetIntentMetadataConsumed:
+      preflight.resetIntentMetadataConsumed,
+    callbackOutcome: rejectedAsyncActionError.callbackOutcome,
+    rejected: rejectedAsyncActionError.rejected,
+    failClosed: rejectedAsyncActionError.failClosed,
+    rawErrorCaptured: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    hostTransitionStarted: false,
+    publicErrorRoutingWouldBeRequired: true,
+    publicErrorRoutingStarted: false,
+    rootErrorUpdateScheduled: false,
+    publicRootErrorCallbackInvoked: false,
+    errorBoundaryScheduled: false,
+    reactUpdateQueued: false,
+    resetStateQueued: false,
+    realFormReset: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false,
+    blockedReason: 'no-public-error-routing'
+  });
+}
+
+function createRejectedErrorResetActionPublicBlockers(asyncExecution) {
+  return freezeRecord({
+    status:
+      'blocked-public-form-action-reset-and-rejected-error-routing',
+    metadataOnly: true,
+    sourceAsyncCallbackExecutionId: asyncExecution.executionId,
+    sourceSubmitResetExecutionId:
+      asyncExecution.sourceSubmitResetExecutionId,
+    sourceResetIntentRequestId:
+      asyncExecution.sourceResetIntentRequestId,
+    publicFormActionsEnabled: false,
+    publicFormSubmissionReachable: false,
+    publicSubmitDispatchReachable: false,
+    publicRequestFormResetReachable: false,
+    publicActionInvocationReachable: false,
+    publicErrorRoutingReachable: false,
+    publicRootTouched: false,
+    formDataConstructed: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    reactUpdateQueued: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    rootErrorUpdateScheduled: false,
+    publicRootErrorCallbackInvoked: false,
+    errorBoundaryScheduled: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPublicFormActionBlockerBoundary() {
   return freezeRecord({
     status: 'blocked-public-form-action-formdata-compatibility',
@@ -3875,6 +4589,38 @@ function createPublicFormActionAsyncCallbackExecutionBoundary() {
     resetFormInstanceCalled: false,
     formResetCommitted: false,
     realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPublicFormActionRejectedErrorPreflightBoundary() {
+  return freezeRecord({
+    status:
+      'blocked-public-form-action-rejected-error-preflight-compatibility',
+    publicFormActionsEnabled: false,
+    publicRequestFormResetReachable: false,
+    publicFormSubmissionReachable: false,
+    publicSubmitDispatchReachable: false,
+    publicErrorRoutingReachable: false,
+    publicRootTouched: false,
+    realFormAccepted: false,
+    realFormInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    privateAsyncActionCallbackPubliclyReachable: false,
+    hostTransitionStarted: false,
+    reactUpdateQueued: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    rootErrorUpdateScheduled: false,
+    publicRootErrorCallbackInvoked: false,
+    errorBoundaryScheduled: false,
     compatibilityClaimed: false
   });
 }
@@ -3984,6 +4730,21 @@ function getAsyncCallbackExecutionStringProperty(record, key, fallback) {
   }
 
   throwInvalidAsyncCallbackExecutionAdmission(
+    `${key} must be a non-empty string`
+  );
+}
+
+function getRejectedErrorPreflightStringProperty(record, key, fallback) {
+  if (!hasOwnProp(record, key)) {
+    return fallback;
+  }
+
+  const value = record[key];
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+
+  throwInvalidRejectedErrorPreflightAdmission(
     `${key} must be a non-empty string`
   );
 }
@@ -4162,6 +4923,29 @@ function throwInvalidAsyncCallbackExecutionRecord(reason) {
   throw error;
 }
 
+function throwInvalidRejectedErrorPreflightAdmission(reason) {
+  const error = new Error(
+    `Invalid private React DOM form action rejected-error preflight admission: ${reason}.`
+  );
+  error.name = 'FastReactDomFormActionRejectedErrorPreflightGateError';
+  error.code =
+    privateFormActionRejectedErrorPreflightInvalidAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
+function throwInvalidRejectedErrorPreflightRecord(reason) {
+  const error = new Error(
+    `Invalid private React DOM form action rejected-error preflight record: ${reason}.`
+  );
+  error.name = 'FastReactDomFormActionRejectedErrorPreflightGateError';
+  error.code = privateFormActionRejectedErrorPreflightInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
 function prerequisite(id, area, reason) {
   return freezeRecord({ id, area, reason });
 }
@@ -4194,16 +4978,19 @@ module.exports = {
   createFormActionAsyncCallbackExecutionDiagnosticGate,
   createFormActionCallbackActionPreflightDiagnosticGate,
   createFormActionFormDataBlockerDiagnosticGate,
+  createFormActionRejectedErrorPreflightDiagnosticGate,
   createFormActionSubmitDispatchDiagnosticGate,
   createFormActionSubmitResetExecutionDiagnosticGate,
   createUnsupportedFormActionAsyncCallbackExecutionError,
   createUnsupportedFormActionCallbackActionPreflightError,
   createUnsupportedFormActionFormDataBlockerError,
+  createUnsupportedFormActionRejectedErrorPreflightError,
   createUnsupportedFormActionSubmitDispatchError,
   createUnsupportedFormActionSubmitResetExecutionError,
   describePrivateFormActionAsyncCallbackExecutionGate,
   describePrivateFormActionCallbackActionPreflightGate,
   describePrivateFormActionFormDataBlockerGate,
+  describePrivateFormActionRejectedErrorPreflightGate,
   describePrivateFormActionSubmitDispatchGate,
   describePrivateFormActionSubmitResetExecutionGate,
   formActionAsyncCallbackExecutionBlockedSideEffects,
@@ -4221,6 +5008,10 @@ module.exports = {
   formActionFormDataBlockerDiagnosticSideEffects,
   formActionFormDataBlockerGateSchemaVersion,
   formActionFormDataBlockerMissingPrerequisites,
+  formActionRejectedErrorPreflightBlockedSideEffects,
+  formActionRejectedErrorPreflightDiagnosticSideEffects,
+  formActionRejectedErrorPreflightGateSchemaVersion,
+  formActionRejectedErrorPreflightMissingPrerequisites,
   formActionSubmitDispatchBlockedSideEffects,
   formActionSubmitDispatchDiagnosticSideEffects,
   formActionSubmitDispatchGateSchemaVersion,
@@ -4232,11 +5023,13 @@ module.exports = {
   getPrivateFormActionAsyncCallbackExecutionRecordPayload,
   getPrivateFormActionCallbackActionPreflightRecordPayload,
   getPrivateFormActionFormDataBlockerRecordPayload,
+  getPrivateFormActionRejectedErrorPreflightRecordPayload,
   getPrivateFormActionSubmitDispatchRecordPayload,
   getPrivateFormActionSubmitResetExecutionRecordPayload,
   isPrivateFormActionAsyncCallbackExecutionRecord,
   isPrivateFormActionCallbackActionPreflightRecord,
   isPrivateFormActionFormDataBlockerRecord,
+  isPrivateFormActionRejectedErrorPreflightRecord,
   isPrivateFormActionSubmitDispatchRecord,
   isPrivateFormActionSubmitResetExecutionRecord,
   privateFormActionAsyncCallbackExecutionGateErrorCode,
@@ -4260,6 +5053,13 @@ module.exports = {
   privateFormActionFormDataBlockerRecordedStatus,
   privateFormActionFormDataBlockerRecordType,
   privateFormActionFormDataBlockerStatus,
+  privateFormActionRejectedErrorPreflightGateErrorCode,
+  privateFormActionRejectedErrorPreflightGateId,
+  privateFormActionRejectedErrorPreflightInvalidAdmissionCode,
+  privateFormActionRejectedErrorPreflightInvalidRecordCode,
+  privateFormActionRejectedErrorPreflightRecordedStatus,
+  privateFormActionRejectedErrorPreflightRecordType,
+  privateFormActionRejectedErrorPreflightStatus,
   privateFormActionSubmitDispatchGateErrorCode,
   privateFormActionSubmitDispatchGateId,
   privateFormActionSubmitDispatchInvalidAdmissionCode,
@@ -4277,6 +5077,7 @@ module.exports = {
   recordFormActionAsyncCallbackExecution,
   recordFormActionCallbackActionInvocationPreflight,
   recordFormActionFormDataBlockerDiagnostic,
+  recordFormActionRejectedErrorPreflight,
   recordFormActionSubmitDispatchDiagnostic,
   recordFormActionSubmitResetExecution
 };
