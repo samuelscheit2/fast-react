@@ -29,6 +29,34 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 885, 887, and 895
+
+- Worker 885 replaced React-minted `act` lifecycle evidence with React DOM
+  private root public-facade lifecycle container snapshots, requiring
+  WeakMap-owned current root-bridge request/source records before private React
+  and React DOM test-utils passive diagnostics are accepted. Public
+  `React.act`, `react-dom/test-utils.act`, public roots, passive effect
+  execution, Scheduler timing, renderer execution, warnings, thenables, and
+  package compatibility remain blocked.
+- Worker 887 added private hydrateRoot lifecycle request-boundary admission and
+  same-container currentness through marker/listener, target-claiming,
+  event-replay, execution-preflight, and text-claim patch records, preserving
+  node snapshot and text-content evidence while rejecting cloned, foreign,
+  alias, and stale same-container rows. Public `hydrateRoot`, root objects,
+  native/Rust execution, browser DOM mutation, event replay, callbacks, and
+  compatibility remain blocked.
+- Worker 895 extended the private Rust test-renderer native lifecycle path for
+  a narrow `HostComponent -> [HostText, HostText]` update, adding
+  source-owned multi-child host-output rows, lifecycle links, finished-work
+  identity gates, and private `toJSON`/`toTree` native execution evidence.
+  Public serialization, JS/CJS/package compatibility, native bridge loading,
+  generic multi-child identity, React DOM, root/act/Scheduler, and broad
+  renderer compatibility remain blocked.
+- The batch was accepted after read-only audits and focused React act/test-utils
+  lifecycle, hydrateRoot lifecycle/currentness, Rust test-renderer
+  multi-child/native lifecycle, package-surface, import-smoke, formatting, and
+  `git diff --check` verification recorded in git history and worker reports.
+
 ### Workers 881, 888, 890, 892-893, and 896
 
 - Worker 890 added a private sync-flush canary that composes accepted

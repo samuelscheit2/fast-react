@@ -15,9 +15,13 @@ Date: 2026-05-11
 - Added one concise accepted-history batch to `MASTER_PROGRESS.md`.
 - Kept the active queue limited to Workers 885, 887, 891, 895, 897, and 898,
   with public compatibility blockers still explicit.
-- Follow-up status correction records Workers 885, 887, and 895 under
-  read-only audit, Worker 891 still fixing after DO NOT MERGE, Worker 898
-  active implementation, and accepted history unchanged.
+- Earlier follow-up recorded the then-current audit statuses for Workers 885,
+  887, and 895; the latest follow-up supersedes those statuses after their
+  acceptance.
+- Latest follow-up merged current `main`
+  `ed79f32dc45d1b73cde365b2c7689edd870415fc`, moved accepted Workers 885,
+  887, and 895 into `MASTER_PROGRESS.md`, and reduced the live queue to
+  Workers 891, 897, and 898.
 - No code files were edited.
 
 ## Changed Files
@@ -37,9 +41,13 @@ Date: 2026-05-11
 - Self-review confirmed newly accepted Workers 881, 888, 890, 892, 893, and
   896 now appear as accepted history/input only, while Workers 885, 887, 891,
   895, 897, and 898 remain active/current work in `MASTER_PLAN.md`.
-- Follow-up self-review confirmed Workers 885, 887, and 895 are audit-pending
-  only, Worker 891 remains fixing, Worker 898 remains active implementation,
-  and `MASTER_PROGRESS.md` accepted history stayed unchanged.
+- Earlier follow-up self-review confirmed the then-current audit-pending state
+  for Workers 885, 887, and 895 before their later acceptance.
+- Latest follow-up merged `main` without conflicts, read accepted Worker 885,
+  887, and 895 reports, and confirmed `MASTER_PLAN.md` now treats only Workers
+  891 and 898 as unaccepted implementation work while `MASTER_PROGRESS.md`
+  contains accepted summaries for Workers 881, 888, 890, 892, 893, 896, 885,
+  887, and 895.
 
 ## Commands Run
 
@@ -89,6 +97,28 @@ git diff --cached --check
 git diff --cached --name-only
 ```
 
+Current-main refresh:
+
+```sh
+git status --short --branch
+git rev-parse HEAD main
+git log --oneline --decorate --graph --max-count=16 --all
+git merge main --no-edit
+sed -n '46,170p' MASTER_PLAN.md
+sed -n '1,120p' MASTER_PROGRESS.md
+sed -n '1,220p' worker-progress/worker-885-react-act-lifecycle-boundary-gate.md
+sed -n '1,220p' worker-progress/worker-887-hydrateroot-lifecycle-boundary-admission.md
+sed -n '1,240p' worker-progress/worker-895-rust-test-renderer-multichild-lifecycle-native.md
+sed -n '1,180p' worker-progress/worker-897-docs-post-queue-merge-refresh.md
+git rev-parse HEAD main
+git log --oneline --decorate -8
+git diff -- MASTER_PLAN.md MASTER_PROGRESS.md worker-progress/worker-897-docs-post-queue-merge-refresh.md
+rg -n "Worker 885|Worker 887|Worker 891|Worker 895|Worker 897|Worker 898|audit_885|audit_887|audit_895|read-only audit|under read-only audit|remain non-input|accepted/merged baseline|ed79f32d|c9d3fcf" MASTER_PLAN.md MASTER_PROGRESS.md worker-progress/worker-897-docs-post-queue-merge-refresh.md
+git diff --name-only
+rg -n "under read-only audit|audit-pending only|remain unaccepted|Workers 885, 887, and 895 are|Worker 885.*non-input|Worker 887.*non-input|Worker 895.*non-input|Worker 885:|Worker 887:|Worker 895:" MASTER_PLAN.md MASTER_PROGRESS.md worker-progress/worker-897-docs-post-queue-merge-refresh.md
+git diff --check
+```
+
 ## Checks
 
 - `git diff --check` passed.
@@ -97,16 +127,13 @@ git diff --cached --name-only
 ## Risks Or Blockers
 
 - No implementation blockers. This branch is docs-only.
-- Workers 885, 887, and 895 are under read-only audit and are not accepted
-  input.
 - Worker 891 remains active fixing after DO NOT MERGE and is not accepted
   input.
 - Worker 898 remains active implementation and is not accepted input.
 
 ## Recommended Next Tasks
 
-- Complete audits for Workers 885, 887, and 895, continue Worker 891 fixing,
-  and review Worker 898 against accepted private blockers before any future
-  merge.
+- Continue Worker 891 fixing and review Worker 898 against accepted private
+  blockers before any future merge.
 - Refresh `MASTER_PLAN.md` and `MASTER_PROGRESS.md` again after the next
   accepted batch.

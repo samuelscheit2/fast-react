@@ -46,29 +46,22 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Accepted/merged baseline includes Workers 803-837,
-842-846, 848-852, 855-860, 862-874, 878-883, 886, 888-890, 892-893, and
-896. Current main after the latest accepted batch is
-`c9d3fcf94ba0aa48eaef992efbf7072bd8a9285f`.
+842-846, 848-852, 855-860, 862-874, 878-883, 885-890, 892-893, and
+895-896. Current main after the latest accepted batch is
+`ed79f32dc45d1b73cde365b2c7689edd870415fc`.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
 Current active queue:
 
-- Worker 885: latest stale same-root `act` lifecycle snapshot fix is under
-  read-only audit in `audit_885_react_act_lifecycle_boundary_latest_fix`.
-- Worker 887: latest hydrateRoot snapshot-field preservation fix is under
-  read-only audit in `audit_887_hydrateroot_lifecycle_boundary_final`.
 - Worker 891: active fixing after DO NOT MERGE for unmount lifecycle
   blocked-behavior aliases and source boundary path.
-- Worker 895: completed implementation is under read-only audit in
-  `audit_895_rust_test_renderer_multichild_lifecycle_native`.
 - Worker 897: active docs worker refreshing coordination docs after the latest
   accepted batch.
 - Worker 898: active implementation worker.
 
-Workers 885, 887, 891, 895, and 898 remain unaccepted. Do not use their
-branches as accepted input until they are reviewed, verified, and merged.
-Worker 897 is docs-only.
+Workers 891 and 898 remain unaccepted. Do not use their branches as accepted
+input until they are reviewed, verified, and merged. Worker 897 is docs-only.
 
 Accepted private evidence still keeps public root/render, `act`, `flushSync`,
 Scheduler timing, hydration, resources/forms, serialization, native execution,
@@ -81,23 +74,19 @@ canonical evidence requirements.
 ## Near-Term Sequencing
 
 1. Treat the accepted baseline through current main
-   `c9d3fcf94ba0aa48eaef992efbf7072bd8a9285f` as private evidence only. Public
+   `ed79f32dc45d1b73cde365b2c7689edd870415fc` as private evidence only. Public
    package, root, native, React DOM, test-renderer, Scheduler, `act`,
    hydration, resource/form, serialization, and `flushSync` compatibility still
    require fail-closed gates and dual-run oracle evidence.
-2. Complete read-only audits for Workers 885, 887, and 895 before
-   reconsidering merge; their latest fixes remain non-input until the stated
-   lifecycle/currentness/source-boundary and test-renderer/native gaps are
-   closed.
-3. Re-review Worker 891 after its active DO NOT MERGE fix is ready, and review
-   Worker 898 against the accepted source-owned lifecycle, deletion,
-   sync-flush, HostRoot lane handoff, native-generation, resource/form,
-   Scheduler variant, package-surface, and public blocker requirements before
-   any merge.
-4. Prefer parallelizable independent proofs even when they may conflict in test
+2. Re-review Worker 891 after its active DO NOT MERGE fix is ready, and review
+   Worker 898 against the accepted source-owned lifecycle, hydration, `act`,
+   deletion, sync-flush, HostRoot lane handoff, test-renderer multi-child
+   native, native-generation, resource/form, Scheduler variant,
+   package-surface, and public blocker requirements before any merge.
+3. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
-5. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
@@ -114,7 +103,8 @@ canonical evidence requirements.
   package-root native execution parity, Workers 859 and 868 Rust private
   lifecycle/native consumer hardening, and Worker 872 package-root/CJS private
   lifecycle execution evidence, plus accepted Workers 881 and 888 private
-  serialization and TestInstance lifecycle gates. Worker 853 remains
+  serialization and TestInstance lifecycle gates and Worker 895 private
+  multi-child test-renderer native lifecycle evidence. Worker 853 remains
   rejected/redundant. Public serialization, `ReactTestInstance`,
   JS/CJS/package compatibility, native bridge loading/execution,
   root/act/Scheduler compatibility, and broad multichild identity remain
@@ -134,10 +124,10 @@ canonical evidence requirements.
   React updates, DOM/head mutation, native/root execution, and package
   compatibility remain blocked.
 - React `act` and React DOM test-utils work can consume accepted Worker 857's
-  frozen, nested source-owned scheduler-driven passive diagnostics. Worker 885
-  remains non-input until accepted. Public `act`, public root work, passive
-  effect execution, Scheduler timing, warnings, thenable behavior, renderer
-  behavior, and package compatibility remain blocked.
+  frozen, nested source-owned scheduler-driven passive diagnostics and Worker
+  885's source-owned root lifecycle boundary gate. Public `act`, public root
+  work, passive effect execution, Scheduler timing, warnings, thenable
+  behavior, renderer behavior, and package compatibility remain blocked.
 - Native lifecycle work can consume accepted Worker 858's Rust JSON lifecycle
   mirror, Worker 870's in-process JSON batch lifecycle executor, Worker 873's
   private generation/replay no-stale guard, and Worker 882's native JS
@@ -152,10 +142,11 @@ canonical evidence requirements.
   blocked.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
-  text-claim patch execution, and the text-patch admission ledger. Worker 887
-  remains non-input until accepted. Future hydration work must prove real root
-  creation, marker/listener behavior, recoverable error routing, event replay,
-  and DOM mutation semantics against React 19.2.6.
+  text-claim patch execution, the text-patch admission ledger, and Worker
+  887's private lifecycle boundary admission/currentness evidence. Future
+  hydration work must prove real root creation, marker/listener behavior,
+  recoverable error routing, event replay, and DOM mutation semantics against
+  React 19.2.6.
 - Additional private root/test-renderer bridge gates that require accepted
   `finished_work` / `finished_lanes` handoff before any wider serialization or
   native bridge execution.
