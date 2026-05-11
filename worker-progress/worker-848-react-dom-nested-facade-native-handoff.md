@@ -51,6 +51,13 @@
   closed before diagnostic metadata is exposed.
 - Added negative coverage for extra child and parent attributes, extra child own
   properties, extra style state, and extra topology siblings.
+- Third audit follow-up: fixed the remaining container-level validation gap by
+  snapshotting and revalidating the container attributes, own properties, style
+  state, text content, and child topology with the same exact node snapshot used
+  for nested host nodes.
+- Added negative coverage for factories that mutate container attributes,
+  container own properties, or container style state after creating the
+  canonical native handoff.
 
 ## Commands Run
 

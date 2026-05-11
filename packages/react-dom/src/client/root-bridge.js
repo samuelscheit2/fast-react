@@ -8367,8 +8367,7 @@ function createActiveNestedHostOutputSnapshotForNativeUpdateHandoff(context) {
     childNode: createActiveHostOutputNodeSnapshot(
       context.nestedMount.childNode
     ),
-    containerChildren: snapshotChildNodes(context.container),
-    containerTextContent: context.container.textContent,
+    containerNode: createActiveHostOutputNodeSnapshot(context.container),
     parentNode: createActiveHostOutputNodeSnapshot(
       context.nestedMount.parentNode
     ),
@@ -8413,8 +8412,10 @@ function activeNestedHostOutputTopologyMatches(context) {
 
 function activeNestedHostOutputSnapshotMatches(context, snapshot) {
   return (
-    childNodesMatch(context.container, snapshot.containerChildren) &&
-    context.container.textContent === snapshot.containerTextContent &&
+    activeHostOutputNodeSnapshotMatches(
+      context.container,
+      snapshot.containerNode
+    ) &&
     activeHostOutputNodeSnapshotMatches(
       context.nestedMount.parentNode,
       snapshot.parentNode

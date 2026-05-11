@@ -10274,6 +10274,13 @@ test('private react-dom/client facade nested host-output native handoff fails cl
       };
     }
     const container = createElement('DIV', document);
+    if (options && options.withStyleContainer) {
+      container.style = {
+        setProperty(name, value) {
+          this[String(name)] = String(value);
+        }
+      };
+    }
     const adapter = descriptor.value({
       createRenderAdmissionIdPrefix: `${label}-admission`,
       hostOutputUpdateIdPrefix: `${label}-handoff`,
@@ -10450,6 +10457,25 @@ test('private react-dom/client facade nested host-output native handoff fails cl
       mutate({parentHostInstanceNode}) {
         parentHostInstanceNode.setAttribute('data-extra', 'tampered');
       }
+    },
+    {
+      label: 'container-extra-attribute',
+      mutate({container}) {
+        container.setAttribute('data-container-extra', 'tampered');
+      }
+    },
+    {
+      label: 'container-extra-property',
+      mutate({container}) {
+        container.extraNativeHandoffProperty = 'tampered';
+      }
+    },
+    {
+      label: 'container-extra-style',
+      mutate({container}) {
+        container.style.backgroundColor = 'red';
+      },
+      options: {withStyleContainer: true}
     },
     {
       label: 'extra-child-sibling',
