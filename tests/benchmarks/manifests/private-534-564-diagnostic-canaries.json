@@ -36,7 +36,7 @@
       "acceptedGate": {
         "id": "reconciler-root-finished-work-commit-handoff-private-diagnostic-gate",
         "status": "accepted-private-partial",
-        "command": "cargo test -p fast-react-reconciler --all-features root_work_loop_finished_work root_commit_finished_host_root",
+        "command": "cargo test -p fast-react-reconciler --all-features root_work_loop_finished_work && cargo test -p fast-react-reconciler --all-features root_commit_finished_work",
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Worker 534 admits private HostRoot finished-work handoff records before commit consumption while host mutation, public root rendering, effects, refs, hydration, and compatibility remain blocked."
@@ -53,7 +53,7 @@
       "acceptedGate": {
         "id": "reconciler-root-lane-priority-scheduling-private-diagnostic-gate",
         "status": "accepted-private-partial",
-        "command": "cargo test -p fast-react-reconciler --all-features lane_priority root_work_loop_lane_priority",
+        "command": "cargo test -p fast-react-reconciler --all-features lane_priority && cargo test -p fast-react-reconciler --all-features root_work_loop_lane_priority",
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Worker 535 admits private lane-priority and root scheduling snapshots for sync/default updates while callback scheduling, callback execution, host operations, batching, and compatibility remain blocked."
@@ -70,7 +70,7 @@
       "acceptedGate": {
         "id": "react-function-component-callback-layout-context-private-diagnostic-gate",
         "status": "accepted-private-partial",
-        "command": "cargo test -p fast-react-reconciler --all-features use_callback layout_effect context_provider_update_lane && node --test tests/conformance/test/react-hook-dispatcher-guard.test.mjs",
+        "command": "cargo test -p fast-react-reconciler --all-features use_callback && cargo test -p fast-react-reconciler --all-features layout_effect && cargo test -p fast-react-reconciler --all-features context_provider_update_lane && node --test tests/conformance/test/react-hook-dispatcher-guard.test.mjs",
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Workers 536, 537, and 538 admit private useCallback, layout-effect destroy/create ordering, and context-provider lane propagation metadata while public hook forwarding, callback execution, effect callbacks, broad context traversal, root switching, and compatibility remain blocked."
@@ -291,7 +291,7 @@
       "acceptedGate": {
         "id": "react-transition-suspense-offscreen-blocker-private-diagnostic-gate",
         "status": "accepted-private-partial",
-        "command": "node --test tests/conformance/test/react-hook-dispatcher-guard.test.mjs && cargo test -p fast-react-reconciler --all-features thenable_ping offscreen_visibility",
+        "command": "node --test tests/conformance/test/react-hook-dispatcher-guard.test.mjs && cargo test -p fast-react-reconciler --all-features thenable_ping && cargo test -p fast-react-reconciler --all-features offscreen_visibility",
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Workers 557, 558, and 559 admit private transition-hook dispatcher blockers plus Suspense thenable ping and Offscreen visibility transition metadata while transition scheduling, thenable listeners, retry execution, Offscreen rendering/effects, hydration, and compatibility remain blocked."

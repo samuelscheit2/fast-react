@@ -51,6 +51,140 @@ export const PRIVATE_DIAGNOSTIC_COMPATIBILITY_STATUS =
 export const DIAGNOSTIC_TIMING_STATUS = "diagnostic-only";
 export const TIMING_DATA_POLICY = "diagnostic-until-compatible";
 
+const RESULT_PROPERTY_NAMES = Object.freeze([
+  "schemaVersion",
+  "kind",
+  "manifestId",
+  "generatedTimestampIncluded",
+  "scenarioResults"
+]);
+
+const SCENARIO_RESULT_PROPERTY_NAMES = Object.freeze([
+  "scenarioId",
+  "implementation",
+  "lane",
+  "timingStatus"
+]);
+
+const NPM_RUN_SCRIPT_PATTERN = /^[a-z0-9][a-z0-9:-]*$/;
+const NPM_WORKSPACE_NAME_PATTERN =
+  /^(?:@[a-z0-9-]+\/[a-z0-9-]+|[a-z0-9-]+)$/;
+const NODE_TEST_PATH_PATTERN =
+  /^(?:packages|tests)\/[A-Za-z0-9._/-]+\.(?:js|mjs)$/;
+const CARGO_PACKAGE_PATTERN = /^fast-react-[a-z0-9-]+$/;
+
+const ACCEPTED_NPM_COMMAND_SEGMENTS = Object.freeze(new Set([
+  "npm run check --workspace @fast-react/native",
+  "npm run check --workspace scheduler",
+  "npm run dom-text-content:conformance --workspace @fast-react/conformance",
+  "npm run root-public-facade:conformance --workspace @fast-react/conformance",
+  "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+  "npm run test:react-test-renderer:serialization --workspace @fast-react/conformance"
+]));
+
+const ACCEPTED_NODE_TEST_TARGETS = Object.freeze(new Set([
+  "packages/react-dom/test/dom-property-operations-private.test.js",
+  "packages/react-dom/test/events-private.test.js",
+  "packages/react-dom/test/hydration-boundary.test.js",
+  "packages/react-dom/test/hydration-private.test.js",
+  "packages/react-dom/test/react-dom-private-root-bridge-shell.test.js",
+  "packages/react-dom/test/resource-form-unsupported-gates.test.js",
+  "tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs",
+  "tests/conformance/test/act-passive-local-gate.test.mjs",
+  "tests/conformance/test/dom-controlled-input-oracle.test.mjs",
+  "tests/conformance/test/dom-event-delegation-oracle.test.mjs",
+  "tests/conformance/test/dom-property-payload-helper.test.mjs",
+  "tests/conformance/test/dom-style-dangerous-html-oracle.test.mjs",
+  "tests/conformance/test/element-object-oracle.test.mjs",
+  "tests/conformance/test/react-act-oracle.test.mjs",
+  "tests/conformance/test/react-dom-client-root-oracle.test.mjs",
+  "tests/conformance/test/react-dom-container-root-markers-oracle.test.mjs",
+  "tests/conformance/test/react-dom-create-portal-local-gate.test.mjs",
+  "tests/conformance/test/react-dom-event-dispatch-plugin-skeleton.test.mjs",
+  "tests/conformance/test/react-dom-flush-sync-batching-oracle.test.mjs",
+  "tests/conformance/test/react-dom-form-actions-oracle.test.mjs",
+  "tests/conformance/test/react-dom-hydration-boundary-gate.test.mjs",
+  "tests/conformance/test/react-dom-resource-hints-oracle.test.mjs",
+  "tests/conformance/test/react-dom-root-listener-installation-oracle.test.mjs",
+  "tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs",
+  "tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs",
+  "tests/conformance/test/react-hook-dispatcher-guard.test.mjs",
+  "tests/conformance/test/react-hook-dispatcher-oracle.test.mjs",
+  "tests/conformance/test/react-test-renderer-act-oracle.test.mjs",
+  "tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs",
+  "tests/conformance/test/react-test-renderer-error-surface-oracle.test.mjs",
+  "tests/conformance/test/react-test-renderer-root-lifecycle-oracle.test.mjs",
+  "tests/conformance/test/scheduler-mock-expired-lane-flush.test.mjs",
+  "tests/conformance/test/scheduler-mock-oracle.test.mjs",
+  "tests/conformance/test/scheduler-native-entry-oracle.test.mjs",
+  "tests/conformance/test/scheduler-post-task-oracle.test.mjs",
+  "tests/conformance/test/scheduler-post-task-root-continuation.test.mjs"
+]));
+
+const ACCEPTED_CARGO_ALL_FEATURES_PACKAGES = Object.freeze(new Set([
+  "fast-react-reconciler",
+  "fast-react-test-renderer"
+]));
+
+const REJECTED_ZERO_TEST_CARGO_FILTERS = Object.freeze(new Map([
+  [
+    "fast-react-reconciler",
+    new Set(["deleted_subtree_passive", "root_commit_finished_host_root"])
+  ]
+]));
+
+const ACCEPTED_CARGO_TEST_FILTERS = Object.freeze(new Map([
+  [
+    "fast-react-napi",
+    new Set([
+      "batch_response_sequence",
+      "native_root_bridge",
+      "stream_batch_roundtrip",
+      "worker_thread_teardown"
+    ])
+  ],
+  [
+    "fast-react-reconciler",
+    new Set([
+      "begin_work",
+      "begin_work_fails_closed_with_suspense_list_and_activity_child_shape_diagnostics",
+      "complete_work",
+      "context",
+      "context_provider_update_lane",
+      "function_component",
+      "lane_priority",
+      "layout_effect",
+      "offscreen",
+      "offscreen_visibility",
+      "passive_effects_",
+      "passive_effects_deleted_subtree",
+      "passive_effects_callback_executor_errors_preserve_cross_phase_order_and_block_root_errors",
+      "root_commit_deletion_subtree_traversal_gate",
+      "root_commit_effect_list",
+      "root_commit_finished_work",
+      "root_scheduler",
+      "root_updates",
+      "root_work_loop_finished_work",
+      "root_work_loop_lane_priority",
+      "root_work_loop_preflight_and_complete_handoff_report_suspense_list_activity_child_shapes",
+      "thenable_ping",
+      "unsupported_feature",
+      "use_callback"
+    ])
+  ],
+  [
+    "fast-react-test-renderer",
+    new Set([
+      "private_error_boundary",
+      "private_test_instance",
+      "root_create_preflight",
+      "root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics",
+      "root_private_tree_committed_fiber_inspection",
+      "to_json"
+    ])
+  ]
+]));
+
 const DEFAULT_BENCHMARK_ROOT = path.resolve(
   fileURLToPath(new URL("..", import.meta.url))
 );
@@ -237,6 +371,7 @@ export function validateBenchmarkResult(result, options = {}) {
     return [`${label}: result must be a JSON object`];
   }
 
+  validateAllowedProperties(result, RESULT_PROPERTY_NAMES, label, errors);
   requireEqual(result.schemaVersion, 1, `${label}: schemaVersion`, errors);
   requireEqual(
     result.kind,
@@ -265,6 +400,17 @@ export function validateBenchmarkResult(result, options = {}) {
   const scenarioById = new Map(
     (manifest?.scenarios ?? []).map((scenario) => [scenario.id, scenario])
   );
+  const gateById = new Map(
+    (manifest?.conformanceGates ?? []).map((gate) => [gate.id, gate])
+  );
+  const requiredScenarioIds = Array.isArray(manifest?.requiredScenarioIds)
+    ? manifest.requiredScenarioIds.filter(
+        (scenarioId) => typeof scenarioId === "string"
+      )
+    : [];
+  const requiredScenarioIdSet = new Set(requiredScenarioIds);
+  const coveredRequiredScenarioIds = new Set();
+  const seenScenarioLaneRows = new Set();
 
   for (const scenarioResult of result.scenarioResults) {
     if (!isPlainObject(scenarioResult)) {
@@ -272,6 +418,15 @@ export function validateBenchmarkResult(result, options = {}) {
       continue;
     }
 
+    const scenarioResultLabel = `${label}: result scenario ${String(
+      scenarioResult.scenarioId
+    )}`;
+    validateAllowedProperties(
+      scenarioResult,
+      SCENARIO_RESULT_PROPERTY_NAMES,
+      scenarioResultLabel,
+      errors
+    );
     requireString(
       scenarioResult.scenarioId,
       `${label}: scenarioResult.scenarioId`,
@@ -284,6 +439,19 @@ export function validateBenchmarkResult(result, options = {}) {
     );
     requireString(scenarioResult.lane, `${label}: scenarioResult.lane`, errors);
 
+    if (
+      typeof scenarioResult.scenarioId === "string" &&
+      typeof scenarioResult.lane === "string"
+    ) {
+      const rowKey = `${scenarioResult.scenarioId}\u0000${scenarioResult.lane}`;
+      if (seenScenarioLaneRows.has(rowKey)) {
+        errors.push(
+          `${label}: duplicate result row for scenario ${scenarioResult.scenarioId} lane ${scenarioResult.lane}`
+        );
+      }
+      seenScenarioLaneRows.add(rowKey);
+    }
+
     if (!TIMING_STATUSES.includes(scenarioResult.timingStatus)) {
       errors.push(
         `${label}: unknown timingStatus ${String(
@@ -291,6 +459,15 @@ export function validateBenchmarkResult(result, options = {}) {
         )} for result scenario ${String(scenarioResult.scenarioId)}`
       );
       continue;
+    }
+
+    if (
+      typeof scenarioResult.scenarioId === "string" &&
+      !requiredScenarioIdSet.has(scenarioResult.scenarioId)
+    ) {
+      errors.push(
+        `${scenarioResultLabel}: scenarioId is not listed in manifest.requiredScenarioIds`
+      );
     }
 
     const scenario = scenarioById.get(scenarioResult.scenarioId);
@@ -303,12 +480,31 @@ export function validateBenchmarkResult(result, options = {}) {
       continue;
     }
 
-    validateTimingCompatibilityPair(
-      scenario.compatibilityStatus,
-      scenarioResult.timingStatus,
-      `${label}: result scenario ${scenarioResult.scenarioId}`,
+    if (requiredScenarioIdSet.has(scenarioResult.scenarioId)) {
+      coveredRequiredScenarioIds.add(scenarioResult.scenarioId);
+    }
+
+    const gates = collectScenarioGates(
+      scenario,
+      gateById,
+      scenarioResultLabel,
       errors
     );
+    validateResultTimingAdmission(
+      scenario,
+      scenarioResult.timingStatus,
+      gates,
+      scenarioResultLabel,
+      errors
+    );
+  }
+
+  for (const requiredScenarioId of requiredScenarioIds) {
+    if (!coveredRequiredScenarioIds.has(requiredScenarioId)) {
+      errors.push(
+        `${label}: missing required scenario result ${requiredScenarioId}`
+      );
+    }
   }
 
   return errors;
@@ -368,6 +564,24 @@ function validateSchemaFiles({ benchmarkRoot }, errors) {
     "benchmark result schema: timingStatus enum",
     errors
   );
+  requireEqual(
+    resultSchema.additionalProperties,
+    false,
+    "benchmark result schema: additionalProperties",
+    errors
+  );
+  requireEqual(
+    resultSchema.$defs?.scenarioResult?.additionalProperties,
+    false,
+    "benchmark result schema: scenarioResult additionalProperties",
+    errors
+  );
+  requireExactArray(
+    resultSchema.$defs?.scenarioResult?.required,
+    SCENARIO_RESULT_PROPERTY_NAMES,
+    "benchmark result schema: scenarioResult required",
+    errors
+  );
   requireExactArray(
     benchmarkReadinessStatusIds,
     BENCHMARK_READINESS_STATUSES,
@@ -417,7 +631,8 @@ function validateConformanceGates(manifest, { label, repoRoot }, errors) {
     validateAcceptedGate(
       gate.acceptedGate,
       `${label}: conformance gate ${String(gate.id)} acceptedGate`,
-      errors
+      errors,
+      { repoRoot }
     );
 
     if (typeof gate.id === "string") {
@@ -675,7 +890,101 @@ function validateTimingCompatibilityPair(
   }
 }
 
-function validateAcceptedGate(acceptedGate, label, errors) {
+function collectScenarioGates(scenario, gateById, label, errors) {
+  if (!Array.isArray(scenario.conformanceGateIds)) {
+    errors.push(
+      `${label}: manifest scenario conformanceGateIds must be an array`
+    );
+    return [];
+  }
+
+  const gates = [];
+  for (const gateId of scenario.conformanceGateIds) {
+    const gate = gateById.get(gateId);
+    if (!gate) {
+      errors.push(`${label}: unknown conformance gate ${String(gateId)}`);
+      continue;
+    }
+    gates.push(gate);
+  }
+  return gates;
+}
+
+function validateResultTimingAdmission(
+  scenario,
+  timingStatus,
+  gates,
+  label,
+  errors
+) {
+  validateTimingCompatibilityPair(
+    scenario.compatibilityStatus,
+    timingStatus,
+    label,
+    errors
+  );
+
+  if (timingStatus === "not-collected") {
+    return;
+  }
+
+  if (timingStatus === DIAGNOSTIC_TIMING_STATUS) {
+    if (!isPrivateDiagnosticScenario(scenario)) {
+      errors.push(
+        `${label}: diagnostic-only result timing requires a private diagnostic scenario with compatibilityStatus ${PRIVATE_DIAGNOSTIC_COMPATIBILITY_STATUS} and timingStatus ${DIAGNOSTIC_TIMING_STATUS}; public performance proof is blocked`
+      );
+      return;
+    }
+    validateDiagnosticPrivateGateAdmission(gates, label, errors);
+    return;
+  }
+
+  if (CLAIM_CAPABLE_TIMING_STATUSES.includes(timingStatus)) {
+    if (!CLAIM_CAPABLE_TIMING_STATUSES.includes(scenario.timingStatus)) {
+      errors.push(
+        `${label}: timingStatus ${timingStatus} requires a claim-capable manifest scenario timingStatus`
+      );
+    }
+    if (scenario.compatibilityStatus === GREEN_COMPATIBILITY_STATUS) {
+      validateResultGreenGateAdmission(gates, label, errors);
+    }
+    return;
+  }
+
+  if (timingStatus !== scenario.timingStatus) {
+    errors.push(
+      `${label}: timingStatus ${timingStatus} is not admitted by manifest scenario timingStatus ${String(
+        scenario.timingStatus
+      )}`
+    );
+  }
+}
+
+function validateResultGreenGateAdmission(gates, label, errors) {
+  if (gates.length === 0) {
+    errors.push(`${label}: claim-capable timing requires conformance gates`);
+    return;
+  }
+
+  for (const gate of gates) {
+    if (
+      gate.acceptedGate?.status !== "green-admitted" ||
+      gate.acceptedGate?.admitted !== true ||
+      gate.acceptedGate?.compatibilityClaimed !== true
+    ) {
+      errors.push(
+        `${label}: claim-capable timing requires ${gate.id} acceptedGate.status=green-admitted, admitted=true, and compatibilityClaimed=true`
+      );
+    }
+  }
+}
+
+function validateAcceptedGate(
+  acceptedGate,
+  label,
+  errors,
+  { repoRoot = DEFAULT_REPO_ROOT } = {}
+) {
   if (acceptedGate === undefined) {
     return;
   }
@@ -686,6 +995,9 @@ function validateAcceptedGate(acceptedGate, label, errors) {
 
   requireString(acceptedGate.id, `${label}.id`, errors);
   requireString(acceptedGate.command, `${label}.command`, errors);
+  validateRunnableAcceptedGateCommand(acceptedGate.command, label, errors, {
+    repoRoot
+  });
   if (!ACCEPTED_GATE_STATUSES.includes(acceptedGate.status)) {
     errors.push(`${label}: unknown status ${String(acceptedGate.status)}`);
   }
@@ -724,6 +1036,234 @@ function validateAcceptedGate(acceptedGate, label, errors) {
       )} requires admitted=false and compatibilityClaimed=false`
     );
   }
+}
+
+function validateRunnableAcceptedGateCommand(
+  command,
+  label,
+  errors,
+  { repoRoot = DEFAULT_REPO_ROOT } = {}
+) {
+  if (typeof command !== "string" || command.length === 0) {
+    return;
+  }
+
+  if (/[`$<>;|]/.test(command) || command.includes("||")) {
+    errors.push(
+      `${label}.command must be runnable command segments joined only with &&`
+    );
+  }
+
+  const segments = command.split("&&").map((segment) => segment.trim());
+  if (
+    segments.length === 0 ||
+    segments.some((segment) => segment.length === 0)
+  ) {
+    errors.push(`${label}.command must contain non-empty command segments`);
+    return;
+  }
+
+  for (const segment of segments) {
+    errors.push(
+      ...validateAcceptedGateCommandSegment(segment, {
+        label,
+        repoRoot
+      })
+    );
+  }
+}
+
+function validateAcceptedGateCommandSegment(segment, { label, repoRoot }) {
+  const tokens = segment.split(/\s+/).filter(Boolean);
+  if (tokens.length < 2) {
+    return [
+      `${label}.command segment ${JSON.stringify(
+        segment
+      )} must be an npm run, node --test, or cargo test command`
+    ];
+  }
+
+  if (tokens[0] === "npm" && tokens[1] === "run") {
+    return validateNpmRunCommandSegment(segment, tokens, { label, repoRoot });
+  }
+  if (tokens[0] === "node" && tokens[1] === "--test") {
+    return validateNodeTestCommandSegment(segment, tokens, { label, repoRoot });
+  }
+  if (tokens[0] === "cargo" && tokens[1] === "test") {
+    return validateCargoTestCommandSegment(segment, tokens, { label, repoRoot });
+  }
+
+  return [
+    `${label}.command segment ${JSON.stringify(
+      segment
+    )} must be an npm run, node --test, or cargo test command`
+  ];
+}
+
+function validateNpmRunCommandSegment(segment, tokens, { label, repoRoot }) {
+  const errors = [];
+  const segmentLabel = `${label}.command segment ${JSON.stringify(segment)}`;
+
+  if (tokens.length !== 3 && tokens.length !== 5) {
+    errors.push(
+      `${segmentLabel} must be \`npm run <script>\` optionally followed by \`--workspace <workspace>\``
+    );
+    return errors;
+  }
+
+  const scriptName = tokens[2];
+  if (!NPM_RUN_SCRIPT_PATTERN.test(scriptName)) {
+    errors.push(`${segmentLabel} has invalid npm script ${scriptName}`);
+    return errors;
+  }
+
+  let packageJsonPath = path.join(repoRoot, "package.json");
+  if (tokens.length === 5) {
+    if (tokens[3] !== "--workspace") {
+      errors.push(`${segmentLabel} only supports --workspace after the script`);
+      return errors;
+    }
+    if (!NPM_WORKSPACE_NAME_PATTERN.test(tokens[4])) {
+      errors.push(`${segmentLabel} has invalid workspace ${tokens[4]}`);
+      return errors;
+    }
+    packageJsonPath = findWorkspacePackageJson(repoRoot, tokens[4]);
+    if (!packageJsonPath) {
+      errors.push(`${segmentLabel} references unknown workspace ${tokens[4]}`);
+      return errors;
+    }
+  }
+
+  const packageJson = readJsonFile(packageJsonPath);
+  if (packageJson.scripts?.[scriptName] === undefined) {
+    errors.push(
+      `${segmentLabel} references missing package script ${scriptName}`
+    );
+  }
+  if (!ACCEPTED_NPM_COMMAND_SEGMENTS.has(segment)) {
+    errors.push(`${segmentLabel} is not an accepted benchmark gate npm command`);
+  }
+
+  return errors;
+}
+
+function validateNodeTestCommandSegment(segment, tokens, { label, repoRoot }) {
+  const errors = [];
+  const segmentLabel = `${label}.command segment ${JSON.stringify(segment)}`;
+
+  if (tokens.length < 3) {
+    return [`${segmentLabel} must include at least one repo test path`];
+  }
+
+  for (const testPath of tokens.slice(2)) {
+    if (!NODE_TEST_PATH_PATTERN.test(testPath)) {
+      errors.push(
+        `${segmentLabel} test target ${JSON.stringify(
+          testPath
+        )} must be a repo .js or .mjs test path`
+      );
+      continue;
+    }
+
+    const resolvedTestPath = resolveRepoPath(repoRoot, testPath);
+    if (!resolvedTestPath || !existsSync(resolvedTestPath)) {
+      errors.push(
+        `${segmentLabel} test target does not exist: ${testPath}`
+      );
+      continue;
+    }
+    if (!statSync(resolvedTestPath).isFile()) {
+      errors.push(`${segmentLabel} test target is not a file: ${testPath}`);
+      continue;
+    }
+    if (!ACCEPTED_NODE_TEST_TARGETS.has(testPath)) {
+      errors.push(
+        `${segmentLabel} test target ${JSON.stringify(
+          testPath
+        )} is not an accepted benchmark gate test target`
+      );
+    }
+  }
+
+  return errors;
+}
+
+function validateCargoTestCommandSegment(segment, tokens, { label, repoRoot }) {
+  const errors = [];
+  const segmentLabel = `${label}.command segment ${JSON.stringify(segment)}`;
+
+  if (tokens.length < 5 || tokens[2] !== "-p") {
+    errors.push(`${segmentLabel} must include \`-p <crate>\``);
+    return errors;
+  }
+
+  const packageName = tokens[3];
+  if (!CARGO_PACKAGE_PATTERN.test(packageName)) {
+    errors.push(`${segmentLabel} has invalid crate package ${packageName}`);
+    return errors;
+  }
+
+  const cargoPackagePath = path.join(
+    repoRoot,
+    "crates",
+    packageName,
+    "Cargo.toml"
+  );
+  if (!existsSync(cargoPackagePath)) {
+    errors.push(`${segmentLabel} references unknown crate ${packageName}`);
+    return errors;
+  }
+
+  const args = tokens.slice(4);
+  if (!args.includes("--all-features")) {
+    errors.push(`${segmentLabel} must include --all-features`);
+  }
+
+  const filters = args.filter((arg) => arg !== "--all-features");
+  if (filters.length > 1) {
+    errors.push(
+      `${segmentLabel} must include at most one Cargo TESTNAME filter`
+    );
+  }
+  if (
+    filters.length === 0 &&
+    !ACCEPTED_CARGO_ALL_FEATURES_PACKAGES.has(packageName)
+  ) {
+    errors.push(
+      `${segmentLabel} all-features cargo command is not accepted for ${packageName}`
+    );
+  }
+
+  const acceptedFilters =
+    ACCEPTED_CARGO_TEST_FILTERS.get(packageName) ?? new Set();
+  const rejectedZeroTestFilters =
+    REJECTED_ZERO_TEST_CARGO_FILTERS.get(packageName) ?? new Set();
+  for (const arg of args) {
+    if (arg === "--all-features") {
+      continue;
+    }
+    if (arg.startsWith("-")) {
+      errors.push(`${segmentLabel} has unsupported cargo flag ${arg}`);
+      continue;
+    }
+    if (rejectedZeroTestFilters.has(arg)) {
+      errors.push(
+        `${segmentLabel} test filter ${JSON.stringify(
+          arg
+        )} selects zero tests for ${packageName}`
+      );
+      continue;
+    }
+    if (!acceptedFilters.has(arg)) {
+      errors.push(
+        `${segmentLabel} test filter ${JSON.stringify(
+          arg
+        )} is not an accepted benchmark gate filter for ${packageName}`
+      );
+    }
+  }
+
+  return errors;
 }
 
 function validateGateCompatibilityClaims(gates, label, errors) {
@@ -821,6 +1361,42 @@ function readJsonFile(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));
 }
 
+function findWorkspacePackageJson(repoRoot, workspaceName) {
+  const rootPackageJson = readJsonFile(path.join(repoRoot, "package.json"));
+  for (const workspacePattern of rootPackageJson.workspaces ?? []) {
+    if (
+      typeof workspacePattern !== "string" ||
+      !workspacePattern.endsWith("/*")
+    ) {
+      continue;
+    }
+
+    const workspaceRoot = resolveRepoPath(
+      repoRoot,
+      workspacePattern.slice(0, -2)
+    );
+    if (!workspaceRoot || !existsSync(workspaceRoot)) {
+      continue;
+    }
+
+    for (const workspaceEntry of readdirSync(workspaceRoot)) {
+      const packageJsonPath = path.join(
+        workspaceRoot,
+        workspaceEntry,
+        "package.json"
+      );
+      if (!existsSync(packageJsonPath)) {
+        continue;
+      }
+      const packageJson = readJsonFile(packageJsonPath);
+      if (packageJson.name === workspaceName) {
+        return packageJsonPath;
+      }
+    }
+  }
+  return null;
+}
+
 function resolveRepoPath(repoRoot, candidatePath) {
   if (typeof candidatePath !== "string") {
     return null;
@@ -879,6 +1455,15 @@ function requireExactArray(actual, expected, label, errors) {
     errors.push(
       `${label} must equal ${JSON.stringify(expected)}; saw ${JSON.stringify(actual)}`
     );
+  }
+}
+
+function validateAllowedProperties(value, allowedProperties, label, errors) {
+  const allowedPropertySet = new Set(allowedProperties);
+  for (const propertyName of Object.keys(value)) {
+    if (!allowedPropertySet.has(propertyName)) {
+      errors.push(`${label}: unsupported property ${propertyName}`);
+    }
   }
 }
 
