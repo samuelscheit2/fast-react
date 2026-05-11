@@ -323,6 +323,70 @@ impl HookStatePayload {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct HookStateQueueSource {
+    list: HookListId,
+    hook: HookSlotId,
+    queue: HookQueueId,
+    base_queue: Option<HookUpdateId>,
+    source_owned: bool,
+}
+
+#[allow(dead_code)]
+impl HookStateQueueSource {
+    #[must_use]
+    const fn source_owned(hook: &HookSlot, payload: HookStatePayload) -> Self {
+        Self {
+            list: hook.list(),
+            hook: hook.id(),
+            queue: payload.queue(),
+            base_queue: payload.base_queue(),
+            source_owned: true,
+        }
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) const fn caller_shaped_for_canary(
+        list: HookListId,
+        hook: HookSlotId,
+        queue: HookQueueId,
+    ) -> Self {
+        Self {
+            list,
+            hook,
+            queue,
+            base_queue: None,
+            source_owned: false,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn list(self) -> HookListId {
+        self.list
+    }
+
+    #[must_use]
+    pub(crate) const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(self) -> HookQueueId {
+        self.queue
+    }
+
+    #[must_use]
+    pub(crate) const fn base_queue(self) -> Option<HookUpdateId> {
+        self.base_queue
+    }
+
+    #[must_use]
+    pub(crate) const fn is_source_owned(self) -> bool {
+        self.source_owned
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HookEffectPayload {
     effect: HookEffectId,
 }
@@ -565,8 +629,66 @@ impl HookListArena {
         Ok(())
     }
 
+    #[cfg(test)]
+    pub(crate) fn set_hook_list_for_canary(
+        &mut self,
+        hook: HookSlotId,
+        list: HookListId,
+    ) -> Result<(), HookListError> {
+        self.hook_mut(hook)?.list = list;
+        Ok(())
+    }
+
     pub fn ordered_hooks(&self, list: HookListId) -> Result<Vec<HookSlotId>, HookListError> {
         self.collect_list_hooks(list)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn state_queue_source(
+        &self,
+        hook: HookSlotId,
+    ) -> Result<HookStateQueueSource, HookListError> {
+        let hook_record = self.hook(hook)?;
+        let payload = hook_record
+            .payload()
+            .state_payload()
+            .ok_or(HookListError::HookSlotPayloadNotState { hook })?;
+        let source = HookStateQueueSource::source_owned(hook_record, payload);
+        self.validate_state_queue_source(source)?;
+        Ok(source)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn validate_state_queue_source(
+        &self,
+        source: HookStateQueueSource,
+    ) -> Result<(), HookListError> {
+        if !source.is_source_owned() {
+            return Err(HookListError::CallerShapedStateQueueSource {
+                hook: source.hook(),
+                queue: source.queue(),
+            });
+        }
+
+        self.validate_list_links(source.list())?;
+        self.ensure_hook_belongs_to_list(source.hook(), source.list())?;
+        let payload = self.hook(source.hook())?.payload().state_payload().ok_or(
+            HookListError::HookSlotPayloadNotState {
+                hook: source.hook(),
+            },
+        )?;
+
+        if payload.queue() != source.queue() || payload.base_queue() != source.base_queue() {
+            return Err(HookListError::StateQueueSourceMismatch {
+                hook: source.hook(),
+                expected_queue: source.queue(),
+                actual_queue: payload.queue(),
+                expected_base_queue: source.base_queue(),
+                actual_base_queue: payload.base_queue(),
+            });
+        }
+
+        Ok(())
     }
 
     pub fn append_hook(
@@ -1089,6 +1211,20 @@ pub enum HookListError {
         expected: HookSlotId,
         actual: Option<HookSlotId>,
     },
+    HookSlotPayloadNotState {
+        hook: HookSlotId,
+    },
+    CallerShapedStateQueueSource {
+        hook: HookSlotId,
+        queue: HookQueueId,
+    },
+    StateQueueSourceMismatch {
+        hook: HookSlotId,
+        expected_queue: HookQueueId,
+        actual_queue: HookQueueId,
+        expected_base_queue: Option<HookUpdateId>,
+        actual_base_queue: Option<HookUpdateId>,
+    },
     GenerationOverflow,
 }
 
@@ -1256,6 +1392,32 @@ impl Display for HookListError {
                 list.slot().get(),
                 expected.slot().get(),
                 actual.map_or_else(|| "none".to_string(), |id| id.slot().get().to_string())
+            ),
+            Self::HookSlotPayloadNotState { hook } => write!(
+                formatter,
+                "hook slot {} does not contain a state queue payload",
+                hook.slot().get()
+            ),
+            Self::CallerShapedStateQueueSource { hook, queue } => write!(
+                formatter,
+                "hook slot {} has caller-shaped state queue source for queue {}",
+                hook.slot().get(),
+                queue.raw()
+            ),
+            Self::StateQueueSourceMismatch {
+                hook,
+                expected_queue,
+                actual_queue,
+                expected_base_queue,
+                actual_base_queue,
+            } => write!(
+                formatter,
+                "hook slot {} state queue source expected queue {} and base tail {:?}, actual queue {} and base tail {:?}",
+                hook.slot().get(),
+                expected_queue.raw(),
+                expected_base_queue.map(HookUpdateId::raw),
+                actual_queue.raw(),
+                actual_base_queue.map(HookUpdateId::raw)
             ),
             Self::GenerationOverflow => formatter.write_str("hook list generation overflowed"),
         }
