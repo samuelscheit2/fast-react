@@ -116,6 +116,10 @@ const privateFormActionRejectedErrorPreflightInvalidRecordCode =
   'FAST_REACT_DOM_FORM_ACTION_REJECTED_ERROR_PREFLIGHT_INVALID_RECORD';
 const formActionsOracleKind =
   'react-19.2.6-react-dom-form-actions-oracle';
+const formActionFulfilledResetExecutionDiagnosticKind =
+  'deterministic-private-fulfilled-action-reset-fake-commit';
+const formActionFulfilledResetExecutionQueueExecutionKind =
+  'deterministic-fake-reset-state-queue';
 
 const formActionFormDataBlockerRecordPayloads = new WeakMap();
 const formActionSubmitDispatchRecordPayloads = new WeakMap();
@@ -3696,16 +3700,16 @@ function normalizeFormActionFulfilledResetExecutionAdmission(
     deterministicFakeResetCommitOnly: true,
     postFulfillmentOnly: true,
     diagnosticKind:
-      getFulfilledResetExecutionStringProperty(
+      getFulfilledResetExecutionExactStringProperty(
         admission,
         'diagnosticKind',
-        'deterministic-private-fulfilled-action-reset-fake-commit'
+        formActionFulfilledResetExecutionDiagnosticKind
       ),
     queueExecutionKind:
-      getFulfilledResetExecutionStringProperty(
+      getFulfilledResetExecutionExactStringProperty(
         admission,
         'queueExecutionKind',
-        'deterministic-fake-reset-state-queue'
+        formActionFulfilledResetExecutionQueueExecutionKind
       ),
     commitKind,
     sourceAsyncCallbackExecutionId,
@@ -6230,6 +6234,25 @@ function getFulfilledResetExecutionStringProperty(record, key, fallback) {
   );
 }
 
+function getFulfilledResetExecutionExactStringProperty(
+  record,
+  key,
+  expected
+) {
+  if (!hasOwnProp(record, key)) {
+    return expected;
+  }
+
+  const value = record[key];
+  if (value === expected) {
+    return expected;
+  }
+
+  throwInvalidFulfilledResetExecutionAdmission(
+    `${key} must be ${expected}`
+  );
+}
+
 function getRejectedErrorPreflightStringProperty(record, key, fallback) {
   if (!hasOwnProp(record, key)) {
     return fallback;
@@ -6528,8 +6551,10 @@ module.exports = {
   formActionCallbackActionPreflightMissingPrerequisites,
   formActionFulfilledResetExecutionBlockedSideEffects,
   formActionFulfilledResetExecutionDiagnosticSideEffects,
+  formActionFulfilledResetExecutionDiagnosticKind,
   formActionFulfilledResetExecutionGateSchemaVersion,
   formActionFulfilledResetExecutionMissingPrerequisites,
+  formActionFulfilledResetExecutionQueueExecutionKind,
   formActionFormDataBlockerBlockedSideEffects,
   formActionFormDataBlockerDiagnosticSideEffects,
   formActionFormDataBlockerGateSchemaVersion,

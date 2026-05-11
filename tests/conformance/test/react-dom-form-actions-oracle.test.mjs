@@ -21,6 +21,7 @@ import {
 } from "../src/react-dom-form-actions-oracle.mjs";
 import {
   assertPrivateFormActionAsyncCallbackExecutionGate,
+  assertPrivateFormActionFulfilledResetExecutionGate,
   assertPrivateFormActionRejectedErrorPreflightGate,
   assertPrivateFormActionResetDispatcherGate,
   assertFastReactFormActionPrerequisiteGate,
@@ -102,6 +103,10 @@ test("Fast React form-action private submit/reset/callback gates stay metadata-o
 
 test("Fast React form-action private async callback execution stays fail-closed", async () => {
   await assertPrivateFormActionAsyncCallbackExecutionGate();
+});
+
+test("Fast React form-action private fulfilled reset execution stays fake-commit-only", async () => {
+  await assertPrivateFormActionFulfilledResetExecutionGate();
 });
 
 test("Fast React form-action private rejected-error preflight stays metadata-only", async () => {

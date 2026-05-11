@@ -110,6 +110,14 @@ test('private fulfilled form action reset execution records deterministic fake q
   );
   assert.equal(record.admission.deterministicFakeResetCommitOnly, true);
   assert.equal(record.admission.postFulfillmentOnly, true);
+  assert.equal(
+    record.admission.diagnosticKind,
+    formActions.formActionFulfilledResetExecutionDiagnosticKind
+  );
+  assert.equal(
+    record.admission.queueExecutionKind,
+    formActions.formActionFulfilledResetExecutionQueueExecutionKind
+  );
   assert.equal(record.admission.fulfilledActionResultConsumed, true);
   assert.equal(record.admission.resetMetadataConsumed, true);
   assert.equal(record.admission.privateAsyncActionCallbackInvoked, false);
@@ -173,6 +181,10 @@ test('private fulfilled form action reset execution records deterministic fake q
   assert.equal(
     record.fakeResetStateQueueExecution.fakeResetStateUpdateQueued,
     true
+  );
+  assert.equal(
+    record.fakeResetStateQueueExecution.queueExecutionKind,
+    formActions.formActionFulfilledResetExecutionQueueExecutionKind
   );
   assert.equal(
     record.fakeResetStateQueueExecution.resetQueuePendingMutated,
@@ -444,6 +456,22 @@ test('private fulfilled form action reset execution rejects stale foreign cloned
     {
       admission: {
         explicitFormActionFulfilledResetExecution: true,
+        diagnosticKind: 'real-react-update-queue'
+      },
+      reason:
+        'diagnosticKind must be deterministic-private-fulfilled-action-reset-fake-commit'
+    },
+    {
+      admission: {
+        explicitFormActionFulfilledResetExecution: true,
+        queueExecutionKind: 'real-react-update-queue'
+      },
+      reason:
+        'queueExecutionKind must be deterministic-fake-reset-state-queue'
+    },
+    {
+      admission: {
+        explicitFormActionFulfilledResetExecution: true,
         publicSubmitDispatchRequested: true
       },
       reason: 'public submit dispatch must remain blocked'
@@ -469,6 +497,13 @@ test('private fulfilled form action reset execution rejects stale foreign cloned
       },
       reason:
         'updateQueue must not be passed to the fulfilled reset execution gate'
+    },
+    {
+      admission: {
+        explicitFormActionFulfilledResetExecution: true,
+        reactUpdateQueued: true
+      },
+      reason: 'react update queueing must remain blocked'
     },
     {
       admission: {
