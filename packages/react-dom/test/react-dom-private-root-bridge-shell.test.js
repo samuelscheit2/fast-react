@@ -3871,6 +3871,148 @@ test('private root unmount host-output cleanup clears fake DOM and metadata', ()
   );
 });
 
+test('private root unmount host-output cleanup accepts current host-output update', () => {
+  const document = createDocument('private-unmount-host-output-update');
+  const container = createElement('DIV', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hostOutputUpdateIdPrefix: 'unmount-current-update',
+    initialHostOutputIdPrefix: 'unmount-current-initial',
+    unmountCleanupIdPrefix: 'unmount-current-cleanup'
+  });
+  const initialElement = {
+    props: {
+      children: 'initial text',
+      className: 'root-card',
+      id: 'message'
+    },
+    type: 'section'
+  };
+  const updatedElement = {
+    props: {
+      children: 'updated text',
+      className: 'root-card updated',
+      id: 'message'
+    },
+    type: 'section'
+  };
+
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, initialElement);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const initialHandoff = bridge.applyInitialRenderHostOutput(admission);
+  const initialPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(initialHandoff);
+  const update = bridge.renderContainer(create.handle, updatedElement);
+  const updateHandoff = bridge.applyHostOutputUpdate(update, {
+    hostInstanceToken: initialPayload.hostToken,
+    nextProps: updatedElement.props,
+    tag: 'section',
+    textUpdate: {
+      newText: 'updated text',
+      oldText: 'initial text',
+      textInstance: initialPayload.textNode
+    }
+  });
+
+  assert.equal(
+    updateHandoff.updateStatus,
+    rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(initialPayload.hostNode.textContent, 'updated text');
+  assert.deepEqual(attributeEntries(initialPayload.hostNode), [
+    ['class', 'root-card updated'],
+    ['id', 'message']
+  ]);
+
+  const unmount = bridge.unmountContainer(create.handle);
+  const cleanup = bridge.cleanupUnmountHostOutput(admission, unmount);
+  const hiddenCleanup =
+    rootBridge.getPrivateRootUnmountHostOutputCleanupPayload(cleanup);
+
+  assert.equal(
+    cleanup.cleanupStatus,
+    rootBridge.ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED
+  );
+  assert.equal(cleanup.cleanupId, 'unmount-current-cleanup:1');
+  assert.equal(cleanup.sourceAdmissionId, admission.admissionId);
+  assert.equal(cleanup.sourceRenderRequestId, admission.renderRequestId);
+  assert.equal(cleanup.sourceUnmountRequestId, unmount.requestId);
+  assert.equal(
+    cleanup.unmountAdmission.rootOwnership.currentAdmissionMatchesRootHandle,
+    true
+  );
+  assert.equal(hiddenCleanup.admissionRecord, admission);
+  assert.equal(hiddenCleanup.unmountRecord, unmount);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(initialPayload.hostNode),
+    null
+  );
+  assert.equal(
+    componentTree.getMountedHostInstanceTokenFromNode(initialPayload.hostNode),
+    null
+  );
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+
+  const staleDocument =
+    createDocument('private-unmount-host-output-update-stale');
+  const staleContainer = createElement('DIV', staleDocument);
+  const staleBridge = rootBridge.createPrivateRootBridgeShell();
+  const staleCreate = staleBridge.createClientRoot(staleContainer);
+  const staleSideEffects =
+    staleBridge.applyCreateRootSideEffects(staleCreate);
+  const staleRender =
+    staleBridge.renderContainer(staleCreate.handle, initialElement);
+  const staleAdmission = staleBridge.admitCreateRenderPath(
+    staleCreate,
+    staleSideEffects,
+    staleRender
+  );
+  const staleInitialHandoff =
+    staleBridge.applyInitialRenderHostOutput(staleAdmission);
+  const staleInitialPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      staleInitialHandoff
+    );
+  const staleUpdatedRender =
+    staleBridge.renderContainer(staleCreate.handle, updatedElement);
+  staleBridge.applyHostOutputUpdate(staleUpdatedRender, {
+    hostInstanceToken: staleInitialPayload.hostToken,
+    nextProps: updatedElement.props,
+    tag: 'section',
+    textUpdate: {
+      newText: 'updated text',
+      oldText: 'initial text',
+      textInstance: staleInitialPayload.textNode
+    }
+  });
+  staleBridge.renderContainer(staleCreate.handle, {
+    props: {
+      children: 'unapplied text',
+      className: 'root-card stale',
+      id: 'message'
+    },
+    type: 'section'
+  });
+  const staleUnmount = staleBridge.unmountContainer(staleCreate.handle);
+
+  assert.throws(
+    () => staleBridge.cleanupUnmountHostOutput(staleAdmission, staleUnmount),
+    {
+      code: 'FAST_REACT_DOM_INVALID_UNMOUNT_HOST_OUTPUT_CLEANUP_RECORD',
+      message: /stale root handle admission metadata/
+    }
+  );
+  assert.equal(staleContainer.childNodes.length, 1);
+  staleBridge.revertCreateRootSideEffects(staleSideEffects);
+});
+
 test('private root unmount admission rejects stale roots and portal containers', () => {
   const document = createDocument('private-unmount-admission-rejections');
   const staleContainer = createElement('DIV', document);
