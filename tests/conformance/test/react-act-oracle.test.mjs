@@ -3202,7 +3202,7 @@ function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
   label
 ) {
   const originalHelper = Scheduler[helperName];
-  const fakeHelper = createFakeSchedulerFlushHelperWithSourceValidator();
+  const fakeHelper = createFakeSchedulerFlushHelperWithPrivateDiagnostics();
   const helperDescriptor = Object.getOwnPropertyDescriptor(
     Scheduler,
     helperName
@@ -3225,6 +3225,13 @@ function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
     label
   );
   assert.equal(Object.isFrozen(originalHelper), true, label);
+  assert.deepEqual(
+    Reflect.ownKeys(originalHelper)
+      .filter((key) => typeof key === "symbol")
+      .map((key) => key.description),
+    [],
+    label
+  );
 
   try {
     Scheduler[helperName] = fakeHelper;
@@ -3257,21 +3264,68 @@ function assertSchedulerFlushHelperRejectsFakeValidatorMutation(
     false,
     label
   );
+
+  const diagnosticsDescriptor = Object.getOwnPropertyDescriptor(
+    originalHelper,
+    privateActQueueFlushDiagnosticsExport
+  );
+  assert.equal(diagnosticsDescriptor.configurable, false, label);
+  assert.equal(diagnosticsDescriptor.enumerable, false, label);
+  assert.equal(diagnosticsDescriptor.writable, false, label);
+  assert.equal(Object.isFrozen(diagnosticsDescriptor.value), true, label);
+  assert.equal(
+    Reflect.defineProperty(
+      originalHelper,
+      privateActQueueFlushDiagnosticsExport,
+      {
+        configurable: false,
+        enumerable: false,
+        value: createFakeSchedulerPrivateDiagnostics(),
+        writable: false
+      }
+    ),
+    false,
+    label
+  );
+  assert.equal(
+    Reflect.defineProperty(
+      diagnosticsDescriptor.value,
+      "schedulerMockExpiredActRootWorkSourceValidator",
+      {
+        configurable: false,
+        enumerable: true,
+        value: createFakeSchedulerSourceValidator(),
+        writable: false
+      }
+    ),
+    false,
+    label
+  );
 }
 
-function createFakeSchedulerFlushHelperWithSourceValidator() {
+function createFakeSchedulerFlushHelperWithPrivateDiagnostics() {
   const fakeHelper = function () {};
   Object.defineProperty(
     fakeHelper,
-    Symbol("fast-react.scheduler.mock-expired-act-root-work-source-validator"),
+    privateActQueueFlushDiagnosticsExport,
     {
       configurable: false,
       enumerable: false,
-      value: createFakeSchedulerSourceValidator(),
+      value: createFakeSchedulerPrivateDiagnostics(),
       writable: false
     }
   );
   return Object.freeze(fakeHelper);
+}
+
+function createFakeSchedulerPrivateDiagnostics() {
+  return Object.freeze({
+    status: "private-scheduler-act-queue-flush-diagnostics",
+    exportName: privateActQueueFlushDiagnosticsExport,
+    providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics: true,
+    schedulerMockExpiredActRootWorkSourceValidator:
+      createFakeSchedulerSourceValidator()
+  });
 }
 
 function createFakeSchedulerSourceValidator() {
