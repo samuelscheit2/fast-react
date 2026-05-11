@@ -45,36 +45,26 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Runtime accepted baseline is main `cf31f851`
-(`Merge worker 989 conformance private gate false-green sweep`); this docs
-refresh makes no runtime compatibility claim. Accepted implementation history
-now includes merges through Worker 997, including accepted Workers 910, 949,
-964, 972-974, 976-977, 979-982, 985, 988-989, 991, 993, 995, and 997 branches
-since the previous
-`c2cb703f` docs baseline. Worker 853's competing test-renderer branch was
-rejected as redundant after Worker 844 was accepted; do not use it as accepted
-input.
+Top-level cap: 30 workers. Current accepted docs baseline is main `8a3b4042`
+(`Refresh docs after worker 989`), with runtime implementation accepted through
+`cf31f851` (`Merge worker 989 conformance private gate false-green sweep`);
+this docs refresh makes no runtime compatibility claim. Accepted implementation
+history now includes the post-Worker-997 batch: Workers 986, 987, 992, 1000,
+998, 978, 999, 990, 967, 996, 994, and 989. Worker 853's competing
+test-renderer branch was rejected as redundant after Worker 844 was accepted;
+do not use it as accepted input.
 
 Current orchestration queue:
 
-- Worker 967: active repair after audits found the ToJSON host-output source
-  evidence still false-greens on a dead function declaration/token shell.
-- Worker 978: under audit after escaped quoted hidden-carrier key repair.
-- Workers 986, 987, 990, and 994: active repair workers after concrete
-  audit blockers in React DOM `flushSync`, Scheduler public timing,
-  controlled input/restore, and benchmark scanners.
-- Worker 992: under audit after its test-renderer act/Scheduler repair.
-- Worker 996: hydrateRoot replay blocker audit is being rerun after a
-  null/no-result audit return.
-- Workers 998, 999, and 1000: active independent implementation lanes for Rust
-  HostText/root commit currentness, React context/useContext blockers, and
-  Scheduler boundary factory fail-closed hardening.
+- No active implementation or audit workers are recorded in this plan after the
+  `8a3b4042` docs baseline. Start new work from the queue candidates below or
+  explicit orchestrator assignment.
 
-Do not consume active worker outputs as accepted evidence until reviewed,
+Do not consume future active worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair or audit lane lands, move
 the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private evidence through `cf31f851`, plus audit policy through
+Accepted private evidence through `8a3b4042`, plus audit policy through
 `732a6b21`, still keeps public root/render/unmount, `act`,
 `react-dom/test-utils.act`, `flushSync`, Scheduler timing, hydration,
 resources/forms, public input/change or controlled-input behavior,
@@ -88,13 +78,13 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat the accepted branch baseline through `cf31f851` as private evidence
+1. Treat the accepted branch baseline through `8a3b4042` as private evidence
    only. Public package, root, native, React DOM, test-renderer, Scheduler,
    `act`, `react-dom/test-utils.act`, hydration, resource/form,
    public controlled-input, serialization, React Children lazy/full traversal,
    unsupported hook, event dispatch, and `flushSync` compatibility still
    require fail-closed gates and dual-run oracle evidence.
-2. Review active workers and audits against the accepted source-owned
+2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct
    multi-child fiber inspection, native-generation/cleanup, worker-thread
@@ -118,7 +108,7 @@ canonical evidence requirements.
 
 - Rust root/sync-flush/function/deletion execution can extend accepted Workers
   855, 860, 862-867, 878-879, 889-890, 896, 898, 904, 906-907, 917-921, 936,
-  943, 948, 954, 973, 980, 982, 985, 991, and 997, plus Worker 966's
+  943, 948, 954, 973, 980, 982, 985, 991, 997, and 998, plus Worker 966's
   refreshed private admission 804 managed-child source-token ledger, toward
   managed-child, HostText, multi-child, sync-flush delete/post-passive, root
   child replacement/delete-plus-place continuation, FunctionComponent
@@ -130,11 +120,12 @@ canonical evidence requirements.
   staging failure preservation, Worker 928 HostRoot container descendant
   currentness, Worker 980 expired queue-lane currentness, Worker 982 root
   work-loop bailout, Worker 985 render-phase root consumption, Worker 991
-  HostWork delete/place continuation, and Worker 997 hook pending-ring
-  currentness shapes only as private test-host canaries with source-owned
-  commit, host-node, root/lane, scheduler, queue/handoff, store-backed row lane
-  metadata, topology, replay, ref/passive, and cleanup validation. Public React
-  DOM/test-renderer roots and public `flushSync` remain blocked.
+  HostWork delete/place continuation, Worker 997 hook pending-ring currentness,
+  and Worker 998 HostText commit currentness shapes only as private test-host
+  canaries with source-owned commit, host-node, root/lane, scheduler,
+  queue/handoff, store-backed row lane metadata, topology, replay, ref/passive,
+  and cleanup validation. Public React DOM/test-renderer roots and public
+  `flushSync` remain blocked.
 - Test-renderer package-root/native work should use accepted Worker 844
   package-root native execution parity, Workers 859 and 868 Rust private
   lifecycle/native consumer hardening, and Worker 872 package-root/CJS private
@@ -145,12 +136,14 @@ canonical evidence requirements.
   boundary evidence, Worker 932 CJS production private act/update lifecycle
   parity evidence, Worker 936 source-bound reconciler generic direct
   multi-child inspection, Worker 941 CJS production TestInstance currentness,
-  and Worker 946 private test-renderer direct inspection consumer evidence.
-  Worker 917 remains reconciler-owned inspection context that keeps the generic
-  test-renderer boundary fail-closed. Worker 853 remains rejected/redundant.
-  Public serialization, `ReactTestInstance`, JS/CJS/package compatibility,
-  native bridge loading/execution, root/act/Scheduler compatibility, and broad
-  multichild identity remain blocked.
+  Worker 946 private test-renderer direct inspection consumer evidence, Worker
+  967 serialization/local oracle repair, and Worker 992 private act/Scheduler
+  blocker currentness. Worker 917 remains reconciler-owned inspection context
+  that keeps the generic test-renderer boundary fail-closed. Worker 853 remains
+  rejected/redundant. Public serialization, `ReactTestInstance`,
+  JS/CJS/package compatibility, native bridge loading/execution,
+  root/act/Scheduler compatibility, and broad multichild identity remain
+  blocked.
 - React DOM facade/native handoffs may use accepted Worker 848 nested facade
   native handoff metadata, Worker 869 fake-DOM lifecycle snapshots, Worker 874
   private lifecycle request/snapshot boundary hardening, Worker 880 root update
@@ -161,44 +154,46 @@ canonical evidence requirements.
   currentness, Worker 939 focus/blur dispatch currentness, Worker 944 root
   update native handoff currentness, Worker 947 private root-bridge cleanup
   after accepted host-output update smoke evidence, Worker 910 recoverable-error
-  boundary admission, Worker 979 profiling createRoot private facade gate, and
-  Worker 915 symbol-only client facade gates, plus Worker 958 private
-  input/change extraction and controlled-restore queue currentness, as
-  diagnostic input. Worker 920's
+  boundary admission, Worker 979 profiling createRoot private facade gate,
+  Worker 915 symbol-only client facade gates, Worker 958 private input/change
+  extraction and controlled-restore queue currentness, and Worker 990
+  controlled input/event blocker hardening as diagnostic input. Worker 920's
   HostNodeStore payload currentness can inform fake/native host update
   handoffs only when scoped root/fiber/token/phase/target identity is
-  preserved. Worker 958 input/change evidence is consumable only when exact
-  root listener registration, dispatch payload, bridge preflight, controlled
-  restore gate identity, fake-DOM target limits, and resource/form alias
-  rejection are preserved. Any real native/Rust execution or public facade work
-  still must prove scheduling, commit, cleanup, DOM output, listener/event/ref
-  behavior, controlled input behavior, hydration boundaries, public/browser
-  DOM/hydration/event/ref/package/native/Rust alias rejection, and package
-  compatibility.
+  preserved. Workers 958 and 990 input/change evidence is consumable only when
+  exact root listener registration, dispatch payload, bridge preflight,
+  controlled restore gate identity, fake-DOM target limits, and resource/form
+  alias rejection are preserved. Any real native/Rust execution or public facade
+  work still must prove scheduling, commit, cleanup, DOM output,
+  listener/event/ref behavior, controlled input behavior, hydration boundaries,
+  public/browser DOM/hydration/event/ref/package/native/Rust alias rejection,
+  and package compatibility.
 - Resource and form work can consume accepted Worker 856's root execution
   consumer with Worker 850 ledger/source-token metadata and Worker 883
   lifecycle boundary hardening, plus Worker 893's private root/lifecycle-bound
   reset execution evidence and Worker 942's fulfilled-reset generation
   currentness, Worker 952's source-owned resource root lifecycle
-  boundary/currentness evidence, and Worker 953's path/token evidence-context
-  hardening, plus Worker 981's resource/form root currentness. Worker 958's
-  recursive resource/form smuggling rejection in input/change bridge paths is
+  boundary/currentness evidence, Worker 953's path/token evidence-context
+  hardening, and Worker 981's resource/form root currentness. Workers 958 and
+  990 resource/form smuggling rejections in input/change bridge paths are
   overlap context only, not resource/form execution evidence. Public resources,
   forms, action/reset invocation, React updates, DOM/head mutation, native/root
   execution, and package compatibility remain blocked.
 - React `act` and React DOM test-utils work can consume accepted Worker 857's
   frozen, nested source-owned scheduler-driven passive diagnostics, Worker
   885's source-owned root lifecycle boundary gate, Worker 902's private
-  test-renderer act/update lifecycle boundary, and Worker 913's public
-  React.act blocked-currentness gate, plus Worker 930's public
+  test-renderer act/update lifecycle boundary, Worker 992's private
+  act/Scheduler blocker currentness, and Worker 913's public React.act
+  blocked-currentness gate, plus Worker 930's public
   `react-dom/test-utils.act` blocked-currentness gate. Public `act`, public
   test-utils act callback/thenable/warning behavior, public root work, passive
   effect execution, Scheduler timing, renderer behavior, and package
   compatibility remain blocked.
 - Public `flushSync` follow-ups can consume accepted Worker 933's
   source-owned public `react-dom` and `react-dom/profiling` blocked-currentness
-  report only as negative/private evidence, plus Worker 953's caller-override
-  and non-enumerable-claim rejection hardening. Callback execution,
+  report and Worker 986's refreshed blocked-currentness rows only as
+  negative/private evidence, plus Worker 953's caller-override and
+  non-enumerable-claim rejection hardening. Callback execution,
   return/thenable compatibility, public root execution, Scheduler queue
   draining, act/test-utils routing, DOM mutation, passive effects,
   package/profiling compatibility, and hydration-only evidence remain blocked.
@@ -228,19 +223,21 @@ canonical evidence requirements.
   surface currentness, Worker 943 private render-phase staging currentness,
   Worker 956 private `useRef` dispatcher currentness, Worker 974 private
   `useRef` execution evidence, Worker 977 Rust `useRef` execution canary,
-  Worker 988 `useRef` renderer lifecycle blockers, and Worker 997 hook
-  pending-ring currentness, plus Worker 953's unsupported-hook report
-  override/source-proof hardening. Public dispatcher routing, `useRef`
-  execution/ref identity, unsupported hook execution,
-  external-store subscription, callback invocation, ID generation, root
-  scheduling, renderer behavior, `act`, Scheduler timing, and package
-  compatibility remain blocked.
+  Worker 988 `useRef` renderer lifecycle blockers, Worker 997 hook
+  pending-ring currentness, and Worker 999 context/useContext readiness
+  blockers, plus Worker 953's unsupported-hook report override/source-proof
+  hardening. Public dispatcher routing, `useRef` execution/ref identity, public
+  context/provider rendering, unsupported hook execution, external-store
+  subscription, callback invocation, ID generation, root scheduling, renderer
+  behavior, `act`, Scheduler timing, and package compatibility remain blocked.
 - Scheduler variant and root-scheduler continuation work can consume accepted
   Worker 886 as the variant boundary, Worker 909's live source-currentness seal,
   Worker 914's public root-entry currentness gate, and Worker 937's variant
   currentness parity gate for root, native, mock, postTask, and CJS variant
   diagnostics, plus Worker 949's Scheduler variant currentness, Worker 953's
-  factory-owned source-report, and Worker 886 provenance hardening.
+  factory-owned source-report, Worker 987's public timing blocker currentness,
+  Worker 1000's boundary factory fail-closed hardening, and Worker 886
+  provenance hardening.
   Root-scheduler follow-ups can build on Worker 904's private HostRoot
   queue/lane continuation gate, Worker 907's
   callback/currentness negative canaries, Worker 906's expired default+sync
@@ -259,21 +256,24 @@ canonical evidence requirements.
   false-green hardening. Full conformance execution still has pre-existing
   serialization and private-admission failures, so discovery coverage and
   benchmark manifest/result validation are not broad conformance or performance
-  compatibility claims.
-- Conformance harness follow-ups can also consume accepted Worker 964's private
-  admission 727-728 ledger refresh. Worker 967 remains current work only for
-  react-test-renderer serialization/local oracle repair; do not use its branch
-  output as accepted evidence until merged.
+  compatibility claims. Benchmark harness follow-ups can also consume Worker
+  994's command-provenance currentness hardening without treating it as a
+  performance claim.
+- Conformance harness follow-ups can also consume accepted Workers 964 and 978
+  private admission 727-728 ledger refreshes, Worker 967's serialization/local
+  oracle repair, and Worker 989's private admission 729-731 false-green sweep as
+  private fail-closed evidence only.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, the text-patch admission ledger, Worker 887's
   private lifecycle boundary admission/currentness evidence, Worker 900's
   corrected private admission 820 source ledger for hydrateRoot lifecycle
-  boundary rows, Worker 912's listener currentness gate, and Worker 910's
-  recoverable-error boundary admission. Future hydration work must prove real
-  root creation, marker/listener behavior, recoverable error routing, event
-  replay, browser DOM mutation, native/reconciler execution, and package
-  compatibility against React 19.2.6.
+  boundary rows, Worker 912's listener currentness gate, Worker 910's
+  recoverable-error boundary admission, and Worker 996's replay blocker
+  currentness. Future hydration work must prove real root creation,
+  marker/listener behavior, recoverable error routing, event replay, browser
+  DOM mutation, native/reconciler execution, and package compatibility against
+  React 19.2.6.
 - Additional private root/test-renderer bridge gates can build on Worker 898's
   accepted `finished_work` / `finished_lanes` queue-lane consumer, Worker 904's
   scheduler-owned continuation evidence, Worker 899's test-renderer direct
