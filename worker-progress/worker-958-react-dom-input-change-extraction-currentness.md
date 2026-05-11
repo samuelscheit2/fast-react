@@ -12,6 +12,9 @@
   identity, revalidates current listener state, binds execution to the exact
   bridge preflight, and recursively rejects nested resource/form smuggling
   without touching live-like targets.
+- Updated the adjacent DOM event delegation oracle private input/change helper
+  to register source-owned root listener currentness evidence before creating
+  extraction preflight records.
 - Added focused private and conformance coverage for missing, cloned, stale,
   cross-root, cross-dispatch, hydration/resource/form alias, browser/public
   claim, and foreign restore-gate rejection paths.
@@ -27,6 +30,7 @@
 - `packages/react-dom/test/events-private.test.js`
 - `tests/conformance/test/dom-controlled-input-oracle.test.mjs`
 - `tests/conformance/test/react-dom-event-dispatch-plugin-skeleton.test.mjs`
+- `tests/conformance/test/dom-event-delegation-oracle.test.mjs`
 - `packages/react-dom/test/resource-form-unsupported-gates.test.js`
 - `worker-progress/worker-958-react-dom-input-change-extraction-currentness.md`
 
@@ -61,6 +65,9 @@
 - Audit repair coverage rejects same-shape foreign roots, currentness after
   listener cleanup, swapped execution preflights after bridge creation, and
   nested resource/form evidence in bridge admission.
+- DOM event delegation oracle coverage now exercises the required
+  source-owned root listener currentness evidence for private input/change
+  extraction without claiming public event or controlled-input compatibility.
 - The resource/form unsupported gate test was updated because the package
   workspace check exercises its private input/change helper paths; those paths
   now provide the same root listener currentness evidence and expect the new
@@ -75,10 +82,12 @@
 - `node --check packages/react-dom/test/resource-form-unsupported-gates.test.js`
 - `node --check tests/conformance/test/dom-controlled-input-oracle.test.mjs`
 - `node --check tests/conformance/test/react-dom-event-dispatch-plugin-skeleton.test.mjs`
+- `node --check tests/conformance/test/dom-event-delegation-oracle.test.mjs`
 - `node --test packages/react-dom/test/events-private.test.js`
 - `node --test packages/react-dom/test/resource-form-unsupported-gates.test.js`
 - `node --test tests/conformance/test/dom-controlled-input-oracle.test.mjs`
 - `node --test tests/conformance/test/react-dom-event-dispatch-plugin-skeleton.test.mjs`
+- `node --test tests/conformance/test/dom-event-delegation-oracle.test.mjs`
 - `npm run check --workspace @fast-react/react-dom`
 - `npm run check:package-surface`
 - `node tests/smoke/import-entrypoints.mjs`
