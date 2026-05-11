@@ -11350,6 +11350,18 @@ test('private react-dom/client facade root.unmount clears active host output met
     rootBridge.getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload(
       diagnostic
     );
+  const unmountLifecycleExecution =
+    diagnostic.rootUnmountLifecycleExecutionRecord;
+  const unmountLifecycleExecutionPayload =
+    rootBridge.getPrivateRootPublicFacadeRootUnmountLifecycleExecutionPayload(
+      unmountLifecycleExecution
+    );
+  const unmountLifecycleRequestBoundary =
+    unmountLifecycleExecution.rootUnmountLifecycleRequestBoundaryRecord;
+  const unmountLifecycleRequestBoundaryPayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      unmountLifecycleRequestBoundary
+    );
   const unmountSnapshot = diagnostic.sourceContainerSnapshot;
   const unmountSnapshotPayload =
     rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
@@ -11405,6 +11417,192 @@ test('private react-dom/client facade root.unmount clears active host output met
   assert.equal(diagnostic.nativeUnmountRequestMirrored, true);
   assert.equal(diagnostic.nativeExecution, false);
   assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.equal(
+    diagnostic.rootUnmountLifecycleExecutionStatus,
+    rootBridge
+      .ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_LIFECYCLE_EXECUTION_ACCEPTED
+  );
+  assert.equal(diagnostic.rootUnmountLifecycleExecutionConsumed, true);
+  assert.equal(diagnostic.rootUnmountLifecycleExecutionSourceOwned, true);
+  assert.equal(
+    diagnostic.rootUnmountLifecycleRequestBoundaryRecord,
+    unmountLifecycleRequestBoundary
+  );
+  assert.equal(
+    diagnostic.rootUnmountLifecycleRequestBoundaryStatus,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
+  );
+  assert.equal(
+    diagnostic.rootUnmountLifecycleRequestBoundarySourceOwned,
+    true
+  );
+  assert.equal(diagnostic.rootUnmountLifecycleRequestBoundaryCurrent, true);
+  assert.equal(diagnostic.rootUnmountLifecycleSnapshotOwned, true);
+  assert.equal(diagnostic.rootUnmountLifecycleSnapshotBeforeChildCount, 1);
+  assert.equal(
+    diagnostic.rootUnmountLifecycleFinishedWorkHandoffId,
+    renderDiagnostic.rootWorkLoopFinishedWorkHandoffId
+  );
+  assert.equal(
+    unmountLifecycleExecution.$$typeof,
+    rootBridge
+      .privateRootPublicFacadeRootUnmountLifecycleExecutionRecordType
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord(
+      unmountLifecycleExecution
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeRootUnmountLifecycleExecutionRecord(
+      {}
+    ),
+    false
+  );
+  assert.equal(unmountLifecycleExecution.sourceRequestId, unmount.requestId);
+  assert.equal(
+    unmountLifecycleExecution.sourceRequestSequence,
+    unmount.requestSequence
+  );
+  assert.equal(unmountLifecycleExecution.sourceRequestType, 'root.unmount');
+  assert.equal(unmountLifecycleExecution.entrypoint, 'react-dom/client');
+  assert.equal(unmountLifecycleExecution.sameEntrypoint, true);
+  assert.equal(unmountLifecycleExecution.sourceOwned, true);
+  assert.equal(unmountLifecycleExecution.requestBoundaryCurrent, true);
+  assert.equal(Object.isFrozen(unmountLifecycleExecution), true);
+  assert.equal(
+    unmountLifecycleExecution.rootUnmountLifecycleAdmissionRecord,
+    unmountLifecycleExecutionPayload.rootUnmountLifecycleAdmissionRecord
+  );
+  assert.equal(
+    unmountLifecycleExecution.rootUnmountLifecycleRequestBoundaryRecord,
+    unmountLifecycleRequestBoundary
+  );
+  assert.equal(
+    unmountLifecycleExecution.rootUnmountLifecycleRequestBoundaryStatus,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
+  );
+  assert.equal(
+    unmountLifecycleExecution.rootUnmountLifecycleRequestBoundarySourceOwned,
+    true
+  );
+  assert.equal(unmountLifecycleExecution.replayRejected, true);
+  assert.equal(unmountLifecycleExecution.lifecycleRowsFrozen, true);
+  assert.equal(unmountLifecycleExecution.nativeExecution, false);
+  assert.equal(unmountLifecycleExecution.reconcilerExecution, false);
+  assert.equal(unmountLifecycleExecution.compatibilityClaimed, false);
+  assert.equal(unmountLifecycleExecutionPayload.consumed, true);
+  assert.equal(unmountLifecycleExecutionPayload.payload.root, root);
+  assert.equal(
+    unmountLifecycleExecutionPayload.rootUnmountLifecycleRequestBoundaryRecord,
+    unmountLifecycleRequestBoundary
+  );
+  assert.equal(
+    unmountLifecycleExecutionPayload.rootUnmountLifecycleRequestBoundaryPayload,
+    unmountLifecycleRequestBoundaryPayload
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.$$typeof,
+    rootBridge.privateRootLifecycleRequestBoundaryRecordType
+  );
+  assert.equal(
+    rootBridge.isPrivateRootLifecycleRequestBoundaryRecord(
+      unmountLifecycleRequestBoundary
+    ),
+    true
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.boundaryStatus,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceRequestId,
+    unmount.requestId
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceRequestSequence,
+    unmount.requestSequence
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceRequestType,
+    'root.unmount'
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceOperation,
+    'unmount'
+  );
+  assert.equal(unmountLifecycleRequestBoundary.rootId, unmount.rootId);
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceLifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.sourceLifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.activeLifecycleStatus,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.latestSourceRequestId,
+    unmount.requestId
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.latestSourceRequestSequence,
+    unmount.requestSequence
+  );
+  assert.equal(
+    unmountLifecycleRequestBoundary.lifecycleRequestVersion,
+    unmountLifecycleExecution.lifecycleRequestVersionAfter
+  );
+  assert.equal(unmountLifecycleRequestBoundary.sourceOwned, true);
+  assert.equal(unmountLifecycleRequestBoundary.activeRootLifecycle, true);
+  assert.equal(unmountLifecycleRequestBoundary.requestBoundaryCurrent, true);
+  assert.equal(unmountLifecycleRequestBoundary.publicRootExecution, false);
+  assert.equal(unmountLifecycleRequestBoundary.nativeExecution, false);
+  assert.equal(unmountLifecycleRequestBoundary.reconcilerExecution, false);
+  assert.equal(unmountLifecycleRequestBoundary.domMutation, false);
+  assert.equal(unmountLifecycleRequestBoundary.browserDomMutation, false);
+  assert.equal(unmountLifecycleRequestBoundary.hydration, false);
+  assert.equal(unmountLifecycleRequestBoundary.eventDispatch, false);
+  assert.equal(unmountLifecycleRequestBoundary.refEffects, false);
+  assert.equal(unmountLifecycleRequestBoundary.packageCompatibility, false);
+  assert.equal(unmountLifecycleRequestBoundary.compatibilityClaimed, false);
+  assert.equal(
+    unmountLifecycleRequestBoundaryPayload.admissionRecord,
+    unmountLifecycleExecution.rootUnmountLifecycleAdmissionRecord
+  );
+  assert.equal(unmountLifecycleRequestBoundaryPayload.sourceRecord, unmount);
+  assert.equal(
+    unmountLifecycleRequestBoundaryPayload.lifecycleRequestVersion,
+    unmountLifecycleExecution.lifecycleRequestVersionAfter
+  );
+  assert.equal(
+    unmountLifecycleExecutionPayload.createRecord,
+    renderPayload.createRecord
+  );
+  assert.equal(
+    unmountLifecycleExecutionPayload.sourceContainerSnapshotBefore.childCount,
+    1
+  );
+  assert.equal(
+    cleanupPayload.unmountLifecycleExecutionRecord,
+    unmountLifecycleExecution
+  );
+  assert.equal(
+    cleanupPayload.unmountLifecycleExecutionPayload,
+    unmountLifecycleExecutionPayload
+  );
+  assert.equal(
+    cleanupPayload.rootUnmountLifecycleRequestBoundaryRecord,
+    unmountLifecycleRequestBoundary
+  );
+  assert.equal(
+    cleanupPayload.rootUnmountLifecycleRequestBoundaryPayload,
+    unmountLifecycleRequestBoundaryPayload
+  );
   assert.equal(
     diagnostic.sourceContainerSnapshotStatus,
     rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_LIFECYCLE_CONTAINER_SNAPSHOT_ACCEPTED
@@ -11465,6 +11663,247 @@ test('private react-dom/client facade root.unmount clears active host output met
   assert.throws(() => reactDomClient.createRoot(document.createElement('div')), {
     code: 'FAST_REACT_UNIMPLEMENTED'
   });
+});
+
+test('private react-dom/client facade root.unmount lifecycle execution fails closed for stale cloned cross-root and replayed evidence', () => {
+  const document = createDocument(
+    'private-client-facade-root-unmount-lifecycle-negative'
+  );
+  const container = createElement('DIV', document);
+  const crossContainer = createElement('DIV', document);
+  const replayContainer = createElement('DIV', document);
+  const element = {
+    props: {
+      children: 'unmount lifecycle initial',
+      id: 'unmount-lifecycle-host'
+    },
+    type: 'section'
+  };
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    requestIdPrefix: 'facade-unmount-lifecycle-request',
+    rootIdPrefix: 'facade-unmount-lifecycle-root',
+    updateIdPrefix: 'facade-unmount-lifecycle-update'
+  });
+  const root = adapter.createRoot(container);
+  const crossRoot = adapter.createRoot(crossContainer);
+  const replayRoot = adapter.createRoot(replayContainer);
+  const renderDiagnostic = root.render(element);
+  const crossRenderDiagnostic = crossRoot.render(element);
+  const replayRenderDiagnostic = replayRoot.render(element);
+  const renderPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      renderDiagnostic
+    );
+  const crossRenderPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      crossRenderDiagnostic
+    );
+  const replayRenderPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      replayRenderDiagnostic
+    );
+  let staleExecutionRecord = null;
+  let crossExecutionRecord = null;
+
+  assert.throws(
+    () =>
+      root.unmount({
+        rootUnmountLifecycleMetadataFactory() {
+          return {
+            lifecycleRows: [
+              {
+                kind: 'caller-built-unmount-lifecycle-row'
+              }
+            ]
+          };
+        }
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT',
+      message: /caller-built lifecycle row/
+    }
+  );
+  assert.equal(container.textContent, 'unmount lifecycle initial');
+  assert.deepEqual(adapter.getRootHostOutputUnmountCleanupDiagnostics(root), []);
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root)
+      .rootLifecycleStatus,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+
+  assert.throws(
+    () =>
+      root.unmount({
+        rootUnmountLifecycleExecutionFactory(context) {
+          const row = context.createRootUnmountLifecycleExecutionRow({
+            kind: 'cloned-unmount-lifecycle-row'
+          });
+          staleExecutionRecord =
+            context.createRootUnmountLifecycleExecutionRecord({
+              lifecycleRows: [row],
+              source: 'cloned-unmount-lifecycle'
+            });
+          return Object.freeze({...staleExecutionRecord});
+        }
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT',
+      message: /intact source-owned lifecycle execution record/
+    }
+  );
+  assert.equal(container.textContent, 'unmount lifecycle initial');
+  assert.deepEqual(adapter.getRootHostOutputUnmountCleanupDiagnostics(root), []);
+
+  assert.throws(
+    () =>
+      crossRoot.unmount({
+        rootUnmountLifecycleExecutionFactory(context) {
+          const row = context.createRootUnmountLifecycleExecutionRow({
+            kind: 'cross-root-unmount-lifecycle-row'
+          });
+          crossExecutionRecord =
+            context.createRootUnmountLifecycleExecutionRecord({
+              lifecycleRows: [row],
+              source: 'cross-root-unmount-lifecycle'
+            });
+          return Object.freeze({...crossExecutionRecord});
+        }
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT',
+      message: /intact source-owned lifecycle execution record/
+    }
+  );
+  assert.throws(
+    () =>
+      root.unmount({
+        rootUnmountLifecycleExecutionRecord: crossExecutionRecord
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT',
+      message: /stale, cross-root, cloned, or caller-built lifecycle execution metadata/
+    }
+  );
+  assert.throws(
+    () =>
+      root.unmount({
+        rootUnmountLifecycleExecutionRecord: staleExecutionRecord
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT',
+      message: /stale, cross-root, cloned, or caller-built lifecycle execution metadata/
+    }
+  );
+  assert.throws(
+    () =>
+      root.unmount({
+        rootUnmountLifecycleExecutionFactory(context) {
+          const row = context.createRootUnmountLifecycleExecutionRow({
+            kind: 'alias-unmount-lifecycle-row',
+            nativeExecution: false
+          });
+          return context.createRootUnmountLifecycleExecutionRecord({
+            lifecycleRows: [row]
+          });
+        }
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT',
+      message: /alias claims/
+    }
+  );
+  assert.throws(
+    () =>
+      root.unmount({
+        rootUnmountLifecycleExecutionFactory(context) {
+          const row = context.createRootUnmountLifecycleExecutionRow({
+            browserDomMutation: true,
+            eventDispatch: true,
+            hydration: true,
+            kind: 'audit-alias-unmount-lifecycle-row',
+            packageCompatibility: true,
+            prose: 'claimed cleanup prose alias',
+            refEffects: true,
+            sourceSyntax: 'root.unmount()'
+          });
+          return context.createRootUnmountLifecycleExecutionRecord({
+            lifecycleRows: [row],
+            source: 'audit-alias-unmount-lifecycle'
+          });
+        }
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT',
+      message: /alias claims/
+    }
+  );
+  assert.deepEqual(adapter.getRootHostOutputUnmountCleanupDiagnostics(root), []);
+  assert.equal(container.textContent, 'unmount lifecycle initial');
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root)
+      .rootLifecycleStatus,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+
+  const unmount = root.unmount({
+    rootUnmountLifecycleExecutionFactory(context) {
+      const row = context.createRootUnmountLifecycleExecutionRow({
+        kind: 'accepted-unmount-lifecycle-row',
+        rowIndex: 0
+      });
+      return context.createRootUnmountLifecycleExecutionRecord({
+        lifecycleRows: [row],
+        source: 'accepted-unmount-lifecycle'
+      });
+    }
+  });
+  const [diagnostic] =
+    adapter.getRootHostOutputUnmountCleanupDiagnostics(root);
+  const consumedExecutionRecord =
+    diagnostic.rootUnmountLifecycleExecutionRecord;
+  const consumedExecutionPayload =
+    rootBridge.getPrivateRootPublicFacadeRootUnmountLifecycleExecutionPayload(
+      consumedExecutionRecord
+    );
+
+  assert.equal(unmount.noOp, false);
+  assert.equal(diagnostic.rootUnmountLifecycleExecutionConsumed, true);
+  assert.equal(
+    consumedExecutionRecord.lifecycleMetadataSource,
+    'accepted-unmount-lifecycle'
+  );
+  assert.equal(consumedExecutionPayload.consumed, true);
+  assert.equal(container.childNodes.length, 0);
+
+  assert.throws(
+    () =>
+      replayRoot.unmount({
+        rootUnmountLifecycleExecutionRecord: consumedExecutionRecord
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT',
+      message: /replayed lifecycle execution record/
+    }
+  );
+  assert.equal(replayContainer.textContent, 'unmount lifecycle initial');
+  assert.deepEqual(
+    adapter.getRootHostOutputUnmountCleanupDiagnostics(replayRoot),
+    []
+  );
+
+  crossRenderPayload.bridge.cleanupInitialRenderHostOutput(
+    crossRenderPayload.hostOutputHandoff
+  );
+  replayRenderPayload.bridge.cleanupInitialRenderHostOutput(
+    replayRenderPayload.hostOutputHandoff
+  );
+  assert.equal(crossContainer.childNodes.length, 0);
+  assert.equal(replayContainer.childNodes.length, 0);
 });
 
 test('private react-dom/client facade root.unmount links ref detach and passive destroy evidence before cleanup', () => {
