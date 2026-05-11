@@ -59,6 +59,10 @@ mod root_bridge_requests {
         "worker-render-root-stale-executable-preflight";
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_ROW_ID: &str =
         "worker-render-value-stale-executable-preflight";
+    const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_PROVENANCE_TOKEN: &str =
+        "cleanup-hook-source-provenance:worker-764:env-764:render-root:slot-1:g1-current-2";
+    const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_PROVENANCE_TOKEN: &str =
+        "cleanup-hook-source-provenance:worker-764:env-764:render-value:slot-3:g1-current-2";
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_ID: &str =
         "worker-root-handle-cleanup-hook";
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_ID: &str =
@@ -168,6 +172,7 @@ mod root_bridge_requests {
         NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_GUARD_CONSUMED_STATUS,
         "cleanup-generation-currentness-duplicate-cleanup-rejected",
         "cleanup-generation-currentness-source-record-id-smuggling-rejected",
+        "cleanup-generation-currentness-source-provenance-smuggling-rejected",
         "cleanup-generation-currentness-stale-generation-reentry-rejected",
         "cleanup-generation-currentness-cross-environment-reentry-rejected",
         "cleanup-generation-currentness-reentry-after-retire-rejected",
@@ -3535,6 +3540,7 @@ mod root_bridge_requests {
         source_worker_thread_id: u64,
         source_environment_id: BridgeEnvironmentId,
         source_row_id: &'static str,
+        source_provenance_token: Option<&'static str>,
         source_handle_kind: BridgeHandleKind,
         source_handle_environment_id: Option<BridgeEnvironmentId>,
         source_handle_slot: Option<u64>,
@@ -3580,6 +3586,7 @@ mod root_bridge_requests {
                 source_worker_thread_id,
                 source_environment_id,
                 source_row_id,
+                source_provenance_token: None,
                 source_handle_kind,
                 source_handle_environment_id: None,
                 source_handle_slot: None,
@@ -3643,6 +3650,7 @@ mod root_bridge_requests {
                 source_worker_thread_id: row.source_worker_thread_id(),
                 source_environment_id: row.source_environment_id(),
                 source_row_id: row.source_row_id(),
+                source_provenance_token: row.source_provenance_token(),
                 source_handle_kind: row.source_handle_kind(),
                 source_handle_environment_id: row.source_handle_environment_id(),
                 source_handle_slot: row.source_handle_slot(),
@@ -3666,12 +3674,22 @@ mod root_bridge_requests {
 
         #[cfg(test)]
         #[must_use]
+        pub(crate) const fn with_source_provenance_token_for_test(
+            mut self,
+            token: Option<&'static str>,
+        ) -> Self {
+            self.source_provenance_token = token;
+            self
+        }
+
+        #[cfg(test)]
+        #[must_use]
         pub(crate) const fn with_id_for_test(mut self, id: &'static str) -> Self {
             self.id = id;
             self
         }
 
-        const fn with_source_identity_from_executable_preflight_row(
+        fn with_source_identity_from_executable_preflight_row(
             mut self,
             row: NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow,
         ) -> Self {
@@ -3681,6 +3699,8 @@ mod root_bridge_requests {
             self.source_current_generation = row.current_generation();
             self.source_record_id = row.record_id();
             self.source_root_id = row.source_root_id();
+            self.source_provenance_token =
+                cleanup_hook_source_provenance_token_for_executable_preflight_row(row);
             self
         }
 
@@ -3695,11 +3715,12 @@ mod root_bridge_requests {
             self.source_current_generation = row.source_current_generation();
             self.source_record_id = row.source_record_id();
             self.source_root_id = row.source_root_id();
+            self.source_provenance_token = row.source_provenance_token();
             self
         }
 
         #[cfg(test)]
-        pub(crate) const fn with_source_identity_from_executable_preflight_row_for_test(
+        pub(crate) fn with_source_identity_from_executable_preflight_row_for_test(
             self,
             row: NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow,
         ) -> Self {
@@ -3759,6 +3780,11 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn source_row_id(self) -> &'static str {
             self.source_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_provenance_token(self) -> Option<&'static str> {
+            self.source_provenance_token
         }
 
         #[must_use]
@@ -3903,6 +3929,7 @@ mod root_bridge_requests {
         source_worker_thread_id: u64,
         source_environment_id: BridgeEnvironmentId,
         source_row_id: &'static str,
+        source_provenance_token: Option<&'static str>,
         source_handle_kind: BridgeHandleKind,
         source_handle_environment_id: Option<BridgeEnvironmentId>,
         source_handle_slot: Option<u64>,
@@ -3980,6 +4007,7 @@ mod root_bridge_requests {
                 source_worker_thread_id: evidence.source_worker_thread_id(),
                 source_environment_id: evidence.source_environment_id(),
                 source_row_id: evidence.source_row_id(),
+                source_provenance_token: evidence.source_provenance_token(),
                 source_handle_kind: evidence.source_handle_kind(),
                 source_handle_environment_id: evidence.source_handle_environment_id(),
                 source_handle_slot: evidence.source_handle_slot(),
@@ -4075,6 +4103,11 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn source_row_id(self) -> &'static str {
             self.source_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_provenance_token(self) -> Option<&'static str> {
+            self.source_provenance_token
         }
 
         #[must_use]
@@ -4204,10 +4237,12 @@ mod root_bridge_requests {
         cleanup_hook_source_environment_id: BridgeEnvironmentId,
         root_cleanup_hook_evidence_row_id: &'static str,
         root_cleanup_hook_source_row_id: &'static str,
+        root_cleanup_hook_source_provenance_token: Option<&'static str>,
         root_handle_current_generation: u64,
         root_cleanup_current_generation: u64,
         value_cleanup_hook_evidence_row_id: &'static str,
         value_cleanup_hook_source_row_id: &'static str,
+        value_cleanup_hook_source_provenance_token: Option<&'static str>,
         source_value_handle: BridgeHandle,
         value_handle_current_generation: u64,
         value_cleanup_current_generation: u64,
@@ -4225,10 +4260,12 @@ mod root_bridge_requests {
         root_cleanup_handoff_row_id: String,
         root_cleanup_hook_evidence_row_id: &'static str,
         root_cleanup_hook_source_row_id: &'static str,
+        root_cleanup_hook_source_provenance_token: Option<&'static str>,
         source_value_handle: BridgeHandle,
         value_cleanup_handoff_row_id: String,
         value_cleanup_hook_evidence_row_id: &'static str,
         value_cleanup_hook_source_row_id: &'static str,
+        value_cleanup_hook_source_provenance_token: Option<&'static str>,
         cleanup_hook_source_worker_thread_id: u64,
         cleanup_hook_source_environment_id: BridgeEnvironmentId,
         lifecycle_transition: NativeRootBridgeLifecycleTransition,
@@ -4416,6 +4453,7 @@ mod root_bridge_requests {
         cleanup_hook_source_worker_thread_id: u64,
         cleanup_hook_source_environment_id: BridgeEnvironmentId,
         cleanup_hook_source_row_id: &'static str,
+        cleanup_hook_source_provenance_token: Option<&'static str>,
         batch_index: usize,
         request_id: u64,
         kind: &'static str,
@@ -4463,6 +4501,7 @@ mod root_bridge_requests {
                 cleanup_hook_source_worker_thread_id: cleanup_hook_row.source_worker_thread_id(),
                 cleanup_hook_source_environment_id: cleanup_hook_row.source_environment_id(),
                 cleanup_hook_source_row_id: cleanup_hook_row.source_row_id(),
+                cleanup_hook_source_provenance_token: cleanup_hook_row.source_provenance_token(),
                 batch_index: executor_row.batch_index(),
                 request_id: executor_row.request_id(),
                 kind: executor_row.kind(),
@@ -4522,6 +4561,11 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn cleanup_hook_source_row_id(&self) -> &'static str {
             self.cleanup_hook_source_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_provenance_token(&self) -> Option<&'static str> {
+            self.cleanup_hook_source_provenance_token
         }
 
         #[must_use]
@@ -4679,6 +4723,15 @@ mod root_bridge_requests {
             source_environment_id: BridgeEnvironmentId,
         ) -> Self {
             self.cleanup_hook_source_environment_id = source_environment_id;
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) fn with_cleanup_hook_source_provenance_token_for_test(
+            mut self,
+            token: Option<&'static str>,
+        ) -> Self {
+            self.cleanup_hook_source_provenance_token = token;
             self
         }
 
@@ -4908,6 +4961,7 @@ mod root_bridge_requests {
         cleanup_hook_source_worker_thread_id: u64,
         cleanup_hook_source_environment_id: BridgeEnvironmentId,
         cleanup_hook_source_row_id: &'static str,
+        cleanup_hook_source_provenance_token: Option<&'static str>,
         cleanup_hook_id: &'static str,
         cleanup_hook_function_identity_token: &'static str,
         cleanup_hook_argument_identity_token: &'static str,
@@ -4968,6 +5022,8 @@ mod root_bridge_requests {
                 cleanup_hook_source_environment_id: cleanup_row
                     .cleanup_hook_source_environment_id(),
                 cleanup_hook_source_row_id: cleanup_row.cleanup_hook_source_row_id(),
+                cleanup_hook_source_provenance_token: cleanup_row
+                    .cleanup_hook_source_provenance_token(),
                 cleanup_hook_id: cleanup_hook_row.cleanup_hook_id(),
                 cleanup_hook_function_identity_token: cleanup_hook_row
                     .cleanup_hook_function_identity_token(),
@@ -5099,6 +5155,11 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn cleanup_hook_source_row_id(&self) -> &'static str {
             self.cleanup_hook_source_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_provenance_token(&self) -> Option<&'static str> {
+            self.cleanup_hook_source_provenance_token
         }
 
         #[must_use]
@@ -8760,7 +8821,7 @@ mod root_bridge_requests {
         candidate_rows: &[NativeRootBridgeJsonBatchLifecycleExecutorRow],
         cleanup_hook_row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
     ) -> Result<NativeRootBridgeCleanupGenerationConsumerRow, &'static str> {
-        let Some(_role) = cleanup_hook_accepted_canonical_role(cleanup_hook_row) else {
+        let Some(role) = cleanup_hook_accepted_canonical_role(cleanup_hook_row) else {
             return Err(
                 NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
             );
@@ -8805,6 +8866,8 @@ mod root_bridge_requests {
             || cleanup_hook_row.source_environment_id() != executor.environment_id()
             || source_handle_environment_id != executor.environment_id()
             || cleanup_hook_source_root_id != executor.root_id().unwrap_or_default()
+            || cleanup_hook_row.source_provenance_token()
+                != Some(cleanup_hook_source_provenance_token_for_role(role))
         {
             return Err(
                 NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
@@ -8942,6 +9005,10 @@ mod root_bridge_requests {
             || value_row.cleanup_hook_source_environment_id().is_none()
             || root_row.cleanup_hook_source_environment_id()
                 != value_row.cleanup_hook_source_environment_id()
+            || root_row.cleanup_hook_source_provenance_token()
+                != Some(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_PROVENANCE_TOKEN)
+            || value_row.cleanup_hook_source_provenance_token()
+                != Some(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_PROVENANCE_TOKEN)
         {
             return Err(
                 NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
@@ -8957,10 +9024,14 @@ mod root_bridge_requests {
             cleanup_hook_source_environment_id: root_row.cleanup_hook_source_environment_id(),
             root_cleanup_hook_evidence_row_id: root_row.cleanup_hook_evidence_row_id(),
             root_cleanup_hook_source_row_id: root_row.cleanup_hook_source_row_id(),
+            root_cleanup_hook_source_provenance_token: root_row
+                .cleanup_hook_source_provenance_token(),
             root_handle_current_generation: root_row.executor_handle_current_generation(),
             root_cleanup_current_generation: root_row.cleanup_hook_source_current_generation(),
             value_cleanup_hook_evidence_row_id: value_row.cleanup_hook_evidence_row_id(),
             value_cleanup_hook_source_row_id: value_row.cleanup_hook_source_row_id(),
+            value_cleanup_hook_source_provenance_token: value_row
+                .cleanup_hook_source_provenance_token(),
             source_value_handle: value_row.source_handle(),
             value_handle_current_generation: value_row.executor_handle_current_generation(),
             value_cleanup_current_generation: value_row.cleanup_hook_source_current_generation(),
@@ -9240,6 +9311,10 @@ mod root_bridge_requests {
                 != NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_EVIDENCE_ROW_ID
             || value_row.cleanup_hook_source_row_id()
                 != NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_ROW_ID
+            || root_row.cleanup_hook_source_provenance_token()
+                != Some(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_PROVENANCE_TOKEN)
+            || value_row.cleanup_hook_source_provenance_token()
+                != Some(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_PROVENANCE_TOKEN)
         {
             return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE);
         }
@@ -9280,10 +9355,14 @@ mod root_bridge_requests {
                 root_cleanup_handoff_row_id: root_row.cleanup_handoff_row_id().to_owned(),
                 root_cleanup_hook_evidence_row_id: root_row.cleanup_hook_evidence_row_id(),
                 root_cleanup_hook_source_row_id: root_row.cleanup_hook_source_row_id(),
+                root_cleanup_hook_source_provenance_token: root_row
+                    .cleanup_hook_source_provenance_token(),
                 source_value_handle: value_row.source_handle(),
                 value_cleanup_handoff_row_id: value_row.cleanup_handoff_row_id().to_owned(),
                 value_cleanup_hook_evidence_row_id: value_row.cleanup_hook_evidence_row_id(),
                 value_cleanup_hook_source_row_id: value_row.cleanup_hook_source_row_id(),
+                value_cleanup_hook_source_provenance_token: value_row
+                    .cleanup_hook_source_provenance_token(),
                 cleanup_hook_source_worker_thread_id: root_row
                     .cleanup_hook_source_worker_thread_id(),
                 cleanup_hook_source_environment_id: root_row.cleanup_hook_source_environment_id(),
@@ -9432,6 +9511,10 @@ mod root_bridge_requests {
 
         if cleanup_row.cleanup_hook_evidence_row_id() != cleanup_hook_row.id()
             || cleanup_row.cleanup_hook_source_row_id() != cleanup_hook_row.source_row_id()
+            || cleanup_row.cleanup_hook_source_provenance_token()
+                != cleanup_hook_row.source_provenance_token()
+            || cleanup_row.cleanup_hook_source_provenance_token()
+                != Some(cleanup_hook_source_provenance_token_for_role(role))
         {
             return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE);
         }
@@ -9591,7 +9674,10 @@ mod root_bridge_requests {
         };
         let evidence = NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(row);
 
-        expected_identity.matches_evidence(evidence) && expected_identity.matches_order(evidence)
+        expected_identity.matches_evidence(evidence)
+            && expected_identity.matches_order(evidence)
+            && row.source_provenance_token()
+                == Some(cleanup_hook_source_provenance_token_for_role(role))
     }
 
     #[cfg(test)]
@@ -9776,7 +9862,10 @@ mod root_bridge_requests {
         let role =
             cleanup_hook_canonical_role_for_source(row.source_row_id(), row.source_handle_kind())?;
 
-        (row.id() == cleanup_hook_expected_evidence_row_id(role)).then_some(role)
+        (row.id() == cleanup_hook_expected_evidence_row_id(role)
+            && row.source_provenance_token()
+                == Some(cleanup_hook_source_provenance_token_for_role(role)))
+        .then_some(role)
     }
 
     const fn cleanup_hook_expected_evidence_row_id(
@@ -10207,6 +10296,26 @@ mod root_bridge_requests {
         }
     }
 
+    const fn cleanup_hook_source_provenance_token_for_role(
+        role: NativeRootBridgeWorkerThreadCleanupHookCanonicalRole,
+    ) -> &'static str {
+        match role {
+            NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root => {
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_PROVENANCE_TOKEN
+            }
+            NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value => {
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_PROVENANCE_TOKEN
+            }
+        }
+    }
+
+    fn cleanup_hook_source_provenance_token_for_executable_preflight_row(
+        row: NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow,
+    ) -> Option<&'static str> {
+        cleanup_hook_canonical_role_for_source(row.id(), row.handle_kind())
+            .map(cleanup_hook_source_provenance_token_for_role)
+    }
+
     pub(crate) fn validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
         executable_preflight: &NativeRootBridgeWorkerThreadTeardownExecutablePreflight,
         evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence,
@@ -10332,6 +10441,8 @@ mod root_bridge_requests {
             && evidence.source_current_generation() == source_row.current_generation()
             && evidence.source_record_id() == source_row.record_id()
             && evidence.source_root_id() == source_row.source_root_id()
+            && evidence.source_provenance_token()
+                == cleanup_hook_source_provenance_token_for_executable_preflight_row(source_row)
     }
 
     const fn current_generation_for_handle_table_error(
@@ -14809,6 +14920,19 @@ mod tests {
             ]
         );
         assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_provenance_token())
+                .collect::<Vec<_>>(),
+            [
+                Some(
+                    "cleanup-hook-source-provenance:worker-764:env-764:render-root:slot-1:g1-current-2"
+                ),
+                Some(
+                    "cleanup-hook-source-provenance:worker-764:env-764:render-value:slot-3:g1-current-2"
+                )
+            ]
+        );
+        assert_eq!(
             rows.iter().map(|row| row.batch_index()).collect::<Vec<_>>(),
             [1, 1]
         );
@@ -15151,6 +15275,111 @@ mod tests {
     }
 
     #[test]
+    fn native_root_bridge_batch_lifecycle_cleanup_hook_generation_consumer_rejects_forged_cleanup_source_provenance_before_replay_key()
+     {
+        fn forged_cleanup_preflight(
+            forge_root_provenance: bool,
+        ) -> NativeRootBridgeWorkerThreadCleanupHookPreflight {
+            let canonical = native_root_bridge_worker_thread_cleanup_hook_preflight();
+            let root_evidence = NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(
+                canonical.rows()[0],
+            );
+            let value_evidence =
+                NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(
+                    canonical.rows()[1],
+                );
+
+            if forge_root_provenance {
+                validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows([
+                    root_evidence.with_source_provenance_token_for_test(Some(
+                        "caller-shaped-root-cleanup-source-provenance",
+                    )),
+                    value_evidence,
+                ])
+            } else {
+                validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows([
+                    root_evidence,
+                    value_evidence.with_source_provenance_token_for_test(Some(
+                        "caller-shaped-value-cleanup-source-provenance",
+                    )),
+                ])
+            }
+        }
+
+        for (case, forged_preflight) in [
+            (
+                "forged-root-cleanup-source-provenance",
+                forged_cleanup_preflight(true),
+            ),
+            (
+                "forged-value-cleanup-source-provenance",
+                forged_cleanup_preflight(false),
+            ),
+        ] {
+            let json = native_root_bridge_cleanup_generation_consumer_json(764);
+            let gate = parse_native_root_bridge_json_transport_for_gate(&json).unwrap();
+
+            assert_eq!(
+                forged_preflight.accepted_cleanup_evidence_count(),
+                0,
+                "{case}"
+            );
+            assert!(
+                !forged_preflight.canonical_executable_evidence_accepted(),
+                "{case}"
+            );
+            assert!(
+                forged_preflight.rows().iter().all(|row| {
+                    row.status()
+                        == NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Rejected
+                }),
+                "{case}"
+            );
+            assert!(
+                forged_preflight.rows().iter().any(|row| {
+                    row.code()
+                        == Some(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE)
+                }),
+                "{case}"
+            );
+
+            let rejected =
+                native_root_bridge_cleanup_generation_consumer_for_gate(&gate, &forged_preflight);
+            assert!(!rejected.source_rows_validated(), "{case}");
+            assert!(!rejected.cleanup_hook_preflight_accepted(), "{case}");
+            assert!(!rejected.cleanup_generation_consumed(), "{case}");
+            assert_eq!(
+                rejected.cleanup_generation_error_code(),
+                Some(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE),
+                "{case}"
+            );
+            assert_eq!(rejected.consumed_cleanup_generation_count(), 0, "{case}");
+            assert!(rejected.rows().is_empty(), "{case}");
+
+            let canonical_preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+            let accepted = native_root_bridge_cleanup_generation_consumer_for_gate(
+                &gate,
+                &canonical_preflight,
+            );
+            assert!(accepted.source_rows_validated(), "{case}");
+            assert!(accepted.cleanup_hook_preflight_accepted(), "{case}");
+            assert!(accepted.cleanup_generation_consumed(), "{case}");
+            assert_eq!(accepted.consumed_cleanup_generation_count(), 2, "{case}");
+
+            let replayed = native_root_bridge_cleanup_generation_consumer_for_gate(
+                &gate,
+                &canonical_preflight,
+            );
+            assert!(!replayed.cleanup_generation_consumed(), "{case}");
+            assert_eq!(
+                replayed.cleanup_generation_error_code(),
+                Some(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_REPLAYED_EVIDENCE_CODE),
+                "{case}"
+            );
+        }
+    }
+
+    #[test]
     fn native_root_bridge_batch_lifecycle_cleanup_hook_generation_consumer_rejects_stale_json_handles()
      {
         let cleanup_hook_preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
@@ -15401,6 +15630,19 @@ mod tests {
         );
         assert_eq!(
             rows.iter()
+                .map(|row| row.cleanup_hook_source_provenance_token())
+                .collect::<Vec<_>>(),
+            [
+                Some(
+                    "cleanup-hook-source-provenance:worker-764:env-764:render-root:slot-1:g1-current-2"
+                ),
+                Some(
+                    "cleanup-hook-source-provenance:worker-764:env-764:render-value:slot-3:g1-current-2"
+                )
+            ]
+        );
+        assert_eq!(
+            rows.iter()
                 .map(|row| row.cleanup_hook_id())
                 .collect::<Vec<_>>(),
             [
@@ -15591,6 +15833,42 @@ mod tests {
             cleanup_generation_consumer.rows(),
             NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE,
         );
+    }
+
+    #[test]
+    fn native_root_bridge_cleanup_generation_currentness_canary_rejects_cleanup_hook_source_provenance_smuggling()
+     {
+        let (lifecycle_consumer, cleanup_generation_consumer, cleanup_hook_preflight) =
+            accepted_cleanup_generation_currentness_sources();
+
+        assert!(
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REENTRY_EVIDENCE_IDS
+                .contains(&"cleanup-generation-currentness-source-provenance-smuggling-rejected")
+        );
+
+        let mut forged_source_provenance_rows = cleanup_generation_consumer.rows().to_vec();
+        forged_source_provenance_rows[0] = forged_source_provenance_rows[0]
+            .clone()
+            .with_cleanup_hook_source_provenance_token_for_test(Some(
+                "caller-shaped-root-cleanup-source-provenance",
+            ));
+        assert_cleanup_generation_currentness_rejection(
+            &lifecycle_consumer,
+            &cleanup_generation_consumer,
+            &cleanup_hook_preflight,
+            &forged_source_provenance_rows,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE,
+        );
+
+        let accepted = native_root_bridge_cleanup_generation_currentness_canary_for_private_sources(
+            &lifecycle_consumer,
+            &cleanup_generation_consumer,
+            &cleanup_hook_preflight,
+            cleanup_generation_consumer.rows(),
+        );
+        assert!(accepted.cleanup_handoff_current());
+        assert!(accepted.cleanup_reentry_guard_consumed());
+        assert_eq!(accepted.accepted_cleanup_handoff_count(), 2);
     }
 
     #[test]
@@ -17455,6 +17733,12 @@ mod tests {
             root_cleanup.source_row_id(),
             "worker-render-root-stale-executable-preflight"
         );
+        assert_eq!(
+            root_cleanup.source_provenance_token(),
+            Some(
+                "cleanup-hook-source-provenance:worker-764:env-764:render-root:slot-1:g1-current-2"
+            )
+        );
         assert_eq!(root_cleanup.source_handle_kind(), BridgeHandleKind::Root);
         assert_eq!(
             root_cleanup.source_error_code(),
@@ -17491,6 +17775,12 @@ mod tests {
         assert_eq!(
             value_cleanup.source_row_id(),
             "worker-render-value-stale-executable-preflight"
+        );
+        assert_eq!(
+            value_cleanup.source_provenance_token(),
+            Some(
+                "cleanup-hook-source-provenance:worker-764:env-764:render-value:slot-3:g1-current-2"
+            )
         );
         assert_eq!(value_cleanup.source_handle_kind(), BridgeHandleKind::Value);
         assert!(value_cleanup.canonical_executable_evidence());
