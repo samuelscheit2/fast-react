@@ -1458,7 +1458,8 @@ function drainDelayedMockSchedulerWorkWithActRootMetadataForDiagnostics(
           validation.delayMs,
           validation.startTime,
           validation.expirationTime,
-          validation.priorityTimeoutMs
+          validation.priorityTimeoutMs,
+          false
         );
       }
     );
@@ -1641,6 +1642,9 @@ function createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiag
   if (optionsRejectionReason !== null) {
     throw createDelayedActRootWorkMetadataError(optionsRejectionReason);
   }
+  const rendererRootSource = delayedRendererRootWorkMetadataSources.get(
+    rendererRootMetadata
+  );
 
   const expiredActRootWorkMetadata =
     createExpiredActRootWorkMetadataFromDelayedRendererRootMetadata(
@@ -1677,11 +1681,7 @@ function createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiag
         },
         rendererRootSource: {
           rendererRootMetadata,
-          rendererRootEvidence:
-            createDelayedRendererRootWorkSourceEvidence(
-              rendererRootMetadata,
-              rendererRootValidation
-            )
+          rendererRootEvidence: rendererRootSource.rendererRootEvidence
         }
       }
     );
@@ -1888,6 +1888,8 @@ function createDelayedRendererRootWorkMetadataForDiagnostics(
   delayedRendererRootWorkMetadataSources.set(metadata, {
     sourceScheduler,
     shadowState,
+    taskRecord: validation.taskRecord,
+    scheduleOrder: validation.taskRecord.scheduleOrder,
     rendererRootMetadata: metadata,
     rendererRootEvidence: createDelayedRendererRootWorkSourceEvidence(
       metadata,
@@ -2137,7 +2139,8 @@ function validateDelayedRendererRootWorkMetadata(
     const sourceEvidenceRejectionReason =
       getRejectedDelayedRendererRootMetadataSourceReason(
         rendererRootMetadata,
-        source
+        source,
+        taskRecord
       );
     if (sourceEvidenceRejectionReason !== null) {
       return invalid(sourceEvidenceRejectionReason);
@@ -2219,13 +2222,34 @@ function createDelayedRendererRootWorkSourceEvidence(
   rendererRootMetadata,
   validation
 ) {
+  const actQueueRecords = rendererRootMetadata.actQueue.records.slice();
+  const rootWorkRecordEntries = validation.rootWorkValidation.records.slice();
+
   return Object.freeze({
     rendererRootMetadata,
     topLevelSignature:
       createDelayedRendererRootWorkMetadataSignature(rendererRootMetadata),
     callbackHandle: rendererRootMetadata.callbackHandle,
+    scheduleOrder: validation.taskRecord.scheduleOrder,
+    scheduledCallback: validation.taskRecord.task.callback,
+    scheduledCallbackSignature:
+      createDelayedActRootWorkCallbackSignatureString(
+        validation.taskRecord.task.callback
+      ),
     actQueue: rendererRootMetadata.actQueue,
+    actQueueRecordsArray: rendererRootMetadata.actQueue.records,
+    actQueueRecords: Object.freeze(actQueueRecords),
+    actQueueRecordCallbacks: Object.freeze(
+      actQueueRecords.map(getDelayedActRootWorkActTaskCallbackIdentity)
+    ),
+    actQueueRecordSignatures: Object.freeze(
+      actQueueRecords.map(createDelayedActRootWorkActTaskSignature)
+    ),
     rootWorkRecords: rendererRootMetadata.rootWorkRecords,
+    rootWorkRecordEntries: Object.freeze(rootWorkRecordEntries),
+    rootWorkRecordSignatures: Object.freeze(
+      rootWorkRecordEntries.map(createDelayedActRootWorkRecordSignature)
+    ),
     expectedActQueuePendingCount:
       rendererRootMetadata.expectedActQueuePendingCount,
     actQueueRecordCount: validation.actQueueValidation.pendingCount,
@@ -2240,7 +2264,8 @@ function createDelayedRendererRootWorkSourceEvidence(
 
 function getRejectedDelayedRendererRootMetadataSourceReason(
   rendererRootMetadata,
-  source
+  source,
+  taskRecord
 ) {
   const evidence = source.rendererRootEvidence;
   if (!isObjectLike(evidence)) {
@@ -2252,8 +2277,26 @@ function getRejectedDelayedRendererRootMetadataSourceReason(
   if (evidence.rendererRootMetadata !== rendererRootMetadata) {
     return 'renderer-root-metadata-source-evidence-mismatch';
   }
+  if (source.taskRecord !== taskRecord) {
+    return 'renderer-root-metadata-source-task-record-mismatch';
+  }
+  if (source.scheduleOrder !== taskRecord.scheduleOrder) {
+    return 'renderer-root-metadata-source-schedule-order-mismatch';
+  }
   if (evidence.callbackHandle !== rendererRootMetadata.callbackHandle) {
     return 'renderer-root-metadata-source-callback-handle-mismatch';
+  }
+  if (evidence.scheduleOrder !== taskRecord.scheduleOrder) {
+    return 'renderer-root-metadata-source-callback-schedule-order-mismatch';
+  }
+  if (evidence.scheduledCallback !== taskRecord.task.callback) {
+    return 'renderer-root-metadata-source-callback-identity-mismatch';
+  }
+  if (
+    evidence.scheduledCallbackSignature !==
+    createDelayedActRootWorkCallbackSignatureString(taskRecord.task.callback)
+  ) {
+    return 'renderer-root-metadata-source-callback-signature-mismatch';
   }
   if (evidence.actQueue !== rendererRootMetadata.actQueue) {
     return 'renderer-root-metadata-source-act-queue-mismatch';
@@ -2267,12 +2310,52 @@ function getRejectedDelayedRendererRootMetadataSourceReason(
   ) {
     return 'renderer-root-metadata-source-act-queue-count-mismatch';
   }
+  const actQueueRecords = rendererRootMetadata.actQueue.records;
+  if (!Array.isArray(actQueueRecords)) {
+    return 'renderer-root-metadata-source-act-queue-records-not-array';
+  }
+  if (actQueueRecords !== evidence.actQueueRecordsArray) {
+    return 'renderer-root-metadata-source-act-queue-records-array-mismatch';
+  }
   if (
-    Array.isArray(rendererRootMetadata.actQueue.records) &&
-    rendererRootMetadata.actQueue.records.length !==
-      evidence.actQueueRecordCount
+    !Array.isArray(evidence.actQueueRecords) ||
+    !Array.isArray(evidence.actQueueRecordCallbacks) ||
+    !Array.isArray(evidence.actQueueRecordSignatures)
   ) {
+    return 'renderer-root-metadata-source-act-queue-entry-evidence-missing';
+  }
+  if (actQueueRecords.length !== evidence.actQueueRecordCount) {
     return 'renderer-root-metadata-source-act-queue-record-count-mismatch';
+  }
+  for (let index = 0; index < evidence.actQueueRecordCount; index++) {
+    const record = actQueueRecords[index];
+    if (record !== evidence.actQueueRecords[index]) {
+      return (
+        'renderer-root-metadata-source-act-queue-record-' +
+        index +
+        '-identity-mismatch'
+      );
+    }
+    if (
+      getDelayedActRootWorkActTaskCallbackIdentity(record) !==
+      evidence.actQueueRecordCallbacks[index]
+    ) {
+      return (
+        'renderer-root-metadata-source-act-queue-record-' +
+        index +
+        '-callback-mismatch'
+      );
+    }
+    if (
+      createDelayedActRootWorkActTaskSignature(record) !==
+      evidence.actQueueRecordSignatures[index]
+    ) {
+      return (
+        'renderer-root-metadata-source-act-queue-record-' +
+        index +
+        '-signature-mismatch'
+      );
+    }
   }
   if (
     !Array.isArray(rendererRootMetadata.rootWorkRecords) ||
@@ -2280,6 +2363,32 @@ function getRejectedDelayedRendererRootMetadataSourceReason(
       evidence.rootWorkRecordCount
   ) {
     return 'renderer-root-metadata-source-root-work-record-count-mismatch';
+  }
+  if (
+    !Array.isArray(evidence.rootWorkRecordEntries) ||
+    !Array.isArray(evidence.rootWorkRecordSignatures)
+  ) {
+    return 'renderer-root-metadata-source-root-work-entry-evidence-missing';
+  }
+  for (let index = 0; index < evidence.rootWorkRecordCount; index++) {
+    const record = rendererRootMetadata.rootWorkRecords[index];
+    if (record !== evidence.rootWorkRecordEntries[index]) {
+      return (
+        'renderer-root-metadata-source-root-work-record-' +
+        index +
+        '-identity-mismatch'
+      );
+    }
+    if (
+      createDelayedActRootWorkRecordSignature(record) !==
+      evidence.rootWorkRecordSignatures[index]
+    ) {
+      return (
+        'renderer-root-metadata-source-root-work-record-' +
+        index +
+        '-signature-mismatch'
+      );
+    }
   }
   if (
     rendererRootMetadata.scheduledVirtualTime !==
@@ -2707,6 +2816,10 @@ function createDelayedActRootWorkCallbackSignature(callback) {
   });
 }
 
+function createDelayedActRootWorkCallbackSignatureString(callback) {
+  return JSON.stringify(createDelayedActRootWorkCallbackSignature(callback));
+}
+
 function createDelayedActRootWorkRecordSignature(record) {
   if (!isObjectLike(record)) {
     return 'not-object';
@@ -3118,7 +3231,8 @@ function getRejectedDelayedActRootWorkMetadataProducerSourceReason(
   delayMs,
   startTime,
   expirationTime,
-  priorityTimeoutMs
+  priorityTimeoutMs,
+  validateScheduledCallbackIdentity = true
 ) {
   const source = delayedActRootWorkMetadataSources.get(
     delayedActRootWorkMetadata
@@ -3163,7 +3277,8 @@ function getRejectedDelayedActRootWorkMetadataProducerSourceReason(
     getRejectedDelayedRendererRootProducerSourceReason(
       source,
       delayedActRootWorkMetadata,
-      expiredActRootWorkMetadata
+      expiredActRootWorkMetadata,
+      validateScheduledCallbackIdentity
     );
   if (rendererRootSourceRejectionReason !== null) {
     return rendererRootSourceRejectionReason;
@@ -3174,7 +3289,8 @@ function getRejectedDelayedActRootWorkMetadataProducerSourceReason(
 function getRejectedDelayedRendererRootProducerSourceReason(
   source,
   delayedActRootWorkMetadata,
-  expiredActRootWorkMetadata
+  expiredActRootWorkMetadata,
+  validateScheduledCallbackIdentity
 ) {
   if (source.rendererRootMetadata === undefined) {
     return null;
@@ -3212,8 +3328,30 @@ function getRejectedDelayedRendererRootProducerSourceReason(
   if (rendererRootMetadata.callbackHandle !== source.callbackHandle) {
     return 'metadata-source-renderer-root-callback-handle-mismatch';
   }
-  if (rendererRootMetadata.callbackHandle !== expiredActRootWorkMetadata.callbackHandle) {
+  if (
+    rendererRootMetadata.callbackHandle !==
+    expiredActRootWorkMetadata.callbackHandle
+  ) {
     return 'metadata-source-renderer-root-expired-callback-handle-mismatch';
+  }
+  if (evidence.scheduleOrder !== source.scheduleOrder) {
+    return 'metadata-source-renderer-root-callback-schedule-order-mismatch';
+  }
+  if (
+    validateScheduledCallbackIdentity === true &&
+    evidence.scheduledCallback !== source.taskRecord.task.callback
+  ) {
+    return 'metadata-source-renderer-root-callback-identity-mismatch';
+  }
+  if (validateScheduledCallbackIdentity === true) {
+    if (
+      evidence.scheduledCallbackSignature !==
+      createDelayedActRootWorkCallbackSignatureString(
+        source.taskRecord.task.callback
+      )
+    ) {
+      return 'metadata-source-renderer-root-callback-signature-mismatch';
+    }
   }
   if (rendererRootMetadata.actQueue !== source.actQueue) {
     return 'metadata-source-renderer-root-act-queue-mismatch';
@@ -3236,12 +3374,52 @@ function getRejectedDelayedRendererRootProducerSourceReason(
   ) {
     return 'metadata-source-renderer-root-act-queue-count-mismatch';
   }
+  const actQueueRecords = rendererRootMetadata.actQueue.records;
+  if (!Array.isArray(actQueueRecords)) {
+    return 'metadata-source-renderer-root-act-queue-records-not-array';
+  }
+  if (actQueueRecords !== evidence.actQueueRecordsArray) {
+    return 'metadata-source-renderer-root-act-queue-records-array-mismatch';
+  }
   if (
-    Array.isArray(rendererRootMetadata.actQueue.records) &&
-    rendererRootMetadata.actQueue.records.length !==
-      evidence.actQueueRecordCount
+    !Array.isArray(evidence.actQueueRecords) ||
+    !Array.isArray(evidence.actQueueRecordCallbacks) ||
+    !Array.isArray(evidence.actQueueRecordSignatures)
   ) {
+    return 'metadata-source-renderer-root-act-queue-entry-evidence-missing';
+  }
+  if (actQueueRecords.length !== evidence.actQueueRecordCount) {
     return 'metadata-source-renderer-root-act-queue-record-count-mismatch';
+  }
+  for (let index = 0; index < evidence.actQueueRecordCount; index++) {
+    const record = actQueueRecords[index];
+    if (record !== evidence.actQueueRecords[index]) {
+      return (
+        'metadata-source-renderer-root-act-queue-record-' +
+        index +
+        '-identity-mismatch'
+      );
+    }
+    if (
+      getDelayedActRootWorkActTaskCallbackIdentity(record) !==
+      evidence.actQueueRecordCallbacks[index]
+    ) {
+      return (
+        'metadata-source-renderer-root-act-queue-record-' +
+        index +
+        '-callback-mismatch'
+      );
+    }
+    if (
+      createDelayedActRootWorkActTaskSignature(record) !==
+      evidence.actQueueRecordSignatures[index]
+    ) {
+      return (
+        'metadata-source-renderer-root-act-queue-record-' +
+        index +
+        '-signature-mismatch'
+      );
+    }
   }
   if (
     !Array.isArray(rendererRootMetadata.rootWorkRecords) ||
@@ -3249,6 +3427,32 @@ function getRejectedDelayedRendererRootProducerSourceReason(
       evidence.rootWorkRecordCount
   ) {
     return 'metadata-source-renderer-root-work-record-count-mismatch';
+  }
+  if (
+    !Array.isArray(evidence.rootWorkRecordEntries) ||
+    !Array.isArray(evidence.rootWorkRecordSignatures)
+  ) {
+    return 'metadata-source-renderer-root-work-entry-evidence-missing';
+  }
+  for (let index = 0; index < evidence.rootWorkRecordCount; index++) {
+    const record = rendererRootMetadata.rootWorkRecords[index];
+    if (record !== evidence.rootWorkRecordEntries[index]) {
+      return (
+        'metadata-source-renderer-root-work-record-' +
+        index +
+        '-identity-mismatch'
+      );
+    }
+    if (
+      createDelayedActRootWorkRecordSignature(record) !==
+      evidence.rootWorkRecordSignatures[index]
+    ) {
+      return (
+        'metadata-source-renderer-root-work-record-' +
+        index +
+        '-signature-mismatch'
+      );
+    }
   }
   if (
     rendererRootMetadata.scheduledVirtualTime !==
@@ -3456,6 +3660,30 @@ function summarizeDelayedRendererRootWorkMetadataForDiagnostics(
   const rootWorkRecords = Array.isArray(rendererRootMetadata.rootWorkRecords)
     ? rendererRootMetadata.rootWorkRecords
     : [];
+  const actQueueEntryEvidenceMatches =
+    isObjectLike(evidence) &&
+    actQueueRecords === evidence.actQueueRecordsArray &&
+    Array.isArray(evidence.actQueueRecords) &&
+    Array.isArray(evidence.actQueueRecordCallbacks) &&
+    Array.isArray(evidence.actQueueRecordSignatures) &&
+    actQueueRecords.every(
+      (record, index) =>
+        record === evidence.actQueueRecords[index] &&
+        getDelayedActRootWorkActTaskCallbackIdentity(record) ===
+          evidence.actQueueRecordCallbacks[index] &&
+        createDelayedActRootWorkActTaskSignature(record) ===
+          evidence.actQueueRecordSignatures[index]
+    );
+  const rootWorkEntryEvidenceMatches =
+    isObjectLike(evidence) &&
+    Array.isArray(evidence.rootWorkRecordEntries) &&
+    Array.isArray(evidence.rootWorkRecordSignatures) &&
+    rootWorkRecords.every(
+      (record, index) =>
+        record === evidence.rootWorkRecordEntries[index] &&
+        createDelayedActRootWorkRecordSignature(record) ===
+          evidence.rootWorkRecordSignatures[index]
+    );
   const sourceEvidenceMatches =
     isObjectLike(evidence) &&
     evidence.rendererRootMetadata === rendererRootMetadata &&
@@ -3463,8 +3691,17 @@ function summarizeDelayedRendererRootWorkMetadataForDiagnostics(
       createDelayedRendererRootWorkMetadataSignature(rendererRootMetadata) &&
     evidence.actQueue === rendererRootMetadata.actQueue &&
     evidence.rootWorkRecords === rendererRootMetadata.rootWorkRecords &&
+    evidence.callbackHandle === rendererRootMetadata.callbackHandle &&
+    isObjectLike(rendererRootMetadata.callbackHandle) &&
+    evidence.scheduledCallback === rendererRootMetadata.callbackHandle.callback &&
+    evidence.scheduledCallbackSignature ===
+      createDelayedActRootWorkCallbackSignatureString(
+        rendererRootMetadata.callbackHandle.callback
+      ) &&
     evidence.actQueueRecordCount === actQueueRecords.length &&
-    evidence.rootWorkRecordCount === rootWorkRecords.length;
+    evidence.rootWorkRecordCount === rootWorkRecords.length &&
+    actQueueEntryEvidenceMatches &&
+    rootWorkEntryEvidenceMatches;
 
   return Object.freeze({
     kind: rendererRootMetadata.kind ?? null,

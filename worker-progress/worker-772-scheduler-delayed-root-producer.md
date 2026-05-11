@@ -12,6 +12,9 @@
   rejects stale callback handles, cloned renderer-root source metadata, cloned
   produced delayed metadata, mutated act queue/root work evidence, public
   compatibility claims, and execution claims.
+- Acceptance-audit follow-up tightened renderer-root source proof so it binds
+  the scheduled callback identity plus each nested act queue/root work entry
+  identity and signature before private handoff or delayed drain.
 - The delayed drain report now summarizes the renderer-root producer evidence
   while preserving the nested expired act/root report that Worker 747's React
   private act gate already consumes.
@@ -35,14 +38,17 @@
 - `node --check tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs` - passed.
 - `node --check tests/conformance/test/react-act-oracle.test.mjs` - passed.
 - `git diff --check` - passed.
+- `node --test tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs` - passed, 5 tests.
 - `node --test tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs tests/conformance/test/react-act-oracle.test.mjs` - passed, 23 tests.
 - `node --test tests/conformance/test/scheduler-mock-oracle.test.mjs` - passed, 23 tests.
 - `node --test tests/conformance/test/scheduler-mock-expired-lane-flush.test.mjs` - passed, 3 tests.
 - `node --test tests/conformance/test/private-admission-739-745-gate.test.mjs tests/conformance/test/private-admission-746-753-gate.test.mjs` - passed, 15 tests.
+- `node --test tests/conformance/test/scheduler-native-entry-oracle.test.mjs` - failed on the known private source-validator symbol exposure from mock flush helpers, outside this worker's touched symbol path.
 - `npm run check --workspace scheduler` - passed; npm printed the existing `minimum-release-age` warning.
 - `npm run check --workspace @fast-react/react` - passed; npm printed the existing `minimum-release-age` warning.
 - `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
 - `node tests/smoke/import-entrypoints.mjs` - passed.
+- `git diff -- packages/scheduler/unstable_mock.js | rg "privateSchedulerMockExpiredActRootWorkSourceValidator|mock-expired-act-root-work-source-validator" || true` - no output; the audit-noted native-entry symbol exposure was not introduced or changed by this branch.
 
 ## Evidence Gathered
 
@@ -61,6 +67,16 @@
   identity and timing evidence.
 - Confirmed a stale delayed renderer-root callback handle rejects as
   `renderer-root-producer-stale-callback-handle`.
+- Confirmed replacing the delayed callback handle's callback with a different
+  branded callback rejects as
+  `metadata-source-renderer-root-callback-identity-mismatch` before either
+  callback runs.
+- Confirmed a same-length act queue entry swap before renderer-root handoff
+  rejects as
+  `renderer-root-metadata-source-act-queue-record-0-identity-mismatch`.
+- Confirmed a same-length root work record swap before renderer-root handoff
+  rejects as
+  `renderer-root-metadata-source-root-work-record-1-identity-mismatch`.
 - Confirmed a cloned renderer-root metadata source rejects as
   `renderer-root-metadata-source-proof`.
 - Confirmed a cloned renderer-produced delayed metadata object rejects as
@@ -80,6 +96,9 @@
   timing compatibility, public React act compatibility, public root scheduler
   compatibility, public renderer compatibility, renderer work, renderer roots,
   queued work, or effects.
+- The `scheduler-native-entry-oracle` still reports the pre-existing mock flush
+  helper private validator symbol exposure. This branch did not introduce or
+  modify that source-validator symbol path, so it remains a separate follow-up.
 - Future renderer-owned root producers should pass Scheduler-owned metadata
   through this private route without cloning the renderer-root metadata,
   callback handle, act queue, or root work record arrays.
