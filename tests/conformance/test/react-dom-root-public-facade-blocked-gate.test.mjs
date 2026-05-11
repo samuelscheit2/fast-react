@@ -1389,6 +1389,190 @@ test("React DOM client private hydrateRoot target-claiming preflight remains pri
   assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
 });
 
+test("React DOM client private hydrateRoot event replay preflight validates blocked replay only", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const eventListener = require(
+    path.join(repoRoot, "packages/react-dom/src/events/react-dom-event-listener.js")
+  );
+  const eventSystemFlags = require(
+    path.join(repoRoot, "packages/react-dom/src/events/event-system-flags.js")
+  );
+  const pluginEventSystem = require(
+    path.join(repoRoot, "packages/react-dom/src/events/plugin-event-system.js")
+  );
+  const symbol = rootBridge.privateHydrateRootPublicFacadePreflightSymbol;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.hydrateRoot,
+    symbol
+  );
+  const document = createPrivateGateDocument(
+    "public-facade-hydrate-event-replay",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const target = createPrivateGateElement("BUTTON", document, domContainer);
+  const start = createPrivateGateCommentNode("$", document, domContainer);
+  const end = createPrivateGateCommentNode("/$", document, domContainer);
+  start.parentNode = container;
+  target.parentNode = container;
+  end.parentNode = container;
+  container.childNodes = [start, target, end];
+  let recoverableErrorCalls = 0;
+  const preflight = descriptor.value({
+    hydrateIdPrefix: "facade-hydrate-event-replay",
+    publicFacadeHydratePreflightIdPrefix:
+      "facade-hydrate-event-replay-preflight",
+    requestIdPrefix: "facade-hydrate-event-replay-request"
+  });
+  const hydrateRecord = preflight.hydrateRoot(
+    container,
+    {
+      props: {
+        children: "event replay"
+      },
+      type: "App"
+    },
+    {
+      identifierPrefix: "hydrate-event-replay-",
+      onRecoverableError() {
+        recoverableErrorCalls++;
+      }
+    }
+  );
+  const wrapper =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      "click",
+      eventSystemFlags.IS_CAPTURE_PHASE
+    );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapper,
+      {
+        target,
+        type: "click"
+      }
+    );
+  const targetClaimRecord = preflight.preflightTargetClaiming(
+    hydrateRecord,
+    dispatchRecord,
+    {
+      source: "conformance-hydrate-root-event-replay-target-claiming"
+    }
+  );
+  const eventReplayRecord = preflight.preflightEventReplay(
+    targetClaimRecord,
+    {
+      source: "conformance-hydrate-root-event-replay"
+    }
+  );
+  const eventReplayPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(
+      eventReplayRecord
+    );
+  const executionPayload =
+    rootBridge.getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
+      eventReplayRecord.replayExecutionRecord
+    );
+
+  assert.equal(
+    eventReplayRecord.preflightStatus,
+    rootBridge.ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EVENT_REPLAY_PREFLIGHTED
+  );
+  assert.equal(Object.isFrozen(eventReplayRecord), true);
+  assert.equal(
+    rootBridge.isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
+      eventReplayRecord
+    ),
+    true
+  );
+  assert.equal(eventReplayRecord.markerListenerPreflight, hydrateRecord.markerListenerPreflight);
+  assert.equal(eventReplayRecord.targetClaimingPreflight, targetClaimRecord);
+  assert.equal(eventReplayRecord.preconditions.markerListenerPreflightRequired, true);
+  assert.equal(eventReplayRecord.preconditions.targetClaimingPreflightRequired, true);
+  assert.equal(eventReplayRecord.preconditions.canonicalReplayExecutionMetadata, true);
+  assert.equal(eventReplayRecord.dispatchRecord, dispatchRecord);
+  assert.equal(eventReplayRecord.dispatchRecordStatus, "blocked");
+  assert.equal(eventReplayRecord.targetPath, "container.childNodes[1]");
+  assert.equal(eventReplayRecord.markerPath, "container.childNodes[0]");
+  assert.equal(eventReplayRecord.targetDispatchExecuted, false);
+  assert.equal(eventReplayRecord.eventReplayDispatchAttempted, false);
+  assert.equal(eventReplayRecord.nativeEventRedispatched, false);
+  assert.equal(eventReplayRecord.syntheticEventCreated, false);
+  assert.equal(eventReplayRecord.listenerInvocationCount, 0);
+  assert.equal(eventReplayRecord.hydrateInstanceCalled, false);
+  assert.equal(eventReplayRecord.rootScheduled, false);
+  assert.equal(eventReplayRecord.suspenseHydrationScheduled, false);
+  assert.equal(eventReplayRecord.replayQueueDrained, false);
+  assert.equal(eventReplayRecord.replayQueuesDrained, false);
+  assert.equal(eventReplayRecord.clickReplayDispatchDiagnosticRecorded, true);
+  assert.equal(eventReplayRecord.clickReplayDispatchDiagnosticBlocked, true);
+  assert.equal(eventReplayRecord.recoverableErrorsQueued, false);
+  assert.equal(eventReplayRecord.onRecoverableErrorInvoked, false);
+  assert.equal(eventReplayRecord.publicOnRecoverableErrorInvoked, false);
+  assert.equal(recoverableErrorCalls, 0);
+  assert.equal(eventReplayRecord.publicHydrateRootEnabled, false);
+  assert.equal(eventReplayRecord.publicHydrationTargetClaimed, false);
+  assert.equal(eventReplayRecord.publicHydrationCompatibilityClaimed, false);
+  assert.equal(eventReplayRecord.publicHydrationReplayCompatibilityClaimed, false);
+  assert.equal(eventReplayRecord.eventDispatch, false);
+  assert.equal(eventReplayRecord.compatibilityClaimed, false);
+  assert.deepEqual(
+    eventReplayRecord.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "hydrate-root-marker-listener-preflight-required",
+      "hydrate-root-target-claiming-preflight-required",
+      "hydrate-root-replay-target-dispatch-execution-metadata",
+      "hydrate-root-event-replay-state-unchanged"
+    ]
+  );
+  assert.equal(eventReplayPayload.preflight, preflight);
+  assert.equal(eventReplayPayload.targetClaimingPreflight, targetClaimRecord);
+  assert.equal(eventReplayPayload.replayExecutionPayload, executionPayload);
+  assert.equal(executionPayload.dispatchRecord, dispatchRecord);
+  assert.deepEqual(preflight.getHydrateRootEventReplayPreflightRecords(), [
+    eventReplayRecord
+  ]);
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .eventReplayPreflightRecordCount,
+    1
+  );
+  assert.throws(
+    () => preflight.preflightEventReplay(Object.freeze({...targetClaimRecord})),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT",
+      message: /target-claiming/
+    }
+  );
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.hydrateRoot.status, "throws");
+  assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
+});
+
 test("React DOM client private facade preflights marker/listener setup and cleanup without public behavior", () => {
   const reactDomClient = require(
     path.join(repoRoot, "packages/react-dom/client.js")
