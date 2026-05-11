@@ -3477,6 +3477,10 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_DIAGNOSTIC_NAME: &
     "fast-react-test-renderer.tojson.sibling-text.finished-work-identity";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_STATUS: &str =
     "private-tojson-sibling-text-finished-work-identity-validated-public-tojson-blocked";
+pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.serialization.private-unmount-nested-source-report-gate";
+pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS: &str =
+    "private-unmount-nested-source-report-admission-validated-public-native-package-blocked";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-update-host-output-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID: &str =
@@ -7441,6 +7445,276 @@ impl TestRendererPrivateSerializationFinishedWorkIdentityGate {
     #[must_use]
     pub const fn compatibility_claimed(self) -> bool {
         self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateUnmountNestedSourceReportAdmissionGate {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    nested_root: FiberRootId,
+    unmount_root: FiberRootId,
+    nested_route_record_id: &'static str,
+    nested_route_status: &'static str,
+    unmount_admission_record_id: &'static str,
+    unmount_admission_status: &'static str,
+    nested_identity_diagnostic_name: &'static str,
+    unmount_identity_diagnostic_name: &'static str,
+    nested_source_report_diagnostic_name: &'static str,
+    nested_host_output_shape: TestRendererPrivateToJsonHostOutputShape,
+    unmount_host_output_shape: TestRendererPrivateToJsonHostOutputShape,
+    nested_source_node_count: usize,
+    nested_host_component_count: usize,
+    nested_host_text_count: usize,
+    unmount_host_node_cleanup_count: usize,
+    unmount_cleanup_order_record_count: usize,
+    nested_identity_accepted: bool,
+    unmount_identity_accepted: bool,
+    nested_route_admission_accepted: bool,
+    unmount_route_admission_accepted: bool,
+    nested_committed_source_report_ownership_accepted: bool,
+    unmount_deletion_cleanup_metadata_accepted: bool,
+    consumes_worker_736_nested_source_report_identity: bool,
+    consumes_worker_733_unmount_identity: bool,
+    broad_multichild_identity_available: bool,
+    public_to_json_available: bool,
+    public_to_tree_available: bool,
+    public_test_instance_available: bool,
+    public_serialization_available: bool,
+    public_route_available: bool,
+    native_bridge_loading_available: bool,
+    native_bridge_available: bool,
+    native_execution_available: bool,
+    js_facade_available: bool,
+    cjs_facade_available: bool,
+    package_compatibility_claimed: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateUnmountNestedSourceReportAdmissionGate {
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn nested_root(self) -> FiberRootId {
+        self.nested_root
+    }
+
+    #[must_use]
+    pub const fn unmount_root(self) -> FiberRootId {
+        self.unmount_root
+    }
+
+    #[must_use]
+    pub const fn nested_route_record_id(self) -> &'static str {
+        self.nested_route_record_id
+    }
+
+    #[must_use]
+    pub const fn nested_route_status(self) -> &'static str {
+        self.nested_route_status
+    }
+
+    #[must_use]
+    pub const fn unmount_admission_record_id(self) -> &'static str {
+        self.unmount_admission_record_id
+    }
+
+    #[must_use]
+    pub const fn unmount_admission_status(self) -> &'static str {
+        self.unmount_admission_status
+    }
+
+    #[must_use]
+    pub const fn nested_identity_diagnostic_name(self) -> &'static str {
+        self.nested_identity_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn unmount_identity_diagnostic_name(self) -> &'static str {
+        self.unmount_identity_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn nested_source_report_diagnostic_name(self) -> &'static str {
+        self.nested_source_report_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn nested_host_output_shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.nested_host_output_shape
+    }
+
+    #[must_use]
+    pub const fn unmount_host_output_shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.unmount_host_output_shape
+    }
+
+    #[must_use]
+    pub const fn nested_source_node_count(self) -> usize {
+        self.nested_source_node_count
+    }
+
+    #[must_use]
+    pub const fn nested_host_component_count(self) -> usize {
+        self.nested_host_component_count
+    }
+
+    #[must_use]
+    pub const fn nested_host_text_count(self) -> usize {
+        self.nested_host_text_count
+    }
+
+    #[must_use]
+    pub const fn unmount_host_node_cleanup_count(self) -> usize {
+        self.unmount_host_node_cleanup_count
+    }
+
+    #[must_use]
+    pub const fn unmount_cleanup_order_record_count(self) -> usize {
+        self.unmount_cleanup_order_record_count
+    }
+
+    #[must_use]
+    pub const fn nested_identity_accepted(self) -> bool {
+        self.nested_identity_accepted
+    }
+
+    #[must_use]
+    pub const fn unmount_identity_accepted(self) -> bool {
+        self.unmount_identity_accepted
+    }
+
+    #[must_use]
+    pub const fn nested_route_admission_accepted(self) -> bool {
+        self.nested_route_admission_accepted
+    }
+
+    #[must_use]
+    pub const fn unmount_route_admission_accepted(self) -> bool {
+        self.unmount_route_admission_accepted
+    }
+
+    #[must_use]
+    pub const fn nested_committed_source_report_ownership_accepted(self) -> bool {
+        self.nested_committed_source_report_ownership_accepted
+    }
+
+    #[must_use]
+    pub const fn unmount_deletion_cleanup_metadata_accepted(self) -> bool {
+        self.unmount_deletion_cleanup_metadata_accepted
+    }
+
+    #[must_use]
+    pub const fn consumes_worker_736_nested_source_report_identity(self) -> bool {
+        self.consumes_worker_736_nested_source_report_identity
+    }
+
+    #[must_use]
+    pub const fn consumes_worker_733_unmount_identity(self) -> bool {
+        self.consumes_worker_733_unmount_identity
+    }
+
+    #[must_use]
+    pub const fn broad_multichild_identity_available(self) -> bool {
+        self.broad_multichild_identity_available
+    }
+
+    #[must_use]
+    pub const fn public_to_json_available(self) -> bool {
+        self.public_to_json_available
+    }
+
+    #[must_use]
+    pub const fn public_to_tree_available(self) -> bool {
+        self.public_to_tree_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_available(self) -> bool {
+        self.public_test_instance_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn public_route_available(self) -> bool {
+        self.public_route_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_loading_available(self) -> bool {
+        self.native_bridge_loading_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn js_facade_available(self) -> bool {
+        self.js_facade_available
+    }
+
+    #[must_use]
+    pub const fn cjs_facade_available(self) -> bool {
+        self.cjs_facade_available
+    }
+
+    #[must_use]
+    pub const fn package_compatibility_claimed(self) -> bool {
+        self.package_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+
+    #[must_use]
+    pub fn public_native_package_js_surfaces_blocked(self) -> bool {
+        !self.public_to_json_available()
+            && !self.public_to_tree_available()
+            && !self.public_test_instance_available()
+            && !self.public_serialization_available()
+            && !self.public_route_available()
+            && !self.native_bridge_loading_available()
+            && !self.native_bridge_available()
+            && !self.native_execution_available()
+            && !self.js_facade_available()
+            && !self.cjs_facade_available()
+            && !self.package_compatibility_claimed()
+            && !self.compatibility_claimed()
+    }
+
+    #[must_use]
+    pub fn private_admission_ready(self) -> bool {
+        self.nested_identity_accepted()
+            && self.unmount_identity_accepted()
+            && self.nested_route_admission_accepted()
+            && self.unmount_route_admission_accepted()
+            && self.nested_committed_source_report_ownership_accepted()
+            && self.unmount_deletion_cleanup_metadata_accepted()
+            && self.consumes_worker_736_nested_source_report_identity()
+            && self.consumes_worker_733_unmount_identity()
+            && !self.broad_multichild_identity_available()
+            && self.public_native_package_js_surfaces_blocked()
     }
 }
 
@@ -14681,6 +14955,166 @@ impl TestRendererRoot {
         )
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "private pre-admission matrix intentionally joins two independent evidence streams"
+    )]
+    pub fn describe_private_unmount_nested_source_report_admission_gate_for_canary(
+        nested_root: &Self,
+        nested_output: &TestRendererNestedHostParentPlacedHostOutput,
+        nested_route: TestRendererPrivateUpdateRouteAdmissionRecord,
+        nested_report: Option<&TestRendererPrivateJsonSerializationReport>,
+        nested_identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
+        unmount_root: &Self,
+        unmount_output: &TestRendererUnmountedHostOutput,
+        unmount_handoff: Option<TestRendererUnmountDeletionCommitHandoffDiagnostics>,
+        unmount_admission: TestRendererUnmountNativeBridgeAdmission,
+        unmount_identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
+    ) -> Result<TestRendererPrivateUnmountNestedSourceReportAdmissionGate, TestRendererRootError>
+    {
+        let Some(nested_report) = nested_report else {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-missing",
+            ));
+        };
+        let Some(nested_identity) = nested_identity else {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-finished-work-identity-missing",
+            ));
+        };
+        let Some(unmount_handoff) = unmount_handoff else {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "unmount-deletion-commit-handoff-missing",
+            ));
+        };
+        let Some(unmount_identity) = unmount_identity else {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "unmount-finished-work-identity-missing",
+            ));
+        };
+
+        Self::validate_private_unmount_nested_source_report_nested_route_for_canary(
+            nested_root,
+            nested_output,
+            nested_route,
+        )?;
+        let nested_identity = nested_root
+            .validate_private_serialization_finished_work_identity_for_native_execution(
+                "create().toJSON",
+                TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
+                TestRendererRootUpdateKind::Update,
+                true,
+                false,
+                Some(nested_identity),
+            )
+            .map_err(Self::private_unmount_nested_source_report_gate_identity_error)?;
+        nested_root
+            .validate_private_nested_update_native_execution_matches_handoff_for_canary(
+                nested_output,
+                nested_route,
+                nested_identity,
+            )
+            .map_err(Self::private_unmount_nested_source_report_gate_error)?;
+        Self::validate_private_unmount_nested_source_report_ownership_for_canary(
+            nested_output,
+            nested_route,
+            nested_report,
+            nested_identity,
+        )?;
+
+        Self::validate_private_unmount_nested_source_report_unmount_admission_for_canary(
+            unmount_root,
+            unmount_admission,
+        )?;
+        let Some(scheduled_update) = unmount_root.scheduled_updates.last() else {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "unmount-route-admission-missing",
+            ));
+        };
+        unmount_root
+            .validate_private_unmount_native_bridge_handoff_for_canary(
+                scheduled_update,
+                unmount_handoff,
+            )
+            .map_err(|_| {
+                Self::private_unmount_nested_source_report_gate_error(
+                    "unmount-deletion-cleanup-handoff-mismatch",
+                )
+            })?;
+        let unmount_identity = unmount_root
+            .validate_private_serialization_finished_work_identity_for_native_execution(
+                "create().unmount -> create().toJSON",
+                TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
+                TestRendererRootUpdateKind::Unmount,
+                true,
+                false,
+                Some(unmount_identity),
+            )
+            .map_err(Self::private_unmount_nested_source_report_gate_identity_error)?;
+        let unmount_row = unmount_root
+            .describe_private_to_json_host_output_unmount_row_for_canary(unmount_output)?;
+        unmount_root
+            .validate_private_unmount_native_execution_matches_handoff_for_canary(
+                unmount_output,
+                unmount_admission,
+                unmount_identity,
+                unmount_row,
+            )
+            .map_err(Self::private_unmount_nested_source_report_gate_error)?;
+
+        let nested_inspection = nested_report.gate().fiber_inspection().ok_or_else(|| {
+            Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-ownership-mismatch",
+            )
+        })?;
+        let gate = TestRendererPrivateUnmountNestedSourceReportAdmissionGate {
+            diagnostic_name:
+                TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS,
+            nested_root: nested_root.root_id,
+            unmount_root: unmount_root.root_id,
+            nested_route_record_id: nested_route.record_id(),
+            nested_route_status: nested_route.status(),
+            unmount_admission_record_id: unmount_admission.diagnostic_id(),
+            unmount_admission_status: unmount_admission.status(),
+            nested_identity_diagnostic_name: nested_identity.diagnostic_name(),
+            unmount_identity_diagnostic_name: unmount_identity.diagnostic_name(),
+            nested_source_report_diagnostic_name: nested_report.diagnostic_name(),
+            nested_host_output_shape: nested_report.host_output_shape(),
+            unmount_host_output_shape: unmount_row.host_output_shape(),
+            nested_source_node_count: nested_report.node_count(),
+            nested_host_component_count: nested_inspection.host_components().len(),
+            nested_host_text_count: nested_inspection.host_texts().len(),
+            unmount_host_node_cleanup_count: unmount_handoff.host_node_cleanup_count(),
+            unmount_cleanup_order_record_count: unmount_handoff.cleanup_order_record_count(),
+            nested_identity_accepted: true,
+            unmount_identity_accepted: true,
+            nested_route_admission_accepted: true,
+            unmount_route_admission_accepted: true,
+            nested_committed_source_report_ownership_accepted: true,
+            unmount_deletion_cleanup_metadata_accepted: true,
+            consumes_worker_736_nested_source_report_identity: true,
+            consumes_worker_733_unmount_identity: true,
+            broad_multichild_identity_available: false,
+            public_to_json_available: false,
+            public_to_tree_available: false,
+            public_test_instance_available: false,
+            public_serialization_available: false,
+            public_route_available: false,
+            native_bridge_loading_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            js_facade_available: false,
+            cjs_facade_available: false,
+            package_compatibility_claimed: false,
+            compatibility_claimed: false,
+        };
+        Self::validate_private_unmount_nested_source_report_admission_gate_for_canary(gate)
+            .map_err(Self::private_unmount_nested_source_report_gate_error)?;
+
+        Ok(gate)
+    }
+
     pub fn describe_private_tree_committed_fiber_inspection_for_canary(
         &self,
         commit: &HostRootCommitRecord,
@@ -16345,6 +16779,326 @@ impl TestRendererRoot {
             || blocker.package_compatibility_claimed()
         {
             return Err("public-or-native-compatibility-claim");
+        }
+
+        Ok(())
+    }
+
+    fn private_unmount_nested_source_report_gate_error(
+        reason: &'static str,
+    ) -> TestRendererRootError {
+        TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+            reason,
+        }
+        .into()
+    }
+
+    fn private_unmount_nested_source_report_gate_identity_error(
+        reason: &'static str,
+    ) -> TestRendererRootError {
+        if reason == "public-or-native-compatibility-claim" {
+            return TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                reason: "public-or-native-package-js-compatibility-claim",
+            }
+            .into();
+        }
+
+        Self::private_unmount_nested_source_report_gate_error(reason)
+    }
+
+    fn validate_private_unmount_nested_source_report_nested_route_for_canary(
+        nested_root: &Self,
+        nested_output: &TestRendererNestedHostParentPlacedHostOutput,
+        route: TestRendererPrivateUpdateRouteAdmissionRecord,
+    ) -> Result<(), TestRendererRootError> {
+        if route.record_id() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+            || route.status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+            || route.root() != nested_root.root_id
+            || route.public_surface() != "create().update"
+            || route.request_api() != "TestRendererRoot::update"
+            || route.source_diagnostic_name() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME
+            || route.source_diagnostic_status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS
+            || route.lifecycle() != TestRendererRootLifecycle::Active
+            || route.lifecycle() != nested_root.lifecycle
+            || route.scheduled_update_kind() != TestRendererRootUpdateKind::Update
+            || route.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || route.scheduled_update_sequence() != nested_output.scheduled_update_sequence()
+            || route.scheduled_update_sequence() != nested_root.scheduled_updates.len()
+        {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-route-admission-mismatch",
+            ));
+        }
+        if !route.consumes_accepted_host_root_update_queue_metadata()
+            || !route.consumes_accepted_root_work_loop_metadata()
+            || !route.consumes_accepted_host_output_metadata()
+            || !route.rejects_stale_root_lifecycle()
+            || !route.rejects_stale_host_output()
+            || !route.rejects_missing_update_queue_evidence()
+        {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-route-admission-evidence-missing",
+            ));
+        }
+        if route.public_root_update_available()
+            || route.public_serialization_available()
+            || route.native_execution_available()
+            || route.compatibility_claimed()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                    reason: "public-or-native-package-js-compatibility-claim",
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_unmount_nested_source_report_unmount_admission_for_canary(
+        unmount_root: &Self,
+        admission: TestRendererUnmountNativeBridgeAdmission,
+    ) -> Result<(), TestRendererRootError> {
+        if admission.diagnostic_id()
+            != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+            || admission.status() != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS
+            || admission.root() != unmount_root.root_id
+            || admission.route_dependency_id()
+                != TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID
+            || admission.deletion_commit_handoff_id()
+                != TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
+            || admission.cleanup_handoff_id()
+                != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_DIAGNOSTIC_ID
+            || admission.lifecycle() != TestRendererRootLifecycle::UnmountScheduled
+            || admission.lifecycle() != unmount_root.lifecycle
+            || admission.scheduled_update_kind() != TestRendererRootUpdateKind::Unmount
+            || !admission.scheduled_element_is_none()
+            || admission.scheduled_update_sequence() != unmount_root.scheduled_updates.len()
+        {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "unmount-route-admission-mismatch",
+            ));
+        }
+        if !admission.deletion_commit_handoff_accepted()
+            || !admission.cleanup_handoff_accepted()
+            || !admission.lifecycle_evidence_accepted()
+            || !admission.cleanup_blockers_accepted()
+            || !admission.passive_ref_cleanup_order_accepted()
+            || !admission.native_cleanup_after_ref_and_passive_ordering()
+            || !admission.rust_unmount_cleanup_handoff_executed()
+            || !admission.host_output_produced()
+        {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "unmount-route-admission-evidence-missing",
+            ));
+        }
+        if admission.public_unmount_compatibility_claimed()
+            || admission.public_host_teardown_compatibility_claimed()
+            || admission.act_flushing_claimed()
+            || admission.native_bridge_available()
+            || admission.native_execution()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                    reason: "public-or-native-package-js-compatibility-claim",
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_unmount_nested_source_report_ownership_for_canary(
+        output: &TestRendererNestedHostParentPlacedHostOutput,
+        route: TestRendererPrivateUpdateRouteAdmissionRecord,
+        report: &TestRendererPrivateJsonSerializationReport,
+        identity: TestRendererPrivateSerializationFinishedWorkIdentityGate,
+    ) -> Result<(), TestRendererRootError> {
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        if report.diagnostic_name() != TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+            || report.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || report.host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::NestedHostText
+            || report.root_node_kind() != TestRendererPrivateJsonNodeKind::HostComponent
+            || report.root_child_count() != 1
+            || report.node_count() != 4
+            || !report.host_output_snapshot_current()
+            || !report.public_blockers().all_blocked()
+        {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-ownership-mismatch",
+            ));
+        }
+        let Some(row) = report.host_output_row() else {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-row-missing",
+            ));
+        };
+        if row.id() != TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID
+            || row.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || row.host_output_shape() != TestRendererPrivateToJsonHostOutputShape::NestedHostText
+            || !row.public_blockers().all_blocked()
+            || !row.dependency_diagnostics().public_surfaces_blocked()
+        {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-row-mismatch",
+            ));
+        }
+
+        let Some(inspection) = report.gate().fiber_inspection() else {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-ownership-mismatch",
+            ));
+        };
+        if inspection != output.fiber_inspection()
+            || inspection.current() != output.commit().current()
+            || inspection.root_children().len() != 1
+            || inspection.host_components().len() != 2
+            || inspection.host_texts().len() != 2
+            || report.gate().commit().current() != identity.report_finished_work()
+            || report.gate().commit().finished_lanes_bits() != identity.report_finished_lanes_bits()
+        {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-ownership-mismatch",
+            ));
+        }
+
+        let snapshot_children = output.snapshot().children();
+        let [TestNodeSnapshot::Element(outer_snapshot)] = snapshot_children else {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-ownership-mismatch",
+            ));
+        };
+        let [TestNodeSnapshot::Element(inner_snapshot)] = outer_snapshot.children() else {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-ownership-mismatch",
+            ));
+        };
+        let [
+            TestNodeSnapshot::Text(stable_text),
+            TestNodeSnapshot::Text(placed_text),
+        ] = inner_snapshot.children()
+        else {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-ownership-mismatch",
+            ));
+        };
+
+        let nodes = report.nodes();
+        let outer = &nodes[0];
+        let inner = &nodes[1];
+        let stable = &nodes[2];
+        let placed = &nodes[3];
+        let stable_text_fiber = inspection.host_texts()[0].fiber();
+        let placed_text_fiber = inspection.host_texts()[1].fiber();
+        if outer.node_kind() != TestRendererPrivateJsonNodeKind::HostComponent
+            || outer.parent_ordinal().is_some()
+            || outer.child_ordinals() != [1]
+            || outer.fiber().fiber() != fiber_handle!(output.outer_fibers().component())
+            || inner.node_kind() != TestRendererPrivateJsonNodeKind::HostComponent
+            || inner.parent_ordinal() != Some(0)
+            || inner.child_ordinals() != [2, 3]
+            || inner.fiber().fiber() != fiber_handle!(output.inner_fibers().component())
+            || stable.node_kind() != TestRendererPrivateJsonNodeKind::Text
+            || stable.parent_ordinal() != Some(1)
+            || !stable.child_ordinals().is_empty()
+            || stable.text() != Some(stable_text.text())
+            || stable.fiber().fiber() != fiber_handle!(output.inner_fibers().text())
+            || stable.fiber().fiber() != fiber_handle!(stable_text_fiber)
+            || placed.node_kind() != TestRendererPrivateJsonNodeKind::Text
+            || placed.parent_ordinal() != Some(1)
+            || !placed.child_ordinals().is_empty()
+            || placed.text() != Some(placed_text.text())
+            || placed.fiber().fiber() != fiber_handle!(placed_text_fiber)
+        {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-ownership-mismatch",
+            ));
+        }
+
+        if identity.root() != route.root()
+            || identity.root_scheduled_update_sequence() != route.scheduled_update_sequence()
+            || identity.render_current() != route.render_current()
+            || identity.render_finished_work() != route.render_finished_work()
+            || identity.commit_previous_current() != route.commit_previous_current()
+            || identity.commit_current() != route.commit_current()
+            || identity.report_finished_work() != route.commit_current()
+            || identity.render_lanes_bits() != route.render_lanes_bits()
+            || identity.commit_finished_lanes_bits() != route.commit_finished_lanes_bits()
+            || identity.report_finished_lanes_bits() != route.commit_finished_lanes_bits()
+        {
+            return Err(Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-identity-route-mismatch",
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_unmount_nested_source_report_admission_gate_for_canary(
+        gate: TestRendererPrivateUnmountNestedSourceReportAdmissionGate,
+    ) -> Result<(), &'static str> {
+        if gate.diagnostic_name()
+            != TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAME
+            || gate.status() != TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS
+        {
+            return Err("unmount-nested-source-report-gate-diagnostic-mismatch");
+        }
+        if gate.nested_route_record_id() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+            || gate.nested_route_status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+            || gate.unmount_admission_record_id()
+                != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+            || gate.unmount_admission_status()
+                != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS
+            || gate.nested_identity_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME
+            || gate.unmount_identity_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME
+            || gate.nested_source_report_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        {
+            return Err("unmount-nested-source-report-gate-source-mismatch");
+        }
+        if gate.nested_host_output_shape()
+            != TestRendererPrivateToJsonHostOutputShape::NestedHostText
+            || gate.unmount_host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            || gate.nested_source_node_count() != 4
+            || gate.nested_host_component_count() != 2
+            || gate.nested_host_text_count() != 2
+            || gate.unmount_host_node_cleanup_count() == 0
+            || gate.unmount_cleanup_order_record_count() < gate.unmount_host_node_cleanup_count()
+        {
+            return Err("unmount-nested-source-report-gate-shape-mismatch");
+        }
+        if !gate.nested_identity_accepted()
+            || !gate.unmount_identity_accepted()
+            || !gate.nested_route_admission_accepted()
+            || !gate.unmount_route_admission_accepted()
+            || !gate.nested_committed_source_report_ownership_accepted()
+            || !gate.unmount_deletion_cleanup_metadata_accepted()
+            || !gate.consumes_worker_736_nested_source_report_identity()
+            || !gate.consumes_worker_733_unmount_identity()
+        {
+            return Err("unmount-nested-source-report-gate-evidence-not-consumed");
+        }
+        if gate.broad_multichild_identity_available() {
+            return Err("broad-multichild-identity-unexpectedly-open");
+        }
+        if !gate.public_native_package_js_surfaces_blocked() {
+            return Err("public-or-native-package-js-compatibility-claim");
         }
 
         Ok(())
@@ -20698,6 +21452,40 @@ mod tests {
         (root, output, route, report)
     }
 
+    fn nested_source_report_identity_inputs_for_canary() -> (
+        TestRendererRoot,
+        TestRendererNestedHostParentPlacedHostOutput,
+        TestRendererPrivateUpdateRouteAdmissionRecord,
+        TestRendererPrivateJsonSerializationReport,
+        TestRendererPrivateSerializationFinishedWorkIdentityGate,
+    ) {
+        let mut root = TestRendererRoot::create_nested_host_components_with_text_for_canary(
+            "section",
+            "span",
+            "stable",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_nested_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let output = root
+            .render_and_commit_nested_host_parent_text_placement_for_canary("inserted")
+            .unwrap();
+        let route = accepted_nested_update_route_admission_for_root(&root, &output);
+        let report = root
+            .describe_private_json_serialization_after_nested_update_for_canary(&output)
+            .unwrap();
+        let identity = root
+            .describe_private_to_json_nested_finished_work_identity_gate_for_canary(
+                &output,
+                Some(&report),
+            )
+            .unwrap();
+
+        (root, output, route, report, identity)
+    }
+
     fn assert_sibling_text_identity_error_reason(
         error: TestRendererRootError,
         expected_reason: &'static str,
@@ -20722,6 +21510,33 @@ mod tests {
                 reason,
             } => assert_eq!(*reason, expected_reason),
             other => panic!("unexpected sibling-text identity error: {other:?}"),
+        }
+    }
+
+    fn assert_unmount_nested_source_report_gate_error_reason(
+        error: TestRendererRootError,
+        expected_reason: &'static str,
+    ) {
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected private unmount/nested source-report gate error");
+        };
+        match error.as_ref() {
+            TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::NonCommittedFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                reason,
+            } => assert_eq!(*reason, expected_reason),
+            other => panic!("unexpected private unmount/nested gate error: {other:?}"),
         }
     }
 
@@ -23440,6 +24255,349 @@ mod tests {
         assert_eq!(inner.element_type().as_str(), "span");
         assert_eq!(inner.children().unwrap()[0].as_text(), Some("stable"));
         assert_eq!(inner.children().unwrap()[1].as_text(), Some("inserted"));
+    }
+
+    #[test]
+    fn root_private_unmount_nested_source_report_gate_consumes_worker_733_and_736_evidence() {
+        let (nested_root, nested_output, nested_route, nested_report, nested_identity) =
+            nested_source_report_identity_inputs_for_canary();
+        let (unmount_root, unmounted, handoff, admission, unmount_identity) =
+            accepted_unmount_identity_for_root(false, true);
+
+        let gate =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&nested_report),
+                Some(nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap();
+
+        assert_eq!(
+            gate.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            gate.status(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS
+        );
+        assert_eq!(gate.nested_root(), nested_root.root_id());
+        assert_eq!(gate.unmount_root(), unmount_root.root_id());
+        assert_eq!(
+            gate.nested_host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::NestedHostText
+        );
+        assert_eq!(
+            gate.unmount_host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+        );
+        assert_eq!(gate.nested_source_node_count(), 4);
+        assert_eq!(gate.nested_host_component_count(), 2);
+        assert_eq!(gate.nested_host_text_count(), 2);
+        assert_eq!(gate.unmount_host_node_cleanup_count(), 2);
+        assert_eq!(gate.unmount_cleanup_order_record_count(), 4);
+        assert!(gate.nested_identity_accepted());
+        assert!(gate.unmount_identity_accepted());
+        assert!(gate.nested_route_admission_accepted());
+        assert!(gate.unmount_route_admission_accepted());
+        assert!(gate.nested_committed_source_report_ownership_accepted());
+        assert!(gate.unmount_deletion_cleanup_metadata_accepted());
+        assert!(gate.consumes_worker_736_nested_source_report_identity());
+        assert!(gate.consumes_worker_733_unmount_identity());
+        assert!(gate.private_admission_ready());
+        assert!(!gate.broad_multichild_identity_available());
+        assert!(!gate.public_to_json_available());
+        assert!(!gate.public_to_tree_available());
+        assert!(!gate.public_test_instance_available());
+        assert!(!gate.public_serialization_available());
+        assert!(!gate.public_route_available());
+        assert!(!gate.native_bridge_loading_available());
+        assert!(!gate.native_bridge_available());
+        assert!(!gate.native_execution_available());
+        assert!(!gate.js_facade_available());
+        assert!(!gate.cjs_facade_available());
+        assert!(!gate.package_compatibility_claimed());
+        assert!(!gate.compatibility_claimed());
+        assert!(gate.public_native_package_js_surfaces_blocked());
+    }
+
+    #[test]
+    fn root_private_unmount_nested_source_report_gate_rejects_stale_foreign_tampered_handoffs() {
+        let (nested_root, nested_output, nested_route, nested_report, nested_identity) =
+            nested_source_report_identity_inputs_for_canary();
+        let (unmount_root, unmounted, handoff, admission, unmount_identity) =
+            accepted_unmount_identity_for_root(false, true);
+
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&nested_report),
+                None,
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "nested-finished-work-identity-missing",
+        );
+
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&nested_report),
+                Some(unmount_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "finished-work-identity-public-surface-mismatch",
+        );
+
+        let mut stale_nested_identity = nested_identity;
+        stale_nested_identity.commit_current.slot += 1;
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&nested_report),
+                Some(stale_nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "finished-work-identity-stale",
+        );
+
+        let mut stale_nested_route = nested_route;
+        stale_nested_route.commit_current.slot += 1;
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                stale_nested_route,
+                Some(&nested_report),
+                Some(nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "update-admission-handoff-mismatch",
+        );
+
+        let mut broad_report = nested_report.clone();
+        broad_report.host_output_shape = TestRendererPrivateToJsonHostOutputShape::SiblingText;
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&broad_report),
+                Some(nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "nested-source-report-ownership-mismatch",
+        );
+
+        let mut tampered_placed_text_report = nested_report.clone();
+        tampered_placed_text_report.nodes[3].fiber = tampered_placed_text_report.nodes[2].fiber;
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&tampered_placed_text_report),
+                Some(nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "nested-source-report-ownership-mismatch",
+        );
+
+        let mut stale_handoff = handoff;
+        stale_handoff.cleanup_order_record_count = stale_handoff.host_node_cleanup_count();
+        stale_handoff
+            .passive_ref_cleanup_order
+            .cleanup_order_record_count = stale_handoff.host_node_cleanup_count();
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&nested_report),
+                Some(nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(stale_handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "unmount-deletion-cleanup-handoff-mismatch",
+        );
+
+        let mut tampered_admission = admission;
+        tampered_admission.cleanup_handoff_id = "tampered-cleanup-handoff";
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&nested_report),
+                Some(nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                tampered_admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "unmount-route-admission-mismatch",
+        );
+    }
+
+    #[test]
+    fn root_private_unmount_nested_source_report_gate_rejects_public_native_package_claims() {
+        let (nested_root, nested_output, nested_route, nested_report, nested_identity) =
+            nested_source_report_identity_inputs_for_canary();
+        let (unmount_root, unmounted, handoff, admission, unmount_identity) =
+            accepted_unmount_identity_for_root(false, true);
+
+        let mut public_nested_identity = nested_identity;
+        public_nested_identity.public_to_json_available = true;
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&nested_report),
+                Some(public_nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "public-or-native-package-js-compatibility-claim",
+        );
+
+        let mut native_admission = admission;
+        native_admission.native_bridge_available = true;
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&nested_report),
+                Some(nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                native_admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "public-or-native-package-js-compatibility-claim",
+        );
+
+        let gate =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&nested_report),
+                Some(nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap();
+
+        let mut broad_gate = gate;
+        broad_gate.broad_multichild_identity_available = true;
+        assert_eq!(
+            TestRendererRoot::validate_private_unmount_nested_source_report_admission_gate_for_canary(
+                broad_gate,
+            )
+            .unwrap_err(),
+            "broad-multichild-identity-unexpectedly-open"
+        );
+
+        let mut test_instance_gate = gate;
+        test_instance_gate.public_test_instance_available = true;
+        assert_eq!(
+            TestRendererRoot::validate_private_unmount_nested_source_report_admission_gate_for_canary(
+                test_instance_gate,
+            )
+            .unwrap_err(),
+            "public-or-native-package-js-compatibility-claim"
+        );
+
+        let mut js_gate = gate;
+        js_gate.native_bridge_loading_available = true;
+        js_gate.js_facade_available = true;
+        js_gate.cjs_facade_available = true;
+        js_gate.package_compatibility_claimed = true;
+        assert_eq!(
+            TestRendererRoot::validate_private_unmount_nested_source_report_admission_gate_for_canary(
+                js_gate,
+            )
+            .unwrap_err(),
+            "public-or-native-package-js-compatibility-claim"
+        );
     }
 
     #[test]
