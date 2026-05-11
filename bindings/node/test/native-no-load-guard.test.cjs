@@ -269,6 +269,354 @@ function assertNoNativeCleanupHookExecution(record, label) {
   assert.equal(record.reactBehaviorError, false, `${label} React behavior`);
 }
 
+function assertNoNativeGenerationLedgerExecution(record, label) {
+  assert.equal(record.nativeAddonLoaded, false, `${label} addon`);
+  assert.equal(record.nativeExecution, false, `${label} native`);
+  assert.equal(record.nodeWorkerThreadsExecution, false, `${label} worker`);
+  assert.equal(record.napiCleanupHookExecution, false, `${label} cleanup`);
+  assert.equal(record.rendererExecution, false, `${label} renderer`);
+  assert.equal(record.reconcilerExecution, false, `${label} reconciler`);
+  assert.equal(record.publicNativeCompatibility, false, `${label} public`);
+  assert.equal(record.packageExportCompatibility, false, `${label} package`);
+  assert.equal(record.reactBehaviorError, false, `${label} React behavior`);
+}
+
+function getGenerationAdmissionLedger(native) {
+  const descriptor = Object.getOwnPropertyDescriptor(
+    native.nativeRootBridgeRequestShape,
+    'jsonBatchLifecycleGenerationAdmissionLedger'
+  );
+
+  assert.ok(descriptor, 'generation admission ledger descriptor exists');
+  assert.ok(Object.isFrozen(descriptor.value));
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(
+    Object.keys(native.nativeRootBridgeRequestShape).includes(
+      'jsonBatchLifecycleGenerationAdmissionLedger'
+    ),
+    false
+  );
+
+  return descriptor.value;
+}
+
+function getGenerationAdmissionLedgerValidator(native) {
+  const ledger = getGenerationAdmissionLedger(native);
+  const descriptor = Object.getOwnPropertyDescriptor(
+    ledger,
+    'validateGenerationAdmissionRows'
+  );
+
+  assert.equal(typeof descriptor.value, 'function');
+  assert.equal(
+    descriptor.value.name,
+    'validateNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRows'
+  );
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(
+    Object.keys(ledger).includes('validateGenerationAdmissionRows'),
+    false
+  );
+
+  return descriptor.value;
+}
+
+function generationAdmissionRow(row, overrides = {}) {
+  return Object.freeze({ ...row, ...overrides });
+}
+
+function assertPrivateGenerationAdmissionLedger(native) {
+  const ledger = getGenerationAdmissionLedger(native);
+  const validateGenerationAdmissionRows =
+    getGenerationAdmissionLedgerValidator(native);
+
+  assert.equal(
+    ledger.ledgerStatus,
+    'blocked-private-native-root-bridge-json-batch-lifecycle-generation-ledger'
+  );
+  assert.equal(
+    ledger.model,
+    'fast-react-napi.NativeRootBridgeJsonBatchLifecycleGenerationAdmissionLedger'
+  );
+  assert.equal(
+    ledger.evaluationMode,
+    'static-source-token-ledger-no-native-load-no-package-export'
+  );
+  assert.equal(
+    ledger.sourceWorker,
+    'worker-873-native-lifecycle-no-stale-execution'
+  );
+  assert.equal(ledger.sourceFile, 'crates/fast-react-napi/src/lib.rs');
+  assert.equal(ledger.sourceOwnedEvidenceRequired, true);
+  assert.equal(ledger.blockedPrivateEvidenceOnly, true);
+  assert.equal(ledger.publicAdmission, false);
+  assert.equal(ledger.canonicalSourceEvidenceAccepted, true);
+  assert.equal(ledger.acceptedEvidenceCount, 6);
+  assert.equal(ledger.rejectedEvidenceCount, 0);
+  assert.deepEqual(ledger.rejectedRows, []);
+  assertNoNativeGenerationLedgerExecution(ledger, 'generation ledger');
+  assert.deepEqual(
+    ledger.requiredEvidenceIds,
+    ledger.rows.map((row) => row.id)
+  );
+  assert.deepEqual(
+    ledger.requiredEvidenceRoles,
+    ledger.rows.map((row) => row.role)
+  );
+  assert.deepEqual(ledger.rows.map((row) => row.status), [
+    ledger.acceptedStatus,
+    ledger.acceptedStatus,
+    ledger.acceptedStatus,
+    ledger.acceptedStatus,
+    ledger.acceptedStatus,
+    ledger.acceptedStatus
+  ]);
+  assert.deepEqual(ledger.rows.map((row) => row.id), [
+    'worker-873-json-batch-lifecycle-executor-status',
+    'worker-873-json-batch-lifecycle-source-guard',
+    'worker-873-json-batch-lifecycle-executor-row',
+    'worker-873-json-batch-lifecycle-generation-allocation',
+    'worker-873-json-batch-lifecycle-source-row-validator',
+    'worker-873-json-batch-lifecycle-replay-consumption'
+  ]);
+  assert.deepEqual(ledger.rows.map((row) => row.role), [
+    'executor-status-and-rejection-codes',
+    'source-owned-generation-handle-table-guard',
+    'accepted-row-carries-source-guard',
+    'generation-and-json-value-reuse-guard',
+    'stale-caller-public-claim-source-row-validator',
+    'single-consume-generation-replay-guard'
+  ]);
+
+  const rustSource = fs.readFileSync(
+    path.resolve(__dirname, '../../../crates/fast-react-napi/src/lib.rs'),
+    'utf8'
+  );
+  const workerProgress = fs.readFileSync(
+    path.resolve(__dirname, '../../../', ledger.sourceWorkerProgress),
+    'utf8'
+  );
+  assert.match(workerProgress, /private source-owned generation guard/u);
+
+  for (const row of ledger.rows) {
+    assert.ok(Object.isFrozen(row), row.id);
+    assert.ok(Object.isFrozen(row.sourceIdentifiers), row.id);
+    assert.deepEqual(Object.keys(row), ledger.generationAdmissionRowFields);
+    assert.equal(
+      row.evidenceKind,
+      'source-owned-rust-identifier-set',
+      row.id
+    );
+    assert.equal(row.sourceFile, 'crates/fast-react-napi/src/lib.rs', row.id);
+    assert.equal(row.sourceOwnedEvidence, true, row.id);
+    assert.equal(row.blockedPrivateEvidence, true, row.id);
+    assert.equal(row.publicAdmission, false, row.id);
+    assert.equal(row.callerShapedEvidence, false, row.id);
+    assert.equal(row.proseEvidence, false, row.id);
+    assert.equal(row.testTitleEvidence, false, row.id);
+    assert.equal(row.errorMessageEvidence, false, row.id);
+    assert.equal(row.sourceSyntaxOnly, false, row.id);
+    assert.equal(row.compatibilityAlias, null, row.id);
+    assertNoNativeGenerationLedgerExecution(row, row.id);
+    for (const sourceIdentifier of row.sourceIdentifiers) {
+      assert.ok(
+        rustSource.includes(sourceIdentifier),
+        `${row.id} source identifier ${sourceIdentifier}`
+      );
+    }
+  }
+
+  const mirrored = validateGenerationAdmissionRows(ledger.rows);
+  assert.notEqual(mirrored, ledger);
+  assert.deepEqual(mirrored, ledger);
+  assert.ok(Object.isFrozen(mirrored));
+  assert.ok(Object.isFrozen(mirrored.rows));
+  assertNoNativeGenerationLedgerExecution(
+    mirrored,
+    'mirrored generation ledger'
+  );
+
+  const canonicalStatus = ledger.rows[0];
+  const canonicalGuard = ledger.rows[1];
+  const canonicalReplay = ledger.rows[5];
+  const codes = ledger.rejectionCodes;
+  const cases = [
+    {
+      row: generationAdmissionRow(canonicalGuard, {
+        id: 'generation-ledger-stale-source-identifiers',
+        sourceIdentifiers: ['NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard']
+      }),
+      code: codes.staleOrForeign
+    },
+    {
+      row: generationAdmissionRow(canonicalGuard, {
+        id: 'generation-ledger-wrong-source-role',
+        role: 'caller-shaped-generation-guard'
+      }),
+      code: codes.sourceRoleMismatch
+    },
+    {
+      row: generationAdmissionRow(canonicalGuard, {
+        id: 'generation-ledger-caller-shaped-row',
+        sourceOwnedEvidence: false,
+        callerShapedEvidence: true
+      }),
+      code: codes.callerBuilt
+    },
+    {
+      row: generationAdmissionRow(canonicalStatus, {
+        id: 'generation-ledger-prose-evidence',
+        evidenceKind: 'prose',
+        proseEvidence: true
+      }),
+      code: codes.proseEvidence
+    },
+    {
+      row: generationAdmissionRow(canonicalStatus, {
+        id: 'generation-ledger-test-title-evidence',
+        evidenceKind: 'test-title',
+        testTitleEvidence: true
+      }),
+      code: codes.proseEvidence
+    },
+    {
+      row: generationAdmissionRow(canonicalStatus, {
+        id: 'generation-ledger-error-message-evidence',
+        evidenceKind: 'error-message',
+        errorMessageEvidence: true
+      }),
+      code: codes.proseEvidence
+    },
+    {
+      row: generationAdmissionRow(canonicalStatus, {
+        id: 'generation-ledger-source-syntax-only',
+        evidenceKind: 'source-syntax',
+        sourceSyntaxOnly: true
+      }),
+      code: codes.sourceSyntaxOnly
+    },
+    {
+      row: generationAdmissionRow(canonicalReplay, {
+        id: 'generation-ledger-public-native-claim',
+        nativeExecution: true,
+        publicNativeCompatibility: true
+      }),
+      code: codes.publicNativeExecutionClaim
+    },
+    {
+      row: generationAdmissionRow(canonicalReplay, {
+        id: 'generation-ledger-package-export-claim',
+        packageExportCompatibility: true,
+        packageCompatibilityClaimed: true
+      }),
+      code: codes.packageExportClaim
+    },
+    {
+      row: generationAdmissionRow(canonicalReplay, {
+        id: 'generation-ledger-native-addon-load-claim',
+        nativeAddonLoaded: true
+      }),
+      code: codes.nativeAddonLoadClaim
+    },
+    {
+      row: generationAdmissionRow(canonicalReplay, {
+        id: 'generation-ledger-cleanup-hook-execution-claim',
+        napiCleanupHookExecution: true
+      }),
+      code: codes.cleanupHookExecutionClaim
+    },
+    {
+      row: generationAdmissionRow(canonicalReplay, {
+        id: 'generation-ledger-worker-thread-execution-claim',
+        nodeWorkerThreadsExecution: true
+      }),
+      code: codes.workerThreadExecutionClaim
+    },
+    {
+      row: generationAdmissionRow(canonicalReplay, {
+        id: 'generation-ledger-renderer-reconciler-output-claim',
+        rendererExecution: true,
+        reconcilerExecution: true
+      }),
+      code: codes.rendererReconcilerOutputClaim
+    },
+    {
+      row: generationAdmissionRow(canonicalReplay, {
+        id: 'generation-ledger-compatibility-alias-claim',
+        compatibilityAlias: 'react-native'
+      }),
+      code: codes.compatibilityAliasClaim
+    }
+  ];
+
+  for (const diagnosticCase of cases) {
+    const result = validateGenerationAdmissionRows([diagnosticCase.row]);
+    assert.ok(Object.isFrozen(result), diagnosticCase.row.id);
+    assert.equal(result.rows.length, 1, diagnosticCase.row.id);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.row.id);
+    assert.equal(result.rejectedEvidenceCount, 1, diagnosticCase.row.id);
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.row.id
+    );
+    assertNoNativeGenerationLedgerExecution(result, diagnosticCase.row.id);
+
+    const [row] = result.rows;
+    assert.equal(row.id, diagnosticCase.row.id);
+    assert.equal(row.status, ledger.rejectedStatus, diagnosticCase.row.id);
+    assert.equal(row.code, diagnosticCase.code, diagnosticCase.row.id);
+    assert.equal(Object.hasOwn(row, 'packageCompatibilityClaimed'), false);
+    assertNoNativeGenerationLedgerExecution(row, diagnosticCase.row.id);
+  }
+
+  for (const diagnosticCase of [
+    {
+      id: 'generation-ledger-missing-canonical-row',
+      rows: [canonicalGuard]
+    },
+    {
+      id: 'generation-ledger-duplicate-canonical-row',
+      rows: [canonicalGuard, canonicalGuard]
+    }
+  ]) {
+    const result = validateGenerationAdmissionRows(diagnosticCase.rows);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(
+      result.rejectedEvidenceCount,
+      diagnosticCase.rows.length,
+      diagnosticCase.id
+    );
+    assert.equal(result.canonicalSourceEvidenceAccepted, false, diagnosticCase.id);
+    for (const row of result.rows) {
+      assert.equal(row.status, ledger.rejectedStatus, diagnosticCase.id);
+      assert.equal(row.code, codes.canonicalSetMismatch, diagnosticCase.id);
+      assertNoNativeGenerationLedgerExecution(row, diagnosticCase.id);
+    }
+  }
+
+  const publicClaimResult = validateGenerationAdmissionRows([
+    cases.find((diagnosticCase) => diagnosticCase.code === codes.publicNativeExecutionClaim).row
+  ]);
+  const publicClaimRevalidated = validateGenerationAdmissionRows([
+    publicClaimResult.rows[0]
+  ]);
+  assert.equal(publicClaimRevalidated.acceptedEvidenceCount, 0);
+  assert.equal(publicClaimRevalidated.rejectedEvidenceCount, 1);
+  assert.equal(
+    publicClaimRevalidated.rows[0].code,
+    codes.publicNativeExecutionClaim
+  );
+  assertNoNativeGenerationLedgerExecution(
+    publicClaimRevalidated.rows[0],
+    'generation ledger revalidated public claim'
+  );
+}
+
 function getCleanupHookPreflightValidator(native) {
   const cleanupHookPreflight =
     native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight;
@@ -699,6 +1047,10 @@ async function main() {
     await runForbiddenLoadFixtureMatrix();
 
     const native = require('../index.cjs');
+    const nativePackageJson = require('../package.json');
+    const nativePackageJsonModule = await import('../package.json', {
+      with: { type: 'json' }
+    });
     const expectedBoundaryErrorCodeMap = {
       unsupportedNativeExecution: 'FAST_REACT_NATIVE_BINDING_UNIMPLEMENTED',
       rustNativeExportsNotBuilt: 'FAST_REACT_NAPI_EXPORTS_NOT_BUILT',
@@ -736,6 +1088,8 @@ async function main() {
     ];
 
     assert.equal(native.bindingStatus, 'placeholder');
+    assert.equal(nativePackageJson.name, '@fast-react/native');
+    assert.equal(nativePackageJsonModule.default.name, '@fast-react/native');
     assert.equal(native.nativeBindingManifest.status, 'placeholder');
     const actualRootBridgeEvidence =
       native.nativeBindingManifest.nativeRootBridgeValidationEvidence;
@@ -962,6 +1316,7 @@ async function main() {
       true
     );
     assertPrivateCleanupHookPreflightCallable(native);
+    assertPrivateGenerationAdmissionLedger(native);
     assertNativeRootBridgeBatchLifecycleConsumerNoLoad(native);
     assert.equal(
       native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
@@ -1047,6 +1402,10 @@ async function main() {
     assert.equal(
       getCleanupHookPreflightValidator(esmNative),
       getCleanupHookPreflightValidator(native)
+    );
+    assert.equal(
+      getGenerationAdmissionLedgerValidator(esmNative),
+      getGenerationAdmissionLedgerValidator(native)
     );
   } finally {
     restoreModuleGuards();

@@ -710,6 +710,11 @@ function assertNativePackageDiagnosticSurface(nativeRuntime) {
     requestShape.workerThreadTeardownExecutablePreflight;
   const workerThreadCleanupHookPreflight =
     requestShape.workerThreadCleanupHookPreflight;
+  const generationLedgerDescriptor = Object.getOwnPropertyDescriptor(
+    requestShape,
+    'jsonBatchLifecycleGenerationAdmissionLedger'
+  );
+  const generationLedger = generationLedgerDescriptor?.value;
 
   assert.equal(
     batchMetadata.batchGateStatus,
@@ -1204,6 +1209,70 @@ function assertNativePackageDiagnosticSurface(nativeRuntime) {
     workerThreadCleanupHookPreflight.publicNativeCompatibility,
     false
   );
+
+  assert.equal(
+    generationLedgerDescriptor.enumerable,
+    false,
+    'native generation ledger stays non-enumerable'
+  );
+  assert.equal(
+    Object.keys(requestShape).includes(
+      'jsonBatchLifecycleGenerationAdmissionLedger'
+    ),
+    false,
+    'native generation ledger stays off enumerable package surface'
+  );
+  assert.equal(
+    generationLedger.ledgerStatus,
+    'blocked-private-native-root-bridge-json-batch-lifecycle-generation-ledger',
+    'native generation ledger status'
+  );
+  assert.equal(
+    generationLedger.evaluationMode,
+    'static-source-token-ledger-no-native-load-no-package-export',
+    'native generation ledger mode'
+  );
+  assert.equal(
+    generationLedger.canonicalSourceEvidenceAccepted,
+    true,
+    'native generation ledger canonical evidence'
+  );
+  assert.equal(generationLedger.acceptedEvidenceCount, 6);
+  assert.equal(generationLedger.rejectedEvidenceCount, 0);
+  assert.deepEqual(
+    generationLedger.rows.map((row) => row.id),
+    [
+      'worker-873-json-batch-lifecycle-executor-status',
+      'worker-873-json-batch-lifecycle-source-guard',
+      'worker-873-json-batch-lifecycle-executor-row',
+      'worker-873-json-batch-lifecycle-generation-allocation',
+      'worker-873-json-batch-lifecycle-source-row-validator',
+      'worker-873-json-batch-lifecycle-replay-consumption'
+    ],
+    'native generation ledger evidence ids'
+  );
+  assertNativeNoExecutionFlags(
+    generationLedger,
+    'native generation ledger'
+  );
+  assert.equal(generationLedger.nodeWorkerThreadsExecution, false);
+  assert.equal(generationLedger.napiCleanupHookExecution, false);
+  assert.equal(generationLedger.packageExportCompatibility, false);
+  for (const row of generationLedger.rows) {
+    assert.deepEqual(
+      Object.keys(row),
+      generationLedger.generationAdmissionRowFields,
+      `native generation ledger row fields ${row.id}`
+    );
+    assert.equal(row.sourceOwnedEvidence, true, row.id);
+    assert.equal(row.blockedPrivateEvidence, true, row.id);
+    assert.equal(row.publicAdmission, false, row.id);
+    assert.equal(row.compatibilityAlias, null, row.id);
+    assertNativeNoExecutionFlags(row, `native generation ledger ${row.id}`);
+    assert.equal(row.nodeWorkerThreadsExecution, false, row.id);
+    assert.equal(row.napiCleanupHookExecution, false, row.id);
+    assert.equal(row.packageExportCompatibility, false, row.id);
+  }
 }
 
 function assertLoadError(error, expected, label) {
