@@ -4440,6 +4440,29 @@ mod tests {
         let mut expected_operations = operations_before_update_opt_in;
         expected_operations.push("commit_text_update");
         assert_eq!(fixture.host.operations(), expected_operations);
+
+        let operations_after_execution = fixture.host.operations();
+        let replay_error = execute_sync_flush_host_mutations_for_canary(
+            &mut fixture.store,
+            &mut fixture.host,
+            &committed,
+            diagnostics,
+            request,
+            &mut fixture.host_work,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            replay_error,
+            SyncFlushHostMutationExecutionErrorForCanary::ReplayedHostMutationExecution {
+                root,
+                order,
+                finished_work,
+            } if root == fixture.root_id
+                && order == committed.order()
+                && finished_work == committed.commit().finished_work()
+        ));
+        assert_eq!(fixture.host.operations(), operations_after_execution);
     }
 
     #[test]
@@ -4510,6 +4533,29 @@ mod tests {
         let mut expected_operations = operations_before_update_opt_in;
         expected_operations.push("commit_update");
         assert_eq!(fixture.host.operations(), expected_operations);
+
+        let operations_after_execution = fixture.host.operations();
+        let replay_error = execute_sync_flush_host_mutations_for_canary(
+            &mut fixture.store,
+            &mut fixture.host,
+            &committed,
+            diagnostics,
+            request,
+            &mut fixture.host_work,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            replay_error,
+            SyncFlushHostMutationExecutionErrorForCanary::ReplayedHostMutationExecution {
+                root,
+                order,
+                finished_work,
+            } if root == fixture.root_id
+                && order == committed.order()
+                && finished_work == committed.commit().finished_work()
+        ));
+        assert_eq!(fixture.host.operations(), operations_after_execution);
     }
 
     #[test]

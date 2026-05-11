@@ -53,3 +53,30 @@ All commands passed.
   test-renderer, package, or scheduler behavior.
 - The new unmount execution applies host-node deletion cleanup only through the
   explicit sync-flush private opt-in executor.
+
+## Audit Follow-up - 2026-05-11
+
+- Merged current `origin/main`; branch was already up to date.
+- Added source-owned replay protection to `HostWorkResult` for sync-flush host
+  mutation execution. Each accepted execution records an identity derived from
+  the rebuilt source request and the host-work epoch before entering the host
+  applier.
+- Added HostText and HostComponent update replay assertions proving a reused
+  committed diagnostics/request/host-work tuple returns
+  `ReplayedHostMutationExecution` without recording another host operation.
+
+## Follow-up Verification Results
+
+```sh
+git fetch origin main
+git merge origin/main --no-edit
+cargo fmt --all
+cargo test -p fast-react-reconciler --all-features sync_flush_private_host_mutation_execution
+cargo test -p fast-react-reconciler --all-features sync_flush
+cargo test -p fast-react-reconciler --all-features host_work
+cargo check -p fast-react-reconciler --all-features
+cargo fmt --all --check
+git diff --check
+```
+
+All follow-up commands passed.
