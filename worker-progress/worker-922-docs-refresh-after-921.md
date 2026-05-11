@@ -7,13 +7,18 @@
 ## Summary
 
 - Refreshed `MASTER_PLAN.md` for the accepted baseline through `6d2dafad`
-  (`Merge worker 921 begin work function component bailout blocker`).
+  (`Merge worker 921 begin work function component bailout blocker`), then
+  merged current `main` and advanced the docs baseline to `da842580`
+  (`Merge worker 920 host node store update payload currentness`).
 - Removed accepted Workers 902, 906-909, 912-916, 918-919, and 921 from the
-  active queue and left Workers 910, 917, 920, and this docs worker as the only
-  unaccepted queue entries for this branch baseline.
+  first active queue, then removed accepted Workers 917 and 920 after their
+  merge and left Worker 910, Workers 923-927, and this docs worker as the
+  unaccepted queue entries for the `da842580` baseline.
 - Added a concise accepted-history block to `MASTER_PROGRESS.md` for the
   post-Worker-911 accepted batch, grouped by subsystem and preserving private
   evidence/currentness requirements plus public compatibility blockers.
+- Added accepted-history coverage for Worker 917 reconciler direct multi-child
+  fiber inspection and Worker 920 HostNodeStore update payload currentness.
 
 ## Changed Files
 
@@ -58,6 +63,14 @@
 - `sed -n '1,140p' worker-progress/worker-922-docs-refresh-after-921.md`
 - `rg -n "cc34b057ec8a3652f03c1769a6a7405e37273e8c|Worker 902: active|Worker 906: active|Worker 907: active|Worker 908: active|Worker 909: active|Worker 911: active|DO NOT MERGE|Workers 902 and 906-910" MASTER_PLAN.md MASTER_PROGRESS.md worker-progress/worker-922-docs-refresh-after-921.md`
 - `git status --short --branch`
+- `git rev-parse --short=8 main`
+- `git show --stat --oneline --decorate --no-renames main`
+- `git log --oneline --decorate --max-count=25 main`
+- `git merge --no-edit main`
+- `sed -n '1,220p' worker-progress/worker-917-reconciler-direct-multichild-fiber-inspection.md`
+- `sed -n '1,220p' worker-progress/worker-920-host-node-store-update-payload-currentness.md`
+- `find worker-progress -maxdepth 1 -type f \( -name 'worker-923-*' -o -name 'worker-924-*' -o -name 'worker-925-*' -o -name 'worker-926-*' -o -name 'worker-927-*' \) -print | sort`
+- `git branch --format='%(refname:short)' | rg '^worker/(923|924|925|926|927)'`
 
 ## Evidence Gathered
 
@@ -66,28 +79,27 @@
 - Git history from `cc34b057` through `6d2dafad` contains the accepted merges
   for Workers 902, 907, 908, 909, 916, 915, 906, 919, 914, 918, 912, 913, and
   921, plus Worker 911's older docs refresh.
+- Local `main` advanced to `da842580` and was merged cleanly into this worker
+  branch, bringing accepted Worker 917 and Worker 920 reports into the branch.
 - The accepted worker reports record the relevant private evidence/currentness
   facts and public blockers summarized in `MASTER_PROGRESS.md`.
 - `git diff --check` passed, and manual `sed` inspection confirmed the updated
   master docs keep active/future work in `MASTER_PLAN.md` and accepted history
   in `MASTER_PROGRESS.md`.
-- Worker 910 and Worker 920 branches are not ancestors of the assigned baseline.
-- A local `main` ref advanced to `663bb109` with a Worker 917 merge after this
-  branch point, while this worker branch and `origin/main` remain at
-  `6d2dafad`; this docs refresh intentionally does not consume Worker 917 as
-  accepted input.
+- Worker 910 remains unaccepted after a DO NOT MERGE. Worker branches 923-927
+  exist locally but have no worker-progress reports in this branch yet.
 
 ## Risks Or Blockers
 
 - No implementation blockers found.
-- Staleness risk: if Workers 910, 917, or 920 are accepted after this branch
-  started, the next docs refresh should move those facts from `MASTER_PLAN.md`
-  active queue into `MASTER_PROGRESS.md` accepted history.
+- Staleness risk: if Worker 910 or Workers 923-927 are accepted after this
+  branch started, the next docs refresh should move those facts from
+  `MASTER_PLAN.md` active queue into `MASTER_PROGRESS.md` accepted history.
 - Worker 905's docs branch remains superseded by later docs/history updates and
   was not consumed.
 
 ## Recommended Next Tasks
 
-- After Workers 910, 917, and 920 settle, run a small docs follow-up that bumps
-  the accepted baseline, removes settled workers from the active queue, and
-  records their accepted evidence in `MASTER_PROGRESS.md`.
+- After Worker 910 or Workers 923-927 settle, run a small docs follow-up that
+  bumps the accepted baseline, removes settled workers from the active queue,
+  and records their accepted evidence in `MASTER_PROGRESS.md`.

@@ -47,28 +47,26 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Accepted/merged baseline for this branch includes
 Workers 803-837, 842-846, 848-852, 855-860, 862-874, 878-883, 885-893,
-895-896, 898-902, 904, 906-909, 912-916, 918-919, and 921. Current baseline is
-`6d2dafad` (`Merge worker 921 begin work function component bailout blocker`).
+895-896, 898-902, 904, 906-909, and 912-921. Current baseline is
+`da842580` (`Merge worker 920 host node store update payload currentness`).
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
 Current active queue:
 
-- Worker 910: hydration recoverable-error boundary admission fixed branch under
-  re-audit; do not treat it as accepted input until merged into the accepted
-  baseline.
-- Worker 917: reconciler direct multi-child fiber inspection fixed branch under
-  re-audit; do not treat it as accepted input until merged into the accepted
-  baseline.
-- Worker 920: HostNodeStore update payload currentness fixed branch under
-  re-audit; do not treat it as accepted input until merged into the accepted
-  baseline.
-- Worker 922: docs-only refresh for the `6d2dafad` baseline.
+- Worker 910: fixing after DO NOT MERGE for hydration recoverable-error
+  boundary admission; do not treat it as accepted input.
+- Worker 923: active native cleanup currentness admission ledger worker.
+- Worker 924: active N-API worker-thread cleanup currentness worker.
+- Worker 925: active concurrent update drain currentness worker.
+- Worker 926: active core hook staging failure preservation worker.
+- Worker 927: active root listener dispatch currentness worker.
+- Worker 922: docs-only refresh for the `da842580` baseline.
 
-If Workers 910, 917, or 920 merge after this branch point, update this section
+If Workers 910 or 923-927 merge after this branch point, update this section
 and move their accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private evidence through `6d2dafad` still keeps public
+Accepted private evidence through `da842580` still keeps public
 root/render/unmount, `act`, `flushSync`, Scheduler timing, hydration,
 resources/forms, serialization, native/reconciler execution, package
 compatibility, and broad renderer compatibility blocked.
@@ -79,17 +77,18 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat the accepted branch baseline through `6d2dafad` as private evidence
+1. Treat the accepted branch baseline through `da842580` as private evidence
    only. Public package, root, native, React DOM, test-renderer, Scheduler,
    `act`, hydration, resource/form, serialization, and `flushSync`
    compatibility still require fail-closed gates and dual-run oracle evidence.
-2. Review Workers 910, 917, and 920 against the accepted source-owned
-   lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
-   scheduler continuation/currentness, test-renderer direct multi-child fiber
-   inspection, native-generation, resource/form, host-node currentness,
-   Scheduler variant/root currentness, package-surface, and public blocker
-   requirements before any merge. Do not consume their outputs until reviewed,
-   verified, and merged.
+2. Review Workers 910 and 923-927 against the accepted source-owned lifecycle,
+   hydration, `act`, deletion, sync-flush, HostRoot lane handoff, scheduler
+   continuation/currentness, reconciler/test-renderer direct multi-child fiber
+   inspection, native-generation/cleanup, worker-thread cleanup, concurrent
+   update drain, hook staging failure preservation, root-listener dispatch,
+   resource/form, host-node currentness, Scheduler variant/root currentness,
+   package-surface, and public blocker requirements before any merge. Do not
+   consume their outputs until reviewed, verified, and merged.
 3. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
@@ -99,27 +98,29 @@ canonical evidence requirements.
 ## Next Queue Candidates
 
 - Rust root/sync-flush/function/deletion execution can extend accepted Workers
-  855, 860, 862-867, 878-879, 889-890, 896, 898, 904, 906-907, 918-919, and
-  921 toward managed-child, HostText, multi-child, sync-flush
-  delete/post-passive continuation, FunctionComponent deletion/render-phase
-  update/bailout blocker coverage, HostRoot update-queue lane handoff,
-  finished-work commit queue-lane consumer, terminal host descendant
-  collection, and scheduler-owned continuation/currentness shapes only as
-  private test-host canaries with source-owned commit, host-node, root/lane,
-  scheduler, queue/handoff, store-backed row lane metadata, topology, replay,
-  ref/passive, and cleanup validation. Public React DOM/test-renderer roots and
-  public `flushSync` remain blocked.
+  855, 860, 862-867, 878-879, 889-890, 896, 898, 904, 906-907, 917-921 toward
+  managed-child, HostText, multi-child, sync-flush delete/post-passive
+  continuation, FunctionComponent deletion/render-phase update/bailout blocker
+  coverage, HostRoot update-queue lane handoff, finished-work commit queue-lane
+  consumer, direct committed-fiber inspection, terminal host descendant
+  collection, scheduler-owned continuation/currentness, and HostNodeStore
+  update payload currentness shapes only as private test-host canaries with
+  source-owned commit, host-node, root/lane, scheduler, queue/handoff,
+  store-backed row lane metadata, topology, replay, ref/passive, and cleanup
+  validation. Public React DOM/test-renderer roots and public `flushSync`
+  remain blocked.
 - Test-renderer package-root/native work should use accepted Worker 844
   package-root native execution parity, Workers 859 and 868 Rust private
   lifecycle/native consumer hardening, and Worker 872 package-root/CJS private
   lifecycle execution evidence, plus accepted Workers 881 and 888 private
   serialization and TestInstance lifecycle gates, Worker 895 private
   multi-child test-renderer native lifecycle evidence, Worker 899 source-owned
-  direct multi-child fiber inspection, and Worker 902 private act/update
-  lifecycle boundary evidence. Worker 853 remains rejected/redundant. Public
-  serialization, `ReactTestInstance`, JS/CJS/package compatibility, native
-  bridge loading/execution, root/act/Scheduler compatibility, and broad
-  multichild identity remain blocked.
+  direct multi-child fiber inspection, Worker 902 private act/update lifecycle
+  boundary evidence, and Worker 917 only as reconciler-owned inspection context
+  that keeps the generic test-renderer boundary fail-closed. Worker 853 remains
+  rejected/redundant. Public serialization, `ReactTestInstance`, JS/CJS/package
+  compatibility, native bridge loading/execution, root/act/Scheduler
+  compatibility, and broad multichild identity remain blocked.
 - React DOM facade/native handoffs may use accepted Worker 848 nested facade
   native handoff metadata, Worker 869 fake-DOM lifecycle snapshots, Worker 874
   private lifecycle request/snapshot boundary hardening, Worker 880 root update
@@ -127,11 +128,13 @@ canonical evidence requirements.
   Worker 891 source-owned root unmount lifecycle request-boundary consumer, and
   Worker 901 source-owned render/update/nested lifecycle boundary consumer,
   plus Worker 912 root-listener currentness and Worker 915 symbol-only client
-  facade gates, as diagnostic input. Any real native/Rust execution or public
-  facade work still must prove scheduling, commit, cleanup, DOM output,
-  listener/event/ref behavior, hydration boundaries, public/browser
-  DOM/hydration/event/ref/package/native/Rust alias rejection, and package
-  compatibility.
+  facade gates, as diagnostic input. Worker 920's HostNodeStore payload
+  currentness can inform fake/native host update handoffs only when scoped
+  root/fiber/token/phase/target identity is preserved. Any real native/Rust
+  execution or public facade work still must prove scheduling, commit, cleanup,
+  DOM output, listener/event/ref behavior, hydration boundaries,
+  public/browser DOM/hydration/event/ref/package/native/Rust alias rejection,
+  and package compatibility.
 - Resource and form work can consume accepted Worker 856's root execution
   consumer with Worker 850 ledger/source-token metadata and Worker 883
   lifecycle boundary hardening, plus Worker 893's private root/lifecycle-bound
@@ -177,11 +180,13 @@ canonical evidence requirements.
   against React 19.2.6.
 - Additional private root/test-renderer bridge gates can build on Worker 898's
   accepted `finished_work` / `finished_lanes` queue-lane consumer, Worker 904's
-  scheduler-owned continuation evidence, and Worker 899's direct multi-child
-  fiber identity proof only after preserving source-owned handoff rows,
-  store-backed row lane metadata, scheduler/commit identity, direct child fiber
-  handles, and public blockers before any wider serialization or native bridge
-  execution.
+  scheduler-owned continuation evidence, Worker 899's test-renderer direct
+  multi-child fiber identity proof, Worker 917's reconciler-owned direct
+  committed-fiber inspection, and Worker 920's host-node update currentness
+  only after preserving source-owned handoff rows, store-backed row lane
+  metadata, scheduler/commit identity, direct child fiber handles, scoped host
+  update currentness, and public blockers before any wider serialization or
+  native bridge execution.
 
 Premature until later gates are green: public React DOM root render/unmount,
 public `act`, public `flushSync`, public Scheduler timing, public hydration,

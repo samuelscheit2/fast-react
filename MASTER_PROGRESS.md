@@ -29,6 +29,35 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 917 and 920
+
+- Worker 917 added reconciler-owned private direct committed-fiber inspection
+  for `HostRoot -> HostComponent -> [HostText, HostText]`, including actual
+  `StateNodeHandle` identity and source/currentness rows for current root,
+  previous/committed/store current, finished-work and finished-lanes,
+  parent/child/sibling order, props/text identity, node lanes, and live
+  `FiberArena` topology. Its audit fix restores the generic
+  `inspect_test_renderer_committed_fiber_tree` boundary so the direct
+  multi-child shape remains blocked outside the private reconciler canary.
+  Public serialization, react-test-renderer compatibility, React DOM
+  compatibility, native execution, broad renderer behavior, act, Scheduler, and
+  package compatibility remain blocked.
+- Worker 920 strengthened private `HostNodeStore` update payloads with
+  source-owned currentness and monotonic replay rejection. Applied property
+  updates, text updates, and latest-props rows now bind source sequence,
+  handle, root, fiber, token, phase, and target identity, with real host-work
+  component property and text update commit paths threading scoped currentness
+  before store application. Stale invalidated/removed handles, wrong
+  root/fiber/token/phase/target payloads, replayed property/text updates,
+  cross-target application, sequence-only currentness, and public DOM
+  compatibility claims are rejected. Public DOM/test-renderer/native execution,
+  renderer compatibility, root public behavior, and package compatibility
+  remain blocked.
+- The accepted state for this batch is current main `da842580`
+  (`Merge worker 920 host node store update payload currentness`) after the
+  focused reconciler/host-node/host-work checks, formatting, and
+  `git diff --check` verification recorded in worker reports and git history.
+
 ### Workers 902, 906-909, 912-916, 918-919, and 921
 
 - Worker 902 added private package-root/CJS test-renderer act/update lifecycle
