@@ -15,6 +15,7 @@ const formActions = require(path.join(
   'shared',
   'form-actions.js'
 ));
+const rootBridge = require(path.join(sourceRoot, 'client', 'root-bridge.js'));
 
 const compatibilityTarget = 'react-dom@19.2.6';
 
@@ -25,7 +26,8 @@ test('private fulfilled form action reset execution records deterministic fake q
   const second = await createFulfilledResetExecutionRecord(
     'fulfilled-reset-deterministic'
   );
-  const { asyncExecution, callbackCalls, execution, record } = first;
+  const { asyncExecution, callbackCalls, execution, record, rootContext } =
+    first;
   const summary =
     formActions.describePrivateFormActionFulfilledResetExecutionGate();
 
@@ -51,6 +53,13 @@ test('private fulfilled form action reset execution records deterministic fake q
   assert.equal(summary.consumesFulfilledAsyncCallbackExecution, true);
   assert.equal(summary.consumesSubmitResetExecutionMetadata, true);
   assert.equal(summary.recordsFulfilledActionResultMetadata, true);
+  assert.equal(summary.acceptsPrivateRootLifecycleBinding, true);
+  assert.equal(summary.rootlessStandaloneFormEvidenceAllowed, true);
+  assert.equal(summary.recordsRootLifecycleBoundaryWhenProvided, true);
+  assert.equal(
+    summary.rootLifecycleBoundaryRecordType,
+    formActions.privateFormActionFulfilledResetRootLifecycleBoundaryRecordType
+  );
   assert.equal(summary.executesDeterministicFakeResetStateQueue, true);
   assert.equal(summary.recordsDeterministicFakeResetCommit, true);
   assert.equal(summary.rejectsRejectedAsyncCallbacks, true);
@@ -123,6 +132,55 @@ test('private fulfilled form action reset execution records deterministic fake q
   assert.equal(record.admission.privateAsyncActionCallbackInvoked, false);
   assert.equal(record.admission.reactUpdateQueued, false);
   assert.equal(record.admission.realFormReset, false);
+  assert.equal(
+    record.rootExecutionBoundary.$$typeof,
+    formActions.privateFormActionFulfilledResetRootLifecycleBoundaryRecordType
+  );
+  assert.equal(
+    record.rootExecutionBoundary.status,
+    formActions.privateFormActionFulfilledResetRootLifecycleBoundaryStatus
+  );
+  assert.equal(
+    record.rootExecutionBoundary.sourceRootBridgeAdmissionId,
+    rootContext.admission.requestId
+  );
+  assert.equal(
+    record.rootExecutionBoundary.sourceRootLifecycleBoundaryId,
+    rootContext.lifecycleBoundary.boundaryId
+  );
+  assert.equal(record.rootExecutionBoundary.rootId, rootContext.admission.rootId);
+  assert.equal(
+    record.rootExecutionBoundary.lifecycleTransition,
+    rootContext.lifecycleBoundary.lifecycleTransition
+  );
+  assert.equal(
+    record.rootExecutionBoundary.sourceOwnedRootLifecycleBoundary,
+    true
+  );
+  assert.equal(record.rootExecutionBoundary.requestBoundaryCurrent, true);
+  assert.equal(record.rootExecutionBoundary.publicRootExecution, false);
+  assert.deepEqual(record.rootExecutionBoundary.sourceOwnedTokens, [
+    formActions.privateFormActionFulfilledResetRootLifecycleBoundaryRecordType,
+    formActions.privateFormActionFulfilledResetRootLifecycleBoundaryStatus,
+    rootBridge.privateRootAdmissionRecordType,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+    rootBridge.privateRootLifecycleRequestBoundaryRecordType,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
+    rootContext.admission.rootId,
+    rootContext.lifecycleBoundary.boundaryId,
+    rootContext.lifecycleBoundary.lifecycleTransition
+  ]);
+  const rootIdentity =
+    formActions
+      .getPrivateFormActionFulfilledResetExecutionRootIdentityPayload(
+        record
+      );
+  assert.equal(rootIdentity.rootBridgeAdmission, rootContext.admission);
+  assert.equal(
+    rootIdentity.rootLifecycleRequestBoundary,
+    rootContext.lifecycleBoundary
+  );
+  assert.equal(rootIdentity.rootExecutionBoundary, record.rootExecutionBoundary);
 
   assert.equal(record.sourceAsyncCallbackExecution.fulfilled, true);
   assert.equal(record.sourceAsyncCallbackExecution.rejected, false);
@@ -187,6 +245,22 @@ test('private fulfilled form action reset execution records deterministic fake q
     formActions.formActionFulfilledResetExecutionQueueExecutionKind
   );
   assert.equal(
+    record.fakeResetStateQueueExecution.rootExecutionBoundaryId,
+    record.rootExecutionBoundary.boundaryId
+  );
+  assert.equal(
+    record.fakeResetStateQueueExecution.sourceRootBridgeAdmissionId,
+    rootContext.admission.requestId
+  );
+  assert.equal(
+    record.fakeResetStateQueueExecution.sourceRootLifecycleBoundaryId,
+    rootContext.lifecycleBoundary.boundaryId
+  );
+  assert.equal(
+    record.fakeResetStateQueueExecution.rootContainerInfo,
+    record.rootExecutionBoundary.rootContainerInfo
+  );
+  assert.equal(
     record.fakeResetStateQueueExecution.resetQueuePendingMutated,
     false
   );
@@ -205,6 +279,18 @@ test('private fulfilled form action reset execution records deterministic fake q
   assert.equal(
     record.fakeResetCommitExecution.fakeResetStateQueueExecutionId,
     record.fakeResetStateQueueExecution.queueExecutionId
+  );
+  assert.equal(
+    record.fakeResetCommitExecution.rootExecutionBoundaryId,
+    record.rootExecutionBoundary.boundaryId
+  );
+  assert.equal(
+    record.fakeResetCommitExecution.fakeResetStateQueueRootExecutionBoundaryId,
+    record.fakeResetStateQueueExecution.rootExecutionBoundaryId
+  );
+  assert.equal(
+    record.fakeResetCommitExecution.fakeResetStateQueueRootId,
+    record.fakeResetStateQueueExecution.rootId
   );
   assert.equal(record.fakeResetCommitExecution.afterMutationEffectsOrder, true);
   assert.equal(
@@ -255,6 +341,7 @@ test('private fulfilled form action reset execution records deterministic fake q
     error.sourceAsyncCallbackExecutionId,
     asyncExecution.executionId
   );
+  assert.equal(error.rootExecutionBoundary, record.rootExecutionBoundary);
   assert.deepEqual(
     error.fakeResetStateQueueExecution,
     record.fakeResetStateQueueExecution
@@ -386,6 +473,79 @@ test('private fulfilled form action reset execution rejects stale foreign cloned
     }
   );
 
+  const rootContext = createPrivateRootBridgeAdmission(
+    'fulfilled-reset-negative-root'
+  );
+  const foreignRootContext = createPrivateRootBridgeAdmission(
+    'fulfilled-reset-negative-foreign-root'
+  );
+  assert.throws(
+    () =>
+      gate.recordFulfilledResetExecution(
+        scenario.asyncExecution,
+        scenario.execution,
+        {
+          explicitFormActionFulfilledResetExecution: true
+        },
+        {
+          rootBridgeAdmission: {
+            ...rootContext.admission
+          },
+          rootLifecycleRequestBoundary: rootContext.lifecycleBoundary
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionFulfilledResetExecutionInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'root lifecycle binding for fulfilled reset execution must be source-owned active and current'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordFulfilledResetExecution(
+        scenario.asyncExecution,
+        scenario.execution,
+        {
+          explicitFormActionFulfilledResetExecution: true
+        },
+        {
+          rootBridgeAdmission: rootContext.admission,
+          rootLifecycleRequestBoundary:
+            foreignRootContext.lifecycleBoundary
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionFulfilledResetExecutionInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'root lifecycle binding for fulfilled reset execution must be source-owned active and current'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordFulfilledResetExecution(
+        scenario.asyncExecution,
+        scenario.execution,
+        {
+          explicitFormActionFulfilledResetExecution: true
+        },
+        {
+          render() {},
+          unmount() {}
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionFulfilledResetExecutionInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'root lifecycle binding for fulfilled reset execution must be source-owned active and current'
+    }
+  );
+
   const rejected = await createAsyncExecution(
     scenario.preflight,
     'fulfilled-reset-negative-rejected',
@@ -452,6 +612,14 @@ test('private fulfilled form action reset execution rejects stale foreign cloned
       },
       reason:
         'fakeResetCommit must not be passed to the fulfilled reset execution gate'
+    },
+    {
+      admission: {
+        explicitFormActionFulfilledResetExecution: true,
+        rootId: 'caller-root'
+      },
+      reason:
+        'rootId must not be passed to the fulfilled reset execution gate'
     },
     {
       admission: {
@@ -611,6 +779,7 @@ test('private fulfilled form action reset execution rejects stale foreign cloned
 
 async function createFulfilledResetExecutionRecord(prefix) {
   const scenario = await createFulfilledAsyncScenario(prefix);
+  const rootContext = createPrivateRootBridgeAdmission(prefix);
   const resetExecutionGate =
     formActions.createFormActionFulfilledResetExecutionDiagnosticGate({
       requestIdPrefix: `${prefix}-reset`
@@ -622,11 +791,16 @@ async function createFulfilledResetExecutionRecord(prefix) {
       explicitFormActionFulfilledResetExecution: true,
       sourceAsyncCallbackExecutionId: scenario.asyncExecution.executionId,
       sourceSubmitResetExecutionId: scenario.execution.executionId
+    },
+    {
+      rootBridgeAdmission: rootContext.admission,
+      rootLifecycleRequestBoundary: rootContext.lifecycleBoundary
     }
   );
 
   return {
     ...scenario,
+    rootContext,
     record
   };
 }
@@ -650,6 +824,67 @@ async function createFulfilledAsyncScenario(prefix) {
     ...scenario,
     asyncExecution,
     callbackCalls
+  };
+}
+
+function createPrivateRootBridgeAdmission(prefix) {
+  const document = createRootBridgeDocument();
+  const container = createRootBridgeElement('DIV', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    requestIdPrefix: `${prefix}-root-request`,
+    rootIdPrefix: `${prefix}-root`,
+    updateIdPrefix: `${prefix}-root-update`
+  });
+  const create = bridge.createClientRoot(container, {
+    identifierPrefix: `${prefix}-`
+  });
+  const render = bridge.renderContainer(create.handle, {
+    props: {
+      children: 'blocked'
+    },
+    type: 'span'
+  });
+  const admission = bridge.admitRequest(render);
+  const lifecycleBoundary =
+    rootBridge.createPrivateRootLifecycleRequestBoundary(admission);
+
+  return {
+    admission,
+    bridge,
+    create,
+    container,
+    document,
+    lifecycleBoundary,
+    render
+  };
+}
+
+function createRootBridgeDocument() {
+  const document = {
+    nodeName: '#document',
+    nodeType: 9,
+    __mutationLog: [],
+    __registrations: [],
+    addEventListener(type, listener) {
+      this.__registrations.push({ listener, type });
+    }
+  };
+  document.ownerDocument = document;
+  return document;
+}
+
+function createRootBridgeElement(nodeName, ownerDocument) {
+  return {
+    nodeName,
+    localName: nodeName.toLowerCase(),
+    nodeType: 1,
+    ownerDocument,
+    parentNode: null,
+    __mutationLog: [],
+    __registrations: [],
+    addEventListener(type, listener) {
+      this.__registrations.push({ listener, type });
+    }
   };
 }
 
