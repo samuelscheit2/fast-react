@@ -800,9 +800,33 @@ const resourceHintRootMapStoragePreflightBlockedSideEffects = freezeRecord({
   fakeResourceMapsCreated: false,
   fakeResourceMapsMutated: false,
   publicResourceHintDomInsertion: false,
+  publicHeadSingletonBehavior: false,
+  publicSingletonBehavior: false,
+  singletonResolutionReachable: false,
+  headChildrenCleared: false,
+  publicRootTouched: false,
+  realDocumentMutated: false,
+  realHeadMutated: false,
+  fakeHeadMutated: false,
+  resourceFetchStarted: false,
+  fetchStarted: false,
+  preloadStarted: false,
+  modulePreloadStarted: false,
+  scriptPreinitStarted: false,
+  moduleScriptPreinitStarted: false,
+  scriptExecutionStarted: false,
+  resourceLoadStateMutated: false,
+  loadStateMutated: false,
+  loadingStateMutated: false,
+  stylesheetLoadStateMutated: false,
+  preloadOrStyleDomWorkDispatched: false,
+  loadEventSubscribed: false,
+  errorEventSubscribed: false,
   publicResourceMapCommitBehavior: false,
   publicScriptModuleResourceDispatch: false,
   publicStylesheetLoadStateDispatch: false,
+  packageCompatibilityClaimed: false,
+  packageExportsMutated: false,
   compatibilityClaimed: false
 });
 
@@ -1435,6 +1459,18 @@ const resourceHintRootMapStoragePreflightBlockedCapabilities = freezeArray([
   blockedCapability(
     'public-resource-dispatch',
     'Public resource hint dispatch and DOM insertion remain blocked.'
+  ),
+  blockedCapability(
+    'public-head-mutation',
+    'Public head singleton behavior and real/fake head mutation remain blocked.'
+  ),
+  blockedCapability(
+    'stylesheet-script-lifecycle',
+    'Stylesheet load state and script/module lifecycle work is not started or mutated.'
+  ),
+  blockedCapability(
+    'package-export-compatibility',
+    'Package exports and compatibility claims remain unchanged and unclaimed.'
   )
 ]);
 
@@ -3250,9 +3286,14 @@ function describePrivateResourceHintRootMapStoragePreflightGate() {
       'hoistableScripts'
     ]),
     skipsPreloadPropsRootStorage: true,
+    rejectsMixedRootMapRowKinds: true,
     rejectsStaleSourceRows: true,
     rejectsDuplicateStorageRows: true,
     rejectsForeignRootStorage: true,
+    rejectsPreloadPropsRootStorageClaims: true,
+    rejectsPublicHeadMutationClaims: true,
+    rejectsStylesheetScriptLifecycleClaims: true,
+    rejectsPackageCompatibilityClaims: true,
     mutatesRootResourceStorage: false,
     mutatesHoistableStylesMap: false,
     mutatesHoistableScriptsMap: false,
@@ -9270,11 +9311,7 @@ function normalizeResourceHintRootMapStoragePreflightAdmission(
   }
 
   assertNoRootMapStoragePreflightTargets(admission);
-  assertNoPublicResourceDispatchClaims(
-    admission,
-    throwInvalidResourceHintRootMapStoragePreflightAdmission,
-    'root-map storage preflight gate'
-  );
+  assertNoRootMapStoragePreflightClaims(admission);
 
   return freezeRecord({
     preflightKind,
@@ -9374,6 +9411,105 @@ function assertNoRootMapStoragePreflightTargets(admission) {
     if (hasOwnProp(admission, field)) {
       throwInvalidResourceHintRootMapStoragePreflightAdmission(
         `${field} must not be passed to the root-map storage preflight gate`
+      );
+    }
+  }
+}
+
+function assertNoRootMapStoragePreflightClaims(admission) {
+  assertNoPublicResourceDispatchClaims(
+    admission,
+    throwInvalidResourceHintRootMapStoragePreflightAdmission,
+    'root-map storage preflight gate'
+  );
+  assertNoRootMapStoragePreflightClaimFields(
+    admission,
+    [
+      'rootResourceStorageCreated',
+      'rootResourceStorageMutated',
+      'hoistableStylesMapCreated',
+      'hoistableStylesMapMutated',
+      'hoistableScriptsMapCreated',
+      'hoistableScriptsMapMutated',
+      'preloadPropsMapCreated',
+      'preloadPropsMapMutated',
+      'realResourceMapsCreated',
+      'realResourceMapsMutated',
+      'fakeResourceMapsCreated',
+      'fakeResourceMapsMutated'
+    ],
+    'root resource-map storage or preload-props mutation'
+  );
+  assertNoRootMapStoragePreflightClaimFields(
+    admission,
+    [
+      'publicHeadSingletonBehavior',
+      'publicSingletonBehavior',
+      'singletonResolutionReachable',
+      'headChildrenCleared',
+      'publicHeadMutation',
+      'publicHeadMutationBehavior',
+      'publicRootTouched',
+      'realDocumentMutated',
+      'realHeadMutated',
+      'fakeHeadMutated',
+      'headMutated'
+    ],
+    'public head or DOM mutation'
+  );
+  assertNoRootMapStoragePreflightClaimFields(
+    admission,
+    [
+      'resourceFetchStarted',
+      'fetchStarted',
+      'preloadRecordStarted',
+      'preloadStarted',
+      'modulePreloadStarted',
+      'scriptRecordLoaded',
+      'scriptPreinitStarted',
+      'moduleScriptPreinitStarted',
+      'scriptExecutionStarted',
+      'resourceLoadStateMutated',
+      'loadStateMutated',
+      'loadingStateMutated',
+      'stylesheetLoadStateMutated',
+      'preloadOrStyleDomWorkDispatched',
+      'loadEventSubscribed',
+      'errorEventSubscribed',
+      'loadEventDispatched',
+      'errorEventDispatched',
+      'commitSuspended'
+    ],
+    'stylesheet or script lifecycle execution'
+  );
+  assertNoRootMapStoragePreflightClaimFields(
+    admission,
+    [
+      'packageCompatibilityClaimed',
+      'packageExportCompatibilityClaimed',
+      'packageExportsMutated',
+      'packageExportAdded',
+      'packageJsonExportsMutated',
+      'rootManifestsOrLockfilesMutated',
+      'resourceFormGatesExported',
+      'privateResourceHintGateExported',
+      'exportsResourceFormGates',
+      'exportsPrivateResourceHintRootMapStoragePreflight'
+    ],
+    'package/export compatibility'
+  );
+}
+
+function assertNoRootMapStoragePreflightClaimFields(
+  admission,
+  fields,
+  claimKind
+) {
+  for (const field of fields) {
+    if (admission[field] === true) {
+      throwInvalidResourceHintRootMapStoragePreflightAdmission(
+        `${field} must not claim ${claimKind} in ` +
+          'the root-map storage preflight gate'
       );
     }
   }
@@ -12388,6 +12524,7 @@ function isRootMapStoragePreflightResourceMapRow(row) {
 }
 
 function createRootMapStoragePreflightRow(row, index, admission) {
+  assertCanonicalRootMapStoragePreflightSourceRow(row);
   const rootMapName = getRootMapStorageName(row);
   const resourceShapeKind =
     row.recordKind === 'stylesheet'
@@ -12450,6 +12587,48 @@ function createRootMapStoragePreflightRow(row, index, admission) {
     rawValuesRetained: false,
     compatibilityClaimed: false
   });
+}
+
+function assertCanonicalRootMapStoragePreflightSourceRow(row) {
+  if (row.mapKind === 'hoistable-styles') {
+    if (
+      row.recordKind !== 'stylesheet' ||
+      row.resourceKind !== 'style' ||
+      row.contractId !== 'preinit-style'
+    ) {
+      throwInvalidResourceHintRootMapStoragePreflightAdmission(
+        'hoistable-styles root-map storage rows must describe stylesheet preinit rows'
+      );
+    }
+    return;
+  }
+
+  if (row.mapKind === 'hoistable-scripts') {
+    const canonicalScriptContract =
+      row.contractId === 'preinit-script' ||
+      row.contractId === 'preinit-module-script';
+    const canonicalScriptKind =
+      (row.contractId === 'preinit-script' &&
+        row.scriptKind === 'classic') ||
+      (row.contractId === 'preinit-module-script' &&
+        row.scriptKind === 'module');
+
+    if (
+      row.recordKind !== 'script' ||
+      row.resourceKind !== 'script' ||
+      canonicalScriptContract !== true ||
+      canonicalScriptKind !== true
+    ) {
+      throwInvalidResourceHintRootMapStoragePreflightAdmission(
+        'hoistable-scripts root-map storage rows must describe script preinit rows'
+      );
+    }
+    return;
+  }
+
+  throwInvalidResourceHintRootMapStoragePreflightAdmission(
+    `unsupported root-map storage map kind ${row.mapKind}`
+  );
 }
 
 function createSkippedPreloadPropsRootMapStorageRow(row, index, admission) {

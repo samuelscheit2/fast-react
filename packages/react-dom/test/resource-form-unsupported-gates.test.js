@@ -14386,6 +14386,50 @@ test('private resource root-map storage preflight rejects stale duplicate and fo
       compatibilityTarget
     }
   );
+
+  const tamperedMixedKindCommit = {
+    ...staleScenario.commit,
+    privateResourceMapRecords:
+      staleScenario.commit.privateResourceMapRecords.map((row, index) =>
+        index === 1
+          ? {
+              ...row,
+              recordKind: 'script',
+              mapKind: 'hoistable-styles',
+              resourceKind: 'script',
+              contractId: 'preinit-script',
+              scriptKind: 'classic'
+            }
+          : row
+      )
+  };
+  assert.equal(
+    resourceFormGate.isPrivateResourceHintResourceMapCommitRecord(
+      tamperedMixedKindCommit
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintRootMapStoragePreflightGate()
+        .recordRootMapStoragePreflight(tamperedMixedKindCommit, {
+          explicitRootMapStoragePreflight: true
+        }),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintRootMapStoragePreflightInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () => {
+      staleScenario.commit.privateResourceMapRecords[1].mapKind =
+        'hoistable-scripts';
+    },
+    TypeError
+  );
 });
 
 test('private resource root-map storage preflight rejects public claims raw targets and malformed admissions', () => {
@@ -14418,6 +14462,45 @@ test('private resource root-map storage preflight rejects public claims raw targ
     'publicScriptModuleResourceDispatch',
     'publicResourceApisReachable',
     'compatibilityClaimed'
+  ];
+  const rootStorageClaimFields = [
+    'rootResourceStorageMutated',
+    'hoistableStylesMapMutated',
+    'hoistableScriptsMapMutated',
+    'preloadPropsMapMutated',
+    'realResourceMapsMutated',
+    'fakeResourceMapsMutated'
+  ];
+  const headMutationClaimFields = [
+    'publicHeadSingletonBehavior',
+    'publicSingletonBehavior',
+    'singletonResolutionReachable',
+    'headChildrenCleared',
+    'realDocumentMutated',
+    'realHeadMutated',
+    'fakeHeadMutated'
+  ];
+  const lifecycleClaimFields = [
+    'resourceFetchStarted',
+    'preloadStarted',
+    'modulePreloadStarted',
+    'scriptPreinitStarted',
+    'moduleScriptPreinitStarted',
+    'scriptExecutionStarted',
+    'resourceLoadStateMutated',
+    'stylesheetLoadStateMutated',
+    'preloadOrStyleDomWorkDispatched',
+    'loadEventSubscribed',
+    'errorEventSubscribed'
+  ];
+  const packageClaimFields = [
+    'packageCompatibilityClaimed',
+    'packageExportCompatibilityClaimed',
+    'packageExportsMutated',
+    'packageJsonExportsMutated',
+    'rootManifestsOrLockfilesMutated',
+    'resourceFormGatesExported',
+    'exportsPrivateResourceHintRootMapStoragePreflight'
   ];
   const blockedTargetFields = [
     'root',
@@ -14528,6 +14611,54 @@ test('private resource root-map storage preflight rejects public claims raw targ
     );
   }
 
+  for (const field of rootStorageClaimFields) {
+    assertRootMapStoragePreflightAdmissionRejects(
+      scenario.commit,
+      {
+        explicitRootMapStoragePreflight: true,
+        [field]: true
+      },
+      `${field} must not claim root resource-map storage or ` +
+        'preload-props mutation in the root-map storage preflight gate'
+    );
+  }
+
+  for (const field of headMutationClaimFields) {
+    assertRootMapStoragePreflightAdmissionRejects(
+      scenario.commit,
+      {
+        explicitRootMapStoragePreflight: true,
+        [field]: true
+      },
+      `${field} must not claim public head or DOM mutation in ` +
+        'the root-map storage preflight gate'
+    );
+  }
+
+  for (const field of lifecycleClaimFields) {
+    assertRootMapStoragePreflightAdmissionRejects(
+      scenario.commit,
+      {
+        explicitRootMapStoragePreflight: true,
+        [field]: true
+      },
+      `${field} must not claim stylesheet or script lifecycle ` +
+        'execution in the root-map storage preflight gate'
+    );
+  }
+
+  for (const field of packageClaimFields) {
+    assertRootMapStoragePreflightAdmissionRejects(
+      scenario.commit,
+      {
+        explicitRootMapStoragePreflight: true,
+        [field]: true
+      },
+      `${field} must not claim package/export compatibility in ` +
+        'the root-map storage preflight gate'
+    );
+  }
+
   for (const field of blockedTargetFields) {
     assertRootMapStoragePreflightAdmissionRejects(
       scenario.commit,
@@ -14555,6 +14686,11 @@ test('private resource root-map storage preflight rejects public claims raw targ
   assert.equal(summary.publicResourceMapCommitBehavior, false);
   assert.equal(summary.publicScriptModuleResourceDispatch, false);
   assert.equal(summary.publicStylesheetLoadStateDispatch, false);
+  assert.equal(summary.rejectsMixedRootMapRowKinds, true);
+  assert.equal(summary.rejectsPreloadPropsRootStorageClaims, true);
+  assert.equal(summary.rejectsPublicHeadMutationClaims, true);
+  assert.equal(summary.rejectsStylesheetScriptLifecycleClaims, true);
+  assert.equal(summary.rejectsPackageCompatibilityClaims, true);
   assert.equal(summary.sideEffects.rootResourceStorageMutated, false);
   assert.equal(summary.sideEffects.realResourceMapsMutated, false);
   assert.equal(summary.sideEffects.fakeResourceMapsMutated, false);
