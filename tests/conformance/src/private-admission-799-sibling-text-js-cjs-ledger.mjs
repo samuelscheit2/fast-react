@@ -165,7 +165,8 @@ const rowData799 = freezeArray([
         tokens: [
           "worker-768-test-renderer-index-sibling-text-admission",
           "rootFinishedLanesHandoff",
-          "`packages/react-test-renderer/index.js`"
+          "rootRequestId",
+          "rootId"
         ]
       }),
       evidenceData({
@@ -176,7 +177,7 @@ const rowData799 = freezeArray([
           "private-tojson-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked",
           "createPrivateToJSONSiblingTextJSAdmissionDiagnosticResult(",
           "canCreateAcceptedSiblingTextDiagnosticResult(",
-          "Expected canonical private rootFinishedLanesHandoff evidence.",
+          "requiresRootFinishedLanesHandoffEvidence: true",
           "validatePrivateRootFinishedLanesHandoffEvidence(",
           "committedFiberInspectionCurrentMatchesCommit: true",
           "consumesPrivateRootFinishedLanesHandoffGate: true",
@@ -225,7 +226,7 @@ const rowData799 = freezeArray([
         role: "worker-769-progress",
         path: "worker-progress/worker-769-cjs-sibling-text-totree-admission.md",
         tokens: [
-          "# Worker 769 - CJS Sibling Text toTree Admission",
+          "serializeAcceptedTreeMetadata",
           "rootFinishedLanesHandoff",
           "committedFiberInspection"
         ]
@@ -283,9 +284,8 @@ const rowData799 = freezeArray([
         role: "worker-787-progress",
         path: "worker-progress/worker-787-cjs-sibling-text-tojson-admission.md",
         tokens: [
-          "# Worker 787 - CJS Sibling Text toJSON Admission",
           "rootFinishedLanesHandoff",
-          "committed fiber inspection"
+          "createAcceptedSiblingTextDiagnosticResult"
         ]
       }),
       cjsToJSONEvidenceData({

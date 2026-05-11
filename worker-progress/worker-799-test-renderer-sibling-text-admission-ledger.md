@@ -12,6 +12,8 @@
   blocker fields.
 - The ledger reads source/progress/test/package files only. It does not execute
   native bridge code and does not claim public serialization compatibility.
+- Follow-up acceptance audit replaced brittle prose/source-error tokens with
+  durable field names, function names, and diagnostic/status identifiers.
 
 ## Changed Files
 
@@ -28,6 +30,14 @@
 - `node tests/smoke/package-surface-guard.mjs` - passed.
 - `node tests/smoke/import-entrypoints.mjs` - passed.
 - `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs --test-name-pattern "sibling|toJSON|toTree|root finished"` - failed in existing package-root assertions for missing exposed root handoff metadata fields; this worker did not edit that file or package implementation.
+- Follow-up:
+  - `node --check tests/conformance/src/private-admission-799-sibling-text-js-cjs-ledger.mjs` - passed.
+  - `node --check tests/conformance/test/private-admission-799-sibling-text-js-cjs-ledger.test.mjs` - passed.
+  - `node --test tests/conformance/test/private-admission-799-sibling-text-js-cjs-ledger.test.mjs` - passed, 5 tests.
+  - `node --test tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs --test-name-pattern "sibling|toJSON|toTree|root finished"` - passed, 33 tests.
+  - `node tests/smoke/package-surface-guard.mjs` - passed.
+  - `node tests/smoke/import-entrypoints.mjs` - passed.
+  - `git diff --check` - passed.
 
 ## Evidence Gathered
 
@@ -35,6 +45,10 @@
 - Source token checks pin `rootFinishedLanesHandoff`, committed fiber inspection,
   dedicated sibling-text identity, and `publicToJSON`/`publicToTree`/
   TestInstance/native/package/export blockers.
+- Follow-up source tokens now use `requiresRootFinishedLanesHandoffEvidence`,
+  `serializeAcceptedTreeMetadata`, `createAcceptedSiblingTextDiagnosticResult`,
+  `rootRequestId`, `rootId`, and related field/function names instead of prose
+  headings or error-message text.
 - Package surface checks confirm `@fast-react/react-test-renderer` still has no
   `exports` map and import smoke still rejects private runtime exports.
 - The adjacent create-routing sibling-focused suite passes.
