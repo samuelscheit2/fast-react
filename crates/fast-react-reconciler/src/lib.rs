@@ -74,8 +74,13 @@ pub use host_tokens::{
     HostFiberTokenValidationError,
 };
 pub use private_fiber_inspection::{
-    TestRendererCommittedFiberInspectionError, TestRendererCommittedFiberNodeInspection,
-    TestRendererCommittedFiberTreeInspection, inspect_test_renderer_committed_fiber_tree,
+    ReconcilerDirectMultiChildCommittedFiberInspection,
+    ReconcilerDirectMultiChildCommittedFiberInspectionError,
+    ReconcilerDirectMultiChildCommittedFiberSource, TestRendererCommittedFiberInspectionError,
+    TestRendererCommittedFiberNodeInspection, TestRendererCommittedFiberTreeInspection,
+    inspect_reconciler_direct_multi_child_committed_fiber_tree,
+    inspect_test_renderer_committed_fiber_tree,
+    record_reconciler_direct_multi_child_committed_fiber_source,
 };
 pub use root_callbacks::{
     RootUpdateCallbackRecord, RootUpdateCallbackSnapshot, RootUpdateCallbackVisibility,
