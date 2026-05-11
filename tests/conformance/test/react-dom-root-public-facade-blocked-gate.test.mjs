@@ -3157,6 +3157,10 @@ test("React DOM client private facade host-output update routes through private 
     update.nativeHandoffStatus,
     rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
   );
+  assert.equal(update.lifecycleContainerSnapshotCurrent, true);
+  assert.equal(update.hostOutputUpdateCurrent, true);
+  assert.equal(update.rootCommitHostComponentUpdateCurrent, false);
+  assert.equal(update.updateNativeHandoffCurrent, true);
   assert.equal(
     update.nativeRequestKind,
     rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_RENDER
@@ -3404,6 +3408,10 @@ test("React DOM client private facade root.render update consumes source-owned H
   );
   assert.equal(update.nativeUpdateRequestMirrored, true);
   assert.equal(update.rootCommitUpdateExecutionBeforeNativeHandoff, true);
+  assert.equal(update.lifecycleContainerSnapshotCurrent, true);
+  assert.equal(update.hostOutputUpdateCurrent, true);
+  assert.equal(update.rootCommitHostComponentUpdateCurrent, true);
+  assert.equal(update.updateNativeHandoffCurrent, true);
   assert.equal(
     update.rustRootCommitUpdateExecutionMetadataAccepted,
     true

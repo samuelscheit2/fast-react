@@ -6573,6 +6573,10 @@ test('private react-dom/client facade root.render lifecycle update mutates fake 
   assert.equal(updateDiagnostic.lifecycleRequestBoundaryAccepted, true);
   assert.equal(updateDiagnostic.lifecycleRequestBoundarySourceOwned, true);
   assert.equal(updateDiagnostic.lifecycleRequestBoundaryCurrent, true);
+  assert.equal(updateDiagnostic.lifecycleContainerSnapshotCurrent, true);
+  assert.equal(updateDiagnostic.hostOutputUpdateCurrent, true);
+  assert.equal(updateDiagnostic.rootCommitHostComponentUpdateCurrent, false);
+  assert.equal(updateDiagnostic.updateNativeHandoffCurrent, true);
   assert.equal(
     updateDiagnostic.updateLifecycleStatusBefore,
     rootBridge.ROOT_LIFECYCLE_RENDERED
@@ -6879,6 +6883,10 @@ test('private react-dom/client facade root.render consumes source-owned HostComp
     updateDiagnostic.rootCommitUpdateExecutionBeforeNativeHandoff,
     true
   );
+  assert.equal(updateDiagnostic.lifecycleContainerSnapshotCurrent, true);
+  assert.equal(updateDiagnostic.hostOutputUpdateCurrent, true);
+  assert.equal(updateDiagnostic.rootCommitHostComponentUpdateCurrent, true);
+  assert.equal(updateDiagnostic.updateNativeHandoffCurrent, true);
   assert.equal(updateDiagnostic.nativeExecution, false);
   assert.equal(updateDiagnostic.reconcilerExecution, false);
   assert.equal(updateDiagnostic.browserDomMutation, false);
@@ -10592,6 +10600,10 @@ test('private react-dom/client facade host-output update diagnostic routes root.
   assert.equal(updateDiagnostic.publicRootExecution, false);
   assert.equal(updateDiagnostic.publicRootCompatibilitySurface, false);
   assert.equal(updateDiagnostic.nativeUpdateRequestMirrored, true);
+  assert.equal(updateDiagnostic.lifecycleContainerSnapshotCurrent, true);
+  assert.equal(updateDiagnostic.hostOutputUpdateCurrent, true);
+  assert.equal(updateDiagnostic.rootCommitHostComponentUpdateCurrent, false);
+  assert.equal(updateDiagnostic.updateNativeHandoffCurrent, true);
   assert.equal(updateDiagnostic.nativeExecution, false);
   assert.equal(updateDiagnostic.reconcilerExecution, false);
   assert.equal(updateDiagnostic.rootScheduled, false);

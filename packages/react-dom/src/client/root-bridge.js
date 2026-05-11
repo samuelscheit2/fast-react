@@ -8739,10 +8739,32 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
       phase: 'update',
       sourceRecord: updateRecord
     });
+  const updateNativeCurrentness =
+    validatePrivateRootPublicFacadeUpdateNativeHandoffCurrentness({
+      activeRender,
+      createPayload,
+      createRecord,
+      hostOutputUpdateHandoff,
+      hostOutputUpdatePayload,
+      lifecycleRequestAdmission,
+      lifecycleRequestBoundary,
+      payload,
+      rootCommitHostComponentUpdateHandoff,
+      rootCommitHostComponentUpdatePayload,
+      rootCommitUpdateExecution,
+      sourceContainerSnapshot,
+      updateRecord
+    });
   const nativeHandoffRecord =
     payload.bridge.createNativeRequestHandoff(updateRecord);
   const nativeHandoffPayload =
     rootNativeHandoffPayloads.get(nativeHandoffRecord) || null;
+  validatePrivateRootPublicFacadeUpdateNativeHandoffRecord({
+    element,
+    nativeHandoffPayload,
+    nativeHandoffRecord,
+    updateRecord
+  });
 
   const rootBridgeState = handleState.bridgeState;
   const sequence = rootBridgeState.nextPublicFacadeHostOutputUpdateSequence++;
@@ -8879,6 +8901,14 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
       rootCommitUpdateExecution !== null,
     rootCommitUpdateExecutionBeforeNativeHandoff:
       rootCommitUpdateExecution !== null,
+    lifecycleContainerSnapshotCurrent:
+      updateNativeCurrentness.lifecycleContainerSnapshotCurrent,
+    hostOutputUpdateCurrent:
+      updateNativeCurrentness.hostOutputUpdateCurrent,
+    rootCommitHostComponentUpdateCurrent:
+      updateNativeCurrentness.rootCommitHostComponentUpdateCurrent,
+    updateNativeHandoffCurrent:
+      updateNativeCurrentness.updateNativeHandoffCurrent,
     publicCreateRootEnabled: false,
     publicHydrateRootEnabled: false,
     publicRootCreated: false,
@@ -9584,6 +9614,171 @@ function consumePrivateRootPublicFacadeRootCommitHostComponentUpdateExecution(
         handoff,
         handoffPayload
       })
+    );
+  }
+}
+
+function validatePrivateRootPublicFacadeUpdateNativeHandoffCurrentness({
+  activeRender,
+  createPayload,
+  createRecord,
+  hostOutputUpdateHandoff,
+  hostOutputUpdatePayload,
+  lifecycleRequestAdmission,
+  lifecycleRequestBoundary,
+  payload,
+  rootCommitHostComponentUpdateHandoff,
+  rootCommitHostComponentUpdatePayload,
+  rootCommitUpdateExecution,
+  sourceContainerSnapshot,
+  updateRecord
+}) {
+  const updateValidation = validateHostOutputUpdateRequestRecord(
+    updateRecord,
+    throwInvalidRootPublicFacadeHostOutputUpdate
+  );
+  const lifecycleValidation =
+    validatePrivateRootPublicFacadeLifecycleRequestBoundaryEvidence({
+      container: createPayload.container,
+      createRecord,
+      lifecycleRequestAdmission,
+      lifecycleRequestBoundary,
+      payload,
+      sourceRecord: updateRecord
+    });
+  if (lifecycleValidation === null) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update native handoff requires source-owned active lifecycle request-boundary evidence for the same update request.'
+    );
+  }
+  if (!lifecycleValidation.containerRequestCurrent) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update native handoff rejected stale same-container lifecycle request-boundary evidence.'
+    );
+  }
+  if (
+    !privateRootPublicFacadeLifecycleContainerSnapshotCurrent(
+      createPayload.container,
+      updateRecord,
+      sourceContainerSnapshot
+    )
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update native handoff rejected stale lifecycle container snapshot evidence.'
+    );
+  }
+  if (
+    updateValidation.rootHandleState !== getPrivateRootHandleState(payload.rootHandle)
+  ) {
+    throwForeignRootBridgeRequest();
+  }
+  if (rootNativeHandoffRecords.get(updateRecord) !== undefined) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update native handoff rejected replayed update currentness.'
+    );
+  }
+  if (
+    activeRender.hostOutputPayload.active !== true ||
+    activeRender.renderPayload.createRecord !== createRecord ||
+    activeRender.renderPayload.rootHandle !== payload.rootHandle
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update native handoff requires the current initial host-output render.'
+    );
+  }
+  if (
+    hostOutputUpdatePayload === undefined ||
+    hostOutputUpdatePayload.sourceRecord !== updateRecord ||
+    hostOutputUpdatePayload.rootHandle !== payload.rootHandle ||
+    hostOutputUpdatePayload.hostInstanceToken !==
+      activeRender.hostOutputPayload.hostToken ||
+    hostOutputUpdateHandoff.$$typeof !== privateRootHostOutputUpdateHandoffRecordType ||
+    hostOutputUpdateHandoff.updateStatus !== ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED ||
+    hostOutputUpdateHandoff.fakeDomMutation !== true ||
+    hostOutputUpdateHandoff.nativeExecution !== false ||
+    hostOutputUpdateHandoff.reconcilerExecution !== false ||
+    hostOutputUpdateHandoff.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update native handoff requires current fake-DOM host-output update evidence.'
+    );
+  }
+  if (rootHostOutputUpdateHandoffRecords.get(updateRecord) !== hostOutputUpdateHandoff) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update native handoff rejected stale host-output update currentness.'
+    );
+  }
+
+  let rootCommitHostComponentUpdateCurrent = false;
+  if (rootCommitUpdateExecution !== null) {
+    if (
+      rootCommitUpdateExecution.payload.consumed !== true ||
+      rootCommitHostComponentUpdatePayload === null ||
+      rootCommitHostComponentUpdatePayload === undefined ||
+      rootCommitHostComponentUpdatePayload.sourceRecord !== updateRecord ||
+      rootCommitHostComponentUpdatePayload.rootHandle !== payload.rootHandle ||
+      rootCommitHostComponentUpdatePayload.hostOutputHandoff !==
+        hostOutputUpdateHandoff ||
+      rootCommitHostComponentUpdatePayload.hostOutputPayload !==
+        hostOutputUpdatePayload ||
+      rootCommitHostComponentUpdateHandoff === null ||
+      rootCommitHostComponentUpdateHandoff.$$typeof !==
+        privateRootCommitHostComponentUpdateHandoffRecordType ||
+      rootCommitHostComponentUpdateHandoff.updateStatus !==
+        ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_APPLIED ||
+      rootCommitHostComponentUpdateHandoff.nativeExecution !== false ||
+      rootCommitHostComponentUpdateHandoff.reconcilerExecution !== false ||
+      rootCommitHostComponentUpdateHandoff.compatibilityClaimed !== false ||
+      rootCommitHostComponentUpdateHandoffRecords.get(updateRecord) !==
+        rootCommitHostComponentUpdateHandoff
+    ) {
+      throwInvalidRootPublicFacadeHostOutputUpdate(
+        'Public-facade root.render update native handoff requires consumed current HostComponent/HostText update metadata.'
+      );
+    }
+    for (const row of rootCommitUpdateExecution.payload.metadataRows) {
+      const consumed = rootPublicFacadeRootCommitHostUpdateConsumedRows.get(row);
+      if (
+        consumed === undefined ||
+        consumed.executionRecord !== rootCommitUpdateExecution.record ||
+        consumed.handoff !== rootCommitHostComponentUpdateHandoff ||
+        consumed.handoffPayload !== rootCommitHostComponentUpdatePayload
+      ) {
+        throwInvalidRootPublicFacadeHostOutputUpdate(
+          'Public-facade root.render update native handoff rejected replayed HostComponent/HostText update currentness.'
+        );
+      }
+    }
+    rootCommitHostComponentUpdateCurrent = true;
+  }
+
+  return freezeRecord({
+    lifecycleContainerSnapshotCurrent: true,
+    hostOutputUpdateCurrent: true,
+    rootCommitHostComponentUpdateCurrent,
+    updateNativeHandoffCurrent: true
+  });
+}
+
+function validatePrivateRootPublicFacadeUpdateNativeHandoffRecord({
+  element,
+  nativeHandoffPayload,
+  nativeHandoffRecord,
+  updateRecord
+}) {
+  if (
+    nativeHandoffPayload === null ||
+    nativeHandoffPayload.sourceRecord !== updateRecord ||
+    nativeHandoffPayload.value !== element ||
+    nativeHandoffRecord.$$typeof !== privateRootNativeHandoffRecordType ||
+    nativeHandoffRecord.handoffStatus !== ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED ||
+    nativeHandoffRecord.operation !== 'render' ||
+    nativeHandoffRecord.sourceRequestId !== updateRecord.requestId ||
+    nativeHandoffRecord.nativeRequestRecord.kind !==
+      NATIVE_ROOT_BRIDGE_REQUEST_RENDER
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade root.render update native handoff requires current mirrored native update request evidence.'
     );
   }
 }
