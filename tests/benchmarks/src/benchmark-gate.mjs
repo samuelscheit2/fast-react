@@ -66,11 +66,14 @@ const SCENARIO_RESULT_PROPERTY_NAMES = Object.freeze([
   "timingStatus"
 ]);
 
-const ACCEPTED_GATE_COMMAND_PREFIXES = Object.freeze([
-  "cargo test ",
-  "node --test ",
-  "npm run "
-]);
+const NPM_RUN_SCRIPT_PATTERN = /^[a-z0-9][a-z0-9:-]*$/;
+const NPM_WORKSPACE_NAME_PATTERN =
+  /^(?:@[a-z0-9-]+\/[a-z0-9-]+|[a-z0-9-]+)$/;
+const NODE_TEST_PATH_PATTERN =
+  /^(?:packages|tests)\/[A-Za-z0-9._/-]+\.(?:js|mjs)$/;
+const CARGO_PACKAGE_PATTERN = /^fast-react-[a-z0-9-]+$/;
+const CARGO_TEST_FILTER_PATTERN = /^[a-z][a-z0-9_]*$/;
+const CARGO_SINGLE_WORD_TEST_FILTERS = Object.freeze(["context", "offscreen"]);
 
 const DEFAULT_BENCHMARK_ROOT = path.resolve(
   fileURLToPath(new URL("..", import.meta.url))
@@ -518,7 +521,8 @@ function validateConformanceGates(manifest, { label, repoRoot }, errors) {
     validateAcceptedGate(
       gate.acceptedGate,
       `${label}: conformance gate ${String(gate.id)} acceptedGate`,
-      errors
+      errors,
+      { repoRoot }
     );
 
     if (typeof gate.id === "string") {
@@ -865,7 +869,12 @@ function validateResultGreenGateAdmission(gates, label, errors) {
   }
 }
 
-function validateAcceptedGate(acceptedGate, label, errors) {
+function validateAcceptedGate(
+  acceptedGate,
+  label,
+  errors,
+  { repoRoot = DEFAULT_REPO_ROOT } = {}
+) {
   if (acceptedGate === undefined) {
     return;
   }
@@ -876,7 +885,9 @@ function validateAcceptedGate(acceptedGate, label, errors) {
 
   requireString(acceptedGate.id, `${label}.id`, errors);
   requireString(acceptedGate.command, `${label}.command`, errors);
-  validateRunnableAcceptedGateCommand(acceptedGate.command, label, errors);
+  validateRunnableAcceptedGateCommand(acceptedGate.command, label, errors, {
+    repoRoot
+  });
   if (!ACCEPTED_GATE_STATUSES.includes(acceptedGate.status)) {
     errors.push(`${label}: unknown status ${String(acceptedGate.status)}`);
   }
@@ -917,7 +928,12 @@ function validateAcceptedGate(acceptedGate, label, errors) {
   }
 }
 
-function validateRunnableAcceptedGateCommand(command, label, errors) {
+function validateRunnableAcceptedGateCommand(
+  command,
+  label,
+  errors,
+  { repoRoot = DEFAULT_REPO_ROOT } = {}
+) {
   if (typeof command !== "string" || command.length === 0) {
     return;
   }
@@ -938,18 +954,175 @@ function validateRunnableAcceptedGateCommand(command, label, errors) {
   }
 
   for (const segment of segments) {
-    if (
-      !ACCEPTED_GATE_COMMAND_PREFIXES.some((prefix) =>
-        segment.startsWith(prefix)
-      )
-    ) {
+    errors.push(
+      ...validateAcceptedGateCommandSegment(segment, {
+        label,
+        repoRoot
+      })
+    );
+  }
+}
+
+function validateAcceptedGateCommandSegment(segment, { label, repoRoot }) {
+  const tokens = segment.split(/\s+/).filter(Boolean);
+  if (tokens.length < 2) {
+    return [
+      `${label}.command segment ${JSON.stringify(
+        segment
+      )} must be an npm run, node --test, or cargo test command`
+    ];
+  }
+
+  if (tokens[0] === "npm" && tokens[1] === "run") {
+    return validateNpmRunCommandSegment(segment, tokens, { label, repoRoot });
+  }
+  if (tokens[0] === "node" && tokens[1] === "--test") {
+    return validateNodeTestCommandSegment(segment, tokens, { label, repoRoot });
+  }
+  if (tokens[0] === "cargo" && tokens[1] === "test") {
+    return validateCargoTestCommandSegment(segment, tokens, { label, repoRoot });
+  }
+
+  return [
+    `${label}.command segment ${JSON.stringify(
+      segment
+    )} must be an npm run, node --test, or cargo test command`
+  ];
+}
+
+function validateNpmRunCommandSegment(segment, tokens, { label, repoRoot }) {
+  const errors = [];
+  const segmentLabel = `${label}.command segment ${JSON.stringify(segment)}`;
+
+  if (tokens.length !== 3 && tokens.length !== 5) {
+    errors.push(
+      `${segmentLabel} must be \`npm run <script>\` optionally followed by \`--workspace <workspace>\``
+    );
+    return errors;
+  }
+
+  const scriptName = tokens[2];
+  if (!NPM_RUN_SCRIPT_PATTERN.test(scriptName)) {
+    errors.push(`${segmentLabel} has invalid npm script ${scriptName}`);
+    return errors;
+  }
+
+  let packageJsonPath = path.join(repoRoot, "package.json");
+  if (tokens.length === 5) {
+    if (tokens[3] !== "--workspace") {
+      errors.push(`${segmentLabel} only supports --workspace after the script`);
+      return errors;
+    }
+    if (!NPM_WORKSPACE_NAME_PATTERN.test(tokens[4])) {
+      errors.push(`${segmentLabel} has invalid workspace ${tokens[4]}`);
+      return errors;
+    }
+    packageJsonPath = findWorkspacePackageJson(repoRoot, tokens[4]);
+    if (!packageJsonPath) {
+      errors.push(`${segmentLabel} references unknown workspace ${tokens[4]}`);
+      return errors;
+    }
+  }
+
+  const packageJson = readJsonFile(packageJsonPath);
+  if (packageJson.scripts?.[scriptName] === undefined) {
+    errors.push(
+      `${segmentLabel} references missing package script ${scriptName}`
+    );
+  }
+
+  return errors;
+}
+
+function validateNodeTestCommandSegment(segment, tokens, { label, repoRoot }) {
+  const errors = [];
+  const segmentLabel = `${label}.command segment ${JSON.stringify(segment)}`;
+
+  if (tokens.length < 3) {
+    return [`${segmentLabel} must include at least one repo test path`];
+  }
+
+  for (const testPath of tokens.slice(2)) {
+    if (!NODE_TEST_PATH_PATTERN.test(testPath)) {
       errors.push(
-        `${label}.command segment ${JSON.stringify(
-          segment
-        )} must start with npm run, node --test, or cargo test`
+        `${segmentLabel} test target ${JSON.stringify(
+          testPath
+        )} must be a repo .js or .mjs test path`
+      );
+      continue;
+    }
+
+    const resolvedTestPath = resolveRepoPath(repoRoot, testPath);
+    if (!resolvedTestPath || !existsSync(resolvedTestPath)) {
+      errors.push(
+        `${segmentLabel} test target does not exist: ${testPath}`
+      );
+      continue;
+    }
+    if (!statSync(resolvedTestPath).isFile()) {
+      errors.push(`${segmentLabel} test target is not a file: ${testPath}`);
+    }
+  }
+
+  return errors;
+}
+
+function validateCargoTestCommandSegment(segment, tokens, { label, repoRoot }) {
+  const errors = [];
+  const segmentLabel = `${label}.command segment ${JSON.stringify(segment)}`;
+
+  if (tokens.length < 5 || tokens[2] !== "-p") {
+    errors.push(`${segmentLabel} must include \`-p <crate>\``);
+    return errors;
+  }
+
+  const packageName = tokens[3];
+  if (!CARGO_PACKAGE_PATTERN.test(packageName)) {
+    errors.push(`${segmentLabel} has invalid crate package ${packageName}`);
+    return errors;
+  }
+
+  const cargoPackagePath = path.join(
+    repoRoot,
+    "crates",
+    packageName,
+    "Cargo.toml"
+  );
+  if (!existsSync(cargoPackagePath)) {
+    errors.push(`${segmentLabel} references unknown crate ${packageName}`);
+    return errors;
+  }
+
+  const args = tokens.slice(4);
+  if (!args.includes("--all-features")) {
+    errors.push(`${segmentLabel} must include --all-features`);
+  }
+
+  for (const arg of args) {
+    if (arg === "--all-features") {
+      continue;
+    }
+    if (arg.startsWith("-")) {
+      errors.push(`${segmentLabel} has unsupported cargo flag ${arg}`);
+      continue;
+    }
+    if (!isAcceptedCargoTestFilter(arg)) {
+      errors.push(
+        `${segmentLabel} test filter ${JSON.stringify(
+          arg
+        )} must be a snake_case benchmark gate filter`
       );
     }
   }
+
+  return errors;
+}
+
+function isAcceptedCargoTestFilter(value) {
+  return (
+    CARGO_TEST_FILTER_PATTERN.test(value) &&
+    (value.includes("_") || CARGO_SINGLE_WORD_TEST_FILTERS.includes(value))
+  );
 }
 
 function validateGateCompatibilityClaims(gates, label, errors) {
@@ -1045,6 +1218,42 @@ function listJsonFiles(directory, options = {}) {
 
 function readJsonFile(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function findWorkspacePackageJson(repoRoot, workspaceName) {
+  const rootPackageJson = readJsonFile(path.join(repoRoot, "package.json"));
+  for (const workspacePattern of rootPackageJson.workspaces ?? []) {
+    if (
+      typeof workspacePattern !== "string" ||
+      !workspacePattern.endsWith("/*")
+    ) {
+      continue;
+    }
+
+    const workspaceRoot = resolveRepoPath(
+      repoRoot,
+      workspacePattern.slice(0, -2)
+    );
+    if (!workspaceRoot || !existsSync(workspaceRoot)) {
+      continue;
+    }
+
+    for (const workspaceEntry of readdirSync(workspaceRoot)) {
+      const packageJsonPath = path.join(
+        workspaceRoot,
+        workspaceEntry,
+        "package.json"
+      );
+      if (!existsSync(packageJsonPath)) {
+        continue;
+      }
+      const packageJson = readJsonFile(packageJsonPath);
+      if (packageJson.name === workspaceName) {
+        return packageJsonPath;
+      }
+    }
+  }
+  return null;
 }
 
 function resolveRepoPath(repoRoot, candidatePath) {

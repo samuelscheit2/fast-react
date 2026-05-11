@@ -512,16 +512,37 @@ test("benchmark result gate rejects public diagnostic timing proof", () => {
 });
 
 test("benchmark accepted gates reject decorative non-runnable commands", () => {
-  const manifest = clone(privateDiagnosticManifest);
-  manifest.conformanceGates[0].acceptedGate.command =
-    "Worker 957 says this benchmark passed";
+  const cases = [
+    {
+      command: "Worker 957 says this benchmark passed",
+      pattern:
+        /command segment "Worker 957 says this benchmark passed" must be an npm run, node --test, or cargo test command/
+    },
+    {
+      command: "npm run Worker 957 says this benchmark passed",
+      pattern:
+        /command segment "npm run Worker 957 says this benchmark passed" must be `npm run <script>` optionally followed by `--workspace <workspace>`/
+    },
+    {
+      command: "node --test this benchmark passed",
+      pattern:
+        /command segment "node --test this benchmark passed" test target "this" must be a repo \.js or \.mjs test path/
+    },
+    {
+      command: "cargo test it passed",
+      pattern:
+        /command segment "cargo test it passed" must include `-p <crate>`/
+    }
+  ];
 
-  const errors = validateBenchmarkManifest(manifest, { repoRoot });
+  for (const { command, pattern } of cases) {
+    const manifest = clone(privateDiagnosticManifest);
+    manifest.conformanceGates[0].acceptedGate.command = command;
 
-  assert.match(
-    errors.join("\n"),
-    /command segment "Worker 957 says this benchmark passed" must start with npm run, node --test, or cargo test/
-  );
+    const errors = validateBenchmarkManifest(manifest, { repoRoot });
+
+    assert.match(errors.join("\n"), pattern);
+  }
 });
 
 function readManifest(fileName) {

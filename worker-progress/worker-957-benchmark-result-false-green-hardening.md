@@ -19,8 +19,11 @@ performance proof.
     backed by accepted private conformance gates.
   - Keeps claim-capable result statuses gated behind green manifest timing and
     `green-admitted` accepted gate metadata.
-  - Rejects accepted-gate command prose that is not shaped like a runnable
-    `npm run`, `node --test`, or `cargo test` command segment.
+  - Rejects accepted-gate command prose, including prose hidden behind
+    `npm run`, `node --test`, or `cargo test` prefixes.
+  - Validates accepted-gate command segments against repo-shaped npm scripts,
+    real Node test file paths, real Cargo crate names, `--all-features`, and
+    benchmark-style Cargo test filters.
 - `tests/benchmarks/schema/benchmark-result.schema.json`
   - Makes `scenarioResults` non-empty when a result artifact exists.
   - Sets `scenarioResult.additionalProperties` to `false`.
@@ -29,6 +32,8 @@ performance proof.
   - Adds negatives for omitted required scenarios, duplicate scenario/lane
     rows, timing-shaped extra fields, unsupported timing statuses, public
     diagnostic proof, and non-runnable accepted-gate command metadata.
+  - Adds repair coverage for `npm run Worker 957 says this benchmark passed`,
+    `node --test this benchmark passed`, and `cargo test it passed`.
 
 ## Commands Run
 
@@ -46,6 +51,8 @@ performance proof.
 - The focused benchmark gate test passes with 24/24 tests.
 - The full benchmark check passes with 64/64 benchmark tests.
 - No result artifacts were created.
+- Accepted-gate command validation rejects prefix-only prose and verifies
+  existing manifest commands against package scripts, test paths, and crates.
 
 ## Risks Or Blockers
 
