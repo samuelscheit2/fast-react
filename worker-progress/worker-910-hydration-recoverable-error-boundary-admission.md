@@ -20,6 +20,11 @@
   importing `hydrate-root-source-ledger.js` and
   `hydration-boundary-gate.js`; cloned/forged records still reject and the real
   source path still admits.
+- Merged current `main`, including Worker 947's root-bridge smoke fix, and
+  preserved the Worker 910 source-ledger hardening.
+- Updated the public client facade spy regression to preload a frozen fake
+  `root-bridge.js` cache entry instead of mutating the real frozen root-bridge
+  exports.
 
 ## Changed Files
 
@@ -27,6 +32,7 @@
 - `packages/react-dom/src/client/hydration-boundary-gate.js`
 - `packages/react-dom/src/client/root-bridge.js`
 - `packages/react-dom/test/hydration-boundary.test.js`
+- `packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js`
 - `worker-progress/worker-910-hydration-recoverable-error-boundary-admission.md`
 
 ## Cache-Poisoning-Resistant Path
@@ -49,10 +55,16 @@
 - `node --check packages/react-dom/src/client/hydration-boundary-gate.js`
 - `node --check packages/react-dom/src/client/root-bridge.js`
 - `node --check packages/react-dom/test/hydration-boundary.test.js`
+- `node --check packages/react-dom/test/hydration-private.test.js`
+- `node --check packages/react-dom/test/react-dom-private-root-bridge-shell.test.js`
+- `node --check packages/react-dom/test/hydrate-root-text-claim-patch-bridge.test.js`
+- `node --check packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js`
+- `node --check tests/smoke/react-dom-private-root-bridge-shell.mjs`
 - `node --test packages/react-dom/test/hydration-boundary.test.js`
 - `node --test packages/react-dom/test/hydration-private.test.js`
 - `node --test packages/react-dom/test/react-dom-private-root-bridge-shell.test.js`
 - `node --test packages/react-dom/test/hydrate-root-text-claim-patch-bridge.test.js`
+- `node --test packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js`
 - `node --test tests/conformance/test/private-admission-806-hydrateroot-preflight-ledger.test.mjs`
 - `node --test tests/conformance/test/private-admission-849-hydrateroot-text-patch-ledger.test.mjs`
 - `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
@@ -62,11 +74,9 @@
 - `node tests/smoke/import-entrypoints.mjs`
 - `node tests/smoke/package-surface-guard.mjs`
 - `node tests/smoke/react-dom-root-exports.mjs`
+- `node tests/smoke/react-dom-private-root-bridge-shell.mjs`
 - `npm run check --workspace @fast-react/react-dom`
 - `git diff --check`
-- `node tests/smoke/react-dom-private-root-bridge-shell.mjs` failed with the
-  existing baseline `FAST_REACT_DOM_INVALID_UNMOUNT_HOST_OUTPUT_CLEANUP_RECORD`
-  at `tests/smoke/react-dom-private-root-bridge-shell.mjs:386`.
 
 ## Evidence Gathered
 
@@ -74,26 +84,26 @@
   pre-load cache-poisoning regression.
 - Adjacent private hydration, hydrateRoot text claim patch, and root-bridge
   suites pass.
+- The public client facade symbol regression passes with immutable real
+  root-bridge exports by cache-preloading a frozen fake module only inside the
+  child-process import path.
 - HydrateRoot preflight/text-patch conformance ledgers, hydration boundary
   conformance, public facade blocked-gate conformance, client-root oracle, and
   hydration-marker oracle tests pass.
 - Package surface, root export, import smoke, and React DOM workspace checks
   pass.
-- The root-bridge smoke failure matches the previously documented mainline
-  unmount cleanup blocker and is not caused by this cache-poisoning repair.
+- The root-bridge smoke script now passes after the Worker 947 mainline fix
+  was merged.
 
 ## Risks Or Blockers
 
-- `tests/smoke/react-dom-private-root-bridge-shell.mjs` still fails on the
-  known unmount host-output cleanup scenario, while the focused
-  `react-dom-private-root-bridge-shell.test.js` suite passes.
 - This remains private diagnostic evidence only; no public `hydrateRoot`,
   real hydration/replay, root scheduling, callback routing, native execution,
   reconciler execution, DOM mutation, package, or Rust compatibility is opened.
+- A fresh read-only audit should still be run before handoff because this branch
+  merged current `main` after the original Worker 910 commit.
 
 ## Recommended Next Tasks
 
-- Keep the separate root-bridge smoke refresh for
-  `tests/smoke/react-dom-private-root-bridge-shell.mjs`.
 - Re-run the Worker 910 admission tests if future hydrateRoot work renames or
   moves preflight source-ledger fields.
