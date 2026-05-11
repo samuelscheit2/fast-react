@@ -361,6 +361,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "react-act-private-dispatcher-gate",
     privateSchedulerMockExpiredActRootWorkPrerequisiteId,
     privateReactActSchedulerDiagnosticsLedgerPrerequisiteId,
+    privateSchedulerMockDelayedActRootWorkPrerequisiteId,
     "scheduler-act-queue-routing-records",
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
@@ -903,6 +904,64 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     gate.privateSchedulerMockDelayedActRootWorkDiagnostics.workerId,
     "worker-835-react-dom-test-utils-act-delayed-scheduler-handoff"
   );
+  const delayedSchedulerPrerequisite = gate.acceptedPrivatePrerequisites.find(
+    (prerequisite) =>
+      prerequisite.id === privateSchedulerMockDelayedActRootWorkPrerequisiteId
+  );
+  assert.equal(
+    delayedSchedulerPrerequisite,
+    gate.acceptedPrivatePrerequisites[3]
+  );
+  assert.equal(
+    delayedSchedulerPrerequisite.workerId,
+    "worker-835-react-dom-test-utils-act-delayed-scheduler-handoff"
+  );
+  assert.equal(
+    delayedSchedulerPrerequisite.status,
+    "accepted-private-test-utils-act-scheduler-mock-delayed-act-root-work-nested-expired-diagnostics-without-public-act-routing"
+  );
+  assert.equal(
+    delayedSchedulerPrerequisite.source,
+    "packages/react-dom/src/test-utils-act-gate.js"
+  );
+  assert.equal(delayedSchedulerPrerequisite.present, true);
+  assert.equal(delayedSchedulerPrerequisite.recordOnly, false);
+  assert.equal(delayedSchedulerPrerequisite.privateDiagnostic, true);
+  assert.equal(
+    delayedSchedulerPrerequisite.diagnosticGateId,
+    "react-dom-test-utils-act-private-scheduler-mock-delayed-act-root-work-gate-1"
+  );
+  assert.equal(
+    delayedSchedulerPrerequisite.diagnosticStatus,
+    delayedSchedulerPrerequisite.status
+  );
+  assert.equal(
+    delayedSchedulerPrerequisite.preflightsSchedulerMockDelayedActRootWorkDiagnostics,
+    true
+  );
+  assert.equal(
+    delayedSchedulerPrerequisite.consumesNestedExpiredActRootWorkDiagnostics,
+    true
+  );
+  assert.equal(delayedSchedulerPrerequisite.rejectsStaleDiagnostics, true);
+  assert.equal(
+    delayedSchedulerPrerequisite.rejectsForeignRendererRootEvidence,
+    true
+  );
+  assert.equal(delayedSchedulerPrerequisite.rejectsTamperedDiagnostics, true);
+  assert.equal(delayedSchedulerPrerequisite.rejectsPublicClaims, true);
+  assert.equal(
+    delayedSchedulerPrerequisite
+      .acceptsTopLevelDelayedActRootWorkAsPublicActEvidence,
+    false
+  );
+  assert.equal(delayedSchedulerPrerequisite.publicActExecution, false);
+  assert.equal(delayedSchedulerPrerequisite.publicRootExecution, false);
+  assert.equal(
+    delayedSchedulerPrerequisite.publicSchedulerFlushBehaviorExecuted,
+    false
+  );
+  assert.equal(delayedSchedulerPrerequisite.executesRendererRoots, false);
   assert.equal(
     gate.privateSchedulerMockDelayedActRootWorkDiagnostics.prerequisiteId,
     privateSchedulerMockDelayedActRootWorkPrerequisiteId
@@ -1641,6 +1700,25 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     }
   ]);
 
+  const removedDelayedSchedulerPrerequisiteGate =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      acceptedPrivatePrerequisites: gate.acceptedPrivatePrerequisites.filter(
+        (prerequisite) =>
+          prerequisite.id !==
+          privateSchedulerMockDelayedActRootWorkPrerequisiteId
+      )
+    });
+  assert.deepEqual(removedDelayedSchedulerPrerequisiteGate.violations, [
+    {
+      id: "accepted-private-prerequisite-manifest-mismatch",
+      missingPrerequisiteIds: [
+        privateSchedulerMockDelayedActRootWorkPrerequisiteId
+      ],
+      unexpectedPrerequisiteIds: [],
+      duplicatePrerequisiteIds: []
+    }
+  ]);
+
   const stalePrivatePrerequisiteGate =
     gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
       acceptedPrivatePrerequisites: gate.acceptedPrivatePrerequisites.map(
@@ -1667,6 +1745,37 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     }
   ]);
 
+  const staleDelayedSchedulerPrerequisiteGate =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      acceptedPrivatePrerequisites: gate.acceptedPrivatePrerequisites.map(
+        (prerequisite) =>
+          prerequisite.id === privateSchedulerMockDelayedActRootWorkPrerequisiteId
+            ? {
+                ...prerequisite,
+                workerId:
+                  "worker-835-foreign-react-dom-test-utils-delayed-scheduler",
+                preflightsSchedulerMockDelayedActRootWorkDiagnostics: false,
+                evidence: prerequisite.evidence.slice(1)
+              }
+            : prerequisite
+      )
+    });
+  assert.deepEqual(staleDelayedSchedulerPrerequisiteGate.violations, [
+    {
+      id: "accepted-private-prerequisite-stale-evidence",
+      prerequisites: [
+        {
+          prerequisiteId: privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+          reasons: [
+            "worker-id-mismatch",
+            "evidence-mismatch",
+            "preflightsSchedulerMockDelayedActRootWorkDiagnostics-not-true"
+          ]
+        }
+      ]
+    }
+  ]);
+
   const privatePublicClaimGate =
     gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
       acceptedPrivatePrerequisites: gate.acceptedPrivatePrerequisites.map(
@@ -1683,6 +1792,50 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
         {
           prerequisiteId: "react-act-private-dispatcher-gate",
           field: "publicCompatibilityClaimed"
+        }
+      ]
+    }
+  ]);
+
+  const delayedSchedulerPublicClaimGate =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      acceptedPrivatePrerequisites: gate.acceptedPrivatePrerequisites.map(
+        (prerequisite) =>
+          prerequisite.id === privateSchedulerMockDelayedActRootWorkPrerequisiteId
+            ? {
+                ...prerequisite,
+                publicReactActCompatibilityClaimed: true,
+                summary: {
+                  ...prerequisite.summary,
+                  publicSchedulerFlushBehaviorExecuted: true
+                }
+              }
+            : prerequisite
+      )
+    });
+  assert.deepEqual(delayedSchedulerPublicClaimGate.violations, [
+    {
+      id: "accepted-private-prerequisite-stale-evidence",
+      prerequisites: [
+        {
+          prerequisiteId: privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+          reasons: [
+            "publicReactActCompatibilityClaimed-not-false",
+            "summary.publicSchedulerFlushBehaviorExecuted-not-false"
+          ]
+        }
+      ]
+    },
+    {
+      id: "accepted-private-prerequisite-public-claim-detected",
+      claims: [
+        {
+          prerequisiteId: privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+          field: "publicReactActCompatibilityClaimed"
+        },
+        {
+          prerequisiteId: privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+          field: "summary.publicSchedulerFlushBehaviorExecuted"
         }
       ]
     }

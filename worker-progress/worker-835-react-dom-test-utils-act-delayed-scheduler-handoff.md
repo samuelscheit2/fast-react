@@ -5,6 +5,7 @@
 - Implemented DOM-side private preflight for Scheduler mock delayed act/root diagnostics.
 - The route delegates to React private act gate delayed preflight, validates the React-owned preflight object, and wraps the nested expired drain through the existing React DOM expired consumer.
 - Added gate metadata for the delayed private diagnostics surface while keeping public `react-dom/test-utils.act`, public React act, public roots/effects, and public Scheduler timing blocked.
+- Audit follow-up: added the delayed Scheduler diagnostics row to `acceptedPrivatePrerequisites`, with stale/tampered/public-claim validation and manifest coverage.
 - Added package and conformance coverage using real `scheduler/unstable_mock` delayed promotion through `unstable_flushExpired`.
 
 ## Verification
@@ -16,6 +17,16 @@
 - `npm run check:package-surface` passed.
 - `node tests/smoke/import-entrypoints.mjs` passed.
 - `git diff --check && git diff --cached --check` passed.
+
+## Audit Follow-Up Verification
+
+- `node -c packages/react-dom/src/test-utils-act-gate.js` passed.
+- `node --test packages/react-dom/test/react-dom-test-utils-act-gate.test.js` passed.
+- `node --test tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs` passed.
+- `node --test tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs tests/conformance/test/react-act-oracle.test.mjs tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs` passed.
+- `npm run check --workspace @fast-react/react-dom` passed.
+- `npm run check:package-surface` passed.
+- `node tests/smoke/import-entrypoints.mjs` passed.
 
 ## Remaining
 

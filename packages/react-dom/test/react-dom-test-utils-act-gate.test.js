@@ -203,6 +203,42 @@ test('private act gate consumes Worker 810 ledger shape without opening public a
 });
 
 test('private act gate preflights delayed Scheduler diagnostics through nested expired consumption', () => {
+  const gate = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate();
+  const prerequisite = gate.acceptedPrivatePrerequisites.find(
+    (candidate) =>
+      candidate.id ===
+      gateModule.privateSchedulerMockDelayedActRootWorkPrerequisiteId
+  );
+
+  assert.equal(
+    gate.acceptedPrivatePrerequisiteIds.includes(
+      gateModule.privateSchedulerMockDelayedActRootWorkPrerequisiteId
+    ),
+    true
+  );
+  assert.notEqual(prerequisite, undefined);
+  assert.equal(
+    prerequisite.status,
+    gateModule.privateSchedulerMockDelayedActRootWorkDiagnosticStatus
+  );
+  assert.equal(prerequisite.present, true);
+  assert.equal(prerequisite.privateDiagnostic, true);
+  assert.equal(
+    prerequisite.diagnosticGateId,
+    gateModule.privateSchedulerMockDelayedActRootWorkDiagnosticGateId
+  );
+  assert.equal(
+    prerequisite.preflightsSchedulerMockDelayedActRootWorkDiagnostics,
+    true
+  );
+  assert.equal(prerequisite.consumesNestedExpiredActRootWorkDiagnostics, true);
+  assert.equal(
+    prerequisite.acceptsTopLevelDelayedActRootWorkAsPublicActEvidence,
+    false
+  );
+  assert.equal(prerequisite.publicSchedulerFlushBehaviorExecuted, false);
+  assert.equal(prerequisite.executesRendererRoots, false);
+
   for (const nodeEnv of ['development', 'production']) {
     const {
       Scheduler,
@@ -373,6 +409,123 @@ test('private act gate preflights delayed Scheduler diagnostics through nested e
 
     Scheduler.reset();
   }
+});
+
+test('private act gate validates delayed Scheduler prerequisite manifest and public claims', () => {
+  const gate = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate();
+  const baseline = gate.acceptedPrivatePrerequisites.find(
+    (candidate) =>
+      candidate.id ===
+      gateModule.privateSchedulerMockDelayedActRootWorkPrerequisiteId
+  );
+
+  assert.notEqual(baseline, undefined);
+
+  const missing = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+    acceptedPrivatePrerequisites: gate.acceptedPrivatePrerequisites.filter(
+      (prerequisite) =>
+        prerequisite.id !==
+        gateModule.privateSchedulerMockDelayedActRootWorkPrerequisiteId
+    )
+  });
+  assert.equal(
+    missing.status,
+    'blocked-public-test-utils-act-private-routing-with-violations'
+  );
+  assert.deepEqual(missing.violations, [
+    {
+      id: 'accepted-private-prerequisite-manifest-mismatch',
+      missingPrerequisiteIds: [
+        gateModule.privateSchedulerMockDelayedActRootWorkPrerequisiteId
+      ],
+      unexpectedPrerequisiteIds: [],
+      duplicatePrerequisiteIds: []
+    }
+  ]);
+
+  const stale = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+    acceptedPrivatePrerequisites: replacePrerequisite(
+      gate.acceptedPrivatePrerequisites,
+      {
+        ...baseline,
+        workerId:
+          'worker-835-foreign-react-dom-test-utils-delayed-scheduler',
+        preflightsSchedulerMockDelayedActRootWorkDiagnostics: false,
+        records: baseline.records.slice(1)
+      }
+    )
+  });
+  assert.equal(
+    stale.status,
+    'blocked-public-test-utils-act-private-routing-with-violations'
+  );
+  assert.deepEqual(stale.violations, [
+    {
+      id: 'accepted-private-prerequisite-stale-evidence',
+      prerequisites: [
+        {
+          prerequisiteId:
+            gateModule.privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+          reasons: [
+            'worker-id-mismatch',
+            'records-mismatch',
+            'preflightsSchedulerMockDelayedActRootWorkDiagnostics-not-true'
+          ]
+        }
+      ]
+    }
+  ]);
+
+  const publicClaim =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      acceptedPrivatePrerequisites: replacePrerequisite(
+        gate.acceptedPrivatePrerequisites,
+        {
+          ...baseline,
+          publicReactActCompatibilityClaimed: true,
+          summary: {
+            ...baseline.summary,
+            publicSchedulerFlushBehaviorExecuted: true
+          }
+        }
+      )
+    });
+  assert.equal(
+    publicClaim.status,
+    'blocked-public-test-utils-act-private-routing-with-violations'
+  );
+  assert.deepEqual(publicClaim.violations, [
+    {
+      id: 'accepted-private-prerequisite-stale-evidence',
+      prerequisites: [
+        {
+          prerequisiteId:
+            gateModule.privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+          reasons: [
+            'publicReactActCompatibilityClaimed-not-false',
+            'summary.publicSchedulerFlushBehaviorExecuted-not-false'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'accepted-private-prerequisite-public-claim-detected',
+      claims: [
+        {
+          prerequisiteId:
+            gateModule.privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+          field: 'publicReactActCompatibilityClaimed'
+        },
+        {
+          prerequisiteId:
+            gateModule.privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+          field: 'summary.publicSchedulerFlushBehaviorExecuted'
+        }
+      ]
+    }
+  ]);
+  assert.equal(publicClaim.publicTestUtilsActReady, false);
+  assert.equal(publicClaim.sideEffectPolicy.executesRendererRoots, false);
 });
 
 test('private act gate rejects stale foreign or tampered Worker 810 ledger metadata', () => {

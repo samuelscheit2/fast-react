@@ -49,6 +49,10 @@ const privateSchedulerMockDelayedActRootWorkPrerequisiteId =
   'scheduler-mock-delayed-act-root-work-nested-expired-diagnostics';
 const privateSchedulerMockDelayedActRootWorkPreflightStatus =
   'preflighted-private-test-utils-act-scheduler-mock-delayed-act-root-work-nested-expired-diagnostics';
+const privateSchedulerMockDelayedActRootWorkWorkerId =
+  'worker-835-react-dom-test-utils-act-delayed-scheduler-handoff';
+const privateSchedulerMockDelayedActRootWorkSource =
+  'packages/react-dom/src/test-utils-act-gate.js';
 const privateReactActSchedulerDiagnosticsLedgerPrerequisiteId =
   'react-act-scheduler-private-diagnostics-ledger';
 const privateReactActSchedulerDiagnosticsLedgerGateId =
@@ -446,8 +450,7 @@ const privateSchedulerMockDelayedActRootWorkEvidence = freezeArray([
 const privateSchedulerMockDelayedActRootWorkDiagnosticSummary = freezeRecord({
   gateId: privateSchedulerMockDelayedActRootWorkDiagnosticGateId,
   status: privateSchedulerMockDelayedActRootWorkDiagnosticStatus,
-  workerId:
-    'worker-835-react-dom-test-utils-act-delayed-scheduler-handoff',
+  workerId: privateSchedulerMockDelayedActRootWorkWorkerId,
   prerequisiteId: privateSchedulerMockDelayedActRootWorkPrerequisiteId,
   reactActPreflightStatus: reactActSchedulerMockDelayedActRootWorkPreflightStatus,
   consumesReactActPrivateDelayedSchedulerDiagnostics: true,
@@ -486,6 +489,45 @@ const privateSchedulerMockDelayedActRootWorkDiagnosticSummary = freezeRecord({
   executesRendererRoots: false,
   compatibilityClaimed: false
 });
+const privateSchedulerMockDelayedActRootWorkRequiredTrueFields = freezeArray([
+  'consumesReactActPrivateDelayedSchedulerDiagnostics',
+  'preflightsSchedulerMockDelayedActRootWorkDiagnostics',
+  'acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics',
+  'consumesNestedExpiredActRootWorkDiagnostics',
+  'consumesSchedulerMockExpiredActRootWorkDiagnostics',
+  'drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics',
+  'consumesAcceptedExpiredActRootWorkRecords',
+  'drainsAcceptedInternalTestQueues',
+  'requiresSchedulerOwnedSourceProof',
+  'rejectsStaleDiagnostics',
+  'rejectsForeignRendererRootEvidence',
+  'rejectsTamperedDiagnostics',
+  'rejectsPublicClaims'
+]);
+const privateSchedulerMockDelayedActRootWorkRequiredFalseFields = freezeArray([
+  'acceptsTopLevelDelayedActRootWorkAsPublicActEvidence',
+  'queueFlushingReady',
+  'rendererRootsReady',
+  'passiveEffectsReady',
+  'continuationFlushingReady',
+  'publicActExecution',
+  'publicRootExecution',
+  'publicEffectExecution',
+  'publicActPassiveDrain',
+  'publicSchedulerTimingCompatibilityClaimed',
+  'publicReactActCompatibilityClaimed',
+  'publicRootSchedulerCompatibilityClaimed',
+  'publicRendererCompatibilityClaimed',
+  'drainsPublicSchedulerTaskQueue',
+  'drainsPublicReactActQueue',
+  'invokesPublicSchedulerFlushHelper',
+  'publicSchedulerFlushBehaviorExecuted',
+  'executesQueuedWork',
+  'executesEffects',
+  'executesRendererWork',
+  'executesRendererRoots',
+  'compatibilityClaimed'
+]);
 const privateReactActSchedulerDiagnosticsLedgerWorkerIds = freezeArray([
   'worker-747-react-private-act-expired-scheduler-consumer',
   'worker-772-scheduler-delayed-root-producer',
@@ -1069,6 +1111,21 @@ const acceptedPrivatePrerequisites = freezeRecords([
     ...privateReactActSchedulerDiagnosticsLedgerSummary
   },
   {
+    id: privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+    present: true,
+    status: privateSchedulerMockDelayedActRootWorkDiagnosticStatus,
+    source: privateSchedulerMockDelayedActRootWorkSource,
+    workerId: privateSchedulerMockDelayedActRootWorkWorkerId,
+    recordOnly: false,
+    privateDiagnostic: true,
+    diagnosticGateId: privateSchedulerMockDelayedActRootWorkDiagnosticGateId,
+    diagnosticStatus: privateSchedulerMockDelayedActRootWorkDiagnosticStatus,
+    summary: privateSchedulerMockDelayedActRootWorkDiagnosticSummary,
+    ...privateSchedulerMockDelayedActRootWorkDiagnosticSummary,
+    records: privateSchedulerMockDelayedActRootWorkRecords,
+    evidence: privateSchedulerMockDelayedActRootWorkEvidence
+  },
+  {
     id: 'scheduler-act-queue-routing-records',
     present: true,
     status: schedulerActQueueRecordOnlyStatus,
@@ -1621,8 +1678,7 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
     privateSchedulerMockDelayedActRootWorkDiagnostics: freezeRecord({
       gateId: privateSchedulerMockDelayedActRootWorkDiagnosticGateId,
       status: privateSchedulerMockDelayedActRootWorkDiagnosticStatus,
-      workerId:
-        'worker-835-react-dom-test-utils-act-delayed-scheduler-handoff',
+      workerId: privateSchedulerMockDelayedActRootWorkWorkerId,
       prerequisiteId: privateSchedulerMockDelayedActRootWorkPrerequisiteId,
       acceptedPrerequisiteId:
         privateSchedulerMockDelayedActRootWorkPrerequisiteId,
@@ -2194,8 +2250,7 @@ function preflightSchedulerMockDelayedActRootWorkDiagnostics(report) {
     gateId: privateSchedulerMockDelayedActRootWorkDiagnosticGateId,
     diagnosticStatus: privateSchedulerMockDelayedActRootWorkDiagnosticStatus,
     prerequisiteId: privateSchedulerMockDelayedActRootWorkPrerequisiteId,
-    workerId:
-      'worker-835-react-dom-test-utils-act-delayed-scheduler-handoff',
+    workerId: privateSchedulerMockDelayedActRootWorkWorkerId,
     reactActPreflightStatus: reactActPreflightReport.status,
     schedulerMockDelayedActRootWorkDiagnosticsStatus:
       reactActPreflightReport.schedulerMockDelayedActRootWorkDiagnosticsStatus,
@@ -2433,6 +2488,25 @@ function collectStaleAcceptedPrivatePrerequisites(prerequisites) {
     }
   }
 
+  const delayedSchedulerPrerequisite = prerequisitesById.get(
+    privateSchedulerMockDelayedActRootWorkPrerequisiteId
+  );
+  if (delayedSchedulerPrerequisite) {
+    const reasons =
+      collectSchedulerMockDelayedActRootWorkStaleReasons(
+        delayedSchedulerPrerequisite
+      );
+    if (reasons.length > 0) {
+      stalePrerequisites.push(
+        freezeRecord({
+          prerequisiteId:
+            privateSchedulerMockDelayedActRootWorkPrerequisiteId,
+          reasons
+        })
+      );
+    }
+  }
+
   return freezeArray(stalePrerequisites);
 }
 
@@ -2457,6 +2531,115 @@ function collectAcceptedPrivatePrerequisitePublicClaims(prerequisites) {
   }
 
   return freezeArray(claims);
+}
+
+function collectSchedulerMockDelayedActRootWorkStaleReasons(prerequisite) {
+  const reasons = collectSchedulerMockDelayedActRootWorkRecordReasons({
+    record: prerequisite,
+    prefix: '',
+    validatePrerequisiteRow: true
+  });
+
+  if (!isObjectLike(prerequisite.summary)) {
+    reasons.push('summary-missing');
+  } else {
+    reasons.push(
+      ...collectSchedulerMockDelayedActRootWorkRecordReasons({
+        record: prerequisite.summary,
+        prefix: 'summary.',
+        validatePrerequisiteRow: false
+      })
+    );
+  }
+
+  return freezeArray(reasons);
+}
+
+function collectSchedulerMockDelayedActRootWorkRecordReasons({
+  record,
+  prefix,
+  validatePrerequisiteRow
+}) {
+  const reasons = [];
+
+  if (record.workerId !== privateSchedulerMockDelayedActRootWorkWorkerId) {
+    reasons.push(`${prefix}worker-id-mismatch`);
+  }
+  if (
+    record.status !== privateSchedulerMockDelayedActRootWorkDiagnosticStatus
+  ) {
+    reasons.push(`${prefix}status-mismatch`);
+  }
+  if (
+    record.gateId !== privateSchedulerMockDelayedActRootWorkDiagnosticGateId
+  ) {
+    reasons.push(`${prefix}gate-id-mismatch`);
+  }
+  if (
+    record.prerequisiteId !==
+    privateSchedulerMockDelayedActRootWorkPrerequisiteId
+  ) {
+    reasons.push(`${prefix}prerequisite-id-mismatch`);
+  }
+  if (
+    record.reactActPreflightStatus !==
+    reactActSchedulerMockDelayedActRootWorkPreflightStatus
+  ) {
+    reasons.push(`${prefix}react-act-preflight-status-mismatch`);
+  }
+
+  if (validatePrerequisiteRow) {
+    if (record.source !== privateSchedulerMockDelayedActRootWorkSource) {
+      reasons.push(`${prefix}source-mismatch`);
+    }
+    if (record.recordOnly !== false) {
+      reasons.push(`${prefix}recordOnly-not-false`);
+    }
+    if (record.privateDiagnostic !== true) {
+      reasons.push(`${prefix}privateDiagnostic-not-true`);
+    }
+    if (
+      record.diagnosticGateId !==
+      privateSchedulerMockDelayedActRootWorkDiagnosticGateId
+    ) {
+      reasons.push(`${prefix}diagnostic-gate-id-mismatch`);
+    }
+    if (
+      record.diagnosticStatus !==
+      privateSchedulerMockDelayedActRootWorkDiagnosticStatus
+    ) {
+      reasons.push(`${prefix}diagnostic-status-mismatch`);
+    }
+    if (
+      !sameStringArray(
+        record.records,
+        privateSchedulerMockDelayedActRootWorkRecords
+      )
+    ) {
+      reasons.push(`${prefix}records-mismatch`);
+    }
+    if (
+      !sameStringArray(
+        record.evidence,
+        privateSchedulerMockDelayedActRootWorkEvidence
+      )
+    ) {
+      reasons.push(`${prefix}evidence-mismatch`);
+    }
+  }
+
+  for (const field of privateSchedulerMockDelayedActRootWorkRequiredTrueFields) {
+    if (record[field] !== true) {
+      reasons.push(`${prefix}${field}-not-true`);
+    }
+  }
+  for (const field of privateSchedulerMockDelayedActRootWorkRequiredFalseFields) {
+    if (record[field] !== false) {
+      reasons.push(`${prefix}${field}-not-false`);
+    }
+  }
+
+  return reasons;
 }
 
 function collectReactActSchedulerDiagnosticsLedgerStaleReasons(prerequisite) {

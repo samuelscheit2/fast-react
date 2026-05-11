@@ -3085,6 +3085,7 @@ test("React DOM test-utils act private routing gate tracks React act metadata wi
     "react-act-private-dispatcher-gate",
     "scheduler-mock-expired-act-root-work-diagnostics",
     "react-act-scheduler-private-diagnostics-ledger",
+    "scheduler-mock-delayed-act-root-work-nested-expired-diagnostics",
     "scheduler-act-queue-routing-records",
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
