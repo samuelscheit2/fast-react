@@ -1197,6 +1197,32 @@ test("useRef hook currentness rejects stale source, surface drift, and forged cl
     }),
     "useRef-hook-currentness-surface-currentness-source-proof"
   );
+  let accessorRead = false;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, "surfaceCurrentnessRows", {
+    enumerable: true,
+    get() {
+      accessorRead = true;
+      return report.surfaceCurrentnessRows;
+    }
+  });
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport(accessorOptions),
+    "useRef-hook-currentness-source-proof"
+  );
+  assert.equal(accessorRead, false);
+  const ambiguousProxyOptions = new Proxy(
+    {},
+    {
+      ownKeys() {
+        throw new Error("ambiguous useRef options");
+      }
+    }
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport(ambiguousProxyOptions),
+    "useRef-hook-currentness-source-proof"
+  );
   assertUseRefCurrentnessRejected(
     hookDispatcher.createUseRefHookCurrentnessReport({
       publicRootlessInvalidHookBlocked: false
@@ -1251,6 +1277,21 @@ test("useRef hook currentness rejects same-shaped fake root useRef", () => {
     assertUseRefCurrentnessRejected(
       report,
       "useRef-hook-currentness-surface-currentness"
+    );
+
+    const inheritedOverrideOptions = Object.create({
+      surfaceCurrentnessRowOverrides: Object.fromEntries(
+        expectedUseRefSurfaceCurrentnessRows.map((row) => [
+          row.surfaceId,
+          { ...row }
+        ])
+      )
+    });
+    assertUseRefCurrentnessRejected(
+      hookDispatcher.createUseRefHookCurrentnessReport(
+        inheritedOverrideOptions
+      ),
+      "useRef-hook-currentness-source-proof"
     );
   } finally {
     React.useRef = originalUseRef;

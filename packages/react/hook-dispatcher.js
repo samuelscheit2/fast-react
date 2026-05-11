@@ -1269,6 +1269,21 @@ const useRefHookCompatibilityFalseFlags = freezeArray([
   'idGenerationClaimed',
   'packageCompatibility'
 ]);
+const useRefHookCurrentnessReportOptionNames = freezeArray([
+  'hookNames',
+  'publicShapeBlockers',
+  'sourceReport',
+  'blockerCurrentness',
+  'surfaceCurrentnessFieldNames',
+  'surfaceCurrentnessRows',
+  'surfaceCurrentnessRowOverrides',
+  'cjsSurfaceCurrentnessBlocked',
+  'reactServerSurfaceCurrentnessBlocked',
+  'publicRootlessInvalidHookBlocked',
+  'genericDispatcherForwardingBlocked',
+  'privateDispatcherRequired',
+  ...useRefHookCompatibilityFalseFlags
+]);
 const useRefHookCurrentnessReportKind =
   'fast-react.private.use_ref_hook_currentness';
 const useRefHookCurrentnessReportVersion = 1;
@@ -2380,8 +2395,105 @@ function isUseRefInvalidHookCallError(error) {
   );
 }
 
+function sanitizeUseRefHookCurrentnessReportOptions(overrides) {
+  if (overrides == null) {
+    return {
+      options: {},
+      sourceOwnedOptions: true
+    };
+  }
+
+  if (!isObjectLike(overrides) || typeof overrides === 'function') {
+    return {
+      options: {},
+      sourceOwnedOptions: false
+    };
+  }
+
+  let prototype;
+  let ownKeys;
+
+  try {
+    prototype = Object.getPrototypeOf(overrides);
+    ownKeys = Reflect.ownKeys(overrides);
+  } catch {
+    return {
+      options: {},
+      sourceOwnedOptions: false
+    };
+  }
+
+  if (prototype !== Object.prototype && prototype !== null) {
+    return {
+      options: {},
+      sourceOwnedOptions: false
+    };
+  }
+
+  const ownStringKeys = new Set();
+  const options = {};
+
+  for (const key of ownKeys) {
+    if (
+      typeof key !== 'string' ||
+      !useRefHookCurrentnessReportOptionNames.includes(key)
+    ) {
+      return {
+        options: {},
+        sourceOwnedOptions: false
+      };
+    }
+
+    let descriptor;
+
+    try {
+      descriptor = Object.getOwnPropertyDescriptor(overrides, key);
+    } catch {
+      return {
+        options: {},
+        sourceOwnedOptions: false
+      };
+    }
+
+    if (
+      descriptor == null ||
+      !Object.prototype.hasOwnProperty.call(descriptor, 'value')
+    ) {
+      return {
+        options: {},
+        sourceOwnedOptions: false
+      };
+    }
+
+    ownStringKeys.add(key);
+    options[key] = descriptor.value;
+  }
+
+  try {
+    for (const key in overrides) {
+      if (!ownStringKeys.has(key)) {
+        return {
+          options: {},
+          sourceOwnedOptions: false
+        };
+      }
+    }
+  } catch {
+    return {
+      options: {},
+      sourceOwnedOptions: false
+    };
+  }
+
+  return {
+    options,
+    sourceOwnedOptions: true
+  };
+}
+
 function createUseRefHookCurrentnessReport(overrides = {}) {
-  const normalized = overrides ?? {};
+  const { options: normalized, sourceOwnedOptions } =
+    sanitizeUseRefHookCurrentnessReportOptions(overrides);
   const hasSurfaceCurrentnessRowsOverride =
     Object.prototype.hasOwnProperty.call(normalized, 'surfaceCurrentnessRows');
   const hasSurfaceCurrentnessRowOverrides =
@@ -2455,14 +2567,20 @@ function createUseRefHookCurrentnessReport(overrides = {}) {
     packageCompatibility: normalized.packageCompatibility ?? false
   });
 
-  if (!hasSurfaceCurrentnessRowsOverride && !hasSurfaceCurrentnessRowOverrides) {
+  if (
+    sourceOwnedOptions &&
+    !hasSurfaceCurrentnessRowsOverride &&
+    !hasSurfaceCurrentnessRowOverrides
+  ) {
     useRefHookSurfaceCurrentnessRowsByReport.set(
       report,
       surfaceCurrentnessRows
     );
   }
 
-  useRefHookCurrentnessReports.add(report);
+  if (sourceOwnedOptions) {
+    useRefHookCurrentnessReports.add(report);
+  }
   return report;
 }
 

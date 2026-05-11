@@ -15,6 +15,10 @@
   canonical module-owned object identity, and `useRef` surface currentness rows
   derive source-function identity plus rootless/generic-dispatcher probes
   instead of hardcoded blocker booleans.
+- Audit repair 2: `createUseRefHookCurrentnessReport()` now sanitizes report
+  options before reading values, accepts only own data properties from plain or
+  null-prototype option records, and leaves inherited/accessor/proxy-ambiguous
+  options untrusted.
 
 ## Changed Files
 
@@ -42,6 +46,8 @@ rejects cloned rows, row-overridden reports, root/CJS/server drift, stale source
 rows, same-shaped fake `useRef` exports, generic dispatcher forwarding, public
 compatibility flags, Scheduler/root prerequisite smuggling,
 callback/external-store/id claims, and ref identity compatibility claims.
+Inherited `surfaceCurrentnessRowOverrides` and own accessor/proxy-ambiguous
+options are ignored as untrusted and are not given report provenance.
 
 `isPrivateRefHookDispatcherMetadata(metadata)` now rejects same-shaped clones by
 requiring `metadata === privateRefHookDispatcherMetadata`.
@@ -63,6 +69,9 @@ requiring `metadata === privateRefHookDispatcherMetadata`.
 - Added audit negative coverage for shallow-cloned ref dispatcher metadata,
   same-shaped fake `React.useRef` returning a ref object, row-overridden
   currentness reports, and cloned surface/currentness report rows.
+- Added audit negative coverage for prototype-inherited
+  `surfaceCurrentnessRowOverrides` under a fake same-shaped `React.useRef`, own
+  accessor options, and proxy-ambiguous options.
 
 ## Commands Run
 
