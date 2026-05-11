@@ -108,6 +108,9 @@ const {
     isPluginPortalEventOwnerRootGateRecord
 } = require('../events/plugin-event-system.js');
 const {
+  registerPrivateHydrateRootSourceLedgerRecord
+} = require('./hydrate-root-source-ledger.js');
+const {
   appendChild,
   appendChildToContainer,
   appendInitialChild,
@@ -3813,19 +3816,25 @@ function createPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(
     publicHydrationReplayCompatibilityClaimed: false
   });
 
+  const lifecycleRequestBoundaryPayload = freezeRecord({
+    admissionPayload,
+    bridge: preflightState.bridge,
+    container,
+    lifecycleContainerSnapshot,
+    preflight: preflightState.preflight,
+    requestAdmission,
+    requestPayload,
+    requestRecord
+  });
   rootHydratePublicFacadeLifecycleRequestBoundaryPayloads.set(
     record,
-    freezeRecord({
-      admissionPayload,
-      bridge: preflightState.bridge,
-      container,
-      lifecycleContainerSnapshot,
-      preflight: preflightState.preflight,
-      requestAdmission,
-      requestPayload,
-      requestRecord
-    })
+    lifecycleRequestBoundaryPayload
   );
+  registerPrivateHydrateRootSourceLedgerRecord(record, {
+    ...lifecycleRequestBoundaryPayload,
+    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+    ledgerKind: 'hydrate-root-public-facade-lifecycle-request-boundary'
+  });
   return record;
 }
 
@@ -4009,7 +4018,7 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     compatibilityClaimed: false
   });
 
-  rootHydratePublicFacadePreflightRecordPayloads.set(record, freezeRecord({
+  const preflightRecordPayload = freezeRecord({
     bridge: preflightState.bridge,
     lifecycleRequestBoundary,
     markerListenerPreflight,
@@ -4018,7 +4027,16 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     recoverableErrorPreflight,
     requestAdmission,
     requestRecord
-  }));
+  });
+  rootHydratePublicFacadePreflightRecordPayloads.set(
+    record,
+    preflightRecordPayload
+  );
+  registerPrivateHydrateRootSourceLedgerRecord(record, {
+    ...preflightRecordPayload,
+    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+    ledgerKind: 'hydrate-root-public-facade-preflight-record'
+  });
   return record;
 }
 
@@ -5002,7 +5020,7 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     browserDomEventCompatibilityClaimed: false
   });
 
-  rootHydratePublicFacadeEventReplayPreflightPayloads.set(record, freezeRecord({
+  const eventReplayPreflightPayload = freezeRecord({
     afterState,
     beforeState,
     blockerEvidence,
@@ -5023,7 +5041,16 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     requestRecord,
     targetClaimingPayload,
     targetClaimingPreflight: targetClaimingPreflightRecord
-  }));
+  });
+  rootHydratePublicFacadeEventReplayPreflightPayloads.set(
+    record,
+    eventReplayPreflightPayload
+  );
+  registerPrivateHydrateRootSourceLedgerRecord(record, {
+    ...eventReplayPreflightPayload,
+    hydrationBoundaryRecord,
+    ledgerKind: 'hydrate-root-public-facade-event-replay-preflight-record'
+  });
   return record;
 }
 
@@ -5439,7 +5466,7 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     browserDomEventCompatibilityClaimed: false
   });
 
-  rootHydratePublicFacadeExecutionPreflightPayloads.set(record, freezeRecord({
+  const executionPreflightPayload = freezeRecord({
     afterState,
     beforeState,
     blockerEvidence,
@@ -5462,7 +5489,16 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     targetClaimingPayload: eventReplayPayload.targetClaimingPayload,
     targetClaimingPreflight:
       eventReplayPayload.targetClaimingPreflight
-  }));
+  });
+  rootHydratePublicFacadeExecutionPreflightPayloads.set(
+    record,
+    executionPreflightPayload
+  );
+  registerPrivateHydrateRootSourceLedgerRecord(record, {
+    ...executionPreflightPayload,
+    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+    ledgerKind: 'hydrate-root-public-facade-execution-preflight-record'
+  });
   return record;
 }
 

@@ -2031,6 +2031,34 @@ test('private hydration recoverable error boundary admission rejects stale clone
       }),
     invalidAdmission
   );
+  const clonedLifecycleRequestBoundary = Object.freeze({
+    ...scenario.lifecycleRequestBoundary
+  });
+  const clonedHydrateRootPreflightRecord = Object.freeze({
+    ...scenario.hydrateRecord,
+    lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+  });
+  const clonedEventReplayPreflightRecord = Object.freeze({
+    ...scenario.eventReplayPreflightRecord,
+    lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+  });
+  const clonedExecutionPreflightRecord = Object.freeze({
+    ...scenario.executionPreflightRecord,
+    eventReplayPreflight: clonedEventReplayPreflightRecord,
+    lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+  });
+  assert.throws(
+    () =>
+      createHydrationRecoverableBoundaryAdmission(scenario, {
+        options: {
+          eventReplayPreflightRecord: clonedEventReplayPreflightRecord,
+          executionPreflightRecord: clonedExecutionPreflightRecord,
+          hydrateRootPreflightRecord: clonedHydrateRootPreflightRecord,
+          lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+        }
+      }),
+    invalidAdmission
+  );
   assert.throws(
     () =>
       createHydrationRecoverableBoundaryAdmission(scenario, {

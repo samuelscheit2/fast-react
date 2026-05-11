@@ -12,6 +12,9 @@ const {
   resolveHydrationContainerNodePath
 } = require('./hydration-marker-parser.js');
 const {
+  getPrivateHydrateRootSourceLedgerRecordPayload
+} = require('./hydrate-root-source-ledger.js');
+const {
   duplicateCreateRootWarning,
   getCreateRootWarning,
   hasLegacyRootMarker,
@@ -4628,8 +4631,44 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
     admissionOptions.executionPreflightRecord;
   const lifecycleRequestBoundary =
     admissionOptions.lifecycleRequestBoundary;
+  const hydrateRootSourceLedgerPayload =
+    getPrivateHydrateRootSourceLedgerRecordPayload(
+      hydrateRootPreflightRecord
+    );
+  const eventReplaySourceLedgerPayload =
+    getPrivateHydrateRootSourceLedgerRecordPayload(
+      eventReplayPreflightRecord
+    );
+  const executionSourceLedgerPayload =
+    getPrivateHydrateRootSourceLedgerRecordPayload(
+      executionPreflightRecord
+    );
+  const lifecycleSourceLedgerPayload =
+    getPrivateHydrateRootSourceLedgerRecordPayload(
+      lifecycleRequestBoundary
+    );
 
   if (
+    !isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+      hydrateRootSourceLedgerPayload,
+      hydrateRootPreflightRecord,
+      'hydrate-root-public-facade-preflight-record'
+    ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+      eventReplaySourceLedgerPayload,
+      eventReplayPreflightRecord,
+      'hydrate-root-public-facade-event-replay-preflight-record'
+    ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+      executionSourceLedgerPayload,
+      executionPreflightRecord,
+      'hydrate-root-public-facade-execution-preflight-record'
+    ) ||
+    !isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+      lifecycleSourceLedgerPayload,
+      lifecycleRequestBoundary,
+      'hydrate-root-public-facade-lifecycle-request-boundary'
+    ) ||
     !isHydrationRecoverableErrorBoundaryAdmissionHydrateRootPreflight(
       hydrateRootPreflightRecord
     ) ||
@@ -4644,7 +4683,37 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
     ) ||
     hydrateRootPreflightRecord.hydrationBoundaryRecord !==
       hydrationBoundaryRecord ||
+    hydrateRootSourceLedgerPayload.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    eventReplaySourceLedgerPayload.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    executionSourceLedgerPayload.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    lifecycleSourceLedgerPayload.hydrationBoundaryRecord !==
+      hydrationBoundaryRecord ||
+    hydrateRootSourceLedgerPayload.preflight !==
+      eventReplaySourceLedgerPayload.preflight ||
+    hydrateRootSourceLedgerPayload.preflight !==
+      executionSourceLedgerPayload.preflight ||
+    hydrateRootSourceLedgerPayload.preflight !==
+      lifecycleSourceLedgerPayload.preflight ||
+    hydrateRootSourceLedgerPayload.bridge !==
+      eventReplaySourceLedgerPayload.bridge ||
+    hydrateRootSourceLedgerPayload.bridge !==
+      executionSourceLedgerPayload.bridge ||
+    hydrateRootSourceLedgerPayload.bridge !==
+      lifecycleSourceLedgerPayload.bridge ||
+    hydrateRootSourceLedgerPayload.requestRecord !==
+      eventReplaySourceLedgerPayload.requestRecord ||
+    hydrateRootSourceLedgerPayload.requestRecord !==
+      executionSourceLedgerPayload.requestRecord ||
+    hydrateRootSourceLedgerPayload.requestRecord !==
+      lifecycleSourceLedgerPayload.requestRecord ||
+    hydrateRootSourceLedgerPayload.requestAdmission !==
+      lifecycleSourceLedgerPayload.requestAdmission ||
     hydrateRootPreflightRecord.recoverableErrorPreflight !==
+      recoverableErrorPreflightRecord ||
+    hydrateRootSourceLedgerPayload.recoverableErrorPreflight !==
       recoverableErrorPreflightRecord ||
     hydrateRootPreflightRecord.acceptedPrivateMetadataDiagnostics !==
       hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics ||
@@ -4652,19 +4721,34 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
       hydrationBoundaryRecord.recoverableErrorMetadata ||
     hydrateRootPreflightRecord.lifecycleRequestBoundary !==
       lifecycleRequestBoundary ||
+    hydrateRootSourceLedgerPayload.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
     hydrateRootPreflightRecord.requestAdmission !==
       lifecycleRequestBoundary.requestAdmission ||
     eventReplayPreflightRecord.lifecycleRequestBoundary !==
       lifecycleRequestBoundary ||
+    eventReplaySourceLedgerPayload.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
     eventReplayPreflightRecord.targetClaimingDiagnostic !==
       targetClaimingDiagnostic ||
+    !eventReplaySourceLedgerPayload.targetClaimingPayload ||
+    eventReplaySourceLedgerPayload.targetClaimingPayload
+      .targetClaimingDiagnostic !== targetClaimingDiagnostic ||
     eventReplayPreflightRecord.replayExecutionRecord !==
+      replayExecutionRecord ||
+    eventReplaySourceLedgerPayload.replayExecutionRecord !==
       replayExecutionRecord ||
     executionPreflightRecord.lifecycleRequestBoundary !==
       lifecycleRequestBoundary ||
+    executionSourceLedgerPayload.lifecycleRequestBoundary !==
+      lifecycleRequestBoundary ||
     executionPreflightRecord.eventReplayPreflight !==
       eventReplayPreflightRecord ||
+    executionSourceLedgerPayload.eventReplayPreflight !==
+      eventReplayPreflightRecord ||
     executionPreflightRecord.replayExecutionRecord !==
+      replayExecutionRecord ||
+    executionSourceLedgerPayload.replayExecutionRecord !==
       replayExecutionRecord ||
     executionPreflightRecord.recoverableErrorMetadata !==
       hydrationBoundaryRecord.recoverableErrorMetadata ||
@@ -4680,6 +4764,12 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
       hydrationBoundaryRecord.recordId ||
     lifecycleRequestBoundary.requestAdmission !==
       hydrateRootPreflightRecord.requestAdmission ||
+    lifecycleSourceLedgerPayload.requestAdmission !==
+      hydrateRootPreflightRecord.requestAdmission ||
+    lifecycleSourceLedgerPayload.lifecycleContainerSnapshot !==
+      lifecycleRequestBoundary.lifecycleContainerSnapshot ||
+    lifecycleSourceLedgerPayload.container !==
+      hydrationBoundaryPayload.container ||
     lifecycleRequestBoundary.lifecycleContainerSnapshot.childCount !==
       getHydrationRecoverableErrorBoundaryAdmissionChildCount(
         hydrationBoundaryPayload.container
@@ -4694,11 +4784,29 @@ function validateHydrationRecoverableErrorBoundaryAdmissionSourceLedger(
 
   return freezeRecord({
     eventReplayPreflightRecord,
+    eventReplaySourceLedgerPayload,
     executionPreflightRecord,
+    executionSourceLedgerPayload,
     hydrateRootPreflightRecord,
+    hydrateRootSourceLedgerPayload,
     lifecycleContainerSnapshotCurrent: true,
-    lifecycleRequestBoundary
+    lifecycleRequestBoundary,
+    lifecycleSourceLedgerPayload,
+    sourceOwnedLedgerPayloads: true
   });
+}
+
+function isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
+  payload,
+  record,
+  ledgerKind
+) {
+  return (
+    payload &&
+    typeof payload === 'object' &&
+    payload.record === record &&
+    payload.ledgerKind === ledgerKind
+  );
 }
 
 function isHydrationRecoverableErrorBoundaryAdmissionHydrateRootPreflight(
