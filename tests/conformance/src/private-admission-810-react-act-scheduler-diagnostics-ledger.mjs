@@ -109,6 +109,11 @@ export const PRIVATE_ADMISSION_810_REQUIRED_FALSE_REQUIREMENTS = freezeArray([
   "publicDelayedRendererRootAdmissionClaimed"
 ]);
 
+export const PRIVATE_ADMISSION_810_REQUIRED_REQUIREMENT_FIELDS = freezeArray([
+  ...PRIVATE_ADMISSION_810_REQUIRED_TRUE_REQUIREMENTS,
+  ...PRIVATE_ADMISSION_810_REQUIRED_FALSE_REQUIREMENTS
+]);
+
 export const PRIVATE_ADMISSION_810_DURABLE_EVIDENCE_TOKEN_CLASSES =
   freezeArray([
     freezeRecord({
@@ -146,6 +151,22 @@ export const PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES =
     freezeRecord({
       id: "field-value-expression",
       pattern: /:\s*(?:true|false|null|undefined|["']|\d)/u
+    }),
+    freezeRecord({
+      id: "comma-suffixed-snippet",
+      pattern: /,$/u
+    }),
+    freezeRecord({
+      id: "string-literal-snippet",
+      pattern: /^["'][\s\S]*["']$/u
+    }),
+    freezeRecord({
+      id: "member-call-expression",
+      pattern: /\b[$A-Z_a-z][\w$]*\.[_$A-Z_a-z][\w$]*\s*\(/u
+    }),
+    freezeRecord({
+      id: "member-expression-snippet",
+      pattern: /\b[$A-Z_a-z][\w$]*\.[_$A-Z_a-z][\w$]*/u
     }),
     freezeRecord({
       id: "block-or-statement-syntax",
@@ -264,6 +285,46 @@ export const PRIVATE_ADMISSION_810_REQUIRED_RENDERER_ROOT_SCOPES =
     [worker793]: "delayed-renderer-root-public-blockers-only",
     [worker798]: "delayed-renderer-root-public-blockers-only"
   });
+
+export const PRIVATE_ADMISSION_810_REQUIRED_EVIDENCE_ROLES = freezeRecord({
+  [worker747]: freezeArray([
+    "worker-747-react-act-source",
+    "worker-747-scheduler-source",
+    "worker-747-react-act-test-fields"
+  ]),
+  [worker772]: freezeArray([
+    "worker-772-scheduler-source",
+    "worker-772-delayed-test-fields"
+  ]),
+  [worker773]: freezeArray([
+    "worker-773-react-dom-source",
+    "worker-773-react-dom-test-fields"
+  ]),
+  [worker775]: freezeArray([
+    "worker-775-react-act-source",
+    "worker-775-scheduler-source",
+    "worker-775-react-act-test-fields"
+  ]),
+  [worker791]: freezeArray([
+    "worker-791-scheduler-source",
+    "worker-791-react-source",
+    "worker-791-native-test-fields"
+  ]),
+  [worker792]: freezeArray([
+    "worker-792-react-act-source",
+    "worker-792-scheduler-source",
+    "worker-792-react-act-test-fields"
+  ]),
+  [worker793]: freezeArray([
+    "worker-793-scheduler-source",
+    "worker-793-delayed-negative-test-fields"
+  ]),
+  [worker798]: freezeArray([
+    "worker-798-scheduler-source",
+    "worker-798-native-test-fields",
+    "worker-798-scheduler-mock-test-fields"
+  ])
+});
 
 const privateAdmission810Rows = freezeArray([
   ledgerRow({
@@ -556,6 +617,42 @@ export function evaluatePrivateAdmission810Gate({
         })
       )
   );
+  const evidenceRoleMismatches = evaluatedRows.flatMap((row) => {
+    const expectedRoles = PRIVATE_ADMISSION_810_REQUIRED_EVIDENCE_ROLES[
+      row.workerId
+    ];
+    const actualRoles = row.evidence.map((evidenceRow) => evidenceRow.role);
+    const duplicateRoles = actualRoles.filter(
+      (role, index) => actualRoles.indexOf(role) !== index
+    );
+    const missingRoles = expectedRoles.filter(
+      (role) => !actualRoles.includes(role)
+    );
+    const unexpectedRoles = actualRoles.filter(
+      (role) => !expectedRoles.includes(role)
+    );
+
+    if (
+      actualRoles.length > 0 &&
+      missingRoles.length === 0 &&
+      unexpectedRoles.length === 0 &&
+      duplicateRoles.length === 0 &&
+      sameStringArray(actualRoles, expectedRoles)
+    ) {
+      return [];
+    }
+
+    return [
+      freezeRecord({
+        workerId: row.workerId,
+        expectedEvidenceRoles: expectedRoles,
+        actualEvidenceRoles: freezeArray(actualRoles),
+        missingEvidenceRoles: freezeArray(missingRoles),
+        unexpectedEvidenceRoles: freezeArray(unexpectedRoles),
+        duplicateEvidenceRoles: freezeArray(duplicateRoles)
+      })
+    ];
+  });
   const diagnosticMismatches = compareRequiredArrayByWorker({
     rows: evaluatedRows,
     requiredByWorker: PRIVATE_ADMISSION_810_REQUIRED_DIAGNOSTIC_IDS,
@@ -611,6 +708,35 @@ export function evaluatePrivateAdmission810Gate({
       }
     }
     return mismatches;
+  });
+  const requirementFieldMismatches = evaluatedRows.flatMap((row) => {
+    const actualFields = Object.keys(row.requirements ?? {});
+    const missingFields = PRIVATE_ADMISSION_810_REQUIRED_REQUIREMENT_FIELDS.filter(
+      (field) => !actualFields.includes(field)
+    );
+    const unexpectedFields = actualFields.filter(
+      (field) =>
+        !PRIVATE_ADMISSION_810_REQUIRED_REQUIREMENT_FIELDS.includes(field)
+    );
+
+    if (
+      missingFields.length === 0 &&
+      unexpectedFields.length === 0 &&
+      sameStringSet(PRIVATE_ADMISSION_810_REQUIRED_REQUIREMENT_FIELDS, actualFields)
+    ) {
+      return [];
+    }
+
+    return [
+      freezeRecord({
+        workerId: row.workerId,
+        expectedRequirementFields:
+          PRIVATE_ADMISSION_810_REQUIRED_REQUIREMENT_FIELDS,
+        actualRequirementFields: freezeArray(actualFields),
+        missingRequirementFields: freezeArray(missingFields),
+        unexpectedRequirementFields: freezeArray(unexpectedFields)
+      })
+    ];
   });
   const publicBlockerFieldMismatches = evaluatedRows.flatMap((row) => {
     const actualFields = Object.keys(row.publicBlockerClaims ?? {});
@@ -686,6 +812,11 @@ export function evaluatePrivateAdmission810Gate({
   );
   pushRowsViolation(
     violations,
+    "evidence-role-manifest-mismatch",
+    evidenceRoleMismatches
+  );
+  pushRowsViolation(
+    violations,
     "private-diagnostic-id-mismatch",
     diagnosticMismatches
   );
@@ -708,6 +839,11 @@ export function evaluatePrivateAdmission810Gate({
     violations,
     "private-ledger-requirement-mismatch",
     requirementMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "requirement-field-mismatch",
+    requirementFieldMismatches
   );
   pushRowsViolation(
     violations,
@@ -735,15 +871,18 @@ export function evaluatePrivateAdmission810Gate({
     delayedRendererRootPublicClaimIds
   );
 
-  const evidenceRecognized = evidenceMismatches.length === 0;
+  const evidenceRecognized =
+    evidenceMismatches.length === 0 && evidenceRoleMismatches.length === 0;
   const durableEvidenceTokensRecognized =
     nonDurableEvidenceTokenMismatches.length === 0;
+  const evidenceRolesRecognized = evidenceRoleMismatches.length === 0;
   const diagnosticIdsRecognized = diagnosticMismatches.length === 0;
   const statusesRecognized = statusMismatches.length === 0;
   const evidenceKindsRecognized = evidenceKindMismatches.length === 0;
   const rendererRootScopesRecognized =
     rendererRootScopeMismatches.length === 0;
-  const requirementsRecognized = requirementMismatches.length === 0;
+  const requirementsRecognized =
+    requirementMismatches.length === 0 && requirementFieldMismatches.length === 0;
   const blockedPublicClaimsRecognized =
     publicBlockerFieldMismatches.length === 0 &&
     publicBlockerClaimViolationIds.length === 0;
@@ -777,6 +916,7 @@ export function evaluatePrivateAdmission810Gate({
       : PRIVATE_ADMISSION_810_VIOLATION_STATUS,
     privateDiagnosticsRecognized,
     evidenceRecognized,
+    evidenceRolesRecognized,
     durableEvidenceTokensRecognized,
     diagnosticIdsRecognized,
     statusesRecognized,
@@ -797,6 +937,12 @@ export function evaluatePrivateAdmission810Gate({
       nonDurableEvidenceTokenMismatches.map(
         (mismatch) => `${mismatch.workerId}.${mismatch.role}`
       )
+    ),
+    evidenceRoleViolationIds: freezeArray(
+      evidenceRoleMismatches.map((mismatch) => mismatch.workerId)
+    ),
+    requirementFieldViolationIds: freezeArray(
+      requirementFieldMismatches.map((mismatch) => mismatch.workerId)
     ),
     staticReadOnlyViolationIds: freezeArray(staticReadOnlyViolationIds),
     sourceValidatorOwnershipViolationIds: freezeArray(

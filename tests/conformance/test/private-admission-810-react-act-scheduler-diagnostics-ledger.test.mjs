@@ -8,7 +8,9 @@ import {
   PRIVATE_ADMISSION_810_PUBLIC_BLOCKER_FIELDS,
   PRIVATE_ADMISSION_810_REQUIRED_DIAGNOSTIC_IDS,
   PRIVATE_ADMISSION_810_REQUIRED_EVIDENCE_KINDS,
+  PRIVATE_ADMISSION_810_REQUIRED_EVIDENCE_ROLES,
   PRIVATE_ADMISSION_810_REQUIRED_FALSE_REQUIREMENTS,
+  PRIVATE_ADMISSION_810_REQUIRED_REQUIREMENT_FIELDS,
   PRIVATE_ADMISSION_810_REQUIRED_RENDERER_ROOT_SCOPES,
   PRIVATE_ADMISSION_810_REQUIRED_STATUSES,
   PRIVATE_ADMISSION_810_REQUIRED_TRUE_REQUIREMENTS,
@@ -79,6 +81,16 @@ test("private admission 810 manifest pins accepted React act and Scheduler hando
       [...PRIVATE_ADMISSION_810_PUBLIC_BLOCKER_FIELDS].sort(),
       row.workerId
     );
+    assert.deepEqual(
+      row.evidence.map((evidenceRow) => evidenceRow.role),
+      PRIVATE_ADMISSION_810_REQUIRED_EVIDENCE_ROLES[row.workerId],
+      row.workerId
+    );
+    assert.deepEqual(
+      Object.keys(row.requirements).sort(),
+      [...PRIVATE_ADMISSION_810_REQUIRED_REQUIREMENT_FIELDS].sort(),
+      row.workerId
+    );
     assertAllFalse(row.publicBlockerClaims, row.workerId);
   }
 });
@@ -89,6 +101,7 @@ test("private admission 810 gate recognizes private source-owned diagnostics whi
   assert.equal(gate.status, PRIVATE_ADMISSION_810_GATE_STATUS);
   assert.equal(gate.privateDiagnosticsRecognized, true);
   assert.equal(gate.evidenceRecognized, true);
+  assert.equal(gate.evidenceRolesRecognized, true);
   assert.equal(gate.durableEvidenceTokensRecognized, true);
   assert.equal(gate.diagnosticIdsRecognized, true);
   assert.equal(gate.statusesRecognized, true);
@@ -105,6 +118,8 @@ test("private admission 810 gate recognizes private source-owned diagnostics whi
   assert.deepEqual(gate.recognizedWorkerIds, expectedWorkers);
   assert.deepEqual(gate.publicBlockerClaimViolationIds, []);
   assert.deepEqual(gate.nonDurableEvidenceTokenViolationIds, []);
+  assert.deepEqual(gate.evidenceRoleViolationIds, []);
+  assert.deepEqual(gate.requirementFieldViolationIds, []);
   assert.deepEqual(gate.staticReadOnlyViolationIds, []);
   assert.deepEqual(gate.sourceValidatorOwnershipViolationIds, []);
   assert.deepEqual(gate.delayedRendererRootPublicClaimIds, []);
@@ -228,6 +243,59 @@ test("private admission 810 gate rejects missing Scheduler-owned source validato
   );
 });
 
+test("private admission 810 gate rejects empty, missing, and extra evidence roles", () => {
+  const worker772Row = rowByWorker(worker772);
+  const worker798Row = rowByWorker(worker798);
+  const extraEvidenceRow = {
+    ...worker798Row.evidence[0],
+    role: "worker-798-unexpected-extra-evidence"
+  };
+  const gate = evaluatePrivateAdmission810Gate({
+    rowOverrides: {
+      [worker791]: {
+        evidence: []
+      },
+      [worker772]: {
+        evidence: worker772Row.evidence.filter(
+          (evidenceRow) => evidenceRow.role !== "worker-772-delayed-test-fields"
+        )
+      },
+      [worker798]: {
+        evidence: [...worker798Row.evidence, extraEvidenceRow]
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_810_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.evidenceRecognized, false);
+  assert.equal(gate.evidenceRolesRecognized, false);
+  assert.deepEqual(gate.evidenceRoleViolationIds, [
+    worker772,
+    worker791,
+    worker798
+  ]);
+  assertViolationIds(gate, ["evidence-role-manifest-mismatch"]);
+
+  const rows = getViolationRows(gate, "evidence-role-manifest-mismatch");
+  const row772 = rows.find((row) => row.workerId === worker772);
+  const row791 = rows.find((row) => row.workerId === worker791);
+  const row798 = rows.find((row) => row.workerId === worker798);
+  assert.deepEqual(row772.missingEvidenceRoles, [
+    "worker-772-delayed-test-fields"
+  ]);
+  assert.deepEqual(row772.unexpectedEvidenceRoles, []);
+  assert.deepEqual(row791.actualEvidenceRoles, []);
+  assert.deepEqual(
+    row791.missingEvidenceRoles,
+    PRIVATE_ADMISSION_810_REQUIRED_EVIDENCE_ROLES[worker791]
+  );
+  assert.deepEqual(row798.missingEvidenceRoles, []);
+  assert.deepEqual(row798.unexpectedEvidenceRoles, [
+    "worker-798-unexpected-extra-evidence"
+  ]);
+});
+
 test("private admission 810 gate rejects source-syntax evidence tokens", () => {
   assert.deepEqual(
     PRIVATE_ADMISSION_810_DURABLE_EVIDENCE_TOKEN_CLASSES.map(
@@ -249,6 +317,10 @@ test("private admission 810 gate rejects source-syntax evidence tokens", () => {
       "source-collection-method-expression",
       "source-declaration-snippet",
       "field-value-expression",
+      "comma-suffixed-snippet",
+      "string-literal-snippet",
+      "member-call-expression",
+      "member-expression-snippet",
       "block-or-statement-syntax",
       "not-allowed-durable-token-class"
     ]
@@ -267,6 +339,18 @@ test("private admission 810 gate rejects source-syntax evidence tokens", () => {
             "publicSchedulerTimingCompatibilityClaimed: false"
           ]
         )
+      },
+      [worker775]: {
+        evidence: withAdditionalEvidenceTokens(
+          rowByWorker(worker775),
+          "worker-775-react-act-source",
+          [
+            "Scheduler,",
+            "'unstable_flushExpired'",
+            "diagnostics.schedulerMockExpiredActRootWorkSourceValidator",
+            "validator.isSchedulerMockExpiredActRootWorkSource(diagnostics)"
+          ]
+        )
       }
     }
   });
@@ -276,23 +360,39 @@ test("private admission 810 gate rejects source-syntax evidence tokens", () => {
   assert.equal(gate.evidenceRecognized, true);
   assert.equal(gate.durableEvidenceTokensRecognized, false);
   assert.deepEqual(gate.nonDurableEvidenceTokenViolationIds, [
+    `${worker775}.worker-775-react-act-source`,
     `${worker791}.worker-791-scheduler-source`
   ]);
   assertViolationIds(gate, ["non-durable-evidence-token-shape"]);
 
-  const evidenceRow = gate.rowsByWorker[worker791].evidence.find(
+  const schedulerEvidenceRow = gate.rowsByWorker[worker791].evidence.find(
     (row) => row.role === "worker-791-scheduler-source"
   );
-  assert.notEqual(evidenceRow, undefined);
-  assert.equal(evidenceRow.recognized, false);
-  assert.deepEqual(evidenceRow.missingTokens, []);
+  const reactActEvidenceRow = gate.rowsByWorker[worker775].evidence.find(
+    (row) => row.role === "worker-775-react-act-source"
+  );
+  assert.notEqual(schedulerEvidenceRow, undefined);
+  assert.notEqual(reactActEvidenceRow, undefined);
+  assert.equal(schedulerEvidenceRow.recognized, false);
+  assert.equal(reactActEvidenceRow.recognized, false);
+  assert.deepEqual(schedulerEvidenceRow.missingTokens, []);
+  assert.deepEqual(reactActEvidenceRow.missingTokens, []);
   assert.deepEqual(
-    evidenceRow.nonDurableTokens.map((entry) => entry.shapeId),
+    schedulerEvidenceRow.nonDurableTokens.map((entry) => entry.shapeId),
     [
       "object-api-expression",
       "weak-collection-source-shape",
       "source-collection-method-expression",
       "field-value-expression"
+    ]
+  );
+  assert.deepEqual(
+    reactActEvidenceRow.nonDurableTokens.map((entry) => entry.shapeId),
+    [
+      "comma-suffixed-snippet",
+      "string-literal-snippet",
+      "member-expression-snippet",
+      "member-call-expression"
     ]
   );
 });
@@ -404,6 +504,43 @@ test("private admission 810 gate rejects public act, root, Scheduler, renderer, 
     gate.publicBlockerClaimViolationIds
   );
   assert.deepEqual(gate.delayedRendererRootPublicClaimIds, [worker792]);
+});
+
+test("private admission 810 gate rejects unexpected requirement fields", () => {
+  const gate = evaluatePrivateAdmission810Gate({
+    rowOverrides: {
+      [worker798]: {
+        requirements: {
+          publicSchedulerFlushBehaviorExecuted: true,
+          executesRendererRoots: true
+        }
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_810_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.requirementsRecognized, false);
+  assert.deepEqual(gate.requirementFieldViolationIds, [worker798]);
+  assertViolationIds(gate, ["requirement-field-mismatch"]);
+
+  const rows = getViolationRows(gate, "requirement-field-mismatch");
+  assert.deepEqual(rows, [
+    {
+      workerId: worker798,
+      expectedRequirementFields: PRIVATE_ADMISSION_810_REQUIRED_REQUIREMENT_FIELDS,
+      actualRequirementFields: [
+        ...PRIVATE_ADMISSION_810_REQUIRED_REQUIREMENT_FIELDS,
+        "publicSchedulerFlushBehaviorExecuted",
+        "executesRendererRoots"
+      ],
+      missingRequirementFields: [],
+      unexpectedRequirementFields: [
+        "publicSchedulerFlushBehaviorExecuted",
+        "executesRendererRoots"
+      ]
+    }
+  ]);
 });
 
 test("private admission 810 gate rejects non-static evaluation and non-Scheduler validator ownership", () => {
@@ -520,6 +657,12 @@ function assertViolationIds(gate, expectedIds) {
   for (const expectedId of expectedIds) {
     assert.equal(actualIds.includes(expectedId), true, expectedId);
   }
+}
+
+function getViolationRows(gate, id) {
+  const violation = gate.violations.find((candidate) => candidate.id === id);
+  assert.notEqual(violation, undefined, id);
+  return violation.rows;
 }
 
 function assertSubset(expectedSubset, actualSuperset) {

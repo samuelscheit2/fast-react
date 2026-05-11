@@ -25,6 +25,16 @@
   function names, source-owned constants, or lower-case diagnostic/status IDs.
 - Prose, test-title, and error-message evidence tokens now fail closed even
   when the text exists in a source or test file.
+- Second re-audit follow-up pins the exact required evidence-role manifest per
+  worker and fails closed on empty, missing, duplicate, or unexpected evidence
+  roles.
+- The `requirements` object is schema-closed against the exact required fields;
+  unexpected public or renderer-like fields such as
+  `publicSchedulerFlushBehaviorExecuted` and `executesRendererRoots` now fail
+  the private admission gate.
+- Focused regressions now confirm the evidence allowlist rejects snippet/member
+  shapes including `Scheduler,`, string-literal snippets, member expressions,
+  and member-call expressions.
 
 ## Changed Files
 
@@ -59,6 +69,14 @@
 - Re-audit follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
 - Re-audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
 - Re-audit follow-up: `git diff --check` - passed.
+- Second re-audit follow-up: `node --check tests/conformance/src/private-admission-810-react-act-scheduler-diagnostics-ledger.mjs` - passed.
+- Second re-audit follow-up: `node --check tests/conformance/test/private-admission-810-react-act-scheduler-diagnostics-ledger.test.mjs` - passed.
+- Second re-audit follow-up: `node --test tests/conformance/test/private-admission-810-react-act-scheduler-diagnostics-ledger.test.mjs` - passed, 10 tests.
+- Second re-audit follow-up: `node --test tests/conformance/test/react-act-oracle.test.mjs tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs tests/conformance/test/scheduler-mock-oracle.test.mjs tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs tests/conformance/test/scheduler-native-entry-oracle.test.mjs tests/conformance/test/scheduler-mock-expired-lane-flush.test.mjs` - passed, 82 tests.
+- Second re-audit follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
+- Second re-audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
+- Second re-audit follow-up: `git diff --check` - passed.
+- Second re-audit follow-up: `git diff --cached --check` - passed.
 
 ## Evidence Gathered
 
@@ -84,6 +102,15 @@
   delayed renderer-root test title plus an existing React act gate error
   message and verifies both are rejected as
   `not-allowed-durable-token-class` without relying on missing-token behavior.
+- Second re-audit coverage now removes one worker's evidence, removes a
+  required evidence role from another worker, and adds an unexpected role to a
+  third worker to verify the exact evidence-role manifest fails closed.
+- Second re-audit coverage now injects unexpected `requirements` keys that look
+  like public Scheduler flush and renderer-root admissions, and verifies the
+  gate reports `requirement-field-mismatch`.
+- Second re-audit coverage now injects `Scheduler,`, string-literal source
+  snippets, member expressions, and member-call expressions, and verifies all
+  are rejected by positive durable-token classification.
 
 ## Risks Or Blockers
 
