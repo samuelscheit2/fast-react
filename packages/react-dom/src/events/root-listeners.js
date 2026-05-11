@@ -54,12 +54,16 @@ const privateRootListenerRegistrationRecordType =
   'fast.react_dom.private_root_listener_registration_record';
 const privateRootListenerCleanupRecordType =
   'fast.react_dom.private_root_listener_cleanup_record';
+const privateRootListenerCurrentnessGateRecordType =
+  'fast.react_dom.private_root_listener_currentness_gate_record';
 const privatePortalPrepareMountListenerIntentRecordType =
   'fast.react_dom.private_portal_prepare_mount_listener_intent_record';
 const ROOT_LISTENERS_REGISTERED =
   'registered-private-root-listeners';
 const ROOT_LISTENERS_REVERTED =
   'reverted-private-root-listeners';
+const PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_STATUS =
+  'validated-private-root-listener-currentness-gate';
 const PORTAL_PREPARE_MOUNT_LISTENER_INTENT_RECORDED =
   'recorded-private-portal-prepare-mount-listener-intent';
 const PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND =
@@ -84,11 +88,14 @@ const INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE =
   'FAST_REACT_DOM_INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE';
 const INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE =
   'FAST_REACT_DOM_INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION';
+const INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE =
+  'FAST_REACT_DOM_INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE';
 
 const rootListenerRegistrationPayloads = new WeakMap();
 const rootListenerCleanupRecords = new WeakMap();
 const rootListenerDispatchRecords = new WeakMap();
 const rootListenerInvocationCanaryRecords = new WeakMap();
+const privateRootListenerCurrentnessGatePayloads = new WeakMap();
 const privateRootHostOutputClickDispatchCanaryPayloads = new WeakMap();
 const privateRootClickEventDelegationDispatchGatePayloads = new WeakMap();
 const privateRootFocusBlurEventDispatchExecutionPayloads = new WeakMap();
@@ -866,6 +873,155 @@ function isPrivateRootHostOutputSyntheticEventShapeGateRecord(record) {
   );
 }
 
+function createPrivateRootListenerCurrentnessGateRecord(
+  listenerRegistrationRecord,
+  options
+) {
+  const diagnosticOptions =
+    normalizePrivateRootListenerCurrentnessGateOptions(options);
+  const registrationPayload =
+    assertPrivateRootListenerCurrentnessGateRegistrationPayload(
+      listenerRegistrationRecord
+    );
+
+  assertPrivateRootListenerCurrentnessSourceRecord(
+    diagnosticOptions.sourceRecord,
+    diagnosticOptions.sourceKind
+  );
+
+  const beforeState =
+    createRootListenerCurrentnessGateState(registrationPayload);
+  assertRootListenerCurrentnessGateStateCurrent(beforeState);
+
+  if (diagnosticOptions.afterDiagnosticsHook !== null) {
+    diagnosticOptions.afterDiagnosticsHook();
+  }
+
+  const afterState =
+    createRootListenerCurrentnessGateState(registrationPayload);
+
+  if (!rootListenerCurrentnessGateStateMatches(beforeState, afterState)) {
+    throwRootListenerCurrentnessGateError(
+      'Private root listener currentness diagnostics observed listener state mutation while collecting evidence.',
+      'listener-state-mutated-during-diagnostics'
+    );
+  }
+  assertRootListenerCurrentnessGateStateCurrent(afterState);
+
+  const listenerRows = afterState.listenerRows;
+  const targetRows = afterState.targetRows;
+  const ownerDocumentSelectionChangeRows = listenerRows.filter(
+    (row) =>
+      row.targetRole === 'owner-document' &&
+      row.domEventName === 'selectionchange'
+  );
+  const ownerDocumentDedupeRows = targetRows.filter(
+    (row) => row.sameDocumentDedupeEvidence
+  );
+  const sameContainerDedupeRows = targetRows.filter(
+    (row) => row.sameContainerDedupeEvidence
+  );
+  const record = freezeRecord({
+    $$typeof: privateRootListenerCurrentnessGateRecordType,
+    kind: 'FastReactDomPrivateRootListenerCurrentnessGateRecord',
+    action: 'validate-private-root-listener-currentness',
+    status: PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_STATUS,
+    registrationRecordKind: listenerRegistrationRecord.kind,
+    registrationRecordType: listenerRegistrationRecord.$$typeof,
+    registrationStatus: listenerRegistrationRecord.registrationStatus,
+    sourceKind: diagnosticOptions.sourceKind,
+    sourceOwned: true,
+    sourceOwnership: 'weakmap-root-listener-registration',
+    sourceRecordProvided: diagnosticOptions.sourceRecord !== null,
+    sourceRequestType: getMaybeStringProperty(
+      diagnosticOptions.sourceRecord,
+      'requestType'
+    ),
+    sourceFacadeCall: getMaybeStringProperty(
+      diagnosticOptions.sourceRecord,
+      'facadeCall'
+    ),
+    sourceOperation: getMaybeStringProperty(
+      diagnosticOptions.sourceRecord,
+      'operation'
+    ),
+    currentRegistration: true,
+    registrationActive: true,
+    registrationCount: listenerRegistrationRecord.registrationCount,
+    rootRegistrationCount: listenerRegistrationRecord.rootRegistrationCount,
+    ownerDocumentRegistrationCount:
+      listenerRegistrationRecord.ownerDocumentRegistrationCount,
+    listenerRowCount: listenerRows.length,
+    currentListenerRowCount: listenerRows.filter((row) => row.current).length,
+    rootListenerRowCount: listenerRows.filter(
+      (row) => row.targetRole === 'root-container'
+    ).length,
+    ownerDocumentListenerRowCount: listenerRows.filter(
+      (row) => row.targetRole === 'owner-document'
+    ).length,
+    ownerDocumentSelectionChangeCurrent:
+      ownerDocumentSelectionChangeRows.length > 0 ||
+      ownerDocumentDedupeRows.length > 0,
+    ownerDocumentSelectionChangeRowCount:
+      ownerDocumentSelectionChangeRows.length,
+    targetRowCount: targetRows.length,
+    sameContainerDedupeCurrent:
+      sameContainerDedupeRows.length > 0 &&
+      sameContainerDedupeRows.every((row) => row.current),
+    sameContainerDedupeRowCount: sameContainerDedupeRows.length,
+    sameDocumentDedupeCurrent:
+      ownerDocumentDedupeRows.length > 0 &&
+      ownerDocumentDedupeRows.every((row) => row.current),
+    sameDocumentDedupeRowCount: ownerDocumentDedupeRows.length,
+    listenerStateStable: true,
+    listenerCountMutationObserved: false,
+    gateInstalledBrowserListener: false,
+    listenerInstallation: false,
+    publicListenerInstallation: false,
+    eventDispatch: false,
+    syntheticEventDispatch: false,
+    syntheticEventCount: 0,
+    willDispatchPublicEvent: false,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    browserDomEventCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    targetRows,
+    listenerRows
+  });
+
+  privateRootListenerCurrentnessGatePayloads.set(
+    record,
+    freezeRecord({
+      afterState,
+      beforeState,
+      listenerRegistrationRecord,
+      options: freezeRecord({
+        sourceKind: diagnosticOptions.sourceKind,
+        sourceRecord: diagnosticOptions.sourceRecord
+      }),
+      sourceRecord: diagnosticOptions.sourceRecord
+    })
+  );
+
+  return record;
+}
+
+function getPrivateRootListenerCurrentnessGatePayload(record) {
+  if (
+    record === null ||
+    (typeof record !== 'object' && typeof record !== 'function')
+  ) {
+    return null;
+  }
+
+  return privateRootListenerCurrentnessGatePayloads.get(record) || null;
+}
+
+function isPrivateRootListenerCurrentnessGateRecord(record) {
+  return getPrivateRootListenerCurrentnessGatePayload(record) !== null;
+}
+
 function getAddEventListenerOptions(
   domEventName,
   isCapturePhaseListener,
@@ -1119,6 +1275,10 @@ function registerSupportedRootListeners(
     return undefined;
   }
 
+  for (const snapshot of targetSnapshots) {
+    snapshot.afterInfo = describeListenerTargetSnapshot(snapshot.target);
+  }
+
   const record = freezeRecord({
     $$typeof: privateRootListenerRegistrationRecordType,
     kind: 'FastReactDomPrivateRootListenerRegistrationRecord',
@@ -1144,7 +1304,7 @@ function registerSupportedRootListeners(
       targetSnapshots.map((snapshot) => snapshot.beforeInfo)
     ),
     targetSnapshotsAfter: freezeArray(
-      targets.map((target) => describeListenerTargetSnapshot(target))
+      targetSnapshots.map((snapshot) => snapshot.afterInfo)
     ),
     listenerRecords: freezeArray(
       installedListeners.map((listenerRecord) =>
@@ -1157,6 +1317,9 @@ function registerSupportedRootListeners(
   rootListenerRegistrationPayloads.set(record, {
     active: true,
     installedListeners,
+    ownerDocument,
+    record,
+    rootContainerElement,
     targetSnapshots
   });
 
@@ -1417,6 +1580,8 @@ function snapshotListenerTarget(target) {
 function describeListenerTargetSnapshot(target) {
   const eventListenerSet = target && target[internalEventHandlersKey];
   return freezeRecord({
+    browserRegistrationCount: getTargetRegistrationCount(target),
+    browserRegistrationInspectable: isTargetRegistrationInspectable(target),
     canInstallListeners: canInstallListener(target),
     eventListenerSetSize:
       eventListenerSet instanceof Set ? eventListenerSet.size : 0,
@@ -1608,6 +1773,269 @@ function describeListenerOptions(options) {
   });
 }
 
+function createRootListenerCurrentnessGateState(registrationPayload) {
+  const targetRows = freezeArray(
+    registrationPayload.targetSnapshots.map((snapshot) =>
+      createRootListenerCurrentnessTargetRow(registrationPayload, snapshot)
+    )
+  );
+  const listenerRows = freezeArray(
+    registrationPayload.installedListeners.map((listenerRecord, index) =>
+      createRootListenerCurrentnessListenerRow(
+        registrationPayload,
+        listenerRecord,
+        index
+      )
+    )
+  );
+
+  return freezeRecord({
+    listenerRows,
+    targetRows
+  });
+}
+
+function createRootListenerCurrentnessTargetRow(
+  registrationPayload,
+  snapshot
+) {
+  const target = snapshot.target;
+  const targetRole = getRootListenerCurrentnessTargetRole(
+    registrationPayload,
+    target
+  );
+  const afterInfo = snapshot.afterInfo || describeListenerTargetSnapshot(target);
+  const currentInfo = describeListenerTargetSnapshot(target);
+  const installedListenerCount =
+    registrationPayload.installedListeners.filter(
+      (listenerRecord) => listenerRecord.target === target
+    ).length;
+  const dedupeEvidence = installedListenerCount === 0;
+  const browserRegistrationCountCurrent =
+    !afterInfo.browserRegistrationInspectable ||
+    afterInfo.browserRegistrationCount === currentInfo.browserRegistrationCount;
+  const eventListenerSetSizeCurrent =
+    afterInfo.eventListenerSetSize === currentInfo.eventListenerSetSize;
+  const listeningMarkerCurrent =
+    afterInfo.listeningMarker.trueValueCount ===
+      currentInfo.listeningMarker.trueValueCount &&
+    afterInfo.listeningMarker.propertyCount ===
+      currentInfo.listeningMarker.propertyCount;
+
+  return freezeRecord({
+    targetRole,
+    targetInfo: freezeRecord(describeContainer(target)),
+    current:
+      registrationPayload.active &&
+      browserRegistrationCountCurrent &&
+      eventListenerSetSizeCurrent &&
+      listeningMarkerCurrent,
+    installedListenerCount,
+    expectedBrowserRegistrationCount: afterInfo.browserRegistrationCount,
+    currentBrowserRegistrationCount: currentInfo.browserRegistrationCount,
+    browserRegistrationInspectable:
+      afterInfo.browserRegistrationInspectable,
+    expectedListenerSetSize: afterInfo.eventListenerSetSize,
+    currentListenerSetSize: currentInfo.eventListenerSetSize,
+    expectedListeningMarkerTrueValueCount:
+      afterInfo.listeningMarker.trueValueCount,
+    currentListeningMarkerTrueValueCount:
+      currentInfo.listeningMarker.trueValueCount,
+    expectedListeningMarkerPropertyCount:
+      afterInfo.listeningMarker.propertyCount,
+    currentListeningMarkerPropertyCount:
+      currentInfo.listeningMarker.propertyCount,
+    dedupeEvidence,
+    sameContainerDedupeEvidence:
+      dedupeEvidence && targetRole === 'root-container',
+    sameDocumentDedupeEvidence:
+      dedupeEvidence && targetRole === 'owner-document',
+    ownerDocumentSelectionChangeDedupeEvidence:
+      dedupeEvidence && targetRole === 'owner-document',
+    browserDomEventCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    eventDispatch: false,
+    gateInstalledBrowserListener: false,
+    listenerInstallation: false,
+    publicRootBehaviorChanged: false
+  });
+}
+
+function createRootListenerCurrentnessListenerRow(
+  registrationPayload,
+  listenerRecord,
+  index
+) {
+  const targetRole = getRootListenerCurrentnessTargetRole(
+    registrationPayload,
+    listenerRecord.target
+  );
+  const listenerSetHasKey = targetHasEventListenerSetKey(
+    listenerRecord.target,
+    listenerRecord.listenerSetKey
+  );
+  const targetRegistration = getTargetListenerRegistrationStatus(
+    listenerRecord
+  );
+  const listenerShellOwned =
+    listenerRecord.listener.__FAST_REACT_DOM_EVENT_SHELL__ === true &&
+    listenerRecord.listener.__FAST_REACT_DOM_EVENT_TARGET__ ===
+      listenerRecord.target &&
+    listenerRecord.listener.__FAST_REACT_DOM_EVENT_NAME__ ===
+      listenerRecord.domEventName &&
+    listenerRecord.listener.__FAST_REACT_DOM_EVENT_FLAGS__ ===
+      listenerRecord.eventSystemFlags;
+
+  return freezeRecord({
+    rowIndex: index,
+    targetRole,
+    domEventName: listenerRecord.domEventName,
+    phase: listenerRecord.isCapturePhaseListener ? 'capture' : 'bubble',
+    eventSystemFlags: listenerRecord.eventSystemFlags,
+    listenerSetKey: listenerRecord.listenerSetKey,
+    listenerOptions: listenerRecord.listenerOptionsInfo,
+    current:
+      registrationPayload.active &&
+      listenerSetHasKey &&
+      targetRegistration.current &&
+      listenerShellOwned,
+    listenerSetHasKey,
+    browserRegistrationInspectable: targetRegistration.inspectable,
+    browserRegistrationPresent: targetRegistration.present,
+    listenerShellOwned,
+    sourceOwned: true,
+    sourceOwnership: 'weakmap-root-listener-registration',
+    browserDomEventCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    eventDispatch: false,
+    gateInstalledBrowserListener: false,
+    listenerInstallation: false,
+    publicListenerInstallation: false,
+    publicRootBehaviorChanged: false,
+    willDispatchPublicEvent: false
+  });
+}
+
+function assertRootListenerCurrentnessGateStateCurrent(state) {
+  for (const targetRow of state.targetRows) {
+    if (!targetRow.current) {
+      throwRootListenerCurrentnessGateError(
+        'Private root listener currentness diagnostics found listener target state that no longer matches the registration record.',
+        'listener-count-mutated-after-registration'
+      );
+    }
+  }
+
+  for (const listenerRow of state.listenerRows) {
+    if (!listenerRow.current) {
+      throwRootListenerCurrentnessGateError(
+        'Private root listener currentness diagnostics found a stale root listener registration.',
+        'listener-registration-not-current'
+      );
+    }
+  }
+}
+
+function rootListenerCurrentnessGateStateMatches(left, right) {
+  if (
+    left.targetRows.length !== right.targetRows.length ||
+    left.listenerRows.length !== right.listenerRows.length
+  ) {
+    return false;
+  }
+
+  for (let index = 0; index < left.targetRows.length; index++) {
+    const leftRow = left.targetRows[index];
+    const rightRow = right.targetRows[index];
+    if (
+      leftRow.currentBrowserRegistrationCount !==
+        rightRow.currentBrowserRegistrationCount ||
+      leftRow.currentListenerSetSize !== rightRow.currentListenerSetSize ||
+      leftRow.currentListeningMarkerTrueValueCount !==
+        rightRow.currentListeningMarkerTrueValueCount ||
+      leftRow.currentListeningMarkerPropertyCount !==
+        rightRow.currentListeningMarkerPropertyCount
+    ) {
+      return false;
+    }
+  }
+
+  for (let index = 0; index < left.listenerRows.length; index++) {
+    const leftRow = left.listenerRows[index];
+    const rightRow = right.listenerRows[index];
+    if (
+      leftRow.current !== rightRow.current ||
+      leftRow.listenerSetHasKey !== rightRow.listenerSetHasKey ||
+      leftRow.browserRegistrationPresent !==
+        rightRow.browserRegistrationPresent ||
+      leftRow.listenerShellOwned !== rightRow.listenerShellOwned
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function getRootListenerCurrentnessTargetRole(registrationPayload, target) {
+  if (target === registrationPayload.rootContainerElement) {
+    return 'root-container';
+  }
+  if (target === registrationPayload.ownerDocument) {
+    return 'owner-document';
+  }
+  return 'unknown-target';
+}
+
+function targetHasEventListenerSetKey(target, listenerSetKey) {
+  const listenerSet =
+    target != null &&
+    (typeof target === 'object' || typeof target === 'function')
+      ? target[internalEventHandlersKey]
+      : null;
+  return listenerSet instanceof Set && listenerSet.has(listenerSetKey);
+}
+
+function getTargetListenerRegistrationStatus(listenerRecord) {
+  const target = listenerRecord.target;
+  if (!isTargetRegistrationInspectable(target)) {
+    return {
+      current: true,
+      inspectable: false,
+      present: false
+    };
+  }
+
+  const present = target.__registrations.some(
+    (registration) =>
+      registration.type === listenerRecord.domEventName &&
+      registration.listener === listenerRecord.listener &&
+      registration.options === listenerRecord.listenerOptions
+  );
+
+  return {
+    current: present,
+    inspectable: true,
+    present
+  };
+}
+
+function isTargetRegistrationInspectable(target) {
+  return !!(target && Array.isArray(target.__registrations));
+}
+
+function getTargetRegistrationCount(target) {
+  return isTargetRegistrationInspectable(target)
+    ? target.__registrations.length
+    : 0;
+}
+
+function getMaybeStringProperty(value, propertyName) {
+  return isObjectLike(value) && typeof value[propertyName] === 'string'
+    ? value[propertyName]
+    : null;
+}
+
 function assertActiveRootListenerRegistrationPayload(registrationRecord) {
   const payload = rootListenerRegistrationPayloads.get(registrationRecord);
   if (payload === undefined) {
@@ -1621,6 +2049,128 @@ function assertActiveRootListenerRegistrationPayload(registrationRecord) {
     );
   }
   return payload;
+}
+
+function assertPrivateRootListenerCurrentnessGateRegistrationPayload(
+  registrationRecord
+) {
+  const payload = rootListenerRegistrationPayloads.get(registrationRecord);
+  if (payload === undefined) {
+    throwRootListenerCurrentnessGateError(
+      'Expected a source-owned private React DOM root listener registration record.',
+      'invalid-registration-record'
+    );
+  }
+  if (!payload.active) {
+    throwRootListenerCurrentnessGateError(
+      'Cannot validate private React DOM root listener currentness after the registration was reverted.',
+      'stale-registration-record'
+    );
+  }
+  return payload;
+}
+
+function normalizePrivateRootListenerCurrentnessGateOptions(options) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  assertNoPrivateRootListenerCurrentnessPublicBehaviorClaims(
+    normalizedOptions
+  );
+
+  const sourceKind = normalizePrivateRootListenerCurrentnessSourceKind(
+    normalizedOptions.sourceKind ||
+      normalizedOptions.facadeCall ||
+      normalizedOptions.operation ||
+      'createRoot'
+  );
+
+  return freezeRecord({
+    afterDiagnosticsHook:
+      typeof normalizedOptions.afterDiagnosticsHook === 'function'
+        ? normalizedOptions.afterDiagnosticsHook
+        : null,
+    sourceKind,
+    sourceRecord: isObjectLike(normalizedOptions.sourceRecord)
+      ? normalizedOptions.sourceRecord
+      : null
+  });
+}
+
+function normalizePrivateRootListenerCurrentnessSourceKind(sourceKind) {
+  if (
+    sourceKind === 'createRoot' ||
+    sourceKind === 'hydrateRoot' ||
+    sourceKind === 'portal'
+  ) {
+    return sourceKind;
+  }
+
+  throwRootListenerCurrentnessGateError(
+    'Private root listener currentness diagnostics require a createRoot, hydrateRoot, or portal source kind.',
+    'unsupported-source-kind'
+  );
+}
+
+function assertNoPrivateRootListenerCurrentnessPublicBehaviorClaims(options) {
+  const blockedClaimFields = [
+    'browserDomEventCompatibilityClaimed',
+    'compatibilityClaimed',
+    'eventDispatch',
+    'listenerInstallation',
+    'publicDispatchEnabled',
+    'publicListenerInstallation',
+    'publicRootBehaviorChanged',
+    'rootListenerInstallation',
+    'syntheticEventDispatch',
+    'willDispatchPublicEvent'
+  ];
+
+  for (const field of blockedClaimFields) {
+    if (options[field] === true) {
+      throwRootListenerCurrentnessGateError(
+        'Private root listener currentness diagnostics cannot claim public DOM event behavior.',
+        'public-behavior-claimed'
+      );
+    }
+  }
+}
+
+function assertPrivateRootListenerCurrentnessSourceRecord(
+  sourceRecord,
+  sourceKind
+) {
+  if (sourceRecord === null) {
+    return;
+  }
+
+  const requestType = getMaybeStringProperty(sourceRecord, 'requestType');
+  const facadeCall = getMaybeStringProperty(sourceRecord, 'facadeCall');
+  const operation = getMaybeStringProperty(sourceRecord, 'operation');
+
+  if (
+    sourceKind === 'createRoot' &&
+    (requestType === 'hydrateRoot' ||
+      facadeCall === 'hydrateRoot' ||
+      operation === 'hydrateRoot' ||
+      operation === 'hydrate-root-marker-listener-preflight')
+  ) {
+    throwRootListenerCurrentnessGateError(
+      'Private root listener currentness diagnostics cannot consume hydrateRoot evidence through a createRoot source alias.',
+      'source-kind-alias-mismatch'
+    );
+  }
+
+  if (
+    sourceKind === 'hydrateRoot' &&
+    (requestType === 'createRoot' ||
+      facadeCall === 'createRoot' ||
+      operation === 'createRoot' ||
+      operation === 'public-facade-marker-listener-preflight')
+  ) {
+    throwRootListenerCurrentnessGateError(
+      'Private root listener currentness diagnostics cannot consume createRoot evidence through a hydrateRoot source alias.',
+      'source-kind-alias-mismatch'
+    );
+  }
 }
 
 function normalizePrivateRootHostOutputClickDispatchCanaryOptions(options) {
@@ -1966,6 +2516,13 @@ function throwRootFocusBlurEventDispatchExecutionError(message, reason) {
   throw error;
 }
 
+function throwRootListenerCurrentnessGateError(message, reason) {
+  const error = new Error(message);
+  error.code = INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE;
+  error.reason = reason;
+  throw error;
+}
+
 function freezeRecord(record) {
   return Object.freeze(record);
 }
@@ -1980,18 +2537,21 @@ module.exports = {
   INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CODE,
   INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
   INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+  INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
   PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND,
   PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS,
   PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_RECORD_KIND,
   PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_STATUS,
   PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND,
   PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS,
+  PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_STATUS,
   PORTAL_PREPARE_MOUNT_LISTENER_INTENT_RECORDED,
   PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND,
   PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
   ROOT_LISTENERS_REGISTERED,
   ROOT_LISTENERS_REVERTED,
   addTrappedEventListener,
+  createPrivateRootListenerCurrentnessGateRecord,
   createPrivateRootHostOutputClickSyntheticEventShapeGate,
   createEventListenerShell,
   createPortalPrepareMountListenerIntentRecord,
@@ -2006,6 +2566,7 @@ module.exports = {
   getPrivateRootClickEventDelegationDispatchGatePayload,
   getPrivateRootHostOutputClickDispatchCanaryPayload,
   getPrivateRootHostOutputSyntheticEventShapeGatePayload,
+  getPrivateRootListenerCurrentnessGatePayload,
   invokeLastRootListenerSingleListenerCanary,
   invokePrivateRootFocusBlurEventDispatchExecution,
   invokePrivateRootClickEventDelegationDispatchGate,
@@ -2015,12 +2576,14 @@ module.exports = {
   isPrivateRootClickEventDelegationDispatchGateRecord,
   isPrivateRootHostOutputClickDispatchCanaryRecord,
   isPrivateRootHostOutputSyntheticEventShapeGateRecord,
+  isPrivateRootListenerCurrentnessGateRecord,
   listenToAllSupportedEvents,
   listenToNativeEvent,
   listenToNonDelegatedEvent,
   listenToPortalContainerEvents,
   privatePortalPrepareMountListenerIntentRecordType,
   privateRootListenerCleanupRecordType,
+  privateRootListenerCurrentnessGateRecordType,
   privateRootListenerRegistrationRecordType,
   registerRootListenersForPrivateRoot,
   revertRootListenersForPrivateRoot
