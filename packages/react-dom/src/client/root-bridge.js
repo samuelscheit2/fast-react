@@ -13974,6 +13974,7 @@ function applyPrivateRootHostOutputUpdateWithBridge(
 
   const existing = rootHostOutputUpdateHandoffRecords.get(record);
   if (existing !== undefined) {
+    validation.rootHandleState.latestHostOutputUpdateRecord = record;
     return existing;
   }
 
@@ -14221,6 +14222,7 @@ function applyPrivateRootHostOutputUpdateWithBridge(
             oldText: normalized.textUpdate.oldText
           }
   });
+  validation.rootHandleState.latestHostOutputUpdateRecord = record;
 
   return handoff;
 }
@@ -15009,6 +15011,7 @@ function createPrivateRootHandle(owner, container, rootOptions, bridgeState) {
     containerInfo: freezeRecord(describeContainer(container)),
     createRenderAdmissionRecord: null,
     latestLifecycleRequestRecord: null,
+    latestHostOutputUpdateRecord: null,
     lifecycleRequestVersion: 0,
     lifecycleStatus: ROOT_LIFECYCLE_CREATED,
     nativeRootHandle,
@@ -22187,7 +22190,15 @@ function validateUnmountHostOutputCleanupRecords(
       'Private unmount host-output cleanup requires root.unmount after the admitted render.'
     );
   }
-  if (admissionPayload.renderRecord.renderCount !== unmountRecord.renderCount) {
+  if (
+    !isUnmountHostOutputCleanupRenderCurrent({
+      admissionPayload,
+      admissionRecord,
+      unmountPayload,
+      unmountRecord,
+      unmountValidation
+    })
+  ) {
     throwInvalidUnmountHostOutputCleanupRecord(
       'Private unmount host-output cleanup rejects stale root handle admission metadata.'
     );
@@ -22213,6 +22224,92 @@ function validateUnmountHostOutputCleanupRecords(
     portalContainerUsageSummary:
       summarizePrivatePortalContainerUsage(portalContainerUsage)
   };
+}
+
+function isUnmountHostOutputCleanupRenderCurrent({
+  admissionPayload,
+  admissionRecord,
+  unmountPayload,
+  unmountRecord,
+  unmountValidation
+}) {
+  if (admissionPayload.renderRecord.renderCount === unmountRecord.renderCount) {
+    return true;
+  }
+
+  const latestUpdateRecord =
+    unmountValidation.rootHandleState.latestHostOutputUpdateRecord;
+  if (latestUpdateRecord === null) {
+    return false;
+  }
+
+  const latestUpdateHandoff =
+    rootHostOutputUpdateHandoffRecords.get(latestUpdateRecord);
+  if (latestUpdateHandoff === undefined) {
+    return false;
+  }
+
+  const latestUpdatePayload =
+    rootHostOutputUpdateHandoffPayloads.get(latestUpdateHandoff);
+  if (latestUpdatePayload === undefined) {
+    return false;
+  }
+
+  const initialHandoff =
+    rootInitialHostOutputHandoffRecords.get(admissionRecord);
+  if (initialHandoff === undefined) {
+    return false;
+  }
+
+  const initialPayload =
+    rootInitialHostOutputHandoffPayloads.get(initialHandoff);
+  if (initialPayload === undefined || initialPayload.active !== true) {
+    return false;
+  }
+
+  if (
+    latestUpdatePayload.sourceRecord !== latestUpdateRecord ||
+    latestUpdatePayload.rootHandle !== unmountPayload.rootHandle ||
+    latestUpdatePayload.bridgeState !== unmountValidation.bridgeState
+  ) {
+    return false;
+  }
+
+  if (
+    initialPayload.admissionRecord !== admissionRecord ||
+    initialPayload.createRecord !== admissionPayload.createRecord ||
+    initialPayload.renderRecord !== admissionPayload.renderRecord ||
+    initialPayload.rootOwner !== admissionPayload.createRecord.owner ||
+    initialPayload.container !== unmountValidation.rootHandleState.container
+  ) {
+    return false;
+  }
+
+  if (
+    latestUpdateRecord.operation !== 'render' ||
+    latestUpdateRecord.lifecycleStatusBefore !== ROOT_LIFECYCLE_RENDERED ||
+    latestUpdateRecord.lifecycleStatusAfter !== ROOT_LIFECYCLE_RENDERED ||
+    latestUpdateRecord.rootId !== unmountRecord.rootId ||
+    latestUpdateRecord.rootKind !== unmountRecord.rootKind ||
+    latestUpdateRecord.rootTag !== unmountRecord.rootTag ||
+    latestUpdateRecord.renderCount !== unmountRecord.renderCount ||
+    latestUpdateRecord.requestSequence <=
+      admissionPayload.renderRecord.requestSequence ||
+    latestUpdateRecord.requestSequence >= unmountRecord.requestSequence
+  ) {
+    return false;
+  }
+
+  if (
+    !Array.isArray(initialPayload.hostTokens) ||
+    !Array.isArray(initialPayload.hostNodes) ||
+    !initialPayload.hostTokens.includes(latestUpdatePayload.hostInstanceToken) ||
+    !initialPayload.hostNodes.includes(latestUpdatePayload.hostInstanceNode)
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 function validateCreateRenderAdmissionStillIntact(

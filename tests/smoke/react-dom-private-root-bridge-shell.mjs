@@ -391,7 +391,10 @@ assertPrivateRecordInvariants(second);
   assert.deepEqual(
     capabilityIds(cleanup.acceptedCapabilities),
     [
+      'root-unmount-admission-metadata',
       'fake-dom-clear-container',
+      'fake-dom-container-cleanup-metadata',
+      'deletion-cleanup-metadata',
       'component-tree-metadata-detach',
       'root-marker-listener-revert'
     ]
