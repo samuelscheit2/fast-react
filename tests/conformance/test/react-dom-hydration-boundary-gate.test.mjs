@@ -2125,6 +2125,88 @@ test("private hydration replay error metadata rejects stale roots and public rep
 
   const invalidReplayMetadataCode =
     "FAST_REACT_DOM_INVALID_HYDRATION_REPLAY_ERROR_METADATA";
+  function assertReplayMetadataRejects(tamperedOwnership, message) {
+    const expected = {
+      code: invalidReplayMetadataCode
+    };
+    if (message !== undefined) {
+      expected.message = message;
+    }
+    assert.throws(
+      () =>
+        scenario.bridge.createHydrationReplayErrorMetadata(
+          scenario.hydrateRecord,
+          tamperedOwnership
+        ),
+      expected
+    );
+  }
+
+  assertReplayMetadataRejects(
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      ownershipRows: scenario.ownershipDiagnostics.ownershipRows.map((row) =>
+        Object.freeze({
+          ...row,
+          compatibilityClaimed: true
+        })
+      )
+    }),
+    /ownership rows/
+  );
+  assertReplayMetadataRejects(
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        replayQueueDrainOrderDiagnostics: Object.freeze({
+          ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+            .replayQueueDrainOrderDiagnostics,
+          compatibilityClaimed: true
+        })
+      })
+    }),
+    /ownership or queue diagnostics/
+  );
+  assertReplayMetadataRejects(
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        blockedEventReplayTargets:
+          scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+            .blockedEventReplayTargets.map((row) =>
+              Object.freeze({
+                ...row,
+                compatibilityClaimed: true
+              })
+            )
+      })
+    }),
+    /blocked target rows/
+  );
+  assertReplayMetadataRejects(
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        replayQueueDrainOrderDiagnostics: Object.freeze({
+          ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+            .replayQueueDrainOrderDiagnostics,
+          drainOrder:
+            scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+              .replayQueueDrainOrderDiagnostics.drainOrder.map((row) =>
+                Object.freeze({
+                  ...row,
+                  publicOnRecoverableErrorInvoked: true
+                })
+              )
+        })
+      })
+    }),
+    /replay queue drain diagnostic rows/
+  );
+
   for (const tamperedOwnership of [
     Object.freeze({
       ...scenario.ownershipDiagnostics,
@@ -2217,16 +2299,7 @@ test("private hydration replay error metadata rejects stale roots and public rep
       )
     })
   ]) {
-    assert.throws(
-      () =>
-        scenario.bridge.createHydrationReplayErrorMetadata(
-          scenario.hydrateRecord,
-          tamperedOwnership
-        ),
-      {
-        code: invalidReplayMetadataCode
-      }
-    );
+    assertReplayMetadataRejects(tamperedOwnership, undefined);
   }
 
   const invalidRootRequestCode = "FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST";

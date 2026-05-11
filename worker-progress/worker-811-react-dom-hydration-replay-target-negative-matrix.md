@@ -14,6 +14,12 @@ metadata now rejects cloned ownership diagnostics, nested replay queue
 diagnostics, and queue/drain-order rows that claim compatibility, queueing,
 replay queue draining, event replay, dispatch, or hydration effects.
 
+Audit follow-up hardened the nested evidence checks further so cloned
+ownership diagnostics reach the intended nested validators. Ownership rows now
+reject compatibility claims, blocked target rows reject compatibility claims,
+nested drain diagnostics reject compatibility claims, and replay queue drain
+rows reject public recoverable-error callback claims.
+
 ## Changed Files
 
 - `packages/react-dom/src/client/root-bridge.js`
@@ -30,6 +36,13 @@ replay queue draining, event replay, dispatch, or hydration effects.
   queue diagnostic, blocked event replay targets, and drain-order rows for
   blocked public/replay/hydration effect fields before replay error metadata can
   be recorded.
+- Audit negatives now mutate cloned nested rows directly:
+  `ownershipRows[].compatibilityClaimed`,
+  `replayQueueDrainOrderDiagnostics.compatibilityClaimed`,
+  `blockedEventReplayTargets[].compatibilityClaimed`, and
+  `replayQueueDrainOrderDiagnostics.drainOrder[].publicOnRecoverableErrorInvoked`.
+  Each assertion matches the nested validator message so regressions cannot pass
+  by failing earlier at payload identity.
 - Package hydration-private tests now reject foreign container dispatch rows,
   unowned replay targets, public target-dispatch links, replayed ownership
   diagnostics, claimed target rows that say they executed, and copied replay
@@ -51,6 +64,17 @@ replay queue draining, event replay, dispatch, or hydration effects.
 - `node --test tests/conformance/test/react-dom-hydration-boundary-gate.test.mjs packages/react-dom/test/hydration-private.test.js`
 - `npm run check --workspace @fast-react/react-dom`
 - `git diff --check`
+
+## Audit Follow-Up
+
+- The requested audit file path `/root/audit_811_hydration_replay_target_negative_matrix`
+  was not present in this environment, so the follow-up used the explicit
+  blocker details from the audit message.
+- Preserved public hydrateRoot/root creation/replay/DOM/listener/callback
+  blockers while adding row-level public callback and compatibility rejection
+  for replay error metadata.
+- Re-ran syntax checks, combined focused hydration tests, the react-dom
+  workspace check, and whitespace validation after the nested validator changes.
 
 ## Verification
 

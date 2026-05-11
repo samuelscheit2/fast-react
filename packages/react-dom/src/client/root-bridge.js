@@ -17580,6 +17580,10 @@ function validateHydrationReplayErrorMetadataBlockedOwnershipDiagnostics(
     eventReplayQueueDiagnostics.replayedEventCount !== 0 ||
     !replayQueueDrainOrderDiagnostics ||
     typeof replayQueueDrainOrderDiagnostics !== 'object' ||
+    replayQueueDrainOrderDiagnostics.compatibilityClaimed === true ||
+    replayQueueDrainOrderDiagnostics.browserDomEventCompatibilityClaimed ===
+      true ||
+    replayQueueDrainOrderDiagnostics.publicRootBehaviorChanged === true ||
     replayQueueDrainOrderDiagnostics.replayQueuesDrained !== false ||
     replayQueueDrainOrderDiagnostics.willDrainReplayQueues !== false ||
     replayQueueDrainOrderDiagnostics.eventsReplayed !== false ||
@@ -17593,17 +17597,23 @@ function validateHydrationReplayErrorMetadataBlockedOwnershipDiagnostics(
   }
 
   validateHydrationReplayErrorMetadataBlockedQueueRows(
-    eventReplayQueueDiagnostics.blockedEventReplayTargets
+    eventReplayQueueDiagnostics.blockedEventReplayTargets,
+    'blocked target'
   );
   validateHydrationReplayErrorMetadataBlockedQueueRows(
-    eventReplayQueueDiagnostics.drainOrder
+    eventReplayQueueDiagnostics.drainOrder,
+    'event replay drain-order'
   );
   validateHydrationReplayErrorMetadataBlockedQueueRows(
-    replayQueueDrainOrderDiagnostics.drainOrder
+    replayQueueDrainOrderDiagnostics.drainOrder,
+    'replay queue drain diagnostic'
   );
 }
 
-function validateHydrationReplayErrorMetadataBlockedQueueRows(rows) {
+function validateHydrationReplayErrorMetadataBlockedQueueRows(
+  rows,
+  rowType
+) {
   for (const row of rows) {
     if (
       !row ||
@@ -17613,13 +17623,35 @@ function validateHydrationReplayErrorMetadataBlockedQueueRows(rows) {
       row.willDrainReplayQueues !== false ||
       row.willDispatch !== false ||
       row.willHydrate !== false ||
-      row.willReplay !== false
+      row.willReplay !== false ||
+      hasHydrationReplayErrorMetadataPublicCallbackOrCompatibilityClaim(row)
     ) {
       throwInvalidHydrationReplayErrorMetadata(
-        'Hydration replay error metadata cannot accept replay queue rows that claim queueing, dispatch, hydration, replay, or draining effects.'
+        `Hydration replay error metadata cannot accept ${rowType} rows that claim queueing, dispatch, hydration, replay, draining, public callback, or compatibility effects.`
       );
     }
   }
+}
+
+function hasHydrationReplayErrorMetadataPublicCallbackOrCompatibilityClaim(
+  row
+) {
+  return (
+    row.compatibilityClaimed === true ||
+    row.browserDomEventCompatibilityClaimed === true ||
+    row.publicRootBehaviorChanged === true ||
+    row.recoverableErrorCompatibilityClaimed === true ||
+    row.publicErrorBoundariesEnabled === true ||
+    row.rootErrorCallbacksInvoked === true ||
+    row.publicRootErrorCallbacksInvoked === true ||
+    row.onRecoverableErrorInvoked === true ||
+    row.publicOnRecoverableErrorInvoked === true ||
+    row.rootErrorCallbackInvocationCount > 0 ||
+    row.reportGlobalErrorInvoked === true ||
+    row.rootErrorUpdatesScheduled === true ||
+    row.queuedRecoverableError === true ||
+    row.recoverableErrorsQueued === true
+  );
 }
 
 function validateHydrationReplayErrorMetadataOwnershipRow(ownershipRow) {
@@ -17661,10 +17693,13 @@ function validateHydrationReplayErrorMetadataOwnershipRow(ownershipRow) {
     ownershipRow.willDrainReplayQueues !== false ||
     ownershipRow.willDispatch !== false ||
     ownershipRow.willHydrate !== false ||
-    ownershipRow.willReplay !== false
+    ownershipRow.willReplay !== false ||
+    hasHydrationReplayErrorMetadataPublicCallbackOrCompatibilityClaim(
+      ownershipRow
+    )
   ) {
     throwInvalidHydrationReplayErrorMetadata(
-      'Hydration replay error metadata must not consume replayed or queued event rows.'
+      'Hydration replay error metadata must not consume replayed, queued, public callback, or compatibility ownership rows.'
     );
   }
 }
