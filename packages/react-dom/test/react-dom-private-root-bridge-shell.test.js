@@ -14,6 +14,9 @@ const controlledRestoreQueue = require(
   path.join(packageRoot, 'src/client/controlled-restore-queue.js')
 );
 const rootBridge = require(path.join(packageRoot, 'src/client/root-bridge.js'));
+const hydrationGate = require(
+  path.join(packageRoot, 'src/client/hydration-boundary-gate.js')
+);
 const componentTree = require(
   path.join(packageRoot, 'src/client/component-tree.js')
 );
@@ -6570,9 +6573,12 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
     },
     type: 'span'
   };
+  let recoverableErrorCalls = 0;
   const hydrationOptions = {
     identifierPrefix: 'private-hydrate-preflight-',
-    onRecoverableError() {}
+    onRecoverableError() {
+      recoverableErrorCalls++;
+    }
   };
   const descriptor = Object.getOwnPropertyDescriptor(
     reactDomClient.hydrateRoot,
@@ -6669,6 +6675,13 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
     rootBridge.getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload(
       markerListenerPreflight
     );
+  const recoverableErrorPreflight =
+    hydratePreflight.recoverableErrorPreflight;
+  const recoverableErrorPayload =
+    rootBridge
+      .getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload(
+        recoverableErrorPreflight
+      );
 
   assertPrivateHydrateRootPublicFacadePreflightRecord(hydratePreflight, {
     hydrateId: 'hydrate-preflight-root:1',
@@ -6678,6 +6691,7 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
   assert.equal(payload.requestAdmission, hydratePreflight.requestAdmission);
   assert.equal(payload.nativeHandoffRecord, null);
   assert.equal(payload.markerListenerPreflight, markerListenerPreflight);
+  assert.equal(payload.recoverableErrorPreflight, recoverableErrorPreflight);
   assert.equal(payload.preflight, preflight);
   assertPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
     markerListenerPreflight,
@@ -6708,8 +6722,127 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
     hydratePreflight.acceptedPrivateMetadataDiagnostics
   );
   assert.equal(
+    payload.requestRecord.recoverableErrorMetadata,
+    hydratePreflight.recoverableErrorMetadata
+  );
+  assert.equal(
     hydratePayload.hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics,
     hydratePreflight.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    recoverableErrorPreflight.recoverableErrorMetadata,
+    hydratePreflight.recoverableErrorMetadata
+  );
+  assert.equal(
+    recoverableErrorPreflight.acceptedBoundaryMetadataDiagnostics,
+    hydratePreflight.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    recoverableErrorPreflight.acceptedBoundaryMetadataRow.metadataId,
+    hydrationGate.privateHydrationTextMismatchRecoverableErrorRoutingMetadataId
+  );
+  assert.equal(
+    recoverableErrorPreflight.preflightStatus,
+    hydrationGate.privateHydrationTextMismatchRecoverableErrorPreflightStatus
+  );
+  assert.equal(
+    recoverableErrorPreflight.kind,
+    hydrationGate
+      .HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_RECORD_KIND
+  );
+  assert.equal(
+    rootBridge
+      .isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord(
+        recoverableErrorPreflight
+      ),
+    true
+  );
+  assert.equal(
+    recoverableErrorPayload.hydrationBoundaryRecord,
+    hydratePreflight.hydrationBoundaryRecord
+  );
+  assert.equal(
+    recoverableErrorPayload.hydrationOptions,
+    hydrationOptions
+  );
+  assert.equal(
+    recoverableErrorPayload.recoverableErrorMetadata,
+    hydratePreflight.recoverableErrorMetadata
+  );
+  assert.equal(recoverableErrorPreflight.recoverableErrorMetadataAccepted, true);
+  assert.equal(recoverableErrorPreflight.recoverableErrorMetadataCount, 1);
+  assert.equal(recoverableErrorPreflight.queuedRecoverableErrorCount, 0);
+  assert.equal(recoverableErrorPreflight.wouldQueueRecoverableErrorCount, 1);
+  assert.equal(recoverableErrorPreflight.recoverableErrorsQueued, false);
+  assert.equal(recoverableErrorPreflight.willQueueRecoverableErrors, false);
+  assert.equal(recoverableErrorPreflight.onRecoverableErrorConfigured, true);
+  assert.equal(recoverableErrorPreflight.onRecoverableErrorInvoked, false);
+  assert.equal(
+    recoverableErrorPreflight.privateOnRecoverableErrorInvoked,
+    false
+  );
+  assert.equal(
+    recoverableErrorPreflight.publicOnRecoverableErrorInvoked,
+    false
+  );
+  assert.equal(recoverableErrorPreflight.rootErrorCallbackInvocationCount, 0);
+  assert.equal(recoverableErrorPreflight.publicHydrateRootSupported, false);
+  assert.equal(
+    recoverableErrorPreflight.publicHydrationCompatibilityClaimed,
+    false
+  );
+  assert.equal(recoverableErrorPreflight.compatibilityClaimed, false);
+  assert.equal(recoverableErrorCalls, 0);
+  assert.throws(
+    () =>
+      hydrationGate
+        .createHydrationTextMismatchRecoverableErrorPreflightRecord(
+          hydratePreflight.hydrationBoundaryRecord,
+          hydratePreflight.acceptedPrivateMetadataDiagnostics,
+          Object.freeze({
+            ...hydratePreflight.recoverableErrorMetadata
+          }),
+          {
+            enableRecoverableErrorPreflight: true,
+            hydrationOptions
+          }
+        ),
+    {
+      code:
+        hydrationGate
+          .INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_CODE,
+      message: /must match/
+    }
+  );
+  assert.throws(
+    () =>
+      hydrationGate
+        .createHydrationTextMismatchRecoverableErrorPreflightRecord(
+          hydratePreflight.hydrationBoundaryRecord,
+          hydratePreflight.acceptedPrivateMetadataDiagnostics,
+          Object.freeze({
+            ...hydratePreflight.recoverableErrorMetadata,
+            recoverableErrorRows: Object.freeze(
+              hydratePreflight.recoverableErrorMetadata
+                .recoverableErrorRows.map((row, index) =>
+                  Object.freeze({
+                    ...row,
+                    publicCallbackInvoked: index === 0
+                  })
+                )
+            )
+          }),
+          {
+            enableRecoverableErrorPreflight: true,
+            hydrationOptions
+          }
+        ),
+    {
+      code:
+        hydrationGate
+          .INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_PREFLIGHT_CODE,
+      message: /unqueued recoverable mismatch rows/
+    }
   );
   assert.deepEqual(preflight.getHydrateRootPreflightRecords(), [
     hydratePreflight
@@ -6727,6 +6860,16 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
   assert.equal(
     rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
       .markerListenerPreflightRecordCount,
+    1
+  );
+  assert.deepEqual(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .recoverableErrorPreflightRecords,
+    [recoverableErrorPreflight]
+  );
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .recoverableErrorPreflightRecordCount,
     1
   );
   assert.deepEqual(
@@ -10780,7 +10923,8 @@ function assertPrivateHydrateRootPublicFacadePreflightRecord(record, expected) {
     [
       'private-hydrate-root-bridge-request-admission',
       'unsupported-hydration-boundary-diagnostics',
-      'hydrate-root-marker-listener-preflight-diagnostics'
+      'hydrate-root-marker-listener-preflight-diagnostics',
+      'hydrate-root-recoverable-error-preflight-diagnostics'
     ]
   );
   assert.deepEqual(
@@ -10855,6 +10999,29 @@ function assertPrivateHydrateRootPublicFacadePreflightRecord(record, expected) {
       .publicRootRenderCompatibilityClaimed,
     false
   );
+  assert.equal(
+    record.recoverableErrorPreflight.recoverableErrorMetadata,
+    record.recoverableErrorMetadata
+  );
+  assert.equal(
+    record.recoverableErrorPreflight.acceptedBoundaryMetadataDiagnostics,
+    record.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    record.recoverableErrorPreflightStatus,
+    hydrationGate.privateHydrationTextMismatchRecoverableErrorPreflightStatus
+  );
+  assert.equal(record.recoverableErrorPreflightAccepted, true);
+  assert.equal(record.recoverableErrorMetadataAccepted, true);
+  assert.equal(record.recoverableErrorMetadataCount, 1);
+  assert.equal(record.queuedRecoverableErrorCount, 0);
+  assert.equal(record.wouldQueueRecoverableErrorCount, 1);
+  assert.equal(record.recoverableErrorsQueued, false);
+  assert.equal(record.willQueueRecoverableErrors, false);
+  assert.equal(record.onRecoverableErrorConfigured, true);
+  assert.equal(record.onRecoverableErrorInvoked, false);
+  assert.equal(record.publicOnRecoverableErrorInvoked, false);
+  assert.equal(record.rootErrorCallbackInvocationCount, 0);
   assert.equal(
     rootBridge.isPrivateHydrateRootPublicFacadePreflightRecord(record),
     true
