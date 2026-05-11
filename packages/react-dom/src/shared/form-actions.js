@@ -6,6 +6,7 @@ const {
   unimplementedCode
 } = require('../../placeholder-utils.js');
 const internalsGate = require('../resource-form-internals-gate.js');
+const rootBridge = require('../client/root-bridge.js');
 
 const hasOwn = Object.prototype.hasOwnProperty;
 
@@ -42,6 +43,8 @@ const privateFormActionAsyncCallbackExecutionRecordType =
   'fast.react_dom.private_form_action_async_callback_execution_record';
 const privateFormActionFulfilledResetExecutionRecordType =
   'fast.react_dom.private_form_action_fulfilled_reset_execution_record';
+const privateFormActionFulfilledResetRootLifecycleBoundaryRecordType =
+  'fast.react_dom.private_form_action_fulfilled_reset_root_lifecycle_boundary_record';
 const privateFormActionRejectedErrorPreflightRecordType =
   'fast.react_dom.private_form_action_rejected_error_preflight_record';
 const privateFormActionFormDataBlockerStatus =
@@ -70,6 +73,8 @@ const privateFormActionAsyncCallbackExecutionRecordedStatus =
   'executed-private-form-action-async-callback-fake-path';
 const privateFormActionFulfilledResetExecutionRecordedStatus =
   'executed-private-form-action-fulfilled-reset-fake-commit-path';
+const privateFormActionFulfilledResetRootLifecycleBoundaryStatus =
+  'bound-private-form-action-fulfilled-reset-root-lifecycle';
 const privateFormActionRejectedErrorPreflightRecordedStatus =
   'recorded-private-form-action-rejected-error-preflight';
 const privateFormActionFormDataBlockerGateErrorCode =
@@ -127,6 +132,8 @@ const formActionSubmitResetExecutionRecordPayloads = new WeakMap();
 const formActionCallbackActionPreflightRecordPayloads = new WeakMap();
 const formActionAsyncCallbackExecutionRecordPayloads = new WeakMap();
 const formActionFulfilledResetExecutionRecordPayloads = new WeakMap();
+const formActionFulfilledResetExecutionRootIdentityPayloads =
+  new WeakMap();
 const formActionRejectedErrorPreflightRecordPayloads = new WeakMap();
 const consumedFormActionFulfilledResetExecutions = new WeakSet();
 const consumedFormActionRejectedErrorPreflightExecutions = new WeakSet();
@@ -231,7 +238,31 @@ const blockedFulfilledResetExecutionAdmissionFields = freezeArray([
   'fakeResetStateQueue',
   'fakeResetCommit',
   'fakeFormResetCommit',
-  'resetFormInstanceCall'
+  'resetFormInstanceCall',
+  'rootBridgeAdmission',
+  'rootLifecycleRequestBoundary',
+  'rootLifecycleBoundary',
+  'rootExecutionBoundary',
+  'rootExecutionIdentity',
+  'rootId',
+  'rootKind',
+  'rootTag',
+  'sourceRootBridgeAdmissionId',
+  'sourceRootBridgeAdmissionStatus',
+  'sourceRootRequestId',
+  'sourceRootRequestSequence',
+  'sourceRootRequestType',
+  'sourceRootOperation',
+  'sourceRootLifecycleBoundaryId',
+  'sourceRootLifecycleBoundaryStatus',
+  'sourceLifecycleStatusBefore',
+  'sourceLifecycleStatusAfter',
+  'lifecycleTransition',
+  'activeLifecycleStatus',
+  'lifecycleRequestVersion',
+  'containerInfo',
+  'containerIdentity',
+  'rootContainerInfo'
 ]);
 
 const blockedRejectedErrorPreflightAdmissionFields = freezeArray([
@@ -1004,13 +1035,15 @@ function createFormActionFulfilledResetExecutionDiagnosticGate(options) {
     recordFulfilledResetExecution(
       asyncCallbackExecutionRecord,
       submitResetExecutionRecord,
-      admission
+      admission,
+      rootLifecycleBinding
     ) {
       return recordFormActionFulfilledResetExecutionWithGate(
         gateState,
         asyncCallbackExecutionRecord,
         submitResetExecutionRecord,
-        admission
+        admission,
+        rootLifecycleBinding
       );
     }
   });
@@ -1087,13 +1120,15 @@ async function recordFormActionAsyncCallbackExecution(
 function recordFormActionFulfilledResetExecution(
   asyncCallbackExecutionRecord,
   submitResetExecutionRecord,
-  admission
+  admission,
+  rootLifecycleBinding
 ) {
   return defaultFormActionFulfilledResetExecutionGate
     .recordFulfilledResetExecution(
       asyncCallbackExecutionRecord,
       submitResetExecutionRecord,
-      admission
+      admission,
+      rootLifecycleBinding
     );
 }
 
@@ -1428,6 +1463,17 @@ function describePrivateFormActionFulfilledResetExecutionGate() {
     consumesFulfilledAsyncCallbackExecution: true,
     consumesSubmitResetExecutionMetadata: true,
     consumesResetMetadata: true,
+    acceptsPrivateRootLifecycleBinding: true,
+    acceptedRootLifecycleBindingRecordType:
+      rootBridge.privateRootLifecycleRequestBoundaryRecordType,
+    acceptedRootLifecycleBindingStatus:
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
+    rootlessStandaloneFormEvidenceAllowed: true,
+    recordsRootLifecycleBoundaryWhenProvided: true,
+    rootLifecycleBoundaryRecordType:
+      privateFormActionFulfilledResetRootLifecycleBoundaryRecordType,
+    rootLifecycleBoundaryStatus:
+      privateFormActionFulfilledResetRootLifecycleBoundaryStatus,
     recordsAcceptedMetadataIds: true,
     recordsFulfilledActionResultMetadata: true,
     executesDeterministicFakeResetStateQueue: true,
@@ -1679,6 +1725,7 @@ function createUnsupportedFormActionFulfilledResetExecutionError(record) {
   error.sourceSubmitResetExecutionId =
     payload.sourceSubmitResetExecutionId;
   error.fulfilledActionResult = payload.fulfilledActionResult;
+  error.rootExecutionBoundary = payload.rootExecutionBoundary;
   error.fakeResetStateQueueExecution =
     payload.fakeResetStateQueueExecution;
   error.fakeResetCommitExecution = payload.fakeResetCommitExecution;
@@ -1738,6 +1785,15 @@ function getPrivateFormActionAsyncCallbackExecutionRecordPayload(record) {
 
 function getPrivateFormActionFulfilledResetExecutionRecordPayload(record) {
   return formActionFulfilledResetExecutionRecordPayloads.get(record) || null;
+}
+
+function getPrivateFormActionFulfilledResetExecutionRootIdentityPayload(
+  record
+) {
+  return (
+    formActionFulfilledResetExecutionRootIdentityPayloads.get(record) ||
+    null
+  );
 }
 
 function getPrivateFormActionRejectedErrorPreflightRecordPayload(record) {
@@ -2226,7 +2282,8 @@ function recordFormActionFulfilledResetExecutionWithGate(
   gateState,
   asyncCallbackExecutionRecord,
   submitResetExecutionRecord,
-  admission
+  admission,
+  rootLifecycleBinding
 ) {
   const asyncExecution =
     assertAcceptedFormActionAsyncCallbackExecutionRecordForFulfilledResetExecution(
@@ -2242,6 +2299,10 @@ function recordFormActionFulfilledResetExecutionWithGate(
       asyncExecution,
       submitResetExecution,
       admission
+    );
+  const normalizedRootLifecycleBinding =
+    normalizeFormActionFulfilledResetRootLifecycleBinding(
+      rootLifecycleBinding
     );
 
   if (
@@ -2266,16 +2327,23 @@ function recordFormActionFulfilledResetExecutionWithGate(
   const acceptedMetadataIds =
     createFulfilledResetExecutionAcceptedMetadataIds(
       asyncExecution,
-      submitResetExecution
+      submitResetExecution,
+      normalizedRootLifecycleBinding
     );
   const fulfilledActionResult =
     createFulfilledActionResultMetadata(asyncExecution);
+  const rootExecutionBoundary =
+    createFulfilledResetRootLifecycleBoundary(
+      executionId,
+      normalizedRootLifecycleBinding
+    );
   const fakeResetStateQueueExecution =
     createFulfilledResetStateQueueExecution(
       asyncExecution,
       submitResetExecution,
       executionId,
-      normalizedAdmission
+      normalizedAdmission,
+      rootExecutionBoundary
     );
   const fakeResetCommitExecution =
     createFulfilledResetCommitExecution(
@@ -2283,7 +2351,8 @@ function recordFormActionFulfilledResetExecutionWithGate(
       submitResetExecution,
       fakeResetStateQueueExecution,
       executionId,
-      normalizedAdmission
+      normalizedAdmission,
+      rootExecutionBoundary
     );
 
   gateState.consumedFulfilledExecutions.add(asyncCallbackExecutionRecord);
@@ -2343,6 +2412,7 @@ function recordFormActionFulfilledResetExecutionWithGate(
         submitResetExecution
       ),
     fulfilledActionResult,
+    rootExecutionBoundary,
     fakeResetStateQueueExecution,
     fakeResetCommitExecution,
     publicFormActionBoundary:
@@ -2353,6 +2423,15 @@ function recordFormActionFulfilledResetExecutionWithGate(
   });
 
   formActionFulfilledResetExecutionRecordPayloads.set(payload, payload);
+  if (normalizedRootLifecycleBinding !== null) {
+    formActionFulfilledResetExecutionRootIdentityPayloads.set(
+      payload,
+      createFulfilledResetRootIdentityPayload(
+        normalizedRootLifecycleBinding,
+        rootExecutionBoundary
+      )
+    );
+  }
   return payload;
 }
 
@@ -5486,11 +5565,199 @@ function createAsyncCallbackExecutionSideEffects(outcome) {
   return formActionAsyncCallbackExecutionNonThenableSideEffects;
 }
 
-function createFulfilledResetExecutionAcceptedMetadataIds(
-  asyncExecution,
-  submitResetExecution
+function normalizeFormActionFulfilledResetRootLifecycleBinding(binding) {
+  if (binding == null) {
+    return null;
+  }
+
+  if (typeof binding !== 'object') {
+    throwInvalidFulfilledResetExecutionRecord(
+      'root lifecycle binding for fulfilled reset execution must be source-owned private root metadata'
+    );
+  }
+
+  const rootBridgeAdmission = binding.rootBridgeAdmission;
+  const rootLifecycleRequestBoundary =
+    binding.rootLifecycleRequestBoundary;
+  const rootLifecyclePayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      rootLifecycleRequestBoundary
+    );
+
+  if (
+    !rootBridge.isPrivateRootBridgeAdmissionRecord(rootBridgeAdmission) ||
+    !rootBridge.isSourceOwnedPrivateRootBridgeAdmissionRecord(
+      rootBridgeAdmission
+    ) ||
+    !rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      rootBridgeAdmission,
+      rootLifecycleRequestBoundary
+    ) ||
+    rootLifecyclePayload === null ||
+    rootLifecyclePayload.admissionRecord !== rootBridgeAdmission ||
+    rootLifecyclePayload.rootHandleState == null ||
+    rootLifecyclePayload.rootHandleState.container == null ||
+    rootLifecyclePayload.rootHandleState.containerInfo == null
+  ) {
+    throwInvalidFulfilledResetExecutionRecord(
+      'root lifecycle binding for fulfilled reset execution must be source-owned active and current'
+    );
+  }
+
+  return freezeRecord({
+    rootBridgeAdmission,
+    rootLifecycleRequestBoundary,
+    rootLifecyclePayload,
+    bridgeState: rootLifecyclePayload.bridgeState,
+    rootHandleState: rootLifecyclePayload.rootHandleState,
+    sourceRecord: rootLifecyclePayload.sourceRecord,
+    container: rootLifecyclePayload.rootHandleState.container,
+    containerInfo: rootLifecyclePayload.rootHandleState.containerInfo
+  });
+}
+
+function createFulfilledResetRootLifecycleBoundary(
+  executionId,
+  rootLifecycleBinding
+) {
+  if (rootLifecycleBinding === null) {
+    return null;
+  }
+
+  const admission = rootLifecycleBinding.rootBridgeAdmission;
+  const boundary = rootLifecycleBinding.rootLifecycleRequestBoundary;
+  return freezeRecord({
+    $$typeof: privateFormActionFulfilledResetRootLifecycleBoundaryRecordType,
+    kind:
+      'FastReactDomPrivateFormActionFulfilledResetRootLifecycleBoundaryRecord',
+    status: privateFormActionFulfilledResetRootLifecycleBoundaryStatus,
+    boundaryId: `${executionId}:root-lifecycle-boundary`,
+    sourceWorkerId:
+      'worker-893-resource-form-reset-lifecycle-execution',
+    sourceRootBridgeAdmissionId: admission.requestId,
+    sourceRootBridgeAdmissionStatus: admission.admissionStatus,
+    sourceRootRequestId: boundary.sourceRequestId,
+    sourceRootRequestSequence: boundary.sourceRequestSequence,
+    sourceRootRequestType: boundary.sourceRequestType,
+    sourceRootOperation: boundary.sourceOperation,
+    sourceRootLifecycleBoundaryId: boundary.boundaryId,
+    sourceRootLifecycleBoundaryStatus: boundary.boundaryStatus,
+    rootId: admission.rootId,
+    rootKind: admission.rootKind,
+    rootTag: admission.rootTag,
+    rootContainerInfo: rootLifecycleBinding.containerInfo,
+    sourceLifecycleStatusBefore: boundary.sourceLifecycleStatusBefore,
+    sourceLifecycleStatusAfter: boundary.sourceLifecycleStatusAfter,
+    lifecycleTransition: boundary.lifecycleTransition,
+    activeLifecycleStatus: boundary.activeLifecycleStatus,
+    lifecycleRequestVersion: boundary.lifecycleRequestVersion,
+    sourceOwnedRootLifecycleBoundary: true,
+    activeRootLifecycle: true,
+    requestBoundaryCurrent: true,
+    publicRootExecution: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
+    sourceOwnedTokens: freezeArray([
+      privateFormActionFulfilledResetRootLifecycleBoundaryRecordType,
+      privateFormActionFulfilledResetRootLifecycleBoundaryStatus,
+      rootBridge.privateRootAdmissionRecordType,
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+      rootBridge.privateRootLifecycleRequestBoundaryRecordType,
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
+      admission.rootId,
+      boundary.boundaryId,
+      boundary.lifecycleTransition
+    ])
+  });
+}
+
+function createFulfilledResetRootIdentityPayload(
+  rootLifecycleBinding,
+  rootExecutionBoundary
 ) {
   return freezeRecord({
+    rootBridgeAdmission: rootLifecycleBinding.rootBridgeAdmission,
+    rootLifecycleRequestBoundary:
+      rootLifecycleBinding.rootLifecycleRequestBoundary,
+    rootLifecyclePayload: rootLifecycleBinding.rootLifecyclePayload,
+    bridgeState: rootLifecycleBinding.bridgeState,
+    rootHandleState: rootLifecycleBinding.rootHandleState,
+    sourceRecord: rootLifecycleBinding.sourceRecord,
+    container: rootLifecycleBinding.container,
+    containerInfo: rootLifecycleBinding.containerInfo,
+    rootExecutionBoundary
+  });
+}
+
+function createFulfilledResetRootLifecycleExecutionFields(
+  rootExecutionBoundary
+) {
+  if (rootExecutionBoundary === null) {
+    return {};
+  }
+
+  return {
+    rootExecutionBoundaryId: rootExecutionBoundary.boundaryId,
+    rootExecutionBoundaryStatus: rootExecutionBoundary.status,
+    sourceRootBridgeAdmissionId:
+      rootExecutionBoundary.sourceRootBridgeAdmissionId,
+    sourceRootBridgeAdmissionStatus:
+      rootExecutionBoundary.sourceRootBridgeAdmissionStatus,
+    sourceRootRequestId: rootExecutionBoundary.sourceRootRequestId,
+    sourceRootRequestSequence:
+      rootExecutionBoundary.sourceRootRequestSequence,
+    sourceRootRequestType: rootExecutionBoundary.sourceRootRequestType,
+    sourceRootOperation: rootExecutionBoundary.sourceRootOperation,
+    sourceRootLifecycleBoundaryId:
+      rootExecutionBoundary.sourceRootLifecycleBoundaryId,
+    sourceRootLifecycleBoundaryStatus:
+      rootExecutionBoundary.sourceRootLifecycleBoundaryStatus,
+    rootId: rootExecutionBoundary.rootId,
+    rootKind: rootExecutionBoundary.rootKind,
+    rootTag: rootExecutionBoundary.rootTag,
+    rootContainerInfo: rootExecutionBoundary.rootContainerInfo,
+    sourceLifecycleStatusBefore:
+      rootExecutionBoundary.sourceLifecycleStatusBefore,
+    sourceLifecycleStatusAfter:
+      rootExecutionBoundary.sourceLifecycleStatusAfter,
+    lifecycleTransition: rootExecutionBoundary.lifecycleTransition,
+    activeLifecycleStatus: rootExecutionBoundary.activeLifecycleStatus,
+    lifecycleRequestVersion:
+      rootExecutionBoundary.lifecycleRequestVersion,
+    sourceOwnedRootLifecycleBoundary: true,
+    activeRootLifecycle: true,
+    requestBoundaryCurrent: true
+  };
+}
+
+function createFulfilledResetRootLifecycleQueueLinkFields(
+  fakeResetStateQueueExecution
+) {
+  if (fakeResetStateQueueExecution.rootExecutionBoundaryId === undefined) {
+    return {};
+  }
+
+  return {
+    fakeResetStateQueueRootExecutionBoundaryId:
+      fakeResetStateQueueExecution.rootExecutionBoundaryId,
+    fakeResetStateQueueRootId: fakeResetStateQueueExecution.rootId,
+    fakeResetStateQueueRootLifecycleBoundaryId:
+      fakeResetStateQueueExecution.sourceRootLifecycleBoundaryId
+  };
+}
+
+function createFulfilledResetExecutionAcceptedMetadataIds(
+  asyncExecution,
+  submitResetExecution,
+  rootLifecycleBinding
+) {
+  const ids = {
     ...asyncExecution.acceptedMetadataIds,
     asyncCallbackExecutionId: asyncExecution.executionId,
     asyncCallbackExecutionSequence: asyncExecution.executionSequence,
@@ -5507,7 +5774,16 @@ function createFulfilledResetExecutionAcceptedMetadataIds(
       submitResetExecution.sourceResetIntentRequestId,
     resetIntentRequestSequence:
       submitResetExecution.sourceResetIntentRequestSequence
-  });
+  };
+
+  if (rootLifecycleBinding !== null) {
+    ids.rootBridgeAdmissionId =
+      rootLifecycleBinding.rootBridgeAdmission.requestId;
+    ids.rootLifecycleBoundaryId =
+      rootLifecycleBinding.rootLifecycleRequestBoundary.boundaryId;
+  }
+
+  return freezeRecord(ids);
 }
 
 function createFulfilledResetSourceAsyncCallbackExecution(asyncExecution) {
@@ -5627,7 +5903,8 @@ function createFulfilledResetStateQueueExecution(
   asyncExecution,
   submitResetExecution,
   executionId,
-  admission
+  admission,
+  rootExecutionBoundary
 ) {
   const resetMetadata = asyncExecution.resetMetadata;
   const resetIntent = submitResetExecution.resetIntentConsumption;
@@ -5644,6 +5921,9 @@ function createFulfilledResetStateQueueExecution(
       submitResetExecution.executionId,
     sourceResetIntentRequestId:
       submitResetExecution.sourceResetIntentRequestId,
+    ...createFulfilledResetRootLifecycleExecutionFields(
+      rootExecutionBoundary
+    ),
     queueExecutionKind: admission.queueExecutionKind,
     sourceFunctionNames: freezeArray([
       'request' + 'FormReset',
@@ -5686,7 +5966,8 @@ function createFulfilledResetCommitExecution(
   submitResetExecution,
   fakeResetStateQueueExecution,
   executionId,
-  admission
+  admission,
+  rootExecutionBoundary
 ) {
   const resetIntent = submitResetExecution.resetIntentConsumption;
   return freezeRecord({
@@ -5705,6 +5986,12 @@ function createFulfilledResetCommitExecution(
       fakeResetStateQueueExecution.queueExecutionId,
     fakeResetStateUpdateId:
       fakeResetStateQueueExecution.resetStateUpdateId,
+    ...createFulfilledResetRootLifecycleExecutionFields(
+      rootExecutionBoundary
+    ),
+    ...createFulfilledResetRootLifecycleQueueLinkFields(
+      fakeResetStateQueueExecution
+    ),
     commitKind: admission.commitKind,
     sourceFunctionNames: freezeArray([
       'request' + 'FormReset',
@@ -6573,6 +6860,7 @@ module.exports = {
   formActionSubmitResetExecutionMissingPrerequisites,
   getPrivateFormActionAsyncCallbackExecutionRecordPayload,
   getPrivateFormActionCallbackActionPreflightRecordPayload,
+  getPrivateFormActionFulfilledResetExecutionRootIdentityPayload,
   getPrivateFormActionFulfilledResetExecutionRecordPayload,
   getPrivateFormActionFormDataBlockerRecordPayload,
   getPrivateFormActionRejectedErrorPreflightRecordPayload,
@@ -6606,6 +6894,8 @@ module.exports = {
   privateFormActionFulfilledResetExecutionRecordedStatus,
   privateFormActionFulfilledResetExecutionRecordType,
   privateFormActionFulfilledResetExecutionStatus,
+  privateFormActionFulfilledResetRootLifecycleBoundaryRecordType,
+  privateFormActionFulfilledResetRootLifecycleBoundaryStatus,
   privateFormActionFormDataBlockerGateErrorCode,
   privateFormActionFormDataBlockerGateId,
   privateFormActionFormDataBlockerInvalidAdmissionCode,

@@ -19090,7 +19090,11 @@ test('private resource/form root execution consumer links accepted fake evidence
   );
   const { fulfilledResetExecution } =
     await createPrivateFulfilledResetExecutionRecord(
-      'root-execution-consumer-form'
+      'root-execution-consumer-form',
+      {
+        admission,
+        lifecycleBoundary
+      }
     );
   const gate = resourceFormGate.createResourceFormRootExecutionConsumerGate({
     requestIdPrefix: 'root-execution-consumer-gate'
@@ -19205,8 +19209,14 @@ test('private resource/form root execution consumer links accepted fake evidence
     summary.requiresSourceOwnedActiveRootLifecycleRequestBoundary,
     true
   );
+  assert.equal(
+    summary.requiresFormFulfilledResetRootLifecycleIdentity,
+    true
+  );
   assert.equal(summary.rejectsStaleRootLifecycleSnapshots, true);
   assert.equal(summary.rejectsCallerBuiltLifecycleSourceRecords, true);
+  assert.equal(summary.rejectsRootlessFormFulfilledResetRecords, true);
+  assert.equal(summary.rejectsCrossContainerFormFulfilledResetRecords, true);
   assert.equal(consumer.ledgerBoundary.runtimeRecordsRequired, true);
   assert.equal(
     consumer.ledgerBoundary.callerSuppliedDiagnosticStringsAccepted,
@@ -19272,6 +19282,26 @@ test('private resource/form root execution consumer links accepted fake evidence
     consumer.formFulfilledResetBoundary.commitExecutionId,
     fulfilledResetExecution.fakeResetCommitExecution.commitExecutionId
   );
+  assert.equal(
+    consumer.formFulfilledResetBoundary.rootExecutionBoundaryId,
+    fulfilledResetExecution.rootExecutionBoundary.boundaryId
+  );
+  assert.equal(
+    consumer.formFulfilledResetBoundary.sourceRootBridgeAdmissionId,
+    admission.requestId
+  );
+  assert.equal(
+    consumer.formFulfilledResetBoundary.sourceRootLifecycleBoundaryId,
+    lifecycleBoundary.boundaryId
+  );
+  assert.equal(
+    consumer.formFulfilledResetBoundary.rootId,
+    admission.rootId
+  );
+  assert.equal(
+    consumer.formFulfilledResetBoundary.rootContainerInfo,
+    fulfilledResetExecution.rootExecutionBoundary.rootContainerInfo
+  );
   assert.deepEqual(
     consumer.formFulfilledResetBoundary.sourceOwnedTokens,
     [
@@ -19283,6 +19313,12 @@ test('private resource/form root execution consumer links accepted fake evidence
       formActions.formActionFulfilledResetExecutionDiagnosticKind,
       formActions.formActionFulfilledResetExecutionQueueExecutionKind,
       'after-mutation-form-reset-order',
+      formActions
+        .privateFormActionFulfilledResetRootLifecycleBoundaryRecordType,
+      formActions
+        .privateFormActionFulfilledResetRootLifecycleBoundaryStatus,
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
       'executed-private-form-action-fulfilled-reset-state-queue-fake',
       'executed-private-form-action-fulfilled-reset-commit-fake'
     ]
@@ -19369,10 +19405,43 @@ test('private resource/form root execution consumer rejects stale cross-root mis
     'root-execution-consumer-foreign',
     'foreign-root-execution-consumer-root'
   );
-  const { fulfilledResetExecution } =
+  const { fulfilledResetExecution: rootlessFulfilledResetExecution } =
     await createPrivateFulfilledResetExecutionRecord(
       'root-execution-consumer-negative-form'
     );
+  const { fulfilledResetExecution } =
+    await createPrivateFulfilledResetExecutionRecord(
+      'root-execution-consumer-negative-bound-form',
+      {
+        admission: freshAdmission,
+        lifecycleBoundary: freshLifecycleBoundary
+      }
+    );
+  const foreignRoot = createPrivateRootBridgeAdmission();
+  const foreignNextRender = foreignRoot.bridge.renderContainer(
+    foreignRoot.create.handle,
+    {
+      props: {
+        children: 'foreign fresh boundary'
+      },
+      type: 'span'
+    }
+  );
+  const foreignFreshAdmission =
+    foreignRoot.bridge.admitRequest(foreignNextRender);
+  const foreignFreshLifecycleBoundary =
+    rootBridge.createPrivateRootLifecycleRequestBoundary(
+      foreignFreshAdmission
+    );
+  const {
+    fulfilledResetExecution: crossContainerFulfilledResetExecution
+  } = await createPrivateFulfilledResetExecutionRecord(
+    'root-execution-consumer-cross-container-form',
+    {
+      admission: foreignFreshAdmission,
+      lifecycleBoundary: foreignFreshLifecycleBoundary
+    }
+  );
   const gate = resourceFormGate.createResourceFormRootExecutionConsumerGate({
     requestIdPrefix: 'root-execution-consumer-negative-gate'
   });
@@ -19689,6 +19758,68 @@ test('private resource/form root execution consumer rejects stale cross-root mis
         freshAdmission,
         freshLifecycleBoundary,
         resourceExecution,
+        rootlessFulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'form fulfilled reset execution root lifecycle identity must be source-owned'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        freshAdmission,
+        freshLifecycleBoundary,
+        resourceExecution,
+        crossContainerFulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'form fulfilled reset execution root lifecycle identity must match root bridge admission and lifecycle boundary'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        freshAdmission,
+        freshLifecycleBoundary,
+        resourceExecution,
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true,
+          sourceRootLifecycleBoundaryId:
+            freshLifecycleBoundary.boundaryId
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'source-owned root execution tokens must come from private records'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        freshAdmission,
+        freshLifecycleBoundary,
+        resourceExecution,
         fulfilledResetExecution,
         {
           explicitResourceFormRootExecutionConsumer: true,
@@ -19745,6 +19876,75 @@ test('private resource/form root execution consumer rejects stale cross-root mis
       compatibilityTarget,
       reason:
         'source-owned root execution tokens must come from private records'
+    }
+  );
+
+  const staleFormRoot = createPrivateRootBridgeAdmission();
+  const staleFormNextRender = staleFormRoot.bridge.renderContainer(
+    staleFormRoot.create.handle,
+    {
+      props: {
+        children: 'stale form boundary'
+      },
+      type: 'span'
+    }
+  );
+  const staleFormAdmission =
+    staleFormRoot.bridge.admitRequest(staleFormNextRender);
+  const staleFormLifecycleBoundary =
+    rootBridge.createPrivateRootLifecycleRequestBoundary(
+      staleFormAdmission
+    );
+  const staleFormResourceExecution =
+    createRootMapStorageExecutionForRoot(
+      'root-execution-consumer-stale-form-resource',
+      staleFormAdmission.rootId
+    );
+  const { fulfilledResetExecution: staleFormFulfilledResetExecution } =
+    await createPrivateFulfilledResetExecutionRecord(
+      'root-execution-consumer-stale-form',
+      {
+        admission: staleFormAdmission,
+        lifecycleBoundary: staleFormLifecycleBoundary
+      }
+    );
+  const staleFormLaterRender = staleFormRoot.bridge.renderContainer(
+    staleFormRoot.create.handle,
+    {
+      props: {
+        children: 'later form boundary'
+      },
+      type: 'span'
+    }
+  );
+  const staleFormLaterAdmission =
+    staleFormRoot.bridge.admitRequest(staleFormLaterRender);
+  const staleFormLaterLifecycleBoundary =
+    rootBridge.createPrivateRootLifecycleRequestBoundary(
+      staleFormLaterAdmission
+    );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceFormRootExecutionConsumerGate({
+          requestIdPrefix: 'root-execution-consumer-stale-form-gate'
+        })
+        .recordRootExecutionConsumer(
+          staleFormLaterAdmission,
+          staleFormLaterLifecycleBoundary,
+          staleFormResourceExecution,
+          staleFormFulfilledResetExecution,
+          {
+            explicitResourceFormRootExecutionConsumer: true
+          }
+        ),
+    {
+      code:
+        resourceFormGate
+          .rootBoundaryInvalidRootExecutionConsumerRecordCode,
+      compatibilityTarget,
+      reason:
+        'form fulfilled reset execution root lifecycle identity must match root bridge admission and lifecycle boundary'
     }
   );
 
@@ -20320,7 +20520,10 @@ function createRootMapStorageExecutionForRoot(prefix, rootId) {
     });
 }
 
-async function createPrivateFulfilledResetExecutionRecord(prefix) {
+async function createPrivateFulfilledResetExecutionRecord(
+  prefix,
+  rootLifecycleBinding
+) {
   const scenario = createPrivateFormActionCallbackPreflightScenario(prefix);
   const asyncExecution = await formActions
     .createFormActionAsyncCallbackExecutionDiagnosticGate({
@@ -20346,7 +20549,14 @@ async function createPrivateFulfilledResetExecutionRecord(prefix) {
         explicitFormActionFulfilledResetExecution: true,
         sourceAsyncCallbackExecutionId: asyncExecution.executionId,
         sourceSubmitResetExecutionId: scenario.execution.executionId
-      }
+      },
+      rootLifecycleBinding == null
+        ? undefined
+        : {
+            rootBridgeAdmission: rootLifecycleBinding.admission,
+            rootLifecycleRequestBoundary:
+              rootLifecycleBinding.lifecycleBoundary
+          }
     );
 
   return {

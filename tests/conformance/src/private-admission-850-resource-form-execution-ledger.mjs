@@ -51,6 +51,8 @@ export const PRIVATE_ADMISSION_850_REQUIRED_ACCEPTED_IDS = freezeRecord({
     "deterministic-private-fulfilled-action-reset-fake-commit",
     "deterministic-fake-reset-state-queue",
     "form-action-fulfilled-reset-execution.fake-commit",
+    "fast.react_dom.private_form_action_fulfilled_reset_root_lifecycle_boundary_record",
+    "bound-private-form-action-fulfilled-reset-root-lifecycle",
     "after-mutation-form-reset-order"
   ])
 });
@@ -68,6 +70,7 @@ export const PRIVATE_ADMISSION_850_REQUIRED_STATUSES = freezeRecord({
     "executed-private-form-action-fulfilled-reset-fake-commit-path",
     "executed-private-form-action-fulfilled-reset-state-queue-fake",
     "executed-private-form-action-fulfilled-reset-commit-fake",
+    "bound-private-form-action-fulfilled-reset-root-lifecycle",
     "recorded-private-form-action-fulfilled-result-metadata",
     "blocked-public-form-action-fulfilled-reset-execution-compatibility",
     "executed-private-form-action-async-callback-fulfilled"
@@ -101,8 +104,16 @@ export const PRIVATE_ADMISSION_850_REQUIRED_FIELD_NAMES = freezeRecord({
   ]),
   [worker830]: freezeArray([
     "fulfilledActionResult",
+    "rootExecutionBoundary",
     "fakeResetStateQueueExecution",
     "fakeResetCommitExecution",
+    "sourceRootBridgeAdmissionId",
+    "sourceRootLifecycleBoundaryId",
+    "rootExecutionBoundaryId",
+    "rootContainerInfo",
+    "lifecycleRequestVersion",
+    "sourceOwnedRootLifecycleBoundary",
+    "fakeResetStateQueueRootExecutionBoundaryId",
     "diagnosticKind",
     "queueExecutionKind",
     "sourceFunctionNames",
@@ -142,6 +153,8 @@ export const PRIVATE_ADMISSION_850_REQUIRED_SOURCE_VALUES = freezeRecord({
       "deterministic-private-fulfilled-action-reset-fake-commit",
     queueExecutionKind: "deterministic-fake-reset-state-queue",
     commitKind: "after-mutation-form-reset-order",
+    rootLifecycleBoundaryStatus:
+      "bound-private-form-action-fulfilled-reset-root-lifecycle",
     queueStatus:
       "executed-private-form-action-fulfilled-reset-state-queue-fake",
     commitStatus: "executed-private-form-action-fulfilled-reset-commit-fake"
@@ -418,11 +431,14 @@ const privateAdmission850Rows = freezeArray([
           "privateFormActionFulfilledResetExecutionRecordType",
           "privateFormActionFulfilledResetExecutionStatus",
           "privateFormActionFulfilledResetExecutionRecordedStatus",
+          "privateFormActionFulfilledResetRootLifecycleBoundaryRecordType",
+          "privateFormActionFulfilledResetRootLifecycleBoundaryStatus",
           "formActionFulfilledResetExecutionDiagnosticKind",
           "formActionFulfilledResetExecutionQueueExecutionKind",
           "createFormActionFulfilledResetExecutionDiagnosticGate",
           "recordFormActionFulfilledResetExecutionWithGate",
           "FastReactDomPrivateFormActionFulfilledResetExecutionRecord",
+          "FastReactDomPrivateFormActionFulfilledResetRootLifecycleBoundaryRecord",
           "form-action-fulfilled-reset-execution.fake-commit",
           "form-action-fulfilled-reset-fake-commit"
         ]
@@ -441,6 +457,11 @@ const privateAdmission850Rows = freezeArray([
           "dispatchSetStateInternalRecorded",
           "fakeResetStateQueueExecuted",
           "fakeResetStateUpdateQueued",
+          "rootExecutionBoundaryId",
+          "sourceRootBridgeAdmissionId",
+          "sourceRootLifecycleBoundaryId",
+          "rootContainerInfo",
+          "sourceOwnedRootLifecycleBoundary",
           "resetQueuePendingMutated",
           "realReactUpdateQueued",
           "updateQueueCaptured",
@@ -462,6 +483,8 @@ const privateAdmission850Rows = freezeArray([
           "fakeResetCommitExecuted",
           "fakeFormResetCommitRecorded",
           "fakeResetFormInstanceCallRecorded",
+          "fakeResetStateQueueRootExecutionBoundaryId",
+          "fakeResetStateQueueRootLifecycleBoundaryId",
           "resetFormInstance",
           "resetFormInstanceCalled",
           "formResetCommitted",
@@ -473,10 +496,13 @@ const privateAdmission850Rows = freezeArray([
         path: formActionsPath,
         tokens: [
           "normalizeFormActionFulfilledResetExecutionAdmission",
+          "normalizeFormActionFulfilledResetRootLifecycleBinding",
           "assertNoFulfilledResetExecutionRawAdmissionFields",
           "getFulfilledResetExecutionExactStringProperty",
           "assertNoFormActionPublicBehaviorAliasClaims",
           "blockedFulfilledResetExecutionAdmissionFields",
+          "rootBridgeAdmission",
+          "rootLifecycleRequestBoundary",
           "deterministic-private-fulfilled-action-reset-fake-commit",
           "after-mutation-form-reset-order",
           "publicSubmitDispatchRequested",
@@ -503,6 +529,9 @@ const privateAdmission850Rows = freezeArray([
           "formResetCommitted",
           "realFormReset",
           "describePrivateResourceFormRootExecutionConsumerBoundary",
+          "requiresFormFulfilledResetRootLifecycleIdentity",
+          "rejectsRootlessFormFulfilledResetRecords",
+          "rejectsCrossContainerFormFulfilledResetRecords",
           "formFulfilledResetExecutionConsumed",
           "deterministicFakeResetStateQueueConsumed",
           "deterministicFakeResetCommitConsumed",

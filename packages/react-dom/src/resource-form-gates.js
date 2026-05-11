@@ -394,7 +394,9 @@ function recordResourceFormRootExecutionConsumerWithGate(
     );
   const fulfilledResetExecution =
     assertFormFulfilledResetExecutionForRootConsumer(
-      formFulfilledResetExecutionRecord
+      formFulfilledResetExecutionRecord,
+      rootBridgeAdmission,
+      lifecycleBoundary
     );
 
   if (
@@ -824,7 +826,11 @@ function assertRootMapStorageSnapshotEntriesForRootConsumer(entries, rows) {
   }
 }
 
-function assertFormFulfilledResetExecutionForRootConsumer(record) {
+function assertFormFulfilledResetExecutionForRootConsumer(
+  record,
+  rootBridgeAdmission,
+  lifecycleBoundary
+) {
   const payload =
     formActions.getPrivateFormActionFulfilledResetExecutionRecordPayload(
       record
@@ -860,11 +866,146 @@ function assertFormFulfilledResetExecutionForRootConsumer(record) {
     );
   }
 
-  assertFormFulfilledResetExecutionPlanForRootConsumer(payload);
+  assertFormFulfilledResetRootLifecycleForRootConsumer(
+    record,
+    payload,
+    rootBridgeAdmission,
+    lifecycleBoundary
+  );
+  assertFormFulfilledResetExecutionPlanForRootConsumer(
+    payload,
+    rootBridgeAdmission,
+    lifecycleBoundary
+  );
   return payload;
 }
 
-function assertFormFulfilledResetExecutionPlanForRootConsumer(payload) {
+function assertFormFulfilledResetRootLifecycleForRootConsumer(
+  record,
+  payload,
+  rootBridgeAdmission,
+  lifecycleBoundary
+) {
+  const rootExecutionBoundary = payload.rootExecutionBoundary;
+  const rootIdentity =
+    formActions
+      .getPrivateFormActionFulfilledResetExecutionRootIdentityPayload(
+        record
+      );
+  const lifecyclePayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      lifecycleBoundary
+    );
+
+  if (
+    rootIdentity === null ||
+    rootExecutionBoundary == null ||
+    typeof rootExecutionBoundary !== 'object' ||
+    lifecyclePayload === null
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset execution root lifecycle identity must be source-owned'
+    );
+  }
+
+  if (
+    rootIdentity.rootBridgeAdmission !== rootBridgeAdmission ||
+    rootIdentity.rootLifecycleRequestBoundary !== lifecycleBoundary ||
+    rootIdentity.rootLifecyclePayload !== lifecyclePayload ||
+    rootIdentity.bridgeState !== lifecyclePayload.bridgeState ||
+    rootIdentity.rootHandleState !== lifecyclePayload.rootHandleState ||
+    rootIdentity.sourceRecord !== lifecyclePayload.sourceRecord ||
+    rootIdentity.container !== lifecyclePayload.rootHandleState.container ||
+    rootIdentity.containerInfo !==
+      lifecyclePayload.rootHandleState.containerInfo ||
+    rootIdentity.rootExecutionBoundary !== rootExecutionBoundary ||
+    !rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      rootBridgeAdmission,
+      lifecycleBoundary
+    )
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset execution root lifecycle identity must match root bridge admission and lifecycle boundary'
+    );
+  }
+
+  if (
+    rootExecutionBoundary.$$typeof !==
+      formActions
+        .privateFormActionFulfilledResetRootLifecycleBoundaryRecordType ||
+    rootExecutionBoundary.kind !==
+      'FastReactDomPrivateFormActionFulfilledResetRootLifecycleBoundaryRecord' ||
+    rootExecutionBoundary.status !==
+      formActions
+        .privateFormActionFulfilledResetRootLifecycleBoundaryStatus ||
+    rootExecutionBoundary.sourceRootBridgeAdmissionId !==
+      rootBridgeAdmission.requestId ||
+    rootExecutionBoundary.sourceRootBridgeAdmissionStatus !==
+      rootBridgeAdmission.admissionStatus ||
+    rootExecutionBoundary.sourceRootRequestId !==
+      lifecycleBoundary.sourceRequestId ||
+    rootExecutionBoundary.sourceRootRequestSequence !==
+      lifecycleBoundary.sourceRequestSequence ||
+    rootExecutionBoundary.sourceRootRequestType !==
+      lifecycleBoundary.sourceRequestType ||
+    rootExecutionBoundary.sourceRootOperation !==
+      lifecycleBoundary.sourceOperation ||
+    rootExecutionBoundary.sourceRootLifecycleBoundaryId !==
+      lifecycleBoundary.boundaryId ||
+    rootExecutionBoundary.sourceRootLifecycleBoundaryStatus !==
+      lifecycleBoundary.boundaryStatus ||
+    rootExecutionBoundary.rootId !== rootBridgeAdmission.rootId ||
+    rootExecutionBoundary.rootKind !== rootBridgeAdmission.rootKind ||
+    rootExecutionBoundary.rootTag !== rootBridgeAdmission.rootTag ||
+    rootExecutionBoundary.rootContainerInfo !==
+      lifecyclePayload.rootHandleState.containerInfo ||
+    rootExecutionBoundary.sourceLifecycleStatusBefore !==
+      lifecycleBoundary.sourceLifecycleStatusBefore ||
+    rootExecutionBoundary.sourceLifecycleStatusAfter !==
+      lifecycleBoundary.sourceLifecycleStatusAfter ||
+    rootExecutionBoundary.lifecycleTransition !==
+      lifecycleBoundary.lifecycleTransition ||
+    rootExecutionBoundary.activeLifecycleStatus !==
+      lifecycleBoundary.activeLifecycleStatus ||
+    rootExecutionBoundary.lifecycleRequestVersion !==
+      lifecycleBoundary.lifecycleRequestVersion ||
+    rootExecutionBoundary.sourceOwnedRootLifecycleBoundary !== true ||
+    rootExecutionBoundary.activeRootLifecycle !== true ||
+    rootExecutionBoundary.requestBoundaryCurrent !== true ||
+    rootExecutionBoundary.publicRootExecution !== false ||
+    rootExecutionBoundary.nativeExecution !== false ||
+    rootExecutionBoundary.reconcilerExecution !== false ||
+    rootExecutionBoundary.domMutation !== false ||
+    rootExecutionBoundary.markerWrites !== false ||
+    rootExecutionBoundary.listenerInstallation !== false ||
+    rootExecutionBoundary.hydration !== false ||
+    rootExecutionBoundary.eventDispatch !== false ||
+    rootExecutionBoundary.compatibilityClaimed !== false ||
+    !sameStringArray(rootExecutionBoundary.sourceOwnedTokens, [
+      formActions
+        .privateFormActionFulfilledResetRootLifecycleBoundaryRecordType,
+      formActions
+        .privateFormActionFulfilledResetRootLifecycleBoundaryStatus,
+      rootBridge.privateRootAdmissionRecordType,
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+      rootBridge.privateRootLifecycleRequestBoundaryRecordType,
+      rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED,
+      rootBridgeAdmission.rootId,
+      lifecycleBoundary.boundaryId,
+      lifecycleBoundary.lifecycleTransition
+    ])
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset execution root lifecycle identity must remain source-owned current metadata'
+    );
+  }
+}
+
+function assertFormFulfilledResetExecutionPlanForRootConsumer(
+  payload,
+  rootBridgeAdmission,
+  lifecycleBoundary
+) {
   const asyncSource = payload.sourceAsyncCallbackExecution;
   const submitResetSource = payload.sourceSubmitResetExecution;
   const fulfilledResult = payload.fulfilledActionResult;
@@ -943,6 +1084,14 @@ function assertFormFulfilledResetExecutionPlanForRootConsumer(payload) {
     );
   }
 
+  assertFormFulfilledResetQueueCommitRootLifecycleForRootConsumer(
+    payload,
+    queue,
+    commit,
+    rootBridgeAdmission,
+    lifecycleBoundary
+  );
+
   if (
     payload.publicFormActionBoundary?.publicFormActionsEnabled !== false ||
     payload.publicFormActionBoundary?.publicSubmitDispatchReachable !==
@@ -966,6 +1115,79 @@ function assertFormFulfilledResetExecutionPlanForRootConsumer(payload) {
       'form fulfilled reset execution must remain fake and public-blocked'
     );
   }
+}
+
+function assertFormFulfilledResetQueueCommitRootLifecycleForRootConsumer(
+  payload,
+  queue,
+  commit,
+  rootBridgeAdmission,
+  lifecycleBoundary
+) {
+  const rootExecutionBoundary = payload.rootExecutionBoundary;
+  if (
+    !formFulfilledResetExecutionRowMatchesRootLifecycle(
+      queue,
+      rootExecutionBoundary,
+      rootBridgeAdmission,
+      lifecycleBoundary
+    ) ||
+    !formFulfilledResetExecutionRowMatchesRootLifecycle(
+      commit,
+      rootExecutionBoundary,
+      rootBridgeAdmission,
+      lifecycleBoundary
+    ) ||
+    commit.fakeResetStateQueueRootExecutionBoundaryId !==
+      queue.rootExecutionBoundaryId ||
+    commit.fakeResetStateQueueRootId !== queue.rootId ||
+    commit.fakeResetStateQueueRootLifecycleBoundaryId !==
+      queue.sourceRootLifecycleBoundaryId
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset fake queue and commit root lifecycle evidence must match root bridge admission'
+    );
+  }
+}
+
+function formFulfilledResetExecutionRowMatchesRootLifecycle(
+  row,
+  rootExecutionBoundary,
+  rootBridgeAdmission,
+  lifecycleBoundary
+) {
+  return (
+    row != null &&
+    rootExecutionBoundary != null &&
+    row.rootExecutionBoundaryId === rootExecutionBoundary.boundaryId &&
+    row.rootExecutionBoundaryStatus === rootExecutionBoundary.status &&
+    row.sourceRootBridgeAdmissionId === rootBridgeAdmission.requestId &&
+    row.sourceRootBridgeAdmissionStatus ===
+      rootBridgeAdmission.admissionStatus &&
+    row.sourceRootRequestId === lifecycleBoundary.sourceRequestId &&
+    row.sourceRootRequestSequence ===
+      lifecycleBoundary.sourceRequestSequence &&
+    row.sourceRootRequestType === lifecycleBoundary.sourceRequestType &&
+    row.sourceRootOperation === lifecycleBoundary.sourceOperation &&
+    row.sourceRootLifecycleBoundaryId === lifecycleBoundary.boundaryId &&
+    row.sourceRootLifecycleBoundaryStatus ===
+      lifecycleBoundary.boundaryStatus &&
+    row.rootId === rootBridgeAdmission.rootId &&
+    row.rootKind === rootBridgeAdmission.rootKind &&
+    row.rootTag === rootBridgeAdmission.rootTag &&
+    row.rootContainerInfo === rootExecutionBoundary.rootContainerInfo &&
+    row.sourceLifecycleStatusBefore ===
+      lifecycleBoundary.sourceLifecycleStatusBefore &&
+    row.sourceLifecycleStatusAfter ===
+      lifecycleBoundary.sourceLifecycleStatusAfter &&
+    row.lifecycleTransition === lifecycleBoundary.lifecycleTransition &&
+    row.activeLifecycleStatus === lifecycleBoundary.activeLifecycleStatus &&
+    row.lifecycleRequestVersion ===
+      lifecycleBoundary.lifecycleRequestVersion &&
+    row.sourceOwnedRootLifecycleBoundary === true &&
+    row.activeRootLifecycle === true &&
+    row.requestBoundaryCurrent === true
+  );
 }
 
 function createRootLifecycleConsumerBoundary(lifecycleBoundary) {
@@ -1077,6 +1299,8 @@ function createResourceRootMapStorageConsumerBoundary(resourceExecution) {
 function createFormFulfilledResetConsumerBoundary(fulfilledResetExecution) {
   const queue = fulfilledResetExecution.fakeResetStateQueueExecution;
   const commit = fulfilledResetExecution.fakeResetCommitExecution;
+  const rootExecutionBoundary =
+    fulfilledResetExecution.rootExecutionBoundary;
   return freezeRecord({
     status: privateResourceFormRootExecutionConsumerStatus,
     sourceWorkerId:
@@ -1093,6 +1317,17 @@ function createFormFulfilledResetConsumerBoundary(fulfilledResetExecution) {
     resetStateUpdateId: queue.resetStateUpdateId,
     commitExecutionId: commit.commitExecutionId,
     fakeFormResetCommitId: commit.fakeFormResetCommitId,
+    rootExecutionBoundaryId: rootExecutionBoundary.boundaryId,
+    rootExecutionBoundaryStatus: rootExecutionBoundary.status,
+    sourceRootBridgeAdmissionId:
+      rootExecutionBoundary.sourceRootBridgeAdmissionId,
+    sourceRootLifecycleBoundaryId:
+      rootExecutionBoundary.sourceRootLifecycleBoundaryId,
+    rootId: rootExecutionBoundary.rootId,
+    rootContainerInfo: rootExecutionBoundary.rootContainerInfo,
+    lifecycleTransition: rootExecutionBoundary.lifecycleTransition,
+    lifecycleRequestVersion:
+      rootExecutionBoundary.lifecycleRequestVersion,
     sourceOwnedTokens: freezeArray([
       fulfilledResetExecution.gateId,
       fulfilledResetExecution.$$typeof,
@@ -1102,6 +1337,10 @@ function createFormFulfilledResetConsumerBoundary(fulfilledResetExecution) {
       fulfilledResetExecution.admission.diagnosticKind,
       fulfilledResetExecution.admission.queueExecutionKind,
       fulfilledResetExecution.admission.commitKind,
+      rootExecutionBoundary.$$typeof,
+      rootExecutionBoundary.status,
+      rootExecutionBoundary.sourceRootBridgeAdmissionStatus,
+      rootExecutionBoundary.sourceRootLifecycleBoundaryStatus,
       queue.status,
       commit.status
     ]),
@@ -1985,11 +2224,18 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
       formActions.privateFormActionFulfilledResetExecutionRecordType,
     acceptedFormFulfilledResetStatus:
       formActions.privateFormActionFulfilledResetExecutionRecordedStatus,
+    acceptedFormFulfilledResetRootLifecycleBoundaryRecordType:
+      formActions
+        .privateFormActionFulfilledResetRootLifecycleBoundaryRecordType,
+    acceptedFormFulfilledResetRootLifecycleBoundaryStatus:
+      formActions
+        .privateFormActionFulfilledResetRootLifecycleBoundaryStatus,
     consumesRootBridgeAdmission: true,
     consumesRootLifecycleRequestBoundary: true,
     consumesResourceRootMapStorageExecution: true,
     consumesFormFulfilledResetExecution: true,
     requiresSourceOwnedActiveRootLifecycleRequestBoundary: true,
+    requiresFormFulfilledResetRootLifecycleIdentity: true,
     requiresSourceOwnedPrivateRecords: true,
     requiresWorker850AdmissionLedgerBoundary: true,
     rejectsStaleRootLifecycleSnapshots: true,
@@ -1997,6 +2243,10 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
     rejectsCallerBuiltLifecycleSourceRecords: true,
     rejectsStaleRootMapStorageRecords: true,
     rejectsCrossRootResourceRecords: true,
+    rejectsRootlessFormFulfilledResetRecords: true,
+    rejectsStaleFormFulfilledResetRecords: true,
+    rejectsCrossRootFormFulfilledResetRecords: true,
+    rejectsCrossContainerFormFulfilledResetRecords: true,
     rejectsClonedRecords: true,
     rejectsCallerSuppliedSourceTokens: true,
     rejectsPublicCompatibilityAliases: true,
@@ -2194,6 +2444,13 @@ function assertNoRootExecutionConsumerPublicClaims(admission) {
 function assertNoRootExecutionConsumerCallerSourceTokens(admission) {
   for (const field of [
     'sourceRootBridgeAdmissionId',
+    'sourceRootBridgeAdmissionStatus',
+    'sourceRootLifecycleBoundaryId',
+    'sourceRootLifecycleBoundaryStatus',
+    'sourceRootRequestId',
+    'sourceRootRequestSequence',
+    'sourceRootRequestType',
+    'sourceRootOperation',
     'sourceResourceRootMapStorageExecutionId',
     'sourceFormFulfilledResetExecutionId',
     'sourceRootMapStoragePreflightId',
@@ -2202,6 +2459,12 @@ function assertNoRootExecutionConsumerCallerSourceTokens(admission) {
     'rootMapStorageExecutionRows',
     'fakeResetStateQueueExecution',
     'fakeResetCommitExecution',
+    'rootExecutionBoundary',
+    'rootExecutionBoundaryId',
+    'rootLifecycleRequestBoundary',
+    'rootContainerInfo',
+    'lifecycleTransition',
+    'lifecycleRequestVersion',
     'ledgerId',
     'ledgerStatus',
     'workerId',
