@@ -109,6 +109,30 @@ export const SCHEDULER_ROOT_CURRENTNESS_BEHAVIOR_EVIDENCE =
     compatibilityClaimed: false
   });
 
+const SCHEDULER_ROOT_CURRENTNESS_LOCAL_OBSERVATION_ROW_KEYS = Object.freeze([
+  "rowId",
+  "modeId",
+  "scenarioId",
+  "nodeEnv",
+  "condition",
+  "entrypoint",
+  "packageName",
+  "packageSourcePath",
+  "behaviorEvidence",
+  "compatibilityClaimed",
+  "observation"
+]);
+
+const SCHEDULER_ROOT_CURRENTNESS_BEHAVIOR_EVIDENCE_KEYS = Object.freeze([
+  "behaviorEvidenceKind",
+  "entrypoint",
+  "sourcePath",
+  "directDeepCjsImport",
+  "variantBoundaryEvidence",
+  "privateAdmission886Evidence",
+  "compatibilityClaimed"
+]);
+
 export function evaluateSchedulerRootCurrentnessGate({
   oracle = readCheckedSchedulerRootOracle(),
   localObservationRows = null,
@@ -265,10 +289,11 @@ export function evaluateSchedulerRootCurrentnessGate({
   }
 
   const localRowsByKey = new Map(
-    effectiveLocalObservationRows.map((row) => [rowKey(row), row])
+    effectiveLocalObservationRows.map((row) => [row?.rowId, row])
   );
   const currentnessRows = [];
   const missingLocalObservationRowKeys = [];
+  const localObservationIdentityViolationRows = [];
   const modeMismatchRows = [];
   const behaviorEvidenceViolationRows = [];
   const localObservationMismatchRows = [];
@@ -316,6 +341,13 @@ export function evaluateSchedulerRootCurrentnessGate({
         continue;
       }
 
+      const localRowIdentityMatches = localObservationRowMatchesExpected(
+        localRow,
+        {
+          mode,
+          scenarioId
+        }
+      );
       const modeMatches =
         localRow.modeId === mode.id &&
         localRow.nodeEnv === mode.nodeEnv &&
@@ -340,20 +372,36 @@ export function evaluateSchedulerRootCurrentnessGate({
         objectHasPublicClaim(localRow.behaviorEvidence);
       let status = "current-local-root-observation-matches-checked-oracle";
 
+      if (!localRowIdentityMatches) {
+        localObservationIdentityViolationRows.push(expectedKey);
+      }
       if (!modeMatches) {
         modeMismatchRows.push(expectedKey);
-        status = "mode-node-env-mismatch";
-      } else if (!behaviorEvidenceAllowed) {
+      }
+      if (!behaviorEvidenceAllowed) {
         behaviorEvidenceViolationRows.push(expectedKey);
+      }
+      if (localFirstDifferencePath !== null) {
+        localObservationMismatchRows.push(expectedKey);
+      }
+      if (checkedOracleFirstDifferencePath !== null) {
+        checkedOracleMismatchRows.push(expectedKey);
+      }
+      if (!checkedComparisonStillBlocked || rowCompatibilityClaimed) {
+        comparisonClaimViolationRows.push(expectedKey);
+      }
+
+      if (!modeMatches) {
+        status = "mode-node-env-mismatch";
+      } else if (!localRowIdentityMatches) {
+        status = "local-observation-row-identity-mismatch";
+      } else if (!behaviorEvidenceAllowed) {
         status = "non-root-or-private-variant-evidence-used";
       } else if (localFirstDifferencePath !== null) {
-        localObservationMismatchRows.push(expectedKey);
         status = "current-local-observation-mismatch";
       } else if (checkedOracleFirstDifferencePath !== null) {
-        checkedOracleMismatchRows.push(expectedKey);
         status = "checked-local-oracle-row-mismatch";
       } else if (!checkedComparisonStillBlocked || rowCompatibilityClaimed) {
-        comparisonClaimViolationRows.push(expectedKey);
         status = "compatibility-claim-detected";
       }
 
@@ -390,6 +438,11 @@ export function evaluateSchedulerRootCurrentnessGate({
     violations,
     "scheduler-root-currentness-missing-local-observation-row",
     missingLocalObservationRowKeys
+  );
+  pushIdsViolation(
+    violations,
+    "scheduler-root-currentness-local-observation-row-identity-mismatch",
+    localObservationIdentityViolationRows
   );
   pushIdsViolation(
     violations,
@@ -739,6 +792,37 @@ function expectedSourceRowKeys(definition) {
   return freezeArray(keys);
 }
 
+function localObservationRowMatchesExpected(row, { mode, scenarioId }) {
+  if (!row || typeof row !== "object") {
+    return false;
+  }
+
+  const keyManifest = compareStringSets(
+    SCHEDULER_ROOT_CURRENTNESS_LOCAL_OBSERVATION_ROW_KEYS,
+    ownPropertyKeyNames(row)
+  );
+
+  return (
+    hasPlainObjectPrototype(row) &&
+    !objectHasPublicClaim(row) &&
+    keyManifest.missing.length === 0 &&
+    keyManifest.unexpected.length === 0 &&
+    ownKeysAreEnumerableDataProperties(
+      row,
+      SCHEDULER_ROOT_CURRENTNESS_LOCAL_OBSERVATION_ROW_KEYS
+    ) &&
+    row.rowId === `${mode.id}:${scenarioId}` &&
+    row.modeId === mode.id &&
+    row.scenarioId === scenarioId &&
+    row.nodeEnv === mode.nodeEnv &&
+    row.condition === mode.condition &&
+    row.entrypoint === "scheduler" &&
+    row.packageName === "scheduler" &&
+    row.packageSourcePath === "packages/scheduler" &&
+    row.compatibilityClaimed === false
+  );
+}
+
 function tryFindSchedulerRootObservation(oracle, modeId, scenarioId) {
   try {
     return findSchedulerRootObservation(oracle, modeId, scenarioId);
@@ -934,14 +1018,31 @@ function comparableObservation(observation) {
 }
 
 function isPublicRootBehaviorEvidence(evidence) {
+  if (!evidence || typeof evidence !== "object") {
+    return false;
+  }
+
+  const keyManifest = compareStringSets(
+    SCHEDULER_ROOT_CURRENTNESS_BEHAVIOR_EVIDENCE_KEYS,
+    ownPropertyKeyNames(evidence)
+  );
+
   return (
-    evidence?.behaviorEvidenceKind === "current-local-root-probe" &&
-    evidence?.entrypoint === "scheduler" &&
-    evidence?.sourcePath === "packages/scheduler/index.js" &&
-    evidence?.directDeepCjsImport === false &&
-    evidence?.variantBoundaryEvidence === false &&
-    evidence?.privateAdmission886Evidence === false &&
-    evidence?.compatibilityClaimed === false
+    hasPlainObjectPrototype(evidence) &&
+    !objectHasPublicClaim(evidence) &&
+    keyManifest.missing.length === 0 &&
+    keyManifest.unexpected.length === 0 &&
+    ownKeysAreEnumerableDataProperties(
+      evidence,
+      SCHEDULER_ROOT_CURRENTNESS_BEHAVIOR_EVIDENCE_KEYS
+    ) &&
+    evidence.behaviorEvidenceKind === "current-local-root-probe" &&
+    evidence.entrypoint === "scheduler" &&
+    evidence.sourcePath === "packages/scheduler/index.js" &&
+    evidence.directDeepCjsImport === false &&
+    evidence.variantBoundaryEvidence === false &&
+    evidence.privateAdmission886Evidence === false &&
+    evidence.compatibilityClaimed === false
   );
 }
 
