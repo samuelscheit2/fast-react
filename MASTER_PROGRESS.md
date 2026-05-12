@@ -29,6 +29,56 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1024 Docs Refresh and Workers 1020-1023 Cleanup Splits
+
+- Worker 1024 refreshed master docs after accepted organization-only cleanup
+  Workers 1020-1023. This is a docs-only refresh and makes no runtime or public
+  compatibility claim.
+- Worker 1020 split the remaining `fast-react-test-renderer`
+  `TestRendererRoot` lifecycle/accessor implementation into
+  `root_impl/lifecycle.rs` while leaving diagnostics, serialization, query,
+  native bridge, and lifecycle evidence code in `lib.rs`.
+- Worker 1021 split `fast-react-test-renderer` diagnostics into a facade plus
+  private child modules for constants, core records, create/update routes,
+  error-boundary, fixtures, host-node cleanup, host output, JSON, tree, and
+  `TestInstance` diagnostics. The crate-root diagnostics export shape remains
+  unchanged.
+- Worker 1023 split function-component hook record and render request DTOs into
+  `function_component/records.rs`, preserving existing
+  `crate::function_component::...` paths and leaving hook-store orchestration,
+  render-phase gates, effect/context behavior, and render control flow in the
+  parent module.
+- Worker 1022 split HostRoot ref lifecycle metadata, DOM ref callback gates,
+  ref callback execution handoff, cleanup-return gates, and HostComponent
+  ref/update ordering diagnostics into `root_commit/refs.rs`, preserving
+  existing `crate::root_commit::...` paths.
+- Accepted verification included the focused test-renderer root/private and
+  full test-renderer library checks for Worker 1020, full test-renderer library
+  and focused diagnostics checks plus mechanical chunk comparison for Worker
+  1021, focused root-commit ref checks plus post-merge
+  `cargo test -p fast-react-reconciler root_commit --lib` with 108 tests for
+  Worker 1022, and post-merge
+  `cargo test -p fast-react-reconciler function_component --lib` with 149
+  tests for Worker 1023. Cargo formatting and diff checks passed for the
+  accepted worker branches.
+- Post-merge broad validation for the accepted main state passed
+  `cargo test -p fast-react-reconciler` with 886 unit tests plus 1 doc-test,
+  `cargo test -p fast-react-test-renderer --lib` with 182 tests,
+  `cargo fmt --all --check`, `git diff --check`,
+  `npm run check:package-surface` under Node 26.1.0, and
+  `node tests/smoke/import-entrypoints.mjs` under Node 26.1.0. npm emitted
+  only the known `minimum-release-age` config warning during the package-surface
+  check.
+- Worker 1022's final audit returned MERGE, and Worker 1023's audits returned
+  MERGE. Workers 1020 and 1021 were already accepted, merged, and cleaned up
+  before Workers 1022 and 1023 landed.
+- The accepted state for this cleanup batch is main `4f9994eb` after merge
+  commits `e3a6aa56`, `48a8d348`, `31de85fd`, and `4f9994eb`. These changes
+  improve file organization only. Public React DOM roots,
+  test-renderer/native behavior, hooks, Scheduler timing, hydration, events,
+  resources/forms, package compatibility, and broad renderer compatibility
+  remain blocked unless separately proven.
+
 ### Worker 1019 Docs Refresh and Workers 1016-1017 Root Commit Cleanup Splits
 
 - Worker 1019 refreshed master docs after accepted Workers 1016 and 1017. This
