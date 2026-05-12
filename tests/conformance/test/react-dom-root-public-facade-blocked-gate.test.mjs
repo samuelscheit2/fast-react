@@ -102,20 +102,27 @@ const hydrateRootLifecycleBoundaryBlockedFields = Object.freeze([
   "publicHydrationReplayCompatibilityClaimed"
 ]);
 
+const MINIMAL_PUBLIC_DIV_TEXT_ID = 'app&<>"';
+const MINIMAL_PUBLIC_DIV_TEXT = "hello & < >";
+const MINIMAL_PUBLIC_DIV_TEXT_ESCAPED = "hello &amp; &lt; &gt;";
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE = "again & < >";
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED = "again &amp; &lt; &gt;";
+const MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED = "app&amp;&lt;&gt;&quot;";
+
 const MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT = Object.freeze({
   containerChildCount: 1,
   containerChildNodeNames: Object.freeze(["DIV"]),
   containerChildrenCount: 1,
   containerFirstElementChildAttributes: Object.freeze([
-    Object.freeze(["id", "app"])
+    Object.freeze(["id", MINIMAL_PUBLIC_DIV_TEXT_ID])
   ]),
-  containerFirstElementChildInnerHTML: "text",
+  containerFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_ESCAPED,
   containerFirstElementChildNodeName: "DIV",
   containerFirstElementChildTagName: "DIV",
-  containerFirstElementChildTextContent: "text",
-  containerInnerHTML: '<div id="app">text</div>',
+  containerFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_TEXT,
+  containerInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_ESCAPED}</div>`,
   containerMutationLog: Object.freeze([Object.freeze(["appendChild", "DIV"])]),
-  containerTextContent: "text",
+  containerTextContent: MINIMAL_PUBLIC_DIV_TEXT,
   ownerDocumentChildCount: 0,
   ownerDocumentMutationLog: Object.freeze([])
 });
@@ -124,15 +131,15 @@ const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_SNAPSHOT = Object.freeze({
   containerChildNodeNames: Object.freeze(["DIV"]),
   containerChildrenCount: 1,
   containerFirstElementChildAttributes: Object.freeze([
-    Object.freeze(["id", "app"])
+    Object.freeze(["id", MINIMAL_PUBLIC_DIV_TEXT_ID])
   ]),
-  containerFirstElementChildInnerHTML: "updated text",
+  containerFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED,
   containerFirstElementChildNodeName: "DIV",
   containerFirstElementChildTagName: "DIV",
-  containerFirstElementChildTextContent: "updated text",
-  containerInnerHTML: '<div id="app">updated text</div>',
+  containerFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+  containerInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED}</div>`,
   containerMutationLog: Object.freeze([Object.freeze(["appendChild", "DIV"])]),
-  containerTextContent: "updated text",
+  containerTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
   ownerDocumentChildCount: 0,
   ownerDocumentMutationLog: Object.freeze([])
 });
@@ -191,14 +198,14 @@ function assertMinimalPublicDivTextLifecycle(publicBoundary) {
   const renderDivText = publicBoundary.publicRootLifecycle.renderDivText;
   assert.equal(
     renderDivText.label,
-    'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))'
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1].publicApi
   );
   assert.equal(renderDivText.status, "ok");
   assert.equal(renderDivText.value.type, "undefined");
   assert.equal(renderDivText.compatibilityClaimed, false);
   assert.equal(renderDivText.controlledDomShim, true);
   assert.equal(renderDivText.renderElementType, "div");
-  assert.equal(renderDivText.renderTextContent, "text");
+  assert.equal(renderDivText.renderTextContent, MINIMAL_PUBLIC_DIV_TEXT);
   assert.equal(renderDivText.rootObjectCreated, true);
   assert.equal(renderDivText.lifecycleOperationAttempted, true);
   assert.equal(renderDivText.createRootAttempt.status, "ok");
@@ -228,14 +235,17 @@ function assertMinimalPublicDivTextUpdateLifecycle(publicBoundary) {
   const renderUpdate = publicBoundary.publicRootLifecycle.renderUpdate;
   assert.equal(
     renderUpdate.label,
-    'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "updated text"))'
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2].publicApi
   );
   assert.equal(renderUpdate.status, "ok");
   assert.equal(renderUpdate.value.type, "undefined");
   assert.equal(renderUpdate.compatibilityClaimed, false);
   assert.equal(renderUpdate.controlledDomShim, true);
   assert.equal(renderUpdate.renderElementType, "div");
-  assert.equal(renderUpdate.renderTextContent, "updated text");
+  assert.equal(
+    renderUpdate.renderTextContent,
+    MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+  );
   assert.equal(renderUpdate.hostNodeReused, true);
   assert.equal(renderUpdate.rootObjectCreated, true);
   assert.equal(renderUpdate.lifecycleOperationAttempted, true);
@@ -266,14 +276,14 @@ function assertMinimalPublicDivTextUnmountLifecycle(publicBoundary) {
   const unmount = publicBoundary.publicRootLifecycle.unmount;
   assert.equal(
     unmount.label,
-    'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text")); root.unmount()'
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[3].publicApi
   );
   assert.equal(unmount.status, "ok");
   assert.equal(unmount.value.type, "undefined");
   assert.equal(unmount.compatibilityClaimed, false);
   assert.equal(unmount.controlledDomShim, true);
   assert.equal(unmount.renderElementType, "div");
-  assert.equal(unmount.renderTextContent, "text");
+  assert.equal(unmount.renderTextContent, MINIMAL_PUBLIC_DIV_TEXT);
   assert.equal(unmount.duplicateRootTrackingCleared, true);
   assert.equal(unmount.rootObjectCreated, true);
   assert.equal(unmount.lifecycleOperationAttempted, true);
@@ -858,15 +868,26 @@ test("React DOM public createRoot rejects explicit options and extra arguments",
 
   assert.deepEqual(Object.keys(root), ["render", "unmount"]);
   assert.equal(
-    root.render(React.createElement("div", { id: "app" }, "text")),
+    root.render(
+      React.createElement(
+        "div",
+        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+        MINIMAL_PUBLIC_DIV_TEXT
+      )
+    ),
     undefined
   );
   assert.equal(container.childNodes.length, 1);
   assert.equal(container.firstChild.nodeName, "DIV");
-  assert.deepEqual(attributeEntries(container.firstChild), [["id", "app"]]);
-  assert.equal(container.firstChild.getAttribute("id"), "app");
-  assert.equal(container.firstChild.textContent, "text");
-  assert.equal(container.textContent, "text");
+  assert.deepEqual(attributeEntries(container.firstChild), [
+    ["id", MINIMAL_PUBLIC_DIV_TEXT_ID]
+  ]);
+  assert.equal(
+    container.firstChild.getAttribute("id"),
+    MINIMAL_PUBLIC_DIV_TEXT_ID
+  );
+  assert.equal(container.firstChild.textContent, MINIMAL_PUBLIC_DIV_TEXT);
+  assert.equal(container.textContent, MINIMAL_PUBLIC_DIV_TEXT);
 });
 
 test("React DOM client private facade adapter is symbol-only and routes to private records", () => {
@@ -4859,6 +4880,81 @@ test("React DOM public root facade gate records minimal public div text render",
         failure.id === "public-create-root-render-div-text"
     )
   );
+
+  const falseGreenCases = [
+    {
+      label: "omits children count",
+      mutate(operation) {
+        delete operation.controlledDomSnapshot.containerChildrenCount;
+      }
+    },
+    {
+      label: "omits first element child node",
+      mutate(operation) {
+        delete operation.controlledDomSnapshot
+          .containerFirstElementChildNodeName;
+      }
+    },
+    {
+      label: "omits container innerHTML",
+      mutate(operation) {
+        delete operation.controlledDomSnapshot.containerInnerHTML;
+      }
+    },
+    {
+      label: "omits first element child tagName",
+      mutate(operation) {
+        delete operation.controlledDomSnapshot
+          .containerFirstElementChildTagName;
+      }
+    },
+    {
+      label: "uses unescaped serialized attribute and text",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerInnerHTML =
+          `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID}">${MINIMAL_PUBLIC_DIV_TEXT}</div>`;
+      }
+    },
+    {
+      label: "uses unescaped child innerHTML text",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerFirstElementChildInnerHTML =
+          MINIMAL_PUBLIC_DIV_TEXT;
+      }
+    },
+    {
+      label: "omits mutation log",
+      mutate(operation) {
+        delete operation.controlledDomSnapshot.containerMutationLog;
+      }
+    },
+    {
+      label: "adds listener side effect",
+      mutate(operation) {
+        operation.sideEffects.listenerRegistrationCount = 1;
+      }
+    }
+  ];
+  for (const falseGreenCase of falseGreenCases) {
+    const tamperedBoundary = clone(publicBoundary);
+    falseGreenCase.mutate(
+      tamperedBoundary.publicRootLifecycle.renderDivText
+    );
+    const tamperedGate = evaluateReactDomRootPublicFacadeBlockedGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle,
+      clientRootOracle,
+      localPublicFacadeBoundary: tamperedBoundary,
+      privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
+    });
+    assert.equal(tamperedGate.ok, false, falseGreenCase.label);
+    assert.ok(
+      tamperedGate.failures.some(
+        (failure) => failure.id === "public-create-root-render-div-text"
+      ),
+      falseGreenCase.label
+    );
+  }
 });
 
 test("React DOM public root facade gate rejects premature public hydrateRoot behavior", () => {

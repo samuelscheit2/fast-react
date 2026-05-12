@@ -150,6 +150,17 @@ function privatePromotion503533Row({
   });
 }
 
+const MINIMAL_PUBLIC_DIV_TEXT_ID = "app&<>\"";
+const MINIMAL_PUBLIC_DIV_TEXT = "hello & < >";
+const MINIMAL_PUBLIC_DIV_TEXT_ESCAPED = "hello &amp; &lt; &gt;";
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE = "again & < >";
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED = "again &amp; &lt; &gt;";
+const MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED = "app&amp;&lt;&gt;&quot;";
+
+function minimalPublicDivTextApi(text) {
+  return `ReactDOMClient.createRoot(container).render(React.createElement("div", { id: ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID)} }, ${JSON.stringify(text)}))`;
+}
+
 export const REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS =
   Object.freeze([
     privatePromotion503533Row({
@@ -484,8 +495,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
     }),
     Object.freeze({
       id: "public-create-root-render-div-text",
-      publicApi:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))',
+      publicApi: minimalPublicDivTextApi(MINIMAL_PUBLIC_DIV_TEXT),
       scenarioId: "initial-host-render",
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
@@ -493,21 +503,20 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       controlledDomShim: true,
       expectedChildrenCount: 1,
       expectedChildNodeNames: ["DIV"],
-      expectedFirstElementChildAttributes: [["id", "app"]],
-      expectedFirstElementChildInnerHTML: "text",
+      expectedFirstElementChildAttributes: [["id", MINIMAL_PUBLIC_DIV_TEXT_ID]],
+      expectedFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_ESCAPED,
       expectedFirstElementChildNodeName: "DIV",
       expectedFirstElementChildTagName: "DIV",
-      expectedFirstElementChildTextContent: "text",
-      expectedInnerHTML: '<div id="app">text</div>',
+      expectedFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_TEXT,
+      expectedInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_ESCAPED}</div>`,
       expectedMutationLog: [["appendChild", "DIV"]],
-      expectedTextContent: "text",
+      expectedTextContent: MINIMAL_PUBLIC_DIV_TEXT,
       minimalHostOutputAdmission: "render",
       privateBridgeEvidence: "separate"
     }),
     Object.freeze({
       id: "public-create-root-render-update",
-      publicApi:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "updated text"))',
+      publicApi: minimalPublicDivTextApi(MINIMAL_PUBLIC_DIV_TEXT_UPDATE),
       scenarioId: "update-host-render",
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
@@ -515,21 +524,20 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       controlledDomShim: true,
       expectedChildrenCount: 1,
       expectedChildNodeNames: ["DIV"],
-      expectedFirstElementChildAttributes: [["id", "app"]],
-      expectedFirstElementChildInnerHTML: "updated text",
+      expectedFirstElementChildAttributes: [["id", MINIMAL_PUBLIC_DIV_TEXT_ID]],
+      expectedFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED,
       expectedFirstElementChildNodeName: "DIV",
       expectedFirstElementChildTagName: "DIV",
-      expectedFirstElementChildTextContent: "updated text",
-      expectedInnerHTML: '<div id="app">updated text</div>',
+      expectedFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+      expectedInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED}</div>`,
       expectedMutationLog: [["appendChild", "DIV"]],
-      expectedTextContent: "updated text",
+      expectedTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
       minimalHostOutputAdmission: "update",
       privateBridgeEvidence: "separate"
     }),
     Object.freeze({
       id: "public-create-root-unmount-call",
-      publicApi:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text")); root.unmount()',
+      publicApi: `${minimalPublicDivTextApi(MINIMAL_PUBLIC_DIV_TEXT)}; root.unmount()`,
       scenarioId: "root-unmount",
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
@@ -547,6 +555,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
         ["appendChild", "DIV"],
         ["removeChild", "DIV"]
       ],
+      expectedRenderTextContent: MINIMAL_PUBLIC_DIV_TEXT,
       expectedTextContent: "",
       minimalHostOutputAdmission: "unmount",
       privateBridgeEvidence: "separate"
@@ -2827,19 +2836,19 @@ function validatePublicRootLifecycleBlocked({
       key: "renderDivText",
       expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1],
       expectedLabel:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))'
+        REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1].publicApi
     },
     {
       key: "renderUpdate",
       expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2],
       expectedLabel:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "updated text"))'
+        REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2].publicApi
     },
     {
       key: "unmount",
       expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[3],
       expectedLabel:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text")); root.unmount()'
+        REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[3].publicApi
     }
   ];
 
@@ -2865,9 +2874,7 @@ function validatePublicRootLifecycleBlocked({
       operation.controlledDomShim === true &&
       operation.renderElementType === "div" &&
       operation.renderTextContent ===
-        (expected.minimalHostOutputAdmission === "unmount"
-          ? "text"
-          : expected.expectedTextContent) &&
+        getPublicRenderExpectedTextContent(expected) &&
       isPublicRenderControlledDomShimExpectedSnapshot(
         operation.controlledDomSnapshot,
         expected
@@ -2936,7 +2943,8 @@ function validatePublicRootLifecycleBlocked({
       expected.controlledDomShim === true &&
       (operation.controlledDomShim !== true ||
         operation.renderElementType !== "div" ||
-        operation.renderTextContent !== expected.expectedTextContent ||
+        operation.renderTextContent !==
+          getPublicRenderExpectedTextContent(expected) ||
         !isPublicRenderControlledDomShimUntouched(
           operation.controlledDomSnapshot
         ))
@@ -2999,6 +3007,10 @@ function validatePublicRootLifecycleBlocked({
       operation
     });
   }
+}
+
+function getPublicRenderExpectedTextContent(expected) {
+  return expected.expectedRenderTextContent ?? expected.expectedTextContent;
 }
 
 function isPublicRenderControlledDomShimUntouched(snapshot) {
@@ -3299,8 +3311,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
     }),
     renderDivText: attemptControlledPublicRootRenderDivTextOperation({
       domContainer,
-      label:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))',
+      label: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1].publicApi,
       listenerRegistry,
       React,
       reactDomClient,
@@ -3308,8 +3319,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
     }),
     renderUpdate: attemptControlledPublicRootRenderUpdateOperation({
       domContainer,
-      label:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "updated text"))',
+      label: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2].publicApi,
       listenerRegistry,
       React,
       reactDomClient,
@@ -3317,8 +3327,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
     }),
     unmount: attemptControlledPublicRootUnmountOperation({
       domContainer,
-      label:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text")); root.unmount()',
+      label: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[3].publicApi,
       listenerRegistry,
       React,
       reactDomClient,
@@ -3412,7 +3421,13 @@ function attemptControlledPublicRootRenderDivTextOperation({
     }
 
     lifecycleOperationAttempted = true;
-    return root.render(React.createElement("div", { id: "app" }, "text"));
+    return root.render(
+      React.createElement(
+        "div",
+        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+        MINIMAL_PUBLIC_DIV_TEXT
+      )
+    );
   });
 
   return {
@@ -3427,7 +3442,7 @@ function attemptControlledPublicRootRenderDivTextOperation({
     createRootAttempt,
     lifecycleOperationAttempted,
     renderElementType: "div",
-    renderTextContent: "text",
+    renderTextContent: MINIMAL_PUBLIC_DIV_TEXT,
     rootObjectCreated,
     sideEffects: inspectRootFacadeSideEffects(
       container,
@@ -3473,10 +3488,20 @@ function attemptControlledPublicRootRenderUpdateOperation({
     }
 
     lifecycleOperationAttempted = true;
-    root.render(React.createElement("div", { id: "app" }, "text"));
+    root.render(
+      React.createElement(
+        "div",
+        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+        MINIMAL_PUBLIC_DIV_TEXT
+      )
+    );
     const initialHostNode = container.firstChild;
     const value = root.render(
-      React.createElement("div", { id: "app" }, "updated text")
+      React.createElement(
+        "div",
+        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+        MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+      )
     );
     hostNodeReused =
       initialHostNode !== null && container.firstChild === initialHostNode;
@@ -3496,7 +3521,7 @@ function attemptControlledPublicRootRenderUpdateOperation({
     hostNodeReused,
     lifecycleOperationAttempted,
     renderElementType: "div",
-    renderTextContent: "updated text",
+    renderTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
     rootObjectCreated,
     sideEffects: inspectRootFacadeSideEffects(
       container,
@@ -3542,7 +3567,13 @@ function attemptControlledPublicRootUnmountOperation({
     }
 
     lifecycleOperationAttempted = true;
-    root.render(React.createElement("div", { id: "app" }, "text"));
+    root.render(
+      React.createElement(
+        "div",
+        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+        MINIMAL_PUBLIC_DIV_TEXT
+      )
+    );
     const value = root.unmount();
     try {
       reactDomClient.createRoot(container);
@@ -3566,7 +3597,7 @@ function attemptControlledPublicRootUnmountOperation({
     duplicateRootTrackingCleared,
     lifecycleOperationAttempted,
     renderElementType: "div",
-    renderTextContent: "text",
+    renderTextContent: MINIMAL_PUBLIC_DIV_TEXT,
     rootObjectCreated,
     sideEffects: inspectRootFacadeSideEffects(
       container,
