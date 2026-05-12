@@ -23,6 +23,7 @@ import {
   REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS,
   REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
   REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS,
+  REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS,
   REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
   REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_BLOCKED_SURFACES,
   REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_CLAIM_KEYS,
@@ -5219,6 +5220,87 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
       (row) => row.id === "private-root-unmount-admission"
     )
   );
+});
+
+test("React DOM public root facade records hostile render capability rejections", () => {
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle
+  });
+  const rejectionRows = gate.blockedPublicFacadeRows.filter((row) =>
+    REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS.some(
+      (expected) => expected.id === row.id
+    )
+  );
+
+  assert.deepEqual(
+    rejectionRows.map((row) => row.id),
+    REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS.map((row) => row.id)
+  );
+  assert.deepEqual(
+    new Set(rejectionRows.map((row) => row.category)),
+    new Set([
+      "browser-dom-expansion",
+      "event-listener-prop",
+      "hydration-adjacent",
+      "ref-prop",
+      "resource-form-controlled"
+    ])
+  );
+  assert.deepEqual(
+    rejectionRows
+      .filter((row) => row.category === "event-listener-prop")
+      .map((row) => row.label),
+    [
+      "unsupported-onClick-prop",
+      "unsupported-onClickCapture-prop",
+      "unsupported-onSubmit-prop",
+      "unsupported-onChange-prop"
+    ]
+  );
+  assert.deepEqual(
+    rejectionRows
+      .filter((row) => row.category === "ref-prop")
+      .map((row) => row.label),
+    ["unsupported-callback-ref-prop", "unsupported-object-ref-prop"]
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-suppressHydrationWarning-prop" &&
+        row.blockedSurface === "hydration"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-hydrateRoot-options-callbacks" &&
+        row.hydrateRootCallbackInvocationCount === 0 &&
+        row.postAcceptedRenderRejected === false
+    )
+  );
+  for (const row of rejectionRows) {
+    assert.equal(row.gateStatus, REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS);
+    assert.equal(row.compatibilityClaimed, false);
+    assert.equal(row.freshRootRejected, true);
+    assert.equal(row.rejectedBeforePrivateBridgeRender, true);
+    assert.equal(row.rejectedBeforeNativeExecution, true);
+    assert.equal(row.listenerMarkerWritten, false);
+    assert.equal(row.callbackInvocationCount, 0);
+    assert.equal(row.refCallbackInvocationCount, 0);
+    assert.equal(row.refObjectMutationCount, 0);
+    assert.equal(row.resourceDomInsertion, false);
+    assert.equal(row.formActionInvocationCount, 0);
+    assert.equal(row.controlledInputRestore, false);
+    if (row.postAcceptedRenderRejected) {
+      assert.equal(row.previousFakeDomNodePreserved, true);
+      assert.equal(row.previousInnerHTMLPreserved, true);
+      assert.equal(row.previousGetAttributeIdPreserved, true);
+      assert.equal(row.previousLatestPropsPreserved, true);
+      assert.equal(row.previousMutationLogPreserved, true);
+    }
+  }
 });
 
 test("React DOM public root facade gate records minimal public createRoot without compatibility", () => {

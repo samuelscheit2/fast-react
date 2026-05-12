@@ -48,6 +48,39 @@ const compatibilityClaimKeys = Object.freeze([
   'reactDomCompatibilityClaimed',
   'schedulerCompatibilityClaimed'
 ]);
+const publicRenderCapabilityRejectionLabels = Object.freeze([
+  'unsupported-onClick-prop',
+  'unsupported-onClickCapture-prop',
+  'unsupported-onSubmit-prop',
+  'unsupported-onChange-prop',
+  'unsupported-callback-ref-prop',
+  'unsupported-object-ref-prop',
+  'unsupported-className-prop',
+  'unsupported-style-prop',
+  'unsupported-dangerouslySetInnerHTML-prop',
+  'unsupported-keyed-div',
+  'unsupported-span-type',
+  'unsupported-nested-child',
+  'unsupported-fragment',
+  'unsupported-array',
+  'unsupported-suppressHydrationWarning-prop',
+  'unsupported-id-object',
+  'unsupported-link-resource-type',
+  'unsupported-script-resource-type',
+  'unsupported-style-resource-type',
+  'unsupported-form-type',
+  'unsupported-input-type',
+  'unsupported-button-type',
+  'unsupported-textarea-type',
+  'unsupported-action-prop',
+  'unsupported-formAction-prop',
+  'unsupported-value-prop',
+  'unsupported-defaultValue-prop',
+  'unsupported-checked-prop',
+  'unsupported-name-prop',
+  'unsupported-type-prop',
+  'unsupported-component'
+]);
 
 test('react-dom/client private facade symbols are non-enumerable descriptor-stable gates', () => {
   assert.deepEqual(Object.keys(reactDomClient), [
@@ -352,74 +385,20 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     '<div>id removed &amp; &lt; &gt;</div>'
   );
   assertNoRootMarkerOrListenerLeak(createRootContainer, createRootDocument);
-  assertPublicRenderFailureDoesNotLeak(
-    React.createElement('div', {className: 'blocked'}, 'blocked'),
-    'unsupported-className-prop'
-  );
-  assertPublicRenderUpdateFailureDoesNotLeak(
-    React.createElement('div', {className: 'blocked'}, 'blocked'),
-    'unsupported-className-prop'
-  );
-  assertPublicRenderFailureDoesNotLeak(
-    React.createElement('span', null, 'blocked type'),
-    'unsupported-type'
-  );
-  assertPublicRenderUpdateFailureDoesNotLeak(
-    React.createElement('span', null, 'blocked type'),
-    'unsupported-type'
-  );
-  assertPublicRenderFailureDoesNotLeak(
-    React.createElement('div', {id: {}}, 'blocked id'),
-    'unsupported-id-object'
-  );
-  assertPublicRenderUpdateFailureDoesNotLeak(
-    React.createElement('div', {id: {}}, 'blocked id'),
-    'unsupported-id-object'
-  );
-  assertPublicRenderFailureDoesNotLeak(
-    [
-      React.createElement('div', null, 'blocked array')
-    ],
-    'unsupported-array'
-  );
-  assertPublicRenderFailureDoesNotLeak(
-    React.createElement(
-      Symbol.for('react.fragment'),
-      null,
-      React.createElement('div', null, 'blocked fragment')
-    ),
-    'unsupported-fragment'
-  );
-  assertPublicRenderUpdateFailureDoesNotLeak(
-    React.createElement(
-      Symbol.for('react.fragment'),
-      null,
-      React.createElement('div', null, 'blocked fragment')
-    ),
-    'unsupported-fragment'
-  );
-  assertPublicRenderFailureDoesNotLeak(
-    React.createElement(
-      'div',
-      null,
-      React.createElement('span', null, 'blocked nested')
-    ),
-    'unsupported-nested'
-  );
-  assertPublicRenderUpdateFailureDoesNotLeak(
-    React.createElement(
-      'div',
-      null,
-      React.createElement('span', null, 'blocked nested')
-    ),
-    'unsupported-nested'
-  );
-  assertPublicRenderFailureDoesNotLeak(
-    React.createElement(function UnsupportedComponent() {
-      return React.createElement('div', null, 'blocked component');
-    }),
-    'unsupported-component'
-  );
+  for (const createCase of createPublicRenderCapabilityRejectionCaseFactories()) {
+    const freshCase = createCase();
+    assertPublicRenderFailureDoesNotLeak(
+      freshCase.element,
+      freshCase.label,
+      freshCase.assertNoCapabilityEffects
+    );
+    const updateCase = createCase();
+    assertPublicRenderUpdateFailureDoesNotLeak(
+      updateCase.element,
+      updateCase.label,
+      updateCase.assertNoCapabilityEffects
+    );
+  }
 
   const duplicateRootDocument = createDocument('public-create-root-duplicate');
   const duplicateRootContainer = createElement('DIV', duplicateRootDocument);
@@ -531,6 +510,75 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   assert.equal(hydrateRootResult, undefined);
   assert.equal(recoverableErrorCalls, 0);
   assertContainerUntouched(hydrateRootContainer, hydrateRootDocument);
+
+  let hydrateRootCallbackCalls = 0;
+  const hydrateRootBlockedOptionCases = [
+    {
+      label: 'recoverable-error-callback',
+      options: {
+        onRecoverableError() {
+          hydrateRootCallbackCalls++;
+        }
+      }
+    },
+    {
+      label: 'caught-error-callback',
+      options: {
+        onCaughtError() {
+          hydrateRootCallbackCalls++;
+        }
+      }
+    },
+    {
+      label: 'uncaught-error-callback',
+      options: {
+        onUncaughtError() {
+          hydrateRootCallbackCalls++;
+        }
+      }
+    },
+    {
+      label: 'identifier-prefix-option',
+      options: {
+        identifierPrefix: 'blocked-'
+      }
+    },
+    {
+      label: 'hydration-form-state-option',
+      options: {
+        formState: {blocked: true}
+      }
+    }
+  ];
+  for (const blockedCase of hydrateRootBlockedOptionCases) {
+    const blockedHydrateRootDocument = createDocument(
+      `public-hydrate-root-${blockedCase.label}`
+    );
+    const blockedHydrateRootContainer = createElement(
+      'DIV',
+      blockedHydrateRootDocument
+    );
+
+    assert.throws(
+      () => {
+        reactDomClient.hydrateRoot(
+          blockedHydrateRootContainer,
+          React.createElement('div', null, 'blocked hydration'),
+          blockedCase.options
+        );
+      },
+      {
+        code: 'FAST_REACT_UNIMPLEMENTED',
+        entrypoint: 'react-dom/client',
+        exportName: 'hydrateRoot'
+      }
+    );
+    assertContainerUntouched(
+      blockedHydrateRootContainer,
+      blockedHydrateRootDocument
+    );
+  }
+  assert.equal(hydrateRootCallbackCalls, 0);
 
   const profilingCreateRootDocument = createDocument(
     'public-profiling-create-root-placeholder'
@@ -645,6 +693,45 @@ test('public createRoot invokes only the private adapter factory while other pub
   });
 });
 
+test('public createRoot render rejects unsupported inputs before adapter root.render', () => {
+  const result = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        '-e',
+        createRenderCapabilityRejectionSpyScript(packageRoot)
+      ],
+      {
+        encoding: 'utf8'
+      }
+    )
+  );
+
+  assert.deepEqual(
+    result.freshRejectedLabels,
+    publicRenderCapabilityRejectionLabels
+  );
+  assert.deepEqual(
+    result.postAcceptedRejectedLabels,
+    publicRenderCapabilityRejectionLabels
+  );
+  assert.equal(result.adapterCreateRootCalls, 1);
+  assert.equal(result.adapterRenderCalls, 1);
+  assert.deepEqual(result.adapterRenderLabels, ['accepted-minimal-div']);
+  assert.equal(result.eventCallbackCalls, 0);
+  assert.equal(result.refCallbackCalls, 0);
+  assert.equal(result.formCallbackCalls, 0);
+  assert.equal(result.objectRefCurrent, null);
+  assert.deepEqual(
+    result.freshErrors.map((error) => error.exportName),
+    publicRenderCapabilityRejectionLabels.map(() => 'createRoot().render')
+  );
+  assert.deepEqual(
+    result.postAcceptedErrors.map((error) => error.exportName),
+    publicRenderCapabilityRejectionLabels.map(() => 'createRoot().render')
+  );
+});
+
 test('profiling createRoot private facade symbols are descriptor-stable without hydrate parity or claims', () => {
   assert.deepEqual(Object.keys(profiling), [
     '__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE',
@@ -725,6 +812,236 @@ test('profiling createRoot private facade symbols are descriptor-stable without 
     assert.notEqual(packageJson[key], true, `package.json ${key}`);
   }
 });
+
+function createPublicRenderCapabilityRejectionCaseFactories() {
+  const fragmentType = React.Fragment || Symbol.for('react.fragment');
+  const factories = [
+    createEventPropRejectionCaseFactory('unsupported-onClick-prop', 'onClick'),
+    createEventPropRejectionCaseFactory(
+      'unsupported-onClickCapture-prop',
+      'onClickCapture'
+    ),
+    createEventPropRejectionCaseFactory('unsupported-onSubmit-prop', 'onSubmit'),
+    createEventPropRejectionCaseFactory('unsupported-onChange-prop', 'onChange'),
+    () => {
+      let refCallbackCalls = 0;
+      return {
+        label: 'unsupported-callback-ref-prop',
+        element: React.createElement(
+          'div',
+          {
+            ref() {
+              refCallbackCalls++;
+            }
+          },
+          'blocked ref'
+        ),
+        assertNoCapabilityEffects() {
+          assert.equal(refCallbackCalls, 0);
+        }
+      };
+    },
+    () => {
+      const ref = {current: null};
+      return {
+        label: 'unsupported-object-ref-prop',
+        element: React.createElement('div', {ref}, 'blocked ref'),
+        assertNoCapabilityEffects() {
+          assert.equal(ref.current, null);
+        }
+      };
+    },
+    () => ({
+      label: 'unsupported-className-prop',
+      element: React.createElement('div', {className: 'blocked'}, 'blocked')
+    }),
+    () => ({
+      label: 'unsupported-style-prop',
+      element: React.createElement(
+        'div',
+        {style: {color: 'red'}},
+        'blocked style'
+      )
+    }),
+    () => ({
+      label: 'unsupported-dangerouslySetInnerHTML-prop',
+      element: React.createElement('div', {
+        dangerouslySetInnerHTML: {__html: '<span>blocked</span>'}
+      })
+    }),
+    () => ({
+      label: 'unsupported-keyed-div',
+      element: React.createElement('div', {key: 'blocked'}, 'blocked key')
+    }),
+    () => ({
+      label: 'unsupported-span-type',
+      element: React.createElement('span', null, 'blocked type')
+    }),
+    () => ({
+      label: 'unsupported-nested-child',
+      element: React.createElement(
+        'div',
+        null,
+        React.createElement('span', null, 'blocked nested')
+      )
+    }),
+    () => ({
+      label: 'unsupported-fragment',
+      element: React.createElement(
+        fragmentType,
+        null,
+        React.createElement('div', null, 'blocked fragment')
+      )
+    }),
+    () => ({
+      label: 'unsupported-array',
+      element: [React.createElement('div', {key: 'array'}, 'blocked array')]
+    }),
+    () => ({
+      label: 'unsupported-suppressHydrationWarning-prop',
+      element: React.createElement(
+        'div',
+        {suppressHydrationWarning: true},
+        'blocked hydration prop'
+      )
+    }),
+    () => ({
+      label: 'unsupported-id-object',
+      element: React.createElement('div', {id: {}}, 'blocked id')
+    }),
+    () => ({
+      label: 'unsupported-link-resource-type',
+      element: React.createElement('link', {
+        href: '/blocked.css',
+        rel: 'stylesheet'
+      })
+    }),
+    () => ({
+      label: 'unsupported-script-resource-type',
+      element: React.createElement('script', {src: '/blocked.js'})
+    }),
+    () => ({
+      label: 'unsupported-style-resource-type',
+      element: React.createElement('style', null, '.blocked{}')
+    }),
+    createFormCallbackRejectionCaseFactory(
+      'unsupported-form-type',
+      'form',
+      'action'
+    ),
+    () => ({
+      label: 'unsupported-input-type',
+      element: React.createElement('input', {
+        checked: true,
+        defaultValue: 'fallback',
+        name: 'blocked-input',
+        type: 'checkbox',
+        value: 'blocked'
+      })
+    }),
+    createFormCallbackRejectionCaseFactory(
+      'unsupported-button-type',
+      'button',
+      'formAction'
+    ),
+    () => ({
+      label: 'unsupported-textarea-type',
+      element: React.createElement('textarea', {
+        defaultValue: 'fallback',
+        name: 'blocked-textarea',
+        value: 'blocked'
+      })
+    }),
+    createFormCallbackRejectionCaseFactory(
+      'unsupported-action-prop',
+      'div',
+      'action'
+    ),
+    createFormCallbackRejectionCaseFactory(
+      'unsupported-formAction-prop',
+      'div',
+      'formAction'
+    ),
+    () => ({
+      label: 'unsupported-value-prop',
+      element: React.createElement('div', {value: 'blocked'}, 'blocked value')
+    }),
+    () => ({
+      label: 'unsupported-defaultValue-prop',
+      element: React.createElement(
+        'div',
+        {defaultValue: 'blocked'},
+        'blocked defaultValue'
+      )
+    }),
+    () => ({
+      label: 'unsupported-checked-prop',
+      element: React.createElement('div', {checked: true}, 'blocked checked')
+    }),
+    () => ({
+      label: 'unsupported-name-prop',
+      element: React.createElement('div', {name: 'blocked'}, 'blocked name')
+    }),
+    () => ({
+      label: 'unsupported-type-prop',
+      element: React.createElement('div', {type: 'button'}, 'blocked type prop')
+    }),
+    () => ({
+      label: 'unsupported-component',
+      element: React.createElement(function UnsupportedComponent() {
+        return React.createElement('div', null, 'blocked component');
+      })
+    })
+  ];
+
+  assert.deepEqual(
+    factories.map((factory) => factory().label),
+    publicRenderCapabilityRejectionLabels
+  );
+  return factories;
+}
+
+function createEventPropRejectionCaseFactory(label, propName) {
+  return () => {
+    let callbackCalls = 0;
+    return {
+      label,
+      element: React.createElement(
+        'div',
+        {
+          [propName]() {
+            callbackCalls++;
+          }
+        },
+        `blocked ${propName}`
+      ),
+      assertNoCapabilityEffects() {
+        assert.equal(callbackCalls, 0);
+      }
+    };
+  };
+}
+
+function createFormCallbackRejectionCaseFactory(label, type, propName) {
+  return () => {
+    let callbackCalls = 0;
+    return {
+      label,
+      element: React.createElement(
+        type,
+        {
+          [propName]() {
+            callbackCalls++;
+          }
+        },
+        `blocked ${propName}`
+      ),
+      assertNoCapabilityEffects() {
+        assert.equal(callbackCalls, 0);
+      }
+    };
+  };
+}
 
 function assertStablePrivateFacadeDescriptor(owner, symbol, value, symbolKey) {
   const descriptor = Object.getOwnPropertyDescriptor(owner, symbol);
@@ -850,7 +1167,11 @@ function assertNoRootMarkerOrListenerLeak(container, document) {
   assert.equal(document.__registrations.length, 0);
 }
 
-function assertPublicRenderFailureDoesNotLeak(element, label) {
+function assertPublicRenderFailureDoesNotLeak(
+  element,
+  label,
+  assertNoCapabilityEffects = () => {}
+) {
   const document = createDocument(`public-create-root-${label}`);
   const container = document.createElement('div');
   document.__mutationLog.length = 0;
@@ -866,32 +1187,30 @@ function assertPublicRenderFailureDoesNotLeak(element, label) {
       exportName: 'createRoot().render'
     }
   );
-  assert.equal(container.childNodes.length, 0);
-  assert.equal(container.children.length, 0);
-  assert.equal(container.firstElementChild, null);
-  assert.equal(container.innerHTML, '');
-  assert.equal(container.textContent, '');
-  assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
-  assert.equal(listenerRegistry.hasListeningMarker(container), false);
-  assert.equal(listenerRegistry.hasListeningMarker(document), false);
-  assert.equal(container.__registrations.length, 0);
-  assert.equal(document.__registrations.length, 0);
-  assert.equal(container.__mutationLog.length, 0);
-  assert.equal(document.__mutationLog.length, 0);
+  assertContainerUntouched(container, document);
+  assertNoCapabilityEffects();
 }
 
-function assertPublicRenderUpdateFailureDoesNotLeak(element, label) {
+function assertPublicRenderUpdateFailureDoesNotLeak(
+  element,
+  label,
+  assertNoCapabilityEffects = () => {}
+) {
   const document = createDocument(`public-create-root-update-${label}`);
   const container = document.createElement('div');
   document.__mutationLog.length = 0;
   const root = reactDomClient.createRoot(container);
+  const acceptedElement = React.createElement('div', {id: 'safe'}, 'safe');
 
-  assert.equal(
-    root.render(React.createElement('div', {id: 'safe'}, 'safe')),
-    undefined
-  );
+  assert.equal(root.render(acceptedElement), undefined);
   const initialHostNode = container.firstChild;
+  const latestPropsBefore = componentTree.getLatestPropsFromNode(
+    initialHostNode
+  );
+  const stateBefore = summarizePublicRenderState(container, document);
   assert.equal(container.innerHTML, '<div id="safe">safe</div>');
+  assert.equal(initialHostNode.getAttribute('id'), 'safe');
+  assert.equal(latestPropsBefore, acceptedElement.props);
 
   assert.throws(
     () => {
@@ -903,16 +1222,66 @@ function assertPublicRenderUpdateFailureDoesNotLeak(element, label) {
       exportName: 'createRoot().render'
     }
   );
+  const latestPropsAfter = componentTree.getLatestPropsFromNode(
+    container.firstChild
+  );
   assert.equal(container.childNodes.length, 1);
   assert.equal(container.children.length, 1);
   assert.equal(container.firstElementChild, initialHostNode);
   assert.equal(container.firstChild, initialHostNode);
   assert.equal(container.firstChild.getAttribute('id'), 'safe');
+  assert.equal(latestPropsAfter, latestPropsBefore);
+  assert.equal(latestPropsAfter, acceptedElement.props);
+  assert.deepEqual(
+    summarizePublicRenderState(container, document),
+    stateBefore
+  );
   assert.equal(container.innerHTML, '<div id="safe">safe</div>');
   assert.equal(container.textContent, 'safe');
   assertNoRootMarkerOrListenerLeak(container, document);
   assert.equal(container.__mutationLog.length, 1);
   assert.equal(document.__mutationLog.length, 2);
+  assertNoCapabilityEffects();
+}
+
+function summarizePublicRenderState(container, document) {
+  const firstChild = container.firstChild;
+  return {
+    attributes: firstChild === null ? null : attributeEntries(firstChild),
+    childNodeNames: container.childNodes.map((child) => child.nodeName),
+    childNodesLength: container.childNodes.length,
+    childrenLength: container.children.length,
+    documentMutationLog: summarizeMutationLog(document.__mutationLog),
+    firstChildGetAttributeId:
+      firstChild === null ? null : firstChild.getAttribute('id'),
+    firstChildInnerHTML: firstChild === null ? null : firstChild.innerHTML,
+    firstChildNodeName: firstChild === null ? null : firstChild.nodeName,
+    firstChildTextContent: firstChild === null ? null : firstChild.textContent,
+    innerHTML: container.innerHTML,
+    mutationLog: summarizeMutationLog(container.__mutationLog),
+    textContent: container.textContent
+  };
+}
+
+function summarizeMutationLog(mutationLog) {
+  return mutationLog.map((entry) => ({
+    beforeChild: entry.beforeChild?.nodeName ?? null,
+    child: entry.child?.nodeName ?? null,
+    nodeName: entry.nodeName ?? null,
+    type: entry.type,
+    value: Object.prototype.hasOwnProperty.call(entry, 'value')
+      ? String(entry.value)
+      : null
+  }));
+}
+
+function attributeEntries(node) {
+  if (!(node.attributes instanceof Map)) {
+    return null;
+  }
+  return [...node.attributes.entries()].sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
 }
 
 function createDocument(label) {
@@ -1371,6 +1740,314 @@ function createEventTarget(fields) {
       return child;
     }
   };
+}
+`;
+}
+
+function createRenderCapabilityRejectionSpyScript(packageRootPath) {
+  return `
+'use strict';
+
+const path = require('node:path');
+const packageRoot = ${JSON.stringify(packageRootPath)};
+const rootBridgePath = path.join(packageRoot, 'src/client/root-bridge.js');
+const rootBridgeCacheKey = require.resolve(rootBridgePath);
+const adapterRenderLabels = [];
+const freshErrors = [];
+const postAcceptedErrors = [];
+const expectedLabels = ${JSON.stringify(publicRenderCapabilityRejectionLabels)};
+let adapterCreateRootCalls = 0;
+let adapterRenderCalls = 0;
+let currentRenderLabel = null;
+let eventCallbackCalls = 0;
+let formCallbackCalls = 0;
+let refCallbackCalls = 0;
+const objectRef = {current: null};
+
+const rootBridge = Object.freeze({
+  privateRootPublicFacadeAdapterSymbol: Symbol.for(
+    'fast.react_dom.client.private_root_public_facade_adapter'
+  ),
+  privateRootPublicFacadePreflightSymbol: Symbol.for(
+    'fast.react_dom.client.private_root_public_facade_preflight'
+  ),
+  privateHydrateRootPublicFacadePreflightSymbol: Symbol.for(
+    'fast.react_dom.client.private_hydrate_root_public_facade_preflight'
+  ),
+  createPrivateRootPublicFacadeAdapter() {
+    return {
+      createRoot() {
+        adapterCreateRootCalls++;
+        return {
+          render() {
+            adapterRenderCalls++;
+            adapterRenderLabels.push(currentRenderLabel);
+          },
+          unmount() {}
+        };
+      }
+    };
+  },
+  createPrivateRootPublicFacadePreflight() {
+    return {};
+  },
+  createPrivateHydrateRootPublicFacadePreflight() {
+    return {};
+  }
+});
+
+require.cache[rootBridgeCacheKey] = {
+  id: rootBridgeCacheKey,
+  filename: rootBridgeCacheKey,
+  loaded: true,
+  exports: rootBridge
+};
+
+const client = require(path.join(packageRoot, 'client.js'));
+const React = require(path.join(packageRoot, '..', 'react', 'index.js'));
+const root = client.createRoot({});
+
+for (const rejectionCase of createCases()) {
+  renderExpectingRejection(root, rejectionCase, freshErrors);
+}
+
+currentRenderLabel = 'accepted-minimal-div';
+root.render(React.createElement('div', {id: 'safe'}, 'safe'));
+currentRenderLabel = null;
+
+for (const rejectionCase of createCases()) {
+  renderExpectingRejection(root, rejectionCase, postAcceptedErrors);
+}
+
+process.stdout.write(JSON.stringify({
+  adapterCreateRootCalls,
+  adapterRenderCalls,
+  adapterRenderLabels,
+  eventCallbackCalls,
+  formCallbackCalls,
+  freshErrors,
+  freshRejectedLabels: freshErrors.map((error) => error.label),
+  objectRefCurrent: objectRef.current,
+  postAcceptedErrors,
+  postAcceptedRejectedLabels: postAcceptedErrors.map((error) => error.label),
+  refCallbackCalls
+}));
+
+function renderExpectingRejection(root, rejectionCase, errors) {
+  currentRenderLabel = rejectionCase.label;
+  try {
+    root.render(rejectionCase.element);
+    errors.push({
+      label: rejectionCase.label,
+      status: 'ok'
+    });
+  } catch (error) {
+    errors.push({
+      code: error.code,
+      entrypoint: error.entrypoint,
+      exportName: error.exportName,
+      label: rejectionCase.label,
+      status: 'throws'
+    });
+  } finally {
+    currentRenderLabel = null;
+  }
+}
+
+function createCases() {
+  const fragmentType = React.Fragment || Symbol.for('react.fragment');
+  return [
+    eventCase('unsupported-onClick-prop', 'onClick'),
+    eventCase('unsupported-onClickCapture-prop', 'onClickCapture'),
+    eventCase('unsupported-onSubmit-prop', 'onSubmit'),
+    eventCase('unsupported-onChange-prop', 'onChange'),
+    {
+      label: 'unsupported-callback-ref-prop',
+      element: React.createElement(
+        'div',
+        {
+          ref() {
+            refCallbackCalls++;
+          }
+        },
+        'blocked ref'
+      )
+    },
+    {
+      label: 'unsupported-object-ref-prop',
+      element: React.createElement('div', {ref: objectRef}, 'blocked ref')
+    },
+    {
+      label: 'unsupported-className-prop',
+      element: React.createElement('div', {className: 'blocked'}, 'blocked')
+    },
+    {
+      label: 'unsupported-style-prop',
+      element: React.createElement(
+        'div',
+        {style: {color: 'red'}},
+        'blocked style'
+      )
+    },
+    {
+      label: 'unsupported-dangerouslySetInnerHTML-prop',
+      element: React.createElement('div', {
+        dangerouslySetInnerHTML: {__html: '<span>blocked</span>'}
+      })
+    },
+    {
+      label: 'unsupported-keyed-div',
+      element: React.createElement('div', {key: 'blocked'}, 'blocked key')
+    },
+    {
+      label: 'unsupported-span-type',
+      element: React.createElement('span', null, 'blocked type')
+    },
+    {
+      label: 'unsupported-nested-child',
+      element: React.createElement(
+        'div',
+        null,
+        React.createElement('span', null, 'blocked nested')
+      )
+    },
+    {
+      label: 'unsupported-fragment',
+      element: React.createElement(
+        fragmentType,
+        null,
+        React.createElement('div', null, 'blocked fragment')
+      )
+    },
+    {
+      label: 'unsupported-array',
+      element: [
+        React.createElement('div', {key: 'array'}, 'blocked array')
+      ]
+    },
+    {
+      label: 'unsupported-suppressHydrationWarning-prop',
+      element: React.createElement(
+        'div',
+        {suppressHydrationWarning: true},
+        'blocked hydration prop'
+      )
+    },
+    {
+      label: 'unsupported-id-object',
+      element: React.createElement('div', {id: {}}, 'blocked id')
+    },
+    {
+      label: 'unsupported-link-resource-type',
+      element: React.createElement('link', {
+        href: '/blocked.css',
+        rel: 'stylesheet'
+      })
+    },
+    {
+      label: 'unsupported-script-resource-type',
+      element: React.createElement('script', {src: '/blocked.js'})
+    },
+    {
+      label: 'unsupported-style-resource-type',
+      element: React.createElement('style', null, '.blocked{}')
+    },
+    formCase('unsupported-form-type', 'form', 'action'),
+    {
+      label: 'unsupported-input-type',
+      element: React.createElement('input', {
+        checked: true,
+        defaultValue: 'fallback',
+        name: 'blocked-input',
+        type: 'checkbox',
+        value: 'blocked'
+      })
+    },
+    formCase('unsupported-button-type', 'button', 'formAction'),
+    {
+      label: 'unsupported-textarea-type',
+      element: React.createElement('textarea', {
+        defaultValue: 'fallback',
+        name: 'blocked-textarea',
+        value: 'blocked'
+      })
+    },
+    formCase('unsupported-action-prop', 'div', 'action'),
+    formCase('unsupported-formAction-prop', 'div', 'formAction'),
+    {
+      label: 'unsupported-value-prop',
+      element: React.createElement('div', {value: 'blocked'}, 'blocked value')
+    },
+    {
+      label: 'unsupported-defaultValue-prop',
+      element: React.createElement(
+        'div',
+        {defaultValue: 'blocked'},
+        'blocked defaultValue'
+      )
+    },
+    {
+      label: 'unsupported-checked-prop',
+      element: React.createElement('div', {checked: true}, 'blocked checked')
+    },
+    {
+      label: 'unsupported-name-prop',
+      element: React.createElement('div', {name: 'blocked'}, 'blocked name')
+    },
+    {
+      label: 'unsupported-type-prop',
+      element: React.createElement(
+        'div',
+        {type: 'button'},
+        'blocked type prop'
+      )
+    },
+    {
+      label: 'unsupported-component',
+      element: React.createElement(function UnsupportedComponent() {
+        return React.createElement('div', null, 'blocked component');
+      })
+    }
+  ];
+}
+
+function eventCase(label, propName) {
+  return {
+    label,
+    element: React.createElement(
+      'div',
+      {
+        [propName]() {
+          eventCallbackCalls++;
+        }
+      },
+      \`blocked \${propName}\`
+    )
+  };
+}
+
+function formCase(label, type, propName) {
+  return {
+    label,
+    element: React.createElement(
+      type,
+      {
+        [propName]() {
+          formCallbackCalls++;
+        }
+      },
+      \`blocked \${propName}\`
+    )
+  };
+}
+
+if (
+  freshErrors.map((error) => error.label).join('\\n') !==
+    expectedLabels.join('\\n') ||
+  postAcceptedErrors.map((error) => error.label).join('\\n') !==
+    expectedLabels.join('\\n')
+) {
+  throw new Error('Public render rejection labels drifted.');
 }
 `;
 }

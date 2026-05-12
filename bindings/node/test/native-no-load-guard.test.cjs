@@ -108,6 +108,26 @@ function createForbiddenLoadFixtureMatrix() {
   );
   writeFixtureFile(
     tempDir,
+    'cjs-optional-native-package-entry.cjs',
+    "'use strict';\nrequire('@fast-react/native-linux-x64-gnu');\n"
+  );
+  writeFixtureFile(
+    tempDir,
+    'cjs-child-process-entry.cjs',
+    "'use strict';\nrequire('child_process');\n"
+  );
+  writeFixtureFile(
+    tempDir,
+    'cjs-http-entry.cjs',
+    "'use strict';\nrequire('http');\n"
+  );
+  writeFixtureFile(
+    tempDir,
+    'cjs-https-entry.cjs',
+    "'use strict';\nrequire('https');\n"
+  );
+  writeFixtureFile(
+    tempDir,
     'cjs-native-addon-entry.cjs',
     "'use strict';\nrequire('./native-addon-probe');\n"
   );
@@ -144,6 +164,26 @@ function createForbiddenLoadFixtureMatrix() {
   );
   writeFixtureFile(
     tempDir,
+    'esm-optional-native-package-entry.mjs',
+    "import '@fast-react/native-linux-x64-gnu';\n"
+  );
+  writeFixtureFile(
+    tempDir,
+    'esm-child-process-entry.mjs',
+    "import 'node:child_process';\n"
+  );
+  writeFixtureFile(
+    tempDir,
+    'esm-http-entry.mjs',
+    "import 'node:http';\n"
+  );
+  writeFixtureFile(
+    tempDir,
+    'esm-https-entry.mjs',
+    "import 'node:https';\n"
+  );
+  writeFixtureFile(
+    tempDir,
     'esm-dynamic-native-addon-entry.mjs',
     "await import('./native-addon-probe.node');\n"
   );
@@ -153,14 +193,33 @@ function createForbiddenLoadFixtureMatrix() {
       tempDir,
       'cjs-dynamic-native-addon-entry.cjs'
     ),
+    cjsChildProcessEntry: path.join(tempDir, 'cjs-child-process-entry.cjs'),
+    cjsHttpEntry: path.join(tempDir, 'cjs-http-entry.cjs'),
+    cjsHttpsEntry: path.join(tempDir, 'cjs-https-entry.cjs'),
     cjsNativeAddonEntry: path.join(tempDir, 'cjs-native-addon-entry.cjs'),
     cjsNodeWorkerEntry: path.join(tempDir, 'cjs-node-worker-entry.cjs'),
+    cjsOptionalNativePackageEntry: path.join(
+      tempDir,
+      'cjs-optional-native-package-entry.cjs'
+    ),
     cjsWorkerEntry: path.join(tempDir, 'cjs-worker-entry.cjs'),
+    esmChildProcessEntry: pathToFileURL(
+      path.join(tempDir, 'esm-child-process-entry.mjs')
+    ).href,
     esmDynamicNativeAddonEntry: pathToFileURL(
       path.join(tempDir, 'esm-dynamic-native-addon-entry.mjs')
     ).href,
     esmDynamicNodeWorkerEntry: pathToFileURL(
       path.join(tempDir, 'esm-dynamic-node-worker-entry.mjs')
+    ).href,
+    esmHttpEntry: pathToFileURL(
+      path.join(tempDir, 'esm-http-entry.mjs')
+    ).href,
+    esmHttpsEntry: pathToFileURL(
+      path.join(tempDir, 'esm-https-entry.mjs')
+    ).href,
+    esmOptionalNativePackageEntry: pathToFileURL(
+      path.join(tempDir, 'esm-optional-native-package-entry.mjs')
     ).href,
     esmWorkerEntry: pathToFileURL(
       path.join(tempDir, 'esm-worker-entry.mjs')
@@ -1106,6 +1165,26 @@ async function runForbiddenLoadFixtureMatrix() {
       { kind: 'module-load', request: 'node:worker_threads' }
     );
     await assertForbiddenLoad(
+      'CommonJS optional native package require',
+      () => require(fixtures.cjsOptionalNativePackageEntry),
+      { kind: 'module-load', request: '@fast-react/native-linux-x64-gnu' }
+    );
+    await assertForbiddenLoad(
+      'CommonJS child_process require',
+      () => require(fixtures.cjsChildProcessEntry),
+      { kind: 'module-load', request: 'child_process' }
+    );
+    await assertForbiddenLoad(
+      'CommonJS http require',
+      () => require(fixtures.cjsHttpEntry),
+      { kind: 'module-load', request: 'http' }
+    );
+    await assertForbiddenLoad(
+      'CommonJS https require',
+      () => require(fixtures.cjsHttpsEntry),
+      { kind: 'module-load', request: 'https' }
+    );
+    await assertForbiddenLoad(
       'transitive CommonJS .node extension resolution',
       () => require(fixtures.cjsNativeAddonEntry),
       { kind: 'node-extension', request: fixtures.nativeAddonPath }
@@ -1124,6 +1203,26 @@ async function runForbiddenLoadFixtureMatrix() {
       'dynamic ESM node:worker_threads import',
       () => import(fixtures.esmDynamicNodeWorkerEntry),
       { kind: 'module-resolve', request: 'node:worker_threads' }
+    );
+    await assertForbiddenLoad(
+      'ESM optional native package import',
+      () => import(fixtures.esmOptionalNativePackageEntry),
+      { kind: 'module-resolve', request: '@fast-react/native-linux-x64-gnu' }
+    );
+    await assertForbiddenLoad(
+      'ESM node:child_process import',
+      () => import(fixtures.esmChildProcessEntry),
+      { kind: 'module-resolve', request: 'node:child_process' }
+    );
+    await assertForbiddenLoad(
+      'ESM node:http import',
+      () => import(fixtures.esmHttpEntry),
+      { kind: 'module-resolve', request: 'node:http' }
+    );
+    await assertForbiddenLoad(
+      'ESM node:https import',
+      () => import(fixtures.esmHttpsEntry),
+      { kind: 'module-resolve', request: 'node:https' }
     );
     await assertForbiddenLoad(
       'dynamic ESM .node import',
