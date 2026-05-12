@@ -46,8 +46,8 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline before this docs
-refresh is main `5043c3bd`
-(`Merge worker 1176 public createRoot minimal host output`). Accepted
+refresh is main `8a84a8dc`
+(`Merge worker 1200 public unmount smoke repair`). Accepted
 implementation, cleanup, planning, and docs-only history through that commit is
 recorded in `MASTER_PROGRESS.md`; this plan lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
@@ -55,7 +55,7 @@ Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted facts through main `5043c3bd` are recorded in
+- Accepted facts through main `8a84a8dc` are recorded in
   `MASTER_PROGRESS.md`.
 - No later worker output is listed as live accepted input in this plan
   snapshot.
@@ -64,13 +64,14 @@ Current orchestration queue:
   render handoff admission, plus the minimal public
   `react-dom/client.createRoot(container)` ->
   `root.render(React.createElement('div', {id?}, text|number))` fake-DOM
-  host-output path, is to preserve the private reconciler diagnostic path,
-  source-owned execution-surface blockers, repaired no-load guard ledger
-  evidence, React DOM native-compatibility alias denylists, and
-  public/native/browser-DOM capability rejection while proving any later
-  private NAPI/adapter handoff or public root lifecycle extension.
+  host-output path, same-root repeat div/text fake-DOM update, rendered-root
+  unmount cleanup, and aligned public-unmount smoke, is to preserve the private
+  reconciler diagnostic path, source-owned execution-surface blockers, repaired
+  no-load guard ledger evidence, React DOM native-compatibility alias denylists,
+  and public/native/browser-DOM capability rejection while proving any later
+  private NAPI/adapter handoff or broader public root lifecycle extension.
 
-Current project-owned source/test large-file baseline after main `5043c3bd`,
+Current project-owned source/test large-file baseline after main `8a84a8dc`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -94,9 +95,11 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `5043c3bd` includes only
-the minimal public fake-DOM div/text `createRoot().render(...)` path above.
-Public root update/unmount, broader public root rendering, real `.node`
+Accepted compatibility evidence through current main `8a84a8dc` includes only
+the minimal public fake-DOM div/text `createRoot().render(...)` path above,
+Worker 1194's same-root repeat fake-DOM div/text update and rendered-root
+unmount cleanup, and Worker 1200's smoke alignment with those expectations.
+Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 `act`, `react-dom/test-utils.act`, `flushSync`, Scheduler timing,
 test-renderer public behavior, resources/forms, public input/change or
@@ -110,22 +113,27 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `5043c3bd` as
+1. Treat accepted compatibility evidence through current main `8a84a8dc` as
    private evidence, negative public evidence, package-private adapter evidence,
-   file-organization/planning evidence, or Worker 1176's narrow public
-   fake-DOM host-output proof only. In particular, Worker 1148 is large-file
-   planning only; Workers 1144 and 1147 only add crate-private NAPI metadata
-   JSON adapter/admission paths; Worker 1157 proves only a private HTML-like
-   host commit canary; Worker 1156 only admits symbol-private native React DOM
-   render handoff metadata; Worker 1176 proves only minimal public
+   file-organization/planning evidence, Worker 1176's narrow public fake-DOM
+   host-output proof, Worker 1194's narrow public same-root repeat div/text
+   fake-DOM update and rendered-root unmount cleanup proof, or Worker 1200's
+   smoke repair for that lifecycle slice only. In particular, Worker 1148 is
+   large-file planning only; Workers 1144 and 1147 only add crate-private NAPI
+   metadata JSON adapter/admission paths; Worker 1157 proves only a private
+   HTML-like host commit canary; Worker 1156 only admits symbol-private native
+   React DOM render handoff metadata; Worker 1176 proves only minimal public
    `react-dom/client.createRoot(container)` plus one initial div/text
-   `root.render(...)` through the fake-DOM adapter. Public root update/unmount,
-   broad native, browser DOM, test-renderer, Scheduler, `act`,
-   `react-dom/test-utils.act`, hydration, refs/listeners/events, resource/form,
-   public controlled-input, serialization, React Children lazy/full traversal,
-   unsupported hook, `flushSync`, real `.node` loading/N-API runtime, broad
-   package, and broad renderer compatibility still require fail-closed gates
-   and dual-run oracle evidence.
+   `root.render(...)` through the fake-DOM adapter; Worker 1194 proves only the
+   repeat div/text fake-DOM update and rendered-root `root.unmount()` cleanup;
+   Worker 1200 only repairs a smoke test to match those accepted expectations.
+   Broad public root render/update/unmount, broad native, browser DOM,
+   test-renderer, Scheduler, `act`, `react-dom/test-utils.act`, hydration,
+   refs/listeners/events, resource/form, public controlled-input,
+   serialization, React Children lazy/full traversal, unsupported hook,
+   `flushSync`, real `.node` loading/N-API runtime, broad package, and broad
+   renderer compatibility still require fail-closed gates and dual-run oracle
+   evidence.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct
@@ -344,10 +352,13 @@ canonical evidence requirements.
   metadata factory, Worker 1120's reconciler diagnostic export, Worker 1126's
   native factory contract, Worker 1130's Rust metadata shape, Worker 1129's
   NAPI diagnostic probe, Worker 1133's diagnostic-backed NAPI metadata, and
-  Worker 1176's minimal public div/text fake-DOM host-output row. Broader
-  public root rendering remains blocked until later workers prove update,
-  unmount, browser DOM mutation, listener/root marker behavior, lifecycle
-  prerequisites, and package compatibility against React 19.2.6.
+  Worker 1176's minimal public div/text fake-DOM host-output row, plus Worker
+  1194's minimal repeat div/text fake-DOM update and rendered-root unmount rows
+  and Worker 1200's aligned smoke repair. Broader public root rendering remains
+  blocked outside that accepted fake-DOM div/text lifecycle slice until later
+  workers prove additional render/update/unmount shapes, browser DOM mutation,
+  listener/root marker behavior, lifecycle prerequisites, and package
+  compatibility against React 19.2.6.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, the text-patch admission ledger, Worker 887's
@@ -374,6 +385,7 @@ canonical evidence requirements.
   serialization or native bridge execution.
 
 Premature until later gates are green: broad public React DOM root
-render/update/unmount, public `act`, public `react-dom/test-utils.act`, public
-`flushSync`, public Scheduler timing, public hydration, resources, forms,
-controlled inputs, unsupported hooks, and event dispatch.
+render/update/unmount beyond the accepted minimal fake-DOM div/text lifecycle,
+public `act`, public `react-dom/test-utils.act`, public `flushSync`, public
+Scheduler timing, public hydration, resources, forms, controlled inputs,
+unsupported hooks, and event dispatch.
