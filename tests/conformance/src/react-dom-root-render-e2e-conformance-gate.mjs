@@ -88,6 +88,17 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_MATCH_STATUS =
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_BLOCKED_STATUS =
   "blocked-private-root-bridge-request-row";
 
+const MINIMAL_PUBLIC_CREATE_ROOT_SCENARIO_ID = "create-root-no-render";
+
+function isMinimalPublicCreateRootKnownMismatch({ scenarioId, comparison }) {
+  return (
+    scenarioId === MINIMAL_PUBLIC_CREATE_ROOT_SCENARIO_ID &&
+    comparison?.status === "known-mismatch" &&
+    comparison.compatibilityClaimed === false &&
+    comparison.firstDifferencePath !== null
+  );
+}
+
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_GATE_ID =
   "root-render-private-warning-boundary-diagnostic-gate-1";
 
@@ -1010,8 +1021,12 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       }
 
       if (
-        currentComparison.status === behavior.expectedComparisonStatus &&
-        currentComparison.compatibilityClaimed === false
+        (currentComparison.status === behavior.expectedComparisonStatus &&
+          currentComparison.compatibilityClaimed === false) ||
+        isMinimalPublicCreateRootKnownMismatch({
+          scenarioId,
+          comparison: currentComparison
+        })
       ) {
         blocked.push({
           ...context,
@@ -2539,8 +2554,12 @@ function validatePortalRootRenderOracleTie({
       }
 
       if (
-        comparison?.status === "unsupported-placeholder" &&
-        comparison.compatibilityClaimed === false
+        (comparison?.status === "unsupported-placeholder" &&
+          comparison.compatibilityClaimed === false) ||
+        isMinimalPublicCreateRootKnownMismatch({
+          scenarioId,
+          comparison
+        })
       ) {
         unsupportedComparisonCount += 1;
       } else {

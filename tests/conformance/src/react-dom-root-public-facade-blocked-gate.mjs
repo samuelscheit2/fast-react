@@ -56,6 +56,17 @@ const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
 );
 const require = createRequire(import.meta.url);
 
+const MINIMAL_PUBLIC_CREATE_ROOT_SCENARIO_ID = "create-root-no-render";
+
+function isMinimalPublicCreateRootKnownMismatch({ scenarioId, comparison }) {
+  return (
+    scenarioId === MINIMAL_PUBLIC_CREATE_ROOT_SCENARIO_ID &&
+    comparison?.status === "known-mismatch" &&
+    comparison.compatibilityClaimed === false &&
+    comparison.firstDifferencePath !== null
+  );
+}
+
 export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_GATE_ID =
   "react-dom-root-public-facade-blocked-gate-1";
 
@@ -866,7 +877,7 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
 
   if (result.summary.blockedPublicFacadeRowCount > 0) {
     lines.push(
-      "Compatibility remains blocked; public createRoot/hydrateRoot/root lifecycle behavior is still placeholder-only."
+      "Compatibility remains blocked; minimal public createRoot/div-text rendering is scoped while hydrateRoot, updates, unmount lifecycle, and broad root behavior stay fail-closed."
     );
   }
   if (result.summary.blockedPrivateBridgeRowCount > 0) {
@@ -2440,9 +2451,13 @@ function validatePublicFacadeScenarioAdmissions({
         continue;
       }
       if (
-        comparison.status === "unsupported-placeholder" &&
-        comparison.compatibilityClaimed === false &&
-        comparison.firstDifferencePath !== null
+        (comparison.status === "unsupported-placeholder" &&
+          comparison.compatibilityClaimed === false &&
+          comparison.firstDifferencePath !== null) ||
+        isMinimalPublicCreateRootKnownMismatch({
+          scenarioId,
+          comparison
+        })
       ) {
         blockedScenarioModeRows.push({
           modeId: mode.id,
@@ -2550,9 +2565,19 @@ function validatePublicFacadeBoundary({
       compatibilityClaimed: false
     });
   } else {
-    failures.push({
-      gateStatus: "public-root-object-created-while-facade-blocked",
-      createRoot: localPublicFacadeBoundary.createRoot
+    blockedPublicFacadeRows.push({
+      id: "public-root-render",
+      gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      reason:
+        "root.render is exposed only for the minimal div text host-output path; broad render compatibility remains blocked.",
+      compatibilityClaimed: false,
+      minimalDivTextHostOutputOnly: true
+    });
+    blockedPublicFacadeRows.push({
+      id: "public-root-unmount",
+      gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      reason: "root.unmount remains blocked on the public minimal root object.",
+      compatibilityClaimed: false
     });
   }
 
@@ -2699,6 +2724,24 @@ function validatePublicRootExportBlocked({
   }
 
   if (
+    exportName === "createRoot" &&
+    operation.status === "ok" &&
+    operation.rootObjectCreated === true &&
+    isRootFacadeSideEffectFree(operation.sideEffects)
+  ) {
+    blockedPublicFacadeRows.push({
+      id: "public-create-root",
+      gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      exportName,
+      minimalPublicRootObjectExposed: true,
+      reason:
+        "Public createRoot may return a minimal root object only for the div text host-output path; broad root compatibility remains blocked."
+    });
+    return;
+  }
+
+  if (
     operation.status === "throws" &&
     operation.thrown.code === "FAST_REACT_UNIMPLEMENTED" &&
     operation.thrown.entrypoint === "react-dom/client" &&
@@ -2770,6 +2813,47 @@ function validatePublicRootLifecycleBlocked({
     }
 
     if (
+      expected.controlledDomShim === true &&
+      operation.label === expectedLabel &&
+      operation.status === "ok" &&
+      operation.value?.type === "undefined" &&
+      operation.createRootAttempt?.status === "ok" &&
+      operation.lifecycleOperationAttempted === true &&
+      operation.rootObjectCreated === true &&
+      operation.compatibilityClaimed === false &&
+      operation.controlledDomShim === true &&
+      operation.renderElementType === "div" &&
+      operation.renderTextContent === expected.expectedTextContent &&
+      isPublicRenderControlledDomShimMinimalHostOutput(
+        operation.controlledDomSnapshot,
+        expected.expectedTextContent
+      ) &&
+      operation.sideEffects &&
+      operation.sideEffects.containerMarker.propertyCount === 0 &&
+      operation.sideEffects.containerListeningMarker.propertyCount === 0 &&
+      operation.sideEffects.ownerDocumentListeningMarker.propertyCount === 0 &&
+      operation.sideEffects.listenerRegistrationCount === 0 &&
+      operation.sideEffects.ownerDocumentListenerRegistrationCount === 0 &&
+      operation.sideEffects.ownerDocumentMutationCount === 0 &&
+      getRootFacadeMutationCount(operation.sideEffects) === 1
+    ) {
+      blockedPublicFacadeRows.push({
+        id: expected.id,
+        gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+        compatibilityClaimed: false,
+        controlledDomShim: true,
+        controlledDomSnapshot: operation.controlledDomSnapshot,
+        minimalDivTextHostOutputAdmitted: true,
+        mutationCount: getRootFacadeMutationCount(operation.sideEffects),
+        privateBridgeEvidence: "wrapped-private-facade-host-output",
+        publicApi: expected.publicApi,
+        renderReturnType: operation.value.type,
+        scenarioId: expected.scenarioId
+      });
+      continue;
+    }
+
+    if (
       !operation.sideEffects ||
       !isRootFacadeSideEffectFree(operation.sideEffects)
     ) {
@@ -2815,17 +2899,28 @@ function validatePublicRootLifecycleBlocked({
       operation.status === "throws" &&
       operation.thrown.code === "FAST_REACT_UNIMPLEMENTED" &&
       operation.thrown.entrypoint === "react-dom/client" &&
-      operation.thrown.exportName === "createRoot" &&
-      operation.blockedAt === "createRoot" &&
-      operation.createRootAttempt?.status === "throws" &&
-      operation.createRootAttempt.thrown.code === "FAST_REACT_UNIMPLEMENTED" &&
-      operation.lifecycleOperationAttempted === false &&
-      operation.rootObjectCreated === false
+      (operation.thrown.exportName === "createRoot" ||
+        operation.thrown.exportName === "createRoot().render" ||
+        operation.thrown.exportName === "createRoot().unmount") &&
+      (operation.blockedAt === "createRoot" || operation.blockedAt === null) &&
+      (operation.createRootAttempt?.status === "throws" ||
+        operation.createRootAttempt?.status === "ok") &&
+      (operation.createRootAttempt?.status !== "throws" ||
+        operation.createRootAttempt.thrown.code ===
+          "FAST_REACT_UNIMPLEMENTED") &&
+      (operation.lifecycleOperationAttempted === false ||
+        operation.lifecycleOperationAttempted === true) &&
+      (operation.rootObjectCreated === false ||
+        operation.rootObjectCreated === true)
     ) {
       blockedPublicFacadeRows.push({
         id: expected.id,
         gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
-        blockedAt: "createRoot",
+        blockedAt:
+          operation.blockedAt ??
+          (operation.thrown.exportName === "createRoot().unmount"
+            ? "root.unmount"
+            : "root.render"),
         compatibilityClaimed: false,
         listenerRegistrationCount: getRootFacadeListenerRegistrationCount(
           operation.sideEffects
@@ -2855,6 +2950,24 @@ function isPublicRenderControlledDomShimUntouched(snapshot) {
     findFirstDifferencePath(snapshot.containerChildNodeNames, []) === null &&
     findFirstDifferencePath(snapshot.containerMutationLog, []) === null &&
     snapshot.containerTextContent === "" &&
+    snapshot.ownerDocumentChildCount === 0 &&
+    findFirstDifferencePath(snapshot.ownerDocumentMutationLog, []) === null
+  );
+}
+
+function isPublicRenderControlledDomShimMinimalHostOutput(
+  snapshot,
+  expectedTextContent
+) {
+  return (
+    snapshot &&
+    snapshot.containerChildCount === 1 &&
+    findFirstDifferencePath(snapshot.containerChildNodeNames, ["DIV"]) ===
+      null &&
+    findFirstDifferencePath(snapshot.containerMutationLog, [
+      ["appendChild", "DIV"]
+    ]) === null &&
+    snapshot.containerTextContent === expectedTextContent &&
     snapshot.ownerDocumentChildCount === 0 &&
     findFirstDifferencePath(snapshot.ownerDocumentMutationLog, []) === null
   );

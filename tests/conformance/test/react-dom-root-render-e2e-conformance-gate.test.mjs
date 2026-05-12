@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
+const React = require("../../../packages/react/index.js");
 const reactDomClient = require("../../../packages/react-dom/client.js");
 const componentTree = require(
   "../../../packages/react-dom/src/client/component-tree.js"
@@ -54,9 +55,7 @@ test("root render E2E gate keeps private render native handoff metadata below pu
     true
   );
   assert.equal(payload.nativeHandoffRecord.nativeExecution, false);
-  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
-    code: "FAST_REACT_UNIMPLEMENTED"
-  });
+  assertPublicCreateRootMinimalHostOutput(document);
 
   payload.bridge.cleanupInitialRenderHostOutput(payload.hostOutputHandoff);
 });
@@ -112,9 +111,7 @@ test("root render E2E gate accepts private facade root.render fake-DOM execution
     adapter.getRootRequestRecords(root).map((record) => record.requestType),
     ["createRoot", "root.render"]
   );
-  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
-    code: "FAST_REACT_UNIMPLEMENTED"
-  });
+  assertPublicCreateRootMinimalHostOutput(document);
 
   payload.bridge.cleanupInitialRenderHostOutput(payload.hostOutputHandoff);
 });
@@ -232,9 +229,7 @@ test("root render E2E gate accepts private nested initial host output below publ
     childElement.props
   );
   assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
-  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
-    code: "FAST_REACT_UNIMPLEMENTED"
-  });
+  assertPublicCreateRootMinimalHostOutput(document);
 
   const cleanup = bridge.cleanupInitialRenderHostOutput(
     payload.hostOutputHandoff
@@ -350,9 +345,7 @@ test("root render E2E gate accepts private facade root.render unkeyed fragment a
     adapter.getRootRequestRecords(root).map((record) => record.requestType),
     ["createRoot", "root.render"]
   );
-  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
-    code: "FAST_REACT_UNIMPLEMENTED"
-  });
+  assertPublicCreateRootMinimalHostOutput(document);
 
   payload.bridge.cleanupInitialRenderHostOutput(payload.hostOutputHandoff);
 });
@@ -485,9 +478,7 @@ test("private facade root.render update mutates one fake DOM property and text p
     ["data-phase", "stable"],
     ["id", "conformance-host"]
   ]);
-  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
-    code: "FAST_REACT_UNIMPLEMENTED"
-  });
+  assertPublicCreateRootMinimalHostOutput(document);
 
   const initialPayload =
     rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
@@ -584,9 +575,7 @@ test("root render E2E gate keeps private facade root.unmount cleanup below publi
     ).active,
     false
   );
-  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
-    code: "FAST_REACT_UNIMPLEMENTED"
-  });
+  assertPublicCreateRootMinimalHostOutput(document);
 });
 
 test("root render E2E gate links private facade root.unmount cleanup to ref detach and passive destroy evidence only", () => {
@@ -668,9 +657,7 @@ test("root render E2E gate links private facade root.unmount cleanup to ref deta
   assert.equal(cleanup.compatibilityClaimed, false);
   assert.equal(payload.unmountRefPassiveEvidence, cleanup.unmountRefPassiveEvidence);
   assert.equal(container.childNodes.length, 0);
-  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
-    code: "FAST_REACT_UNIMPLEMENTED"
-  });
+  assertPublicCreateRootMinimalHostOutput(document);
 });
 
 test("root render E2E gate consumes private root.unmount ref cleanup and passive destroy ordering below public compatibility", () => {
@@ -766,9 +753,7 @@ test("root render E2E gate consumes private root.unmount ref cleanup and passive
   assert.equal(cleanup.publicRootCompatibilitySurface, false);
   assert.equal(cleanup.compatibilityClaimed, false);
   assert.equal(container.childNodes.length, 0);
-  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
-    code: "FAST_REACT_UNIMPLEMENTED"
-  });
+  assertPublicCreateRootMinimalHostOutput(document);
 });
 
 function createRootWorkLoopFinishedWorkMetadata(options) {
@@ -905,6 +890,31 @@ function attributeEntries(element) {
   return Array.from(element.attributes.entries()).sort(([left], [right]) =>
     left.localeCompare(right)
   );
+}
+
+function assertPublicCreateRootMinimalHostOutput(document) {
+  const container = document.createElement("div");
+  const root = reactDomClient.createRoot(container);
+
+  assert.deepEqual(Object.keys(root), ["render", "unmount"]);
+  assert.equal(root.render.length, 1);
+  assert.equal(root.unmount.length, 0);
+  assert.equal(
+    root.render(React.createElement("div", { id: "app" }, "hello")),
+    undefined
+  );
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild.nodeName, "DIV");
+  assert.equal(container.textContent, "hello");
+  assert.deepEqual(attributeEntries(container.firstChild), [["id", "app"]]);
+  assert.throws(() => root.render(React.createElement("div", null, "again")), {
+    code: "FAST_REACT_UNIMPLEMENTED",
+    exportName: "createRoot().render"
+  });
+  assert.throws(() => root.unmount(), {
+    code: "FAST_REACT_UNIMPLEMENTED",
+    exportName: "createRoot().unmount"
+  });
 }
 
 function createEventTarget(target) {

@@ -14,7 +14,8 @@ const {
   createDocument,
   createElement,
   createTextNode,
-  attributeEntries
+  attributeEntries,
+  assertPublicCreateRootMinimalHostOutput
 } = require('./context.js');
 
 test('private root unmount host-output cleanup clears fake DOM and metadata', () => {
@@ -892,9 +893,7 @@ test('private react-dom/client facade root.unmount clears active host output met
     adapter.getRootHostOutputUnmountCleanupDiagnostics(root).length,
     1
   );
-  assert.throws(() => reactDomClient.createRoot(document.createElement('div')), {
-    code: 'FAST_REACT_UNIMPLEMENTED'
-  });
+  assertPublicCreateRootMinimalHostOutput(document);
 });
 
 test('private react-dom/client facade root.unmount lifecycle execution fails closed for stale cloned cross-root and replayed evidence', () => {
@@ -1798,13 +1797,8 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
     code: 'FAST_REACT_DOM_UNMOUNTED_ROOT'
   });
 
-  const publicContainer = createElement(
-    'DIV',
-    createDocument('private-client-facade-unmount-cleanup-public')
+  const publicDocument = createDocument(
+    'private-client-facade-unmount-cleanup-public'
   );
-  assert.throws(() => reactDomClient.createRoot(publicContainer), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot'
-  });
+  assertPublicCreateRootMinimalHostOutput(publicDocument);
 });

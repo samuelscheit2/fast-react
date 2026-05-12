@@ -13,6 +13,7 @@ const repoRoot = path.resolve(
 const reactDomClient = require(
   path.join(repoRoot, 'packages/react-dom/client.js')
 );
+const React = require(path.join(repoRoot, 'packages/react/index.js'));
 const rootBridge = require(
   path.join(repoRoot, 'packages/react-dom/src/client/root-bridge.js')
 );
@@ -47,12 +48,35 @@ assert.equal(reactDomClient.createRoot.length, 0);
 assert.equal(reactDomClient.createRoot.name, 'createRoot');
 
 {
-  const publicContainer = createElement('DIV', createDocument('public'));
-  const error = captureThrown(() => reactDomClient.createRoot(publicContainer));
-  assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED');
-  assert.equal(error.entrypoint, 'react-dom/client');
-  assert.equal(error.exportName, 'createRoot');
-  assertBridgeDidNotTouchContainer(publicContainer);
+  const publicDocument = createDocument('public');
+  const publicContainer = publicDocument.createElement('div');
+  publicDocument.__mutationLog.length = 0;
+  const root = reactDomClient.createRoot(publicContainer);
+  const renderReturn = root.render(
+    React.createElement('div', {id: 'app'}, 'hello')
+  );
+
+  assert.equal(renderReturn, undefined);
+  assert.equal(publicContainer.childNodes.length, 1);
+  assert.equal(publicContainer.firstChild.nodeName, 'DIV');
+  assert.equal(publicContainer.firstChild.getAttribute('id'), 'app');
+  assert.equal(publicContainer.textContent, 'hello');
+  assert.equal(publicContainer.__registrations.length, 0);
+  assert.equal(publicDocument.__registrations.length, 0);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(publicContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(publicContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(publicDocument), false);
+  const updateError = captureThrown(() =>
+    root.render(React.createElement('div', null, 'again'))
+  );
+  assert.equal(updateError.code, 'FAST_REACT_UNIMPLEMENTED');
+  assert.equal(updateError.entrypoint, 'react-dom/client');
+  assert.equal(updateError.exportName, 'createRoot().render');
+  const unmountError = captureThrown(() => root.unmount());
+  assert.equal(unmountError.code, 'FAST_REACT_UNIMPLEMENTED');
+  assert.equal(unmountError.entrypoint, 'react-dom/client');
+  assert.equal(unmountError.exportName, 'createRoot().unmount');
+  assert.equal(publicContainer.childNodes.length, 1);
 }
 
 const first = createBridgeScenario('first');

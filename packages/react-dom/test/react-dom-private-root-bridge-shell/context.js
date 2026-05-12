@@ -5,6 +5,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const packageRoot = path.resolve(__dirname, '../..');
+const React = require(path.resolve(packageRoot, '..', 'react', 'index.js'));
 const reactDom = require(path.join(packageRoot, 'index.js'));
 const reactDomClient = require(path.join(packageRoot, 'client.js'));
 const resourceFormGate = require(
@@ -2280,10 +2281,38 @@ function attributeEntries(node) {
   );
 }
 
+function assertPublicCreateRootMinimalHostOutput(document) {
+  const container = document.createElement('div');
+  const root = reactDomClient.createRoot(container);
+
+  assert.deepEqual(Object.keys(root), ['render', 'unmount']);
+  assert.equal(root.render.length, 1);
+  assert.equal(root.unmount.length, 0);
+  assert.equal(
+    root.render(React.createElement('div', {id: 'app'}, 'hello')),
+    undefined
+  );
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild.nodeName, 'DIV');
+  assert.equal(container.firstChild.getAttribute('id'), 'app');
+  assert.equal(container.textContent, 'hello');
+  assert.throws(() => root.render(React.createElement('div', null, 'again')), {
+    code: 'FAST_REACT_UNIMPLEMENTED',
+    entrypoint: 'react-dom/client',
+    exportName: 'createRoot().render'
+  });
+  assert.throws(() => root.unmount(), {
+    code: 'FAST_REACT_UNIMPLEMENTED',
+    entrypoint: 'react-dom/client',
+    exportName: 'createRoot().unmount'
+  });
+}
+
 module.exports = {
   assert,
   path,
   test,
+  React,
   packageRoot,
   reactDom,
   reactDomClient,
@@ -2360,5 +2389,6 @@ module.exports = {
   createCommentNode,
   createEventTarget,
   detachChildFromParent,
-  attributeEntries
+  attributeEntries,
+  assertPublicCreateRootMinimalHostOutput
 };

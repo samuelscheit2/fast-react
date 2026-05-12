@@ -23,7 +23,8 @@ const {
   createDocument,
   createElement,
   createTextNode,
-  attributeEntries
+  attributeEntries,
+  assertPublicCreateRootMinimalHostOutput
 } = require('./context.js');
 const native = require(
   path.resolve(__dirname, '../../../../bindings/node/index.cjs')
@@ -1960,15 +1961,10 @@ test('private react-dom/client facade host-output diagnostic renders through bri
   assert.equal(listenerRegistry.hasListeningMarker(container), false);
   assert.equal(listenerRegistry.hasListeningMarker(document), false);
 
-  const publicContainer = createElement(
-    'DIV',
-    createDocument('private-client-facade-host-output-public')
+  const publicDocument = createDocument(
+    'private-client-facade-host-output-public'
   );
-  assert.throws(() => reactDomClient.createRoot(publicContainer), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot'
-  });
+  assertPublicCreateRootMinimalHostOutput(publicDocument);
 });
 
 test('private react-dom/client facade root.render accepts unkeyed Fragment array host children through fake DOM', () => {
@@ -2124,15 +2120,10 @@ test('private react-dom/client facade root.render accepts unkeyed Fragment array
   assert.equal(componentTree.getRootOwnerFromNode(firstText), null);
   assert.equal(componentTree.getRootOwnerFromNode(secondText), null);
 
-  const publicContainer = createElement(
-    'DIV',
-    createDocument('private-client-facade-fragment-array-public')
+  const publicDocument = createDocument(
+    'private-client-facade-fragment-array-public'
   );
-  assert.throws(() => reactDomClient.createRoot(publicContainer), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot'
-  });
+  assertPublicCreateRootMinimalHostOutput(publicDocument);
 });
 
 test('private react-dom/client facade render native handoff consumes facade, work-loop, and fake-DOM metadata', () => {
@@ -2441,15 +2432,10 @@ test('private react-dom/client facade render native handoff consumes facade, wor
   );
   assert.equal(delayedContainer.childNodes.length, 0);
 
-  const publicContainer = createElement(
-    'DIV',
-    createDocument('private-client-facade-render-native-handoff-public')
+  const publicDocument = createDocument(
+    'private-client-facade-render-native-handoff-public'
   );
-  assert.throws(() => reactDomClient.createRoot(publicContainer), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot'
-  });
+  assertPublicCreateRootMinimalHostOutput(publicDocument);
 });
 
 test('private react-dom/client facade render native handoff consumes Rust root work-loop metadata for div text', () => {
@@ -2641,15 +2627,11 @@ test('private react-dom/client facade render native handoff consumes Rust root w
     diagnostic
   ]);
 
-  const publicContainer = createElement(
-    'DIV',
-    createDocument('private-client-facade-rust-root-work-loop-public')
+  const publicDocument = createDocument(
+    'private-client-facade-rust-root-work-loop-public'
   );
-  assert.throws(() => reactDomClient.createRoot(publicContainer), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot'
-  });
+  const publicContainer = createElement('DIV', publicDocument);
+  assertPublicCreateRootMinimalHostOutput(publicDocument);
   assert.throws(
     () => reactDomClient.hydrateRoot(publicContainer, element),
     {
@@ -3241,15 +3223,10 @@ test('private react-dom/client facade host-output update diagnostic routes root.
   assert.equal(componentTree.getRootOwnerFromNode(hostNode), null);
   assert.equal(componentTree.getRootOwnerFromNode(textNode), null);
 
-  const publicContainer = createElement(
-    'DIV',
-    createDocument('private-client-facade-host-output-update-public')
+  const publicDocument = createDocument(
+    'private-client-facade-host-output-update-public'
   );
-  assert.throws(() => reactDomClient.createRoot(publicContainer), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot'
-  });
+  assertPublicCreateRootMinimalHostOutput(publicDocument);
 });
 
 test('private react-dom/client facade nested host-output update diagnostic targets child host output', () => {
@@ -3700,15 +3677,10 @@ test('private react-dom/client facade nested host-output update diagnostic targe
   assert.equal(detach.detachedHostInstanceCount, 3);
   assert.equal(container.childNodes.length, 0);
 
-  const publicContainer = createElement(
-    'DIV',
-    createDocument('private-client-facade-nested-host-output-public')
+  const publicDocument = createDocument(
+    'private-client-facade-nested-host-output-public'
   );
-  assert.throws(() => reactDomClient.createRoot(publicContainer), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot'
-  });
+  assertPublicCreateRootMinimalHostOutput(publicDocument);
 });
 
 test('private react-dom/client facade nested host-output rejects lifecycle alias smuggling before mutation', () => {
@@ -4941,7 +4913,7 @@ test('private react-dom/client facade marker/listener preflight fails closed', (
   assertBridgeDidNotTouchContainer(unmountedContainer, unmountedDocument);
 });
 
-test('public react-dom/client root placeholders remain inert', () => {
+test('public react-dom/client root facade exposes only minimal host output', () => {
   const document = createDocument('public-placeholder');
   const container = createElement('DIV', document);
 
@@ -4951,10 +4923,8 @@ test('public react-dom/client root placeholders remain inert', () => {
     'version'
   ]);
   assert.equal(reactDomClient.__FAST_REACT_PLACEHOLDER__, true);
-  assert.throws(() => reactDomClient.createRoot(container), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot'
-  });
+  assertPublicCreateRootMinimalHostOutput(
+    createDocument('public-placeholder-minimal-host-output')
+  );
   assertBridgeDidNotTouchContainer(container, document);
 });

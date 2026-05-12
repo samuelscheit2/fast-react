@@ -102,6 +102,115 @@ const hydrateRootLifecycleBoundaryBlockedFields = Object.freeze([
   "publicHydrationReplayCompatibilityClaimed"
 ]);
 
+const MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT = Object.freeze({
+  containerChildCount: 1,
+  containerChildNodeNames: Object.freeze(["DIV"]),
+  containerMutationLog: Object.freeze([Object.freeze(["appendChild", "DIV"])]),
+  containerTextContent: "text",
+  ownerDocumentChildCount: 0,
+  ownerDocumentMutationLog: Object.freeze([])
+});
+
+function assertPublicRootFacadeSideEffectFree(sideEffects) {
+  assert.equal(sideEffects.mutationCount, 0);
+  assert.equal(sideEffects.listenerRegistrationCount, 0);
+  assert.equal(sideEffects.ownerDocumentListenerRegistrationCount, 0);
+  assert.equal(sideEffects.ownerDocumentMutationCount, 0);
+  assert.equal(sideEffects.containerMarker.propertyCount, 0);
+  assert.equal(sideEffects.containerListeningMarker.propertyCount, 0);
+  assert.equal(sideEffects.ownerDocumentListeningMarker.propertyCount, 0);
+}
+
+function assertMinimalPublicCreateRootBoundary(publicBoundary) {
+  assert.equal(publicBoundary.createRoot.status, "ok");
+  assert.deepEqual(publicBoundary.createRoot.value, {
+    keys: ["render", "unmount"],
+    type: "object"
+  });
+  assert.equal(publicBoundary.createRoot.rootObjectCreated, true);
+  assertPublicRootFacadeSideEffectFree(publicBoundary.createRoot.sideEffects);
+}
+
+function assertBlockedPublicHydrateRootBoundary(publicBoundary) {
+  assert.equal(publicBoundary.hydrateRoot.status, "throws");
+  assert.equal(
+    publicBoundary.hydrateRoot.thrown.code,
+    "FAST_REACT_UNIMPLEMENTED"
+  );
+  assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
+  assert.equal(publicBoundary.hydrateRoot.thrown.exportName, "hydrateRoot");
+  assert.equal(publicBoundary.hydrateRoot.thrown.entrypoint, "react-dom/client");
+  assertPublicRootFacadeSideEffectFree(publicBoundary.hydrateRoot.sideEffects);
+}
+
+function assertMinimalPublicDivTextLifecycle(publicBoundary) {
+  const renderDivText = publicBoundary.publicRootLifecycle.renderDivText;
+  assert.equal(
+    renderDivText.label,
+    'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text"))'
+  );
+  assert.equal(renderDivText.status, "ok");
+  assert.equal(renderDivText.value.type, "undefined");
+  assert.equal(renderDivText.compatibilityClaimed, false);
+  assert.equal(renderDivText.controlledDomShim, true);
+  assert.equal(renderDivText.renderElementType, "div");
+  assert.equal(renderDivText.renderTextContent, "text");
+  assert.equal(renderDivText.rootObjectCreated, true);
+  assert.equal(renderDivText.lifecycleOperationAttempted, true);
+  assert.equal(renderDivText.createRootAttempt.status, "ok");
+  assert.deepEqual(
+    renderDivText.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT
+  );
+  assert.equal(renderDivText.sideEffects.mutationCount, 1);
+  assert.equal(renderDivText.sideEffects.listenerRegistrationCount, 0);
+  assert.equal(
+    renderDivText.sideEffects.ownerDocumentListenerRegistrationCount,
+    0
+  );
+  assert.equal(renderDivText.sideEffects.ownerDocumentMutationCount, 0);
+  assert.equal(renderDivText.sideEffects.containerMarker.propertyCount, 0);
+  assert.equal(
+    renderDivText.sideEffects.containerListeningMarker.propertyCount,
+    0
+  );
+  assert.equal(
+    renderDivText.sideEffects.ownerDocumentListeningMarker.propertyCount,
+    0
+  );
+}
+
+function assertBlockedPublicLifecycleOperation(operation, exportName) {
+  assert.equal(operation.status, "throws");
+  assert.equal(operation.thrown.code, "FAST_REACT_UNIMPLEMENTED");
+  assert.equal(operation.thrown.exportName, exportName);
+  assert.equal(operation.thrown.entrypoint, "react-dom/client");
+  assert.equal(operation.blockedAt, null);
+  assert.equal(operation.rootObjectCreated, true);
+  assert.equal(operation.lifecycleOperationAttempted, true);
+  assert.equal(operation.createRootAttempt.status, "ok");
+  assert.equal(operation.compatibilityClaimed, false);
+  assertPublicRootFacadeSideEffectFree(operation.sideEffects);
+}
+
+function assertMinimalPublicRootBoundary(publicBoundary) {
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
+  assertBlockedPublicHydrateRootBoundary(publicBoundary);
+  assertBlockedPublicLifecycleOperation(
+    publicBoundary.publicRootLifecycle.renderInitial,
+    "createRoot().render"
+  );
+  assertMinimalPublicDivTextLifecycle(publicBoundary);
+  assertBlockedPublicLifecycleOperation(
+    publicBoundary.publicRootLifecycle.renderUpdate,
+    "createRoot().render"
+  );
+  assertBlockedPublicLifecycleOperation(
+    publicBoundary.publicRootLifecycle.unmount,
+    "createRoot().unmount"
+  );
+}
+
 test("React DOM public root facade gate blocks placeholders while oracle prerequisites remain accepted", () => {
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
@@ -551,51 +660,102 @@ test("React DOM public root facade inspection records current placeholder bounda
     entrypoint: "react-dom/client",
     compatibilityTarget: "react-dom@19.2.6"
   });
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.thrown.code, "FAST_REACT_UNIMPLEMENTED");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
-  assert.equal(publicBoundary.hydrateRoot.status, "throws");
-  assert.equal(publicBoundary.hydrateRoot.thrown.code, "FAST_REACT_UNIMPLEMENTED");
-  assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
-  assert.equal(publicBoundary.hydrateRoot.thrown.exportName, "hydrateRoot");
-  assert.equal(publicBoundary.hydrateRoot.thrown.entrypoint, "react-dom/client");
-  assert.equal(publicBoundary.createRoot.sideEffects.mutationCount, 0);
-  assert.equal(publicBoundary.createRoot.sideEffects.listenerRegistrationCount, 0);
-  assert.equal(publicBoundary.createRoot.sideEffects.containerMarker.propertyCount, 0);
-  assert.equal(publicBoundary.hydrateRoot.sideEffects.mutationCount, 0);
-  assert.equal(publicBoundary.hydrateRoot.sideEffects.listenerRegistrationCount, 0);
-  assert.equal(publicBoundary.hydrateRoot.sideEffects.containerMarker.propertyCount, 0);
+  assertMinimalPublicRootBoundary(publicBoundary);
+});
 
-  for (const operation of [
-    publicBoundary.publicRootLifecycle.renderInitial,
-    publicBoundary.publicRootLifecycle.renderDivText,
-    publicBoundary.publicRootLifecycle.renderUpdate,
-    publicBoundary.publicRootLifecycle.unmount
-  ]) {
-    assert.equal(operation.status, "throws");
-    assert.equal(operation.thrown.code, "FAST_REACT_UNIMPLEMENTED");
-    assert.equal(operation.thrown.exportName, "createRoot");
-    assert.equal(operation.blockedAt, "createRoot");
-    assert.equal(operation.rootObjectCreated, false);
-    assert.equal(operation.lifecycleOperationAttempted, false);
-    assert.equal(operation.compatibilityClaimed, false);
-    assert.equal(operation.sideEffects.mutationCount, 0);
-    assert.equal(operation.sideEffects.listenerRegistrationCount, 0);
-    assert.equal(operation.sideEffects.containerMarker.propertyCount, 0);
+test("React DOM public createRoot rejects explicit options and extra arguments", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const React = require(path.join(repoRoot, "packages/react/index.js"));
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  let callbackCalls = 0;
+  const blockedArgumentCases = [
+    {
+      args: [undefined],
+      label: "undefined-options"
+    },
+    {
+      args: [
+        {
+          onRecoverableError() {
+            callbackCalls++;
+          }
+        }
+      ],
+      label: "recoverable-error-options"
+    },
+    {
+      args: [undefined, "extra"],
+      label: "undefined-options-extra-argument"
+    }
+  ];
+
+  for (const blockedCase of blockedArgumentCases) {
+    const document = createPrivateGateDocument(
+      `public-create-root-${blockedCase.label}-blocked`,
+      domContainer
+    );
+    const container = createPrivateGateElement("DIV", document, domContainer);
+    let createRootResult;
+
+    assert.throws(
+      () => {
+        createRootResult = reactDomClient.createRoot(
+          container,
+          ...blockedCase.args
+        );
+      },
+      (error) => {
+        assert.equal(error.name, "FastReactDomUnimplementedError");
+        assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+        assert.equal(error.entrypoint, "react-dom/client");
+        assert.equal(error.exportName, "createRoot");
+        assert.match(
+          error.message,
+          /Root options, callbacks, hydration, scheduler hooks, and compatibility claims remain blocked\./
+        );
+        return true;
+      }
+    );
+    assert.equal(createRootResult, undefined);
+    assert.equal(
+      rootMarkers.inspectContainerRootMarker(container).propertyCount,
+      0
+    );
+    assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
+    assert.equal(listenerRegistry.hasListeningMarker(container), false);
+    assert.equal(listenerRegistry.hasListeningMarker(document), false);
+    assert.equal(container.__registrations.length, 0);
+    assert.equal(document.__registrations.length, 0);
+    assert.equal(container.__mutationLog.length, 0);
+    assert.equal(document.__mutationLog.length, 0);
   }
+  assert.equal(callbackCalls, 0);
 
-  const renderDivText = publicBoundary.publicRootLifecycle.renderDivText;
-  assert.equal(renderDivText.controlledDomShim, true);
-  assert.equal(renderDivText.renderElementType, "div");
-  assert.equal(renderDivText.renderTextContent, "text");
-  assert.deepEqual(renderDivText.controlledDomSnapshot, {
-    containerChildCount: 0,
-    containerChildNodeNames: [],
-    containerMutationLog: [],
-    containerTextContent: "",
-    ownerDocumentChildCount: 0,
-    ownerDocumentMutationLog: []
-  });
+  const document = createPrivateGateDocument(
+    "public-create-root-no-options-accepted",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const root = reactDomClient.createRoot(container);
+
+  assert.deepEqual(Object.keys(root), ["render", "unmount"]);
+  assert.equal(
+    root.render(React.createElement("div", null, "text")),
+    undefined
+  );
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild.nodeName, "DIV");
+  assert.equal(container.textContent, "text");
 });
 
 test("React DOM client private facade adapter is symbol-only and routes to private records", () => {
@@ -704,9 +864,8 @@ test("React DOM client private facade adapter is symbol-only and routes to priva
   assert.equal(document.__mutationLog.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
-  assert.equal(publicBoundary.hydrateRoot.status, "throws");
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
+  assertBlockedPublicHydrateRootBoundary(publicBoundary);
   assert.deepEqual(publicBoundary.exportKeys, [
     "createRoot",
     "hydrateRoot",
@@ -852,9 +1011,8 @@ test("React DOM client private facade preflight is symbol-only and routes to acc
   assert.equal(document.__mutationLog.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
-  assert.equal(publicBoundary.hydrateRoot.status, "throws");
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
+  assertBlockedPublicHydrateRootBoundary(publicBoundary);
 });
 
 test("React DOM client private hydrateRoot facade preflight is symbol-only and blocked", () => {
@@ -1259,9 +1417,8 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
   assert.equal(document.__mutationLog.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.hydrateRoot.status, "throws");
-  assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
+  assertBlockedPublicHydrateRootBoundary(publicBoundary);
 });
 
 test("React DOM client private hydrateRoot target-claiming preflight remains private and canonical", () => {
@@ -2735,13 +2892,7 @@ test("React DOM client private facade preflights marker/listener setup and clean
   assert.equal(document.__mutationLog.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
-  assert.equal(publicBoundary.createRoot.sideEffects.mutationCount, 0);
-  assert.equal(
-    publicBoundary.createRoot.sideEffects.listenerRegistrationCount,
-    0
-  );
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
 });
 
 test("React DOM client private facade preflight accepts live containers only as blocked evidence", () => {
@@ -2847,13 +2998,7 @@ test("React DOM client private facade preflight accepts live containers only as 
   assert.equal(document.__mutationLog.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
-  assert.equal(publicBoundary.createRoot.sideEffects.mutationCount, 0);
-  assert.equal(
-    publicBoundary.createRoot.sideEffects.listenerRegistrationCount,
-    0
-  );
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
 });
 
 test("React DOM private root-render host-output evidence stays behind public facade block", () => {
@@ -2997,14 +3142,16 @@ test("React DOM private root-render host-output evidence stays behind public fac
   );
   assert.equal(hidden.rootWorkLoopFinishedWorkRecord, finishedWork);
 
-  assert.throws(() => reactDomClient.createRoot(publicContainer), {
+  const publicRoot = reactDomClient.createRoot(publicContainer);
+  assert.deepEqual(Object.keys(publicRoot), ["render", "unmount"]);
+  assert.throws(() => publicRoot.render(element), {
     code: "FAST_REACT_UNIMPLEMENTED",
     entrypoint: "react-dom/client",
-    exportName: "createRoot"
+    exportName: "createRoot().render"
   });
+  assert.equal(publicContainer.childNodes.length, 0);
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
 
   bridge.cleanupInitialRenderHostOutput(hidden.hostOutputHandoff);
   assert.equal(container.childNodes.length, 0);
@@ -3289,8 +3436,7 @@ test("React DOM client private facade host-output update routes through private 
   assert.equal(container.childNodes.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
 });
 
 test("React DOM client private facade root.render update consumes source-owned HostComponent and HostText execution metadata only", () => {
@@ -3509,8 +3655,7 @@ test("React DOM client private facade root.render update consumes source-owned H
   assert.equal(container.childNodes.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
 });
 
 test("React DOM client private facade lifecycle boundary rejects stale source records", () => {
@@ -3685,8 +3830,7 @@ test("React DOM client private facade lifecycle boundary rejects stale source re
   assert.equal(crossContainer.childNodes.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
 });
 
 test("React DOM client private facade nested host-output update stays diagnostic-only", () => {
@@ -3994,8 +4138,7 @@ test("React DOM client private facade nested host-output update stays diagnostic
   assert.equal(listenerRegistry.hasListeningMarker(document), false);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
 });
 
 test("React DOM client private facade nested host-output update rejects lifecycle boundary aliases", () => {
@@ -4400,17 +4543,10 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
   assert.equal(document.__registrations.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
-  assert.equal(publicBoundary.publicRootLifecycle.unmount.status, "throws");
-  assert.equal(
-    publicBoundary.publicRootLifecycle.unmount.compatibilityClaimed,
-    false
-  );
-  assert.equal(publicBoundary.createRoot.sideEffects.mutationCount, 0);
-  assert.equal(
-    publicBoundary.createRoot.sideEffects.listenerRegistrationCount,
-    0
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
+  assertBlockedPublicLifecycleOperation(
+    publicBoundary.publicRootLifecycle.unmount,
+    "createRoot().unmount"
   );
 });
 
@@ -4430,10 +4566,18 @@ test("React DOM public root facade update and unmount rows stay blocked apart fr
     lifecycleRows.map((row) => row.id),
     REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS.map((row) => row.id)
   );
+  const expectedBlockedLifecycleOperations = new Map([
+    ["public-create-root-render-initial", "root.render"],
+    ["public-create-root-render-update", "root.render"],
+    ["public-create-root-unmount-call", "root.unmount"]
+  ]);
   for (const row of lifecycleRows) {
     assert.equal(row.gateStatus, REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS);
-    assert.equal(row.blockedAt, "createRoot");
     assert.equal(row.compatibilityClaimed, false);
+    if (row.id === "public-create-root-render-div-text") {
+      continue;
+    }
+    assert.equal(row.blockedAt, expectedBlockedLifecycleOperations.get(row.id));
     assert.equal(row.listenerRegistrationCount, 0);
     assert.equal(row.mutationCount, 0);
     assert.equal(row.privateBridgeEvidence, "separate");
@@ -4443,14 +4587,14 @@ test("React DOM public root facade update and unmount rows stay blocked apart fr
   );
   assert.ok(publicDivTextRow);
   assert.equal(publicDivTextRow.controlledDomShim, true);
-  assert.deepEqual(publicDivTextRow.controlledDomSnapshot, {
-    containerChildCount: 0,
-    containerChildNodeNames: [],
-    containerMutationLog: [],
-    containerTextContent: "",
-    ownerDocumentChildCount: 0,
-    ownerDocumentMutationLog: []
-  });
+  assert.equal(publicDivTextRow.minimalDivTextHostOutputAdmitted, true);
+  assert.equal(publicDivTextRow.mutationCount, 1);
+  assert.equal(publicDivTextRow.privateBridgeEvidence, "wrapped-private-facade-host-output");
+  assert.equal(publicDivTextRow.renderReturnType, "undefined");
+  assert.deepEqual(
+    publicDivTextRow.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT
+  );
   assert.ok(
     gate.blockedPublicFacadeRows.every((row) => !row.id.startsWith("private-"))
   );
@@ -4483,78 +4627,95 @@ test("React DOM public root facade update and unmount rows stay blocked apart fr
   );
 });
 
-test("React DOM public root facade gate rejects premature public createRoot behavior", () => {
+test("React DOM public root facade gate records minimal public createRoot without compatibility", () => {
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  const prematurePublicBoundary = clone(publicBoundary);
-  prematurePublicBoundary.createRoot = {
-    ...prematurePublicBoundary.createRoot,
-    status: "ok",
-    value: {
-      keys: ["render", "unmount"],
-      type: "object"
-    },
-    rootObjectCreated: true
-  };
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
 
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
     currentOracle: rootRenderOracle,
     clientRootOracle,
-    localPublicFacadeBoundary: prematurePublicBoundary,
+    localPublicFacadeBoundary: publicBoundary,
     privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
   });
 
-  assert.equal(gate.ok, false);
-  assert.ok(
-    gate.failures.some(
-      (failure) =>
-        failure.gateStatus === "public-root-export-not-placeholder-blocked"
-    )
+  assert.equal(gate.ok, true);
+  const createRootRow = gate.blockedPublicFacadeRows.find(
+    (row) => row.id === "public-create-root"
   );
+  assert.equal(createRootRow.minimalPublicRootObjectExposed, true);
+  assert.equal(createRootRow.compatibilityClaimed, false);
+  assert.equal(gate.summary.compatibilityAdmitted, false);
+  assert.equal(gate.summary.compatibilityClaimed, false);
+
+  const broadPublicBoundary = clone(publicBoundary);
+  broadPublicBoundary.createRoot.sideEffects.listenerRegistrationCount = 1;
+  const broadGate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: broadPublicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
+  });
+  assert.equal(broadGate.ok, false);
   assert.ok(
-    gate.failures.some(
+    broadGate.failures.some(
       (failure) =>
-        failure.gateStatus ===
-        "public-root-object-created-while-facade-blocked"
+        failure.gateStatus === "public-root-export-not-placeholder-blocked" &&
+        failure.exportName === "createRoot"
     )
   );
 });
 
-test("React DOM public root facade gate rejects premature public div text render", () => {
+test("React DOM public root facade gate records minimal public div text render only", () => {
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  const prematurePublicBoundary = clone(publicBoundary);
-  prematurePublicBoundary.publicRootLifecycle.renderDivText = {
-    ...prematurePublicBoundary.publicRootLifecycle.renderDivText,
-    status: "ok",
-    value: {
-      type: "undefined"
-    },
-    blockedAt: null,
-    createRootAttempt: {
-      status: "ok",
-      value: {
-        keys: ["render", "unmount"],
-        type: "object"
-      }
-    },
-    lifecycleOperationAttempted: true,
-    rootObjectCreated: true
-  };
+  assertMinimalPublicDivTextLifecycle(publicBoundary);
 
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
     currentOracle: rootRenderOracle,
     clientRootOracle,
-    localPublicFacadeBoundary: prematurePublicBoundary,
+    localPublicFacadeBoundary: publicBoundary,
     privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
   });
 
-  assert.equal(gate.ok, false);
+  assert.equal(gate.ok, true);
+  const renderDivTextRow = gate.blockedPublicFacadeRows.find(
+    (row) => row.id === "public-create-root-render-div-text"
+  );
+  assert.equal(renderDivTextRow.minimalDivTextHostOutputAdmitted, true);
+  assert.equal(renderDivTextRow.compatibilityClaimed, false);
+  assert.equal(renderDivTextRow.mutationCount, 1);
+  assert.deepEqual(
+    renderDivTextRow.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT
+  );
+
+  const broadPublicBoundary = clone(publicBoundary);
+  broadPublicBoundary.publicRootLifecycle.renderDivText.controlledDomSnapshot = {
+    ...broadPublicBoundary.publicRootLifecycle.renderDivText
+      .controlledDomSnapshot,
+    containerChildCount: 2,
+    containerChildNodeNames: ["DIV", "SPAN"],
+    containerMutationLog: [
+      ["appendChild", "DIV"],
+      ["appendChild", "SPAN"]
+    ]
+  };
+  broadPublicBoundary.publicRootLifecycle.renderDivText.sideEffects.mutationCount = 2;
+  const broadGate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: broadPublicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
+  });
+  assert.equal(broadGate.ok, false);
   assert.ok(
-    gate.failures.some(
+    broadGate.failures.some(
       (failure) =>
         failure.gateStatus ===
-          "public-root-lifecycle-operation-not-placeholder-blocked" &&
+          "public-root-lifecycle-operation-produced-side-effects" &&
         failure.id === "public-create-root-render-div-text"
     )
   );
@@ -5337,10 +5498,7 @@ test("React DOM explicit private createRoot mark/listen gate stays separate from
   assert.equal(document.__mutationLog.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
-  assert.equal(publicBoundary.createRoot.status, "throws");
-  assert.equal(publicBoundary.createRoot.sideEffects.listenerRegistrationCount, 0);
-  assert.equal(publicBoundary.createRoot.sideEffects.mutationCount, 0);
-  assert.equal(publicBoundary.createRoot.sideEffects.containerMarker.propertyCount, 0);
+  assertMinimalPublicCreateRootBoundary(publicBoundary);
 
   const defaultPrivateBoundary = inspectReactDomPrivateRootBridgeBoundary();
   assert.equal(defaultPrivateBoundary.sideEffects.listenerRegistrationCount, 0);
