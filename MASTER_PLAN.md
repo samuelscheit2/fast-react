@@ -46,77 +46,29 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline before this docs
-refresh is main `15432066`
-(`Merge worker 1133 NAPI diagnostic-backed metadata`).
-Accepted implementation history still includes the post-Worker-997 batch:
-Workers 986, 987, 992, 1000, 998, 978, 999, 990, 967, 996, 994, and 989.
-Accepted organization-only cleanup history now includes Workers 1002-1062:
-Rust test-module extractions, the test-renderer facade/root/diagnostics splits,
-the N-API root bridge request split, the root work-loop test split, the
-`root_commit` errors/effects/deletions/refs splits, root-commit/host-work test
-splits, the function-component handles/errors, effects, deletions, and hook
-records splits, the `complete_work` split, the `root_work_loop`
-render/preflight splits, the `host_work` payload/mutation/update helper split,
-the `sync_flush` root-record split, the test-renderer test extraction to
-`crates/fast-react-test-renderer/src/tests.rs`, and the test-renderer
-`root_impl` create-route, update-route, host-output, fixture, unmount,
-lifecycle execution, TestInstance, act, and error-boundary splits. The accepted
-cleanup history also includes the test-renderer child test-module split,
-`root_commit` record split, `root_work_loop` complete-handoff split,
-`host_work` root-replacement split, `root_scheduler` act split,
-`function_component` effects split, sync-flush test-module split, and
-`fast-react-napi` test-module split, plus the accepted Workers 1054-1062
-splits for root-commit managed-child canaries, host-work deletions,
-root-scheduler continuations, root-work-loop context providers, passive
-deleted-subtree cleanup, test-renderer serialization execution, React DOM
-resource/form tests, React DOM private root bridge shell tests, and
-resource/form internals contracts. These cleanups make no runtime or public
-compatibility claim.
-Accepted root-render evidence now also includes Worker 1065's source-scanner
-repair and Workers 1074-1077: minimal root element resolver records, a
-test-only HostRoot mount reconciliation canary, a diagnostic
-HostComponent/HostText mutation execution gate that still reports blocked, and
-a public render conformance probe that still expects public `createRoot` to
-throw before `root.render` and leave the DOM shim empty.
-Accepted root-render helper input also includes Workers 1083-1085: the public
-facade blocked gate was split into a dedicated conformance module, a narrow
-production-compiled HostRoot -> HostComponent -> HostText render-shape helper
-was added, and a transactional minimal complete-work host helper was added.
-These helpers remain private/crate-internal and do not commit, mutate DOM, or
-unblock public React DOM root rendering.
-Accepted root-render implementation input now also includes Workers 1090,
-1095, 1096, 1097, 1111, 1110, 1116, 1120, 1126, 1130, 1129, and 1133: a private
-minimal render->complete handoff, a private minimal HostRoot placement commit
-executor, JS admission for Rust-shaped private root work-loop metadata with
-capability-claim rejection, a split private host-output conformance gate, a
-private minimal render->complete->commit placement diagnostic, a private
-symbol-backed native placeholder factory for Rust work-loop metadata, a
-repaired native no-load guard ledger source mapping, a doc-hidden reconciler
-diagnostic API, a symbol-only native private metadata factory contract, a
-crate-private Rust NAPI metadata shape module, and a crate-private NAPI
-diagnostic probe through TestRenderer, plus diagnostic-backed `fast-react-napi`
-metadata with source-owned execution-surface blocker proof and React DOM native
-compatibility alias denylist parity. These are private diagnostics, contract
-tests, and helper paths only; no HostNodeStore/private records, N-API `.node`
-behavior, or public React DOM root rendering is exposed.
+refresh is main `b44d8e03`
+(`Merge worker 1156 native React DOM render handoff admission`). Accepted
+implementation, cleanup, planning, and docs-only history through that commit is
+recorded in `MASTER_PROGRESS.md`; this plan lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted facts through main `15432066` are recorded in
+- Accepted facts through main `b44d8e03` are recorded in
   `MASTER_PROGRESS.md`.
 - No later worker output is listed as live accepted input in this plan
   snapshot.
-- Next root-render sequencing after diagnostic-backed package-private NAPI
-  metadata is to preserve the private reconciler diagnostic path, source-owned
-  execution-surface blockers, repaired no-load guard ledger evidence, React DOM
-  native-compatibility alias denylists, and public/native/DOM capability
-  rejection while proving any later private NAPI/adapter handoff. Public root
-  lifecycle prerequisites remain required before any public
-  `createRoot().render(...)` path.
+- Next root-render sequencing after the accepted private NAPI metadata JSON
+  adapter/roundtrip, private HTML-like host commit canary, and native React DOM
+  render handoff admission is to preserve the private reconciler diagnostic
+  path, source-owned execution-surface blockers, repaired no-load guard ledger
+  evidence, React DOM native-compatibility alias denylists, and
+  public/native/browser-DOM capability rejection while proving any later private
+  NAPI/adapter handoff. Public root lifecycle prerequisites remain required
+  before any public `createRoot().render(...)` path.
 
-Current project-owned source/test large-file baseline after main `4d9b7712`,
+Current project-owned source/test large-file baseline after main `b44d8e03`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -140,18 +92,14 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private compatibility evidence through `8aee0fcd`, accepted public
-root-render blocked evidence and private minimal root-render helpers through
-`b99841e3`, accepted private render/complete/commit helper, metadata/gate, and
-diagnostic-backed NAPI metadata evidence through `15432066`, accepted
-organization-only cleanup through `75fb1a47`, plus audit policy through
-`732a6b21`, still keeps public
-root/render/unmount, `act`,
-`react-dom/test-utils.act`, `flushSync`, Scheduler timing, hydration,
-resources/forms, public input/change or controlled-input behavior,
-serialization, native/reconciler execution, React Children traversal parity,
-unsupported hook behavior, event dispatch, package compatibility, and broad
-renderer compatibility blocked.
+Accepted private compatibility evidence through current main `b44d8e03` still
+keeps public root rendering, public root render/update/unmount, real `.node`
+loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
+`act`, `react-dom/test-utils.act`, `flushSync`, Scheduler timing,
+test-renderer public behavior, resources/forms, public input/change or
+controlled-input behavior, serialization, React Children traversal parity,
+unsupported hook behavior, package compatibility, and broad renderer
+compatibility blocked.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -159,26 +107,19 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through `8aee0fcd`, Worker 1077's
-   public root-render blocked gate as preserved through Worker 1083's split,
-   Workers 1084-1085 as private minimal render-shape and complete-work helper
-   input, Workers 1090, 1096, and 1111 as private render/complete/placement
-   execution helpers, Worker 1095 as private JS metadata admission with
-   capability-claim rejection, Worker 1097 as conformance-gate organization
-   evidence, Worker 1110 as a private native placeholder metadata factory,
-   Worker 1116 as the repaired private native no-load guard ledger mapping,
-   Worker 1120 as a doc-hidden reconciler placement diagnostic export, Worker
-   1126 as native private metadata factory contract evidence, Worker 1130 as
-   crate-private Rust metadata shape validation, Worker 1129 as a crate-private
-   NAPI diagnostic probe, Worker 1133 as diagnostic-backed NAPI metadata
-   admission with source-owned execution-surface blockers and native-compatibility
-   alias denylists, and cleanup history through `75fb1a47` as private evidence,
-   negative public evidence, or file-organization evidence only.
-   Public package, root, native, React DOM, test-renderer, Scheduler, `act`,
-   `react-dom/test-utils.act`, hydration, resource/form, public
-   controlled-input, serialization, React Children lazy/full traversal,
-   unsupported hook, event dispatch, and `flushSync` compatibility still require
-   fail-closed gates and dual-run oracle evidence.
+1. Treat accepted compatibility evidence through current main `b44d8e03` as
+   private evidence, negative public evidence, package-private adapter evidence,
+   or file-organization/planning evidence only. In particular, Worker 1148 is
+   large-file planning only; Workers 1144 and 1147 only add crate-private NAPI
+   metadata JSON adapter/admission paths; Worker 1157 proves only a private
+   HTML-like host commit canary; Worker 1156 only admits symbol-private native
+   React DOM render handoff metadata. Public package, root, native, React DOM,
+   browser DOM, test-renderer, Scheduler, `act`, `react-dom/test-utils.act`,
+   hydration, refs/listeners/events, resource/form, public controlled-input,
+   serialization, React Children lazy/full traversal, unsupported hook,
+   `flushSync`, real `.node` loading/N-API runtime, broad package, and broad
+   renderer compatibility still require fail-closed gates and dual-run oracle
+   evidence.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct
