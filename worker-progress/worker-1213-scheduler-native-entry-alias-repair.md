@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete - repair commit recorded.
+Complete - committed and ready for verification.
 
 ## Summary
 
@@ -98,6 +98,8 @@ Notes:
 - Keep running these hostile evidence canaries whenever Scheduler native-entry
   currentness rows or source-boundary gates are refreshed.
 
-## Repair Commit Hash
+## Commit Hashes
 
-- 94025d2acf85d84d6cd2830cf3bc35bc2d9c8878
+- Implementation repair commit: 94025d2acf85d84d6cd2830cf3bc35bc2d9c8878
+- Report/final branch tip commit: 0356767aeac2513f922e0168e28d8d2d4aaadecc
+- Follow-up report metadata commit before this audit repair: 807aafab6bdc079cb401b2cc60e9962ad497588c
