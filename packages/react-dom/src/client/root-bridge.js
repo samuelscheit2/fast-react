@@ -26816,6 +26816,17 @@ function getPublicFacadeRootWorkLoopFinishedWorkMetadataOption(options) {
       value: options.rootWorkLoopFinishedWorkHandoffMetadata
     };
   }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rustRootWorkLoopFinishedWorkMetadata'
+    )
+  ) {
+    return {
+      found: true,
+      value: options.rustRootWorkLoopFinishedWorkMetadata
+    };
+  }
   return {
     found: false,
     value: undefined

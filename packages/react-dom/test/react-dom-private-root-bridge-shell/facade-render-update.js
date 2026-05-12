@@ -2439,6 +2439,200 @@ test('private react-dom/client facade render native handoff consumes facade, wor
   });
 });
 
+test('private react-dom/client facade render native handoff consumes Rust root work-loop metadata for div text', () => {
+  const document = createDocument(
+    'private-client-facade-rust-root-work-loop-native-handoff'
+  );
+  const container = createElement('DIV', document);
+  const element = {
+    props: {
+      children: 'text'
+    },
+    type: 'div'
+  };
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    createRenderAdmissionIdPrefix: 'facade-rust-admission',
+    initialHostOutputIdPrefix: 'facade-rust-initial',
+    nativeEnvironmentId: 1095,
+    nativeHandoffIdPrefix: 'facade-rust-native',
+    publicFacadeHostOutputRenderIdPrefix: 'facade-rust-render',
+    requestIdPrefix: 'facade-rust-request',
+    rootIdPrefix: 'facade-rust-root',
+    rootRenderNativeHandoffIdPrefix: 'facade-rust-handoff',
+    sideEffectIdPrefix: 'facade-rust-side-effect',
+    updateIdPrefix: 'facade-rust-update'
+  });
+  const root = adapter.createRoot(container);
+  const create = adapter.getRootCreateRecord(root);
+  const metadata = createRootWorkLoopFinishedWorkMetadata({
+    hostType: 'div',
+    renderUpdateId: 'facade-rust-update:1',
+    rootId: create.rootId,
+    rootTag: create.rootTag,
+    textContent: 'text'
+  });
+
+  const handoff = adapter.renderNativeHandoff(root, element, {
+    rustRootWorkLoopFinishedWorkMetadata: metadata
+  });
+  const hidden =
+    rootBridge.getPrivateRootRenderNativeHandoffPayload(handoff);
+  const diagnostic = hidden.hostOutputRenderRecord;
+  const rootWorkLoopRecord = hidden.rootWorkLoopFinishedWorkRecord;
+  const rootWorkLoopPayload = hidden.rootWorkLoopFinishedWorkPayload;
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      hidden.hostOutputHandoff
+    );
+  const hostNode = hostOutputPayload.hostNode;
+  const textNode = hostOutputPayload.textNode;
+
+  assert.equal(
+    handoff.handoffStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED
+  );
+  assert.equal(handoff.handoffId, 'facade-rust-handoff:1');
+  assert.equal(handoff.rootId, 'facade-rust-root:1');
+  assert.equal(handoff.createRequestId, 'facade-rust-request:1');
+  assert.equal(handoff.renderRequestId, 'facade-rust-request:2');
+  assert.equal(handoff.renderUpdateId, 'facade-rust-update:1');
+  assert.equal(handoff.rootWorkLoopEvidenceAccepted, true);
+  assert.equal(handoff.rootWorkLoopFinishedWorkConsumed, true);
+  assert.equal(handoff.rootWorkLoopPublicRootRenderingBlocked, true);
+  assert.equal(handoff.nativeRequestRecord.environmentId, 1095);
+  assert.equal(
+    handoff.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_RENDER
+  );
+  assert.equal(handoff.privateFacadeRoot, true);
+  assert.equal(handoff.publicCreateRootEnabled, false);
+  assert.equal(handoff.publicHydrateRootEnabled, false);
+  assert.equal(handoff.publicRootCreated, false);
+  assert.equal(handoff.publicRootObjectExposed, false);
+  assert.equal(handoff.publicRootExecution, false);
+  assert.equal(handoff.publicRootCompatibilitySurface, false);
+  assert.equal(handoff.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(handoff.nativeExecution, false);
+  assert.equal(handoff.reconcilerExecution, false);
+  assert.equal(handoff.rootScheduled, false);
+  assert.equal(handoff.browserDomMutation, false);
+  assert.equal(handoff.markerWrites, false);
+  assert.equal(handoff.listenerInstallation, false);
+  assert.equal(handoff.hydration, false);
+  assert.equal(handoff.eventDispatch, false);
+  assert.equal(handoff.refEffects, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+
+  assert.equal(
+    diagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED
+  );
+  assert.equal(diagnostic.hostType, 'div');
+  assert.equal(diagnostic.hostOutputShape, 'host-component');
+  assert.equal(diagnostic.textContent, 'text');
+  assert.deepEqual(diagnostic.childTags, ['HostComponent', 'HostText']);
+  assert.equal(diagnostic.rootWorkLoopFinishedWorkConsumed, true);
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.nativeExecution, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.markerWrites, false);
+  assert.equal(diagnostic.listenerInstallation, false);
+  assert.equal(diagnostic.hydration, false);
+  assert.equal(diagnostic.eventDispatch, false);
+  assert.equal(diagnostic.refEffects, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+
+  assert.equal(rootWorkLoopRecord.metadataProvided, true);
+  assert.equal(rootWorkLoopRecord.metadataSource, metadata.source);
+  assert.equal(rootWorkLoopRecord.metadataStatus, metadata.status);
+  assert.equal(rootWorkLoopRecord.metadataRevision, metadata.metadataRevision);
+  assert.equal(rootWorkLoopRecord.renderUpdateId, 'facade-rust-update:1');
+  assert.equal(rootWorkLoopRecord.hostType, 'div');
+  assert.equal(rootWorkLoopRecord.textContent, 'text');
+  assert.equal(rootWorkLoopRecord.rootChildTag, 'HostComponent');
+  assert.equal(rootWorkLoopRecord.completedChildTag, 'HostComponent');
+  assert.equal(rootWorkLoopRecord.hostTextChildTag, 'HostText');
+  assert.deepEqual(rootWorkLoopRecord.childTags, [
+    'HostComponent',
+    'HostText'
+  ]);
+  assert.equal(rootWorkLoopRecord.publicRootRenderingBlocked, true);
+  assert.equal(rootWorkLoopRecord.publicRootExecution, false);
+  assert.equal(rootWorkLoopRecord.publicRootCompatibilitySurface, false);
+  assert.equal(rootWorkLoopRecord.nativeExecution, false);
+  assert.equal(rootWorkLoopRecord.reconcilerExecution, false);
+  assert.equal(rootWorkLoopRecord.hydration, false);
+  assert.equal(rootWorkLoopRecord.eventDispatch, false);
+  assert.equal(rootWorkLoopRecord.refEffects, false);
+  assert.equal(rootWorkLoopRecord.compatibilityClaimed, false);
+  assert.equal(rootWorkLoopPayload.metadata, metadata);
+  assert.equal(rootWorkLoopPayload.normalizedMetadata.source, metadata.source);
+  assert.equal(rootWorkLoopPayload.normalizedMetadata.status, metadata.status);
+  assert.equal(
+    rootWorkLoopPayload.normalizedMetadata.revision,
+    metadata.metadataRevision
+  );
+  assert.equal(
+    diagnostic.rootWorkLoopFinishedWorkMetadata.source,
+    metadata.source
+  );
+  assert.equal(
+    diagnostic.rootWorkLoopFinishedWorkMetadata.status,
+    metadata.status
+  );
+  assert.equal(
+    diagnostic.rootWorkLoopFinishedWorkMetadata.metadataRevision,
+    metadata.metadataRevision
+  );
+
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild, hostNode);
+  assert.equal(hostNode.nodeName, 'DIV');
+  assert.equal(hostNode.firstChild, textNode);
+  assert.equal(textNode.nodeValue, 'text');
+  assert.equal(container.textContent, 'text');
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), create.owner);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), create.owner);
+  assert.equal(componentTree.getLatestPropsFromNode(hostNode), element.props);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.deepEqual(adapter.getRootRenderNativeHandoffRecords(root), [
+    handoff
+  ]);
+  assert.deepEqual(adapter.getRootHostOutputRenderDiagnostics(root), [
+    diagnostic
+  ]);
+
+  const publicContainer = createElement(
+    'DIV',
+    createDocument('private-client-facade-rust-root-work-loop-public')
+  );
+  assert.throws(() => reactDomClient.createRoot(publicContainer), {
+    code: 'FAST_REACT_UNIMPLEMENTED',
+    entrypoint: 'react-dom/client',
+    exportName: 'createRoot'
+  });
+  assert.throws(
+    () => reactDomClient.hydrateRoot(publicContainer, element),
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'hydrateRoot'
+    }
+  );
+
+  hidden.bridge.cleanupInitialRenderHostOutput(hidden.hostOutputHandoff);
+  assert.equal(container.childNodes.length, 0);
+});
+
 test('private react-dom/client facade host-output update diagnostic routes root.render through fake DOM', () => {
   const document = createDocument('private-client-facade-host-output-update');
   const container = createElement('DIV', document);
