@@ -83,6 +83,61 @@ impl RootWorkLoopFinishedWorkMetadata {
     }
 }
 
+#[must_use]
+pub(crate) fn root_work_loop_finished_work_metadata_json_value(
+    metadata: &RootWorkLoopFinishedWorkMetadata,
+) -> serde_json::Value {
+    let facade = metadata.facade();
+    let complete_work = metadata.complete_work();
+    let pending = metadata.pending();
+    let commit = metadata.commit();
+    let placement = metadata.placement();
+
+    serde_json::json!({
+        "source": metadata.source(),
+        "status": metadata.status(),
+        "metadataRevision": metadata.metadata_revision(),
+        "facade": {
+            "rootId": facade.root_id(),
+            "rootTag": facade.root_tag(),
+            "renderUpdateId": facade.render_update_id(),
+            "hostType": facade.host_type(),
+            "hostOutputShape": facade.host_output_shape(),
+            "hostComponentCount": facade.host_component_count(),
+            "hostTextCount": facade.host_text_count(),
+            "textContent": facade.text_content()
+        },
+        "completeWork": {
+            "rootChildTag": complete_work.root_child_tag(),
+            "completedChildTag": complete_work.completed_child_tag(),
+            "hostTextChildTag": complete_work.host_text_child_tag(),
+            "childTags": complete_work.child_tags()
+        },
+        "pending": {
+            "recordsFinishedWork": pending.records_finished_work(),
+            "pendingWorkMatchesFinishedWork": pending.pending_work_matches_finished_work(),
+            "renderLanes": pending.render_lanes(),
+            "finishedLanes": pending.finished_lanes(),
+            "remainingLanes": pending.remaining_lanes()
+        },
+        "commit": {
+            "commitOrderAfterPendingRecord": commit.commit_order_after_pending_record(),
+            "consumedFinishedWorkRecord": commit.consumed_finished_work_record(),
+            "finishedWorkAfterCommit": commit.finished_work_after_commit(),
+            "finishedLanesAfterCommit": commit.finished_lanes_after_commit(),
+            "renderPhaseWorkAfterCommit": commit.render_phase_work_after_commit(),
+            "mutationExecutionBlocked": commit.mutation_execution_blocked(),
+            "publicRootRenderingBlocked": commit.public_root_rendering_blocked(),
+            "effectsRefsAndHydrationBlocked": commit.effects_refs_and_hydration_blocked()
+        },
+        "placement": {
+            "tag": placement.tag(),
+            "applyKind": placement.apply_kind(),
+            "siblingStatus": placement.sibling_status()
+        }
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RootWorkLoopFinishedWorkMetadataFacade {
     root_id: String,
