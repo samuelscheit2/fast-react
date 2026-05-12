@@ -22,6 +22,10 @@ const listenerRegistry = require(path.join(
   packageRoot,
   'src/events/listener-registry.js'
 ));
+const componentTree = require(path.join(
+  packageRoot,
+  'src/client/component-tree.js'
+));
 const {
   DOCUMENT_NODE,
   ELEMENT_NODE,
@@ -203,14 +207,29 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   const createRootContainer = createRootDocument.createElement('div');
   const createRootResult = reactDomClient.createRoot(createRootContainer);
   const escapedPublicId = 'app&<>"';
+  const updatedEscapedPublicId = 'next&<>"';
+  const removedPublicIdText = 'id removed & < >';
+  const initialPublicElement = React.createElement(
+    'div',
+    {id: escapedPublicId},
+    'hello & < >'
+  );
+  const updatedPublicElement = React.createElement(
+    'div',
+    {id: updatedEscapedPublicId},
+    'again & < >'
+  );
+  const idRemovalPublicElement = React.createElement(
+    'div',
+    null,
+    removedPublicIdText
+  );
 
   assert.deepEqual(Object.keys(createRootResult), ['render', 'unmount']);
   assert.equal(createRootResult.render.length, 1);
   assert.equal(createRootResult.unmount.length, 0);
   assert.equal(
-    createRootResult.render(
-      React.createElement('div', {id: escapedPublicId}, 'hello & < >')
-    ),
+    createRootResult.render(initialPublicElement),
     undefined
   );
   assert.equal(createRootContainer.childNodes.length, 1);
@@ -228,6 +247,14 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   assert.deepEqual([...createRootContainer.firstChild.attributes.entries()], [
     ['id', escapedPublicId]
   ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(createRootContainer.firstChild),
+    initialPublicElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(createRootContainer.firstChild).id,
+    escapedPublicId
+  );
   assert.equal(createRootContainer.firstChild.textContent, 'hello & < >');
   assert.equal(
     createRootContainer.firstChild.innerHTML,
@@ -239,6 +266,7 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     '<div id="app&amp;&lt;&gt;&quot;">hello &amp; &lt; &gt;</div>'
   );
   const initialHostNode = createRootContainer.firstChild;
+  assertNoRootMarkerOrListenerLeak(createRootContainer, createRootDocument);
   assert.throws(
     () => {
       createRootResult.render(
@@ -253,9 +281,7 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     }
   );
   assert.equal(
-    createRootResult.render(
-      React.createElement('div', {id: escapedPublicId}, 'again & < >')
-    ),
+    createRootResult.render(updatedPublicElement),
     undefined
   );
   assert.equal(createRootContainer.childNodes.length, 1);
@@ -265,11 +291,23 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   assert.equal(createRootContainer.firstChild.tagName, 'DIV');
   assert.equal(
     createRootContainer.firstChild.getAttribute('id'),
-    escapedPublicId
+    updatedEscapedPublicId
   );
   assert.deepEqual([...createRootContainer.firstChild.attributes.entries()], [
-    ['id', escapedPublicId]
+    ['id', updatedEscapedPublicId]
   ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(createRootContainer.firstChild),
+    updatedPublicElement.props
+  );
+  assert.notEqual(
+    componentTree.getLatestPropsFromNode(createRootContainer.firstChild),
+    initialPublicElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(createRootContainer.firstChild).id,
+    updatedEscapedPublicId
+  );
   assert.equal(createRootContainer.firstChild.textContent, 'again & < >');
   assert.equal(
     createRootContainer.firstChild.innerHTML,
@@ -278,9 +316,47 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   assert.equal(createRootContainer.textContent, 'again & < >');
   assert.equal(
     createRootContainer.innerHTML,
-    '<div id="app&amp;&lt;&gt;&quot;">again &amp; &lt; &gt;</div>'
+    '<div id="next&amp;&lt;&gt;&quot;">again &amp; &lt; &gt;</div>'
   );
+  assertNoRootMarkerOrListenerLeak(createRootContainer, createRootDocument);
+  assert.equal(
+    createRootResult.render(idRemovalPublicElement),
+    undefined
+  );
+  assert.equal(createRootContainer.childNodes.length, 1);
+  assert.equal(createRootContainer.children.length, 1);
+  assert.equal(createRootContainer.firstElementChild, initialHostNode);
+  assert.equal(createRootContainer.firstChild, initialHostNode);
+  assert.equal(createRootContainer.firstChild.tagName, 'DIV');
+  assert.equal(createRootContainer.firstChild.getAttribute('id'), null);
+  assert.deepEqual([...createRootContainer.firstChild.attributes.entries()], []);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(createRootContainer.firstChild),
+    idRemovalPublicElement.props
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(
+      componentTree.getLatestPropsFromNode(createRootContainer.firstChild),
+      'id'
+    ),
+    false
+  );
+  assert.equal(createRootContainer.firstChild.textContent, removedPublicIdText);
+  assert.equal(
+    createRootContainer.firstChild.innerHTML,
+    'id removed &amp; &lt; &gt;'
+  );
+  assert.equal(createRootContainer.textContent, removedPublicIdText);
+  assert.equal(
+    createRootContainer.innerHTML,
+    '<div>id removed &amp; &lt; &gt;</div>'
+  );
+  assertNoRootMarkerOrListenerLeak(createRootContainer, createRootDocument);
   assertPublicRenderFailureDoesNotLeak(
+    React.createElement('div', {className: 'blocked'}, 'blocked'),
+    'unsupported-className-prop'
+  );
+  assertPublicRenderUpdateFailureDoesNotLeak(
     React.createElement('div', {className: 'blocked'}, 'blocked'),
     'unsupported-className-prop'
   );
@@ -288,7 +364,15 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     React.createElement('span', null, 'blocked type'),
     'unsupported-type'
   );
+  assertPublicRenderUpdateFailureDoesNotLeak(
+    React.createElement('span', null, 'blocked type'),
+    'unsupported-type'
+  );
   assertPublicRenderFailureDoesNotLeak(
+    React.createElement('div', {id: {}}, 'blocked id'),
+    'unsupported-id-object'
+  );
+  assertPublicRenderUpdateFailureDoesNotLeak(
     React.createElement('div', {id: {}}, 'blocked id'),
     'unsupported-id-object'
   );
@@ -306,7 +390,23 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     ),
     'unsupported-fragment'
   );
+  assertPublicRenderUpdateFailureDoesNotLeak(
+    React.createElement(
+      Symbol.for('react.fragment'),
+      null,
+      React.createElement('div', null, 'blocked fragment')
+    ),
+    'unsupported-fragment'
+  );
   assertPublicRenderFailureDoesNotLeak(
+    React.createElement(
+      'div',
+      null,
+      React.createElement('span', null, 'blocked nested')
+    ),
+    'unsupported-nested'
+  );
+  assertPublicRenderUpdateFailureDoesNotLeak(
     React.createElement(
       'div',
       null,
@@ -356,6 +456,7 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   assert.equal(createRootContainer.firstElementChild, null);
   assert.equal(createRootContainer.textContent, '');
   assert.equal(createRootContainer.innerHTML, '');
+  assertNoRootMarkerOrListenerLeak(createRootContainer, createRootDocument);
   assert.throws(
     () => {
       createRootResult.render(React.createElement('div', null, 'stale'));
@@ -380,6 +481,7 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   assert.equal(createRootContainer.children.length, 0);
   assert.equal(createRootContainer.firstElementChild, null);
   assert.equal(createRootContainer.innerHTML, '');
+  assertNoRootMarkerOrListenerLeak(createRootContainer, createRootDocument);
 
   const recreatedRoot = reactDomClient.createRoot(createRootContainer);
   assert.equal(
@@ -396,6 +498,7 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   assert.equal(createRootContainer.children.length, 0);
   assert.equal(createRootContainer.firstElementChild, null);
   assert.equal(createRootContainer.innerHTML, '');
+  assertNoRootMarkerOrListenerLeak(createRootContainer, createRootDocument);
 
   const hydrateRootDocument = createDocument('public-hydrate-root-placeholder');
   const hydrateRootContainer = createElement('DIV', hydrateRootDocument);
@@ -735,6 +838,18 @@ function assertContainerUntouched(container, document) {
   assert.equal(document.__mutationLog.length, 0);
 }
 
+function assertNoRootMarkerOrListenerLeak(container, document) {
+  assert.equal(
+    rootMarkers.inspectContainerRootMarker(container).propertyCount,
+    0
+  );
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+}
+
 function assertPublicRenderFailureDoesNotLeak(element, label) {
   const document = createDocument(`public-create-root-${label}`);
   const container = document.createElement('div');
@@ -763,6 +878,41 @@ function assertPublicRenderFailureDoesNotLeak(element, label) {
   assert.equal(document.__registrations.length, 0);
   assert.equal(container.__mutationLog.length, 0);
   assert.equal(document.__mutationLog.length, 0);
+}
+
+function assertPublicRenderUpdateFailureDoesNotLeak(element, label) {
+  const document = createDocument(`public-create-root-update-${label}`);
+  const container = document.createElement('div');
+  document.__mutationLog.length = 0;
+  const root = reactDomClient.createRoot(container);
+
+  assert.equal(
+    root.render(React.createElement('div', {id: 'safe'}, 'safe')),
+    undefined
+  );
+  const initialHostNode = container.firstChild;
+  assert.equal(container.innerHTML, '<div id="safe">safe</div>');
+
+  assert.throws(
+    () => {
+      root.render(element);
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot().render'
+    }
+  );
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.children.length, 1);
+  assert.equal(container.firstElementChild, initialHostNode);
+  assert.equal(container.firstChild, initialHostNode);
+  assert.equal(container.firstChild.getAttribute('id'), 'safe');
+  assert.equal(container.innerHTML, '<div id="safe">safe</div>');
+  assert.equal(container.textContent, 'safe');
+  assertNoRootMarkerOrListenerLeak(container, document);
+  assert.equal(container.__mutationLog.length, 1);
+  assert.equal(document.__mutationLog.length, 2);
 }
 
 function createDocument(label) {

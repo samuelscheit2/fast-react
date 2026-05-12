@@ -151,14 +151,21 @@ function privatePromotion503533Row({
 }
 
 const MINIMAL_PUBLIC_DIV_TEXT_ID = "app&<>\"";
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID = "next&<>\"";
 const MINIMAL_PUBLIC_DIV_TEXT = "hello & < >";
 const MINIMAL_PUBLIC_DIV_TEXT_ESCAPED = "hello &amp; &lt; &gt;";
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE = "again & < >";
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED = "again &amp; &lt; &gt;";
+const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL = "id removed & < >";
+const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_ESCAPED =
+  "id removed &amp; &lt; &gt;";
 const MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED = "app&amp;&lt;&gt;&quot;";
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID_ESCAPED = "next&amp;&lt;&gt;&quot;";
 
-function minimalPublicDivTextApi(text) {
-  return `ReactDOMClient.createRoot(container).render(React.createElement("div", { id: ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID)} }, ${JSON.stringify(text)}))`;
+function minimalPublicDivTextApi(text, id = MINIMAL_PUBLIC_DIV_TEXT_ID) {
+  const props =
+    id === null ? "null" : `{ id: ${JSON.stringify(id)} }`;
+  return `ReactDOMClient.createRoot(container).render(React.createElement("div", ${props}, ${JSON.stringify(text)}))`;
 }
 
 function rootRenderMinimalPublicDivTextApi(rootName, text) {
@@ -170,8 +177,11 @@ const PUBLIC_ROOT_RENDER_INITIAL_API =
 const MINIMAL_PUBLIC_DIV_TEXT_RENDER_API =
   minimalPublicDivTextApi(MINIMAL_PUBLIC_DIV_TEXT);
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API = minimalPublicDivTextApi(
-  MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+  MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+  MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID
 );
+const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API =
+  `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.render(React.createElement("div", null, ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL)}))`;
 const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API =
   `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.unmount()`;
 const MINIMAL_PUBLIC_DIV_TEXT_RECREATE_AFTER_UNMOUNT_API = [
@@ -530,6 +540,10 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       expectedFirstElementChildGetAttributeId: MINIMAL_PUBLIC_DIV_TEXT_ID,
       expectedFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_ESCAPED,
       expectedFirstElementChildNodeName: "DIV",
+      expectedFirstElementChildStoredPropsChildren: MINIMAL_PUBLIC_DIV_TEXT,
+      expectedFirstElementChildStoredPropsHasId: true,
+      expectedFirstElementChildStoredPropsId: MINIMAL_PUBLIC_DIV_TEXT_ID,
+      expectedFirstElementChildStoredPropsSameObject: true,
       expectedFirstElementChildTagName: "DIV",
       expectedFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_TEXT,
       expectedInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_ESCAPED}</div>`,
@@ -548,16 +562,54 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       controlledDomShim: true,
       expectedChildrenCount: 1,
       expectedChildNodeNames: ["DIV"],
-      expectedFirstElementChildAttributes: [["id", MINIMAL_PUBLIC_DIV_TEXT_ID]],
-      expectedFirstElementChildGetAttributeId: MINIMAL_PUBLIC_DIV_TEXT_ID,
+      expectedFirstElementChildAttributes: [
+        ["id", MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID]
+      ],
+      expectedFirstElementChildGetAttributeId:
+        MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID,
       expectedFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED,
       expectedFirstElementChildNodeName: "DIV",
+      expectedFirstElementChildStoredPropsChildren:
+        MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+      expectedFirstElementChildStoredPropsHasId: true,
+      expectedFirstElementChildStoredPropsId:
+        MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID,
+      expectedFirstElementChildStoredPropsSameObject: true,
       expectedFirstElementChildTagName: "DIV",
       expectedFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
-      expectedInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED}</div>`,
+      expectedInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED}</div>`,
       expectedMutationLog: [["appendChild", "DIV"]],
       expectedTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
       minimalHostOutputAdmission: "update",
+      privateBridgeEvidence: "separate"
+    }),
+    Object.freeze({
+      id: "public-create-root-render-id-removal",
+      publicApi: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API,
+      scenarioId: "update-host-render",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      controlledDomShim: true,
+      expectedChildrenCount: 1,
+      expectedChildNodeNames: ["DIV"],
+      expectedFirstElementChildAttributes: [],
+      expectedFirstElementChildGetAttributeId: null,
+      expectedFirstElementChildInnerHTML:
+        MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_ESCAPED,
+      expectedFirstElementChildNodeName: "DIV",
+      expectedFirstElementChildStoredPropsChildren:
+        MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL,
+      expectedFirstElementChildStoredPropsHasId: false,
+      expectedFirstElementChildStoredPropsId: null,
+      expectedFirstElementChildStoredPropsSameObject: true,
+      expectedFirstElementChildTagName: "DIV",
+      expectedFirstElementChildTextContent:
+        MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL,
+      expectedInnerHTML: `<div>${MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_ESCAPED}</div>`,
+      expectedMutationLog: [["appendChild", "DIV"]],
+      expectedTextContent: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL,
+      minimalHostOutputAdmission: "id-removal",
       privateBridgeEvidence: "separate"
     }),
     Object.freeze({
@@ -574,6 +626,10 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       expectedFirstElementChildGetAttributeId: null,
       expectedFirstElementChildInnerHTML: null,
       expectedFirstElementChildNodeName: null,
+      expectedFirstElementChildStoredPropsChildren: null,
+      expectedFirstElementChildStoredPropsHasId: null,
+      expectedFirstElementChildStoredPropsId: null,
+      expectedFirstElementChildStoredPropsSameObject: null,
       expectedFirstElementChildTagName: null,
       expectedFirstElementChildTextContent: null,
       expectedInnerHTML: "",
@@ -600,6 +656,10 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       expectedFirstElementChildGetAttributeId: null,
       expectedFirstElementChildInnerHTML: null,
       expectedFirstElementChildNodeName: null,
+      expectedFirstElementChildStoredPropsChildren: null,
+      expectedFirstElementChildStoredPropsHasId: null,
+      expectedFirstElementChildStoredPropsId: null,
+      expectedFirstElementChildStoredPropsSameObject: null,
       expectedFirstElementChildTagName: null,
       expectedFirstElementChildTextContent: null,
       expectedInnerHTML: "",
@@ -625,7 +685,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS = Object.freeze(
       comparedToAcceptedReactDomOracle: true,
       publicCompatibilityClaimed: false,
       reason:
-        "Public React DOM root facade behavior stays blocked outside the admitted fake-DOM div text render, repeat render, rendered-root unmount cleanup, and recreate-after-unmount path."
+        "Public React DOM root facade behavior stays blocked outside the admitted fake-DOM div text render, id/text update, id removal update, rendered-root unmount cleanup, and recreate-after-unmount path."
     })
   )
 );
@@ -980,7 +1040,7 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
 
   if (result.summary.blockedPublicFacadeRowCount > 0) {
     lines.push(
-      "Compatibility remains blocked; minimal public createRoot/div-text render, repeat render, rendered-root unmount cleanup, and recreate-after-unmount are scoped while hydrateRoot and broad root behavior stay fail-closed."
+      "Compatibility remains blocked; minimal public createRoot/div-text render, id/text update, id removal update, rendered-root unmount cleanup, and recreate-after-unmount are scoped while hydrateRoot and broad root behavior stay fail-closed."
     );
   }
   if (result.summary.blockedPrivateBridgeRowCount > 0) {
@@ -1077,6 +1137,9 @@ export function inspectReactDomRootPublicFacadeBoundary({
     const listenerRegistry = require(
       join(workspaceRoot, "packages/react-dom/src/events/listener-registry.js")
     );
+    const componentTree = require(
+      join(workspaceRoot, "packages/react-dom/src/client/component-tree.js")
+    );
     const domContainer = require(
       join(workspaceRoot, "packages/react-dom/src/client/dom-container.js")
     );
@@ -1117,6 +1180,7 @@ export function inspectReactDomRootPublicFacadeBoundary({
       listenerRegistry
     );
     const publicRootLifecycle = inspectReactDomRootPublicFacadeLifecycle({
+      componentTree,
       domContainer,
       listenerRegistry,
       React,
@@ -2908,14 +2972,20 @@ function validatePublicRootLifecycleBlocked({
       expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API
     },
     {
-      key: "unmount",
+      key: "renderIdRemoval",
       expected: lifecycleRowSource[3],
+      expectedId: "public-create-root-render-id-removal",
+      expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API
+    },
+    {
+      key: "unmount",
+      expected: lifecycleRowSource[4],
       expectedId: "public-create-root-unmount-call",
       expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API
     },
     {
       key: "recreateAfterUnmount",
-      expected: lifecycleRowSource[4],
+      expected: lifecycleRowSource[5],
       expectedId: "public-create-root-recreate-after-unmount",
       expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_RECREATE_AFTER_UNMOUNT_API
     }
@@ -2972,7 +3042,8 @@ function validatePublicRootLifecycleBlocked({
       operation.sideEffects.ownerDocumentMutationCount === 0 &&
       getRootFacadeMutationCount(operation.sideEffects) ===
         expected.expectedMutationLog.length &&
-      (expected.minimalHostOutputAdmission !== "update" ||
+      ((expected.minimalHostOutputAdmission !== "update" &&
+        expected.minimalHostOutputAdmission !== "id-removal") ||
         operation.hostNodeReused === true) &&
       (expected.minimalHostOutputAdmission !== "unmount" ||
         operation.duplicateRootTrackingCleared === true) &&
@@ -2992,6 +3063,8 @@ function validatePublicRootLifecycleBlocked({
           expected.minimalHostOutputAdmission === "render",
         minimalDivTextHostOutputUpdated:
           expected.minimalHostOutputAdmission === "update",
+        minimalDivTextHostOutputIdRemoved:
+          expected.minimalHostOutputAdmission === "id-removal",
         minimalDivTextHostOutputUnmounted:
           expected.minimalHostOutputAdmission === "unmount",
         minimalDivTextHostOutputRecreatedAfterUnmount:
@@ -3201,6 +3274,12 @@ function createPublicDivTextSnapshotExpectation({
       : null,
     expectedFirstElementChildInnerHTML: childPresent ? escapedText : null,
     expectedFirstElementChildNodeName: childPresent ? "DIV" : null,
+    expectedFirstElementChildStoredPropsChildren: childPresent ? text : null,
+    expectedFirstElementChildStoredPropsHasId: childPresent ? true : null,
+    expectedFirstElementChildStoredPropsId: childPresent
+      ? MINIMAL_PUBLIC_DIV_TEXT_ID
+      : null,
+    expectedFirstElementChildStoredPropsSameObject: childPresent ? true : null,
     expectedFirstElementChildTagName: childPresent ? "DIV" : null,
     expectedFirstElementChildTextContent: childPresent ? text : null,
     expectedInnerHTML: childPresent
@@ -3241,6 +3320,10 @@ function isPublicRenderControlledDomShimUntouched(snapshot) {
     snapshot.containerFirstElementChildGetAttributeId === null &&
     snapshot.containerFirstElementChildInnerHTML === null &&
     snapshot.containerFirstElementChildNodeName === null &&
+    snapshot.containerFirstElementChildStoredPropsChildren === null &&
+    snapshot.containerFirstElementChildStoredPropsHasId === null &&
+    snapshot.containerFirstElementChildStoredPropsId === null &&
+    snapshot.containerFirstElementChildStoredPropsSameObject === null &&
     snapshot.containerFirstElementChildTagName === null &&
     snapshot.containerFirstElementChildTextContent === null &&
     snapshot.containerInnerHTML === "" &&
@@ -3270,6 +3353,14 @@ function isPublicRenderControlledDomShimExpectedSnapshot(snapshot, expected) {
       expected.expectedFirstElementChildInnerHTML &&
     snapshot.containerFirstElementChildNodeName ===
       expected.expectedFirstElementChildNodeName &&
+    snapshot.containerFirstElementChildStoredPropsChildren ===
+      expected.expectedFirstElementChildStoredPropsChildren &&
+    snapshot.containerFirstElementChildStoredPropsHasId ===
+      expected.expectedFirstElementChildStoredPropsHasId &&
+    snapshot.containerFirstElementChildStoredPropsId ===
+      expected.expectedFirstElementChildStoredPropsId &&
+    snapshot.containerFirstElementChildStoredPropsSameObject ===
+      expected.expectedFirstElementChildStoredPropsSameObject &&
     snapshot.containerFirstElementChildTagName ===
       expected.expectedFirstElementChildTagName &&
     snapshot.containerFirstElementChildTextContent ===
@@ -3508,6 +3599,7 @@ function rejectClientRootCompatibilityClaimsWhileBlocked({
   }
 }
 function inspectReactDomRootPublicFacadeLifecycle({
+  componentTree,
   domContainer,
   listenerRegistry,
   React,
@@ -3531,6 +3623,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
       }
     }),
     renderDivText: attemptControlledPublicRootRenderDivTextOperation({
+      componentTree,
       domContainer,
       label: MINIMAL_PUBLIC_DIV_TEXT_RENDER_API,
       listenerRegistry,
@@ -3539,6 +3632,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
       rootMarkers
     }),
     renderUpdate: attemptControlledPublicRootRenderUpdateOperation({
+      componentTree,
       domContainer,
       label: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API,
       listenerRegistry,
@@ -3546,7 +3640,17 @@ function inspectReactDomRootPublicFacadeLifecycle({
       reactDomClient,
       rootMarkers
     }),
+    renderIdRemoval: attemptControlledPublicRootRenderIdRemovalOperation({
+      componentTree,
+      domContainer,
+      label: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API,
+      listenerRegistry,
+      React,
+      reactDomClient,
+      rootMarkers
+    }),
     unmount: attemptControlledPublicRootUnmountOperation({
+      componentTree,
       domContainer,
       label: MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API,
       listenerRegistry,
@@ -3555,6 +3659,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
       rootMarkers
     }),
     recreateAfterUnmount: attemptControlledPublicRootRecreateAfterUnmountOperation({
+      componentTree,
       domContainer,
       label: MINIMAL_PUBLIC_DIV_TEXT_RECREATE_AFTER_UNMOUNT_API,
       listenerRegistry,
@@ -3617,6 +3722,7 @@ function attemptChainedPublicRootOperation({
 }
 
 function attemptControlledPublicRootRenderDivTextOperation({
+  componentTree,
   domContainer,
   label,
   listenerRegistry,
@@ -3629,6 +3735,7 @@ function attemptControlledPublicRootRenderDivTextOperation({
     label
   });
   let createRootAttempt = null;
+  let expectedLatestProps = null;
   let lifecycleOperationAttempted = false;
   let rootObjectCreated = false;
 
@@ -3650,13 +3757,13 @@ function attemptControlledPublicRootRenderDivTextOperation({
     }
 
     lifecycleOperationAttempted = true;
-    return root.render(
-      React.createElement(
-        "div",
-        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
-        MINIMAL_PUBLIC_DIV_TEXT
-      )
+    const element = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+      MINIMAL_PUBLIC_DIV_TEXT
     );
+    expectedLatestProps = element.props;
+    return root.render(element);
   });
 
   return {
@@ -3665,7 +3772,9 @@ function attemptControlledPublicRootRenderDivTextOperation({
     compatibilityClaimed: false,
     controlledDomShim: true,
     controlledDomSnapshot: summarizePublicRenderControlledDomShim({
+      componentTree,
       container,
+      expectedLatestProps,
       ownerDocument
     }),
     createRootAttempt,
@@ -3683,6 +3792,7 @@ function attemptControlledPublicRootRenderDivTextOperation({
 }
 
 function attemptControlledPublicRootRenderUpdateOperation({
+  componentTree,
   domContainer,
   label,
   listenerRegistry,
@@ -3695,6 +3805,7 @@ function attemptControlledPublicRootRenderUpdateOperation({
     label
   });
   let createRootAttempt = null;
+  let expectedLatestProps = null;
   let hostNodeReused = false;
   let lifecycleOperationAttempted = false;
   let rootObjectCreated = false;
@@ -3717,21 +3828,20 @@ function attemptControlledPublicRootRenderUpdateOperation({
     }
 
     lifecycleOperationAttempted = true;
-    root.render(
-      React.createElement(
-        "div",
-        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
-        MINIMAL_PUBLIC_DIV_TEXT
-      )
+    const initialElement = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+      MINIMAL_PUBLIC_DIV_TEXT
     );
+    root.render(initialElement);
     const initialHostNode = container.firstChild;
-    const value = root.render(
-      React.createElement(
-        "div",
-        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
-        MINIMAL_PUBLIC_DIV_TEXT_UPDATE
-      )
+    const updateElement = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID },
+      MINIMAL_PUBLIC_DIV_TEXT_UPDATE
     );
+    expectedLatestProps = updateElement.props;
+    const value = root.render(updateElement);
     hostNodeReused =
       initialHostNode !== null && container.firstChild === initialHostNode;
     return value;
@@ -3743,7 +3853,9 @@ function attemptControlledPublicRootRenderUpdateOperation({
     compatibilityClaimed: false,
     controlledDomShim: true,
     controlledDomSnapshot: summarizePublicRenderControlledDomShim({
+      componentTree,
       container,
+      expectedLatestProps,
       ownerDocument
     }),
     createRootAttempt,
@@ -3761,7 +3873,96 @@ function attemptControlledPublicRootRenderUpdateOperation({
   };
 }
 
+function attemptControlledPublicRootRenderIdRemovalOperation({
+  componentTree,
+  domContainer,
+  label,
+  listenerRegistry,
+  React,
+  reactDomClient,
+  rootMarkers
+}) {
+  const { container, ownerDocument } = createPublicRenderControlledDomShim({
+    domContainer,
+    label
+  });
+  let createRootAttempt = null;
+  let expectedLatestProps = null;
+  let hostNodeReused = false;
+  let lifecycleOperationAttempted = false;
+  let rootObjectCreated = false;
+
+  const result = attemptGateOperation(label, () => {
+    let root;
+    try {
+      root = reactDomClient.createRoot(container);
+      createRootAttempt = {
+        status: "ok",
+        value: describeLocalValue(root)
+      };
+      rootObjectCreated = root !== null && typeof root === "object";
+    } catch (error) {
+      createRootAttempt = {
+        status: "throws",
+        thrown: serializeGateError(error)
+      };
+      throw error;
+    }
+
+    lifecycleOperationAttempted = true;
+    const initialElement = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+      MINIMAL_PUBLIC_DIV_TEXT
+    );
+    root.render(initialElement);
+    const initialHostNode = container.firstChild;
+    const updateElement = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID },
+      MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+    );
+    root.render(updateElement);
+    const removalElement = React.createElement(
+      "div",
+      null,
+      MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL
+    );
+    expectedLatestProps = removalElement.props;
+    const value = root.render(removalElement);
+    hostNodeReused =
+      initialHostNode !== null && container.firstChild === initialHostNode;
+    return value;
+  });
+
+  return {
+    ...result,
+    blockedAt: createRootAttempt?.status === "throws" ? "createRoot" : null,
+    compatibilityClaimed: false,
+    controlledDomShim: true,
+    controlledDomSnapshot: summarizePublicRenderControlledDomShim({
+      componentTree,
+      container,
+      expectedLatestProps,
+      ownerDocument
+    }),
+    createRootAttempt,
+    hostNodeReused,
+    lifecycleOperationAttempted,
+    renderElementType: "div",
+    renderTextContent: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL,
+    rootObjectCreated,
+    sideEffects: inspectRootFacadeSideEffects(
+      container,
+      ownerDocument,
+      rootMarkers,
+      listenerRegistry
+    )
+  };
+}
+
 function attemptControlledPublicRootUnmountOperation({
+  componentTree,
   domContainer,
   label,
   listenerRegistry,
@@ -3819,7 +4020,9 @@ function attemptControlledPublicRootUnmountOperation({
     compatibilityClaimed: false,
     controlledDomShim: true,
     controlledDomSnapshot: summarizePublicRenderControlledDomShim({
+      componentTree,
       container,
+      expectedLatestProps: null,
       ownerDocument
     }),
     createRootAttempt,
@@ -3838,6 +4041,7 @@ function attemptControlledPublicRootUnmountOperation({
 }
 
 function attemptControlledPublicRootRecreateAfterUnmountOperation({
+  componentTree,
   domContainer,
   label,
   listenerRegistry,
@@ -3879,31 +4083,35 @@ function attemptControlledPublicRootRecreateAfterUnmountOperation({
     }
 
     lifecycleOperationAttempted = true;
-    root.render(
-      React.createElement(
-        "div",
-        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
-        MINIMAL_PUBLIC_DIV_TEXT
-      )
+    const initialElement = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+      MINIMAL_PUBLIC_DIV_TEXT
     );
+    root.render(initialElement);
     recreateSnapshots.initialRender = summarizePublicRenderControlledDomShim({
+      componentTree,
       container,
+      expectedLatestProps: initialElement.props,
       ownerDocument
     });
-    root.render(
-      React.createElement(
-        "div",
-        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
-        MINIMAL_PUBLIC_DIV_TEXT_UPDATE
-      )
+    const sameRootUpdateElement = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+      MINIMAL_PUBLIC_DIV_TEXT_UPDATE
     );
+    root.render(sameRootUpdateElement);
     recreateSnapshots.sameRootUpdate = summarizePublicRenderControlledDomShim({
+      componentTree,
       container,
+      expectedLatestProps: sameRootUpdateElement.props,
       ownerDocument
     });
     root.unmount();
     recreateSnapshots.firstUnmount = summarizePublicRenderControlledDomShim({
+      componentTree,
       container,
+      expectedLatestProps: null,
       ownerDocument
     });
 
@@ -3924,7 +4132,9 @@ function attemptControlledPublicRootRecreateAfterUnmountOperation({
     );
     recreateSnapshots.afterStaleOldRootAttempts =
       summarizePublicRenderControlledDomShim({
+        componentTree,
         container,
+        expectedLatestProps: null,
         ownerDocument
       });
 
@@ -3943,23 +4153,27 @@ function attemptControlledPublicRootRecreateAfterUnmountOperation({
 
     const freshRender = attemptGateOperationWithValue(
       "fresh root.render after recreate",
-      () =>
-        freshRoot.render(
-          React.createElement(
-            "div",
-            { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
-            MINIMAL_PUBLIC_DIV_TEXT
-          )
-        )
+      () => {
+        const freshElement = React.createElement(
+          "div",
+          { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+          MINIMAL_PUBLIC_DIV_TEXT
+        );
+        const value = freshRoot.render(freshElement);
+        recreateSnapshots.freshRender =
+          summarizePublicRenderControlledDomShim({
+            componentTree,
+            container,
+            expectedLatestProps: freshElement.props,
+            ownerDocument
+          });
+        return value;
+      }
     );
     freshRenderAttempt = freshRender.attempt;
     if (freshRender.error) {
       throw freshRender.error;
     }
-    recreateSnapshots.freshRender = summarizePublicRenderControlledDomShim({
-      container,
-      ownerDocument
-    });
 
     const freshUnmount = attemptGateOperationWithValue(
       "fresh root.unmount after recreate",
@@ -3978,7 +4192,9 @@ function attemptControlledPublicRootRecreateAfterUnmountOperation({
     compatibilityClaimed: false,
     controlledDomShim: true,
     controlledDomSnapshot: summarizePublicRenderControlledDomShim({
+      componentTree,
       container,
+      expectedLatestProps: null,
       ownerDocument
     }),
     createRootAttempt,
@@ -4222,8 +4438,28 @@ function createPublicRenderControlledDomShim({ domContainer, label }) {
   };
 }
 
-function summarizePublicRenderControlledDomShim({ container, ownerDocument }) {
+function summarizePublicRenderControlledDomShim({
+  componentTree,
+  container,
+  expectedLatestProps,
+  ownerDocument
+}) {
   const firstElementChild = container.firstElementChild;
+  const latestProps =
+    firstElementChild === null ||
+    componentTree === null ||
+    componentTree === undefined ||
+    typeof componentTree.getLatestPropsFromNode !== "function"
+      ? null
+      : componentTree.getLatestPropsFromNode(firstElementChild);
+  const latestPropsObject =
+    latestProps !== null && typeof latestProps === "object"
+      ? latestProps
+      : null;
+  const latestPropsHasId =
+    firstElementChild === null || latestPropsObject === null
+      ? null
+      : Object.prototype.hasOwnProperty.call(latestPropsObject, "id");
   return {
     containerChildCount: container.childNodes.length,
     containerChildNodeNames: summarizeChildNodeNames(container),
@@ -4236,6 +4472,16 @@ function summarizePublicRenderControlledDomShim({ container, ownerDocument }) {
       firstElementChild === null ? null : firstElementChild.innerHTML,
     containerFirstElementChildNodeName:
       firstElementChild === null ? null : firstElementChild.nodeName,
+    containerFirstElementChildStoredPropsChildren:
+      latestPropsObject === null ||
+      !Object.prototype.hasOwnProperty.call(latestPropsObject, "children")
+        ? null
+        : latestPropsObject.children,
+    containerFirstElementChildStoredPropsHasId: latestPropsHasId,
+    containerFirstElementChildStoredPropsId:
+      latestPropsHasId === true ? latestPropsObject.id : null,
+    containerFirstElementChildStoredPropsSameObject:
+      firstElementChild === null ? null : latestProps === expectedLatestProps,
     containerFirstElementChildTagName:
       firstElementChild === null ? null : firstElementChild.tagName,
     containerFirstElementChildTextContent:

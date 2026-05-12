@@ -51,11 +51,26 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
   const publicDocument = createDocument('public');
   const publicContainer = publicDocument.createElement('div');
   const publicId = 'app&<>"';
+  const updatedPublicId = 'next&<>"';
+  const removedPublicIdText = 'id removed & < >';
   publicDocument.__mutationLog.length = 0;
   const root = reactDomClient.createRoot(publicContainer);
-  const renderReturn = root.render(
-    React.createElement('div', {id: publicId}, 'hello & < >')
+  const initialElement = React.createElement(
+    'div',
+    {id: publicId},
+    'hello & < >'
   );
+  const updateElement = React.createElement(
+    'div',
+    {id: updatedPublicId},
+    'again & < >'
+  );
+  const idRemovalElement = React.createElement(
+    'div',
+    null,
+    removedPublicIdText
+  );
+  const renderReturn = root.render(initialElement);
 
   assert.equal(renderReturn, undefined);
   assert.equal(publicContainer.childNodes.length, 1);
@@ -67,6 +82,14 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
   assert.deepEqual(attributeEntries(publicContainer.firstChild), [
     ['id', publicId]
   ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(publicContainer.firstChild),
+    initialElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(publicContainer.firstChild).id,
+    publicId
+  );
   assert.equal(publicContainer.firstChild.textContent, 'hello & < >');
   assert.equal(publicContainer.firstChild.innerHTML, 'hello &amp; &lt; &gt;');
   assert.equal(publicContainer.textContent, 'hello & < >');
@@ -80,24 +103,66 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
   assert.equal(listenerRegistry.hasListeningMarker(publicContainer), false);
   assert.equal(listenerRegistry.hasListeningMarker(publicDocument), false);
   const initialHostNode = publicContainer.firstChild;
-  const updateReturn = root.render(
-    React.createElement('div', {id: publicId}, 'again & < >')
-  );
+  const updateReturn = root.render(updateElement);
   assert.equal(updateReturn, undefined);
   assert.equal(publicContainer.childNodes.length, 1);
   assert.equal(publicContainer.children.length, 1);
   assert.equal(publicContainer.firstElementChild, initialHostNode);
   assert.equal(publicContainer.firstChild, initialHostNode);
-  assert.equal(publicContainer.firstChild.getAttribute('id'), publicId);
+  assert.equal(
+    publicContainer.firstChild.getAttribute('id'),
+    updatedPublicId
+  );
   assert.deepEqual(attributeEntries(publicContainer.firstChild), [
-    ['id', publicId]
+    ['id', updatedPublicId]
   ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(publicContainer.firstChild),
+    updateElement.props
+  );
+  assert.notEqual(
+    componentTree.getLatestPropsFromNode(publicContainer.firstChild),
+    initialElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(publicContainer.firstChild).id,
+    updatedPublicId
+  );
   assert.equal(publicContainer.firstChild.textContent, 'again & < >');
   assert.equal(publicContainer.firstChild.innerHTML, 'again &amp; &lt; &gt;');
   assert.equal(publicContainer.textContent, 'again & < >');
   assert.equal(
     publicContainer.innerHTML,
-    '<div id="app&amp;&lt;&gt;&quot;">again &amp; &lt; &gt;</div>'
+    '<div id="next&amp;&lt;&gt;&quot;">again &amp; &lt; &gt;</div>'
+  );
+  const idRemovalReturn = root.render(idRemovalElement);
+  assert.equal(idRemovalReturn, undefined);
+  assert.equal(publicContainer.childNodes.length, 1);
+  assert.equal(publicContainer.children.length, 1);
+  assert.equal(publicContainer.firstElementChild, initialHostNode);
+  assert.equal(publicContainer.firstChild, initialHostNode);
+  assert.equal(publicContainer.firstChild.getAttribute('id'), null);
+  assert.deepEqual(attributeEntries(publicContainer.firstChild), []);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(publicContainer.firstChild),
+    idRemovalElement.props
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(
+      componentTree.getLatestPropsFromNode(publicContainer.firstChild),
+      'id'
+    ),
+    false
+  );
+  assert.equal(publicContainer.firstChild.textContent, removedPublicIdText);
+  assert.equal(
+    publicContainer.firstChild.innerHTML,
+    'id removed &amp; &lt; &gt;'
+  );
+  assert.equal(publicContainer.textContent, removedPublicIdText);
+  assert.equal(
+    publicContainer.innerHTML,
+    '<div>id removed &amp; &lt; &gt;</div>'
   );
   const unmountReturn = root.unmount();
   assert.equal(unmountReturn, undefined);
