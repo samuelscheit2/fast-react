@@ -511,11 +511,14 @@ function consumePublicReactDomFlushSyncBlockedCurrentnessReport(report) {
 }
 
 function validatePublicReactDomFlushSyncBlockedCurrentnessReport(report) {
-  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+  if (!isObjectLike(report)) {
     return 'public-react-dom-flush-sync-currentness-not-frozen';
   }
   if (!publicFlushSyncBlockedCurrentnessReports.has(report)) {
     return 'public-react-dom-flush-sync-currentness-source-proof';
+  }
+  if (!Object.isFrozen(report)) {
+    return 'public-react-dom-flush-sync-currentness-not-frozen';
   }
   if (
     report.kind !== publicFlushSyncBlockedCurrentnessKind ||

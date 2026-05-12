@@ -295,12 +295,43 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
     );
   }
 
+  const frozenForgedReport = Object.freeze({
+    ...report
+  });
   assertFlushSyncCurrentnessRejected(
-    Object.freeze({
-      ...report
-    }),
+    frozenForgedReport,
     'public-react-dom-flush-sync-currentness-source-proof'
   );
+
+  const mutableForgedReport = {
+    ...report
+  };
+  assert.equal(Object.isFrozen(mutableForgedReport), false);
+  assertFlushSyncCurrentnessRejected(
+    mutableForgedReport,
+    'public-react-dom-flush-sync-currentness-source-proof'
+  );
+
+  const hostileForgedReport = createHostileFlushSyncCurrentnessReport();
+  assertFlushSyncCurrentnessRejected(
+    hostileForgedReport.report,
+    'public-react-dom-flush-sync-currentness-source-proof'
+  );
+  assert.deepEqual(hostileForgedReport.getTrapCounts(), {
+    get: 0,
+    ownKeys: 0,
+    getOwnPropertyDescriptor: 0,
+    isExtensible: 0
+  });
+
+  const mutableOwnedReport =
+    createFlushSyncCurrentnessReportWithFreezeBypass();
+  assert.equal(Object.isFrozen(mutableOwnedReport), false);
+  assertFlushSyncCurrentnessRejected(
+    mutableOwnedReport,
+    'public-react-dom-flush-sync-currentness-not-frozen'
+  );
+
   assertFlushSyncCurrentnessRejected(
     guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
       scenarios: report.scenarios
@@ -940,6 +971,57 @@ function assertFlushSyncCurrentnessRejected(report, reason) {
     },
     reason
   );
+}
+
+function createHostileFlushSyncCurrentnessReport() {
+  const trapCounts = {
+    get: 0,
+    ownKeys: 0,
+    getOwnPropertyDescriptor: 0,
+    isExtensible: 0
+  };
+  const trap = (name) => {
+    trapCounts[name]++;
+    throw new Error(
+      `unexpected ${name} trap before flushSync currentness source proof`
+    );
+  };
+
+  return {
+    report: new Proxy(
+      {},
+      {
+        get() {
+          trap('get');
+        },
+        ownKeys() {
+          trap('ownKeys');
+        },
+        getOwnPropertyDescriptor() {
+          trap('getOwnPropertyDescriptor');
+        },
+        isExtensible() {
+          trap('isExtensible');
+        }
+      }
+    ),
+    getTrapCounts() {
+      return {
+        ...trapCounts
+      };
+    }
+  };
+}
+
+function createFlushSyncCurrentnessReportWithFreezeBypass() {
+  const originalFreeze = Object.freeze;
+  Object.freeze = (value) => value;
+
+  try {
+    return guard.createPublicReactDomFlushSyncBlockedCurrentnessReport();
+  } finally {
+    Object.freeze = originalFreeze;
+  }
 }
 
 function replaceCurrentnessScenario(report, index, overrides) {
