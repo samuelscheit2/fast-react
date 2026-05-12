@@ -23,8 +23,7 @@ test("workspace conformance test script covers every executable conformance test
   });
   const importedEntriesByEntry = await discoverStaticImportsForEntries({
     root: conformanceRoot,
-    entries: directAnalysis.directCoveredEntries,
-    requiredEntries
+    entries: directAnalysis.directCoveredEntries
   });
   const analysis = analyzeConformanceTestScriptCoverage({
     testScript: packageJson.scripts.test,
@@ -255,6 +254,152 @@ test("static wrapper import discovery accepts nested gates imported by covered n
   ]);
 });
 
+test("static import graph discovery follows transitive wrapper coverage", async () => {
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "fast-react-conformance-discovery-")
+  );
+
+  try {
+    await writeConformanceFixtureFile(
+      root,
+      "test/root-wrapper.test.mjs",
+      'import "./intermediate-wrapper.mjs";\n'
+    );
+    await writeConformanceFixtureFile(
+      root,
+      "test/intermediate-wrapper.mjs",
+      'import "./final-gate.mjs";\n'
+    );
+    await writeConformanceFixtureFile(root, "test/final-gate.mjs");
+    await writeConformanceFixtureFile(root, "src/source-helper.mjs");
+
+    const requiredEntries = await discoverRequiredConformanceTestEntries(root);
+    const directAnalysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries
+    });
+    const importedEntriesByEntry = await discoverStaticImportsForEntries({
+      root,
+      entries: directAnalysis.directCoveredEntries
+    });
+    const analysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries,
+      importedEntriesByEntry
+    });
+
+    assert.deepEqual(requiredEntries, [
+      "test/final-gate.mjs",
+      "test/intermediate-wrapper.mjs",
+      "test/root-wrapper.test.mjs"
+    ]);
+    assert.deepEqual(importedEntriesByEntry, new Map([
+      ["test/final-gate.mjs", []],
+      ["test/intermediate-wrapper.mjs", ["test/final-gate.mjs"]],
+      ["test/root-wrapper.test.mjs", ["test/intermediate-wrapper.mjs"]]
+    ]));
+    assert.deepEqual(analysis.uncoveredEntries, []);
+    assert.deepEqual(analysis.importCoveredEntries, [
+      "test/final-gate.mjs",
+      "test/intermediate-wrapper.mjs"
+    ]);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("recursive static import coverage is cycle-safe and ignores false-green imports", async () => {
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "fast-react-conformance-discovery-")
+  );
+
+  try {
+    await writeConformanceFixtureFile(
+      root,
+      "test/root-wrapper.test.mjs",
+      [
+        'import "./cycle-a.mjs";',
+        'import "./nonstatic-wrapper.mjs";',
+        'import "../fixtures/unrelated-sidecar.mjs";',
+        'import "react";',
+        ""
+      ].join("\n")
+    );
+    await writeConformanceFixtureFile(
+      root,
+      "test/cycle-a.mjs",
+      'import "./cycle-b.mjs";\n'
+    );
+    await writeConformanceFixtureFile(
+      root,
+      "test/cycle-b.mjs",
+      'import "./cycle-a.mjs";\n'
+    );
+    await writeConformanceFixtureFile(
+      root,
+      "test/nonstatic-wrapper.mjs",
+      [
+        '// import "./missed-gate.mjs";',
+        'const text = "import \\"./missed-gate.mjs\\"";',
+        "const template = `import \"./missed-gate.mjs\"`;",
+        'const load = () => import("./missed-gate.mjs");',
+        "export { load };",
+        ""
+      ].join("\n")
+    );
+    await writeConformanceFixtureFile(
+      root,
+      "fixtures/unrelated-sidecar.mjs",
+      "export {};\n"
+    );
+    await writeConformanceFixtureFile(root, "test/missed-gate.mjs");
+    await writeConformanceFixtureFile(root, "src/source-helper.mjs");
+
+    const requiredEntries = await discoverRequiredConformanceTestEntries(root);
+    const directAnalysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries
+    });
+    const importedEntriesByEntry = await discoverStaticImportsForEntries({
+      root,
+      entries: directAnalysis.directCoveredEntries
+    });
+    const analysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries,
+      importedEntriesByEntry
+    });
+
+    assert.deepEqual(importedEntriesByEntry, new Map([
+      ["fixtures/unrelated-sidecar.mjs", []],
+      ["test/cycle-a.mjs", ["test/cycle-b.mjs"]],
+      ["test/cycle-b.mjs", ["test/cycle-a.mjs"]],
+      ["test/nonstatic-wrapper.mjs", []],
+      [
+        "test/root-wrapper.test.mjs",
+        [
+          "fixtures/unrelated-sidecar.mjs",
+          "test/cycle-a.mjs",
+          "test/nonstatic-wrapper.mjs"
+        ]
+      ]
+    ]));
+    assert.deepEqual(analysis.coveredEntries, [
+      "test/cycle-a.mjs",
+      "test/cycle-b.mjs",
+      "test/nonstatic-wrapper.mjs",
+      "test/root-wrapper.test.mjs"
+    ]);
+    assert.deepEqual(analysis.uncoveredEntries, ["test/missed-gate.mjs"]);
+    assert.equal(
+      analysis.coveredEntries.includes("fixtures/unrelated-sidecar.mjs"),
+      false
+    );
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 async function discoverRequiredConformanceTestEntries(root) {
   const testEntries = await discoverMjsFiles(path.join(root, "test"), {
     include: (name) => name.endsWith(".mjs"),
@@ -270,20 +415,34 @@ async function discoverRequiredConformanceTestEntries(root) {
 
 async function discoverStaticImportsForEntries({
   root,
-  entries,
-  requiredEntries
+  entries
 }) {
-  const requiredEntrySet = new Set(requiredEntries);
   const importsByEntry = new Map();
+  const pendingEntries = [...entries].sort(compareEntries);
+  const visitedEntries = new Set();
 
-  for (const entry of entries) {
+  while (pendingEntries.length > 0) {
+    const entry = pendingEntries.shift();
+    if (visitedEntries.has(entry)) {
+      continue;
+    }
+    visitedEntries.add(entry);
+
     const source = await fs.readFile(path.join(root, entry), "utf8");
-    const importedEntries = discoverRequiredStaticImportsFromSource({
+    const importedEntries = discoverStaticRelativeMjsImportsFromSource({
       entry,
-      source,
-      requiredEntrySet
+      source
     });
-    importsByEntry.set(entry, importedEntries);
+    const inRootEntries = importedEntries.filter(isConformanceRelativeEntry);
+    importsByEntry.set(entry, inRootEntries);
+
+    for (const importedEntry of inRootEntries) {
+      if (!visitedEntries.has(importedEntry)) {
+        pendingEntries.push(importedEntry);
+      }
+    }
+
+    pendingEntries.sort(compareEntries);
   }
 
   return importsByEntry;
@@ -295,12 +454,26 @@ function discoverRequiredStaticImportsFromSource({
   requiredEntries,
   requiredEntrySet = new Set(requiredEntries)
 }) {
+  return discoverStaticRelativeMjsImportsFromSource({ entry, source })
+    .filter((importedEntry) => requiredEntrySet.has(importedEntry))
+    .sort(compareEntries);
+}
+
+function discoverStaticRelativeMjsImportsFromSource({ entry, source }) {
   return parseStaticRelativeMjsImports(source)
     .map((specifier) =>
       normalizeEntry(path.posix.join(path.posix.dirname(entry), specifier))
     )
-    .filter((importedEntry) => requiredEntrySet.has(importedEntry))
+    .filter((importedEntry) => importedEntry.endsWith(".mjs"))
     .sort(compareEntries);
+}
+
+function isConformanceRelativeEntry(entry) {
+  return (
+    !path.posix.isAbsolute(entry) &&
+    entry !== ".." &&
+    !entry.startsWith("../")
+  );
 }
 
 function parseStaticRelativeMjsImports(source) {
@@ -604,10 +777,14 @@ async function discoverMjsFiles(directory, { include, relativePrefix }) {
 
 async function writeConformanceFixtureFiles(root, entries) {
   for (const entry of entries) {
-    const filePath = path.join(root, entry);
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, "export {};\n", "utf8");
+    await writeConformanceFixtureFile(root, entry);
   }
+}
+
+async function writeConformanceFixtureFile(root, entry, source = "export {};\n") {
+  const filePath = path.join(root, entry);
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, source, "utf8");
 }
 
 function analyzeConformanceTestScriptCoverage({
@@ -616,6 +793,7 @@ function analyzeConformanceTestScriptCoverage({
   importedEntriesByEntry = new Map()
 }) {
   const patterns = extractNodeTestPatterns(testScript);
+  const requiredEntrySet = new Set(requiredEntries);
   const directCoveredEntries = requiredEntries
     .filter((entry) =>
       patterns.some((pattern) => testPatternMatchesEntry(pattern, entry))
@@ -623,15 +801,26 @@ function analyzeConformanceTestScriptCoverage({
     .sort(compareEntries);
   const covered = new Set(directCoveredEntries);
   const pendingEntries = [...directCoveredEntries];
+  const visitedEntries = new Set();
 
   while (pendingEntries.length > 0) {
     const entry = pendingEntries.shift();
+    if (visitedEntries.has(entry)) {
+      continue;
+    }
+    visitedEntries.add(entry);
+
     for (const importedEntry of importedEntriesByEntry.get(entry) ?? []) {
-      if (!covered.has(importedEntry)) {
+      if (requiredEntrySet.has(importedEntry) && !covered.has(importedEntry)) {
         covered.add(importedEntry);
+      }
+
+      if (!visitedEntries.has(importedEntry)) {
         pendingEntries.push(importedEntry);
       }
     }
+
+    pendingEntries.sort(compareEntries);
   }
 
   const coveredEntries = [...covered].sort(compareEntries);

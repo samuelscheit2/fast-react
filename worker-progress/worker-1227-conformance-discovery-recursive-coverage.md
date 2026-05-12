@@ -7,16 +7,18 @@ Complete.
 ## Summary
 
 - Hardened `tests/conformance/test/conformance-test-discovery.test.mjs` so
-  required executable conformance gate discovery recurses under
-  `tests/conformance/test` and `tests/conformance/src`.
-- Preserved the Worker 955 fail-closed coverage model: gates must be covered by
-  the workspace `scripts.test` command directly or through a covered static
-  wrapper import.
-- Added focused regression coverage proving nested `test/**/*.mjs` and
-  `src/**/*.test.mjs` entries are discovered and reported uncovered when the
-  script only uses top-level `test/*.mjs` and `src/*.test.mjs` globs.
-- Added nested wrapper-import coverage proving a script-covered nested wrapper
-  can cover its nested imported gate without broad refactoring.
+  package-script coverage follows a deterministic static relative `.mjs` import
+  graph from script-covered entries, not only direct wrapper imports.
+- Preserved Worker 955 behavior: required executable gates remain
+  `test/**/*.mjs` and `src/**/*.test.mjs`; direct `scripts.test` matches still
+  count; direct wrapper imports still count; comments, strings, templates,
+  dynamic imports, and bare/package imports do not create coverage.
+- Kept coverage fail-closed: only required executable gate entries are counted
+  as covered, even when traversal sees an in-repo sidecar module, and missed
+  standalone gates remain reported as uncovered.
+- Added focused hostile fixtures for wrapper -> intermediate wrapper -> gate
+  coverage, cyclic wrapper imports, and dynamic/comment/string false-green
+  attempts that must not cover a missed gate.
 
 ## Changed Files
 
@@ -30,41 +32,43 @@ Complete.
 - PASS: `npm run check:package-surface`
 - PASS: `node tests/smoke/import-entrypoints.mjs`
 - PASS: `git diff --check`
-- PASS: `find tests/conformance/test tests/conformance/src -mindepth 2 -type f \( -path '*/test/*.mjs' -o -path '*/src/*.test.mjs' \) | sort`
 
 ## Evidence Gathered
 
-- Read `WORKER_BRIEF.md`.
-- Inspected Worker 955's accepted pattern in
-  `worker-progress/worker-955-conformance-test-discovery-gate.md` and the
-  existing discovery gate helper tests.
-- The focused discovery test passed with 9 tests, including the new recursive
-  discovery and nested wrapper-import cases.
-- The current checked-in conformance tree has no already-nested executable
-  conformance gate entries matching the new recursive discovery criteria; the
-  new temporary fixture test covers future nested additions.
+- Read `WORKER_BRIEF.md` and Worker 955's accepted discovery-gate report.
+- The focused discovery suite now passes with 11 tests.
+- The transitive wrapper fixture proves `test/root-wrapper.test.mjs` covers
+  `test/intermediate-wrapper.mjs`, which in turn covers
+  `test/final-gate.mjs`.
+- The hostile recursive fixture proves a cycle between `test/cycle-a.mjs` and
+  `test/cycle-b.mjs` terminates deterministically, while
+  `test/missed-gate.mjs` stays uncovered when only mentioned by comments,
+  string/template literals, or `import("./missed-gate.mjs")`.
+- The hostile fixture also imports a non-required
+  `fixtures/unrelated-sidecar.mjs`; traversal can inspect it, but it does not
+  appear in `coveredEntries` because it is not a required executable gate.
 
 ## Audit, Review, Or Nested-Agent Findings
 
-- Recursive discovery remains rooted only at `test` and `src`; the regression
-  fixture includes `fixtures/` and `scripts/` files that are not discovered.
-- `src` discovery still requires `.test.mjs`, so nested source helper modules
-  such as `src/deep/source-helper.mjs` do not become required executable gates.
-- Existing glob semantics are unchanged: `test/*.mjs` and `src/*.test.mjs`
-  cover top-level files only, and the nested fixture entries remain uncovered
-  unless the script uses a matching nested or recursive pattern.
+- Orchestrator review found the previous committed change only recursed
+  filesystem discovery and still built wrapper coverage from direct static
+  imports of direct-covered entries. This repair implements the missing
+  transitive import traversal and adds regression coverage for that blocker.
 - No nested agents were used.
 
 ## Risks Or Blockers
 
-- Full conformance workspace execution still has unrelated baseline failures
-  documented by Worker 955; this task used focused discovery, syntax,
-  package-surface, import-smoke, and whitespace evidence only.
-- This change does not claim broad conformance execution, public React
-  compatibility, or performance compatibility.
+- Full conformance workspace execution was not rerun for this repair; Worker
+  955 documented pre-existing unrelated serialization/private-admission
+  failures. This change is limited to conformance harness evidence and does not
+  claim broad React runtime compatibility.
+- The static import lexer remains intentionally conservative and is scoped to
+  static relative `.mjs` imports inside the conformance tree.
+- Overlap risk: this touches the same discovery gate file that other
+  conformance-harness follow-up workers could reasonably edit.
 
 ## Recommended Next Tasks
 
-- When adding future nested conformance gates, either include them directly in
-  `scripts.test`, cover them through a script-covered wrapper import, or expect
-  this discovery gate to fail closed.
+- If future nested executable conformance gates are added, rely on this gate to
+  fail closed unless the file is matched by `scripts.test` or reachable through
+  a script-covered static relative `.mjs` import chain.
