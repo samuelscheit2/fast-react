@@ -1422,11 +1422,13 @@ function createChildrenTraversalCurrentnessReport(overrides = {}) {
   }
 
   const frozenReport = freezeRecord(report);
-  childrenTraversalCurrentnessReports.add(frozenReport);
-  childrenTraversalCurrentnessReportCreationRejections.set(
-    frozenReport,
-    creationRejectionReason
-  );
+  if (frozenReport === report) {
+    childrenTraversalCurrentnessReports.add(frozenReport);
+    childrenTraversalCurrentnessReportCreationRejections.set(
+      frozenReport,
+      creationRejectionReason
+    );
+  }
   return frozenReport;
 }
 

@@ -999,7 +999,7 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
     ),
     "children-traversal-currentness-behavior-probes"
   );
-  assertCurrentnessRejected(
+  const staleSourceReportHiddenByFreeze =
     createChildrenCurrentnessReportWithFreezeReplacement(
       isChildrenTraversalSourceReportRecord,
       () =>
@@ -1009,10 +1009,25 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
           reactSourceCommit: "stale"
         }
       }
-    ),
+    );
+  assertCurrentnessRejected(
+    staleSourceReportHiddenByFreeze,
     "children-traversal-currentness-source-report"
   );
+  const staleSourceReportReturnedByLaterValidFreeze =
+    createChildrenCurrentnessReportWithFreezeReplacement(
+      isChildrenTraversalCurrentnessReportRecord,
+      () => staleSourceReportHiddenByFreeze
+    );
+  assert.equal(
+    staleSourceReportReturnedByLaterValidFreeze,
+    staleSourceReportHiddenByFreeze
+  );
   assertCurrentnessRejected(
+    staleSourceReportReturnedByLaterValidFreeze,
+    "children-traversal-currentness-source-report"
+  );
+  const publicAliasHiddenByFreeze =
     createChildrenCurrentnessReportWithFreezeReplacement(
       isChildrenTraversalCurrentnessReportRecord,
       (value, originalFreeze) => {
@@ -1022,7 +1037,19 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
       {
         publicChildrenTraversalCompatibilityClaimed: true
       }
-    ),
+    );
+  assertCurrentnessRejected(
+    publicAliasHiddenByFreeze,
+    "children-traversal-currentness-report-shape"
+  );
+  const publicAliasReturnedByLaterValidFreeze =
+    createChildrenCurrentnessReportWithFreezeReplacement(
+      isChildrenTraversalCurrentnessReportRecord,
+      () => publicAliasHiddenByFreeze
+    );
+  assert.equal(publicAliasReturnedByLaterValidFreeze, publicAliasHiddenByFreeze);
+  assertCurrentnessRejected(
+    publicAliasReturnedByLaterValidFreeze,
     "children-traversal-currentness-report-shape"
   );
   assertCurrentnessRejected(
