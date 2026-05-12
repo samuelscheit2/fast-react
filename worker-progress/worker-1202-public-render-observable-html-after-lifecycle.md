@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete pending commit.
+Complete and committed as `1ad2caa8 Add public fake DOM observability evidence`.
 
 ## Summary
 
