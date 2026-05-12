@@ -125,6 +125,62 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
   assert.equal(publicContainer.children.length, 0);
   assert.equal(publicContainer.firstElementChild, null);
   assert.equal(publicContainer.innerHTML, '');
+  const freshRoot = reactDomClient.createRoot(publicContainer);
+  assert.notEqual(freshRoot, root);
+  const freshRenderReturn = freshRoot.render(
+    React.createElement('div', {id: publicId}, 'hello & < >')
+  );
+  assert.equal(freshRenderReturn, undefined);
+  assert.equal(publicContainer.childNodes.length, 1);
+  assert.equal(publicContainer.children.length, 1);
+  assert.equal(publicContainer.firstElementChild, publicContainer.firstChild);
+  assert.equal(publicContainer.firstChild.nodeName, 'DIV');
+  assert.equal(publicContainer.firstChild.tagName, 'DIV');
+  assert.equal(publicContainer.firstChild.getAttribute('id'), publicId);
+  assert.deepEqual(attributeEntries(publicContainer.firstChild), [
+    ['id', publicId]
+  ]);
+  assert.equal(publicContainer.firstChild.textContent, 'hello & < >');
+  assert.equal(publicContainer.firstChild.innerHTML, 'hello &amp; &lt; &gt;');
+  assert.equal(publicContainer.textContent, 'hello & < >');
+  assert.equal(
+    publicContainer.innerHTML,
+    '<div id="app&amp;&lt;&gt;&quot;">hello &amp; &lt; &gt;</div>'
+  );
+  assert.deepEqual(
+    publicContainer.__mutationLog.map((entry) => [
+      entry.type,
+      entry.child?.nodeName
+    ]),
+    [
+      ['appendChild', 'DIV'],
+      ['removeChild', 'DIV'],
+      ['appendChild', 'DIV']
+    ]
+  );
+  assert.equal(freshRoot.unmount(), undefined);
+  assert.equal(publicContainer.childNodes.length, 0);
+  assert.equal(publicContainer.children.length, 0);
+  assert.equal(publicContainer.firstElementChild, null);
+  assert.equal(publicContainer.textContent, '');
+  assert.equal(publicContainer.innerHTML, '');
+  assert.deepEqual(
+    publicContainer.__mutationLog.map((entry) => [
+      entry.type,
+      entry.child?.nodeName
+    ]),
+    [
+      ['appendChild', 'DIV'],
+      ['removeChild', 'DIV'],
+      ['appendChild', 'DIV'],
+      ['removeChild', 'DIV']
+    ]
+  );
+  assert.equal(publicContainer.__registrations.length, 0);
+  assert.equal(publicDocument.__registrations.length, 0);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(publicContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(publicContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(publicDocument), false);
 }
 
 const first = createBridgeScenario('first');

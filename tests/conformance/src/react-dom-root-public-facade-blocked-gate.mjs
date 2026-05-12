@@ -161,6 +161,10 @@ function minimalPublicDivTextApi(text) {
   return `ReactDOMClient.createRoot(container).render(React.createElement("div", { id: ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID)} }, ${JSON.stringify(text)}))`;
 }
 
+function rootRenderMinimalPublicDivTextApi(rootName, text) {
+  return `${rootName}.render(React.createElement("div", { id: ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID)} }, ${JSON.stringify(text)}))`;
+}
+
 const PUBLIC_ROOT_RENDER_INITIAL_API =
   "react-dom/client.createRoot(...).render(initial)";
 const MINIMAL_PUBLIC_DIV_TEXT_RENDER_API =
@@ -170,6 +174,15 @@ const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API = minimalPublicDivTextApi(
 );
 const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API =
   `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.unmount()`;
+const MINIMAL_PUBLIC_DIV_TEXT_RECREATE_AFTER_UNMOUNT_API = [
+  "const root = ReactDOMClient.createRoot(container)",
+  rootRenderMinimalPublicDivTextApi("root", MINIMAL_PUBLIC_DIV_TEXT),
+  rootRenderMinimalPublicDivTextApi("root", MINIMAL_PUBLIC_DIV_TEXT_UPDATE),
+  "root.unmount()",
+  "const freshRoot = ReactDOMClient.createRoot(container)",
+  rootRenderMinimalPublicDivTextApi("freshRoot", MINIMAL_PUBLIC_DIV_TEXT),
+  "freshRoot.unmount()"
+].join("; ");
 
 export const REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS =
   Object.freeze([
@@ -514,6 +527,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       expectedChildrenCount: 1,
       expectedChildNodeNames: ["DIV"],
       expectedFirstElementChildAttributes: [["id", MINIMAL_PUBLIC_DIV_TEXT_ID]],
+      expectedFirstElementChildGetAttributeId: MINIMAL_PUBLIC_DIV_TEXT_ID,
       expectedFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_ESCAPED,
       expectedFirstElementChildNodeName: "DIV",
       expectedFirstElementChildTagName: "DIV",
@@ -535,6 +549,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       expectedChildrenCount: 1,
       expectedChildNodeNames: ["DIV"],
       expectedFirstElementChildAttributes: [["id", MINIMAL_PUBLIC_DIV_TEXT_ID]],
+      expectedFirstElementChildGetAttributeId: MINIMAL_PUBLIC_DIV_TEXT_ID,
       expectedFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED,
       expectedFirstElementChildNodeName: "DIV",
       expectedFirstElementChildTagName: "DIV",
@@ -556,6 +571,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       expectedChildrenCount: 0,
       expectedChildNodeNames: [],
       expectedFirstElementChildAttributes: null,
+      expectedFirstElementChildGetAttributeId: null,
       expectedFirstElementChildInnerHTML: null,
       expectedFirstElementChildNodeName: null,
       expectedFirstElementChildTagName: null,
@@ -569,6 +585,34 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       expectedTextContent: "",
       minimalHostOutputAdmission: "unmount",
       privateBridgeEvidence: "separate"
+    }),
+    Object.freeze({
+      id: "public-create-root-recreate-after-unmount",
+      publicApi: MINIMAL_PUBLIC_DIV_TEXT_RECREATE_AFTER_UNMOUNT_API,
+      scenarioId: "root-unmount",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      controlledDomShim: true,
+      expectedChildrenCount: 0,
+      expectedChildNodeNames: [],
+      expectedFirstElementChildAttributes: null,
+      expectedFirstElementChildGetAttributeId: null,
+      expectedFirstElementChildInnerHTML: null,
+      expectedFirstElementChildNodeName: null,
+      expectedFirstElementChildTagName: null,
+      expectedFirstElementChildTextContent: null,
+      expectedInnerHTML: "",
+      expectedMutationLog: [
+        ["appendChild", "DIV"],
+        ["removeChild", "DIV"],
+        ["appendChild", "DIV"],
+        ["removeChild", "DIV"]
+      ],
+      expectedRenderTextContent: MINIMAL_PUBLIC_DIV_TEXT,
+      expectedTextContent: "",
+      minimalHostOutputAdmission: "recreate-after-unmount",
+      privateBridgeEvidence: "separate"
     })
   ]);
 
@@ -581,7 +625,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS = Object.freeze(
       comparedToAcceptedReactDomOracle: true,
       publicCompatibilityClaimed: false,
       reason:
-        "Public React DOM root facade behavior stays blocked outside the admitted fake-DOM div text render, repeat render, and rendered-root unmount cleanup path."
+        "Public React DOM root facade behavior stays blocked outside the admitted fake-DOM div text render, repeat render, rendered-root unmount cleanup, and recreate-after-unmount path."
     })
   )
 );
@@ -936,7 +980,7 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
 
   if (result.summary.blockedPublicFacadeRowCount > 0) {
     lines.push(
-      "Compatibility remains blocked; minimal public createRoot/div-text render, repeat render, and rendered-root unmount cleanup are scoped while hydrateRoot and broad root behavior stay fail-closed."
+      "Compatibility remains blocked; minimal public createRoot/div-text render, repeat render, rendered-root unmount cleanup, and recreate-after-unmount are scoped while hydrateRoot and broad root behavior stay fail-closed."
     );
   }
   if (result.summary.blockedPrivateBridgeRowCount > 0) {
@@ -2868,6 +2912,12 @@ function validatePublicRootLifecycleBlocked({
       expected: lifecycleRowSource[3],
       expectedId: "public-create-root-unmount-call",
       expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API
+    },
+    {
+      key: "recreateAfterUnmount",
+      expected: lifecycleRowSource[4],
+      expectedId: "public-create-root-recreate-after-unmount",
+      expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_RECREATE_AFTER_UNMOUNT_API
     }
   ];
 
@@ -2925,7 +2975,9 @@ function validatePublicRootLifecycleBlocked({
       (expected.minimalHostOutputAdmission !== "update" ||
         operation.hostNodeReused === true) &&
       (expected.minimalHostOutputAdmission !== "unmount" ||
-        operation.duplicateRootTrackingCleared === true)
+        operation.duplicateRootTrackingCleared === true) &&
+      (expected.minimalHostOutputAdmission !== "recreate-after-unmount" ||
+        isPublicRootRecreateAfterUnmountEvidenceExpected(operation))
     ) {
       blockedPublicFacadeRows.push({
         id: expected.id,
@@ -2942,10 +2994,16 @@ function validatePublicRootLifecycleBlocked({
           expected.minimalHostOutputAdmission === "update",
         minimalDivTextHostOutputUnmounted:
           expected.minimalHostOutputAdmission === "unmount",
+        minimalDivTextHostOutputRecreatedAfterUnmount:
+          expected.minimalHostOutputAdmission === "recreate-after-unmount",
         minimalHostOutputAdmission: expected.minimalHostOutputAdmission,
         mutationCount: getRootFacadeMutationCount(operation.sideEffects),
         privateBridgeEvidence: "wrapped-private-facade-host-output",
         publicApi: expectedLabel,
+        recreateAfterUnmountEvidence:
+          expected.minimalHostOutputAdmission === "recreate-after-unmount"
+            ? summarizePublicRootRecreateAfterUnmountEvidence(operation)
+            : null,
         renderReturnType: operation.value.type,
         scenarioId: expected.scenarioId
       });
@@ -3047,6 +3105,132 @@ function getPublicRenderExpectedTextContent(expected) {
   return expected.expectedRenderTextContent ?? expected.expectedTextContent;
 }
 
+function isPublicRootRecreateAfterUnmountEvidenceExpected(operation) {
+  return (
+    operation.recreatedRootDistinct === true &&
+    operation.freshRootObjectCreated === true &&
+    operation.freshCreateRootAttempt?.status === "ok" &&
+    operation.freshRenderAttempt?.status === "ok" &&
+    operation.freshRenderAttempt.value?.type === "undefined" &&
+    operation.freshUnmountAttempt?.status === "ok" &&
+    operation.freshUnmountAttempt.value?.type === "undefined" &&
+    isPublicRootStaleLifecycleAttemptBlocked(
+      operation.staleRenderAfterUnmountAttempt,
+      "createRoot().render"
+    ) &&
+    isPublicRootStaleLifecycleAttemptBlocked(
+      operation.staleUnmountAfterUnmountAttempt,
+      "createRoot().unmount"
+    ) &&
+    isPublicRenderControlledDomShimExpectedSnapshot(
+      operation.recreateSnapshots?.initialRender,
+      createPublicDivTextSnapshotExpectation({
+        escapedText: MINIMAL_PUBLIC_DIV_TEXT_ESCAPED,
+        mutationLog: [["appendChild", "DIV"]],
+        text: MINIMAL_PUBLIC_DIV_TEXT
+      })
+    ) &&
+    isPublicRenderControlledDomShimExpectedSnapshot(
+      operation.recreateSnapshots?.sameRootUpdate,
+      createPublicDivTextSnapshotExpectation({
+        escapedText: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED,
+        mutationLog: [["appendChild", "DIV"]],
+        text: MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+      })
+    ) &&
+    isPublicRenderControlledDomShimExpectedSnapshot(
+      operation.recreateSnapshots?.firstUnmount,
+      createPublicDivTextSnapshotExpectation({
+        childPresent: false,
+        mutationLog: [
+          ["appendChild", "DIV"],
+          ["removeChild", "DIV"]
+        ],
+        text: ""
+      })
+    ) &&
+    isPublicRenderControlledDomShimExpectedSnapshot(
+      operation.recreateSnapshots?.afterStaleOldRootAttempts,
+      createPublicDivTextSnapshotExpectation({
+        childPresent: false,
+        mutationLog: [
+          ["appendChild", "DIV"],
+          ["removeChild", "DIV"]
+        ],
+        text: ""
+      })
+    ) &&
+    isPublicRenderControlledDomShimExpectedSnapshot(
+      operation.recreateSnapshots?.freshRender,
+      createPublicDivTextSnapshotExpectation({
+        escapedText: MINIMAL_PUBLIC_DIV_TEXT_ESCAPED,
+        mutationLog: [
+          ["appendChild", "DIV"],
+          ["removeChild", "DIV"],
+          ["appendChild", "DIV"]
+        ],
+        text: MINIMAL_PUBLIC_DIV_TEXT
+      })
+    )
+  );
+}
+
+function isPublicRootStaleLifecycleAttemptBlocked(attempt, exportName) {
+  return (
+    attempt?.status === "throws" &&
+    attempt.thrown?.code === "FAST_REACT_UNIMPLEMENTED" &&
+    attempt.thrown.entrypoint === "react-dom/client" &&
+    attempt.thrown.exportName === exportName
+  );
+}
+
+function createPublicDivTextSnapshotExpectation({
+  childPresent = true,
+  escapedText = "",
+  mutationLog,
+  text
+}) {
+  return {
+    expectedChildrenCount: childPresent ? 1 : 0,
+    expectedChildNodeNames: childPresent ? ["DIV"] : [],
+    expectedFirstElementChildAttributes: childPresent
+      ? [["id", MINIMAL_PUBLIC_DIV_TEXT_ID]]
+      : null,
+    expectedFirstElementChildGetAttributeId: childPresent
+      ? MINIMAL_PUBLIC_DIV_TEXT_ID
+      : null,
+    expectedFirstElementChildInnerHTML: childPresent ? escapedText : null,
+    expectedFirstElementChildNodeName: childPresent ? "DIV" : null,
+    expectedFirstElementChildTagName: childPresent ? "DIV" : null,
+    expectedFirstElementChildTextContent: childPresent ? text : null,
+    expectedInnerHTML: childPresent
+      ? `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED}">${escapedText}</div>`
+      : "",
+    expectedMutationLog: mutationLog,
+    expectedTextContent: text
+  };
+}
+
+function summarizePublicRootRecreateAfterUnmountEvidence(operation) {
+  return {
+    afterStaleOldRootAttemptsSnapshot:
+      operation.recreateSnapshots?.afterStaleOldRootAttempts ?? null,
+    firstUnmountSnapshot: operation.recreateSnapshots?.firstUnmount ?? null,
+    freshCreateRootAttempt: operation.freshCreateRootAttempt ?? null,
+    freshRenderAttempt: operation.freshRenderAttempt ?? null,
+    freshRenderSnapshot: operation.recreateSnapshots?.freshRender ?? null,
+    freshRootObjectCreated: operation.freshRootObjectCreated ?? false,
+    freshUnmountAttempt: operation.freshUnmountAttempt ?? null,
+    initialRenderSnapshot: operation.recreateSnapshots?.initialRender ?? null,
+    recreatedRootDistinct: operation.recreatedRootDistinct ?? false,
+    sameRootUpdateSnapshot: operation.recreateSnapshots?.sameRootUpdate ?? null,
+    staleRenderAfterUnmountAttempt:
+      operation.staleRenderAfterUnmountAttempt ?? null,
+    staleUnmountAfterUnmountAttempt:
+      operation.staleUnmountAfterUnmountAttempt ?? null
+  };
+}
+
 function isPublicRenderControlledDomShimUntouched(snapshot) {
   return (
     snapshot &&
@@ -3054,6 +3238,7 @@ function isPublicRenderControlledDomShimUntouched(snapshot) {
     findFirstDifferencePath(snapshot.containerChildNodeNames, []) === null &&
     snapshot.containerChildrenCount === 0 &&
     snapshot.containerFirstElementChildAttributes === null &&
+    snapshot.containerFirstElementChildGetAttributeId === null &&
     snapshot.containerFirstElementChildInnerHTML === null &&
     snapshot.containerFirstElementChildNodeName === null &&
     snapshot.containerFirstElementChildTagName === null &&
@@ -3079,6 +3264,8 @@ function isPublicRenderControlledDomShimExpectedSnapshot(snapshot, expected) {
       snapshot.containerFirstElementChildAttributes,
       expected.expectedFirstElementChildAttributes
     ) === null &&
+    snapshot.containerFirstElementChildGetAttributeId ===
+      expected.expectedFirstElementChildGetAttributeId &&
     snapshot.containerFirstElementChildInnerHTML ===
       expected.expectedFirstElementChildInnerHTML &&
     snapshot.containerFirstElementChildNodeName ===
@@ -3366,6 +3553,14 @@ function inspectReactDomRootPublicFacadeLifecycle({
       React,
       reactDomClient,
       rootMarkers
+    }),
+    recreateAfterUnmount: attemptControlledPublicRootRecreateAfterUnmountOperation({
+      domContainer,
+      label: MINIMAL_PUBLIC_DIV_TEXT_RECREATE_AFTER_UNMOUNT_API,
+      listenerRegistry,
+      React,
+      reactDomClient,
+      rootMarkers
     })
   };
 }
@@ -3642,6 +3837,195 @@ function attemptControlledPublicRootUnmountOperation({
   };
 }
 
+function attemptControlledPublicRootRecreateAfterUnmountOperation({
+  domContainer,
+  label,
+  listenerRegistry,
+  React,
+  reactDomClient,
+  rootMarkers
+}) {
+  const { container, ownerDocument } = createPublicRenderControlledDomShim({
+    domContainer,
+    label
+  });
+  let createRootAttempt = null;
+  let freshCreateRootAttempt = null;
+  let freshRenderAttempt = null;
+  let freshRootObjectCreated = false;
+  let freshUnmountAttempt = null;
+  let lifecycleOperationAttempted = false;
+  let recreatedRootDistinct = false;
+  const recreateSnapshots = {};
+  let rootObjectCreated = false;
+  let staleRenderAfterUnmountAttempt = null;
+  let staleUnmountAfterUnmountAttempt = null;
+
+  const result = attemptGateOperation(label, () => {
+    let root;
+    try {
+      root = reactDomClient.createRoot(container);
+      createRootAttempt = {
+        status: "ok",
+        value: describeLocalValue(root)
+      };
+      rootObjectCreated = root !== null && typeof root === "object";
+    } catch (error) {
+      createRootAttempt = {
+        status: "throws",
+        thrown: serializeGateError(error)
+      };
+      throw error;
+    }
+
+    lifecycleOperationAttempted = true;
+    root.render(
+      React.createElement(
+        "div",
+        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+        MINIMAL_PUBLIC_DIV_TEXT
+      )
+    );
+    recreateSnapshots.initialRender = summarizePublicRenderControlledDomShim({
+      container,
+      ownerDocument
+    });
+    root.render(
+      React.createElement(
+        "div",
+        { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+        MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+      )
+    );
+    recreateSnapshots.sameRootUpdate = summarizePublicRenderControlledDomShim({
+      container,
+      ownerDocument
+    });
+    root.unmount();
+    recreateSnapshots.firstUnmount = summarizePublicRenderControlledDomShim({
+      container,
+      ownerDocument
+    });
+
+    staleRenderAfterUnmountAttempt = attemptGateOperation(
+      "stale root.render after root.unmount",
+      () =>
+        root.render(
+          React.createElement(
+            "div",
+            { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+            MINIMAL_PUBLIC_DIV_TEXT
+          )
+        )
+    );
+    staleUnmountAfterUnmountAttempt = attemptGateOperation(
+      "stale root.unmount after root.unmount",
+      () => root.unmount()
+    );
+    recreateSnapshots.afterStaleOldRootAttempts =
+      summarizePublicRenderControlledDomShim({
+        container,
+        ownerDocument
+      });
+
+    const freshCreateRoot = attemptGateOperationWithValue(
+      "fresh createRoot after root.unmount",
+      () => reactDomClient.createRoot(container)
+    );
+    freshCreateRootAttempt = freshCreateRoot.attempt;
+    if (freshCreateRoot.error) {
+      throw freshCreateRoot.error;
+    }
+    const freshRoot = freshCreateRoot.value;
+    freshRootObjectCreated =
+      freshRoot !== null && typeof freshRoot === "object";
+    recreatedRootDistinct = freshRootObjectCreated && freshRoot !== root;
+
+    const freshRender = attemptGateOperationWithValue(
+      "fresh root.render after recreate",
+      () =>
+        freshRoot.render(
+          React.createElement(
+            "div",
+            { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+            MINIMAL_PUBLIC_DIV_TEXT
+          )
+        )
+    );
+    freshRenderAttempt = freshRender.attempt;
+    if (freshRender.error) {
+      throw freshRender.error;
+    }
+    recreateSnapshots.freshRender = summarizePublicRenderControlledDomShim({
+      container,
+      ownerDocument
+    });
+
+    const freshUnmount = attemptGateOperationWithValue(
+      "fresh root.unmount after recreate",
+      () => freshRoot.unmount()
+    );
+    freshUnmountAttempt = freshUnmount.attempt;
+    if (freshUnmount.error) {
+      throw freshUnmount.error;
+    }
+    return freshUnmount.value;
+  });
+
+  return {
+    ...result,
+    blockedAt: createRootAttempt?.status === "throws" ? "createRoot" : null,
+    compatibilityClaimed: false,
+    controlledDomShim: true,
+    controlledDomSnapshot: summarizePublicRenderControlledDomShim({
+      container,
+      ownerDocument
+    }),
+    createRootAttempt,
+    freshCreateRootAttempt,
+    freshRenderAttempt,
+    freshRootObjectCreated,
+    freshUnmountAttempt,
+    lifecycleOperationAttempted,
+    recreateSnapshots,
+    recreatedRootDistinct,
+    renderElementType: "div",
+    renderTextContent: MINIMAL_PUBLIC_DIV_TEXT,
+    rootObjectCreated,
+    sideEffects: inspectRootFacadeSideEffects(
+      container,
+      ownerDocument,
+      rootMarkers,
+      listenerRegistry
+    ),
+    staleRenderAfterUnmountAttempt,
+    staleUnmountAfterUnmountAttempt
+  };
+}
+
+function attemptGateOperationWithValue(label, callback) {
+  try {
+    const value = callback();
+    return {
+      attempt: {
+        label,
+        status: "ok",
+        value: describeLocalValue(value)
+      },
+      value
+    };
+  } catch (error) {
+    return {
+      attempt: {
+        label,
+        status: "throws",
+        thrown: serializeGateError(error)
+      },
+      error
+    };
+  }
+}
+
 function attemptRootFacadeOperation(
   label,
   callback,
@@ -3846,6 +4230,8 @@ function summarizePublicRenderControlledDomShim({ container, ownerDocument }) {
     containerChildrenCount: container.children.length,
     containerFirstElementChildAttributes:
       firstElementChild === null ? null : attributeEntries(firstElementChild),
+    containerFirstElementChildGetAttributeId:
+      firstElementChild === null ? null : firstElementChild.getAttribute("id"),
     containerFirstElementChildInnerHTML:
       firstElementChild === null ? null : firstElementChild.innerHTML,
     containerFirstElementChildNodeName:
