@@ -46,10 +46,10 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline before this docs
-refresh is main `ab2814c7` (`Merge worker 1044 root scheduler act support`).
+refresh is main `965d1e62` (`Merge worker 1077 public render conformance gate`).
 Accepted implementation history still includes the post-Worker-997 batch:
 Workers 986, 987, 992, 1000, 998, 978, 999, 990, 967, 996, 994, and 989.
-Accepted organization-only cleanup history now includes Workers 1002-1049:
+Accepted organization-only cleanup history now includes Workers 1002-1062:
 Rust test-module extractions, the test-renderer facade/root/diagnostics splits,
 the N-API root bridge request split, the root work-loop test split, the
 `root_commit` errors/effects/deletions/refs splits, root-commit/host-work test
@@ -64,38 +64,50 @@ cleanup history also includes the test-renderer child test-module split,
 `root_commit` record split, `root_work_loop` complete-handoff split,
 `host_work` root-replacement split, `root_scheduler` act split,
 `function_component` effects split, sync-flush test-module split, and
-`fast-react-napi` test-module split. These cleanups make no runtime or public
+`fast-react-napi` test-module split, plus the accepted Workers 1054-1062
+splits for root-commit managed-child canaries, host-work deletions,
+root-scheduler continuations, root-work-loop context providers, passive
+deleted-subtree cleanup, test-renderer serialization execution, React DOM
+resource/form tests, React DOM private root bridge shell tests, and
+resource/form internals contracts. These cleanups make no runtime or public
 compatibility claim.
+Accepted root-render evidence now also includes Worker 1065's source-scanner
+repair and Workers 1074-1077: minimal root element resolver records, a
+test-only HostRoot mount reconciliation canary, a diagnostic
+HostComponent/HostText mutation execution gate that still reports blocked, and
+a public render conformance probe that still expects public `createRoot` to
+throw before `root.render` and leave the DOM shim empty.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Root post-merge broad validation for current main completed successfully;
-  accepted results are recorded in `MASTER_PROGRESS.md`.
-- No implementation worker output is listed as live accepted input in this plan
-  snapshot.
+- Accepted facts through main `965d1e62` are recorded in
+  `MASTER_PROGRESS.md`.
+- No unreviewed implementation worker output is listed as live accepted input
+  in this plan snapshot.
 
-Current large-file baseline after accepted Workers 1036-1049:
+Current large-file baseline after accepted main `965d1e62`:
 
-- `root_commit.rs`: 8,773 lines
-- `function_component.rs`: 8,343 lines
-- `function_component/tests.rs`: 7,968 lines
-- `root_work_loop.rs`: 7,790 lines
-- `fast-react-test-renderer/src/lib.rs`: 7,656 lines
-- `root_scheduler.rs`: 7,270 lines
-- `host_work.rs`: 7,191 lines
-- `root_scheduler/tests.rs`: 6,959 lines
-- `fast-react-napi/src/tests.rs`: 6,640 lines
-- `begin_work.rs`: 6,573 lines
+- `packages/react-dom/src/client/root-bridge.js`: 29,390 lines
+- `packages/react-test-renderer/cjs/react-test-renderer.development.js`: 23,803 lines
+- `packages/react-test-renderer/cjs/react-test-renderer.production.js`: 20,750 lines
+- `tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`: 18,216 lines
+- `tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs`: 15,434 lines
+- `packages/react-test-renderer/index.js`: 15,407 lines
+- `packages/react-dom/src/resource-form-internals-gate.js`: 14,641 lines
+- `packages/react-dom/src/client/controlled-restore-queue.js`: 10,949 lines
+- `packages/react-dom/src/events/plugin-event-system.js`: 9,533 lines
+- `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: 8,553 lines
 
 Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private compatibility evidence through `8a3b4042`, accepted
-organization-only cleanup through `ab2814c7`, plus audit policy through
-`732a6b21`, still keeps public root/render/unmount, `act`,
+Accepted private compatibility evidence through `8aee0fcd`, accepted public
+root-render blocked evidence through `965d1e62`, accepted organization-only
+cleanup through `75fb1a47`, plus audit policy through `732a6b21`, still keeps
+public root/render/unmount, `act`,
 `react-dom/test-utils.act`, `flushSync`, Scheduler timing, hydration,
 resources/forms, public input/change or controlled-input behavior,
 serialization, native/reconciler execution, React Children traversal parity,
@@ -108,13 +120,15 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through `8a3b4042`, plus the
-   organization-only cleanup history through `ab2814c7`, as private evidence
-   or file-organization evidence only. Public package, root, native, React DOM,
-   test-renderer, Scheduler, `act`, `react-dom/test-utils.act`, hydration,
-   resource/form, public controlled-input, serialization, React Children
-   lazy/full traversal, unsupported hook, event dispatch, and `flushSync`
-   compatibility still require fail-closed gates and dual-run oracle evidence.
+1. Treat accepted compatibility evidence through `8aee0fcd`, Worker 1077's
+   public root-render blocked gate through `965d1e62`, and organization-only
+   cleanup history through `75fb1a47` as private evidence, negative public
+   evidence, or file-organization evidence only. Public package, root, native,
+   React DOM, test-renderer, Scheduler, `act`, `react-dom/test-utils.act`,
+   hydration, resource/form, public controlled-input, serialization, React
+   Children lazy/full traversal, unsupported hook, event dispatch, and
+   `flushSync` compatibility still require fail-closed gates and dual-run
+   oracle evidence.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct
@@ -146,7 +160,10 @@ canonical evidence requirements.
 - Rust root/sync-flush/function/deletion execution can extend accepted Workers
   855, 860, 862-867, 878-879, 889-890, 896, 898, 904, 906-907, 917-921, 936,
   943, 948, 954, 973, 980, 982, 985, 991, 997, and 998, plus Worker 966's
-  refreshed private admission 804 managed-child source-token ledger, toward
+  refreshed private admission 804 managed-child source-token ledger, Worker
+  1074's minimal root element resolver, Worker 1075's test-only HostRoot mount
+  reconciliation canary, and Worker 1076's blocked host mutation execution gate,
+  toward
   managed-child, HostText, multi-child, sync-flush delete/post-passive, root
   child replacement/delete-plus-place continuation, FunctionComponent
   deletion/render-phase update/bailout blocker coverage, HostRoot update-queue
@@ -159,10 +176,10 @@ canonical evidence requirements.
   work-loop bailout, Worker 985 render-phase root consumption, Worker 991
   HostWork delete/place continuation, Worker 997 hook pending-ring currentness,
   and Worker 998 HostText commit currentness shapes only as private test-host
-  canaries with source-owned commit, host-node, root/lane, scheduler,
-  queue/handoff, store-backed row lane metadata, topology, replay, ref/passive,
-  and cleanup validation. Public React DOM/test-renderer roots and public
-  `flushSync` remain blocked.
+  canaries or blocked diagnostics with source-owned commit, host-node,
+  root/lane, scheduler, queue/handoff, store-backed row lane metadata,
+  topology, replay, ref/passive, and cleanup validation. Public React
+  DOM/test-renderer roots and public `flushSync` remain blocked.
 - Test-renderer package-root/native work should use accepted Worker 844
   package-root native execution parity, Workers 859 and 868 Rust private
   lifecycle/native consumer hardening, and Worker 872 package-root/CJS private
@@ -194,9 +211,10 @@ canonical evidence requirements.
   boundary admission, Worker 979 profiling createRoot private facade gate,
   Worker 915 symbol-only client facade gates, Worker 958 private input/change
   extraction and controlled-restore queue currentness, and Worker 990
-  controlled input/event blocker hardening as diagnostic input. Worker 920's
-  HostNodeStore payload currentness can inform fake/native host update
-  handoffs only when scoped root/fiber/token/phase/target identity is
+  controlled input/event blocker hardening as diagnostic input, plus Worker
+  1077's public render blocked conformance probe as negative evidence only.
+  Worker 920's HostNodeStore payload currentness can inform fake/native host
+  update handoffs only when scoped root/fiber/token/phase/target identity is
   preserved. Workers 958 and 990 input/change evidence is consumable only when
   exact root listener registration, dispatch payload, bridge preflight,
   controlled restore gate identity, fake-DOM target limits, and resource/form
@@ -300,6 +318,11 @@ canonical evidence requirements.
   private admission 727-728 ledger refreshes, Worker 967's serialization/local
   oracle repair, and Worker 989's private admission 729-731 false-green sweep as
   private fail-closed evidence only.
+- Root-render conformance harness follow-ups can consume Worker 1065's repaired
+  source scanners and Worker 1077's public render blocked probe only as
+  current fail-closed evidence. Public root rendering remains blocked until a
+  later worker proves public `createRoot().render(...)` execution, DOM mutation,
+  listener/root marker behavior, and package compatibility against React 19.2.6.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, the text-patch admission ledger, Worker 887's

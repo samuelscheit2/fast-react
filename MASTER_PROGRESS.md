@@ -29,6 +29,83 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1078 Docs Refresh and Workers 1065/1074-1077 Root Render Gates
+
+- Worker 1078 refreshed master docs for current main `965d1e62`
+  (`Merge worker 1077 public render conformance gate`). This is a docs-only
+  refresh and makes no runtime or public compatibility claim.
+- Worker 1065 repaired root-render conformance source scanners after the recent
+  module/test splits, updated the private root-output gate note, and restored
+  the current blocked-root conformance gates. Focused
+  `root-render-e2e:conformance`, `root-public-facade:conformance`, the public
+  facade gate test, and `git diff --check` passed under Node 26.1.0.
+- Worker 1074 added a production-facing root element resolver surface in
+  `root_config.rs`. The admitted shape remains intentionally narrow:
+  `RootElementHandle::NONE` resolves to null, and non-null handles resolve only
+  to one host component with an optional single text child. Unknown handles,
+  missing required opaque handles, handle mismatches, and unsupported source
+  shapes fail closed.
+- Worker 1075 added a test-only HostRoot mount reconciliation canary in
+  `root_work_loop/render_phase.rs`. It processes a HostRoot update queue,
+  resolves the resulting handle through `TestHostTree`, and creates WIP
+  HostComponent/HostText fibers without host instance creation or commit
+  mutation execution.
+- Worker 1076 added
+  `HostRootCommitRecord::host_component_text_mutation_execution_gate` as a
+  production-compiled diagnostic helper. Non-empty HostComponent/HostText
+  mutation records still report blocked until production complete-work topology
+  and host mutation apply execution are promoted.
+- Worker 1077 tightened the public React DOM root facade blocked gate with an
+  explicit `ReactDOMClient.createRoot(container).render(...)` probe. The
+  expected public boundary remains `FAST_REACT_UNIMPLEMENTED` before
+  `root.render`, and the controlled DOM shim must remain empty with no child
+  nodes, text content, mutation log, listener registrations, or root marker
+  writes.
+- Accepted worker verification for this root-render batch included
+  `cargo fmt --check`, focused `root_config` tests, focused root work-loop
+  host-complete tests, `cargo check -p fast-react-reconciler`, focused
+  root-commit mutation gate tests with and without all features, full
+  `root_commit --lib`, `cargo fmt --all --check`, `git diff --check`, focused
+  public-root conformance tests, and the conformance workspace
+  `root-public-facade` and `root-render-e2e` scripts under Node 26.1.0.
+- The accepted state for this batch is main `965d1e62` after commits
+  `4ff2112b`, `580ff2ae`, `bd1b74cc`, `8aee0fcd`, and `965d1e62`. Public
+  React DOM root rendering, public root unmount/update behavior, DOM mutation,
+  listener/ref behavior, Scheduler/act timing, native/Rust renderer execution,
+  package compatibility, and broad renderer compatibility remain blocked unless
+  separately proven.
+
+### Workers 1054-1062 Cleanup Splits
+
+- Workers 1054-1058 continued behavior-preserving reconciler source splits:
+  root-commit managed-child canaries, host-work deletion cleanup, root-scheduler
+  continuation records, root-work-loop context-provider helpers, and passive
+  deleted-subtree cleanup moved into focused child modules while preserving the
+  existing crate-visible paths.
+- Worker 1059 split private test-renderer `toJSON`/`toTree` native
+  serialization execution helpers into
+  `crates/fast-react-test-renderer/src/root_impl/serialization_execution.rs`
+  while preserving accepted helper access for existing tests.
+- Workers 1060 and 1061 split large React DOM test files into deterministic
+  shard modules while keeping the accepted benchmark shim targets and original
+  test coverage for resource/form unsupported gates and the private root bridge
+  shell.
+- Worker 1062 split immutable resource/form/controlled-input contract data out
+  of `resource-form-internals-gate.js` into
+  `resource-form-internals-contracts.js`, restored source-owned private
+  admission ledger token evidence in the facade, and updated the private
+  package-surface snapshot.
+- Accepted worker verification for this cleanup batch included focused
+  reconciler, test-renderer, React DOM, conformance, benchmark, package-surface,
+  formatting, and diff checks recorded in the worker progress reports.
+- The accepted state for this cleanup batch is main `75fb1a47` after merge
+  commits `e44db8b2`, `7326dc02`, `4259cf96`, `5caec726`, `6290a1af`,
+  `40c192b9`, `0a000f42`, `ce35e89b`, and `75fb1a47`. These changes improve
+  file organization only. Public React DOM roots, test-renderer/native
+  behavior, hooks, Scheduler timing, hydration, events, resources/forms,
+  package compatibility, and broad renderer compatibility remain blocked unless
+  separately proven.
+
 ### Worker 1050 Docs Refresh and Workers 1036-1049 Cleanup Splits
 
 - Worker 1050 refreshed master docs after accepted organization-only cleanup
