@@ -216,8 +216,20 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionAcceptedStatus =
   'accepted-blocked-private-native-json-generation-evidence';
 const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedStatus =
   'rejected-native-json-generation-evidence';
+const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionModuleSourceFile =
+  'crates/fast-react-napi/src/root_bridge_requests/mod.rs';
+const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportSourceFile =
+  'crates/fast-react-napi/src/root_bridge_requests/json_transport.rs';
+const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportParserSourceFile =
+  'crates/fast-react-napi/src/root_bridge_requests/json_transport_parser.rs';
+const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleSourceFile =
+  'crates/fast-react-napi/src/root_bridge_requests/batch_lifecycle.rs';
+const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleAlgorithmsSourceFile =
+  'crates/fast-react-napi/src/root_bridge_requests/batch_lifecycle_algorithms.rs';
+const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionErrorsSourceFile =
+  'crates/fast-react-napi/src/root_bridge_requests/errors.rs';
 const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFile =
-  'crates/fast-react-napi/src/lib.rs';
+  nativeRootBridgeJsonBatchLifecycleGenerationAdmissionModuleSourceFile;
 const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceWorker =
   'worker-873-native-lifecycle-no-stale-execution';
 const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceWorkerProgress =
@@ -297,6 +309,7 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRowFields =
     'id',
     'role',
     'sourceFile',
+    'sourceFiles',
     'evidenceKind',
     'sourceIdentifiers',
     'status',
@@ -325,6 +338,8 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows =
     freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow({
       id: 'worker-873-json-batch-lifecycle-executor-status',
       role: 'executor-status-and-rejection-codes',
+      sourceFile:
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionModuleSourceFile,
       sourceIdentifiers: [
         'NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STATUS',
         'NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_MODEL',
@@ -336,6 +351,8 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows =
     freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow({
       id: 'worker-873-json-batch-lifecycle-source-guard',
       role: 'source-owned-generation-handle-table-guard',
+      sourceFile:
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportSourceFile,
       sourceIdentifiers: [
         'NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard',
         'executor_generation',
@@ -350,6 +367,12 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows =
     freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow({
       id: 'worker-873-json-batch-lifecycle-executor-row',
       role: 'accepted-row-carries-source-guard',
+      sourceFile:
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportSourceFile,
+      sourceFiles: [
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportSourceFile,
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleAlgorithmsSourceFile
+      ],
       sourceIdentifiers: [
         'NativeRootBridgeJsonBatchLifecycleExecutorRow',
         'NativeRootBridgeJsonBatchLifecycleExecutorRow::applied',
@@ -361,6 +384,13 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows =
     freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow({
       id: 'worker-873-json-batch-lifecycle-generation-allocation',
       role: 'generation-and-json-value-reuse-guard',
+      sourceFile:
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleAlgorithmsSourceFile,
+      sourceFiles: [
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleAlgorithmsSourceFile,
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionModuleSourceFile,
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionErrorsSourceFile
+      ],
       sourceIdentifiers: [
         'NEXT_NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_GENERATION',
         'allocate_native_root_bridge_json_batch_lifecycle_executor_generation',
@@ -371,6 +401,8 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows =
     freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow({
       id: 'worker-873-json-batch-lifecycle-source-row-validator',
       role: 'stale-caller-public-claim-source-row-validator',
+      sourceFile:
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportParserSourceFile,
       sourceIdentifiers: [
         'validate_native_root_bridge_json_batch_lifecycle_executor_source_rows',
         'native_root_bridge_json_batch_lifecycle_executor_source_guard_matches',
@@ -381,6 +413,13 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows =
     freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow({
       id: 'worker-873-json-batch-lifecycle-replay-consumption',
       role: 'single-consume-generation-replay-guard',
+      sourceFile:
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportParserSourceFile,
+      sourceFiles: [
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportParserSourceFile,
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionModuleSourceFile,
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleSourceFile
+      ],
       sourceIdentifiers: [
         'CONSUMED_NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_GENERATIONS',
         'validate_and_consume_native_root_bridge_json_batch_lifecycle_executor',
@@ -2954,13 +2993,21 @@ function freezeNativeRootBridgeRequestShape(shape) {
 function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow({
   id,
   role,
+  sourceFile = nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFile,
+  sourceFiles = [sourceFile],
   sourceIdentifiers
 }) {
+  const normalizedSourceFiles =
+    freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFiles(
+      sourceFile,
+      sourceFiles
+    );
+
   return Object.freeze({
     id,
     role,
-    sourceFile:
-      nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFile,
+    sourceFile: normalizedSourceFiles[0],
+    sourceFiles: normalizedSourceFiles,
     evidenceKind:
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceKind,
     sourceIdentifiers: Object.freeze([...sourceIdentifiers]),
@@ -2983,6 +3030,23 @@ function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow
     compatibilityAlias: null,
     reactBehaviorError: false
   });
+}
+
+function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFiles(
+  sourceFile,
+  sourceFiles
+) {
+  const normalizedSourceFiles = [];
+  for (const candidate of [sourceFile, ...arrayFromMaybe(sourceFiles)]) {
+    if (
+      typeof candidate === 'string' &&
+      !normalizedSourceFiles.includes(candidate)
+    ) {
+      normalizedSourceFiles.push(candidate);
+    }
+  }
+
+  return Object.freeze(normalizedSourceFiles);
 }
 
 function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionLedger(
@@ -3042,6 +3106,10 @@ function createNativeRootBridgeJsonBatchLifecycleGenerationAdmissionLedger(
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceWorkerProgress,
     sourceFile:
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFile,
+    sourceFiles:
+      sourceFilesFromNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRows(
+        nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows
+      ),
     evidenceKind:
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceKind,
     acceptedStatus:
@@ -3173,6 +3241,7 @@ function validateNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRow(
   if (
     row.id !== canonicalRow.id ||
     row.sourceFile !== canonicalRow.sourceFile ||
+    !arrayEquals(row.sourceFiles, canonicalRow.sourceFiles) ||
     row.evidenceKind !== canonicalRow.evidenceKind ||
     row.code != null ||
     !arrayEquals(row.sourceIdentifiers, canonicalRow.sourceIdentifiers)
@@ -3264,6 +3333,7 @@ function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionAcceptedRow(
     id: row.id,
     role: row.role,
     sourceFile: row.sourceFile,
+    sourceFiles: Object.freeze([...row.sourceFiles]),
     evidenceKind: row.evidenceKind,
     sourceIdentifiers: Object.freeze([...row.sourceIdentifiers]),
     status:
@@ -3298,6 +3368,7 @@ function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedRow(
     id: row?.id ?? null,
     role: row?.role ?? null,
     sourceFile: row?.sourceFile ?? null,
+    sourceFiles: Object.freeze([...arrayFromMaybe(row?.sourceFiles)]),
     evidenceKind: row?.evidenceKind ?? null,
     sourceIdentifiers: Object.freeze([...arrayFromMaybe(row?.sourceIdentifiers)]),
     status:
@@ -3395,6 +3466,7 @@ function getNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow(
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows.find(
         (canonicalRow) =>
           row?.sourceFile === canonicalRow.sourceFile &&
+          arrayEquals(row?.sourceFiles, canonicalRow.sourceFiles) &&
           row?.evidenceKind === canonicalRow.evidenceKind &&
           arrayEquals(row?.sourceIdentifiers, canonicalRow.sourceIdentifiers)
       ) ?? null
@@ -3402,6 +3474,21 @@ function getNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow(
   }
 
   return byId;
+}
+
+function sourceFilesFromNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRows(
+  rows
+) {
+  const sourceFiles = [];
+  for (const row of rows) {
+    for (const sourceFile of row.sourceFiles) {
+      if (!sourceFiles.includes(sourceFile)) {
+        sourceFiles.push(sourceFile);
+      }
+    }
+  }
+
+  return Object.freeze(sourceFiles);
 }
 
 function arrayFromMaybe(value) {
