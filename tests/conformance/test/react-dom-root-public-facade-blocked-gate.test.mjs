@@ -123,8 +123,16 @@ function minimalPublicDivTextApi(text, id = MINIMAL_PUBLIC_DIV_TEXT_ID) {
   return `ReactDOMClient.createRoot(container).render(React.createElement("div", ${props}, ${JSON.stringify(text)}))`;
 }
 
-function rootRenderMinimalPublicDivTextApi(rootName, text) {
-  return `${rootName}.render(React.createElement("div", { id: ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID)} }, ${JSON.stringify(text)}))`;
+function rootRenderMinimalPublicDivTextApi(
+  rootName,
+  text,
+  id = MINIMAL_PUBLIC_DIV_TEXT_ID
+) {
+  return `${rootName}.render(React.createElement("div", { id: ${JSON.stringify(id)} }, ${JSON.stringify(text)}))`;
+}
+
+function rootRenderNullApi(rootName) {
+  return `${rootName}.render(null)`;
 }
 
 const MINIMAL_PUBLIC_DIV_TEXT_RENDER_API =
@@ -135,6 +143,27 @@ const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API = minimalPublicDivTextApi(
 );
 const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API =
   `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.render(React.createElement("div", null, ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL)}))`;
+const MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_API = [
+  "const root = ReactDOMClient.createRoot(container)",
+  rootRenderMinimalPublicDivTextApi("root", MINIMAL_PUBLIC_DIV_TEXT),
+  rootRenderNullApi("root"),
+  rootRenderNullApi("root"),
+  rootRenderMinimalPublicDivTextApi(
+    "root",
+    MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+    MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID
+  ),
+  rootRenderNullApi("root")
+].join("; ");
+const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_API = [
+  "const root = ReactDOMClient.createRoot(container)",
+  rootRenderMinimalPublicDivTextApi("root", MINIMAL_PUBLIC_DIV_TEXT),
+  rootRenderNullApi("root"),
+  rootRenderNullApi("root"),
+  "root.unmount()",
+  "root.unmount()",
+  "root.render(null)"
+].join("; ");
 const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API =
   `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.unmount()`;
 const MINIMAL_PUBLIC_DIV_TEXT_RECREATE_AFTER_UNMOUNT_API = [
@@ -237,6 +266,81 @@ const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_SNAPSHOT = Object.freeze({
   ownerDocumentChildCount: 0,
   ownerDocumentMutationLog: Object.freeze([])
 });
+const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT = Object.freeze({
+  containerChildCount: 0,
+  containerChildNodeNames: Object.freeze([]),
+  containerChildrenCount: 0,
+  containerFirstElementChildAttributes: null,
+  containerFirstElementChildGetAttributeId: null,
+  containerFirstElementChildInnerHTML: null,
+  containerFirstElementChildNodeName: null,
+  containerFirstElementChildStoredPropsChildren: null,
+  containerFirstElementChildStoredPropsHasId: null,
+  containerFirstElementChildStoredPropsId: null,
+  containerFirstElementChildStoredPropsSameObject: null,
+  containerFirstElementChildTagName: null,
+  containerFirstElementChildTextContent: null,
+  containerInnerHTML: "",
+  containerMutationLog: Object.freeze([
+    Object.freeze(["appendChild", "DIV"]),
+    Object.freeze(["removeChild", "DIV"])
+  ]),
+  containerTextContent: "",
+  ownerDocumentChildCount: 0,
+  ownerDocumentMutationLog: Object.freeze([])
+});
+const MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_RERENDER_SNAPSHOT = Object.freeze({
+  containerChildCount: 1,
+  containerChildNodeNames: Object.freeze(["DIV"]),
+  containerChildrenCount: 1,
+  containerFirstElementChildAttributes: Object.freeze([
+    Object.freeze(["id", MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID])
+  ]),
+  containerFirstElementChildGetAttributeId: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID,
+  containerFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED,
+  containerFirstElementChildNodeName: "DIV",
+  containerFirstElementChildStoredPropsChildren:
+    MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+  containerFirstElementChildStoredPropsHasId: true,
+  containerFirstElementChildStoredPropsId: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID,
+  containerFirstElementChildStoredPropsSameObject: true,
+  containerFirstElementChildTagName: "DIV",
+  containerFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+  containerInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED}</div>`,
+  containerMutationLog: Object.freeze([
+    Object.freeze(["appendChild", "DIV"]),
+    Object.freeze(["removeChild", "DIV"]),
+    Object.freeze(["appendChild", "DIV"])
+  ]),
+  containerTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+  ownerDocumentChildCount: 0,
+  ownerDocumentMutationLog: Object.freeze([])
+});
+const MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_FINAL_SNAPSHOT = Object.freeze({
+  containerChildCount: 0,
+  containerChildNodeNames: Object.freeze([]),
+  containerChildrenCount: 0,
+  containerFirstElementChildAttributes: null,
+  containerFirstElementChildGetAttributeId: null,
+  containerFirstElementChildInnerHTML: null,
+  containerFirstElementChildNodeName: null,
+  containerFirstElementChildStoredPropsChildren: null,
+  containerFirstElementChildStoredPropsHasId: null,
+  containerFirstElementChildStoredPropsId: null,
+  containerFirstElementChildStoredPropsSameObject: null,
+  containerFirstElementChildTagName: null,
+  containerFirstElementChildTextContent: null,
+  containerInnerHTML: "",
+  containerMutationLog: Object.freeze([
+    Object.freeze(["appendChild", "DIV"]),
+    Object.freeze(["removeChild", "DIV"]),
+    Object.freeze(["appendChild", "DIV"]),
+    Object.freeze(["removeChild", "DIV"])
+  ]),
+  containerTextContent: "",
+  ownerDocumentChildCount: 0,
+  ownerDocumentMutationLog: Object.freeze([])
+});
 const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_SNAPSHOT = Object.freeze({
   containerChildCount: 0,
   containerChildNodeNames: Object.freeze([]),
@@ -312,6 +416,26 @@ const MINIMAL_PUBLIC_DIV_TEXT_RECREATE_UNMOUNT_SNAPSHOT = Object.freeze({
   ownerDocumentMutationLog: Object.freeze([])
 });
 
+const PUBLIC_ROOT_LIFECYCLE_COMPATIBILITY_CLAIM_KEYS = Object.freeze([
+  "compatibilityClaimed",
+  "publicCompatibilityClaimed",
+  "publicRootCompatibilitySurface",
+  "publicRootCompatibilityClaimed",
+  "publicRenderCompatibilityClaimed",
+  "publicRootRenderCompatibilityClaimed",
+  "publicRootUnmountCompatibilityClaimed",
+  "browserDomCompatibilityClaimed",
+  "publicBrowserDomCompatibilityClaimed",
+  "nativeCompatibilityClaimed",
+  "publicNativeCompatibilityClaimed"
+]);
+
+function assertPublicRootLifecycleCompatibilityClaimsFalse(operation) {
+  for (const key of PUBLIC_ROOT_LIFECYCLE_COMPATIBILITY_CLAIM_KEYS) {
+    assert.equal(operation[key], false, key);
+  }
+}
+
 function assertPublicRootFacadeSideEffectFree(sideEffects) {
   assert.equal(sideEffects.mutationCount, 0);
   assert.equal(sideEffects.listenerRegistrationCount, 0);
@@ -353,6 +477,7 @@ function assertMinimalPublicDivTextLifecycle(publicBoundary) {
   assert.equal(renderDivText.status, "ok");
   assert.equal(renderDivText.value.type, "undefined");
   assert.equal(renderDivText.compatibilityClaimed, false);
+  assertPublicRootLifecycleCompatibilityClaimsFalse(renderDivText);
   assert.equal(renderDivText.controlledDomShim, true);
   assert.equal(renderDivText.renderElementType, "div");
   assert.equal(renderDivText.renderTextContent, MINIMAL_PUBLIC_DIV_TEXT);
@@ -390,6 +515,7 @@ function assertMinimalPublicDivTextUpdateLifecycle(publicBoundary) {
   assert.equal(renderUpdate.status, "ok");
   assert.equal(renderUpdate.value.type, "undefined");
   assert.equal(renderUpdate.compatibilityClaimed, false);
+  assertPublicRootLifecycleCompatibilityClaimsFalse(renderUpdate);
   assert.equal(renderUpdate.controlledDomShim, true);
   assert.equal(renderUpdate.renderElementType, "div");
   assert.equal(
@@ -432,6 +558,7 @@ function assertMinimalPublicDivTextIdRemovalLifecycle(publicBoundary) {
   assert.equal(renderIdRemoval.status, "ok");
   assert.equal(renderIdRemoval.value.type, "undefined");
   assert.equal(renderIdRemoval.compatibilityClaimed, false);
+  assertPublicRootLifecycleCompatibilityClaimsFalse(renderIdRemoval);
   assert.equal(renderIdRemoval.controlledDomShim, true);
   assert.equal(renderIdRemoval.renderElementType, "div");
   assert.equal(
@@ -464,6 +591,156 @@ function assertMinimalPublicDivTextIdRemovalLifecycle(publicBoundary) {
   );
 }
 
+function assertMinimalPublicRenderNullCleanupLifecycle(publicBoundary) {
+  const renderNullCleanup =
+    publicBoundary.publicRootLifecycle.renderNullCleanup;
+  assert.equal(renderNullCleanup.label, MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_API);
+  assert.equal(renderNullCleanup.status, "ok");
+  assert.equal(renderNullCleanup.value.type, "undefined");
+  assertPublicRootLifecycleCompatibilityClaimsFalse(renderNullCleanup);
+  assert.equal(renderNullCleanup.controlledDomShim, true);
+  assert.equal(renderNullCleanup.renderElementType, "div");
+  assert.equal(renderNullCleanup.renderTextContent, MINIMAL_PUBLIC_DIV_TEXT);
+  assert.equal(renderNullCleanup.rootObjectCreated, true);
+  assert.equal(renderNullCleanup.lifecycleOperationAttempted, true);
+  assert.equal(renderNullCleanup.createRootAttempt.status, "ok");
+  assert.equal(renderNullCleanup.firstRenderNullAttempt.status, "ok");
+  assert.equal(renderNullCleanup.firstRenderNullAttempt.value.type, "undefined");
+  assert.equal(renderNullCleanup.secondRenderNullAttempt.status, "ok");
+  assert.equal(renderNullCleanup.secondRenderNullAttempt.value.type, "undefined");
+  assert.equal(renderNullCleanup.rerenderAfterNullAttempt.status, "ok");
+  assert.equal(renderNullCleanup.rerenderAfterNullAttempt.value.type, "undefined");
+  assert.equal(renderNullCleanup.finalRenderNullAttempt.status, "ok");
+  assert.equal(renderNullCleanup.finalRenderNullAttempt.value.type, "undefined");
+  assert.equal(renderNullCleanup.rerenderedAfterNull, true);
+  assert.equal(renderNullCleanup.rerenderHostNodeDistinct, true);
+  assert.deepEqual(
+    renderNullCleanup.renderNullSnapshots.initialRender,
+    MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT
+  );
+  assert.deepEqual(
+    renderNullCleanup.renderNullSnapshots.firstCleanup,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.deepEqual(
+    renderNullCleanup.renderNullSnapshots.repeatedCleanup,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.deepEqual(
+    renderNullCleanup.renderNullSnapshots.rerenderAfterNull,
+    MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_RERENDER_SNAPSHOT
+  );
+  assert.deepEqual(
+    renderNullCleanup.renderNullSnapshots.finalCleanup,
+    MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_FINAL_SNAPSHOT
+  );
+  assert.deepEqual(
+    renderNullCleanup.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_FINAL_SNAPSHOT
+  );
+  assert.equal(renderNullCleanup.sideEffects.mutationCount, 4);
+  assert.equal(renderNullCleanup.sideEffects.listenerRegistrationCount, 0);
+  assert.equal(
+    renderNullCleanup.sideEffects.ownerDocumentListenerRegistrationCount,
+    0
+  );
+  assert.equal(renderNullCleanup.sideEffects.ownerDocumentMutationCount, 0);
+  assert.equal(renderNullCleanup.sideEffects.containerMarker.propertyCount, 0);
+  assert.equal(renderNullCleanup.sideEffects.containerMarker.truthyCount, 0);
+  assert.equal(
+    renderNullCleanup.sideEffects.containerListeningMarker.propertyCount,
+    0
+  );
+  assert.equal(
+    renderNullCleanup.sideEffects.ownerDocumentListeningMarker.propertyCount,
+    0
+  );
+}
+
+function assertMinimalPublicUnmountAfterNullLifecycle(publicBoundary) {
+  const unmountAfterNull =
+    publicBoundary.publicRootLifecycle.unmountAfterNull;
+  assert.equal(
+    unmountAfterNull.label,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_API
+  );
+  assert.equal(unmountAfterNull.status, "ok");
+  assert.equal(unmountAfterNull.value.type, "undefined");
+  assertPublicRootLifecycleCompatibilityClaimsFalse(unmountAfterNull);
+  assert.equal(unmountAfterNull.controlledDomShim, true);
+  assert.equal(unmountAfterNull.renderElementType, "div");
+  assert.equal(unmountAfterNull.renderTextContent, MINIMAL_PUBLIC_DIV_TEXT);
+  assert.equal(unmountAfterNull.duplicateRootTrackingCleared, true);
+  assert.equal(unmountAfterNull.rootObjectCreated, true);
+  assert.equal(unmountAfterNull.lifecycleOperationAttempted, true);
+  assert.equal(unmountAfterNull.createRootAttempt.status, "ok");
+  assert.equal(unmountAfterNull.firstRenderNullAttempt.status, "ok");
+  assert.equal(unmountAfterNull.firstRenderNullAttempt.value.type, "undefined");
+  assert.equal(unmountAfterNull.secondRenderNullAttempt.status, "ok");
+  assert.equal(unmountAfterNull.secondRenderNullAttempt.value.type, "undefined");
+  assert.equal(unmountAfterNull.unmountAfterNullAttempt.status, "ok");
+  assert.equal(unmountAfterNull.unmountAfterNullAttempt.value.type, "undefined");
+  assert.equal(unmountAfterNull.secondUnmountAttempt.status, "ok");
+  assert.equal(unmountAfterNull.secondUnmountAttempt.value.type, "undefined");
+  assert.equal(
+    unmountAfterNull.staleRenderNullAfterUnmountAttempt.status,
+    "throws"
+  );
+  assert.equal(
+    unmountAfterNull.staleRenderNullAfterUnmountAttempt.thrown.code,
+    "FAST_REACT_UNIMPLEMENTED"
+  );
+  assert.equal(
+    unmountAfterNull.staleRenderNullAfterUnmountAttempt.thrown.exportName,
+    "createRoot().render"
+  );
+  assert.deepEqual(
+    unmountAfterNull.unmountAfterNullSnapshots.initialRender,
+    MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT
+  );
+  assert.deepEqual(
+    unmountAfterNull.unmountAfterNullSnapshots.firstCleanup,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.deepEqual(
+    unmountAfterNull.unmountAfterNullSnapshots.repeatedCleanup,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.deepEqual(
+    unmountAfterNull.unmountAfterNullSnapshots.afterUnmount,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.deepEqual(
+    unmountAfterNull.unmountAfterNullSnapshots.afterSecondUnmount,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.deepEqual(
+    unmountAfterNull.unmountAfterNullSnapshots.afterStaleRenderNull,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.deepEqual(
+    unmountAfterNull.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.equal(unmountAfterNull.sideEffects.mutationCount, 2);
+  assert.equal(unmountAfterNull.sideEffects.listenerRegistrationCount, 0);
+  assert.equal(
+    unmountAfterNull.sideEffects.ownerDocumentListenerRegistrationCount,
+    0
+  );
+  assert.equal(unmountAfterNull.sideEffects.ownerDocumentMutationCount, 0);
+  assert.equal(unmountAfterNull.sideEffects.containerMarker.propertyCount, 0);
+  assert.equal(unmountAfterNull.sideEffects.containerMarker.truthyCount, 0);
+  assert.equal(
+    unmountAfterNull.sideEffects.containerListeningMarker.propertyCount,
+    0
+  );
+  assert.equal(
+    unmountAfterNull.sideEffects.ownerDocumentListeningMarker.propertyCount,
+    0
+  );
+}
+
 function assertMinimalPublicDivTextUnmountLifecycle(publicBoundary) {
   const unmount = publicBoundary.publicRootLifecycle.unmount;
   assert.equal(
@@ -473,6 +750,7 @@ function assertMinimalPublicDivTextUnmountLifecycle(publicBoundary) {
   assert.equal(unmount.status, "ok");
   assert.equal(unmount.value.type, "undefined");
   assert.equal(unmount.compatibilityClaimed, false);
+  assertPublicRootLifecycleCompatibilityClaimsFalse(unmount);
   assert.equal(unmount.controlledDomShim, true);
   assert.equal(unmount.renderElementType, "div");
   assert.equal(unmount.renderTextContent, MINIMAL_PUBLIC_DIV_TEXT);
@@ -508,6 +786,7 @@ function assertMinimalPublicDivTextRecreateAfterUnmountLifecycle(
   assert.equal(recreateAfterUnmount.status, "ok");
   assert.equal(recreateAfterUnmount.value.type, "undefined");
   assert.equal(recreateAfterUnmount.compatibilityClaimed, false);
+  assertPublicRootLifecycleCompatibilityClaimsFalse(recreateAfterUnmount);
   assert.equal(recreateAfterUnmount.controlledDomShim, true);
   assert.equal(recreateAfterUnmount.renderElementType, "div");
   assert.equal(
@@ -615,6 +894,8 @@ function assertMinimalPublicRootBoundary(publicBoundary) {
   assertMinimalPublicDivTextLifecycle(publicBoundary);
   assertMinimalPublicDivTextUpdateLifecycle(publicBoundary);
   assertMinimalPublicDivTextIdRemovalLifecycle(publicBoundary);
+  assertMinimalPublicRenderNullCleanupLifecycle(publicBoundary);
+  assertMinimalPublicUnmountAfterNullLifecycle(publicBoundary);
   assertMinimalPublicDivTextUnmountLifecycle(publicBoundary);
   assertMinimalPublicDivTextRecreateAfterUnmountLifecycle(publicBoundary);
 }
@@ -1255,6 +1536,7 @@ test("React DOM public root render(null) clears fake-DOM output and keeps lifecy
     assert.equal(root.render(null), undefined);
     assert.equal(root.render(null), undefined);
     assert.equal(container.childNodes.length, 0);
+    assert.equal(container.firstChild, null);
     assert.equal(container.textContent, "");
     assert.equal(container.__mutationLog.length, 0);
     assert.equal(document.__mutationLog.length, 0);
@@ -1266,6 +1548,7 @@ test("React DOM public root render(null) clears fake-DOM output and keeps lifecy
     assert.equal(root.unmount(), undefined);
     assert.equal(root.unmount(), undefined);
     assert.equal(container.__mutationLog.length, 0);
+    assert.equal(document.__mutationLog.length, 0);
   }
 
   {
@@ -1275,13 +1558,25 @@ test("React DOM public root render(null) clears fake-DOM output and keeps lifecy
     );
     const container = createPrivateGateElement("DIV", document, domContainer);
     const root = reactDomClient.createRoot(container);
-    const initial = React.createElement("div", { id: "x" }, "text");
-    const next = React.createElement("div", { id: "y" }, "again");
+    const initial = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_TEXT_ID },
+      MINIMAL_PUBLIC_DIV_TEXT
+    );
+    const next = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID },
+      MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+    );
 
     assert.equal(root.render(initial), undefined);
     const firstHostNode = container.firstChild;
+    assert.equal(firstHostNode.getAttribute("id"), MINIMAL_PUBLIC_DIV_TEXT_ID);
+    assert.equal(firstHostNode.textContent, MINIMAL_PUBLIC_DIV_TEXT);
+    assert.equal(componentTree.getLatestPropsFromNode(firstHostNode), initial.props);
     assert.equal(root.render(null), undefined);
     assert.equal(container.childNodes.length, 0);
+    assert.equal(container.firstChild, null);
     assert.equal(container.textContent, "");
     assert.equal(componentTree.getLatestPropsFromNode(firstHostNode), null);
     assert.deepEqual(
@@ -1309,8 +1604,11 @@ test("React DOM public root render(null) clears fake-DOM output and keeps lifecy
     assert.equal(root.render(next), undefined);
     assert.equal(container.childNodes.length, 1);
     assert.notEqual(container.firstChild, firstHostNode);
-    assert.equal(container.firstChild.getAttribute("id"), "y");
-    assert.equal(container.textContent, "again");
+    assert.equal(
+      container.firstChild.getAttribute("id"),
+      MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID
+    );
+    assert.equal(container.textContent, MINIMAL_PUBLIC_DIV_TEXT_UPDATE);
     assert.equal(
       componentTree.getLatestPropsFromNode(container.firstChild),
       next.props
@@ -1331,12 +1629,14 @@ test("React DOM public root render(null) clears fake-DOM output and keeps lifecy
       ]
     );
     assert.equal(container.childNodes.length, 0);
+    assert.equal(container.firstChild, null);
     assert.throws(() => root.render(null), {
       code: "FAST_REACT_UNIMPLEMENTED",
       exportName: "createRoot().render"
     });
     assert.equal(listenerRegistry.hasListeningMarker(container), false);
     assert.equal(listenerRegistry.hasListeningMarker(document), false);
+    assert.equal(document.__mutationLog.length, 0);
   }
 });
 
@@ -5154,6 +5454,8 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
       MINIMAL_PUBLIC_DIV_TEXT_RENDER_API,
       MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API,
       MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API,
+      MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_API,
+      MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_API,
       MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API,
       MINIMAL_PUBLIC_DIV_TEXT_RECREATE_AFTER_UNMOUNT_API
     ]
@@ -5218,6 +5520,79 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
   assert.deepEqual(
     publicIdRemovalRow.controlledDomSnapshot,
     MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_SNAPSHOT
+  );
+  const publicRenderNullRow = lifecycleRows.find(
+    (row) => row.id === "public-create-root-render-null-cleanup"
+  );
+  assert.ok(publicRenderNullRow);
+  assert.equal(publicRenderNullRow.controlledDomShim, true);
+  assert.equal(publicRenderNullRow.minimalDivTextHostOutputRenderNullCleaned, true);
+  assert.equal(publicRenderNullRow.mutationCount, 4);
+  assert.equal(
+    publicRenderNullRow.privateBridgeEvidence,
+    "wrapped-private-facade-host-output"
+  );
+  assert.equal(publicRenderNullRow.renderReturnType, "undefined");
+  for (const key of PUBLIC_ROOT_LIFECYCLE_COMPATIBILITY_CLAIM_KEYS) {
+    assert.equal(publicRenderNullRow[key], false, key);
+  }
+  assert.deepEqual(
+    publicRenderNullRow.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_FINAL_SNAPSHOT
+  );
+  assert.deepEqual(
+    publicRenderNullRow.renderNullCleanupEvidence.firstCleanupSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.deepEqual(
+    publicRenderNullRow.renderNullCleanupEvidence.repeatedCleanupSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.deepEqual(
+    publicRenderNullRow.renderNullCleanupEvidence.rerenderAfterNullSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_RERENDER_SNAPSHOT
+  );
+  assert.equal(
+    publicRenderNullRow.renderNullCleanupEvidence.rerenderAfterNull,
+    true
+  );
+  assert.equal(
+    publicRenderNullRow.renderNullCleanupEvidence.rerenderHostNodeDistinct,
+    true
+  );
+  const publicUnmountAfterNullRow = lifecycleRows.find(
+    (row) => row.id === "public-create-root-unmount-after-null-idempotent"
+  );
+  assert.ok(publicUnmountAfterNullRow);
+  assert.equal(publicUnmountAfterNullRow.controlledDomShim, true);
+  assert.equal(publicUnmountAfterNullRow.minimalDivTextHostOutputUnmountAfterNull, true);
+  assert.equal(publicUnmountAfterNullRow.duplicateRootTrackingCleared, true);
+  assert.equal(publicUnmountAfterNullRow.mutationCount, 2);
+  assert.equal(
+    publicUnmountAfterNullRow.privateBridgeEvidence,
+    "wrapped-private-facade-host-output"
+  );
+  assert.equal(publicUnmountAfterNullRow.renderReturnType, "undefined");
+  for (const key of PUBLIC_ROOT_LIFECYCLE_COMPATIBILITY_CLAIM_KEYS) {
+    assert.equal(publicUnmountAfterNullRow[key], false, key);
+  }
+  assert.deepEqual(
+    publicUnmountAfterNullRow.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
+  );
+  assert.equal(
+    publicUnmountAfterNullRow.unmountAfterNullEvidence.secondUnmountAttempt
+      .value.type,
+    "undefined"
+  );
+  assert.equal(
+    publicUnmountAfterNullRow.unmountAfterNullEvidence
+      .staleRenderNullAfterUnmountAttempt.thrown.code,
+    "FAST_REACT_UNIMPLEMENTED"
+  );
+  assert.deepEqual(
+    publicUnmountAfterNullRow.unmountAfterNullEvidence.afterSecondUnmountSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_SNAPSHOT
   );
   const publicUnmountRow = lifecycleRows.find(
     (row) => row.id === "public-create-root-unmount-call"
@@ -5773,6 +6148,298 @@ test("React DOM public root facade gate records minimal public div text render",
   );
 });
 
+test("React DOM public root facade gate records render(null) cleanup and unmount-after-null evidence", () => {
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assertMinimalPublicRenderNullCleanupLifecycle(publicBoundary);
+  assertMinimalPublicUnmountAfterNullLifecycle(publicBoundary);
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: publicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
+  });
+
+  assert.equal(gate.ok, true);
+  const renderNullRow = gate.blockedPublicFacadeRows.find(
+    (row) => row.id === "public-create-root-render-null-cleanup"
+  );
+  const unmountAfterNullRow = gate.blockedPublicFacadeRows.find(
+    (row) => row.id === "public-create-root-unmount-after-null-idempotent"
+  );
+  assert.equal(renderNullRow.minimalDivTextHostOutputRenderNullCleaned, true);
+  assert.equal(renderNullRow.compatibilityClaimed, false);
+  assert.equal(renderNullRow.mutationCount, 4);
+  assert.deepEqual(
+    renderNullRow.renderNullCleanupEvidence.finalCleanupSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_FINAL_SNAPSHOT
+  );
+  assert.deepEqual(
+    renderNullRow.renderNullCleanupEvidence.rerenderAfterNullSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_RERENDER_SNAPSHOT
+  );
+  assert.equal(unmountAfterNullRow.minimalDivTextHostOutputUnmountAfterNull, true);
+  assert.equal(unmountAfterNullRow.compatibilityClaimed, false);
+  assert.equal(unmountAfterNullRow.duplicateRootTrackingCleared, true);
+  assert.equal(unmountAfterNullRow.mutationCount, 2);
+  assert.equal(
+    unmountAfterNullRow.unmountAfterNullEvidence.secondUnmountAttempt
+      .value.type,
+    "undefined"
+  );
+  assert.equal(
+    unmountAfterNullRow.unmountAfterNullEvidence
+      .staleRenderNullAfterUnmountAttempt.thrown.exportName,
+    "createRoot().render"
+  );
+
+  const falseGreenCases = [
+    {
+      expectedId: "public-create-root-render-null-cleanup",
+      label: "keeps stale host output after render(null)",
+      operationKey: "renderNullCleanup",
+      mutate(operation) {
+        operation.controlledDomSnapshot = clone(MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT);
+      }
+    },
+    {
+      expectedId: "public-create-root-render-null-cleanup",
+      label: "keeps stale latest props after render(null)",
+      operationKey: "renderNullCleanup",
+      mutate(operation) {
+        operation.renderNullSnapshots.finalCleanup
+          .containerFirstElementChildStoredPropsChildren =
+          MINIMAL_PUBLIC_DIV_TEXT;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-null-cleanup",
+      label: "omits render(null) cleanup mutation log",
+      operationKey: "renderNullCleanup",
+      mutate(operation) {
+        delete operation.controlledDomSnapshot.containerMutationLog;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-null-cleanup",
+      label: "adds extra render(null) cleanup mutation",
+      operationKey: "renderNullCleanup",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerMutationLog.push([
+          "removeChild",
+          "DIV"
+        ]);
+        operation.sideEffects.mutationCount = 5;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-null-cleanup",
+      label: "leaks ownerDocument mutation",
+      operationKey: "renderNullCleanup",
+      mutate(operation) {
+        operation.sideEffects.ownerDocumentMutationCount = 1;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-null-cleanup",
+      label: "leaks container root marker",
+      operationKey: "renderNullCleanup",
+      mutate(operation) {
+        operation.sideEffects.containerMarker.propertyCount = 1;
+        operation.sideEffects.containerMarker.truthyCount = 1;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-null-cleanup",
+      label: "leaks listener registration",
+      operationKey: "renderNullCleanup",
+      mutate(operation) {
+        operation.sideEffects.listenerRegistrationCount = 1;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-null-cleanup",
+      label: "drops repeated render(null) snapshot",
+      operationKey: "renderNullCleanup",
+      mutate(operation) {
+        delete operation.renderNullSnapshots.repeatedCleanup;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-null-cleanup",
+      label: "does not rerender on same root after null",
+      operationKey: "renderNullCleanup",
+      mutate(operation) {
+        operation.rerenderedAfterNull = false;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-null-cleanup",
+      label: "claims browser DOM compatibility alias",
+      operationKey: "renderNullCleanup",
+      mutate(operation) {
+        operation.publicBrowserDomCompatibilityClaimed = true;
+      }
+    },
+    {
+      expectedId: "public-create-root-unmount-after-null-idempotent",
+      label: "duplicate-root tracking not cleared after null unmount",
+      operationKey: "unmountAfterNull",
+      mutate(operation) {
+        operation.duplicateRootTrackingCleared = false;
+      }
+    },
+    {
+      expectedId: "public-create-root-unmount-after-null-idempotent",
+      label: "second unmount throws",
+      operationKey: "unmountAfterNull",
+      mutate(operation) {
+        operation.secondUnmountAttempt = {
+          label: "second root.unmount after render(null)",
+          status: "throws",
+          thrown: {
+            code: "FAST_REACT_UNIMPLEMENTED",
+            entrypoint: "react-dom/client",
+            exportName: "createRoot().unmount"
+          }
+        };
+      }
+    },
+    {
+      expectedId: "public-create-root-unmount-after-null-idempotent",
+      label: "second unmount mutates",
+      operationKey: "unmountAfterNull",
+      mutate(operation) {
+        operation.unmountAfterNullSnapshots.afterSecondUnmount
+          .containerMutationLog.push(["removeChild", "DIV"]);
+        operation.sideEffects.mutationCount = 3;
+      }
+    },
+    {
+      expectedId: "public-create-root-unmount-after-null-idempotent",
+      label: "stale render(null) after unmount succeeds",
+      operationKey: "unmountAfterNull",
+      mutate(operation) {
+        operation.staleRenderNullAfterUnmountAttempt = {
+          label: "stale root.render(null) after root.unmount",
+          status: "ok",
+          value: {
+            type: "undefined"
+          }
+        };
+      }
+    },
+    {
+      expectedId: "public-create-root-unmount-after-null-idempotent",
+      label: "claims native compatibility alias",
+      operationKey: "unmountAfterNull",
+      mutate(operation) {
+        operation.publicNativeCompatibilityClaimed = true;
+      }
+    },
+    {
+      expectedId: "public-create-root-unmount-after-null-idempotent",
+      label: "claims public root compatibility alias",
+      operationKey: "unmountAfterNull",
+      mutate(operation) {
+        operation.publicRootCompatibilitySurface = true;
+      }
+    }
+  ];
+
+  for (const falseGreenCase of falseGreenCases) {
+    const tamperedBoundary = clone(publicBoundary);
+    falseGreenCase.mutate(
+      tamperedBoundary.publicRootLifecycle[falseGreenCase.operationKey]
+    );
+    const tamperedGate = evaluateReactDomRootPublicFacadeBlockedGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle,
+      clientRootOracle,
+      localPublicFacadeBoundary: tamperedBoundary,
+      privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
+    });
+    assert.equal(tamperedGate.ok, false, falseGreenCase.label);
+    assert.ok(
+      tamperedGate.failures.some(
+        (failure) => failure.id === falseGreenCase.expectedId
+      ),
+      falseGreenCase.label
+    );
+  }
+
+  const staleLifecycleRows = clone(
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
+  );
+  staleLifecycleRows[4].publicApi = MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API;
+  const staleRowGate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: publicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary(),
+    publicFacadeLifecycleRows: staleLifecycleRows
+  });
+  assert.equal(staleRowGate.ok, false);
+  assert.ok(
+    staleRowGate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+          "public-root-lifecycle-row-public-api-label-mismatch" &&
+        failure.id === "public-create-root-render-null-cleanup" &&
+        failure.expectedPublicApi === MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_API
+    )
+  );
+
+  const missingLifecycleRows = clone(
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
+  );
+  missingLifecycleRows.splice(4, 1);
+  const missingRowGate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: publicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary(),
+    publicFacadeLifecycleRows: missingLifecycleRows
+  });
+  assert.equal(missingRowGate.ok, false);
+  assert.ok(
+    missingRowGate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+          "public-root-lifecycle-row-public-api-label-mismatch" &&
+        failure.expectedId === "public-create-root-render-null-cleanup"
+    )
+  );
+
+  const wrongOrderLifecycleRows = clone(
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
+  );
+  [wrongOrderLifecycleRows[4], wrongOrderLifecycleRows[5]] = [
+    wrongOrderLifecycleRows[5],
+    wrongOrderLifecycleRows[4]
+  ];
+  const wrongOrderGate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: publicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary(),
+    publicFacadeLifecycleRows: wrongOrderLifecycleRows
+  });
+  assert.equal(wrongOrderGate.ok, false);
+  assert.ok(
+    wrongOrderGate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+          "public-root-lifecycle-row-public-api-label-mismatch" &&
+        failure.expectedId === "public-create-root-render-null-cleanup"
+    )
+  );
+});
+
 test("React DOM public root facade gate records recreate after unmount without compatibility", () => {
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
   assertMinimalPublicDivTextRecreateAfterUnmountLifecycle(publicBoundary);
@@ -5914,7 +6581,7 @@ test("React DOM public root facade gate records recreate after unmount without c
   const staleLifecycleRows = clone(
     REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
   );
-  staleLifecycleRows[5].publicApi = MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API;
+  staleLifecycleRows[7].publicApi = MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API;
   const staleLifecycleRowGate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
     currentOracle: rootRenderOracle,
