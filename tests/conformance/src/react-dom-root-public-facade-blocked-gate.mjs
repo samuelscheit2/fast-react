@@ -56,11 +56,15 @@ const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
 );
 const require = createRequire(import.meta.url);
 
-const MINIMAL_PUBLIC_CREATE_ROOT_SCENARIO_ID = "create-root-no-render";
+const MINIMAL_PUBLIC_KNOWN_MISMATCH_SCENARIO_IDS = new Set([
+  "create-root-no-render",
+  "root-unmount",
+  "double-unmount"
+]);
 
-function isMinimalPublicCreateRootKnownMismatch({ scenarioId, comparison }) {
+function isMinimalPublicRootFacadeKnownMismatch({ scenarioId, comparison }) {
   return (
-    scenarioId === MINIMAL_PUBLIC_CREATE_ROOT_SCENARIO_ID &&
+    MINIMAL_PUBLIC_KNOWN_MISMATCH_SCENARIO_IDS.has(scenarioId) &&
     comparison?.status === "known-mismatch" &&
     comparison.compatibilityClaimed === false &&
     comparison.firstDifferencePath !== null
@@ -986,7 +990,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS = Object.freeze(
       comparedToAcceptedReactDomOracle: true,
       publicCompatibilityClaimed: false,
       reason:
-        "Public React DOM root facade behavior stays blocked outside the admitted fake-DOM div text render, id/text update, id removal update, rendered-root unmount cleanup, and recreate-after-unmount path."
+        "Public React DOM root facade behavior stays blocked outside the admitted fake-DOM div text render, id/text update, id removal update, render(null) cleanup, idempotent unmount cleanup, and recreate-after-unmount path."
     })
   )
 );
@@ -1344,7 +1348,7 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
 
   if (result.summary.blockedPublicFacadeRowCount > 0) {
     lines.push(
-      "Compatibility remains blocked; minimal public createRoot/div-text render, id/text update, id removal update, rendered-root unmount cleanup, and recreate-after-unmount are scoped while hydrateRoot and broad root behavior stay fail-closed."
+      "Compatibility remains blocked; minimal public createRoot/div-text render, id/text update, id removal update, render(null) cleanup, idempotent unmount cleanup, and recreate-after-unmount are scoped while hydrateRoot and broad root behavior stay fail-closed."
     );
   }
   if (result.summary.blockedPrivateBridgeRowCount > 0) {
@@ -2925,7 +2929,7 @@ function validatePublicFacadeScenarioAdmissions({
         (comparison.status === "unsupported-placeholder" &&
           comparison.compatibilityClaimed === false &&
           comparison.firstDifferencePath !== null) ||
-        isMinimalPublicCreateRootKnownMismatch({
+        isMinimalPublicRootFacadeKnownMismatch({
           scenarioId,
           comparison
         })
@@ -3502,9 +3506,8 @@ function isPublicRootRecreateAfterUnmountEvidenceExpected(operation) {
       operation.staleRenderAfterUnmountAttempt,
       "createRoot().render"
     ) &&
-    isPublicRootStaleLifecycleAttemptBlocked(
-      operation.staleUnmountAfterUnmountAttempt,
-      "createRoot().unmount"
+    isPublicRootStaleUnmountNoop(
+      operation.staleUnmountAfterUnmountAttempt
     ) &&
     isPublicRenderControlledDomShimExpectedSnapshot(
       operation.recreateSnapshots?.initialRender,
@@ -3565,6 +3568,13 @@ function isPublicRootStaleLifecycleAttemptBlocked(attempt, exportName) {
     attempt.thrown?.code === "FAST_REACT_UNIMPLEMENTED" &&
     attempt.thrown.entrypoint === "react-dom/client" &&
     attempt.thrown.exportName === exportName
+  );
+}
+
+function isPublicRootStaleUnmountNoop(attempt) {
+  return (
+    attempt?.status === "ok" &&
+    attempt.value?.type === "undefined"
   );
 }
 

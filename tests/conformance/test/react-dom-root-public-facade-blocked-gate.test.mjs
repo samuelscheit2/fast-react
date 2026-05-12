@@ -541,15 +541,11 @@ function assertMinimalPublicDivTextRecreateAfterUnmountLifecycle(
   );
   assert.equal(
     recreateAfterUnmount.staleUnmountAfterUnmountAttempt.status,
-    "throws"
+    "ok"
   );
   assert.equal(
-    recreateAfterUnmount.staleUnmountAfterUnmountAttempt.thrown.code,
-    "FAST_REACT_UNIMPLEMENTED"
-  );
-  assert.equal(
-    recreateAfterUnmount.staleUnmountAfterUnmountAttempt.thrown.exportName,
-    "createRoot().unmount"
+    recreateAfterUnmount.staleUnmountAfterUnmountAttempt.value.type,
+    "undefined"
   );
   assert.deepEqual(
     recreateAfterUnmount.recreateSnapshots.initialRender,
@@ -1228,6 +1224,120 @@ test("React DOM public createRoot rejects explicit options and extra arguments",
   );
   assert.equal(listenerRegistry.hasListeningMarker(container), false);
   assert.equal(listenerRegistry.hasListeningMarker(document), false);
+});
+
+test("React DOM public root render(null) clears fake-DOM output and keeps lifecycle narrow", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const React = require(path.join(repoRoot, "packages/react/index.js"));
+  const componentTree = require(
+    path.join(repoRoot, "packages/react-dom/src/client/component-tree.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+
+  {
+    const document = createPrivateGateDocument(
+      "public-render-null-before-render",
+      domContainer
+    );
+    const container = createPrivateGateElement("DIV", document, domContainer);
+    const root = reactDomClient.createRoot(container);
+
+    assert.equal(root.render(null), undefined);
+    assert.equal(root.render(null), undefined);
+    assert.equal(container.childNodes.length, 0);
+    assert.equal(container.textContent, "");
+    assert.equal(container.__mutationLog.length, 0);
+    assert.equal(document.__mutationLog.length, 0);
+    assert.equal(container.__registrations.length, 0);
+    assert.equal(document.__registrations.length, 0);
+    assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
+    assert.equal(listenerRegistry.hasListeningMarker(container), false);
+    assert.equal(listenerRegistry.hasListeningMarker(document), false);
+    assert.equal(root.unmount(), undefined);
+    assert.equal(root.unmount(), undefined);
+    assert.equal(container.__mutationLog.length, 0);
+  }
+
+  {
+    const document = createPrivateGateDocument(
+      "public-render-null-reusable",
+      domContainer
+    );
+    const container = createPrivateGateElement("DIV", document, domContainer);
+    const root = reactDomClient.createRoot(container);
+    const initial = React.createElement("div", { id: "x" }, "text");
+    const next = React.createElement("div", { id: "y" }, "again");
+
+    assert.equal(root.render(initial), undefined);
+    const firstHostNode = container.firstChild;
+    assert.equal(root.render(null), undefined);
+    assert.equal(container.childNodes.length, 0);
+    assert.equal(container.textContent, "");
+    assert.equal(componentTree.getLatestPropsFromNode(firstHostNode), null);
+    assert.deepEqual(
+      container.__mutationLog.map((entry) => [
+        entry.type,
+        entry.child?.nodeName
+      ]),
+      [
+        ["appendChild", "DIV"],
+        ["removeChild", "DIV"]
+      ]
+    );
+    assert.equal(root.render(null), undefined);
+    assert.deepEqual(
+      container.__mutationLog.map((entry) => [
+        entry.type,
+        entry.child?.nodeName
+      ]),
+      [
+        ["appendChild", "DIV"],
+        ["removeChild", "DIV"]
+      ]
+    );
+
+    assert.equal(root.render(next), undefined);
+    assert.equal(container.childNodes.length, 1);
+    assert.notEqual(container.firstChild, firstHostNode);
+    assert.equal(container.firstChild.getAttribute("id"), "y");
+    assert.equal(container.textContent, "again");
+    assert.equal(
+      componentTree.getLatestPropsFromNode(container.firstChild),
+      next.props
+    );
+
+    assert.equal(root.unmount(), undefined);
+    assert.equal(root.unmount(), undefined);
+    assert.deepEqual(
+      container.__mutationLog.map((entry) => [
+        entry.type,
+        entry.child?.nodeName
+      ]),
+      [
+        ["appendChild", "DIV"],
+        ["removeChild", "DIV"],
+        ["appendChild", "DIV"],
+        ["removeChild", "DIV"]
+      ]
+    );
+    assert.equal(container.childNodes.length, 0);
+    assert.throws(() => root.render(null), {
+      code: "FAST_REACT_UNIMPLEMENTED",
+      exportName: "createRoot().render"
+    });
+    assert.equal(listenerRegistry.hasListeningMarker(container), false);
+    assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  }
 });
 
 test("React DOM client private facade adapter is symbol-only and routes to private records", () => {
@@ -5167,8 +5277,8 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
   );
   assert.equal(
     publicRecreateAfterUnmountRow.recreateAfterUnmountEvidence
-      .staleUnmountAfterUnmountAttempt.thrown.exportName,
-    "createRoot().unmount"
+      .staleUnmountAfterUnmountAttempt.value.type,
+    "undefined"
   );
   assert.deepEqual(
     publicRecreateAfterUnmountRow.recreateAfterUnmountEvidence
@@ -5700,8 +5810,8 @@ test("React DOM public root facade gate records recreate after unmount without c
   );
   assert.equal(
     recreateAfterUnmountRow.recreateAfterUnmountEvidence
-      .staleUnmountAfterUnmountAttempt.thrown.code,
-    "FAST_REACT_UNIMPLEMENTED"
+      .staleUnmountAfterUnmountAttempt.value.type,
+    "undefined"
   );
   assert.equal(gate.summary.compatibilityAdmitted, false);
   assert.equal(gate.summary.compatibilityClaimed, false);
@@ -5726,13 +5836,15 @@ test("React DOM public root facade gate records recreate after unmount without c
       }
     },
     {
-      label: "old unmount uses no-op lane",
+      label: "old unmount does not use no-op lane",
       mutate(operation) {
         operation.staleUnmountAfterUnmountAttempt = {
           label: "stale root.unmount after root.unmount",
-          status: "ok",
-          value: {
-            type: "undefined"
+          status: "throws",
+          thrown: {
+            code: "FAST_REACT_UNIMPLEMENTED",
+            entrypoint: "react-dom/client",
+            exportName: "createRoot().unmount"
           }
         };
       }

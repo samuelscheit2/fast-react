@@ -89,11 +89,15 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_MATCH_STATUS =
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_BLOCKED_STATUS =
   "blocked-private-root-bridge-request-row";
 
-const MINIMAL_PUBLIC_CREATE_ROOT_SCENARIO_ID = "create-root-no-render";
+const MINIMAL_PUBLIC_KNOWN_MISMATCH_SCENARIO_IDS = new Set([
+  "create-root-no-render",
+  "root-unmount",
+  "double-unmount"
+]);
 
-function isMinimalPublicCreateRootKnownMismatch({ scenarioId, comparison }) {
+function isMinimalPublicRootFacadeKnownMismatch({ scenarioId, comparison }) {
   return (
-    scenarioId === MINIMAL_PUBLIC_CREATE_ROOT_SCENARIO_ID &&
+    MINIMAL_PUBLIC_KNOWN_MISMATCH_SCENARIO_IDS.has(scenarioId) &&
     comparison?.status === "known-mismatch" &&
     comparison.compatibilityClaimed === false &&
     comparison.firstDifferencePath !== null
@@ -1024,7 +1028,7 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       if (
         (currentComparison.status === behavior.expectedComparisonStatus &&
           currentComparison.compatibilityClaimed === false) ||
-        isMinimalPublicCreateRootKnownMismatch({
+        isMinimalPublicRootFacadeKnownMismatch({
           scenarioId,
           comparison: currentComparison
         })
@@ -2557,7 +2561,7 @@ function validatePortalRootRenderOracleTie({
       if (
         (comparison?.status === "unsupported-placeholder" &&
           comparison.compatibilityClaimed === false) ||
-        isMinimalPublicCreateRootKnownMismatch({
+        isMinimalPublicRootFacadeKnownMismatch({
           scenarioId,
           comparison
         })

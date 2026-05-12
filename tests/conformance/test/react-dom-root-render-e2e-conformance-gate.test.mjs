@@ -916,6 +916,17 @@ function assertPublicCreateRootMinimalHostOutput(document) {
   assert.equal(container.firstChild, hostNode);
   assert.equal(container.textContent, "again");
   assert.deepEqual(attributeEntries(container.firstChild), [["id", "app"]]);
+  assert.equal(root.render(null), undefined);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(container.textContent, "");
+  assert.equal(root.render(null), undefined);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(
+    root.render(React.createElement("div", { id: "app" }, "again")),
+    undefined
+  );
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.textContent, "again");
   assert.equal(root.unmount(), undefined);
   assert.equal(container.childNodes.length, 0);
   assert.equal(container.textContent, "");
@@ -923,10 +934,7 @@ function assertPublicCreateRootMinimalHostOutput(document) {
     code: "FAST_REACT_UNIMPLEMENTED",
     exportName: "createRoot().render"
   });
-  assert.throws(() => root.unmount(), {
-    code: "FAST_REACT_UNIMPLEMENTED",
-    exportName: "createRoot().unmount"
-  });
+  assert.equal(root.unmount(), undefined);
   const recreatedRoot = reactDomClient.createRoot(container);
   assert.equal(recreatedRoot.render(React.createElement("div", null, 42)), undefined);
   assert.equal(container.textContent, "42");
