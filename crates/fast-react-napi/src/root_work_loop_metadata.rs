@@ -380,6 +380,10 @@ pub(crate) struct RootWorkLoopFinishedWorkDiagnosticEvidence {
     public_root_rendering_claimed: bool,
     public_root_rendering_blocked: bool,
     public_compatibility_blocked: bool,
+    effects_execution_blocked: bool,
+    refs_execution_blocked: bool,
+    hydration_execution_blocked: bool,
+    effects_refs_and_hydration_execution_surfaces_blocked: bool,
     effects_refs_and_hydration_blocked: bool,
     public_renderer_package_behavior_exposed: bool,
     react_dom_compatibility_claimed: bool,
@@ -424,6 +428,11 @@ impl RootWorkLoopFinishedWorkDiagnosticEvidence {
             public_root_rendering_claimed: diagnostic.public_root_rendering_claimed(),
             public_root_rendering_blocked: diagnostic.public_root_rendering_blocked(),
             public_compatibility_blocked: diagnostic.public_compatibility_blocked(),
+            effects_execution_blocked: diagnostic.effects_execution_blocked(),
+            refs_execution_blocked: diagnostic.refs_execution_blocked(),
+            hydration_execution_blocked: diagnostic.hydration_execution_blocked(),
+            effects_refs_and_hydration_execution_surfaces_blocked: diagnostic
+                .effects_refs_and_hydration_execution_surfaces_blocked(),
             effects_refs_and_hydration_blocked: diagnostic.effects_refs_and_hydration_blocked(),
             public_renderer_package_behavior_exposed: diagnostic
                 .public_renderer_package_behavior_exposed(),
@@ -533,6 +542,39 @@ impl RootWorkLoopFinishedWorkDiagnosticEvidence {
         effects_refs_and_hydration_blocked: bool,
     ) -> Self {
         self.effects_refs_and_hydration_blocked = effects_refs_and_hydration_blocked;
+        self
+    }
+
+    pub(crate) const fn with_effects_execution_blocked_for_test(
+        mut self,
+        effects_execution_blocked: bool,
+    ) -> Self {
+        self.effects_execution_blocked = effects_execution_blocked;
+        self
+    }
+
+    pub(crate) const fn with_refs_execution_blocked_for_test(
+        mut self,
+        refs_execution_blocked: bool,
+    ) -> Self {
+        self.refs_execution_blocked = refs_execution_blocked;
+        self
+    }
+
+    pub(crate) const fn with_hydration_execution_blocked_for_test(
+        mut self,
+        hydration_execution_blocked: bool,
+    ) -> Self {
+        self.hydration_execution_blocked = hydration_execution_blocked;
+        self
+    }
+
+    pub(crate) const fn with_effects_refs_and_hydration_execution_surfaces_blocked_for_test(
+        mut self,
+        effects_refs_and_hydration_execution_surfaces_blocked: bool,
+    ) -> Self {
+        self.effects_refs_and_hydration_execution_surfaces_blocked =
+            effects_refs_and_hydration_execution_surfaces_blocked;
         self
     }
 }
@@ -876,6 +918,19 @@ fn validate_diagnostic_evidence(
     require_proven(
         evidence.public_compatibility_blocked,
         "public_compatibility_blocked",
+    )?;
+    require_proven(
+        evidence.effects_execution_blocked,
+        "effects_execution_blocked",
+    )?;
+    require_proven(evidence.refs_execution_blocked, "refs_execution_blocked")?;
+    require_proven(
+        evidence.hydration_execution_blocked,
+        "hydration_execution_blocked",
+    )?;
+    require_proven(
+        evidence.effects_refs_and_hydration_execution_surfaces_blocked,
+        "effects_refs_and_hydration_execution_surfaces_blocked",
     )?;
     require_proven(
         evidence.effects_refs_and_hydration_blocked,

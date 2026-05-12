@@ -2785,6 +2785,72 @@ test('private react-dom/client facade rejects Rust root work-loop metadata capab
   }
 });
 
+test('private react-dom/client facade rejects public native compatibility claimed aliases in hand-authored metadata', () => {
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    initialHostOutputIdPrefix: 'facade-rust-native-claim-initial',
+    nativeEnvironmentId: 1096,
+    nativeHandoffIdPrefix: 'facade-rust-native-claim-native',
+    publicFacadeHostOutputRenderIdPrefix:
+      'facade-rust-native-claim-render',
+    requestIdPrefix: 'facade-rust-native-claim-request',
+    rootIdPrefix: 'facade-rust-native-claim-root',
+    rootRenderNativeHandoffIdPrefix: 'facade-rust-native-claim-handoff',
+    updateIdPrefix: 'facade-rust-native-claim-update'
+  });
+  const element = {
+    props: {
+      children: 'text'
+    },
+    type: 'div'
+  };
+
+  for (const claimField of [
+    'publicNativeCompatibilityClaimed',
+    'public_native_compatibility_claimed',
+    'publicNativeCompatibilitySurface',
+    'public_native_compatibility_surface'
+  ]) {
+    const document = createDocument(
+      `private-client-facade-rust-native-claim-${claimField}`
+    );
+    const container = createElement('DIV', document);
+    const root = adapter.createRoot(container);
+    const create = adapter.getRootCreateRecord(root);
+    const baseMetadata =
+      createNativeRootWorkLoopFinishedWorkMetadataForCanary({
+        hostType: 'div',
+        renderUpdateId: 'facade-rust-native-claim-update:1',
+        rootId: create.rootId,
+        rootTag: create.rootTag,
+        textContent: 'text'
+      });
+    const metadata = Object.freeze({
+      ...baseMetadata,
+      [claimField]: true
+    });
+
+    assert.throws(
+      () =>
+        adapter.renderNativeHandoff(root, element, {
+          rustRootWorkLoopFinishedWorkMetadata: metadata
+        }),
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER',
+        message: /cannot claim public, native, DOM/
+      },
+      claimField
+    );
+    assertBridgeDidNotTouchContainer(container, document);
+    assert.deepEqual(adapter.getRootRequestRecords(root), [create]);
+    assert.deepEqual(adapter.getRootHostOutputRenderDiagnostics(root), []);
+    assert.deepEqual(adapter.getRootRenderNativeHandoffRecords(root), []);
+  }
+});
+
 test('private react-dom/client facade rejects invalid native Rust root work-loop metadata factory inputs', () => {
   assert.throws(
     () =>

@@ -216,6 +216,28 @@ impl HostRootMinimalRenderCompletePlacementCommitRecord {
     }
 
     #[must_use]
+    pub(crate) const fn effects_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn refs_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn hydration_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn effects_refs_and_hydration_execution_surfaces_blocked(&self) -> bool {
+        self.effects_execution_blocked()
+            && self.refs_execution_blocked()
+            && self.hydration_execution_blocked()
+    }
+
+    #[must_use]
     pub(crate) fn proves_private_minimal_render_complete_placement_commit(&self) -> bool {
         let complete_work = self.complete_handoff.complete_work();
         self.complete_handoff
@@ -241,6 +263,7 @@ impl HostRootMinimalRenderCompletePlacementCommitRecord {
             && !self.public_root_rendering_claimed()
             && self.public_root_rendering_blocked()
             && self.public_compatibility_blocked()
+            && self.effects_refs_and_hydration_execution_surfaces_blocked()
     }
 }
 
@@ -289,6 +312,10 @@ pub struct MinimalHostRootRenderCompletePlacementDiagnostic {
     public_root_rendering_claimed: bool,
     public_root_rendering_blocked: bool,
     public_compatibility_blocked: bool,
+    effects_execution_blocked: bool,
+    refs_execution_blocked: bool,
+    hydration_execution_blocked: bool,
+    effects_refs_and_hydration_execution_surfaces_blocked: bool,
     effects_refs_and_hydration_blocked: bool,
     public_renderer_package_behavior_exposed: bool,
     react_dom_compatibility_claimed: bool,
@@ -312,6 +339,8 @@ impl MinimalHostRootRenderCompletePlacementDiagnostic {
             placement.public_renderer_package_behavior_exposed();
         let react_dom_compatibility_claimed = placement.react_dom_compatibility_claimed();
         let test_renderer_compatibility_claimed = placement.test_renderer_compatibility_claimed();
+        let effects_refs_and_hydration_execution_surfaces_blocked =
+            record.effects_refs_and_hydration_execution_surfaces_blocked();
 
         Self {
             root: complete_handoff.root(),
@@ -362,9 +391,15 @@ impl MinimalHostRootRenderCompletePlacementDiagnostic {
             public_root_rendering_claimed: record.public_root_rendering_claimed(),
             public_root_rendering_blocked: record.public_root_rendering_blocked(),
             public_compatibility_blocked: record.public_compatibility_blocked(),
-            effects_refs_and_hydration_blocked: !public_renderer_package_behavior_exposed
-                && !react_dom_compatibility_claimed
-                && !test_renderer_compatibility_claimed,
+            effects_execution_blocked: record.effects_execution_blocked(),
+            refs_execution_blocked: record.refs_execution_blocked(),
+            hydration_execution_blocked: record.hydration_execution_blocked(),
+            effects_refs_and_hydration_execution_surfaces_blocked,
+            effects_refs_and_hydration_blocked:
+                effects_refs_and_hydration_execution_surfaces_blocked
+                    && !public_renderer_package_behavior_exposed
+                    && !react_dom_compatibility_claimed
+                    && !test_renderer_compatibility_claimed,
             public_renderer_package_behavior_exposed,
             react_dom_compatibility_claimed,
             test_renderer_compatibility_claimed,
@@ -584,6 +619,26 @@ impl MinimalHostRootRenderCompletePlacementDiagnostic {
     #[must_use]
     pub const fn public_compatibility_blocked(&self) -> bool {
         self.public_compatibility_blocked
+    }
+
+    #[must_use]
+    pub const fn effects_execution_blocked(&self) -> bool {
+        self.effects_execution_blocked
+    }
+
+    #[must_use]
+    pub const fn refs_execution_blocked(&self) -> bool {
+        self.refs_execution_blocked
+    }
+
+    #[must_use]
+    pub const fn hydration_execution_blocked(&self) -> bool {
+        self.hydration_execution_blocked
+    }
+
+    #[must_use]
+    pub const fn effects_refs_and_hydration_execution_surfaces_blocked(&self) -> bool {
+        self.effects_refs_and_hydration_execution_surfaces_blocked
     }
 
     #[must_use]

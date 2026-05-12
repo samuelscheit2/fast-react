@@ -918,6 +918,10 @@ fn root_work_loop_minimal_render_complete_placement_diagnostic_exports_private_b
     assert!(!diagnostic.public_root_rendering_claimed());
     assert!(diagnostic.public_root_rendering_blocked());
     assert!(diagnostic.public_compatibility_blocked());
+    assert!(diagnostic.effects_execution_blocked());
+    assert!(diagnostic.refs_execution_blocked());
+    assert!(diagnostic.hydration_execution_blocked());
+    assert!(diagnostic.effects_refs_and_hydration_execution_surfaces_blocked());
     assert!(diagnostic.effects_refs_and_hydration_blocked());
     assert!(!diagnostic.public_renderer_package_behavior_exposed());
     assert!(!diagnostic.react_dom_compatibility_claimed());

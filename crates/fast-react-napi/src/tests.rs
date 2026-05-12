@@ -503,6 +503,11 @@ fn native_private_root_work_loop_finished_work_metadata_uses_diagnostic_evidence
     assert!(!diagnostic.public_root_rendering_claimed());
     assert!(diagnostic.public_root_rendering_blocked());
     assert!(diagnostic.public_compatibility_blocked());
+    assert!(diagnostic.effects_execution_blocked());
+    assert!(diagnostic.refs_execution_blocked());
+    assert!(diagnostic.hydration_execution_blocked());
+    assert!(diagnostic.effects_refs_and_hydration_execution_surfaces_blocked());
+    assert!(diagnostic.effects_refs_and_hydration_blocked());
     assert!(!diagnostic.public_renderer_package_behavior_exposed());
     assert!(!diagnostic.react_dom_compatibility_claimed());
     assert!(!diagnostic.test_renderer_compatibility_claimed());
@@ -834,6 +839,74 @@ fn native_private_root_work_loop_finished_work_metadata_rejects_hostile_diagnost
         .unwrap_err(),
         RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
             field: "effects_refs_and_hydration_blocked"
+        }
+    );
+
+    let evidence =
+        private_root_work_loop_diagnostic_evidence().with_effects_execution_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "effects_execution_blocked"
+        }
+    );
+
+    let evidence =
+        private_root_work_loop_diagnostic_evidence().with_refs_execution_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "refs_execution_blocked"
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_hydration_execution_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "hydration_execution_blocked"
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_effects_refs_and_hydration_execution_surfaces_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "effects_refs_and_hydration_execution_surfaces_blocked"
         }
     );
 
