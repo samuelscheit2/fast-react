@@ -11,6 +11,7 @@
 - Audit repair: added React DOM private bridge denylist parity for `publicNativeCompatibility` and `public_native_compatibility`.
 - Audit 1140 repair: added React DOM private bridge denylist coverage for public native compatibility claimed/surface aliases.
 - Audit 1140 repair: made effects/ref/hydration blocking require explicit source-owned execution-surface proofs before N-API metadata can publish the combined blocker.
+- Audit 1140 follow-up: replaced local unconditional effects/ref/hydration truth values with a commit-populated execution-surface blocker record derived from finished-work commit blockers, ref gates/handoffs, effect snapshots/gates, pending passive metadata, and root hydration state.
 
 ## Verification
 
@@ -30,6 +31,7 @@
 - Hostile evidence tests reject non-canonical placement kind, mismatched diagnostic text, wrong host/text counts, missing host mutation blocker proof, and public compatibility claims.
 - Repair evidence rejects mismatched host-output shape, tag path, minimal HostRoot -> HostComponent -> HostText proof, and missing independent effects/ref/hydration blocker proof.
 - Audit 1140 tests reject each missing effects/ref/hydration execution-surface proof, reject the missing combined proof, and reject hand-authored React DOM metadata using public native compatibility claimed/surface aliases.
+- Follow-up evidence rejects missing commit execution-surface blockers and false source proof for refs, layout effects, passive effects, and hydration before the diagnostic evidence can satisfy the combined blocker.
 
 ## Risks Or Blockers
 

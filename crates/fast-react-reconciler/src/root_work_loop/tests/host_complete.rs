@@ -745,6 +745,49 @@ fn root_work_loop_minimal_render_complete_placement_commit_appends_div_text_with
     );
     assert!(!gate.production_host_mutation_apply_promoted());
     assert!(!gate.public_dom_compatibility_claimed());
+    let execution_surfaces = commit.execution_surface_blockers();
+    assert_eq!(execution_surfaces.root(), root_id);
+    assert_eq!(execution_surfaces.finished_work(), work_in_progress);
+    assert_eq!(execution_surfaces.root_kind(), RootKind::Client);
+    assert_eq!(
+        execution_surfaces.hydration_state(),
+        HostRootHydrationState::NotHydrated
+    );
+    assert_eq!(
+        execution_surfaces.blockers(),
+        &[
+            HostRootCommitExecutionSurfaceBlocker::RefAttachDetach,
+            HostRootCommitExecutionSurfaceBlocker::LayoutEffectExecution,
+            HostRootCommitExecutionSurfaceBlocker::PassiveEffectExecution,
+            HostRootCommitExecutionSurfaceBlocker::Hydration,
+        ]
+    );
+    assert_eq!(execution_surfaces.ref_commit_record_count(), 0);
+    assert_eq!(execution_surfaces.dom_ref_callback_gate_record_count(), 0);
+    assert_eq!(
+        execution_surfaces.ref_callback_execution_handoff_record_count(),
+        0
+    );
+    assert_eq!(
+        execution_surfaces.ref_cleanup_return_execution_gate_record_count(),
+        0
+    );
+    assert_eq!(execution_surfaces.layout_effect_record_count(), 0);
+    assert_eq!(
+        execution_surfaces.layout_effect_callback_gate_record_count(),
+        0
+    );
+    assert_eq!(execution_surfaces.pending_passive_record_count(), 0);
+    assert_eq!(execution_surfaces.committed_passive_fiber_count(), 0);
+    assert_eq!(execution_surfaces.deleted_subtree_passive_record_count(), 0);
+    assert!(execution_surfaces.refs_execution_blocked());
+    assert!(execution_surfaces.effects_execution_blocked());
+    assert!(execution_surfaces.hydration_execution_blocked());
+    assert!(execution_surfaces.effects_refs_and_hydration_execution_surfaces_blocked());
+    assert!(record.refs_execution_blocked());
+    assert!(record.effects_execution_blocked());
+    assert!(record.hydration_execution_blocked());
+    assert!(record.effects_refs_and_hydration_execution_surfaces_blocked());
 
     let placement = record.placement_commit();
     assert_eq!(placement.root(), root_id);
@@ -817,6 +860,85 @@ fn root_work_loop_minimal_render_complete_placement_commit_appends_div_text_with
         public_error_after_private_commit,
         ReconcilerError::unimplemented(MUTATION_RENDER_PLACEHOLDER_FEATURE)
     );
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_placement_execution_surface_blockers_fail_closed() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = MinimalRecordingHostTokenFactory;
+    let element = RootElementHandle::from_raw(7_568);
+    let element_type = ElementTypeHandle::from_raw(7_569);
+    let props = PropsHandle::from_raw(7_570);
+    let text_props = PropsHandle::from_raw(7_571);
+    let source = minimal_root_component_source(element, element_type, props, "text", text_props);
+
+    update_container(&mut store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let mut adapter = MinimalRecordingHostAdapter::new(element, element_type, props, "div");
+    let record = commit_minimal_root_element_render_complete_handoff_to_host_placement(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .unwrap();
+    let execution_surfaces = record.commit().execution_surface_blockers().clone();
+    assert!(execution_surfaces.effects_refs_and_hydration_execution_surfaces_blocked());
+
+    let without_refs = execution_surfaces
+        .clone()
+        .without_blocker_for_test(HostRootCommitExecutionSurfaceBlocker::RefAttachDetach);
+    assert!(!without_refs.refs_execution_blocked());
+    assert!(!without_refs.effects_refs_and_hydration_execution_surfaces_blocked());
+
+    let without_layout = execution_surfaces
+        .clone()
+        .without_blocker_for_test(HostRootCommitExecutionSurfaceBlocker::LayoutEffectExecution);
+    assert!(!without_layout.effects_execution_blocked());
+    assert!(!without_layout.effects_refs_and_hydration_execution_surfaces_blocked());
+
+    let without_passive = execution_surfaces
+        .clone()
+        .without_blocker_for_test(HostRootCommitExecutionSurfaceBlocker::PassiveEffectExecution);
+    assert!(!without_passive.effects_execution_blocked());
+    assert!(!without_passive.effects_refs_and_hydration_execution_surfaces_blocked());
+
+    let without_hydration = execution_surfaces
+        .clone()
+        .without_blocker_for_test(HostRootCommitExecutionSurfaceBlocker::Hydration);
+    assert!(!without_hydration.hydration_execution_blocked());
+    assert!(!without_hydration.effects_refs_and_hydration_execution_surfaces_blocked());
+
+    let unproven_refs = execution_surfaces
+        .clone()
+        .with_refs_source_proven_for_test(false);
+    assert!(!unproven_refs.refs_execution_blocked());
+    assert!(!unproven_refs.effects_refs_and_hydration_execution_surfaces_blocked());
+
+    let unproven_layout = execution_surfaces
+        .clone()
+        .with_layout_source_proven_for_test(false);
+    assert!(!unproven_layout.effects_execution_blocked());
+    assert!(!unproven_layout.effects_refs_and_hydration_execution_surfaces_blocked());
+
+    let unproven_passive = execution_surfaces
+        .clone()
+        .with_passive_source_proven_for_test(false);
+    assert!(!unproven_passive.effects_execution_blocked());
+    assert!(!unproven_passive.effects_refs_and_hydration_execution_surfaces_blocked());
+
+    let unproven_hydration = execution_surfaces.with_hydration_source_proven_for_test(false);
+    assert!(!unproven_hydration.hydration_execution_blocked());
+    assert!(!unproven_hydration.effects_refs_and_hydration_execution_surfaces_blocked());
 }
 
 #[test]

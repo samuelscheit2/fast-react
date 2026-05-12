@@ -216,25 +216,24 @@ impl HostRootMinimalRenderCompletePlacementCommitRecord {
     }
 
     #[must_use]
-    pub(crate) const fn effects_execution_blocked(&self) -> bool {
-        true
+    pub(crate) fn effects_execution_blocked(&self) -> bool {
+        self.commit.effects_execution_blocked()
     }
 
     #[must_use]
-    pub(crate) const fn refs_execution_blocked(&self) -> bool {
-        true
+    pub(crate) fn refs_execution_blocked(&self) -> bool {
+        self.commit.refs_execution_blocked()
     }
 
     #[must_use]
-    pub(crate) const fn hydration_execution_blocked(&self) -> bool {
-        true
+    pub(crate) fn hydration_execution_blocked(&self) -> bool {
+        self.commit.hydration_execution_blocked()
     }
 
     #[must_use]
-    pub(crate) const fn effects_refs_and_hydration_execution_surfaces_blocked(&self) -> bool {
-        self.effects_execution_blocked()
-            && self.refs_execution_blocked()
-            && self.hydration_execution_blocked()
+    pub(crate) fn effects_refs_and_hydration_execution_surfaces_blocked(&self) -> bool {
+        self.commit
+            .effects_refs_and_hydration_execution_surfaces_blocked()
     }
 
     #[must_use]

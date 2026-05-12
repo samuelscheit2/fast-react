@@ -59,7 +59,8 @@ use crate::passive_effects::{
     PassiveEffectDestroyCallbackExecutor,
 };
 use crate::root_commit::{
-    FunctionComponentDeletedSubtreePendingPassiveCommitHandoff, HostRootDeletionCleanupOrderPhase,
+    FunctionComponentDeletedSubtreePendingPassiveCommitHandoff,
+    HostRootCommitExecutionSurfaceBlocker, HostRootDeletionCleanupOrderPhase,
     HostRootHostMutationExecutionGateStatus, HostRootManagedChildCommitExecutionBlockerForCanary,
     HostRootManagedChildCommitExecutionStatusForCanary,
     HostRootManagedChildCommitHandoffRecordForCanary,
