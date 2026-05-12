@@ -38,7 +38,7 @@ use crate::root_updates::validate_update_container_lane_diagnostics_for_canary;
 use crate::root_updates::{
     HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary,
     HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary,
-    HostRootUpdateQueueLaneHandoffRecordForCanary,
+    HostRootUpdateQueueLaneHandoffErrorForCanary, HostRootUpdateQueueLaneHandoffRecordForCanary,
     commit_host_root_update_queue_lane_handoff_with_finished_work_pending_commit_for_canary,
     validate_host_root_update_queue_lane_handoff_for_commit_for_canary,
 };
@@ -897,6 +897,26 @@ impl RootSchedulerState {
         self.consumed_finished_work_queue_lane_commit_currentness
             .push(consumed);
         true
+    }
+
+    #[cfg(test)]
+    #[allow(
+        dead_code,
+        reason = "private same-lane multi-update currentness canaries may inspect source lifecycle counts"
+    )]
+    fn pending_finished_work_queue_lane_commit_currentness_source_count(&self) -> usize {
+        self.finished_work_queue_lane_commit_currentness_sources
+            .len()
+    }
+
+    #[cfg(test)]
+    #[allow(
+        dead_code,
+        reason = "private same-lane multi-update currentness canaries may inspect source lifecycle counts"
+    )]
+    fn consumed_finished_work_queue_lane_commit_currentness_source_count(&self) -> usize {
+        self.consumed_finished_work_queue_lane_commit_currentness
+            .len()
     }
 }
 
@@ -1968,6 +1988,1778 @@ fn transition_queue_lane_continuation_source_metadata_mismatch_for_canary(
     }
 
     None
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary {
+    StaleCallbackNode,
+    NoTransitionWork,
+    StaleTransitionDiagnostics,
+    BlockedByTransitionRequestMismatch,
+    BlockedByTransitionEntanglementMismatch,
+    BlockedByLaneMismatch,
+    BlockedByFinishedWorkHandoffMismatch,
+    BlockedByQueueLaneHandoffMismatch,
+    RenderedAndCommitted,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RootTransitionSameLaneMultiUpdateQueueLaneContinuationMetadataForCanary {
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    current_callback_node: RootSchedulerCallbackHandle,
+    current_event_transition_lane: Lane,
+    root_current_before_continuation: FiberId,
+    root_pending_lanes_before_continuation: Lanes,
+    root_entangled_lanes_before_continuation: Lanes,
+    finished_work_handoff_identity: Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary>,
+    status: RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary,
+    queue_handoff: Option<HostRootUpdateQueueLaneHandoffRecordForCanary>,
+    queue_handoff_error: Option<HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary>,
+    root_commit_handoff: Option<HostRootFinishedWorkCommitHandoffRecordForCanary>,
+    commit: Option<HostRootCommitRecord>,
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    current_callback_node: RootSchedulerCallbackHandle,
+    current_event_transition_lane: Lane,
+    root_current_before_continuation: FiberId,
+    root_pending_lanes_before_continuation: Lanes,
+    root_entangled_lanes_before_continuation: Lanes,
+    finished_work_handoff_identity: Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary>,
+    status: RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary,
+    queue_handoff: Option<HostRootUpdateQueueLaneHandoffRecordForCanary>,
+    queue_handoff_error: Option<HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary>,
+    root_commit_handoff: Option<HostRootFinishedWorkCommitHandoffRecordForCanary>,
+    commit: Option<HostRootCommitRecord>,
+    source_metadata: RootTransitionSameLaneMultiUpdateQueueLaneContinuationMetadataForCanary,
+    currentness_source_token:
+        Option<RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary>,
+}
+
+#[cfg(test)]
+impl Clone for RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
+    fn clone(&self) -> Self {
+        Self {
+            requests: self.requests,
+            callback_execution: self.callback_execution,
+            current_callback_node: self.current_callback_node,
+            current_event_transition_lane: self.current_event_transition_lane,
+            root_current_before_continuation: self.root_current_before_continuation,
+            root_pending_lanes_before_continuation: self.root_pending_lanes_before_continuation,
+            root_entangled_lanes_before_continuation: self.root_entangled_lanes_before_continuation,
+            finished_work_handoff_identity: self.finished_work_handoff_identity,
+            status: self.status,
+            queue_handoff: self.queue_handoff.clone(),
+            queue_handoff_error: self.queue_handoff_error.clone(),
+            root_commit_handoff: self.root_commit_handoff.clone(),
+            commit: self.commit.clone(),
+            source_metadata: self.source_metadata.clone(),
+            currentness_source_token: None,
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "private same-transition multi-update queue-lane canaries consume this evidence"
+)]
+impl RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
+    #[must_use]
+    pub(crate) const fn requests(&self) -> &[RootTransitionLaneSchedulerRequestRecord; 2] {
+        &self.requests
+    }
+
+    #[must_use]
+    pub(crate) const fn first_request(&self) -> RootTransitionLaneSchedulerRequestRecord {
+        self.requests[0]
+    }
+
+    #[must_use]
+    pub(crate) const fn second_request(&self) -> RootTransitionLaneSchedulerRequestRecord {
+        self.requests[1]
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.requests[0].root()
+    }
+
+    #[must_use]
+    pub(crate) const fn transition_lane(&self) -> Lane {
+        self.requests[0].lane()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_execution(&self) -> RootSchedulerCallbackExecutionRecord {
+        self.callback_execution
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.callback_execution.callback_node()
+    }
+
+    #[must_use]
+    pub(crate) const fn current_callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.current_callback_node
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(&self) -> Lanes {
+        self.callback_execution.selected_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase(&self) -> Option<HostRootRenderPhaseRecord> {
+        self.callback_execution.render_phase()
+    }
+
+    #[must_use]
+    pub(crate) const fn current_event_transition_lane(&self) -> Lane {
+        self.current_event_transition_lane
+    }
+
+    #[must_use]
+    pub(crate) const fn root_current_before_continuation(&self) -> FiberId {
+        self.root_current_before_continuation
+    }
+
+    #[must_use]
+    pub(crate) const fn root_pending_lanes_before_continuation(&self) -> Lanes {
+        self.root_pending_lanes_before_continuation
+    }
+
+    #[must_use]
+    pub(crate) const fn root_entangled_lanes_before_continuation(&self) -> Lanes {
+        self.root_entangled_lanes_before_continuation
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_handoff_identity(
+        &self,
+    ) -> Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary> {
+        self.finished_work_handoff_identity
+    }
+
+    #[must_use]
+    pub(crate) const fn status(
+        &self,
+    ) -> RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) fn queue_handoff(&self) -> Option<&HostRootUpdateQueueLaneHandoffRecordForCanary> {
+        self.queue_handoff.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn queue_handoff_error(
+        &self,
+    ) -> Option<&HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary> {
+        self.queue_handoff_error.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn root_commit_handoff_for_canary(
+        &self,
+    ) -> Option<&HostRootFinishedWorkCommitHandoffRecordForCanary> {
+        self.root_commit_handoff.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn commit(&self) -> Option<&HostRootCommitRecord> {
+        self.commit.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn currentness_source_token(
+        &self,
+    ) -> Option<RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary> {
+        self.currentness_source_token
+    }
+
+    #[must_use]
+    pub(crate) fn update_sequence_ids(&self) -> Vec<UpdateId> {
+        self.requests
+            .iter()
+            .map(|request| request.update())
+            .collect()
+    }
+
+    #[must_use]
+    pub(crate) const fn did_execute_same_lane_multi_update_queue_lane_scheduler_continuation(
+        &self,
+    ) -> bool {
+        matches!(
+            self.status,
+            RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::RenderedAndCommitted
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn rejected_stale_callback_node(&self) -> bool {
+        matches!(
+            self.status,
+            RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::StaleCallbackNode
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn no_transition_work(&self) -> bool {
+        matches!(
+            self.status,
+            RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::NoTransitionWork
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn stale_transition_diagnostics(&self) -> bool {
+        matches!(
+            self.status,
+            RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::StaleTransitionDiagnostics
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_transition_request_mismatch(&self) -> bool {
+        matches!(
+            self.status,
+            RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByTransitionRequestMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_transition_entanglement(&self) -> bool {
+        matches!(
+            self.status,
+            RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByTransitionEntanglementMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_lane_mismatch(&self) -> bool {
+        matches!(
+            self.status,
+            RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByLaneMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_finished_work_handoff_mismatch(&self) -> bool {
+        matches!(
+            self.status,
+            RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_queue_lane_handoff(&self) -> bool {
+        matches!(
+            self.status,
+            RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn async_callback_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_update_scheduling_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_timing_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_transition_hooks_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn native_execution_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn package_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_public_effects(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_transition_scheduler_evidence_for_canary(&self) -> bool {
+        self.did_execute_same_lane_multi_update_queue_lane_scheduler_continuation()
+            && transition_same_lane_multi_update_request_batch_shape_for_canary(self.requests)
+            && self.requests.iter().all(|request| {
+                request.routed_to_private_root_scheduler()
+                    && request.lane() == self.transition_lane()
+                    && request.selected_next_lanes() == self.selected_lanes()
+                    && request.entangled_lanes() == self.selected_lanes()
+            })
+            && self
+                .root_pending_lanes_before_continuation
+                .contains_all(self.selected_lanes())
+            && self
+                .root_entangled_lanes_before_continuation
+                .contains_all(self.selected_lanes())
+            && self.current_event_transition_lane == self.transition_lane()
+            && self.root_current_before_continuation == self.requests[0].fiber()
+            && self.callback_execution.status() == RootSchedulerCallbackExecutionStatus::Rendered
+            && self.callback_execution.root() == self.root()
+            && self.callback_execution.callback_node() == self.current_callback_node
+            && !self.callback_execution.validation().is_stale()
+            && self.callback_execution.selected_lanes() == self.selected_lanes()
+            && self.render_phase().is_some_and(|render| {
+                render.root() == self.root()
+                    && render.current() == self.requests[0].fiber()
+                    && render.render_lanes() == self.selected_lanes()
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_root_scheduler_execution_evidence_for_canary(&self) -> bool {
+        self.accepted_transition_scheduler_evidence_for_canary()
+            && self.finished_work_handoff_identity.is_some_and(
+                RootSyncSchedulerFinishedWorkHandoffIdentityForCanary::accepted_for_root_scheduler_commit_handoff,
+            )
+            && self.root_commit_handoff.as_ref().is_some_and(|handoff| {
+                handoff.proves_private_root_finished_work_commit_metadata_handoff()
+                    && self.commit.as_ref() == Some(handoff.commit())
+            })
+            && self.commit.as_ref().is_some_and(|commit| {
+                self.render_phase().is_some_and(|render| {
+                    commit.root() == self.root()
+                        && commit.previous_current() == render.current()
+                        && commit.current() == render.finished_work()
+                        && commit.finished_work() == render.finished_work()
+                        && commit.finished_lanes() == self.selected_lanes()
+                        && commit.remaining_lanes() == render.remaining_lanes()
+                        && commit.pending_lanes() == render.remaining_lanes()
+                })
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_queue_lane_handoff_evidence_for_canary(&self) -> bool {
+        self.queue_handoff.as_ref().is_some_and(|queue_handoff| {
+            self.queue_handoff_error.is_none()
+                && self.render_phase().is_some_and(|render| {
+                    transition_same_lane_multi_update_queue_handoff_matches_render_for_canary(
+                        self.root(),
+                        render,
+                        self.requests,
+                        queue_handoff,
+                    )
+                    .is_ok()
+                })
+                && transition_same_lane_multi_update_queue_handoff_proves_source_owned_handoff_for_canary(
+                    queue_handoff,
+                    self.requests,
+                )
+                && self.commit.as_ref().is_some_and(|commit| {
+                    commit.root() == queue_handoff.root()
+                        && commit.previous_current() == queue_handoff.current()
+                        && commit.current() == queue_handoff.finished_work()
+                        && commit.finished_work() == queue_handoff.finished_work()
+                        && commit.finished_lanes() == queue_handoff.finished_lanes()
+                        && commit.remaining_lanes() == queue_handoff.remaining_lanes()
+                        && commit.pending_lanes() == queue_handoff.remaining_lanes()
+                })
+        })
+    }
+
+    #[must_use]
+    pub(crate) fn routed_through_same_lane_multi_update_transition_queue_lane_and_commit_evidence_for_canary(
+        &self,
+    ) -> bool {
+        self.accepted_root_scheduler_execution_evidence_for_canary()
+            && self.accepted_queue_lane_handoff_evidence_for_canary()
+            && self.async_callback_execution_blocked()
+            && self.public_update_scheduling_blocked()
+            && !self.public_root_compatibility_claimed()
+            && !self.public_scheduler_timing_compatibility_claimed()
+            && !self.public_transition_hooks_compatibility_claimed()
+            && !self.public_act_compatibility_claimed()
+            && !self.react_dom_compatibility_claimed()
+            && !self.test_renderer_compatibility_claimed()
+            && !self.native_execution_compatibility_claimed()
+            && !self.package_compatibility_claimed()
+            && !self.renderer_compatibility_claimed()
+            && !self.executes_public_effects()
+    }
+
+    #[must_use]
+    pub(crate) fn treats_same_lane_multi_update_transition_host_root_updates_as_current_only_with_queue_lane_handoff_for_canary(
+        &self,
+    ) -> bool {
+        self.routed_through_same_lane_multi_update_transition_queue_lane_and_commit_evidence_for_canary()
+            && self.queue_handoff.as_ref().is_some_and(|queue_handoff| {
+                self.commit.as_ref().is_some_and(|commit| {
+                    commit.root() == queue_handoff.root()
+                        && commit.previous_current() == queue_handoff.current()
+                        && commit.current() == queue_handoff.finished_work()
+                        && commit.finished_work() == queue_handoff.finished_work()
+                        && commit.finished_lanes() == queue_handoff.finished_lanes()
+                        && commit.remaining_lanes() == queue_handoff.remaining_lanes()
+                })
+            })
+    }
+}
+
+#[cfg(test)]
+fn transition_same_lane_multi_update_request_batch_shape_for_canary(
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+) -> bool {
+    let [first, second] = requests;
+    let lane = first.lane();
+    let lane_lanes = lane.to_lanes();
+
+    lane.is_transition()
+        && first.root() == second.root()
+        && first.fiber() == second.fiber()
+        && first.queue() == second.queue()
+        && first.update() != second.update()
+        && second.lane() == lane
+        && first.selected_next_lanes() == lane_lanes
+        && second.selected_next_lanes() == lane_lanes
+        && first.entangled_lanes() == lane_lanes
+        && second.entangled_lanes() == lane_lanes
+        && first.current_event_transition_lane_after() == lane
+        && second.current_event_transition_lane_after() == lane
+}
+
+#[cfg(test)]
+fn transition_same_lane_multi_update_queue_handoff_matches_render_for_canary(
+    root_id: FiberRootId,
+    render: HostRootRenderPhaseRecord,
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    queue_handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
+) -> Result<(), HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary> {
+    if queue_handoff.root() != root_id {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueRootMismatch {
+                expected: root_id,
+                actual: queue_handoff.root(),
+            },
+        );
+    }
+
+    if queue_handoff.current() != render.current()
+        || queue_handoff.finished_work() != render.finished_work()
+    {
+        return Err(HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueFiberIdentityMismatch {
+            root: root_id,
+            expected_current: render.current(),
+            actual_current: queue_handoff.current(),
+            expected_finished_work: render.finished_work(),
+            actual_finished_work: queue_handoff.finished_work(),
+        });
+    }
+
+    if queue_handoff.current_update_queue() != render.current_update_queue()
+        || queue_handoff.work_in_progress_update_queue() != render.work_in_progress_update_queue()
+    {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandleMismatch {
+                root: root_id,
+                expected_current_queue: render.current_update_queue(),
+                actual_current_queue: queue_handoff.current_update_queue(),
+                expected_work_in_progress_queue: render.work_in_progress_update_queue(),
+                actual_work_in_progress_queue: queue_handoff.work_in_progress_update_queue(),
+            },
+        );
+    }
+
+    if queue_handoff.selected_next_lanes_before_render() != render.render_lanes() {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::SelectedLanesMismatch {
+                root: root_id,
+                expected: render.render_lanes(),
+                actual: queue_handoff.selected_next_lanes_before_render(),
+            },
+        );
+    }
+
+    if queue_handoff.finished_lanes() != render.render_lanes() {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::FinishedLanesMismatch {
+                root: root_id,
+                expected: render.render_lanes(),
+                actual: queue_handoff.finished_lanes(),
+            },
+        );
+    }
+
+    if queue_handoff.remaining_lanes() != render.remaining_lanes() {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::RemainingLanesMismatch {
+                root: root_id,
+                expected: render.remaining_lanes(),
+                actual: queue_handoff.remaining_lanes(),
+            },
+        );
+    }
+
+    if queue_handoff.applied_update_count() != render.applied_update_count()
+        || queue_handoff.skipped_update_count() != render.skipped_update_count()
+    {
+        return Err(HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::AppliedSkippedCountMismatch {
+            root: root_id,
+            expected_applied: render.applied_update_count(),
+            actual_applied: queue_handoff.applied_update_count(),
+            expected_skipped: render.skipped_update_count(),
+            actual_skipped: queue_handoff.skipped_update_count(),
+        });
+    }
+
+    if queue_handoff.resulting_element() != render.resulting_element() {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::ResultingElementMismatch {
+                root: root_id,
+                expected: render.resulting_element(),
+                actual: queue_handoff.resulting_element(),
+            },
+        );
+    }
+
+    for record in queue_handoff.update_records() {
+        if !record.committed_by_finished_lanes(render.render_lanes())
+            || render.remaining_lanes().contains_any(record.source_lanes())
+        {
+            return Err(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::SkippedLaneCommitted {
+                    root: root_id,
+                    update: record.update(),
+                    skipped_lanes: record.source_lanes(),
+                    finished_lanes: render.render_lanes(),
+                    remaining_lanes: render.remaining_lanes(),
+                }
+                .into(),
+            );
+        }
+    }
+
+    if !transition_same_lane_multi_update_queue_handoff_proves_source_owned_handoff_for_canary(
+        queue_handoff,
+        requests,
+    ) {
+        return Err(HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandoffNotSourceOwned {
+            root: root_id,
+            queue: queue_handoff.current_update_queue(),
+            expected_updates: requests.iter().map(|request| request.update()).collect(),
+            actual_updates: queue_handoff.update_sequence_ids(),
+            records_in_sequence_order: queue_handoff.records_in_update_sequence_order(),
+        });
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn transition_same_lane_multi_update_queue_handoff_proves_source_owned_handoff_for_canary(
+    queue_handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+) -> bool {
+    if !transition_same_lane_multi_update_request_batch_shape_for_canary(requests) {
+        return false;
+    }
+
+    let expected_updates = requests
+        .iter()
+        .map(|request| request.update())
+        .collect::<Vec<_>>();
+    let lane = requests[0].lane();
+
+    queue_handoff.root() == requests[0].root()
+        && queue_handoff.current() == requests[0].fiber()
+        && queue_handoff.current_update_queue() == requests[0].queue()
+        && queue_handoff.update_sequence_ids() == expected_updates
+        && queue_handoff.proves_same_transition_multi_update_lane_handoff_for_canary(lane)
+        && queue_handoff
+            .update_records()
+            .iter()
+            .zip(requests)
+            .all(|(record, request)| {
+                record.update() == request.update()
+                    && record.lane() == request.lane()
+                    && record.source_lanes() == request.lane().to_lanes()
+            })
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessRecordForCanary {
+    transition_continuation: RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
+    currentness: RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "private same-transition multi-update currentness is exercised by focused canaries"
+)]
+impl RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessRecordForCanary {
+    #[must_use]
+    pub(crate) const fn transition_continuation(
+        &self,
+    ) -> &RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
+        &self.transition_continuation
+    }
+
+    #[must_use]
+    pub(crate) const fn currentness(
+        &self,
+    ) -> &RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary {
+        &self.currentness
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.transition_continuation.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn transition_lane(&self) -> Lane {
+        self.transition_continuation.transition_lane()
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(&self) -> Lanes {
+        self.transition_continuation.selected_lanes()
+    }
+
+    #[must_use]
+    pub(crate) fn source_owned_currentness_consumed(&self) -> bool {
+        self.currentness.source_owned_currentness_consumed()
+    }
+
+    #[must_use]
+    pub(crate) fn ties_same_lane_multi_update_transition_queue_lane_commit_to_live_tree_state_for_canary(
+        &self,
+    ) -> bool {
+        let transition = &self.transition_continuation;
+        let Some(render) = transition.render_phase() else {
+            return false;
+        };
+        let update_sequence_ids = self.currentness.update_sequence_ids();
+
+        transition
+            .routed_through_same_lane_multi_update_transition_queue_lane_and_commit_evidence_for_canary()
+            && self
+                .currentness
+                .ties_finished_work_queue_lane_commit_to_live_tree_state_for_canary()
+            && self.currentness.root() == transition.root()
+            && self.currentness.selected_lanes() == transition.selected_lanes()
+            && self.currentness.finished_lanes() == transition.selected_lanes()
+            && self.currentness.remaining_lanes() == render.remaining_lanes()
+            && self.currentness.requested_callback_node() == transition.callback_node()
+            && self.currentness.current_callback_node() == transition.current_callback_node()
+            && update_sequence_ids == transition.update_sequence_ids()
+            && self.currentness.resulting_element() == render.resulting_element()
+            && transition.transition_lane().is_transition()
+            && transition
+                .selected_lanes()
+                .contains_lane(transition.transition_lane())
+            && transition.selected_lanes().includes_only_transitions()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_timing_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_transition_hooks_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn native_execution_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn package_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_public_effects(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessErrorForCanary {
+    UnacceptedTransitionContinuation {
+        root: FiberRootId,
+        status: RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary,
+    },
+    TransitionWrapperMetadataMismatch {
+        root: FiberRootId,
+        field: &'static str,
+    },
+    FinishedWorkQueueLaneCurrentness(RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary),
+}
+
+#[cfg(test)]
+impl Display for RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnacceptedTransitionContinuation { root, status } => write!(
+                formatter,
+                "root {} same-transition multi-update currentness rejected continuation {:?}",
+                root.raw(),
+                status
+            ),
+            Self::TransitionWrapperMetadataMismatch { root, field } => write!(
+                formatter,
+                "root {} same-transition multi-update currentness wrapper metadata mismatch for {}",
+                root.raw(),
+                field
+            ),
+            Self::FinishedWorkQueueLaneCurrentness(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FinishedWorkQueueLaneCurrentness(error) => Some(error),
+            Self::UnacceptedTransitionContinuation { .. }
+            | Self::TransitionWrapperMetadataMismatch { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary>
+    for RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessErrorForCanary
+{
+    fn from(error: RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary) -> Self {
+        Self::FinishedWorkQueueLaneCurrentness(error)
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    dead_code,
+    reason = "private same-transition multi-update currentness consumer is exercised by focused canaries"
+)]
+pub(crate) fn consume_transition_same_lane_multi_update_queue_lane_commit_currentness_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    transition_continuation: &RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
+) -> Result<
+    RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessRecordForCanary,
+    RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessErrorForCanary,
+> {
+    if let Some(field) =
+        transition_same_lane_multi_update_queue_lane_continuation_source_metadata_mismatch_for_canary(
+            transition_continuation,
+        )
+    {
+        return Err(
+            RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessErrorForCanary::TransitionWrapperMetadataMismatch {
+                root: transition_continuation.root(),
+                field,
+            },
+        );
+    }
+
+    if !transition_continuation
+        .routed_through_same_lane_multi_update_transition_queue_lane_and_commit_evidence_for_canary(
+        )
+    {
+        return Err(
+            RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessErrorForCanary::UnacceptedTransitionContinuation {
+                root: transition_continuation.root(),
+                status: transition_continuation.status(),
+            },
+        );
+    }
+
+    let currentness =
+        consume_transition_same_lane_multi_update_finished_work_queue_lane_commit_currentness_for_canary(
+            store,
+            transition_continuation,
+        )?;
+
+    Ok(
+        RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessRecordForCanary {
+            transition_continuation: transition_continuation.clone(),
+            currentness,
+        },
+    )
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private same-transition multi-update currentness keeps the accepted source-token lifecycle"
+)]
+fn consume_transition_same_lane_multi_update_finished_work_queue_lane_commit_currentness_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    transition_continuation: &RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
+) -> Result<
+    RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary,
+    RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary,
+> {
+    let Some(identity) =
+        transition_same_lane_multi_update_queue_lane_commit_currentness_identity_for_canary(
+            transition_continuation,
+        )
+    else {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::UnacceptedSchedulerContinuation,
+        );
+    };
+    let Some(source_token) = transition_continuation.currentness_source_token() else {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
+                root: identity.root(),
+                finished_work: identity.finished_work(),
+                commit_order: identity.commit_order(),
+            },
+        );
+    };
+
+    if store
+        .root_scheduler()
+        .has_consumed_finished_work_queue_lane_commit_currentness_source(&identity, source_token)
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceAlreadyConsumed {
+                root: identity.root(),
+                finished_work: identity.finished_work(),
+                commit_order: identity.commit_order(),
+            },
+        );
+    }
+
+    if !store
+        .root_scheduler()
+        .has_pending_finished_work_queue_lane_commit_currentness_source(&identity, source_token)
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
+                root: identity.root(),
+                finished_work: identity.finished_work(),
+                commit_order: identity.commit_order(),
+            },
+        );
+    }
+
+    validate_transition_same_lane_multi_update_queue_lane_commit_currentness_live_state_for_canary(
+        store,
+        transition_continuation,
+        &identity,
+    )?;
+
+    let (root_token, committed_element_after_consume, committed_root_children) =
+        committed_host_root_tree_state_for_transition_same_lane_multi_update_currentness_for_canary(
+            store,
+            identity.root(),
+            identity.finished_work(),
+        )?;
+    let root = store.root(identity.root())?;
+    let root_current_after_consume = root.current();
+    let root_finished_work_after_consume = root.finished_work();
+    let root_finished_lanes_after_consume = root.finished_lanes();
+    let root_pending_lanes_after_consume = root.lanes().pending_lanes();
+    let Some(commit) = transition_continuation.commit() else {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::UnacceptedSchedulerContinuation,
+        );
+    };
+    let commit_mutation_record_count = commit.mutation_log().len();
+    let commit_deletion_list_count = commit.deletion_lists().len();
+
+    let source_pending_before_consume = true;
+    if !store
+        .root_scheduler_mut()
+        .consume_finished_work_queue_lane_commit_currentness_source(&identity, source_token)
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
+                root: identity.root(),
+                finished_work: identity.finished_work(),
+                commit_order: identity.commit_order(),
+            },
+        );
+    }
+    let source_consumed_after = store
+        .root_scheduler()
+        .has_consumed_finished_work_queue_lane_commit_currentness_source(&identity, source_token);
+
+    Ok(RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary {
+        identity,
+        root_token,
+        source_pending_before_consume,
+        source_consumed_after,
+        root_current_after_consume,
+        root_finished_work_after_consume,
+        root_finished_lanes_after_consume,
+        root_pending_lanes_after_consume,
+        committed_element_after_consume,
+        committed_root_children,
+        commit_mutation_record_count,
+        commit_deletion_list_count,
+    })
+}
+
+#[cfg(test)]
+fn transition_same_lane_multi_update_queue_lane_commit_currentness_identity_for_canary(
+    transition_continuation: &RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
+) -> Option<RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary> {
+    let root_commit_handoff = transition_continuation.root_commit_handoff_for_canary()?;
+    let queue_handoff = transition_continuation.queue_handoff()?;
+    let commit = root_commit_handoff.commit();
+
+    Some(
+        RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary {
+            root: transition_continuation.root(),
+            previous_current: commit.previous_current(),
+            finished_work: commit.finished_work(),
+            selected_lanes: transition_continuation.selected_lanes(),
+            finished_lanes: commit.finished_lanes(),
+            remaining_lanes: commit.remaining_lanes(),
+            requested_callback_node: transition_continuation.callback_node(),
+            current_callback_node: transition_continuation.current_callback_node(),
+            handoff_order: 0,
+            commit_order: root_commit_handoff.commit_order(),
+            update_sequence_ids: queue_handoff.update_sequence_ids(),
+            resulting_element: queue_handoff.resulting_element(),
+        },
+    )
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private currentness diagnostics preserve exact rejection shape"
+)]
+fn validate_transition_same_lane_multi_update_queue_lane_commit_currentness_live_state_for_canary<
+    H: HostTypes,
+>(
+    store: &FiberRootStore<H>,
+    transition_continuation: &RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
+    identity: &RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary,
+) -> Result<(), RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary> {
+    let Some(root_commit_handoff) = transition_continuation.root_commit_handoff_for_canary() else {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::UnacceptedSchedulerContinuation,
+        );
+    };
+    let Some(queue_handoff) = transition_continuation.queue_handoff() else {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::UnacceptedSchedulerContinuation,
+        );
+    };
+    let commit = root_commit_handoff.commit();
+    if transition_continuation.commit() != Some(commit)
+        || commit.root() != identity.root()
+        || commit.previous_current() != identity.previous_current()
+        || commit.current() != identity.finished_work()
+        || commit.finished_work() != identity.finished_work()
+        || commit.finished_lanes() != identity.finished_lanes()
+        || commit.remaining_lanes() != identity.remaining_lanes()
+        || commit.pending_lanes() != identity.remaining_lanes()
+        || transition_continuation.selected_lanes() != identity.selected_lanes()
+        || queue_handoff.finished_lanes() != identity.finished_lanes()
+        || queue_handoff.remaining_lanes() != identity.remaining_lanes()
+        || queue_handoff.update_sequence_ids() != identity.update_sequence_ids()
+        || queue_handoff.resulting_element() != identity.resulting_element()
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::UnacceptedSchedulerContinuation,
+        );
+    }
+
+    let root = store.root(identity.root())?;
+    if root.current() != identity.finished_work()
+        || root.finished_work().is_some()
+        || !root.finished_lanes().is_empty()
+        || root.lanes().pending_lanes() != identity.remaining_lanes()
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::LiveRootStateMismatch {
+                root: identity.root(),
+                expected_current: identity.finished_work(),
+                actual_current: root.current(),
+                expected_finished_work: None,
+                actual_finished_work: root.finished_work(),
+                expected_finished_lanes: Lanes::NO,
+                actual_finished_lanes: root.finished_lanes(),
+                expected_pending_lanes: identity.remaining_lanes(),
+                actual_pending_lanes: root.lanes().pending_lanes(),
+            },
+        );
+    }
+
+    validate_transition_same_lane_multi_update_queue_lane_commit_currentness_rows_for_canary(
+        store,
+        transition_continuation,
+        queue_handoff,
+    )?;
+
+    let (root_token, committed_element, _children) =
+        committed_host_root_tree_state_for_transition_same_lane_multi_update_currentness_for_canary(
+            store,
+            identity.root(),
+            identity.finished_work(),
+        )?;
+    if root_token != identity.root().state_node_handle() {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::CommittedTreeStateMismatch {
+                root: identity.root(),
+                field: "root_token",
+            },
+        );
+    }
+    if committed_element != identity.resulting_element() {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::CommittedTreeStateMismatch {
+                root: identity.root(),
+                field: "resulting_element",
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn validate_transition_same_lane_multi_update_queue_lane_commit_currentness_rows_for_canary<
+    H: HostTypes,
+>(
+    store: &FiberRootStore<H>,
+    transition_continuation: &RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
+    queue_handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
+) -> Result<(), RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary> {
+    if !transition_same_lane_multi_update_queue_handoff_proves_source_owned_handoff_for_canary(
+        queue_handoff,
+        transition_continuation.requests,
+    ) {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::QueueOrderMismatch {
+                root: queue_handoff.root(),
+                queue: queue_handoff.current_update_queue(),
+                expected_updates: transition_continuation.update_sequence_ids(),
+                actual_updates: queue_handoff.update_sequence_ids(),
+            },
+        );
+    }
+
+    let current_queue_base_updates = store
+        .update_queues()
+        .base_updates(queue_handoff.current_update_queue())?;
+    if current_queue_base_updates != queue_handoff.current_queue_base_updates() {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::QueueOrderMismatch {
+                root: queue_handoff.root(),
+                queue: queue_handoff.current_update_queue(),
+                expected_updates: queue_handoff.current_queue_base_updates().to_vec(),
+                actual_updates: current_queue_base_updates,
+            },
+        );
+    }
+
+    let pending_updates = store
+        .update_queues()
+        .pending_updates(queue_handoff.current_update_queue())?;
+    if !pending_updates.is_empty() {
+        let mut actual_updates = current_queue_base_updates;
+        actual_updates.extend(pending_updates);
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::QueueOrderMismatch {
+                root: queue_handoff.root(),
+                queue: queue_handoff.current_update_queue(),
+                expected_updates: queue_handoff.current_queue_base_updates().to_vec(),
+                actual_updates,
+            },
+        );
+    }
+
+    for row in queue_handoff.update_records() {
+        let actual_lanes = store
+            .update_queues()
+            .update(row.update())?
+            .lane()
+            .remove_lane(Lane::OFFSCREEN);
+        if actual_lanes != row.source_lanes() || actual_lanes != row.lane().to_lanes() {
+            return Err(
+                RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::QueueRowMetadataMismatch {
+                    root: queue_handoff.root(),
+                    update: row.update(),
+                    expected_lanes: row.source_lanes(),
+                    actual_lanes,
+                },
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn committed_host_root_tree_state_for_transition_same_lane_multi_update_currentness_for_canary<
+    H: HostTypes,
+>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    current: FiberId,
+) -> Result<
+    (StateNodeHandle, RootElementHandle, Vec<FiberId>),
+    RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary,
+> {
+    let host_root = store.fiber_arena().get(current)?;
+    if host_root.tag() != FiberTag::HostRoot {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::CommittedTreeStateMismatch {
+                root,
+                field: "tag",
+            },
+        );
+    }
+    let root_token = host_root.state_node();
+    let state = store
+        .host_root_states()
+        .get(host_root.memoized_state())
+        .map_err(FiberRootStoreError::from)?;
+    let children = store.fiber_arena().child_ids(current)?;
+
+    Ok((root_token, state.element(), children))
+}
+
+#[cfg(test)]
+fn transition_same_lane_multi_update_queue_lane_continuation_source_metadata_mismatch_for_canary(
+    transition_continuation: &RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
+) -> Option<&'static str> {
+    let source = &transition_continuation.source_metadata;
+    if transition_continuation.requests != source.requests {
+        return Some("requests");
+    }
+    if transition_continuation.callback_execution != source.callback_execution {
+        return Some("callback_execution");
+    }
+    if transition_continuation.current_callback_node != source.current_callback_node {
+        return Some("current_callback_node");
+    }
+    if transition_continuation.current_event_transition_lane != source.current_event_transition_lane
+    {
+        return Some("current_event_transition_lane");
+    }
+    if transition_continuation.root_current_before_continuation
+        != source.root_current_before_continuation
+    {
+        return Some("root_current_before_continuation");
+    }
+    if transition_continuation.root_pending_lanes_before_continuation
+        != source.root_pending_lanes_before_continuation
+    {
+        return Some("root_pending_lanes_before_continuation");
+    }
+    if transition_continuation.root_entangled_lanes_before_continuation
+        != source.root_entangled_lanes_before_continuation
+    {
+        return Some("root_entangled_lanes_before_continuation");
+    }
+    if transition_continuation.finished_work_handoff_identity
+        != source.finished_work_handoff_identity
+    {
+        return Some("finished_work_handoff_identity");
+    }
+    if transition_continuation.status != source.status {
+        return Some("status");
+    }
+    if transition_continuation.queue_handoff != source.queue_handoff {
+        return Some("queue_handoff");
+    }
+    if transition_continuation.queue_handoff_error != source.queue_handoff_error {
+        return Some("queue_handoff_error");
+    }
+    if transition_continuation.root_commit_handoff != source.root_commit_handoff {
+        return Some("root_commit_handoff");
+    }
+    if transition_continuation.commit != source.commit {
+        return Some("commit");
+    }
+
+    None
+}
+
+#[cfg(test)]
+fn transition_same_lane_multi_update_callback_execution_is_stale_for_canary(
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    current_callback_node: RootSchedulerCallbackHandle,
+) -> bool {
+    let validation = callback_execution.validation();
+    validation.is_stale()
+        || validation.root() != requests[0].root()
+        || validation.requested_callback_node() != callback_execution.callback_node()
+        || validation.current_callback_node() != current_callback_node
+        || callback_execution.root() != requests[0].root()
+        || callback_execution.callback_node() != current_callback_node
+}
+
+#[cfg(test)]
+fn transition_same_lane_multi_update_request_entanglement_is_current_for_canary(
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    root_entangled_lanes: Lanes,
+) -> bool {
+    transition_same_lane_multi_update_request_batch_shape_for_canary(requests)
+        && root_entangled_lanes.contains_all(requests[0].entangled_lanes())
+}
+
+#[cfg(test)]
+fn transition_same_lane_multi_update_callback_render_lanes_match_request_for_canary(
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+) -> bool {
+    callback_execution.status() == RootSchedulerCallbackExecutionStatus::Rendered
+        && callback_execution.selected_lanes() == requests[0].selected_next_lanes()
+        && callback_execution.render_phase().is_some_and(|render| {
+            render.root() == requests[0].root()
+                && render.current() == requests[0].fiber()
+                && render.render_lanes() == requests[0].selected_next_lanes()
+                && render.render_lanes() == requests[0].entangled_lanes()
+                && render.applied_update_count() == requests.len()
+                && render.skipped_update_count() == 0
+        })
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private same-lane multi-update validator preserves queue-lane rejection details"
+)]
+fn validate_transition_same_lane_multi_update_queue_handoff_for_commit_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    render: HostRootRenderPhaseRecord,
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    queue_handoff: Option<&HostRootUpdateQueueLaneHandoffRecordForCanary>,
+) -> Result<(), HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary> {
+    let Some(queue_handoff) = queue_handoff else {
+        return Err(
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::MissingQueueHandoff {
+                root: root_id,
+                finished_work: render.finished_work(),
+            },
+        );
+    };
+
+    transition_same_lane_multi_update_queue_handoff_matches_render_for_canary(
+        root_id,
+        render,
+        requests,
+        queue_handoff,
+    )?;
+
+    for record in queue_handoff.update_records() {
+        let actual_lanes = store
+            .update_queues()
+            .update(record.update())
+            .map_err(HostRootUpdateQueueLaneHandoffErrorForCanary::from)?
+            .lane()
+            .remove_lane(Lane::OFFSCREEN);
+        if actual_lanes != record.source_lanes() || actual_lanes != record.lane().to_lanes() {
+            return Err(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::WrongLaneMetadata {
+                    root: root_id,
+                    queue: queue_handoff.current_update_queue(),
+                    update: record.update(),
+                    expected_lane: record.lane(),
+                    actual_lanes,
+                }
+                .into(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private same-transition multi-update evidence mirrors the canary assertion shape"
+)]
+fn transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    current_callback_node: RootSchedulerCallbackHandle,
+    current_event_transition_lane: Lane,
+    root_current_before_continuation: FiberId,
+    root_pending_lanes_before_continuation: Lanes,
+    root_entangled_lanes_before_continuation: Lanes,
+    finished_work_handoff_identity: Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary>,
+    status: RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary,
+    queue_handoff: Option<&HostRootUpdateQueueLaneHandoffRecordForCanary>,
+    queue_handoff_error: Option<HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary>,
+    root_commit_handoff: Option<HostRootFinishedWorkCommitHandoffRecordForCanary>,
+    commit: Option<HostRootCommitRecord>,
+) -> RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
+    let queue_handoff = queue_handoff.cloned();
+    let source_metadata = RootTransitionSameLaneMultiUpdateQueueLaneContinuationMetadataForCanary {
+        requests,
+        callback_execution,
+        current_callback_node,
+        current_event_transition_lane,
+        root_current_before_continuation,
+        root_pending_lanes_before_continuation,
+        root_entangled_lanes_before_continuation,
+        finished_work_handoff_identity,
+        status,
+        queue_handoff: queue_handoff.clone(),
+        queue_handoff_error: queue_handoff_error.clone(),
+        root_commit_handoff: root_commit_handoff.clone(),
+        commit: commit.clone(),
+    };
+
+    RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
+        requests,
+        callback_execution,
+        current_callback_node,
+        current_event_transition_lane,
+        root_current_before_continuation,
+        root_pending_lanes_before_continuation,
+        root_entangled_lanes_before_continuation,
+        finished_work_handoff_identity,
+        status,
+        queue_handoff,
+        queue_handoff_error,
+        root_commit_handoff,
+        commit,
+        source_metadata,
+        currentness_source_token: None,
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    dead_code,
+    reason = "private same-transition multi-update HostRoot queue/lane scheduler continuation is exercised by focused canaries"
+)]
+pub(crate) fn execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    queue_handoff: Option<&HostRootUpdateQueueLaneHandoffRecordForCanary>,
+) -> Result<
+    RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
+    RootSyncSchedulerContinuationExecutionError,
+> {
+    let (
+        current_callback_node,
+        root_current_before_continuation,
+        root_pending_lanes_before_continuation,
+        root_entangled_lanes_before_continuation,
+    ) = {
+        let root = store
+            .root(requests[0].root())
+            .map_err(RootSchedulerError::from)?;
+        (
+            root.scheduling().callback_node(),
+            root.current(),
+            root.lanes().pending_lanes(),
+            root.lanes().entangled_lanes(),
+        )
+    };
+    let current_event_transition_lane = store.root_scheduler().current_event_transition_lane();
+
+    if !transition_same_lane_multi_update_request_batch_shape_for_canary(requests) {
+        return Ok(
+            transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                requests,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByTransitionRequestMismatch,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if transition_same_lane_multi_update_callback_execution_is_stale_for_canary(
+        requests,
+        callback_execution,
+        current_callback_node,
+    ) {
+        return Ok(
+            transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                requests,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::StaleCallbackNode,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if !root_pending_lanes_before_continuation.contains_all(requests[0].selected_next_lanes()) {
+        return Ok(
+            transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                requests,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::NoTransitionWork,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if root_current_before_continuation != requests[0].fiber()
+        || current_event_transition_lane != requests[0].lane()
+    {
+        return Ok(
+            transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                requests,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::StaleTransitionDiagnostics,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if !transition_same_lane_multi_update_request_entanglement_is_current_for_canary(
+        requests,
+        root_entangled_lanes_before_continuation,
+    ) {
+        return Ok(
+            transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                requests,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByTransitionEntanglementMismatch,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    let Some(render_phase) = callback_execution.render_phase() else {
+        return Ok(
+            transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                requests,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::NoTransitionWork,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    };
+
+    if !transition_same_lane_multi_update_callback_render_lanes_match_request_for_canary(
+        requests,
+        callback_execution,
+    ) {
+        return Ok(
+            transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                requests,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByLaneMismatch,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if store
+        .root(render_phase.root())
+        .map_err(RootSchedulerError::from)?
+        .finished_work()
+        .is_none()
+    {
+        record_root_finished_work_for_scheduler_handoff_for_canary(store, render_phase)?;
+    }
+
+    let render_handoff = root_sync_flush_record_for_canary(
+        0,
+        requests[0].root(),
+        callback_execution.selected_lanes(),
+        render_phase,
+    );
+    let finished_work_handoff_identity =
+        root_sync_scheduler_finished_work_handoff_identity_for_canary(store, render_handoff)?;
+    if !finished_work_handoff_identity.accepted_for_root_scheduler_commit_handoff() {
+        return Ok(
+            transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                requests,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                Some(finished_work_handoff_identity),
+                RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if let Err(error) =
+        validate_transition_same_lane_multi_update_queue_handoff_for_commit_for_canary(
+            store,
+            requests[0].root(),
+            render_phase,
+            requests,
+            queue_handoff,
+        )
+    {
+        return Ok(
+            transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                requests,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                Some(finished_work_handoff_identity),
+                RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch,
+                queue_handoff,
+                Some(error),
+                None,
+                None,
+            ),
+        );
+    }
+
+    let pending_finished_work = match record_host_root_finished_work_pending_commit_for_canary(
+        store,
+        render_phase,
+        0,
+    ) {
+        Ok(pending_finished_work) => pending_finished_work,
+        Err(_error) => {
+            return Ok(
+                transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                    requests,
+                    callback_execution,
+                    current_callback_node,
+                    current_event_transition_lane,
+                    root_current_before_continuation,
+                    root_pending_lanes_before_continuation,
+                    root_entangled_lanes_before_continuation,
+                    Some(finished_work_handoff_identity),
+                    RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch,
+                    queue_handoff,
+                    None,
+                    None,
+                    None,
+                ),
+            );
+        }
+    };
+    let root_commit_handoff = match commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render_phase,
+        Some(pending_finished_work),
+        1,
+    ) {
+        Ok(root_commit_handoff) => root_commit_handoff,
+        Err(error) => {
+            return Ok(
+                transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+                    requests,
+                    callback_execution,
+                    current_callback_node,
+                    current_event_transition_lane,
+                    root_current_before_continuation,
+                    root_pending_lanes_before_continuation,
+                    root_entangled_lanes_before_continuation,
+                    Some(finished_work_handoff_identity),
+                    RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch,
+                    queue_handoff,
+                    Some(HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::FinishedWork(Box::new(error))),
+                    None,
+                    None,
+                ),
+            );
+        }
+    };
+    let commit = root_commit_handoff.commit().clone();
+    recompute_might_have_pending_sync_work(store)?;
+
+    let queue_handoff =
+        queue_handoff.expect("same-transition queue handoff was validated before commit");
+    let currentness_identity = RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary {
+        root: requests[0].root(),
+        previous_current: commit.previous_current(),
+        finished_work: commit.finished_work(),
+        selected_lanes: callback_execution.selected_lanes(),
+        finished_lanes: commit.finished_lanes(),
+        remaining_lanes: commit.remaining_lanes(),
+        requested_callback_node: callback_execution.callback_node(),
+        current_callback_node,
+        handoff_order: render_handoff.order(),
+        commit_order: root_commit_handoff.commit_order(),
+        update_sequence_ids: queue_handoff.update_sequence_ids(),
+        resulting_element: queue_handoff.resulting_element(),
+    };
+    let currentness_source_token = store
+        .root_scheduler_mut()
+        .record_finished_work_queue_lane_commit_currentness_source(currentness_identity);
+
+    let mut continuation =
+        transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
+            requests,
+            callback_execution,
+            current_callback_node,
+            current_event_transition_lane,
+            root_current_before_continuation,
+            root_pending_lanes_before_continuation,
+            root_entangled_lanes_before_continuation,
+            Some(finished_work_handoff_identity),
+            RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::RenderedAndCommitted,
+            Some(queue_handoff),
+            None,
+            Some(root_commit_handoff),
+            Some(commit),
+        );
+    continuation.currentness_source_token = Some(currentness_source_token);
+
+    Ok(continuation)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
