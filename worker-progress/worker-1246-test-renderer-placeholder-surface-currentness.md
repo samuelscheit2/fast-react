@@ -37,9 +37,9 @@ git diff --check
 
 - `node --check tests/conformance/src/react-test-renderer-serialization-local-gate.mjs`: passed, no output.
 - `node --check tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, no output.
-- `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, 52 tests.
+- `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, 56 tests.
 - `node --test tests/conformance/test/react-test-renderer-serialization-oracle.test.mjs`: passed, 28 tests.
-- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: passed, 80 tests.
+- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: passed, 84 tests; npm printed the existing `minimum-release-age` config warning.
 - `npm run check:package-surface`: passed; npm printed the existing `minimum-release-age` config warning.
 - `node tests/smoke/import-entrypoints.mjs`: passed.
 - `git diff --check`: passed, no output.
@@ -68,6 +68,12 @@ git diff --check
   - public/native/package export claim smuggling;
   - pre-metadata `exports.default`, `exports.native`, and
     `module.exports.default` alias smuggling.
+  - trivia-split/bracketed `exports` mutations and
+    `Object.defineProperty`/`Object.assign` export mutations;
+  - simple CommonJS aliases such as `const out = exports; out.default = ...`;
+  - executable template-expression export mutations, including mutations
+    nested inside otherwise expected export assignment values;
+  - repeated `module.exports` assignments after the expected shallow export.
 
 ## Audit And Review Notes
 
@@ -77,6 +83,20 @@ git diff --check
   - a sibling package-root alias under `packages/fast-react-test-renderer`.
 - Both findings were repaired. Focused targeted tests for the repaired cases
   passed before the full verification rerun.
+- A second repair audit found two remaining false-green paths:
+  - CommonJS alias/export mutation smuggling through trivia, bracket access,
+    `Object.defineProperty`, `Object.assign`, simple aliases, and executable
+    template expressions;
+  - repeated `module.exports` assignment after the expected
+    `module.exports = shallow` shallow entrypoint export.
+- The second repair replaced the narrow named-export substring scan with a
+  CommonJS export-operation scanner that skips comments/string/regex trivia,
+  scans executable template expressions, tracks simple `exports` and
+  `module.exports` aliases, recognizes object export mutations, and requires
+  the shallow entrypoint to contain exactly one `module.exports = shallow`
+  assignment.
+- Focused repair tests and the final full verification matrix passed after the
+  second repair. A read-only nested scanner review reported no findings.
 
 ## Risks Or Blockers
 
