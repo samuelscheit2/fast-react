@@ -32,6 +32,7 @@ const createRoot = defineFunctionShape(function createRoot(
   const adapter = createPrivateRootPublicFacadeAdapter();
   const privateRoot = adapter.createRoot(container);
   let rendered = false;
+  let unmounted = false;
   minimalPublicRootContainers.set(container, true);
 
   const root = {};
@@ -41,9 +42,9 @@ const createRoot = defineFunctionShape(function createRoot(
       value(element) {
         assertRenderArgumentsSupported(arguments);
         assertMinimalHostTextElement(element);
-        if (rendered) {
+        if (unmounted) {
           throwUnsupportedRootRender(
-            'Only the initial HostComponent + HostText render is currently exposed.'
+            'Rendering after public root.unmount remains blocked for the minimal host-output facade.'
           );
         }
 
@@ -55,12 +56,23 @@ const createRoot = defineFunctionShape(function createRoot(
     unmount: {
       enumerable: true,
       value() {
-        throw createUnsupportedError(
-          entrypoint,
-          'createRoot().unmount',
-          'was called',
-          'Public root.unmount cleanup remains blocked for the minimal host-output facade.'
-        );
+        assertUnmountArgumentsSupported(arguments);
+        if (unmounted) {
+          throwUnsupportedRootUnmount(
+            'Repeated public root.unmount calls remain blocked.'
+          );
+        }
+        if (!rendered) {
+          throwUnsupportedRootUnmount(
+            'Public root.unmount currently requires one accepted minimal div text render to clean up.'
+          );
+        }
+
+        privateRoot.unmount();
+        minimalPublicRootContainers.delete(container);
+        rendered = false;
+        unmounted = true;
+        return undefined;
       }
     }
   });
@@ -114,6 +126,14 @@ function assertRenderArgumentsSupported(args) {
   if (args.length !== 1) {
     throwUnsupportedRootRender(
       'Callbacks, containers, option objects, and scheduler-related render arguments remain blocked.'
+    );
+  }
+}
+
+function assertUnmountArgumentsSupported(args) {
+  if (args.length !== 0) {
+    throwUnsupportedRootUnmount(
+      'Callbacks, containers, option objects, and scheduler-related unmount arguments remain blocked.'
     );
   }
 }
@@ -179,6 +199,15 @@ function throwUnsupportedRootRender(detail) {
   throw createUnsupportedError(
     entrypoint,
     'createRoot().render',
+    'was called',
+    detail
+  );
+}
+
+function throwUnsupportedRootUnmount(detail) {
+  throw createUnsupportedError(
+    entrypoint,
+    'createRoot().unmount',
     'was called',
     detail
   );

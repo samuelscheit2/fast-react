@@ -110,6 +110,25 @@ const MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT = Object.freeze({
   ownerDocumentChildCount: 0,
   ownerDocumentMutationLog: Object.freeze([])
 });
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_SNAPSHOT = Object.freeze({
+  containerChildCount: 1,
+  containerChildNodeNames: Object.freeze(["DIV"]),
+  containerMutationLog: Object.freeze([Object.freeze(["appendChild", "DIV"])]),
+  containerTextContent: "updated text",
+  ownerDocumentChildCount: 0,
+  ownerDocumentMutationLog: Object.freeze([])
+});
+const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_SNAPSHOT = Object.freeze({
+  containerChildCount: 0,
+  containerChildNodeNames: Object.freeze([]),
+  containerMutationLog: Object.freeze([
+    Object.freeze(["appendChild", "DIV"]),
+    Object.freeze(["removeChild", "DIV"])
+  ]),
+  containerTextContent: "",
+  ownerDocumentChildCount: 0,
+  ownerDocumentMutationLog: Object.freeze([])
+});
 
 function assertPublicRootFacadeSideEffectFree(sideEffects) {
   assert.equal(sideEffects.mutationCount, 0);
@@ -180,6 +199,76 @@ function assertMinimalPublicDivTextLifecycle(publicBoundary) {
   );
 }
 
+function assertMinimalPublicDivTextUpdateLifecycle(publicBoundary) {
+  const renderUpdate = publicBoundary.publicRootLifecycle.renderUpdate;
+  assert.equal(
+    renderUpdate.label,
+    'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "updated text"))'
+  );
+  assert.equal(renderUpdate.status, "ok");
+  assert.equal(renderUpdate.value.type, "undefined");
+  assert.equal(renderUpdate.compatibilityClaimed, false);
+  assert.equal(renderUpdate.controlledDomShim, true);
+  assert.equal(renderUpdate.renderElementType, "div");
+  assert.equal(renderUpdate.renderTextContent, "updated text");
+  assert.equal(renderUpdate.hostNodeReused, true);
+  assert.equal(renderUpdate.rootObjectCreated, true);
+  assert.equal(renderUpdate.lifecycleOperationAttempted, true);
+  assert.equal(renderUpdate.createRootAttempt.status, "ok");
+  assert.deepEqual(
+    renderUpdate.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_UPDATE_SNAPSHOT
+  );
+  assert.equal(renderUpdate.sideEffects.mutationCount, 1);
+  assert.equal(renderUpdate.sideEffects.listenerRegistrationCount, 0);
+  assert.equal(
+    renderUpdate.sideEffects.ownerDocumentListenerRegistrationCount,
+    0
+  );
+  assert.equal(renderUpdate.sideEffects.ownerDocumentMutationCount, 0);
+  assert.equal(renderUpdate.sideEffects.containerMarker.propertyCount, 0);
+  assert.equal(
+    renderUpdate.sideEffects.containerListeningMarker.propertyCount,
+    0
+  );
+  assert.equal(
+    renderUpdate.sideEffects.ownerDocumentListeningMarker.propertyCount,
+    0
+  );
+}
+
+function assertMinimalPublicDivTextUnmountLifecycle(publicBoundary) {
+  const unmount = publicBoundary.publicRootLifecycle.unmount;
+  assert.equal(
+    unmount.label,
+    'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text")); root.unmount()'
+  );
+  assert.equal(unmount.status, "ok");
+  assert.equal(unmount.value.type, "undefined");
+  assert.equal(unmount.compatibilityClaimed, false);
+  assert.equal(unmount.controlledDomShim, true);
+  assert.equal(unmount.renderElementType, "div");
+  assert.equal(unmount.renderTextContent, "text");
+  assert.equal(unmount.duplicateRootTrackingCleared, true);
+  assert.equal(unmount.rootObjectCreated, true);
+  assert.equal(unmount.lifecycleOperationAttempted, true);
+  assert.equal(unmount.createRootAttempt.status, "ok");
+  assert.deepEqual(
+    unmount.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_SNAPSHOT
+  );
+  assert.equal(unmount.sideEffects.mutationCount, 2);
+  assert.equal(unmount.sideEffects.listenerRegistrationCount, 0);
+  assert.equal(unmount.sideEffects.ownerDocumentListenerRegistrationCount, 0);
+  assert.equal(unmount.sideEffects.ownerDocumentMutationCount, 0);
+  assert.equal(unmount.sideEffects.containerMarker.propertyCount, 0);
+  assert.equal(unmount.sideEffects.containerListeningMarker.propertyCount, 0);
+  assert.equal(
+    unmount.sideEffects.ownerDocumentListeningMarker.propertyCount,
+    0
+  );
+}
+
 function assertBlockedPublicLifecycleOperation(operation, exportName) {
   assert.equal(operation.status, "throws");
   assert.equal(operation.thrown.code, "FAST_REACT_UNIMPLEMENTED");
@@ -201,14 +290,8 @@ function assertMinimalPublicRootBoundary(publicBoundary) {
     "createRoot().render"
   );
   assertMinimalPublicDivTextLifecycle(publicBoundary);
-  assertBlockedPublicLifecycleOperation(
-    publicBoundary.publicRootLifecycle.renderUpdate,
-    "createRoot().render"
-  );
-  assertBlockedPublicLifecycleOperation(
-    publicBoundary.publicRootLifecycle.unmount,
-    "createRoot().unmount"
-  );
+  assertMinimalPublicDivTextUpdateLifecycle(publicBoundary);
+  assertMinimalPublicDivTextUnmountLifecycle(publicBoundary);
 }
 
 test("React DOM public root facade gate blocks placeholders while oracle prerequisites remain accepted", () => {
@@ -4544,13 +4627,10 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
   assertMinimalPublicCreateRootBoundary(publicBoundary);
-  assertBlockedPublicLifecycleOperation(
-    publicBoundary.publicRootLifecycle.unmount,
-    "createRoot().unmount"
-  );
+  assertMinimalPublicDivTextUnmountLifecycle(publicBoundary);
 });
 
-test("React DOM public root facade update and unmount rows stay blocked apart from private request metadata", () => {
+test("React DOM public root facade lifecycle rows admit only minimal fake-DOM slices", () => {
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
     currentOracle: rootRenderOracle,
@@ -4567,14 +4647,12 @@ test("React DOM public root facade update and unmount rows stay blocked apart fr
     REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS.map((row) => row.id)
   );
   const expectedBlockedLifecycleOperations = new Map([
-    ["public-create-root-render-initial", "root.render"],
-    ["public-create-root-render-update", "root.render"],
-    ["public-create-root-unmount-call", "root.unmount"]
+    ["public-create-root-render-initial", "root.render"]
   ]);
   for (const row of lifecycleRows) {
     assert.equal(row.gateStatus, REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS);
     assert.equal(row.compatibilityClaimed, false);
-    if (row.id === "public-create-root-render-div-text") {
+    if (row.id !== "public-create-root-render-initial") {
       continue;
     }
     assert.equal(row.blockedAt, expectedBlockedLifecycleOperations.get(row.id));
@@ -4594,6 +4672,40 @@ test("React DOM public root facade update and unmount rows stay blocked apart fr
   assert.deepEqual(
     publicDivTextRow.controlledDomSnapshot,
     MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT
+  );
+  const publicUpdateRow = lifecycleRows.find(
+    (row) => row.id === "public-create-root-render-update"
+  );
+  assert.ok(publicUpdateRow);
+  assert.equal(publicUpdateRow.controlledDomShim, true);
+  assert.equal(publicUpdateRow.minimalDivTextHostOutputUpdated, true);
+  assert.equal(publicUpdateRow.hostNodeReused, true);
+  assert.equal(publicUpdateRow.mutationCount, 1);
+  assert.equal(
+    publicUpdateRow.privateBridgeEvidence,
+    "wrapped-private-facade-host-output"
+  );
+  assert.equal(publicUpdateRow.renderReturnType, "undefined");
+  assert.deepEqual(
+    publicUpdateRow.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_UPDATE_SNAPSHOT
+  );
+  const publicUnmountRow = lifecycleRows.find(
+    (row) => row.id === "public-create-root-unmount-call"
+  );
+  assert.ok(publicUnmountRow);
+  assert.equal(publicUnmountRow.controlledDomShim, true);
+  assert.equal(publicUnmountRow.minimalDivTextHostOutputUnmounted, true);
+  assert.equal(publicUnmountRow.duplicateRootTrackingCleared, true);
+  assert.equal(publicUnmountRow.mutationCount, 2);
+  assert.equal(
+    publicUnmountRow.privateBridgeEvidence,
+    "wrapped-private-facade-host-output"
+  );
+  assert.equal(publicUnmountRow.renderReturnType, "undefined");
+  assert.deepEqual(
+    publicUnmountRow.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_SNAPSHOT
   );
   assert.ok(
     gate.blockedPublicFacadeRows.every((row) => !row.id.startsWith("private-"))
@@ -4667,7 +4779,7 @@ test("React DOM public root facade gate records minimal public createRoot withou
   );
 });
 
-test("React DOM public root facade gate records minimal public div text render only", () => {
+test("React DOM public root facade gate records minimal public div text render", () => {
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
   assertMinimalPublicDivTextLifecycle(publicBoundary);
 

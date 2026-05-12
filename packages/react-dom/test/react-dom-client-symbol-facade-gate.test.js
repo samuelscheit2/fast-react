@@ -215,6 +215,7 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   assert.equal(createRootContainer.firstChild.nodeName, 'DIV');
   assert.equal(createRootContainer.firstChild.getAttribute('id'), 'app');
   assert.equal(createRootContainer.textContent, 'hello');
+  const initialHostNode = createRootContainer.firstChild;
   assert.throws(
     () => {
       createRootResult.render(
@@ -228,18 +229,16 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
       exportName: 'createRoot().render'
     }
   );
-  assert.throws(
-    () => {
-      createRootResult.render(React.createElement('div', null, 'again'));
-    },
-    {
-      code: 'FAST_REACT_UNIMPLEMENTED',
-      entrypoint: 'react-dom/client',
-      exportName: 'createRoot().render'
-    }
+  assert.equal(
+    createRootResult.render(
+      React.createElement('div', {id: 'app'}, 'again')
+    ),
+    undefined
   );
   assert.equal(createRootContainer.childNodes.length, 1);
-  assert.equal(createRootContainer.textContent, 'hello');
+  assert.equal(createRootContainer.firstChild, initialHostNode);
+  assert.equal(createRootContainer.firstChild.getAttribute('id'), 'app');
+  assert.equal(createRootContainer.textContent, 'again');
   assert.throws(
     () => {
       const unsupportedPropsDocument = createDocument(
@@ -320,6 +319,19 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     }
   );
 
+  assert.equal(createRootResult.unmount(), undefined);
+  assert.equal(createRootContainer.childNodes.length, 0);
+  assert.equal(createRootContainer.textContent, '');
+  assert.throws(
+    () => {
+      createRootResult.render(React.createElement('div', null, 'stale'));
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot().render'
+    }
+  );
   assert.throws(
     () => {
       createRootResult.unmount();
@@ -330,8 +342,17 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
       exportName: 'createRoot().unmount'
     }
   );
+  assert.equal(createRootContainer.childNodes.length, 0);
+
+  const recreatedRoot = reactDomClient.createRoot(createRootContainer);
+  assert.equal(
+    recreatedRoot.render(React.createElement('div', null, 42)),
+    undefined
+  );
   assert.equal(createRootContainer.childNodes.length, 1);
-  assert.equal(createRootContainer.textContent, 'hello');
+  assert.equal(createRootContainer.textContent, '42');
+  assert.equal(recreatedRoot.unmount(), undefined);
+  assert.equal(createRootContainer.childNodes.length, 0);
 
   const hydrateRootDocument = createDocument('public-hydrate-root-placeholder');
   const hydrateRootContainer = createElement('DIV', hydrateRootDocument);
