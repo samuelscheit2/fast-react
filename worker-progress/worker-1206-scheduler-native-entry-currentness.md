@@ -32,6 +32,15 @@ Complete.
 
 ## Evidence Gathered
 
+- Rebased cleanly onto current `main` at
+  `e561dd91a489ba96a16283d695db99ef90212aaa`; after the rebase,
+  `git merge-base HEAD main` returned
+  `e561dd91a489ba96a16283d695db99ef90212aaa`.
+- Before this currentness report update, branch history after the rebase
+  contained the rebased implementation commit
+  `7e2e349a0a10d71275fab509768ae2ea84f177de`, followed by report-only commits
+  `4143674c2af720f319a784781a175b713d8e6a3f` and
+  `0bec7a7131e59b4685b147c8e65fb7bdb35dacc9`.
 - Current local native-entry rows are collected from the local scheduler package
   copied into a temporary `node_modules/scheduler`, preserving the checked
   oracle path shape without mutating manifests or running lifecycle scripts.
@@ -60,6 +69,10 @@ Complete.
 - `git diff --check`
 - `git status --short --branch`
 - `git diff --stat`
+- `git rebase main`
+- `git rev-parse HEAD`
+- `git rev-parse main`
+- `git merge-base HEAD main`
 
 ## Verification Results
 
@@ -80,6 +93,8 @@ Notes:
 
 - The npm commands emitted the existing `minimum-release-age` npm config
   warning only.
+- The post-rebase diff stayed limited to the assigned files, and the
+  report-only follow-up stayed limited to this worker report.
 
 ## Risks Or Blockers
 
@@ -101,6 +116,13 @@ Notes:
 
 ## Commit Hash
 
-- Implementation commit: `7e2e349a` (`Add scheduler native entry currentness gate`).
-- Report repair commit: `4143674c` (`Record worker 1206 report hash`).
-- Final report commit: `0bec7a71` (`Record worker 1206 final report hash`).
+- Current main/base: `e561dd91a489ba96a16283d695db99ef90212aaa`
+- Rebased implementation commit:
+  `7e2e349a0a10d71275fab509768ae2ea84f177de` (`Add scheduler native entry
+  currentness gate`)
+- Report repair commit:
+  `4143674c2af720f319a784781a175b713d8e6a3f` (`Record worker 1206 report
+  hash`)
+- Final-report hash repair commit:
+  `0bec7a7131e59b4685b147c8e65fb7bdb35dacc9` (`Record worker 1206 final
+  report hash`)
