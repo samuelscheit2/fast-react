@@ -77,5 +77,7 @@ its own source-proof path and override/proxy coverage.
 
 - Substantive implementation commit:
   `9ef36d3e6044827f67438dc0e3c4abc20e9788fb`
-- This report was updated after the implementation commit to record the hash;
-  the final branch `HEAD` is reported in the worker handoff.
+- Final branch/report commit recorded before this report-only repair:
+  `a96bd93f1bc66fa545a0daa96fec9a04baef9dfc`
+- This report-only repair records both hashes above; the new final branch tip
+  after this repair is reported in the worker handoff.
