@@ -4,7 +4,6 @@
 //! layout reserves the boundary where lane/update/hook semantics will be built.
 
 mod begin_work;
-#[cfg(test)]
 mod complete_work;
 mod concurrent_updates;
 #[cfg(test)]
