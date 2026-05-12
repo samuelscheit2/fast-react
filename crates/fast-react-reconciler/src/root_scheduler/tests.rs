@@ -441,6 +441,28 @@ fn clone_queue_lane_continuation_preserving_currentness_source(
     }
 }
 
+fn clone_transition_queue_lane_continuation_preserving_currentness_source(
+    record: &RootTransitionSchedulerQueueLaneContinuationRecordForCanary,
+) -> RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
+    RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
+        request: record.request,
+        callback_execution: record.callback_execution,
+        current_callback_node: record.current_callback_node,
+        current_event_transition_lane: record.current_event_transition_lane,
+        root_current_before_continuation: record.root_current_before_continuation,
+        root_pending_lanes_before_continuation: record.root_pending_lanes_before_continuation,
+        root_entangled_lanes_before_continuation: record.root_entangled_lanes_before_continuation,
+        finished_work_handoff_identity: record.finished_work_handoff_identity,
+        status: record.status,
+        queue_handoff: record.queue_handoff.clone(),
+        queue_handoff_error: record.queue_handoff_error.clone(),
+        queue_commit_handoff: record.queue_commit_handoff.clone(),
+        commit: record.commit.clone(),
+        source_metadata: record.source_metadata.clone(),
+        currentness_source_token: record.currentness_source_token,
+    }
+}
+
 fn attach_function_component_child(
     store: &mut FiberRootStore<RecordingHost>,
     root_id: FiberRootId,
@@ -1390,6 +1412,463 @@ fn root_scheduler_transition_queue_lane_continuation_rejects_skipped_lane_commit
     assert!(continuation.commit().is_none());
     assert_eq!(store.root(root_id).unwrap().current(), current);
     assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_queue_lane_currentness_consumes_finished_work_source() {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (accepted, request, execution, queue_handoff) = transition_queue_lane_scheduler_handoff(
+        &mut store,
+        root_id,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(12151),
+    );
+    let render = execution.render_phase().unwrap();
+    let prepared = prepare_test_renderer_host_output_canary_fibers(
+        &mut store,
+        render,
+        TestRendererHostOutputCanaryFixture::new(121510, 121511, 121512),
+    )
+    .unwrap();
+    let completed =
+        finish_test_renderer_host_output_canary_fibers(&mut store, prepared, 121513, 121514)
+            .unwrap();
+
+    let continuation = execute_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+        &mut store,
+        request,
+        execution,
+        Some(&queue_handoff),
+    )
+    .unwrap();
+    assert!(continuation.currentness_source_token().is_some());
+
+    let currentness =
+        consume_transition_queue_lane_commit_currentness_for_canary(&mut store, &continuation)
+            .unwrap();
+    let finished = currentness.currentness();
+
+    assert!(currentness.source_owned_currentness_consumed());
+    assert!(currentness.ties_transition_queue_lane_commit_to_live_tree_state_for_canary());
+    assert_eq!(currentness.root(), root_id);
+    assert_eq!(currentness.transition_lane(), Lane::TRANSITION_1);
+    assert_eq!(
+        currentness.selected_lanes(),
+        Lanes::from(Lane::TRANSITION_1)
+    );
+    assert_eq!(
+        currentness
+            .transition_continuation()
+            .currentness_source_token(),
+        None
+    );
+    assert_eq!(finished.root(), root_id);
+    assert_eq!(finished.root_token(), root_id.state_node_handle());
+    assert_eq!(finished.previous_current(), current);
+    assert_eq!(finished.finished_work(), render.finished_work());
+    assert_eq!(finished.selected_lanes(), Lanes::from(Lane::TRANSITION_1));
+    assert_eq!(finished.finished_lanes(), Lanes::from(Lane::TRANSITION_1));
+    assert_eq!(finished.remaining_lanes(), Lanes::NO);
+    assert_eq!(finished.update_sequence_ids(), &[accepted.update()]);
+    assert_eq!(
+        finished.resulting_element(),
+        RootElementHandle::from_raw(12151)
+    );
+    assert_eq!(
+        finished.committed_element_after_consume(),
+        RootElementHandle::from_raw(12151)
+    );
+    assert_eq!(finished.committed_root_children(), &[completed.component()]);
+    assert!(finished.commit_mutation_record_count() > 0);
+    assert_eq!(finished.commit_deletion_list_count(), 0);
+    assert!(!currentness.public_root_compatibility_claimed());
+    assert!(!currentness.public_scheduler_timing_compatibility_claimed());
+    assert!(!currentness.public_transition_hooks_compatibility_claimed());
+    assert!(!currentness.public_act_compatibility_claimed());
+    assert!(!currentness.react_dom_compatibility_claimed());
+    assert!(!currentness.test_renderer_compatibility_claimed());
+    assert!(!currentness.native_execution_compatibility_claimed());
+    assert!(!currentness.package_compatibility_claimed());
+    assert!(!currentness.renderer_compatibility_claimed());
+    assert!(!currentness.executes_public_effects());
+    assert_eq!(
+        store.root(root_id).unwrap().current(),
+        render.finished_work()
+    );
+    assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_queue_lane_currentness_rejects_clone_replay_and_caller_metadata() {
+    let (mut store, root_id, host) = root_store();
+    let (_accepted, request, execution, queue_handoff) = transition_queue_lane_scheduler_handoff(
+        &mut store,
+        root_id,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(12152),
+    );
+    let continuation = execute_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+        &mut store,
+        request,
+        execution,
+        Some(&queue_handoff),
+    )
+    .unwrap();
+    let cloned = continuation.clone();
+    let finished_work = continuation.commit().unwrap().finished_work();
+    let commit_order = continuation
+        .queue_commit_handoff()
+        .unwrap()
+        .finished_work_handoff()
+        .commit_order();
+    let source_token = continuation.currentness_source_token();
+
+    assert!(source_token.is_some());
+    assert_eq!(cloned.currentness_source_token(), None);
+    assert_eq!(
+        consume_transition_queue_lane_commit_currentness_for_canary(&mut store, &cloned)
+            .unwrap_err(),
+        RootTransitionQueueLaneCommitCurrentnessErrorForCanary::FinishedWorkQueueLaneCurrentness(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
+                root: root_id,
+                finished_work,
+                commit_order
+            }
+        )
+    );
+
+    let mut caller_shaped =
+        clone_transition_queue_lane_continuation_preserving_currentness_source(&continuation);
+    caller_shaped.current_event_transition_lane = Lane::TRANSITION_2;
+    assert_eq!(caller_shaped.currentness_source_token(), source_token);
+    assert_eq!(
+        consume_transition_queue_lane_commit_currentness_for_canary(&mut store, &caller_shaped,)
+            .unwrap_err(),
+        RootTransitionQueueLaneCommitCurrentnessErrorForCanary::TransitionWrapperMetadataMismatch {
+            root: root_id,
+            field: "current_event_transition_lane"
+        }
+    );
+
+    let consumed =
+        consume_transition_queue_lane_commit_currentness_for_canary(&mut store, &continuation)
+            .unwrap();
+    assert!(consumed.ties_transition_queue_lane_commit_to_live_tree_state_for_canary());
+    assert_eq!(
+        consume_transition_queue_lane_commit_currentness_for_canary(&mut store, &continuation)
+            .unwrap_err(),
+        RootTransitionQueueLaneCommitCurrentnessErrorForCanary::FinishedWorkQueueLaneCurrentness(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceAlreadyConsumed {
+                root: root_id,
+                finished_work,
+                commit_order
+            }
+        )
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_queue_lane_currentness_rejects_cross_root_and_stale_live_root() {
+    let host = RecordingHost::default();
+    let mut store = FiberRootStore::<RecordingHost>::new();
+    let first = store
+        .create_client_root(FakeContainer::new(12153), RootOptions::new())
+        .unwrap();
+    let second = store
+        .create_client_root(FakeContainer::new(12154), RootOptions::new())
+        .unwrap();
+    let first_update = update_container_transition_for_canary(
+        &mut store,
+        first,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(12155),
+        None,
+    )
+    .unwrap();
+    let first_render =
+        render_host_root_for_lanes(&mut store, first, Lanes::from(Lane::TRANSITION_1)).unwrap();
+    let first_queue_handoff = host_root_update_queue_lane_handoff_for_canary(
+        &store,
+        first,
+        std::slice::from_ref(&first_update),
+        first_render,
+    )
+    .unwrap();
+    let second_current = store.root(second).unwrap().current();
+    let (_second_update, second_request, second_execution, _second_queue_handoff) =
+        transition_queue_lane_scheduler_handoff(
+            &mut store,
+            second,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(12156),
+        );
+
+    let cross_root = execute_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+        &mut store,
+        second_request,
+        second_execution,
+        Some(&first_queue_handoff),
+    )
+    .unwrap();
+
+    assert_eq!(
+            consume_transition_queue_lane_commit_currentness_for_canary(&mut store, &cross_root)
+                .unwrap_err(),
+            RootTransitionQueueLaneCommitCurrentnessErrorForCanary::UnacceptedTransitionContinuation {
+                root: second,
+                status: RootTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+            }
+        );
+    assert_eq!(store.root(second).unwrap().current(), second_current);
+
+    let (mut store, root_id, stale_host) = root_store();
+    let (_accepted, request, execution, queue_handoff) = transition_queue_lane_scheduler_handoff(
+        &mut store,
+        root_id,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(12157),
+    );
+    let continuation = execute_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+        &mut store,
+        request,
+        execution,
+        Some(&queue_handoff),
+    )
+    .unwrap();
+    let stale_finished_work = continuation.commit().unwrap().finished_work();
+
+    update_container_sync(
+        &mut store,
+        root_id,
+        RootElementHandle::from_raw(12158),
+        None,
+    )
+    .unwrap();
+    let next_render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+    let next_commit = commit_finished_host_root(&mut store, next_render).unwrap();
+
+    assert_eq!(
+        consume_transition_queue_lane_commit_currentness_for_canary(&mut store, &continuation)
+            .unwrap_err(),
+        RootTransitionQueueLaneCommitCurrentnessErrorForCanary::FinishedWorkQueueLaneCurrentness(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::LiveRootStateMismatch {
+                root: root_id,
+                expected_current: stale_finished_work,
+                actual_current: next_commit.current(),
+                expected_finished_work: None,
+                actual_finished_work: None,
+                expected_finished_lanes: Lanes::NO,
+                actual_finished_lanes: Lanes::NO,
+                expected_pending_lanes: Lanes::NO,
+                actual_pending_lanes: Lanes::NO
+            }
+        )
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().current(),
+        next_commit.current()
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+    assert_eq!(stale_host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_queue_lane_currentness_rejects_unaccepted_queue_lane_evidence() {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (_accepted, request, execution, _queue_handoff) = transition_queue_lane_scheduler_handoff(
+        &mut store,
+        root_id,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(12159),
+    );
+
+    let scheduler_only =
+        execute_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store, request, execution, None,
+        )
+        .unwrap();
+
+    assert_eq!(
+            consume_transition_queue_lane_commit_currentness_for_canary(&mut store, &scheduler_only)
+                .unwrap_err(),
+            RootTransitionQueueLaneCommitCurrentnessErrorForCanary::UnacceptedTransitionContinuation {
+                root: root_id,
+                status: RootTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+            }
+        );
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+
+    let (mut store, root_id, host_stale_callback) = root_store();
+    let (_accepted, request, execution, queue_handoff) = transition_queue_lane_scheduler_handoff(
+        &mut store,
+        root_id,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(12163),
+    );
+    let first = execute_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+        &mut store,
+        request,
+        execution,
+        Some(&queue_handoff),
+    )
+    .unwrap();
+    let committed_current = first.commit().unwrap().current();
+    let stale_callback =
+        execute_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            request,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        stale_callback.status(),
+        RootTransitionSchedulerQueueLaneContinuationStatusForCanary::StaleCallbackNode
+    );
+    assert_eq!(
+        consume_transition_queue_lane_commit_currentness_for_canary(&mut store, &stale_callback)
+            .unwrap_err(),
+        RootTransitionQueueLaneCommitCurrentnessErrorForCanary::UnacceptedTransitionContinuation {
+            root: root_id,
+            status: RootTransitionSchedulerQueueLaneContinuationStatusForCanary::StaleCallbackNode
+        }
+    );
+    assert_eq!(store.root(root_id).unwrap().current(), committed_current);
+
+    let (mut store, root_id, host_wrong_finished_lanes) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (_accepted, request, execution, queue_handoff) = transition_queue_lane_scheduler_handoff(
+        &mut store,
+        root_id,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(12160),
+    );
+    let mut wrong_finished_lanes = queue_handoff.clone();
+    wrong_finished_lanes.finished_lanes = Lanes::from(Lane::TRANSITION_2);
+    let wrong_finished_lanes_continuation =
+        execute_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            request,
+            execution,
+            Some(&wrong_finished_lanes),
+        )
+        .unwrap();
+
+    assert_eq!(
+            consume_transition_queue_lane_commit_currentness_for_canary(
+                &mut store,
+                &wrong_finished_lanes_continuation,
+            )
+            .unwrap_err(),
+            RootTransitionQueueLaneCommitCurrentnessErrorForCanary::UnacceptedTransitionContinuation {
+                root: root_id,
+                status: RootTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+            }
+        );
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+
+    let (mut store, root_id, host_skipped) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let transition = update_container_transition_for_canary(
+        &mut store,
+        root_id,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(12161),
+        None,
+    )
+    .unwrap();
+    let request = record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(
+        &mut store,
+        &transition,
+    )
+    .unwrap();
+    process_root_schedule_in_microtask(&mut store).unwrap();
+    let callback = store.scheduler_bridge().callback_requests()[0];
+    let validation =
+        validate_scheduled_host_root_callback(&store, root_id, callback.node()).unwrap();
+    let default_update = update_container(
+        &mut store,
+        root_id,
+        RootElementHandle::from_raw(12162),
+        None,
+    )
+    .unwrap();
+    let render =
+        render_host_root_for_lanes(&mut store, root_id, Lanes::from(Lane::TRANSITION_1)).unwrap();
+    let current_queue_base_updates = store
+        .update_queues()
+        .base_updates(render.current_update_queue())
+        .unwrap();
+    let execution = RootSchedulerCallbackExecutionRecord {
+        callback,
+        validation,
+        selected_lanes: Lanes::from(Lane::TRANSITION_1),
+        status: RootSchedulerCallbackExecutionStatus::Rendered,
+        render_phase: Some(render),
+    };
+    let skipped_handoff = HostRootUpdateQueueLaneHandoffRecordForCanary {
+        root: root_id,
+        current: render.current(),
+        finished_work: render.finished_work(),
+        current_update_queue: render.current_update_queue(),
+        work_in_progress_update_queue: render.work_in_progress_update_queue(),
+        pending_lanes_before_render: render.render_lanes().merge(render.remaining_lanes()),
+        selected_next_lanes_before_render: render.render_lanes(),
+        finished_lanes: render.render_lanes(),
+        remaining_lanes: render.remaining_lanes(),
+        pending_lanes_after_render: store.root(root_id).unwrap().lanes().pending_lanes(),
+        update_records: vec![
+            HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                sequence: 0,
+                update: transition.update(),
+                lane: transition.lane(),
+                source_lanes: Lanes::from(Lane::TRANSITION_1),
+                pending_lanes_after_enqueue: transition.pending_lanes_after_enqueue(),
+                selected_next_lanes_after_enqueue: transition.selected_next_lanes(),
+            },
+            HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                sequence: 1,
+                update: default_update.update(),
+                lane: default_update.lane(),
+                source_lanes: Lanes::DEFAULT,
+                pending_lanes_after_enqueue: default_update.pending_lanes_after_enqueue(),
+                selected_next_lanes_after_enqueue: default_update.selected_next_lanes(),
+            },
+        ],
+        current_queue_base_updates,
+        applied_update_count: render.applied_update_count(),
+        skipped_update_count: render.skipped_update_count(),
+        resulting_element: render.resulting_element(),
+    };
+    let skipped = execute_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+        &mut store,
+        request,
+        execution,
+        Some(&skipped_handoff),
+    )
+    .unwrap();
+
+    assert_eq!(
+            consume_transition_queue_lane_commit_currentness_for_canary(&mut store, &skipped)
+                .unwrap_err(),
+            RootTransitionQueueLaneCommitCurrentnessErrorForCanary::UnacceptedTransitionContinuation {
+                root: root_id,
+                status: RootTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+            }
+        );
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+    assert_eq!(host_stale_callback.operations(), Vec::<&'static str>::new());
+    assert_eq!(
+        host_wrong_finished_lanes.operations(),
+        Vec::<&'static str>::new()
+    );
+    assert_eq!(host_skipped.operations(), Vec::<&'static str>::new());
 }
 
 #[test]

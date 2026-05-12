@@ -1129,6 +1129,24 @@ pub(crate) enum RootTransitionSchedulerQueueLaneContinuationStatusForCanary {
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct RootTransitionSchedulerQueueLaneContinuationMetadataForCanary {
+    request: RootTransitionLaneSchedulerRequestRecord,
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    current_callback_node: RootSchedulerCallbackHandle,
+    current_event_transition_lane: Lane,
+    root_current_before_continuation: FiberId,
+    root_pending_lanes_before_continuation: Lanes,
+    root_entangled_lanes_before_continuation: Lanes,
+    finished_work_handoff_identity: Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary>,
+    status: RootTransitionSchedulerQueueLaneContinuationStatusForCanary,
+    queue_handoff: Option<HostRootUpdateQueueLaneHandoffRecordForCanary>,
+    queue_handoff_error: Option<HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary>,
+    queue_commit_handoff: Option<HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary>,
+    commit: Option<HostRootCommitRecord>,
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
     request: RootTransitionLaneSchedulerRequestRecord,
     callback_execution: RootSchedulerCallbackExecutionRecord,
@@ -1143,6 +1161,32 @@ pub(crate) struct RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
     queue_handoff_error: Option<HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary>,
     queue_commit_handoff: Option<HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary>,
     commit: Option<HostRootCommitRecord>,
+    source_metadata: RootTransitionSchedulerQueueLaneContinuationMetadataForCanary,
+    currentness_source_token:
+        Option<RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary>,
+}
+
+#[cfg(test)]
+impl Clone for RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
+    fn clone(&self) -> Self {
+        Self {
+            request: self.request,
+            callback_execution: self.callback_execution,
+            current_callback_node: self.current_callback_node,
+            current_event_transition_lane: self.current_event_transition_lane,
+            root_current_before_continuation: self.root_current_before_continuation,
+            root_pending_lanes_before_continuation: self.root_pending_lanes_before_continuation,
+            root_entangled_lanes_before_continuation: self.root_entangled_lanes_before_continuation,
+            finished_work_handoff_identity: self.finished_work_handoff_identity,
+            status: self.status,
+            queue_handoff: self.queue_handoff.clone(),
+            queue_handoff_error: self.queue_handoff_error.clone(),
+            queue_commit_handoff: self.queue_commit_handoff.clone(),
+            commit: self.commit.clone(),
+            source_metadata: self.source_metadata.clone(),
+            currentness_source_token: None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1250,6 +1294,13 @@ impl RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
     #[must_use]
     pub(crate) fn commit(&self) -> Option<&HostRootCommitRecord> {
         self.commit.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn currentness_source_token(
+        &self,
+    ) -> Option<RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary> {
+        self.currentness_source_token
     }
 
     #[must_use]
@@ -1491,6 +1542,432 @@ impl RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
                 })
             })
     }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootTransitionQueueLaneCommitCurrentnessRecordForCanary {
+    transition_continuation: RootTransitionSchedulerQueueLaneContinuationRecordForCanary,
+    currentness: RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "private transition queue-lane currentness is exercised by focused canaries"
+)]
+impl RootTransitionQueueLaneCommitCurrentnessRecordForCanary {
+    #[must_use]
+    pub(crate) const fn transition_continuation(
+        &self,
+    ) -> &RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
+        &self.transition_continuation
+    }
+
+    #[must_use]
+    pub(crate) const fn currentness(
+        &self,
+    ) -> &RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary {
+        &self.currentness
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.transition_continuation.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn transition_lane(&self) -> Lane {
+        self.transition_continuation.request().lane()
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(&self) -> Lanes {
+        self.transition_continuation.selected_lanes()
+    }
+
+    #[must_use]
+    pub(crate) fn source_owned_currentness_consumed(&self) -> bool {
+        self.currentness.source_owned_currentness_consumed()
+    }
+
+    #[must_use]
+    pub(crate) fn ties_transition_queue_lane_commit_to_live_tree_state_for_canary(&self) -> bool {
+        let transition = &self.transition_continuation;
+        let Some(render) = transition.render_phase() else {
+            return false;
+        };
+        let update_sequence_ids = self.currentness.update_sequence_ids();
+
+        transition.routed_through_transition_queue_lane_and_commit_evidence_for_canary()
+            && self
+                .currentness
+                .ties_finished_work_queue_lane_commit_to_live_tree_state_for_canary()
+            && self.currentness.root() == transition.root()
+            && self.currentness.selected_lanes() == transition.selected_lanes()
+            && self.currentness.finished_lanes() == transition.selected_lanes()
+            && self.currentness.remaining_lanes() == render.remaining_lanes()
+            && self.currentness.requested_callback_node() == transition.callback_node()
+            && self.currentness.current_callback_node() == transition.current_callback_node()
+            && update_sequence_ids.len() == 1
+            && update_sequence_ids[0] == transition.request().update()
+            && self.currentness.resulting_element() == render.resulting_element()
+            && transition.request().lane().is_transition()
+            && transition
+                .selected_lanes()
+                .contains_lane(transition.request().lane())
+            && transition.selected_lanes().includes_only_transitions()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_timing_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_transition_hooks_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn native_execution_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn package_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_public_effects(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum RootTransitionQueueLaneCommitCurrentnessErrorForCanary {
+    UnacceptedTransitionContinuation {
+        root: FiberRootId,
+        status: RootTransitionSchedulerQueueLaneContinuationStatusForCanary,
+    },
+    TransitionWrapperMetadataMismatch {
+        root: FiberRootId,
+        field: &'static str,
+    },
+    FinishedWorkQueueLaneCurrentness(RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary),
+}
+
+#[cfg(test)]
+impl Display for RootTransitionQueueLaneCommitCurrentnessErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnacceptedTransitionContinuation { root, status } => write!(
+                formatter,
+                "root {} transition queue-lane currentness rejected transition continuation {:?}",
+                root.raw(),
+                status
+            ),
+            Self::TransitionWrapperMetadataMismatch { root, field } => write!(
+                formatter,
+                "root {} transition queue-lane currentness wrapper metadata mismatch for {}",
+                root.raw(),
+                field
+            ),
+            Self::FinishedWorkQueueLaneCurrentness(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for RootTransitionQueueLaneCommitCurrentnessErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FinishedWorkQueueLaneCurrentness(error) => Some(error),
+            Self::UnacceptedTransitionContinuation { .. }
+            | Self::TransitionWrapperMetadataMismatch { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary>
+    for RootTransitionQueueLaneCommitCurrentnessErrorForCanary
+{
+    fn from(error: RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary) -> Self {
+        Self::FinishedWorkQueueLaneCurrentness(error)
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    dead_code,
+    reason = "private transition currentness consumer is exercised by focused canaries"
+)]
+pub(crate) fn consume_transition_queue_lane_commit_currentness_for_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    transition_continuation: &RootTransitionSchedulerQueueLaneContinuationRecordForCanary,
+) -> Result<
+    RootTransitionQueueLaneCommitCurrentnessRecordForCanary,
+    RootTransitionQueueLaneCommitCurrentnessErrorForCanary,
+> {
+    if let Some(field) = transition_queue_lane_continuation_source_metadata_mismatch_for_canary(
+        transition_continuation,
+    ) {
+        return Err(
+            RootTransitionQueueLaneCommitCurrentnessErrorForCanary::TransitionWrapperMetadataMismatch {
+                root: transition_continuation.root(),
+                field,
+            },
+        );
+    }
+
+    if !transition_continuation
+        .routed_through_transition_queue_lane_and_commit_evidence_for_canary()
+    {
+        return Err(
+            RootTransitionQueueLaneCommitCurrentnessErrorForCanary::UnacceptedTransitionContinuation {
+                root: transition_continuation.root(),
+                status: transition_continuation.status(),
+            },
+        );
+    }
+
+    let Some(queue_lane_continuation) =
+        transition_queue_lane_currentness_sync_continuation_for_canary(transition_continuation)
+    else {
+        return Err(
+            RootTransitionQueueLaneCommitCurrentnessErrorForCanary::UnacceptedTransitionContinuation {
+                root: transition_continuation.root(),
+                status: transition_continuation.status(),
+            },
+        );
+    };
+
+    if let Some(field) = transition_queue_lane_currentness_wrapper_metadata_mismatch_for_canary(
+        transition_continuation,
+        &queue_lane_continuation,
+    ) {
+        return Err(
+            RootTransitionQueueLaneCommitCurrentnessErrorForCanary::TransitionWrapperMetadataMismatch {
+                root: transition_continuation.root(),
+                field,
+            },
+        );
+    }
+
+    let currentness = consume_finished_work_queue_lane_commit_currentness_for_canary(
+        store,
+        &queue_lane_continuation,
+    )?;
+
+    Ok(RootTransitionQueueLaneCommitCurrentnessRecordForCanary {
+        transition_continuation: transition_continuation.clone(),
+        currentness,
+    })
+}
+
+#[cfg(test)]
+fn transition_queue_lane_currentness_sync_continuation_for_canary(
+    transition_continuation: &RootTransitionSchedulerQueueLaneContinuationRecordForCanary,
+) -> Option<RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary> {
+    let render_phase = transition_continuation.render_phase()?;
+    let status = match transition_continuation.status() {
+        RootTransitionSchedulerQueueLaneContinuationStatusForCanary::StaleCallbackNode => {
+            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::StaleCallbackNode
+        }
+        RootTransitionSchedulerQueueLaneContinuationStatusForCanary::NoTransitionWork => {
+            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::NoSyncWork
+        }
+        RootTransitionSchedulerQueueLaneContinuationStatusForCanary::StaleTransitionDiagnostics
+        | RootTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByTransitionEntanglementMismatch
+        | RootTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByLaneMismatch => {
+            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::BlockedByLaneMismatch
+        }
+        RootTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch => {
+            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::BlockedByFinishedWorkHandoffMismatch
+        }
+        RootTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch => {
+            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        }
+        RootTransitionSchedulerQueueLaneContinuationStatusForCanary::RenderedAndCommitted => {
+            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::RenderedAndCommitted
+        }
+    };
+
+    Some(
+        RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
+            handoff: root_sync_flush_record_for_canary(
+                0,
+                transition_continuation.root(),
+                transition_continuation.selected_lanes(),
+                render_phase,
+            ),
+            requested_callback_node: transition_continuation.callback_node(),
+            current_callback_node: transition_continuation.current_callback_node(),
+            selected_lanes: transition_continuation.selected_lanes(),
+            pending_passive_blocker: None,
+            finished_work_handoff_identity: transition_continuation
+                .finished_work_handoff_identity(),
+            status,
+            queue_handoff: transition_continuation.queue_handoff.clone(),
+            queue_handoff_error: transition_continuation.queue_handoff_error.clone(),
+            queue_commit_handoff: transition_continuation.queue_commit_handoff.clone(),
+            commit: transition_continuation.commit.clone(),
+            currentness_source_token: transition_continuation.currentness_source_token(),
+        },
+    )
+}
+
+#[cfg(test)]
+fn transition_queue_lane_currentness_wrapper_metadata_mismatch_for_canary(
+    transition_continuation: &RootTransitionSchedulerQueueLaneContinuationRecordForCanary,
+    queue_lane_continuation: &RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary,
+) -> Option<&'static str> {
+    if transition_continuation.root() != queue_lane_continuation.root() {
+        return Some("currentness_root");
+    }
+    if transition_continuation.callback_node() != queue_lane_continuation.requested_callback_node()
+    {
+        return Some("currentness_requested_callback_node");
+    }
+    if transition_continuation.current_callback_node()
+        != queue_lane_continuation.current_callback_node()
+    {
+        return Some("currentness_current_callback_node");
+    }
+    if transition_continuation.selected_lanes() != queue_lane_continuation.selected_lanes() {
+        return Some("currentness_selected_lanes");
+    }
+
+    let Some(queue_commit_handoff) = transition_continuation.queue_commit_handoff() else {
+        return Some("queue_commit_handoff");
+    };
+    let identity = root_finished_work_queue_lane_commit_currentness_identity_for_canary(
+        queue_lane_continuation.handoff(),
+        queue_lane_continuation.requested_callback_node(),
+        queue_lane_continuation.current_callback_node(),
+        queue_lane_continuation.selected_lanes(),
+        queue_commit_handoff,
+    );
+    if identity.root() != transition_continuation.root() {
+        return Some("currentness_root");
+    }
+    if identity.requested_callback_node() != transition_continuation.callback_node() {
+        return Some("currentness_requested_callback_node");
+    }
+    if identity.current_callback_node() != transition_continuation.current_callback_node() {
+        return Some("currentness_current_callback_node");
+    }
+    if identity.selected_lanes() != transition_continuation.selected_lanes() {
+        return Some("currentness_selected_lanes");
+    }
+    if identity.finished_lanes() != transition_continuation.selected_lanes() {
+        return Some("currentness_finished_lanes");
+    }
+
+    let update_sequence_ids = identity.update_sequence_ids();
+    if update_sequence_ids.len() != 1
+        || update_sequence_ids[0] != transition_continuation.request().update()
+    {
+        return Some("currentness_update_sequence_ids");
+    }
+
+    let Some(render) = transition_continuation.render_phase() else {
+        return Some("render_phase");
+    };
+    if identity.remaining_lanes() != render.remaining_lanes() {
+        return Some("currentness_remaining_lanes");
+    }
+    if identity.resulting_element() != render.resulting_element() {
+        return Some("currentness_resulting_element");
+    }
+
+    None
+}
+
+#[cfg(test)]
+fn transition_queue_lane_continuation_source_metadata_mismatch_for_canary(
+    transition_continuation: &RootTransitionSchedulerQueueLaneContinuationRecordForCanary,
+) -> Option<&'static str> {
+    let source = &transition_continuation.source_metadata;
+    if transition_continuation.request != source.request {
+        return Some("request");
+    }
+    if transition_continuation.callback_execution != source.callback_execution {
+        return Some("callback_execution");
+    }
+    if transition_continuation.current_callback_node != source.current_callback_node {
+        return Some("current_callback_node");
+    }
+    if transition_continuation.current_event_transition_lane != source.current_event_transition_lane
+    {
+        return Some("current_event_transition_lane");
+    }
+    if transition_continuation.root_current_before_continuation
+        != source.root_current_before_continuation
+    {
+        return Some("root_current_before_continuation");
+    }
+    if transition_continuation.root_pending_lanes_before_continuation
+        != source.root_pending_lanes_before_continuation
+    {
+        return Some("root_pending_lanes_before_continuation");
+    }
+    if transition_continuation.root_entangled_lanes_before_continuation
+        != source.root_entangled_lanes_before_continuation
+    {
+        return Some("root_entangled_lanes_before_continuation");
+    }
+    if transition_continuation.finished_work_handoff_identity
+        != source.finished_work_handoff_identity
+    {
+        return Some("finished_work_handoff_identity");
+    }
+    if transition_continuation.status != source.status {
+        return Some("status");
+    }
+    if transition_continuation.queue_handoff != source.queue_handoff {
+        return Some("queue_handoff");
+    }
+    if transition_continuation.queue_handoff_error != source.queue_handoff_error {
+        return Some("queue_handoff_error");
+    }
+    if transition_continuation.queue_commit_handoff != source.queue_commit_handoff {
+        return Some("queue_commit_handoff");
+    }
+    if transition_continuation.commit != source.commit {
+        return Some("commit");
+    }
+
+    None
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -4381,24 +4858,35 @@ pub(crate) fn execute_transition_scheduler_continuation_for_queue_lane_handoff_f
         };
     let commit = queue_commit_handoff.commit().clone();
     recompute_might_have_pending_sync_work(store)?;
+    let currentness_identity = root_finished_work_queue_lane_commit_currentness_identity_for_canary(
+        render_handoff,
+        callback_execution.callback_node(),
+        current_callback_node,
+        callback_execution.selected_lanes(),
+        &queue_commit_handoff,
+    );
+    let currentness_source_token = store
+        .root_scheduler_mut()
+        .record_finished_work_queue_lane_commit_currentness_source(currentness_identity);
 
-    Ok(
-        transition_scheduler_queue_lane_continuation_record_for_canary(
-            request,
-            callback_execution,
-            current_callback_node,
-            current_event_transition_lane,
-            root_current_before_continuation,
-            root_pending_lanes_before_continuation,
-            root_entangled_lanes_before_continuation,
-            Some(finished_work_handoff_identity),
-            RootTransitionSchedulerQueueLaneContinuationStatusForCanary::RenderedAndCommitted,
-            queue_handoff,
-            None,
-            Some(queue_commit_handoff),
-            Some(commit),
-        ),
-    )
+    let mut continuation = transition_scheduler_queue_lane_continuation_record_for_canary(
+        request,
+        callback_execution,
+        current_callback_node,
+        current_event_transition_lane,
+        root_current_before_continuation,
+        root_pending_lanes_before_continuation,
+        root_entangled_lanes_before_continuation,
+        Some(finished_work_handoff_identity),
+        RootTransitionSchedulerQueueLaneContinuationStatusForCanary::RenderedAndCommitted,
+        queue_handoff,
+        None,
+        Some(queue_commit_handoff),
+        Some(commit),
+    );
+    continuation.currentness_source_token = Some(currentness_source_token);
+
+    Ok(continuation)
 }
 
 #[cfg(test)]
@@ -4466,6 +4954,22 @@ fn transition_scheduler_queue_lane_continuation_record_for_canary(
     queue_commit_handoff: Option<HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary>,
     commit: Option<HostRootCommitRecord>,
 ) -> RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
+    let queue_handoff = queue_handoff.cloned();
+    let source_metadata = RootTransitionSchedulerQueueLaneContinuationMetadataForCanary {
+        request,
+        callback_execution,
+        current_callback_node,
+        current_event_transition_lane,
+        root_current_before_continuation,
+        root_pending_lanes_before_continuation,
+        root_entangled_lanes_before_continuation,
+        finished_work_handoff_identity,
+        status,
+        queue_handoff: queue_handoff.clone(),
+        queue_handoff_error: queue_handoff_error.clone(),
+        queue_commit_handoff: queue_commit_handoff.clone(),
+        commit: commit.clone(),
+    };
     RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
         request,
         callback_execution,
@@ -4476,10 +4980,12 @@ fn transition_scheduler_queue_lane_continuation_record_for_canary(
         root_entangled_lanes_before_continuation,
         finished_work_handoff_identity,
         status,
-        queue_handoff: queue_handoff.cloned(),
+        queue_handoff,
         queue_handoff_error,
         queue_commit_handoff,
         commit,
+        source_metadata,
+        currentness_source_token: None,
     }
 }
 
