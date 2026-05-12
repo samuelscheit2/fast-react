@@ -14,8 +14,8 @@ use crate::root_updates::{
 use crate::test_support::{FakeContainer, RecordingHost};
 use crate::{
     RootElementHandle, RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle,
-    SchedulerActQueueTaskKind, TestRendererHostOutputCanaryFixture, commit_finished_host_root,
-    finish_test_renderer_host_output_canary_fibers,
+    RootUpdatePayload, SchedulerActQueueTaskKind, TestRendererHostOutputCanaryFixture,
+    commit_finished_host_root, finish_test_renderer_host_output_canary_fibers,
     prepare_test_renderer_host_output_canary_fibers, update_container, update_container_sync,
 };
 use fast_react_core::{
@@ -1243,6 +1243,109 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_acce
         Lanes::NO
     );
     assert!(!store.root_scheduler().might_have_pending_sync_work());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_rejects_live_same_lane_queue_staleness()
+ {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (_first, _second, requests, execution, queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(12220),
+            RootElementHandle::from_raw(12221),
+        );
+    let render = execution.render_phase().unwrap();
+    let transition_lanes = Lanes::from(Lane::TRANSITION_1);
+
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().pending_lanes(),
+        transition_lanes
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().entangled_lanes(),
+        transition_lanes
+    );
+    assert_eq!(queue_handoff.pending_lanes_after_render(), transition_lanes);
+    assert_eq!(requests[1].selected_next_lanes(), transition_lanes);
+    assert_eq!(requests[1].entangled_lanes(), transition_lanes);
+
+    let stale_same_lane_update = store.update_queues_mut().create_update(Lane::TRANSITION_1);
+    store
+        .update_queues_mut()
+        .update_mut(stale_same_lane_update)
+        .unwrap()
+        .set_payload(RootUpdatePayload::new(RootElementHandle::from_raw(12222)));
+    store
+        .update_queues_mut()
+        .append_pending_update(queue_handoff.current_update_queue(), stale_same_lane_update)
+        .unwrap();
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().pending_lanes(),
+        queue_handoff.pending_lanes_after_render()
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().entangled_lanes(),
+        requests[1].entangled_lanes()
+    );
+    assert_eq!(
+        store.root_scheduler().current_event_transition_lane(),
+        Lane::TRANSITION_1
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().scheduling().callback_node(),
+        execution.callback_node()
+    );
+
+    let rejection =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        rejection.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+    );
+    assert!(rejection.blocked_by_queue_lane_handoff());
+    assert_eq!(
+        rejection.queue_handoff_error(),
+        Some(
+            &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueLane(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::QueueOrderMismatch {
+                    root: root_id,
+                    queue: queue_handoff.current_update_queue(),
+                    expected_updates: queue_handoff.current_queue_base_updates().to_vec(),
+                    actual_updates: {
+                        let mut updates = queue_handoff.current_queue_base_updates().to_vec();
+                        updates.push(stale_same_lane_update);
+                        updates
+                    }
+                }
+            )
+        )
+    );
+    assert!(rejection.root_commit_handoff_for_canary().is_none());
+    assert!(rejection.commit().is_none());
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(
+        store.root(root_id).unwrap().finished_work(),
+        Some(render.finished_work())
+    );
+    assert_eq!(
+        store
+            .update_queues()
+            .pending_updates(queue_handoff.current_update_queue())
+            .unwrap(),
+        vec![stale_same_lane_update]
+    );
     assert_eq!(host.operations(), Vec::<&'static str>::new());
 }
 
