@@ -277,6 +277,34 @@ test('public test-utils act blocked currentness rejects compatibility drift', ()
     'public-react-dom-test-utils-act-currentness-source-proof'
   );
   assertReactDomTestUtilsCurrentnessRejected(
+    {
+      ...report
+    },
+    'public-react-dom-test-utils-act-currentness-source-proof'
+  );
+  const hostileForgedCurrentnessReport =
+    createHostileReactDomTestUtilsActCurrentnessProxy();
+  assertReactDomTestUtilsCurrentnessRejected(
+    hostileForgedCurrentnessReport.proxy,
+    'public-react-dom-test-utils-act-currentness-source-proof'
+  );
+  assert.deepEqual(hostileForgedCurrentnessReport.getTrapCounts(), {
+    get: 0,
+    getOwnPropertyDescriptor: 0,
+    isExtensible: 0,
+    ownKeys: 0
+  });
+  const mutableReport =
+    createPublicReactDomTestUtilsActCurrentnessReportWithFreezeBypass({
+      publicReactActBlockedCurrentnessConsumption:
+        report.publicReactActBlockedCurrentnessConsumption
+    });
+  assert.equal(Object.isFrozen(mutableReport), false);
+  assertReactDomTestUtilsCurrentnessRejected(
+    mutableReport,
+    'public-react-dom-test-utils-act-currentness-not-frozen'
+  );
+  assertReactDomTestUtilsCurrentnessRejected(
     gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport({
       publicTestUtilsActCompatibilityClaimed: true
     }),
@@ -1747,6 +1775,57 @@ function replaceCurrentnessScenario(report, index, overrides) {
         }
       : scenario
   );
+}
+
+function createHostileReactDomTestUtilsActCurrentnessProxy() {
+  const trapCounts = {
+    get: 0,
+    getOwnPropertyDescriptor: 0,
+    isExtensible: 0,
+    ownKeys: 0
+  };
+  const throwTrap = (trapName) => {
+    trapCounts[trapName] += 1;
+    throw new Error(`forged proxy ${trapName} trap should not be reached`);
+  };
+
+  return {
+    proxy: new Proxy(
+      {},
+      {
+        get() {
+          throwTrap('get');
+        },
+        getOwnPropertyDescriptor() {
+          throwTrap('getOwnPropertyDescriptor');
+        },
+        isExtensible() {
+          throwTrap('isExtensible');
+        },
+        ownKeys() {
+          throwTrap('ownKeys');
+        }
+      }
+    ),
+    getTrapCounts: () => ({
+      ...trapCounts
+    })
+  };
+}
+
+function createPublicReactDomTestUtilsActCurrentnessReportWithFreezeBypass(
+  overrides
+) {
+  const originalFreeze = Object.freeze;
+
+  Object.freeze = (value) => value;
+  try {
+    return gateModule.createPublicReactDomTestUtilsActBlockedCurrentnessReport(
+      overrides
+    );
+  } finally {
+    Object.freeze = originalFreeze;
+  }
 }
 
 function assertReactDomDelayedSchedulerDiagnosticsRejected(
