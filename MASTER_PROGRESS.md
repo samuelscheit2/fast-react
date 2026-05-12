@@ -29,6 +29,36 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1030 Docs Refresh and Workers 1025-1029 Cleanup Splits
+
+- Worker 1030 refreshed master docs after accepted organization-only cleanup
+  Workers 1025-1029. This is a docs-only refresh and makes no runtime or
+  public compatibility claim.
+- Worker 1025 split `complete_work.rs` into child modules under
+  `complete_work/`, preserving existing facade paths.
+- Worker 1027 split `root_work_loop/render_phase.rs` out of the root work-loop
+  facade while preserving existing crate-visible paths.
+- Worker 1026 split host-work payload, mutation, and update helpers under
+  `host_work/`, preserving the existing `host_work` module boundary.
+- Worker 1028 split `root_work_loop/preflight.rs`; the accepted integration
+  preserved both `preflight` and `render_phase` child modules and kept
+  test-only imports warning-free.
+- Worker 1029 split `sync_flush/root_record.rs` out of the sync-flush facade.
+- Accepted validation for the final main state passed
+  `cargo test -p fast-react-reconciler` with 886 unit tests plus 1 doc-test,
+  `cargo test -p fast-react-test-renderer --lib` with 182 tests,
+  `cargo fmt --all --check`, `git diff --check`,
+  `npm run check:package-surface` under Node 26.1.0, and
+  `node tests/smoke/import-entrypoints.mjs` under Node 26.1.0. npm emitted
+  only the known `minimum-release-age` warning during package-surface
+  validation.
+- The accepted state for this cleanup batch is main `2593a5fe` after merge
+  commits `d0fbf74e`, `93b3d581`, `1d08b15e`, `e4990cff`, and `2593a5fe`.
+  These changes improve file organization only. Public React DOM roots,
+  test-renderer/native behavior, hooks, Scheduler timing, hydration, events,
+  resources/forms, package compatibility, and broad renderer compatibility
+  remain blocked unless separately proven.
+
 ### Worker 1024 Docs Refresh and Workers 1020-1023 Cleanup Splits
 
 - Worker 1024 refreshed master docs after accepted organization-only cleanup
