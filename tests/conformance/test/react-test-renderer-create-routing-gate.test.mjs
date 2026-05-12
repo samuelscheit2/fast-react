@@ -618,6 +618,7 @@ function isPackageRootEntrypoint(entrypoint) {
 }
 function hasCompletePrivateRootLifecycleExecutionSourceRecords(entrypoint) {
   return (
+    isPackageRootEntrypoint(entrypoint) ||
     entrypoint === cjsDevelopmentEntrypoint ||
     entrypoint === cjsProductionEntrypoint
   );
@@ -2733,6 +2734,159 @@ test("react-test-renderer CJS development private root-create preflight validate
   assert.equal(rootError.routingGate.createRouteAvailable, false);
 });
 
+test("react-test-renderer package root hidden create bridge returns private root handle evidence", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === packageRootEntrypoint
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create(
+    { props: { children: "hello" }, type: "div" },
+    {}
+  );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const preflight = bridge.getRootCreatePreflight(createRequest);
+  assertPrivateRootCreatePreflight(preflight, createRequest, {
+    entrypoint: entry.entrypoint,
+    ready: true,
+    failureReason: null,
+    supportedChildren: true,
+    rootOptionsMetadataAvailable: true
+  });
+
+  const admission = bridge.getRootCreateRouteAdmission(createRequest);
+  assertPrivateCreateRouteAdmission(
+    admission,
+    preflight,
+    createRequest,
+    entry.entrypoint
+  );
+  const admissionConsumption =
+    bridge.consumeAcceptedRustRootCreateRouteAdmission(
+      createRequest,
+      createRustCreateRouteAdmissionDiagnosticSource(admission)
+    );
+  assertPrivateCreateRouteAdmissionConsumption(
+    admissionConsumption,
+    admission,
+    createRequest,
+    entry.entrypoint
+  );
+
+  const handoff = createRustCreateNativeBridgeHostOutputHandoffSource(
+    createRequest,
+    admission
+  );
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      handoff
+    ),
+    true
+  );
+  const result = bridge.createPrivateRootFromHostOutputHandoff(
+    createRequest,
+    admissionConsumption,
+    handoff
+  );
+  assertPrivatePackageRootCreateBridgeResult(
+    result,
+    createRequest,
+    admissionConsumption
+  );
+
+  const callerShapedAdmission = { ...admissionConsumption };
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      callerShapedAdmission,
+      handoff
+    ),
+    false,
+    "package-root create bridge rejects caller-shaped admission consumption"
+  );
+  const callerShapedError = captureThrown(() =>
+    bridge.createPrivateRootFromHostOutputHandoff(
+      createRequest,
+      callerShapedAdmission,
+      handoff
+    )
+  );
+  assert.equal(
+    callerShapedError.name,
+    "FastReactTestRendererPrivateRootRequestError"
+  );
+  assert.match(callerShapedError.message, /source-owned create-route/u);
+
+  const staleRenderer = moduleExports.create(
+    { props: { children: "stale" }, type: "span" },
+    {}
+  );
+  const [staleRequest] = bridge.getRendererRootRequests(staleRenderer);
+  const staleAdmission = bridge.getRootCreateRouteAdmission(staleRequest);
+  const staleAdmissionConsumption =
+    bridge.consumeAcceptedRustRootCreateRouteAdmission(
+      staleRequest,
+      createRustCreateRouteAdmissionDiagnosticSource(staleAdmission)
+    );
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      staleAdmissionConsumption,
+      handoff
+    ),
+    false,
+    "package-root create bridge rejects stale source-owned admission"
+  );
+
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      {
+        ...handoff,
+        rootRequestSequence: createRequest.requestSequence + 1
+      }
+    ),
+    false,
+    "package-root create bridge rejects stale handoff request sequence"
+  );
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      {
+        ...handoff,
+        renderLanesBits: 2
+      }
+    ),
+    false,
+    "package-root create bridge rejects stale handoff lanes"
+  );
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      {
+        ...handoff,
+        publicSerializationAvailable: true
+      }
+    ),
+    false,
+    "package-root create bridge rejects public serialization claims"
+  );
+
+  const rootError = captureThrown(() => renderer.root);
+  assertCreateRoutingGate(rootError, entry.entrypoint);
+  assert.equal(rootError.routingGate.createRouteAvailable, false);
+});
+
 test("react-test-renderer CJS development private root-create preflight fails closed for unsupported input", () => {
   const entry = entrypoints.find(
     (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
@@ -3021,25 +3175,46 @@ test("react-test-renderer private root request bridge can call a private Rust ex
         "hostOutputProducedFromJs",
         "compatibilityClaimed"
       ];
+      const acceptedCreateRenderer = moduleExports.create(
+        { props: { children: "baseline" }, type: "span" },
+        {}
+      );
+      const [acceptedCreateRequest] =
+        bridge.getRendererRootRequests(acceptedCreateRenderer);
       const acceptedCreateAdmission =
-        createPackageRootCreateRouteAdmissionSource(createRequest);
+        bridge.getRootCreateRouteAdmission(acceptedCreateRequest);
+      const stalePackageRootCreateAdmission =
+        createPackageRootCreateRouteAdmissionSource(acceptedCreateRequest);
+      const stalePackageRootCreateHandoff =
+        createRustCreateNativeBridgeHostOutputHandoffSource(
+          acceptedCreateRequest,
+          stalePackageRootCreateAdmission
+        );
       const acceptedCreateHandoff =
         createRustCreateNativeBridgeHostOutputHandoffSource(
-          createRequest,
+          acceptedCreateRequest,
           acceptedCreateAdmission
         );
       assert.equal(
         bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
-          createRequest,
+          acceptedCreateRequest,
+          stalePackageRootCreateHandoff
+        ),
+        false,
+        "package-root stale caller-shaped create admission baseline rejected"
+      );
+      assert.equal(
+        bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+          acceptedCreateRequest,
           acceptedCreateHandoff
         ),
         true,
         "package-root accepted create handoff baseline"
       );
       assert.equal(
-        bridge.canConsumeRootExecutionResult(createRequest, {
+        bridge.canConsumeRootExecutionResult(acceptedCreateRequest, {
           rustLifecycleDiagnostic:
-            createRustLifecycleDiagnosticSource(createRequest),
+            createRustLifecycleDiagnosticSource(acceptedCreateRequest),
           privateCreateNativeBridgeHostOutputHandoff:
             acceptedCreateHandoff,
           nativeAddonLoaded: false,
@@ -3051,21 +3226,21 @@ test("react-test-renderer private root request bridge can call a private Rust ex
       );
       const noAdmissionCreateHandoff =
         createRustCreateNativeBridgeHostOutputHandoffSource(
-          createRequest,
+          acceptedCreateRequest,
           null
         );
       assert.equal(
         bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
-          createRequest,
+          acceptedCreateRequest,
           noAdmissionCreateHandoff
         ),
         false,
         "package-root no-admission create handoff rejected"
       );
       assert.equal(
-        bridge.canConsumeRootExecutionResult(createRequest, {
+        bridge.canConsumeRootExecutionResult(acceptedCreateRequest, {
           rustLifecycleDiagnostic:
-            createRustLifecycleDiagnosticSource(createRequest),
+            createRustLifecycleDiagnosticSource(acceptedCreateRequest),
           privateCreateNativeBridgeHostOutputHandoff:
             noAdmissionCreateHandoff,
           nativeAddonLoaded: false,
@@ -3077,7 +3252,7 @@ test("react-test-renderer private root request bridge can call a private Rust ex
       );
       assert.equal(
         bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
-          createRequest,
+          acceptedCreateRequest,
           {
             ...acceptedCreateHandoff,
             createRouteAdmission: {
@@ -3093,9 +3268,9 @@ test("react-test-renderer private root request bridge can call a private Rust ex
 
       for (const field of packageRootExecutionWrapperClaimFields) {
         assert.equal(
-          bridge.canConsumeRootExecutionResult(createRequest, {
+          bridge.canConsumeRootExecutionResult(acceptedCreateRequest, {
             rustLifecycleDiagnostic:
-              createRustLifecycleDiagnosticSource(createRequest),
+              createRustLifecycleDiagnosticSource(acceptedCreateRequest),
             privateCreateNativeBridgeHostOutputHandoff:
               acceptedCreateHandoff,
             nativeAddonLoaded: false,
@@ -3350,16 +3525,16 @@ test("react-test-renderer private root request bridge can call a private Rust ex
         };
         assert.equal(
           bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
-            createRequest,
+            acceptedCreateRequest,
             claimedCreateHandoff
           ),
           false,
           `${field} create handoff rejected`
         );
         assert.equal(
-          bridge.canConsumeRootExecutionResult(createRequest, {
+          bridge.canConsumeRootExecutionResult(acceptedCreateRequest, {
             rustLifecycleDiagnostic:
-              createRustLifecycleDiagnosticSource(createRequest),
+              createRustLifecycleDiagnosticSource(acceptedCreateRequest),
             privateCreateNativeBridgeHostOutputHandoff: claimedCreateHandoff,
             nativeAddonLoaded: false,
             nativeExecution: false,
@@ -3378,16 +3553,16 @@ test("react-test-renderer private root request bridge can call a private Rust ex
         };
         assert.equal(
           bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
-            createRequest,
+            acceptedCreateRequest,
             claimedCreateAdmissionHandoff
           ),
           false,
           `${field} create route admission rejected`
         );
         assert.equal(
-          bridge.canConsumeRootExecutionResult(createRequest, {
+          bridge.canConsumeRootExecutionResult(acceptedCreateRequest, {
             rustLifecycleDiagnostic:
-              createRustLifecycleDiagnosticSource(createRequest),
+              createRustLifecycleDiagnosticSource(acceptedCreateRequest),
             privateCreateNativeBridgeHostOutputHandoff:
               claimedCreateAdmissionHandoff,
             nativeAddonLoaded: false,
@@ -3413,7 +3588,7 @@ test("react-test-renderer private root request bridge can call a private Rust ex
           );
           assert.equal(
             bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
-              createRequest,
+              acceptedCreateRequest,
               hiddenCreateHandoff
             ),
             false,
@@ -3428,7 +3603,7 @@ test("react-test-renderer private root request bridge can call a private Rust ex
           };
           assert.equal(
             bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
-              createRequest,
+              acceptedCreateRequest,
               hiddenCreateAdmissionHandoff
             ),
             false,
@@ -9417,7 +9592,10 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
   assert.equal(typeof bridge.getRequestPayload, "function");
   assert.equal(typeof bridge.getRustCanaryMetadata, "function");
   assert.equal(typeof bridge.getRustCanaryOperationMetadata, "function");
-  if (entrypoint === cjsDevelopmentEntrypoint) {
+  if (
+    entrypoint === cjsDevelopmentEntrypoint ||
+    isPackageRootEntrypoint(entrypoint)
+  ) {
     assert.equal(typeof bridge.getRootCreatePreflight, "function");
     assert.equal(typeof bridge.getRendererRootCreatePreflight, "function");
     assert.equal(
@@ -10750,6 +10928,66 @@ function assertPrivateCreateNativeBridgeHostOutputHandoff(handoff, request) {
   assert.equal(handoff.rustExecutionFromJs, false);
   assert.equal(handoff.hostOutputProducedFromJs, false);
   assert.equal(handoff.compatibilityClaimed, false);
+}
+
+function assertPrivatePackageRootCreateBridgeResult(
+  result,
+  request,
+  admissionConsumption
+) {
+  assert.equal(Object.isFrozen(result), true, request.entrypoint);
+  assert.equal(
+    result.kind,
+    "FastReactTestRendererPrivatePackageRootCreateBridgeResult"
+  );
+  assert.equal(
+    result.id,
+    "react-test-renderer-private-package-root-create-bridge-result"
+  );
+  assert.equal(
+    result.status,
+    "private-package-root-create-bridge-host-output-consumed-public-create-blocked"
+  );
+  assert.equal(result.entrypoint, packageRootEntrypoint);
+  assert.equal(result.compatibilityTarget, compatibilityTarget);
+  assert.equal(result.request, request);
+  assert.equal(result.rootRequest, request);
+  assert.equal(result.rootHandle, request.rootHandle);
+  assert.equal(result.rootId, request.rootId);
+  assert.equal(result.rootSequence, request.rootSequence);
+  assert.equal(result.requestId, request.requestId);
+  assert.equal(result.requestSequence, request.requestSequence);
+  assert.equal(result.operation, "create");
+  assert.equal(result.publicSurface, "create()");
+  assert.equal(result.createRouteAdmission, admissionConsumption);
+  assertPrivateCreateNativeBridgeHostOutputHandoff(
+    result.privateCreateNativeBridgeHostOutputHandoff,
+    request
+  );
+  assert.equal(result.hostOutputUpdateKind, "Create");
+  assert.equal(result.hostOutputShape, "SingleHostText");
+  assert.equal(result.hostOutputProduced, true);
+  assert.equal(result.privateRootHandleReturned, true);
+  assert.equal(result.privatePackageRootCreateBridgeAvailable, true);
+  assert.equal(result.sourceOwnedCreateRouteAdmissionConsumed, true);
+  assert.equal(result.sourceOwnedHostOutputHandoffConsumed, true);
+  assert.equal(result.publicRendererRootCreated, false);
+  assert.equal(result.publicRootAvailable, false);
+  assert.equal(result.publicCreateBehaviorAvailable, false);
+  assert.equal(result.publicSerializationAvailable, false);
+  assert.equal(result.publicToJSONAvailable, false);
+  assert.equal(result.publicToTreeAvailable, false);
+  assert.equal(result.publicTestInstanceAvailable, false);
+  assert.equal(result.publicActAvailable, false);
+  assert.equal(result.nativeAddonLoaded, false);
+  assert.equal(result.nativeBridgeAvailable, false);
+  assert.equal(result.nativeExecution, false);
+  assert.equal(result.rustExecutionFromJs, false);
+  assert.equal(result.reconcilerExecutionFromJs, false);
+  assert.equal(result.hostOutputProducedFromJs, false);
+  assert.equal(result.jsPackageCompatibilityAvailable, false);
+  assert.equal(result.packageCompatibilityClaimed, false);
+  assert.equal(result.compatibilityClaimed, false);
 }
 
 function assertCreateNativeHandoffMutationRejection(

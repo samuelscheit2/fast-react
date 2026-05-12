@@ -4975,11 +4975,13 @@ test("react-test-renderer package-root private native create/update serializatio
   assert.notEqual(entry, undefined);
 
   const moduleExports = loadFresh(entry.specifier);
-  const renderer = moduleExports.create({
-    type: "span",
-    props: {},
-    children: ["hello"]
-  });
+  const renderer = moduleExports.create(
+    {
+      type: "span",
+      props: { children: "hello" }
+    },
+    {}
+  );
   const jsonError = captureThrown(() => renderer.toJSON());
   const jsonFacade = Object.getOwnPropertyDescriptor(
     renderer.toJSON,
