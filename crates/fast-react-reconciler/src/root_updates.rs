@@ -1411,6 +1411,38 @@ impl HostRootUpdateQueueLaneHandoffRecordForCanary {
     }
 
     #[must_use]
+    pub(crate) fn proves_same_transition_multi_update_lane_handoff_for_canary(
+        &self,
+        lane: Lane,
+    ) -> bool {
+        let lane_lanes = lane.to_lanes();
+        !self.update_records.is_empty()
+            && self.records_in_update_sequence_order()
+            && self.update_sequence_ids() == self.current_queue_base_updates
+            && self.pending_lanes_before_render == self.finished_lanes.merge(self.remaining_lanes)
+            && self.pending_lanes_after_render == self.pending_lanes_before_render
+            && self.selected_next_lanes_before_render == self.finished_lanes
+            && self.remaining_lanes.is_empty()
+            && self.applied_update_count == self.update_records.len()
+            && self.skipped_update_count == 0
+            && self.root_current_not_switched_by_handoff()
+            && self.work_loop_or_commit_consumer_required()
+            && self.public_root_rendering_blocked()
+            && lane.is_transition()
+            && self.update_records.len() > 1
+            && self.selected_next_lanes_before_render == lane_lanes
+            && self.finished_lanes == lane_lanes
+            && self.remaining_lanes.is_empty()
+            && self.update_records.iter().all(|record| {
+                record.lane() == lane
+                    && record.source_lanes() == lane_lanes
+                    && record.committed_by_finished_lanes(self.finished_lanes)
+                    && record.selected_next_lanes_after_enqueue() == lane_lanes
+                    && record.pending_lanes_after_enqueue().contains_lane(lane)
+            })
+    }
+
+    #[must_use]
     pub(crate) fn root_current_not_switched_by_handoff(&self) -> bool {
         self.current != self.finished_work
     }
