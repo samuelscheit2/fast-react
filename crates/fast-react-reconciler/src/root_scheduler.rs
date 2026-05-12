@@ -1116,6 +1116,169 @@ impl RootTransitionLaneSchedulerRequestRecord {
 
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootEntangledTransitionLaneSchedulerUpdateRecordForCanary {
+    sequence: usize,
+    update: UpdateId,
+    lane: Lane,
+    pending_lanes_after_enqueue: Lanes,
+    selected_next_lanes_after_enqueue: Lanes,
+    entangled_lanes_after_enqueue: Lanes,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "crate-private entangled transition queue-lane canaries inspect per-update diagnostics"
+)]
+impl RootEntangledTransitionLaneSchedulerUpdateRecordForCanary {
+    #[must_use]
+    pub(crate) const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn update(self) -> UpdateId {
+        self.update
+    }
+
+    #[must_use]
+    pub(crate) const fn lane(self) -> Lane {
+        self.lane
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_after_enqueue(self) -> Lanes {
+        self.pending_lanes_after_enqueue
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_next_lanes_after_enqueue(self) -> Lanes {
+        self.selected_next_lanes_after_enqueue
+    }
+
+    #[must_use]
+    pub(crate) const fn entangled_lanes_after_enqueue(self) -> Lanes {
+        self.entangled_lanes_after_enqueue
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootEntangledTransitionLaneSchedulerRequestRecordForCanary {
+    root: FiberRootId,
+    fiber: FiberId,
+    queue: UpdateQueueHandle,
+    first: RootEntangledTransitionLaneSchedulerUpdateRecordForCanary,
+    second: RootEntangledTransitionLaneSchedulerUpdateRecordForCanary,
+    selected_lanes: Lanes,
+    entangled_lanes: Lanes,
+    root_pending_lanes_after_enqueue: Lanes,
+    root_entangled_lanes_after_enqueue: Lanes,
+    current_event_transition_lane_before: Lane,
+    current_event_transition_lane_after: Lane,
+    scheduled_root: ScheduledRootUpdateResult,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "crate-private entangled transition queue-lane scheduler diagnostics are reserved for canaries"
+)]
+impl RootEntangledTransitionLaneSchedulerRequestRecordForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(self) -> UpdateQueueHandle {
+        self.queue
+    }
+
+    #[must_use]
+    pub(crate) const fn first(self) -> RootEntangledTransitionLaneSchedulerUpdateRecordForCanary {
+        self.first
+    }
+
+    #[must_use]
+    pub(crate) const fn second(self) -> RootEntangledTransitionLaneSchedulerUpdateRecordForCanary {
+        self.second
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn entangled_lanes(self) -> Lanes {
+        self.entangled_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn root_pending_lanes_after_enqueue(self) -> Lanes {
+        self.root_pending_lanes_after_enqueue
+    }
+
+    #[must_use]
+    pub(crate) const fn root_entangled_lanes_after_enqueue(self) -> Lanes {
+        self.root_entangled_lanes_after_enqueue
+    }
+
+    #[must_use]
+    pub(crate) const fn current_event_transition_lane_before(self) -> Lane {
+        self.current_event_transition_lane_before
+    }
+
+    #[must_use]
+    pub(crate) const fn current_event_transition_lane_after(self) -> Lane {
+        self.current_event_transition_lane_after
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduled_root(self) -> ScheduledRootUpdateResult {
+        self.scheduled_root
+    }
+
+    #[must_use]
+    pub(crate) const fn update_sequence_ids(self) -> [UpdateId; 2] {
+        [self.first.update, self.second.update]
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> [Lane; 2] {
+        [self.first.lane, self.second.lane]
+    }
+
+    #[must_use]
+    pub(crate) const fn routed_to_private_root_scheduler(self) -> bool {
+        self.scheduled_root.root().raw() == self.root.raw()
+            && self.scheduled_root.might_have_pending_sync_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_execution_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_update_scheduling_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RootTransitionSchedulerQueueLaneContinuationStatusForCanary {
     StaleCallbackNode,
     NoTransitionWork,
@@ -1531,6 +1694,437 @@ impl RootTransitionSchedulerQueueLaneContinuationRecordForCanary {
         &self,
     ) -> bool {
         self.routed_through_transition_queue_lane_and_commit_evidence_for_canary()
+            && self.queue_handoff.as_ref().is_some_and(|queue_handoff| {
+                self.commit.as_ref().is_some_and(|commit| {
+                    commit.root() == queue_handoff.root()
+                        && commit.previous_current() == queue_handoff.current()
+                        && commit.current() == queue_handoff.finished_work()
+                        && commit.finished_work() == queue_handoff.finished_work()
+                        && commit.finished_lanes() == queue_handoff.finished_lanes()
+                        && commit.remaining_lanes() == queue_handoff.remaining_lanes()
+                })
+            })
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary {
+    StaleCallbackNode,
+    NoTransitionWork,
+    StaleTransitionDiagnostics,
+    BlockedByTransitionEntanglementMismatch,
+    BlockedByLaneMismatch,
+    BlockedByFinishedWorkHandoffMismatch,
+    BlockedByQueueLaneHandoffMismatch,
+    RenderedAndCommitted,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RootEntangledTransitionSchedulerQueueLaneContinuationMetadataForCanary {
+    request: RootEntangledTransitionLaneSchedulerRequestRecordForCanary,
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    current_callback_node: RootSchedulerCallbackHandle,
+    current_event_transition_lane: Lane,
+    root_current_before_continuation: FiberId,
+    root_pending_lanes_before_continuation: Lanes,
+    root_entangled_lanes_before_continuation: Lanes,
+    finished_work_handoff_identity: Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary>,
+    status: RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary,
+    queue_handoff: Option<HostRootUpdateQueueLaneHandoffRecordForCanary>,
+    queue_handoff_error: Option<HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary>,
+    queue_commit_handoff: Option<HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary>,
+    commit: Option<HostRootCommitRecord>,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootEntangledTransitionSchedulerQueueLaneContinuationRecordForCanary {
+    request: RootEntangledTransitionLaneSchedulerRequestRecordForCanary,
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    current_callback_node: RootSchedulerCallbackHandle,
+    current_event_transition_lane: Lane,
+    root_current_before_continuation: FiberId,
+    root_pending_lanes_before_continuation: Lanes,
+    root_entangled_lanes_before_continuation: Lanes,
+    finished_work_handoff_identity: Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary>,
+    status: RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary,
+    queue_handoff: Option<HostRootUpdateQueueLaneHandoffRecordForCanary>,
+    queue_handoff_error: Option<HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary>,
+    queue_commit_handoff: Option<HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary>,
+    commit: Option<HostRootCommitRecord>,
+    source_metadata: RootEntangledTransitionSchedulerQueueLaneContinuationMetadataForCanary,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "private entangled transition queue-lane continuation canaries consume this evidence"
+)]
+impl RootEntangledTransitionSchedulerQueueLaneContinuationRecordForCanary {
+    #[must_use]
+    pub(crate) const fn request(
+        &self,
+    ) -> RootEntangledTransitionLaneSchedulerRequestRecordForCanary {
+        self.request
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.request.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_execution(&self) -> RootSchedulerCallbackExecutionRecord {
+        self.callback_execution
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.callback_execution.callback_node()
+    }
+
+    #[must_use]
+    pub(crate) const fn current_callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.current_callback_node
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(&self) -> Lanes {
+        self.callback_execution.selected_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase(&self) -> Option<HostRootRenderPhaseRecord> {
+        self.callback_execution.render_phase()
+    }
+
+    #[must_use]
+    pub(crate) const fn current_event_transition_lane(&self) -> Lane {
+        self.current_event_transition_lane
+    }
+
+    #[must_use]
+    pub(crate) const fn root_current_before_continuation(&self) -> FiberId {
+        self.root_current_before_continuation
+    }
+
+    #[must_use]
+    pub(crate) const fn root_pending_lanes_before_continuation(&self) -> Lanes {
+        self.root_pending_lanes_before_continuation
+    }
+
+    #[must_use]
+    pub(crate) const fn root_entangled_lanes_before_continuation(&self) -> Lanes {
+        self.root_entangled_lanes_before_continuation
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_handoff_identity(
+        &self,
+    ) -> Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary> {
+        self.finished_work_handoff_identity
+    }
+
+    #[must_use]
+    pub(crate) const fn status(
+        &self,
+    ) -> RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) fn queue_handoff(&self) -> Option<&HostRootUpdateQueueLaneHandoffRecordForCanary> {
+        self.queue_handoff.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn queue_handoff_error(
+        &self,
+    ) -> Option<&HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary> {
+        self.queue_handoff_error.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn queue_commit_handoff(
+        &self,
+    ) -> Option<&HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary> {
+        self.queue_commit_handoff.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn root_commit_handoff_for_canary(
+        &self,
+    ) -> Option<&HostRootFinishedWorkCommitHandoffRecordForCanary> {
+        self.queue_commit_handoff()
+            .map(HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary::finished_work_handoff)
+    }
+
+    #[must_use]
+    pub(crate) fn commit(&self) -> Option<&HostRootCommitRecord> {
+        self.commit.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn did_execute_entangled_transition_queue_lane_scheduler_continuation(
+        &self,
+    ) -> bool {
+        matches!(
+            self.status,
+            RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::RenderedAndCommitted
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn rejected_stale_callback_node(&self) -> bool {
+        matches!(
+            self.status,
+            RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::StaleCallbackNode
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn no_transition_work(&self) -> bool {
+        matches!(
+            self.status,
+            RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::NoTransitionWork
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn stale_transition_diagnostics(&self) -> bool {
+        matches!(
+            self.status,
+            RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::StaleTransitionDiagnostics
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_transition_entanglement(&self) -> bool {
+        matches!(
+            self.status,
+            RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByTransitionEntanglementMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_lane_mismatch(&self) -> bool {
+        matches!(
+            self.status,
+            RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByLaneMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_finished_work_handoff_mismatch(&self) -> bool {
+        matches!(
+            self.status,
+            RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_queue_lane_handoff(&self) -> bool {
+        matches!(
+            self.status,
+            RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn async_callback_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_update_scheduling_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_timing_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_transition_hooks_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn package_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_public_effects(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) fn source_metadata_intact_for_canary(&self) -> bool {
+        let source = &self.source_metadata;
+        self.request == source.request
+            && self.callback_execution == source.callback_execution
+            && self.current_callback_node == source.current_callback_node
+            && self.current_event_transition_lane == source.current_event_transition_lane
+            && self.root_current_before_continuation == source.root_current_before_continuation
+            && self.root_pending_lanes_before_continuation
+                == source.root_pending_lanes_before_continuation
+            && self.root_entangled_lanes_before_continuation
+                == source.root_entangled_lanes_before_continuation
+            && self.finished_work_handoff_identity == source.finished_work_handoff_identity
+            && self.status == source.status
+            && self.queue_handoff == source.queue_handoff
+            && self.queue_handoff_error == source.queue_handoff_error
+            && self.queue_commit_handoff == source.queue_commit_handoff
+            && self.commit == source.commit
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_entangled_transition_scheduler_evidence_for_canary(&self) -> bool {
+        let request_lanes = self.request.lanes();
+        self.source_metadata_intact_for_canary()
+            && self.did_execute_entangled_transition_queue_lane_scheduler_continuation()
+            && self.request.routed_to_private_root_scheduler()
+            && request_lanes[0].is_transition()
+            && request_lanes[1].is_transition()
+            && request_lanes[0] != request_lanes[1]
+            && self.request.selected_lanes().includes_only_transitions()
+            && self
+                .request
+                .selected_lanes()
+                .contains_lane(request_lanes[0])
+            && self
+                .request
+                .selected_lanes()
+                .contains_lane(request_lanes[1])
+            && self.request.entangled_lanes() == self.request.selected_lanes()
+            && self
+                .root_pending_lanes_before_continuation
+                .contains_all(self.request.selected_lanes())
+            && self
+                .root_entangled_lanes_before_continuation
+                .contains_all(self.request.entangled_lanes())
+            && self.root_current_before_continuation == self.request.fiber()
+            && self.current_event_transition_lane
+                == self.request.current_event_transition_lane_after()
+            && self.callback_execution.status() == RootSchedulerCallbackExecutionStatus::Rendered
+            && self.callback_execution.root() == self.request.root()
+            && self.callback_execution.callback_node() == self.current_callback_node
+            && !self.callback_execution.validation().is_stale()
+            && self.callback_execution.selected_lanes() == self.request.selected_lanes()
+            && self.render_phase().is_some_and(|render| {
+                render.root() == self.request.root()
+                    && render.current() == self.request.fiber()
+                    && render.render_lanes() == self.request.selected_lanes()
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_root_scheduler_execution_evidence_for_canary(&self) -> bool {
+        self.accepted_entangled_transition_scheduler_evidence_for_canary()
+            && self.finished_work_handoff_identity.is_some_and(
+                RootSyncSchedulerFinishedWorkHandoffIdentityForCanary::accepted_for_root_scheduler_commit_handoff,
+            )
+            && self.commit.as_ref().is_some_and(|commit| {
+                self.render_phase().is_some_and(|render| {
+                    commit.root() == self.request.root()
+                        && commit.previous_current() == render.current()
+                        && commit.current() == render.finished_work()
+                        && commit.finished_work() == render.finished_work()
+                        && commit.finished_lanes() == self.request.selected_lanes()
+                        && commit.remaining_lanes() == render.remaining_lanes()
+                        && commit.pending_lanes() == render.remaining_lanes()
+                })
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_root_commit_execution_evidence_for_canary(&self) -> bool {
+        self.root_commit_handoff_for_canary()
+            .is_some_and(HostRootFinishedWorkCommitHandoffRecordForCanary::proves_private_root_finished_work_commit_metadata_handoff)
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_queue_lane_handoff_evidence_for_canary(&self) -> bool {
+        self.queue_commit_handoff
+            .as_ref()
+            .is_some_and(|commit_handoff| {
+                let queue_handoff = commit_handoff.queue_handoff();
+                let expected_updates = self.request.update_sequence_ids();
+                self.queue_handoff
+                    .as_ref()
+                    .is_some_and(|accepted| accepted == queue_handoff)
+                    && commit_handoff.proves_queue_lane_handoff_gated_current_switch()
+                    && commit_handoff.update_sequence_ids() == expected_updates.as_slice()
+                    && commit_handoff.selected_lanes() == self.request.selected_lanes()
+                    && commit_handoff.finished_lanes() == self.request.selected_lanes()
+                    && queue_handoff.update_records().len() == 2
+                    && queue_handoff.records_have_distinct_compatible_lanes()
+                    && self.render_phase().is_some_and(|render| {
+                        commit_handoff.remaining_lanes() == render.remaining_lanes()
+                            && commit_handoff.applied_update_count()
+                                == render.applied_update_count()
+                            && commit_handoff.skipped_update_count()
+                                == render.skipped_update_count()
+                            && commit_handoff.resulting_element() == render.resulting_element()
+                    })
+                    && queue_handoff.proves_source_owned_lane_handoff()
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn routed_through_entangled_transition_queue_lane_and_commit_evidence_for_canary(
+        &self,
+    ) -> bool {
+        self.accepted_root_scheduler_execution_evidence_for_canary()
+            && self.accepted_root_commit_execution_evidence_for_canary()
+            && self.accepted_queue_lane_handoff_evidence_for_canary()
+            && self.async_callback_execution_blocked()
+            && self.public_update_scheduling_blocked()
+            && !self.public_root_compatibility_claimed()
+            && !self.public_scheduler_timing_compatibility_claimed()
+            && !self.public_transition_hooks_compatibility_claimed()
+            && !self.public_act_compatibility_claimed()
+            && !self.react_dom_compatibility_claimed()
+            && !self.test_renderer_compatibility_claimed()
+            && !self.package_compatibility_claimed()
+            && !self.renderer_compatibility_claimed()
+            && !self.executes_public_effects()
+    }
+
+    #[must_use]
+    pub(crate) fn treats_entangled_transition_host_root_updates_as_current_only_with_queue_lane_handoff_for_canary(
+        &self,
+    ) -> bool {
+        self.routed_through_entangled_transition_queue_lane_and_commit_evidence_for_canary()
             && self.queue_handoff.as_ref().is_some_and(|queue_handoff| {
                 self.commit.as_ref().is_some_and(|commit| {
                     commit.root() == queue_handoff.root()
@@ -3051,6 +3645,65 @@ pub(crate) fn record_transition_lane_scheduler_request_from_update_diagnostics_f
         entangled_lanes: entanglement.entangled_lanes(),
         current_event_transition_lane_before,
         current_event_transition_lane_after: store.root_scheduler().current_event_transition_lane(),
+        scheduled_root,
+    })
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "crate-private entangled transition scheduler route is exercised by canary tests"
+)]
+pub(crate) fn record_entangled_transition_lane_scheduler_request_from_update_diagnostics_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    first: &UpdateContainerResult,
+    second: &UpdateContainerResult,
+) -> Result<RootEntangledTransitionLaneSchedulerRequestRecordForCanary, RootSchedulerError> {
+    let root = first.schedule().root();
+    let fiber = first.schedule().fiber();
+    let queue = first.queue();
+
+    let root_pending_lanes_after_enqueue = store.root(root)?.lanes().pending_lanes();
+    let root_entangled_lanes_after_enqueue = store.root(root)?.lanes().entangled_lanes();
+    let selected_lanes = select_lanes_for_scheduled_task(store, root)?.render_lanes();
+
+    let first = entangled_transition_scheduler_update_record_for_canary(
+        store, root, fiber, queue, 0, first,
+    )?;
+    let second = entangled_transition_scheduler_update_record_for_canary(
+        store, root, fiber, queue, 1, second,
+    )?;
+
+    let entangled_lanes = first.lane().to_lanes().merge_lane(second.lane());
+    validate_entangled_transition_lane_scheduler_request_lanes_for_canary(
+        root,
+        first.lane(),
+        second.lane(),
+        selected_lanes,
+        entangled_lanes,
+        root_entangled_lanes_after_enqueue,
+    )?;
+
+    let current_event_transition_lane_before =
+        store.root_scheduler().current_event_transition_lane();
+    let scheduled_root = ensure_root_schedule_entry(store, root)?;
+    let current_event_transition_lane_after =
+        store.root_scheduler().current_event_transition_lane();
+
+    Ok(RootEntangledTransitionLaneSchedulerRequestRecordForCanary {
+        root,
+        fiber,
+        queue,
+        first,
+        second,
+        selected_lanes,
+        entangled_lanes,
+        root_pending_lanes_after_enqueue,
+        root_entangled_lanes_after_enqueue,
+        current_event_transition_lane_before,
+        current_event_transition_lane_after,
         scheduled_root,
     })
 }
@@ -4890,6 +5543,313 @@ pub(crate) fn execute_transition_scheduler_continuation_for_queue_lane_handoff_f
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    dead_code,
+    reason = "private entangled transition HostRoot queue/lane scheduler continuation is exercised by focused canaries"
+)]
+pub(crate) fn execute_entangled_transition_scheduler_continuation_for_queue_lane_handoff_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    request: RootEntangledTransitionLaneSchedulerRequestRecordForCanary,
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    queue_handoff: Option<&HostRootUpdateQueueLaneHandoffRecordForCanary>,
+) -> Result<
+    RootEntangledTransitionSchedulerQueueLaneContinuationRecordForCanary,
+    RootSyncSchedulerContinuationExecutionError,
+> {
+    let (
+        current_callback_node,
+        root_current_before_continuation,
+        root_pending_lanes_before_continuation,
+        root_entangled_lanes_before_continuation,
+    ) = {
+        let root = store
+            .root(request.root())
+            .map_err(RootSchedulerError::from)?;
+        (
+            root.scheduling().callback_node(),
+            root.current(),
+            root.lanes().pending_lanes(),
+            root.lanes().entangled_lanes(),
+        )
+    };
+    let current_event_transition_lane = store.root_scheduler().current_event_transition_lane();
+
+    if entangled_transition_callback_execution_is_stale_for_canary(
+        request,
+        callback_execution,
+        current_callback_node,
+    ) {
+        return Ok(
+            entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+                request,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::StaleCallbackNode,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if !root_pending_lanes_before_continuation.contains_all(request.selected_lanes()) {
+        return Ok(
+            entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+                request,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::NoTransitionWork,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if root_current_before_continuation != request.fiber()
+        || current_event_transition_lane != request.current_event_transition_lane_after()
+    {
+        return Ok(
+            entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+                request,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::StaleTransitionDiagnostics,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if !entangled_transition_scheduler_request_entanglement_is_current_for_canary(
+        request,
+        root_entangled_lanes_before_continuation,
+    ) {
+        return Ok(
+            entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+                request,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByTransitionEntanglementMismatch,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    let Some(render_phase) = callback_execution.render_phase() else {
+        return Ok(
+            entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+                request,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::NoTransitionWork,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    };
+
+    if !entangled_transition_callback_render_lanes_match_request_for_canary(
+        request,
+        callback_execution,
+    ) {
+        return Ok(
+            entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+                request,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                None,
+                RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByLaneMismatch,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if store
+        .root(render_phase.root())
+        .map_err(RootSchedulerError::from)?
+        .finished_work()
+        .is_none()
+    {
+        record_root_finished_work_for_scheduler_handoff_for_canary(store, render_phase)?;
+    }
+
+    let render_handoff = root_sync_flush_record_for_canary(
+        0,
+        request.root(),
+        callback_execution.selected_lanes(),
+        render_phase,
+    );
+    let finished_work_handoff_identity =
+        root_sync_scheduler_finished_work_handoff_identity_for_canary(store, render_handoff)?;
+    if !finished_work_handoff_identity.accepted_for_root_scheduler_commit_handoff() {
+        return Ok(
+            entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+                request,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                Some(finished_work_handoff_identity),
+                RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch,
+                queue_handoff,
+                None,
+                None,
+                None,
+            ),
+        );
+    }
+
+    if let Err(error) = validate_host_root_update_queue_lane_handoff_for_commit_for_canary(
+        store,
+        request.root(),
+        render_phase,
+        queue_handoff,
+    ) {
+        return Ok(
+            entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+                request,
+                callback_execution,
+                current_callback_node,
+                current_event_transition_lane,
+                root_current_before_continuation,
+                root_pending_lanes_before_continuation,
+                root_entangled_lanes_before_continuation,
+                Some(finished_work_handoff_identity),
+                RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch,
+                queue_handoff,
+                Some(error),
+                None,
+                None,
+            ),
+        );
+    }
+
+    let pending_finished_work = match record_host_root_finished_work_pending_commit_for_canary(
+        store,
+        render_phase,
+        0,
+    ) {
+        Ok(pending_finished_work) => pending_finished_work,
+        Err(_error) => {
+            return Ok(
+                entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+                    request,
+                    callback_execution,
+                    current_callback_node,
+                    current_event_transition_lane,
+                    root_current_before_continuation,
+                    root_pending_lanes_before_continuation,
+                    root_entangled_lanes_before_continuation,
+                    Some(finished_work_handoff_identity),
+                    RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch,
+                    queue_handoff,
+                    None,
+                    None,
+                    None,
+                ),
+            );
+        }
+    };
+    let queue_commit_handoff =
+        match commit_host_root_update_queue_lane_handoff_with_finished_work_pending_commit_for_canary(
+            store,
+            request.root(),
+            render_phase,
+            queue_handoff,
+            Some(pending_finished_work),
+            1,
+        ) {
+            Ok(queue_commit_handoff) => queue_commit_handoff,
+            Err(error) => {
+                return Ok(
+                    entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+                        request,
+                        callback_execution,
+                        current_callback_node,
+                        current_event_transition_lane,
+                        root_current_before_continuation,
+                        root_pending_lanes_before_continuation,
+                        root_entangled_lanes_before_continuation,
+                        Some(finished_work_handoff_identity),
+                        RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch,
+                        queue_handoff,
+                        Some(error),
+                        None,
+                        None,
+                    ),
+                );
+            }
+        };
+    let commit = queue_commit_handoff.commit().clone();
+    recompute_might_have_pending_sync_work(store)?;
+
+    Ok(
+        entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+            request,
+            callback_execution,
+            current_callback_node,
+            current_event_transition_lane,
+            root_current_before_continuation,
+            root_pending_lanes_before_continuation,
+            root_entangled_lanes_before_continuation,
+            Some(finished_work_handoff_identity),
+            RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::RenderedAndCommitted,
+            queue_handoff,
+            None,
+            Some(queue_commit_handoff),
+            Some(commit),
+        ),
+    )
+}
+
+#[cfg(test)]
 fn transition_callback_execution_is_stale_for_canary(
     request: RootTransitionLaneSchedulerRequestRecord,
     callback_execution: RootSchedulerCallbackExecutionRecord,
@@ -4986,6 +5946,127 @@ fn transition_scheduler_queue_lane_continuation_record_for_canary(
         commit,
         source_metadata,
         currentness_source_token: None,
+    }
+}
+
+#[cfg(test)]
+fn entangled_transition_callback_execution_is_stale_for_canary(
+    request: RootEntangledTransitionLaneSchedulerRequestRecordForCanary,
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    current_callback_node: RootSchedulerCallbackHandle,
+) -> bool {
+    let validation = callback_execution.validation();
+    validation.is_stale()
+        || validation.root() != request.root()
+        || validation.requested_callback_node() != callback_execution.callback_node()
+        || validation.current_callback_node() != current_callback_node
+        || callback_execution.root() != request.root()
+        || callback_execution.callback_node() != current_callback_node
+}
+
+#[cfg(test)]
+fn entangled_transition_scheduler_request_entanglement_is_current_for_canary(
+    request: RootEntangledTransitionLaneSchedulerRequestRecordForCanary,
+    root_entangled_lanes: Lanes,
+) -> bool {
+    let [first_lane, second_lane] = request.lanes();
+    first_lane.is_transition()
+        && second_lane.is_transition()
+        && first_lane != second_lane
+        && request.first().sequence() == 0
+        && request.second().sequence() == 1
+        && request.first().update() != request.second().update()
+        && request.selected_lanes().is_non_empty()
+        && request.selected_lanes().includes_only_transitions()
+        && request.selected_lanes().contains_lane(first_lane)
+        && request.selected_lanes().contains_lane(second_lane)
+        && request.entangled_lanes() == request.selected_lanes()
+        && request.entangled_lanes().includes_only_transitions()
+        && request.entangled_lanes().contains_lane(first_lane)
+        && request.entangled_lanes().contains_lane(second_lane)
+        && request
+            .first()
+            .entangled_lanes_after_enqueue()
+            .contains_lane(first_lane)
+        && request
+            .second()
+            .entangled_lanes_after_enqueue()
+            .contains_all(request.entangled_lanes())
+        && request
+            .root_pending_lanes_after_enqueue()
+            .contains_all(request.selected_lanes())
+        && request
+            .root_entangled_lanes_after_enqueue()
+            .contains_all(request.entangled_lanes())
+        && root_entangled_lanes.contains_all(request.entangled_lanes())
+}
+
+#[cfg(test)]
+fn entangled_transition_callback_render_lanes_match_request_for_canary(
+    request: RootEntangledTransitionLaneSchedulerRequestRecordForCanary,
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+) -> bool {
+    callback_execution.status() == RootSchedulerCallbackExecutionStatus::Rendered
+        && callback_execution.selected_lanes() == request.selected_lanes()
+        && callback_execution.render_phase().is_some_and(|render| {
+            render.root() == request.root()
+                && render.current() == request.fiber()
+                && render.render_lanes() == request.selected_lanes()
+                && render.render_lanes() == request.entangled_lanes()
+        })
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private entangled transition queue/lane scheduler evidence mirrors the canary assertion shape"
+)]
+fn entangled_transition_scheduler_queue_lane_continuation_record_for_canary(
+    request: RootEntangledTransitionLaneSchedulerRequestRecordForCanary,
+    callback_execution: RootSchedulerCallbackExecutionRecord,
+    current_callback_node: RootSchedulerCallbackHandle,
+    current_event_transition_lane: Lane,
+    root_current_before_continuation: FiberId,
+    root_pending_lanes_before_continuation: Lanes,
+    root_entangled_lanes_before_continuation: Lanes,
+    finished_work_handoff_identity: Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary>,
+    status: RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary,
+    queue_handoff: Option<&HostRootUpdateQueueLaneHandoffRecordForCanary>,
+    queue_handoff_error: Option<HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary>,
+    queue_commit_handoff: Option<HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary>,
+    commit: Option<HostRootCommitRecord>,
+) -> RootEntangledTransitionSchedulerQueueLaneContinuationRecordForCanary {
+    let queue_handoff = queue_handoff.cloned();
+    let source_metadata = RootEntangledTransitionSchedulerQueueLaneContinuationMetadataForCanary {
+        request,
+        callback_execution,
+        current_callback_node,
+        current_event_transition_lane,
+        root_current_before_continuation,
+        root_pending_lanes_before_continuation,
+        root_entangled_lanes_before_continuation,
+        finished_work_handoff_identity,
+        status,
+        queue_handoff: queue_handoff.clone(),
+        queue_handoff_error: queue_handoff_error.clone(),
+        queue_commit_handoff: queue_commit_handoff.clone(),
+        commit: commit.clone(),
+    };
+    RootEntangledTransitionSchedulerQueueLaneContinuationRecordForCanary {
+        request,
+        callback_execution,
+        current_callback_node,
+        current_event_transition_lane,
+        root_current_before_continuation,
+        root_pending_lanes_before_continuation,
+        root_entangled_lanes_before_continuation,
+        finished_work_handoff_identity,
+        status,
+        queue_handoff,
+        queue_handoff_error,
+        queue_commit_handoff,
+        commit,
+        source_metadata,
     }
 }
 
@@ -5241,6 +6322,135 @@ fn validate_transition_lane_scheduler_lanes_for_canary(
         return Err(RootSchedulerError::TransitionSchedulerUnsupportedLaneSet {
             root,
             lane,
+            selected_lanes,
+        });
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn entangled_transition_scheduler_update_record_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    fiber: FiberId,
+    queue: UpdateQueueHandle,
+    sequence: usize,
+    result: &UpdateContainerResult,
+) -> Result<RootEntangledTransitionLaneSchedulerUpdateRecordForCanary, RootSchedulerError> {
+    validate_schedule_record(store, result.schedule())?;
+
+    let actual_root = result.schedule().root();
+    if actual_root != root {
+        return Err(RootSchedulerError::RescheduleRecordWrongRoot {
+            expected: root,
+            actual: actual_root,
+            fiber: result.schedule().fiber(),
+        });
+    }
+
+    if result.schedule().fiber() != fiber {
+        return Err(RootSchedulerError::ScheduleRecordWrongFiber {
+            root,
+            expected: fiber,
+            actual: result.schedule().fiber(),
+        });
+    }
+
+    let lane = result.lane();
+    if result.source_priority() != RootUpdateLaneSourcePriority::TransitionLane
+        || !lane.is_transition()
+    {
+        return Err(RootSchedulerError::TransitionSchedulerUnsupportedLane {
+            root,
+            lane,
+            source_priority: result.source_priority(),
+            selected_lanes: result.selected_next_lanes(),
+        });
+    }
+
+    let entanglement = result
+        .entanglement()
+        .ok_or(RootSchedulerError::TransitionSchedulerMissingEntanglement { root, lane })?;
+    if result.queue() != queue
+        || entanglement.root() != root
+        || entanglement.queue() != queue
+        || entanglement.lane() != lane
+        || !entanglement.entangled_lanes().contains_lane(lane)
+        || !entanglement.entangled_lanes().includes_only_transitions()
+    {
+        return Err(
+            RootSchedulerError::TransitionSchedulerEntanglementMismatch {
+                root,
+                lane,
+                queue,
+                entanglement,
+            },
+        );
+    }
+
+    let root_ref = store.root(root)?;
+    let current_queue = store
+        .fiber_arena()
+        .get(root_ref.current())
+        .map_err(RootUpdateError::from)?
+        .update_queue();
+    let pending_updates = store
+        .update_queues()
+        .pending_updates(queue)
+        .map_err(RootUpdateError::from)?;
+    let actual_lanes = store
+        .update_queues()
+        .update(result.update())
+        .map_err(RootUpdateError::from)?
+        .lane()
+        .remove_lane(Lane::OFFSCREEN);
+    if current_queue != queue
+        || !pending_updates.contains(&result.update())
+        || actual_lanes != lane.to_lanes()
+    {
+        return Err(RootUpdateError::StaleQueueEvidence {
+            root,
+            queue,
+            update: result.update(),
+            expected_pending_lanes: result.pending_lanes_after_enqueue(),
+            actual_pending_lanes: root_ref.lanes().pending_lanes(),
+        }
+        .into());
+    }
+
+    Ok(RootEntangledTransitionLaneSchedulerUpdateRecordForCanary {
+        sequence,
+        update: result.update(),
+        lane,
+        pending_lanes_after_enqueue: result.pending_lanes_after_enqueue(),
+        selected_next_lanes_after_enqueue: result.selected_next_lanes(),
+        entangled_lanes_after_enqueue: entanglement.entangled_lanes(),
+    })
+}
+
+#[cfg(test)]
+fn validate_entangled_transition_lane_scheduler_request_lanes_for_canary(
+    root: FiberRootId,
+    first_lane: Lane,
+    second_lane: Lane,
+    selected_lanes: Lanes,
+    entangled_lanes: Lanes,
+    root_entangled_lanes: Lanes,
+) -> Result<(), RootSchedulerError> {
+    if !first_lane.is_transition()
+        || !second_lane.is_transition()
+        || first_lane == second_lane
+        || selected_lanes.is_empty()
+        || !selected_lanes.includes_only_transitions()
+        || !selected_lanes.contains_lane(first_lane)
+        || !selected_lanes.contains_lane(second_lane)
+        || entangled_lanes != selected_lanes
+        || !root_entangled_lanes.contains_all(entangled_lanes)
+    {
+        return Err(RootSchedulerError::TransitionSchedulerUnsupportedLaneSet {
+            root,
+            lane: second_lane,
             selected_lanes,
         });
     }
