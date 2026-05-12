@@ -30,6 +30,15 @@ pub(crate) use root_record::{
     SyncFlushRootCommitContinuationRecordForCanary, SyncFlushRootCommitContinuationStatusForCanary,
     commit_sync_flush_root_finished_work_continuation_for_canary,
 };
+#[cfg(test)]
+#[allow(
+    unused_imports,
+    reason = "focused sync-flush minimal host placement canaries import these through the test module prelude"
+)]
+pub(crate) use root_record::{
+    SyncFlushMinimalHostPlacementCommitErrorForCanary,
+    SyncFlushMinimalHostPlacementCommitRecordForCanary,
+};
 
 use crate::root_callbacks::{
     RootUpdateCallbackInvocationExecutionRecord, RootUpdateCallbackInvocationStatus,

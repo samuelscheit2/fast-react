@@ -205,6 +205,13 @@ impl HostRootMinimalElementRenderPhaseRecord {
         !self.public_compatibility_claimed
     }
 
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn with_public_compatibility_claimed_for_canary(mut self) -> Self {
+        self.public_compatibility_claimed = true;
+        self
+    }
+
     #[must_use]
     pub(crate) fn proves_minimal_host_component_with_text_child(&self) -> bool {
         self.root_child_tag == FiberTag::HostComponent
@@ -726,6 +733,20 @@ where
     S: RootElementSource + ?Sized,
 {
     let render = render_host_root_for_lanes(store, root_id, render_lanes)?;
+    materialize_minimal_root_element_from_render_phase(store, render, source)
+}
+
+pub(crate) fn materialize_minimal_root_element_from_render_phase<H, S>(
+    store: &mut FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    source: &S,
+) -> Result<HostRootMinimalElementRenderPhaseRecord, HostRootMinimalElementRenderPhaseError>
+where
+    H: HostTypes,
+    S: RootElementSource + ?Sized,
+{
+    let root_id = render.root();
+    let render_lanes = render.render_lanes();
     if let Some(child) = store.fiber_arena().get(render.current())?.child() {
         return Err(
             HostRootMinimalElementRenderPhaseError::ExistingCurrentChild {

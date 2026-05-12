@@ -1180,19 +1180,19 @@ where
     T: HostFiberTokenFactory<H>,
 {
     validate_minimal_render_for_complete_work_handoff(store, &render)?;
-    if !render.proves_minimal_host_component_with_text_child() {
-        return Err(
-            HostRootMinimalRenderCompleteHandoffError::MinimalRenderRecordShapeMismatch {
-                root: render.root(),
-                host_root_work_in_progress: render.host_root_work_in_progress(),
-            },
-        );
-    }
     if render.public_compatibility_claimed() {
         return Err(
             HostRootMinimalRenderCompleteHandoffError::PublicCompatibilityClaimed {
                 root: render.root(),
                 element: render.root_element(),
+            },
+        );
+    }
+    if !render.proves_minimal_host_component_with_text_child() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::MinimalRenderRecordShapeMismatch {
+                root: render.root(),
+                host_root_work_in_progress: render.host_root_work_in_progress(),
             },
         );
     }
