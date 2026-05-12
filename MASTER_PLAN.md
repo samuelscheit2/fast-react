@@ -52,12 +52,27 @@ baseline is recorded in `MASTER_PROGRESS.md`; this plan lists only
 current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
+Worker 1219's docs-only branch is superseded by main `8f611f0e` and is not
+accepted input because it preserves the stale `fd026e4b` docs-head wording and
+the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
 - Accepted implementation/evidence facts through baseline main `f7be6d87` are
   recorded in `MASTER_PROGRESS.md`.
-- Active, unaccepted workers: none currently.
+- Active, unaccepted workers:
+  - Worker 1220: private same-transition multi-update queue-lane
+    continuation/currentness; branch/worktree
+    `worker/1220-transition-multi-update-currentness`,
+    `/Users/user/Developer/Developer/fast-react-worktrees/worker-1220-transition-multi-update-currentness`;
+    merge readiness pending worker report, focused Rust verification, and
+    independent audit.
+  - Worker 1221: public fake-DOM div/id update hardening for the already
+    accepted narrow `createRoot().render(<div id>text</div>)` lifecycle;
+    branch/worktree `worker/1221-public-fakedom-id-update-hardening`,
+    `/Users/user/Developer/Developer/fast-react-worktrees/worker-1221-public-fakedom-id-update-hardening`;
+    merge readiness pending worker report, focused JS/conformance verification,
+    and independent audit.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
   render handoff admission, plus the minimal public
