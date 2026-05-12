@@ -20,6 +20,8 @@ const userProvidedKeyEscapeRegex = /\/+/g;
 let didWarnAboutMaps = false;
 
 const childrenTraversalCurrentnessReports = new WeakSet();
+const childrenTraversalCurrentnessReportCreationRejections = new WeakMap();
+const childrenTraversalFreezeRecordReturns = new WeakMap();
 
 const childrenTraversalCurrentnessStatus =
   'source-current-for-react-19.2.6-children-helper-traversal-private-blockers';
@@ -1383,11 +1385,21 @@ function createChildrenTraversalCurrentnessReport(overrides = {}) {
     ...defaults,
     ...overrides
   };
+  let creationRejectionReason = !ownDataPropertyKeysEqual(
+    report,
+    childrenTraversalCurrentnessReportFieldNames
+  )
+    ? 'children-traversal-currentness-report-shape'
+    : null;
 
   if (
     Object.hasOwn(overrides, 'sourceReport') &&
     overrides.sourceReport !== childrenTraversalSourceReport
   ) {
+    if (creationRejectionReason === null) {
+      creationRejectionReason =
+        'children-traversal-currentness-source-report';
+    }
     report.sourceReport = freezeRecord({
       ...childrenTraversalSourceReport,
       ...overrides.sourceReport
@@ -1404,8 +1416,17 @@ function createChildrenTraversalCurrentnessReport(overrides = {}) {
     });
   }
 
+  if (creationRejectionReason === null) {
+    creationRejectionReason =
+      getChildrenTraversalCurrentnessReportFieldRejection(report);
+  }
+
   const frozenReport = freezeRecord(report);
   childrenTraversalCurrentnessReports.add(frozenReport);
+  childrenTraversalCurrentnessReportCreationRejections.set(
+    frozenReport,
+    creationRejectionReason
+  );
   return frozenReport;
 }
 
@@ -1474,18 +1495,21 @@ function validateChildrenTraversalCurrentnessReport(report) {
     return 'children-traversal-currentness-source-proof';
   }
 
-  if (!Object.isFrozen(report)) {
+  if (!isFreezeRecordReturnedOriginal(report)) {
+    return 'children-traversal-currentness-source-proof';
+  }
+
+  if (!isObjectFrozen(report)) {
     return 'children-traversal-currentness-not-frozen';
   }
 
+  const creationRejectionReason =
+    childrenTraversalCurrentnessReportCreationRejections.get(report);
   if (
-    report.kind !==
-      'fast-react.private.children_helper_traversal_currentness' ||
-    report.version !== 1 ||
-    report.status !== childrenTraversalCurrentnessStatus ||
-    report.compatibilityTarget !== 'react@19.2.6'
+    creationRejectionReason !== null &&
+    creationRejectionReason !== undefined
   ) {
-    return 'children-traversal-currentness-source-proof';
+    return creationRejectionReason;
   }
 
   if (!isChildrenTraversalCurrentnessSourceEvidenceFrozen()) {
@@ -1499,6 +1523,20 @@ function validateChildrenTraversalCurrentnessReport(report) {
     )
   ) {
     return 'children-traversal-currentness-report-shape';
+  }
+
+  return getChildrenTraversalCurrentnessReportFieldRejection(report);
+}
+
+function getChildrenTraversalCurrentnessReportFieldRejection(report) {
+  if (
+    report.kind !==
+      'fast-react.private.children_helper_traversal_currentness' ||
+    report.version !== 1 ||
+    report.status !== childrenTraversalCurrentnessStatus ||
+    report.compatibilityTarget !== 'react@19.2.6'
+  ) {
+    return 'children-traversal-currentness-source-proof';
   }
 
   if (report.sourceReport !== childrenTraversalSourceReport) {
@@ -1622,12 +1660,17 @@ function isDeepFrozenDataGraph(value, seen = new WeakSet()) {
   }
   seen.add(value);
 
-  if (!Object.isFrozen(value)) {
+  if (!isObjectFrozen(value)) {
     return false;
   }
 
-  for (const key of Reflect.ownKeys(value)) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  const keys = safeOwnKeys(value);
+  if (keys === null) {
+    return false;
+  }
+
+  for (const key of keys) {
+    const descriptor = safeGetOwnPropertyDescriptor(value, key);
     if (descriptor === undefined || !Object.hasOwn(descriptor, 'value')) {
       return false;
     }
@@ -1644,7 +1687,8 @@ function isAcceptedChildrenTraversalBehaviorCurrentness(currentness) {
   if (
     currentness === null ||
     typeof currentness !== 'object' ||
-    !Object.isFrozen(currentness)
+    !isFreezeRecordReturnedOriginal(currentness) ||
+    !isObjectFrozen(currentness)
   ) {
     return false;
   }
@@ -2095,7 +2139,11 @@ function arraysEqual(left, right) {
 }
 
 function ownDataPropertyKeysEqual(value, expectedKeys) {
-  const actualKeys = Reflect.ownKeys(value);
+  const actualKeys = safeOwnKeys(value);
+  if (actualKeys === null) {
+    return false;
+  }
+
   if (actualKeys.length !== expectedKeys.length) {
     return false;
   }
@@ -2106,7 +2154,7 @@ function ownDataPropertyKeysEqual(value, expectedKeys) {
       return false;
     }
 
-    const descriptor = Object.getOwnPropertyDescriptor(value, expectedKey);
+    const descriptor = safeGetOwnPropertyDescriptor(value, expectedKey);
     if (
       descriptor === undefined ||
       descriptor.enumerable !== true ||
@@ -2119,12 +2167,50 @@ function ownDataPropertyKeysEqual(value, expectedKeys) {
   return true;
 }
 
+function isObjectFrozen(value) {
+  try {
+    return Object.isFrozen(value);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function safeOwnKeys(value) {
+  try {
+    return Reflect.ownKeys(value);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function safeGetOwnPropertyDescriptor(value, key) {
+  try {
+    return Object.getOwnPropertyDescriptor(value, key);
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+function isFreezeRecordReturnedOriginal(value) {
+  return childrenTraversalFreezeRecordReturns.get(value) === value;
+}
+
 function freezeArray(values) {
   return Object.freeze(values.slice());
 }
 
 function freezeRecord(record) {
-  return Object.freeze(record);
+  const frozenRecord = Object.freeze(record);
+  if (
+    frozenRecord !== null &&
+    (typeof frozenRecord === 'object' || typeof frozenRecord === 'function')
+  ) {
+    if (!childrenTraversalFreezeRecordReturns.has(frozenRecord)) {
+      childrenTraversalFreezeRecordReturns.set(frozenRecord, record);
+    }
+  }
+
+  return frozenRecord;
 }
 
 function freezeRecordArray(records) {
