@@ -92,7 +92,10 @@ use crate::root_work_loop_metadata::{
     RootWorkLoopFinishedWorkDiagnosticEvidence, RootWorkLoopFinishedWorkMetadataError,
     root_work_loop_finished_work_metadata_for_canary,
     root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary,
+    root_work_loop_finished_work_metadata_from_json_str_for_private_bridge,
+    root_work_loop_finished_work_metadata_from_json_value_for_private_bridge,
     root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary,
+    root_work_loop_finished_work_metadata_json_string,
     root_work_loop_finished_work_metadata_json_value,
 };
 use crate::test_renderer_root_execution_bridge::{
@@ -186,6 +189,36 @@ fn private_root_work_loop_diagnostic_evidence() -> RootWorkLoopFinishedWorkDiagn
         &native_root_work_loop_minimal_placement_diagnostic_for_private_bridge(),
         "div",
     )
+}
+
+fn sorted_json_object_keys(value: &serde_json::Value) -> Vec<String> {
+    let mut keys = value
+        .as_object()
+        .expect("metadata JSON object")
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    keys.sort();
+    keys
+}
+
+fn expected_json_object_keys(keys: &[&str]) -> Vec<String> {
+    let mut keys = keys.iter().map(|key| (*key).to_owned()).collect::<Vec<_>>();
+    keys.sort();
+    keys
+}
+
+fn assert_root_work_loop_metadata_json_rejected(metadata_json: serde_json::Value) {
+    assert!(
+        root_work_loop_finished_work_metadata_from_json_value_for_private_bridge(&metadata_json)
+            .is_err()
+    );
+    assert!(
+        root_work_loop_finished_work_metadata_from_json_str_for_private_bridge(
+            &metadata_json.to_string()
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -480,6 +513,212 @@ fn native_private_root_work_loop_finished_work_metadata_json_value_uses_js_field
             .unwrap()
             .contains_key("apply_kind")
     );
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_json_roundtrip_admits_adapter_shape() {
+    let metadata =
+        root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary(
+            "native-root-work-loop-root:roundtrip",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:roundtrip",
+            "div",
+            "text",
+        )
+        .unwrap();
+
+    let metadata_json = root_work_loop_finished_work_metadata_json_value(&metadata);
+    let metadata_json_string = root_work_loop_finished_work_metadata_json_string(&metadata);
+    let parsed_string_json: serde_json::Value = serde_json::from_str(&metadata_json_string)
+        .expect("metadata JSON string parses back to a value");
+
+    assert_eq!(parsed_string_json, metadata_json);
+    assert_eq!(
+        sorted_json_object_keys(&metadata_json),
+        expected_json_object_keys(&[
+            "source",
+            "status",
+            "metadataRevision",
+            "facade",
+            "completeWork",
+            "pending",
+            "commit",
+            "placement",
+        ])
+    );
+    assert_eq!(
+        sorted_json_object_keys(&metadata_json["facade"]),
+        expected_json_object_keys(&[
+            "rootId",
+            "rootTag",
+            "renderUpdateId",
+            "hostType",
+            "hostOutputShape",
+            "hostComponentCount",
+            "hostTextCount",
+            "textContent",
+        ])
+    );
+    assert_eq!(
+        sorted_json_object_keys(&metadata_json["completeWork"]),
+        expected_json_object_keys(&[
+            "rootChildTag",
+            "completedChildTag",
+            "hostTextChildTag",
+            "childTags",
+        ])
+    );
+    assert_eq!(
+        sorted_json_object_keys(&metadata_json["pending"]),
+        expected_json_object_keys(&[
+            "recordsFinishedWork",
+            "pendingWorkMatchesFinishedWork",
+            "renderLanes",
+            "finishedLanes",
+            "remainingLanes",
+        ])
+    );
+    assert_eq!(
+        sorted_json_object_keys(&metadata_json["commit"]),
+        expected_json_object_keys(&[
+            "commitOrderAfterPendingRecord",
+            "consumedFinishedWorkRecord",
+            "finishedWorkAfterCommit",
+            "finishedLanesAfterCommit",
+            "renderPhaseWorkAfterCommit",
+            "mutationExecutionBlocked",
+            "publicRootRenderingBlocked",
+            "effectsRefsAndHydrationBlocked",
+        ])
+    );
+    assert_eq!(
+        sorted_json_object_keys(&metadata_json["placement"]),
+        expected_json_object_keys(&["tag", "applyKind", "siblingStatus"])
+    );
+
+    let admitted_from_value =
+        root_work_loop_finished_work_metadata_from_json_value_for_private_bridge(&metadata_json)
+            .unwrap();
+    let admitted_from_string =
+        root_work_loop_finished_work_metadata_from_json_str_for_private_bridge(
+            &metadata_json_string,
+        )
+        .unwrap();
+
+    assert_eq!(admitted_from_value, metadata);
+    assert_eq!(admitted_from_string, metadata);
+    assert_eq!(admitted_from_string.facade().host_type(), "div");
+    assert_eq!(
+        admitted_from_string.facade().host_output_shape(),
+        "host-component"
+    );
+    assert_eq!(admitted_from_string.facade().text_content(), "text");
+    assert_eq!(
+        admitted_from_string.complete_work().child_tags(),
+        ["HostComponent", "HostText"]
+    );
+    assert_eq!(
+        admitted_from_string.placement().apply_kind(),
+        "append-placement-to-container"
+    );
+    assert!(admitted_from_string.commit().mutation_execution_blocked());
+    assert!(
+        admitted_from_string
+            .commit()
+            .public_root_rendering_blocked()
+    );
+    assert!(
+        admitted_from_string
+            .commit()
+            .effects_refs_and_hydration_blocked()
+    );
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_json_admission_rejects_hostile_shapes() {
+    let metadata =
+        root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary(
+            "native-root-work-loop-root:reject",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:reject",
+            "div",
+            "text",
+        )
+        .unwrap();
+    let canonical = root_work_loop_finished_work_metadata_json_value(&metadata);
+
+    let mut unknown_top_level_claim = canonical.clone();
+    unknown_top_level_claim
+        .as_object_mut()
+        .unwrap()
+        .insert("nativeExecution".to_owned(), serde_json::json!(true));
+    assert_root_work_loop_metadata_json_rejected(unknown_top_level_claim);
+
+    let mut unknown_nested_public_claim = canonical.clone();
+    unknown_nested_public_claim["commit"]
+        .as_object_mut()
+        .unwrap()
+        .insert(
+            "publicNativeCompatibility".to_owned(),
+            serde_json::json!(true),
+        );
+    assert_root_work_loop_metadata_json_rejected(unknown_nested_public_claim);
+
+    let mut wrong_top_level_casing = canonical.clone();
+    let facade = wrong_top_level_casing
+        .as_object_mut()
+        .unwrap()
+        .remove("facade")
+        .unwrap();
+    wrong_top_level_casing
+        .as_object_mut()
+        .unwrap()
+        .insert("Facade".to_owned(), facade);
+    assert_root_work_loop_metadata_json_rejected(wrong_top_level_casing);
+
+    let mut snake_case_alias = canonical.clone();
+    let apply_kind = snake_case_alias["placement"]
+        .as_object_mut()
+        .unwrap()
+        .remove("applyKind")
+        .unwrap();
+    snake_case_alias["placement"]
+        .as_object_mut()
+        .unwrap()
+        .insert("apply_kind".to_owned(), apply_kind);
+    assert_root_work_loop_metadata_json_rejected(snake_case_alias);
+
+    let mut missing_nested_field = canonical.clone();
+    missing_nested_field["completeWork"]
+        .as_object_mut()
+        .unwrap()
+        .remove("childTags");
+    assert_root_work_loop_metadata_json_rejected(missing_nested_field);
+
+    let mut broadened_host_type = canonical.clone();
+    broadened_host_type["facade"]["hostType"] = serde_json::json!("span");
+    assert_root_work_loop_metadata_json_rejected(broadened_host_type);
+
+    let mut broadened_text_content = canonical.clone();
+    broadened_text_content["facade"]["textContent"] = serde_json::json!("copy");
+    assert_root_work_loop_metadata_json_rejected(broadened_text_content);
+
+    let mut wrong_effects_refs_and_hydration_blocked = canonical.clone();
+    wrong_effects_refs_and_hydration_blocked["commit"]["effectsRefsAndHydrationBlocked"] =
+        serde_json::json!(false);
+    assert_root_work_loop_metadata_json_rejected(wrong_effects_refs_and_hydration_blocked);
+
+    let mut wrong_apply_kind = canonical.clone();
+    wrong_apply_kind["placement"]["applyKind"] =
+        serde_json::json!("insert-placement-in-container-before");
+    assert_root_work_loop_metadata_json_rejected(wrong_apply_kind);
+
+    let mut missing_facade_text = canonical.clone();
+    missing_facade_text["facade"]
+        .as_object_mut()
+        .unwrap()
+        .remove("textContent");
+    assert_root_work_loop_metadata_json_rejected(missing_facade_text);
 }
 
 #[test]
@@ -1028,7 +1267,8 @@ fn native_private_root_work_loop_finished_work_metadata_rejects_hostile_diagnost
 fn native_private_root_work_loop_finished_work_metadata_json_conversion_requires_valid_metadata() {
     let evidence =
         private_root_work_loop_diagnostic_evidence().with_host_output_shape_for_test("host-text");
-    let mut attempted_json_conversion = false;
+    let mut attempted_json_value_conversion = false;
+    let mut attempted_json_string_conversion = false;
     let error = root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
         "native-root-work-loop-root:json",
         "ConcurrentRoot",
@@ -1038,8 +1278,12 @@ fn native_private_root_work_loop_finished_work_metadata_json_conversion_requires
         &evidence,
     )
     .map(|metadata| {
-        attempted_json_conversion = true;
-        root_work_loop_finished_work_metadata_json_value(&metadata)
+        attempted_json_value_conversion = true;
+        let metadata_json = root_work_loop_finished_work_metadata_json_value(&metadata);
+        attempted_json_string_conversion = true;
+        let metadata_json_string = root_work_loop_finished_work_metadata_json_string(&metadata);
+
+        (metadata_json, metadata_json_string)
     })
     .unwrap_err();
 
@@ -1051,7 +1295,8 @@ fn native_private_root_work_loop_finished_work_metadata_json_conversion_requires
             actual: "host-text".to_string()
         }
     );
-    assert!(!attempted_json_conversion);
+    assert!(!attempted_json_value_conversion);
+    assert!(!attempted_json_string_conversion);
 }
 
 #[test]
