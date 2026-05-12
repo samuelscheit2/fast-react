@@ -68,6 +68,7 @@ pub(crate) use deleted_subtree::{
     DeletedSubtreeRefPassiveCleanupExecutionRecord, DeletedSubtreeRefPassiveCleanupExecutionResult,
     execute_deleted_subtree_ref_and_passive_cleanup_after_commit_for_canary,
     flush_passive_effects_after_commit_with_deleted_subtree_destroy_executor_for_canary,
+    flush_passive_effects_after_commit_with_deleted_subtree_destroy_handle_clear_for_canary,
     record_deleted_subtree_unmount_effect_lifecycle_execution_evidence_for_canary,
 };
 
@@ -296,10 +297,130 @@ impl PassiveEffectFlushRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PassiveEffectDestroyHandleClearBeforeExecutionRecord {
+    clear_order: usize,
+    root: FiberRootId,
+    finished_work: FiberId,
+    committed_lanes: Lanes,
+    fiber: FiberId,
+    effect_lanes: Lanes,
+    phase: PendingPassiveEffectPhase,
+    pending_order: PendingPassiveEffectOrder,
+    flush_index: usize,
+    effect_index: Option<usize>,
+    effect: Option<HookEffectId>,
+    instance: HookEffectInstanceId,
+    destroy: HookEffectCallbackHandle,
+    stored_destroy_before_clear: Option<HookEffectCallbackHandle>,
+    stored_destroy_after_clear: Option<HookEffectCallbackHandle>,
+}
+
+impl PassiveEffectDestroyHandleClearBeforeExecutionRecord {
+    #[must_use]
+    pub const fn clear_order(self) -> usize {
+        self.clear_order
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn committed_lanes(self) -> Lanes {
+        self.committed_lanes
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn effect_lanes(self) -> Lanes {
+        self.effect_lanes
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> PendingPassiveEffectPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn pending_order(self) -> PendingPassiveEffectOrder {
+        self.pending_order
+    }
+
+    #[must_use]
+    pub const fn flush_index(self) -> usize {
+        self.flush_index
+    }
+
+    #[must_use]
+    pub const fn effect_index(self) -> Option<usize> {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> Option<HookEffectId> {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn instance(self) -> HookEffectInstanceId {
+        self.instance
+    }
+
+    #[must_use]
+    pub const fn destroy_callback(self) -> HookEffectCallbackHandle {
+        self.destroy
+    }
+
+    #[must_use]
+    pub const fn stored_destroy_before_clear(self) -> Option<HookEffectCallbackHandle> {
+        self.stored_destroy_before_clear
+    }
+
+    #[must_use]
+    pub const fn stored_destroy_after_clear(self) -> Option<HookEffectCallbackHandle> {
+        self.stored_destroy_after_clear
+    }
+
+    #[must_use]
+    pub fn proves_destroy_handle_cleared_before_execution(self) -> bool {
+        self.phase == PendingPassiveEffectPhase::Unmount
+            && self.stored_destroy_before_clear == Some(self.destroy)
+            && self.stored_destroy_after_clear.is_none()
+    }
+
+    #[must_use]
+    pub const fn public_effect_execution_enabled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_act_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn scheduler_driven_passive_execution_enabled(self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PassiveEffectDestroyCallbackExecutionRequest {
     execution_order: usize,
     flush_record: PassiveEffectFlushRecord,
     destroy: HookEffectCallbackHandle,
+    destroy_handle_clear_before_execution:
+        Option<PassiveEffectDestroyHandleClearBeforeExecutionRecord>,
 }
 
 impl PassiveEffectDestroyCallbackExecutionRequest {
@@ -376,6 +497,19 @@ impl PassiveEffectDestroyCallbackExecutionRequest {
     #[must_use]
     pub const fn destroy_callback(self) -> HookEffectCallbackHandle {
         self.destroy
+    }
+
+    #[must_use]
+    pub const fn destroy_handle_clear_before_execution(
+        self,
+    ) -> Option<PassiveEffectDestroyHandleClearBeforeExecutionRecord> {
+        self.destroy_handle_clear_before_execution
+    }
+
+    #[must_use]
+    pub fn destroy_handle_cleared_before_execution(self) -> bool {
+        self.destroy_handle_clear_before_execution
+            .is_some_and(PassiveEffectDestroyHandleClearBeforeExecutionRecord::proves_destroy_handle_cleared_before_execution)
     }
 }
 
@@ -458,6 +592,18 @@ impl PassiveEffectDestroyCallbackExecutionRecord {
     #[must_use]
     pub const fn destroy_callback(self) -> HookEffectCallbackHandle {
         self.request.destroy_callback()
+    }
+
+    #[must_use]
+    pub const fn destroy_handle_clear_before_execution(
+        self,
+    ) -> Option<PassiveEffectDestroyHandleClearBeforeExecutionRecord> {
+        self.request.destroy_handle_clear_before_execution()
+    }
+
+    #[must_use]
+    pub fn destroy_handle_cleared_before_execution(self) -> bool {
+        self.request.destroy_handle_cleared_before_execution()
     }
 }
 
@@ -1308,6 +1454,7 @@ pub(crate) struct PassiveEffectsFlushResult {
     scheduler_driven_passive_execution_enabled: bool,
     root_error_propagation: Option<PassiveEffectRootErrorPropagationRecord>,
     records: Vec<PassiveEffectFlushRecord>,
+    destroy_handle_clears: Vec<PassiveEffectDestroyHandleClearBeforeExecutionRecord>,
     destroy_callback_executions: Vec<PassiveEffectDestroyCallbackExecutionRecord>,
     destroy_callback_errors: Vec<PassiveEffectDestroyCallbackErrorRecord>,
     mount_create_callback_executions: Vec<PassiveEffectMountCreateCallbackExecutionRecord>,
@@ -1341,6 +1488,11 @@ impl PassiveEffectsFlushResult {
     #[must_use]
     pub fn records(&self) -> &[PassiveEffectFlushRecord] {
         &self.records
+    }
+
+    #[must_use]
+    pub fn destroy_handle_clears(&self) -> &[PassiveEffectDestroyHandleClearBeforeExecutionRecord] {
+        &self.destroy_handle_clears
     }
 
     #[must_use]
@@ -1393,6 +1545,11 @@ impl PassiveEffectsFlushResult {
     #[must_use]
     pub fn did_execute_destroy_callbacks(&self) -> bool {
         !self.destroy_callback_executions.is_empty()
+    }
+
+    #[must_use]
+    pub fn did_clear_destroy_handles_before_execution(&self) -> bool {
+        !self.destroy_handle_clears.is_empty()
     }
 
     #[must_use]
@@ -3915,6 +4072,28 @@ pub(crate) enum PassiveEffectsFlushError {
         phase: PendingPassiveEffectPhase,
         order: PendingPassiveEffectOrder,
     },
+    PassiveDestroyHandleClearMissingEffectInstance {
+        root: FiberRootId,
+        fiber: FiberId,
+        phase: PendingPassiveEffectPhase,
+        order: PendingPassiveEffectOrder,
+        destroy: HookEffectCallbackHandle,
+    },
+    PassiveDestroyHandleClearHookEffectArena {
+        root: FiberRootId,
+        fiber: FiberId,
+        order: PendingPassiveEffectOrder,
+        instance: HookEffectInstanceId,
+        source: HookEffectArenaError,
+    },
+    PassiveDestroyHandleClearStoredDestroyMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        order: PendingPassiveEffectOrder,
+        instance: HookEffectInstanceId,
+        expected: Option<HookEffectCallbackHandle>,
+        actual: Option<HookEffectCallbackHandle>,
+    },
 }
 
 impl Display for PassiveEffectsFlushError {
@@ -4218,6 +4397,53 @@ impl Display for PassiveEffectsFlushError {
                 order.phase(),
                 order.sequence()
             ),
+            Self::PassiveDestroyHandleClearMissingEffectInstance {
+                root,
+                fiber,
+                phase,
+                order,
+                destroy,
+            } => write!(
+                formatter,
+                "root {} passive destroy clear expected hook effect instance for {:?} destroy callback {} on fiber slot {} at pending order {}",
+                root.raw(),
+                phase,
+                destroy.raw(),
+                fiber.slot().get(),
+                order.sequence()
+            ),
+            Self::PassiveDestroyHandleClearHookEffectArena {
+                root,
+                fiber,
+                order,
+                instance,
+                source,
+            } => write!(
+                formatter,
+                "root {} passive destroy clear could not access hook effect instance slot {} for fiber slot {} at pending order {}: {}",
+                root.raw(),
+                instance.slot().get(),
+                fiber.slot().get(),
+                order.sequence(),
+                source
+            ),
+            Self::PassiveDestroyHandleClearStoredDestroyMismatch {
+                root,
+                fiber,
+                order,
+                instance,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} passive destroy clear expected stored destroy {:?} on hook effect instance slot {} for fiber slot {} at pending order {}, found {:?}",
+                root.raw(),
+                expected.map(HookEffectCallbackHandle::raw),
+                instance.slot().get(),
+                fiber.slot().get(),
+                order.sequence(),
+                actual.map(HookEffectCallbackHandle::raw)
+            ),
         }
     }
 }
@@ -4252,7 +4478,10 @@ impl Error for PassiveEffectsFlushError {
             | Self::CommittedPassiveCallbackInvocationFiberCountMismatch { .. }
             | Self::CommittedPassiveCallbackInvocationStaleFiber { .. }
             | Self::CommittedPassiveCallbackInvocationWrongRenderPhase { .. }
-            | Self::CommittedPassiveCallbackInvocationWrongEffectPhase { .. } => None,
+            | Self::CommittedPassiveCallbackInvocationWrongEffectPhase { .. }
+            | Self::PassiveDestroyHandleClearMissingEffectInstance { .. }
+            | Self::PassiveDestroyHandleClearStoredDestroyMismatch { .. } => None,
+            Self::PassiveDestroyHandleClearHookEffectArena { source, .. } => Some(source),
         }
     }
 }
@@ -4323,6 +4552,7 @@ pub(crate) fn flush_passive_effects_after_commit<H: HostTypes>(
         PassiveEffectRecordSource::None,
         None,
         None,
+        None,
     )
 }
 
@@ -4381,6 +4611,7 @@ pub(crate) fn flush_passive_effects_after_commit_with_function_component_handoff
         PassiveEffectRecordSource::FunctionComponentHandoffs(function_component_handoffs),
         None,
         None,
+        None,
     )
 }
 
@@ -4399,6 +4630,29 @@ pub(crate) fn flush_passive_effects_after_commit_from_committed_fiber_effects_fo
         commit,
         PassiveEffectRecordSource::CommittedFiberEffects,
         None,
+        None,
+        None,
+    )
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private committed passive destroy clear-before-invoke canary"
+)]
+pub(crate) fn flush_passive_effects_after_commit_from_committed_fiber_effects_with_destroy_handle_clear_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    commit: &HostRootCommitRecord,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    destroy_executor: &mut impl PassiveEffectDestroyCallbackExecutor,
+) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
+    flush_passive_effects_after_commit_inner(
+        store,
+        commit,
+        PassiveEffectRecordSource::CommittedFiberEffects,
+        Some(hook_store),
+        Some(destroy_executor),
         None,
     )
 }
@@ -4450,6 +4704,7 @@ pub(crate) fn execute_update_passive_effect_callbacks_after_commit_from_accepted
         PassiveEffectRecordSource::CommittedFiberEffects,
         None,
         None,
+        None,
     )?;
 
     Ok(invoke_passive_effect_callbacks_under_test_control(
@@ -4489,6 +4744,7 @@ pub(crate) fn flush_passive_effects_after_scheduler_flush_gate_from_committed_fi
         store,
         commit,
         PassiveEffectRecordSource::CommittedFiberEffects,
+        None,
         destroy_executor,
         mount_create_executor,
     )?;
@@ -4571,6 +4827,7 @@ pub(crate) fn flush_passive_effects_after_commit_with_destroy_executor<H: HostTy
         store,
         commit,
         PassiveEffectRecordSource::FunctionComponentHandoffs(function_component_handoffs),
+        None,
         Some(destroy_executor),
         None,
     )
@@ -4591,6 +4848,7 @@ pub(crate) fn flush_passive_effects_after_commit_with_mount_create_executor<H: H
         commit,
         PassiveEffectRecordSource::FunctionComponentHandoffs(function_component_handoffs),
         None,
+        None,
         Some(mount_create_executor),
     )
 }
@@ -4610,6 +4868,7 @@ pub(crate) fn flush_passive_effects_after_commit_with_callback_executors<H: Host
         store,
         commit,
         PassiveEffectRecordSource::FunctionComponentHandoffs(function_component_handoffs),
+        None,
         Some(destroy_executor),
         Some(mount_create_executor),
     )
@@ -4619,6 +4878,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     commit: &HostRootCommitRecord,
     effect_record_source: PassiveEffectRecordSource<'_>,
+    destroy_handle_clear_store: Option<&mut FunctionComponentHookRenderStore>,
     destroy_executor: Option<&mut dyn PassiveEffectDestroyCallbackExecutor>,
     mount_create_executor: Option<&mut dyn PassiveEffectMountCreateCallbackExecutor>,
 ) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
@@ -4632,6 +4892,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
             scheduler_driven_passive_execution_enabled: false,
             root_error_propagation: None,
             records: Vec::new(),
+            destroy_handle_clears: Vec::new(),
             destroy_callback_executions: Vec::new(),
             destroy_callback_errors: Vec::new(),
             mount_create_callback_executions: Vec::new(),
@@ -4682,10 +4943,15 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
         .root_mut(root_id)?
         .scheduling_mut()
         .clear_pending_passive();
-    let (destroy_callback_executions, destroy_callback_errors) = match destroy_executor {
-        Some(destroy_executor) => execute_passive_destroy_callbacks(&mut records, destroy_executor),
-        None => (Vec::new(), Vec::new()),
-    };
+    let (destroy_handle_clears, destroy_callback_executions, destroy_callback_errors) =
+        match destroy_executor {
+            Some(destroy_executor) => execute_passive_destroy_callbacks(
+                &mut records,
+                destroy_handle_clear_store,
+                destroy_executor,
+            )?,
+            None => (Vec::new(), Vec::new(), Vec::new()),
+        };
     let (mount_create_callback_executions, mount_create_callback_errors) =
         match mount_create_executor {
             Some(mount_create_executor) => {
@@ -4720,6 +4986,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
         scheduler_driven_passive_execution_enabled: false,
         root_error_propagation: Some(root_error_propagation),
         records,
+        destroy_handle_clears,
         destroy_callback_executions,
         destroy_callback_errors,
         mount_create_callback_executions,
@@ -5263,11 +5530,17 @@ fn build_passive_flush_records(
 
 fn execute_passive_destroy_callbacks(
     records: &mut [PassiveEffectFlushRecord],
+    mut destroy_handle_clear_store: Option<&mut FunctionComponentHookRenderStore>,
     destroy_executor: &mut dyn PassiveEffectDestroyCallbackExecutor,
-) -> (
-    Vec<PassiveEffectDestroyCallbackExecutionRecord>,
-    Vec<PassiveEffectDestroyCallbackErrorRecord>,
-) {
+) -> Result<
+    (
+        Vec<PassiveEffectDestroyHandleClearBeforeExecutionRecord>,
+        Vec<PassiveEffectDestroyCallbackExecutionRecord>,
+        Vec<PassiveEffectDestroyCallbackErrorRecord>,
+    ),
+    PassiveEffectsFlushError,
+> {
+    let mut destroy_handle_clears = Vec::new();
     let mut executions = Vec::new();
     let mut errors = Vec::new();
     let mut eligible_unmounts = records
@@ -5293,10 +5566,24 @@ fn execute_passive_destroy_callbacks(
         let destroy = record
             .destroy_callback()
             .expect("eligible passive unmount destroy callback is present");
+        let destroy_handle_clear_before_execution =
+            if let Some(hook_store) = destroy_handle_clear_store.as_deref_mut() {
+                let clear_record = clear_passive_destroy_handle_before_execution(
+                    hook_store,
+                    record,
+                    destroy_handle_clears.len(),
+                    destroy,
+                )?;
+                destroy_handle_clears.push(clear_record);
+                Some(clear_record)
+            } else {
+                None
+            };
         let request = PassiveEffectDestroyCallbackExecutionRequest {
             execution_order: executions.len(),
             flush_record: *record,
             destroy,
+            destroy_handle_clear_before_execution,
         };
         let execution = PassiveEffectDestroyCallbackExecutionRecord { request };
         if let Err(error) = destroy_executor.execute_destroy_callback(request) {
@@ -5306,7 +5593,73 @@ fn execute_passive_destroy_callbacks(
         executions.push(execution);
     }
 
-    (executions, errors)
+    Ok((destroy_handle_clears, executions, errors))
+}
+
+fn clear_passive_destroy_handle_before_execution(
+    hook_store: &mut FunctionComponentHookRenderStore,
+    record: &PassiveEffectFlushRecord,
+    clear_order: usize,
+    destroy: HookEffectCallbackHandle,
+) -> Result<PassiveEffectDestroyHandleClearBeforeExecutionRecord, PassiveEffectsFlushError> {
+    let Some(instance) = record.effect_instance() else {
+        return Err(
+            PassiveEffectsFlushError::PassiveDestroyHandleClearMissingEffectInstance {
+                root: record.root(),
+                fiber: record.fiber(),
+                phase: record.phase(),
+                order: record.pending_order(),
+                destroy,
+            },
+        );
+    };
+
+    let instance_record = hook_store
+        .hook_effects_mut()
+        .get_instance_mut(instance)
+        .map_err(
+            |source| PassiveEffectsFlushError::PassiveDestroyHandleClearHookEffectArena {
+                root: record.root(),
+                fiber: record.fiber(),
+                order: record.pending_order(),
+                instance,
+                source,
+            },
+        )?;
+    let stored_destroy_before_clear = instance_record.destroy();
+    if stored_destroy_before_clear != Some(destroy) {
+        return Err(
+            PassiveEffectsFlushError::PassiveDestroyHandleClearStoredDestroyMismatch {
+                root: record.root(),
+                fiber: record.fiber(),
+                order: record.pending_order(),
+                instance,
+                expected: Some(destroy),
+                actual: stored_destroy_before_clear,
+            },
+        );
+    }
+    let cleared_destroy = instance_record.take_destroy();
+    debug_assert_eq!(cleared_destroy, Some(destroy));
+    let stored_destroy_after_clear = instance_record.destroy();
+
+    Ok(PassiveEffectDestroyHandleClearBeforeExecutionRecord {
+        clear_order,
+        root: record.root(),
+        finished_work: record.finished_work(),
+        committed_lanes: record.committed_lanes(),
+        fiber: record.fiber(),
+        effect_lanes: record.effect_lanes(),
+        phase: record.phase(),
+        pending_order: record.pending_order(),
+        flush_index: record.flush_index(),
+        effect_index: record.effect_index(),
+        effect: record.effect(),
+        instance,
+        destroy,
+        stored_destroy_before_clear,
+        stored_destroy_after_clear,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

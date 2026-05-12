@@ -677,6 +677,64 @@ impl PassiveEffectDestroyCallbackExecutor for RecordingDestroyExecutor {
     }
 }
 
+#[derive(Default)]
+struct ObservingDestroyClearExecutor {
+    fail_callback: Option<HookEffectCallbackHandle>,
+    error: PassiveEffectDestroyCallbackErrorHandle,
+    calls: Vec<PassiveEffectDestroyCallbackExecutionRequest>,
+    clear_observations: Vec<PassiveEffectDestroyHandleClearBeforeExecutionRecord>,
+}
+
+impl ObservingDestroyClearExecutor {
+    fn with_error(
+        callback: HookEffectCallbackHandle,
+        error: PassiveEffectDestroyCallbackErrorHandle,
+    ) -> Self {
+        Self {
+            fail_callback: Some(callback),
+            error,
+            calls: Vec::new(),
+            clear_observations: Vec::new(),
+        }
+    }
+
+    fn calls(&self) -> &[PassiveEffectDestroyCallbackExecutionRequest] {
+        &self.calls
+    }
+
+    fn clear_observations(&self) -> &[PassiveEffectDestroyHandleClearBeforeExecutionRecord] {
+        &self.clear_observations
+    }
+}
+
+impl PassiveEffectDestroyCallbackExecutor for ObservingDestroyClearExecutor {
+    fn execute_destroy_callback(
+        &mut self,
+        request: PassiveEffectDestroyCallbackExecutionRequest,
+    ) -> Result<(), PassiveEffectDestroyCallbackErrorHandle> {
+        let clear = request
+            .destroy_handle_clear_before_execution()
+            .expect("destroy clear canary must clear the hook effect instance before callback");
+        assert!(
+            clear.proves_destroy_handle_cleared_before_execution(),
+            "destroy executor must observe clear evidence before callback execution"
+        );
+        assert!(request.destroy_handle_cleared_before_execution());
+        assert_eq!(clear.destroy_callback(), request.destroy_callback());
+        assert_eq!(clear.clear_order(), request.execution_order());
+        assert_eq!(clear.flush_index(), request.flush_index());
+        assert_eq!(clear.phase(), PendingPassiveEffectPhase::Unmount);
+        assert_eq!(clear.stored_destroy_after_clear(), None);
+        self.clear_observations.push(clear);
+        self.calls.push(request);
+        if self.fail_callback == Some(request.destroy_callback()) {
+            Err(self.error)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DeletedCleanupExecutionEvent {
     RefCleanup(FiberId),
@@ -4681,6 +4739,570 @@ fn passive_effects_destroy_executor_runs_unmounts_in_flush_order_and_records_err
 }
 
 #[test]
+fn passive_effects_destroy_clear_before_invoke_clears_returned_destroy_on_update() {
+    let (mut store, root_id, host) = root_store();
+    let previous_current = store.root(root_id).unwrap().current();
+    let component = FiberTypeHandle::from_raw(14_200);
+    let current_function = append_function_component_child(
+        &mut store,
+        previous_current,
+        PropsHandle::from_raw(14_201),
+        component,
+    );
+    let mut hook_store = FunctionComponentHookRenderStore::new();
+    let previous_changed = hook_store
+        .create_current_effect_metadata(
+            store.fiber_arena_mut(),
+            current_function,
+            FunctionComponentEffectPhase::Passive,
+            callback(14_202),
+            deps(14_203),
+            Some(callback(14_204)),
+        )
+        .unwrap();
+    let previous_unchanged = hook_store
+        .create_current_effect_metadata(
+            store.fiber_arena_mut(),
+            current_function,
+            FunctionComponentEffectPhase::Passive,
+            callback(14_205),
+            deps(14_206),
+            Some(callback(14_207)),
+        )
+        .unwrap();
+
+    update_container(
+        &mut store,
+        root_id,
+        RootElementHandle::from_raw(14_208),
+        None,
+    )
+    .unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    let finished_work = render.finished_work();
+    let finished_function = append_function_component_child(
+        &mut store,
+        finished_work,
+        PropsHandle::from_raw(14_209),
+        component,
+    );
+    store
+        .fiber_arena_mut()
+        .link_alternates(current_function, finished_function)
+        .unwrap();
+    let state = hook_store
+        .prepare_render_state(store.fiber_arena(), finished_function)
+        .unwrap();
+    let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+    let first_registration = hook_store
+        .update_effect_metadata(
+            store.fiber_arena_mut(),
+            &mut cursor,
+            FunctionComponentEffectPhase::Passive,
+            callback(14_210),
+            deps(14_211),
+            FunctionComponentEffectDependencyStatus::Changed,
+        )
+        .unwrap();
+    let first_unchanged = hook_store
+        .update_effect_metadata(
+            store.fiber_arena_mut(),
+            &mut cursor,
+            FunctionComponentEffectPhase::Passive,
+            callback(14_212),
+            deps(14_206),
+            FunctionComponentEffectDependencyStatus::Unchanged,
+        )
+        .unwrap();
+    hook_store.finish_render_cursor(cursor).unwrap();
+    assert_eq!(first_registration.instance(), previous_changed.instance());
+    assert_eq!(first_unchanged.instance(), previous_unchanged.instance());
+
+    let queued = queue_function_component_pending_passive_effects(
+        &mut store,
+        root_id,
+        &hook_store,
+        state,
+        Lanes::DEFAULT,
+    )
+    .unwrap();
+    assert_eq!(queued.queued_unmount_count(), 1);
+    assert_eq!(queued.queued_mount_count(), 1);
+    let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+    commit_function_component_effect_queues_for_committed_root(
+        &store,
+        root_id,
+        &mut hook_store,
+        Lanes::DEFAULT,
+    )
+    .unwrap();
+    commit
+        .record_function_component_committed_passive_effects_from_committed_effect_queues_for_canary(
+            &store,
+            &hook_store,
+            std::slice::from_ref(&queued),
+        )
+        .unwrap();
+
+    let mut control = TestPassiveEffectCallbackControl::default()
+        .with_destroy_result(callback(14_204), Ok(()))
+        .with_create_result(callback(14_210), Ok(Some(callback(14_213))));
+    let gate =
+        execute_update_passive_effect_callbacks_after_commit_from_accepted_committed_function_component_under_test_control_for_canary(
+            &mut store,
+            &commit,
+            &mut control,
+        )
+        .unwrap();
+    assert_eq!(gate.len(), 2);
+    assert_eq!(gate.completed_count(), 2);
+    assert!(!gate.public_effect_execution_enabled());
+    assert!(!gate.public_act_compatibility_claimed());
+    assert!(!gate.scheduler_driven_passive_execution_enabled());
+
+    let persistence =
+        persist_passive_effect_returned_destroy_handles_for_canary(&mut hook_store, &gate).unwrap();
+    assert_eq!(persistence.len(), 1);
+    assert!(persistence.proves_returned_destroy_handles_persisted());
+    assert_eq!(
+        hook_store
+            .hook_effects()
+            .get_instance(first_registration.instance())
+            .unwrap()
+            .destroy(),
+        Some(callback(14_213))
+    );
+    assert_eq!(
+        hook_store
+            .hook_effects()
+            .get_instance(first_unchanged.instance())
+            .unwrap()
+            .destroy(),
+        Some(callback(14_207))
+    );
+
+    update_container(
+        &mut store,
+        root_id,
+        RootElementHandle::from_raw(14_214),
+        None,
+    )
+    .unwrap();
+    let second_render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    let second_finished_work = second_render.finished_work();
+    let second_finished_function = append_function_component_child(
+        &mut store,
+        second_finished_work,
+        PropsHandle::from_raw(14_215),
+        component,
+    );
+    store
+        .fiber_arena_mut()
+        .link_alternates(finished_function, second_finished_function)
+        .unwrap();
+    let second_state = hook_store
+        .prepare_render_state(store.fiber_arena(), second_finished_function)
+        .unwrap();
+    let mut second_cursor = hook_store.begin_render_cursor(second_state).unwrap();
+    let second_registration = hook_store
+        .update_effect_metadata(
+            store.fiber_arena_mut(),
+            &mut second_cursor,
+            FunctionComponentEffectPhase::Passive,
+            callback(14_216),
+            deps(14_217),
+            FunctionComponentEffectDependencyStatus::Changed,
+        )
+        .unwrap();
+    let second_unchanged = hook_store
+        .update_effect_metadata(
+            store.fiber_arena_mut(),
+            &mut second_cursor,
+            FunctionComponentEffectPhase::Passive,
+            callback(14_218),
+            deps(14_206),
+            FunctionComponentEffectDependencyStatus::Unchanged,
+        )
+        .unwrap();
+    hook_store.finish_render_cursor(second_cursor).unwrap();
+    assert_eq!(
+        second_registration.instance(),
+        first_registration.instance()
+    );
+    assert_eq!(second_unchanged.instance(), first_unchanged.instance());
+
+    let second_queued = queue_function_component_pending_passive_effects(
+        &mut store,
+        root_id,
+        &hook_store,
+        second_state,
+        Lanes::DEFAULT,
+    )
+    .unwrap();
+    assert_eq!(second_queued.queued_unmount_count(), 1);
+    assert_eq!(second_queued.queued_mount_count(), 1);
+    assert_eq!(second_queued.records()[0].destroy(), Some(callback(14_213)));
+    let mut second_commit = commit_finished_host_root(&mut store, second_render).unwrap();
+    commit_function_component_effect_queues_for_committed_root(
+        &store,
+        root_id,
+        &mut hook_store,
+        Lanes::DEFAULT,
+    )
+    .unwrap();
+    second_commit
+        .record_function_component_committed_passive_effects_from_committed_effect_queues_for_canary(
+            &store,
+            &hook_store,
+            std::slice::from_ref(&second_queued),
+        )
+        .unwrap();
+    let callback_request_count = store.scheduler_bridge().callback_requests().len();
+    let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+    let mut destroy_executor =
+        ObservingDestroyClearExecutor::with_error(callback(14_213), destroy_error(14_219));
+
+    let flush =
+        flush_passive_effects_after_commit_from_committed_fiber_effects_with_destroy_handle_clear_for_canary(
+            &mut store,
+            &second_commit,
+            &mut hook_store,
+            &mut destroy_executor,
+        )
+        .unwrap();
+
+    assert_eq!(flush.status(), PassiveEffectsFlushStatus::Flushed);
+    assert!(flush.did_clear_destroy_handles_before_execution());
+    assert!(flush.did_execute_destroy_callbacks());
+    assert!(flush.did_record_destroy_callback_errors());
+    assert_eq!(flush.destroy_handle_clears().len(), 1);
+    assert_eq!(flush.destroy_callback_executions().len(), 1);
+    assert_eq!(flush.destroy_callback_errors().len(), 1);
+    assert!(!flush.did_execute_mount_create_callbacks());
+    assert!(!flush.public_effect_execution_enabled());
+    assert!(!flush.public_act_compatibility_claimed());
+    assert!(!flush.scheduler_driven_passive_execution_enabled());
+    let unmount = flush.records()[0];
+    let mount = flush.records()[1];
+    assert_eq!(unmount.phase(), PendingPassiveEffectPhase::Unmount);
+    assert_eq!(mount.phase(), PendingPassiveEffectPhase::Mount);
+    assert_eq!(unmount.destroy_callback(), Some(callback(14_213)));
+    assert_eq!(mount.create_callback(), Some(callback(14_216)));
+    assert_eq!(
+        unmount.effect_instance(),
+        Some(second_registration.instance())
+    );
+    assert_eq!(
+        mount.effect_instance(),
+        Some(second_registration.instance())
+    );
+    assert!(unmount.destroy_callback_invoked());
+    assert!(!mount.destroy_callback_invoked());
+    let clear = flush.destroy_handle_clears()[0];
+    assert_eq!(clear.clear_order(), 0);
+    assert_eq!(clear.root(), root_id);
+    assert_eq!(clear.finished_work(), second_finished_work);
+    assert_eq!(clear.fiber(), second_finished_function);
+    assert_eq!(clear.phase(), PendingPassiveEffectPhase::Unmount);
+    assert_eq!(
+        clear.pending_order(),
+        second_queued.records()[0].unmount_order().unwrap()
+    );
+    assert_eq!(clear.effect(), Some(second_registration.effect()));
+    assert_eq!(clear.instance(), second_registration.instance());
+    assert_eq!(clear.destroy_callback(), callback(14_213));
+    assert_eq!(clear.stored_destroy_before_clear(), Some(callback(14_213)));
+    assert_eq!(clear.stored_destroy_after_clear(), None);
+    assert!(clear.proves_destroy_handle_cleared_before_execution());
+    assert!(!clear.public_effect_execution_enabled());
+    assert!(!clear.public_act_compatibility_claimed());
+    assert!(!clear.scheduler_driven_passive_execution_enabled());
+    assert_eq!(destroy_executor.clear_observations(), &[clear]);
+    assert_eq!(
+        destroy_executor.calls(),
+        &[flush.destroy_callback_executions()[0].request()]
+    );
+    assert_eq!(
+        flush.destroy_callback_errors()[0].error(),
+        destroy_error(14_219)
+    );
+    assert_eq!(
+        hook_store
+            .hook_effects()
+            .get_instance(second_registration.instance())
+            .unwrap()
+            .destroy(),
+        None
+    );
+    assert_eq!(
+        hook_store
+            .hook_effects()
+            .get_instance(second_unchanged.instance())
+            .unwrap()
+            .destroy(),
+        Some(callback(14_207))
+    );
+    assert!(
+        store
+            .root(root_id)
+            .unwrap()
+            .scheduling()
+            .pending_passive()
+            .is_empty()
+    );
+    assert_eq!(
+        store.scheduler_bridge().callback_requests().len(),
+        callback_request_count
+    );
+    assert_eq!(
+        store.scheduler_bridge().act_queue_requests().len(),
+        act_queue_request_count
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn passive_effects_destroy_clear_before_invoke_rejects_replay_without_invoking_executor() {
+    let (mut store, root_id, host) = root_store();
+    let previous_current = store.root(root_id).unwrap().current();
+    let component = FiberTypeHandle::from_raw(14_300);
+    let current_function = append_function_component_child(
+        &mut store,
+        previous_current,
+        PropsHandle::from_raw(14_301),
+        component,
+    );
+    let mut hook_store = FunctionComponentHookRenderStore::new();
+    let previous = hook_store
+        .create_current_effect_metadata(
+            store.fiber_arena_mut(),
+            current_function,
+            FunctionComponentEffectPhase::Passive,
+            callback(14_302),
+            deps(14_303),
+            Some(callback(14_304)),
+        )
+        .unwrap();
+
+    update_container(
+        &mut store,
+        root_id,
+        RootElementHandle::from_raw(14_305),
+        None,
+    )
+    .unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    let finished_work = render.finished_work();
+    let finished_function = append_function_component_child(
+        &mut store,
+        finished_work,
+        PropsHandle::from_raw(14_306),
+        component,
+    );
+    store
+        .fiber_arena_mut()
+        .link_alternates(current_function, finished_function)
+        .unwrap();
+    let state = hook_store
+        .prepare_render_state(store.fiber_arena(), finished_function)
+        .unwrap();
+    let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+    let registration = hook_store
+        .update_effect_metadata(
+            store.fiber_arena_mut(),
+            &mut cursor,
+            FunctionComponentEffectPhase::Passive,
+            callback(14_307),
+            deps(14_308),
+            FunctionComponentEffectDependencyStatus::Changed,
+        )
+        .unwrap();
+    hook_store.finish_render_cursor(cursor).unwrap();
+    assert_eq!(registration.instance(), previous.instance());
+
+    let queued = queue_function_component_pending_passive_effects(
+        &mut store,
+        root_id,
+        &hook_store,
+        state,
+        Lanes::DEFAULT,
+    )
+    .unwrap();
+    let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+    commit_function_component_effect_queues_for_committed_root(
+        &store,
+        root_id,
+        &mut hook_store,
+        Lanes::DEFAULT,
+    )
+    .unwrap();
+    commit
+        .record_function_component_committed_passive_effects_from_committed_effect_queues_for_canary(
+            &store,
+            &hook_store,
+            std::slice::from_ref(&queued),
+        )
+        .unwrap();
+    hook_store
+        .hook_effects_mut()
+        .get_instance_mut(registration.instance())
+        .unwrap()
+        .clear_destroy();
+    let mut destroy_executor = ObservingDestroyClearExecutor::default();
+
+    let error =
+        flush_passive_effects_after_commit_from_committed_fiber_effects_with_destroy_handle_clear_for_canary(
+            &mut store,
+            &commit,
+            &mut hook_store,
+            &mut destroy_executor,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        PassiveEffectsFlushError::PassiveDestroyHandleClearStoredDestroyMismatch {
+            root,
+            fiber,
+            order,
+            instance,
+            expected,
+            actual,
+        } if root == root_id
+            && fiber == finished_function
+            && order == queued.records()[0].unmount_order().unwrap()
+            && instance == registration.instance()
+            && expected == Some(callback(14_304))
+            && actual == None
+    ));
+    assert!(destroy_executor.calls().is_empty());
+    assert!(destroy_executor.clear_observations().is_empty());
+    assert_eq!(
+        hook_store
+            .hook_effects()
+            .get_instance(registration.instance())
+            .unwrap()
+            .destroy(),
+        None
+    );
+    assert!(
+        store
+            .root(root_id)
+            .unwrap()
+            .scheduling()
+            .pending_passive()
+            .is_empty()
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn passive_effects_destroy_clear_before_invoke_clears_deleted_subtree_before_executor() {
+    let (mut store, root_id, host) = root_store();
+    update_container(
+        &mut store,
+        root_id,
+        RootElementHandle::from_raw(14_400),
+        None,
+    )
+    .unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    let finished_work = render.finished_work();
+    let mut hook_store = FunctionComponentHookRenderStore::new();
+    let fixture =
+        attach_deleted_host_subtree_ref_passive_fixture(&mut store, &mut hook_store, finished_work);
+    let deleted_handoff = queue_function_component_deleted_subtree_pending_passive_effects(
+        &mut store,
+        root_id,
+        &hook_store,
+        finished_work,
+        fixture.deleted_host,
+        Lanes::DEFAULT,
+    )
+    .unwrap();
+    let queued_passive = deleted_handoff.records()[0];
+    let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+    commit
+        .record_function_component_deleted_subtree_passive_effects_for_canary(&[deleted_handoff])
+        .unwrap();
+    let mut destroy_executor = ObservingDestroyClearExecutor::default();
+
+    let flush =
+        flush_passive_effects_after_commit_with_deleted_subtree_destroy_handle_clear_for_canary(
+            &mut store,
+            &commit,
+            &mut hook_store,
+            &mut destroy_executor,
+        )
+        .unwrap();
+
+    assert_eq!(flush.status(), PassiveEffectsFlushStatus::Flushed);
+    assert!(flush.did_clear_destroy_handles_before_execution());
+    assert!(flush.did_execute_destroy_callbacks());
+    assert!(!flush.did_record_destroy_callback_errors());
+    assert_eq!(flush.destroy_handle_clears().len(), 1);
+    assert_eq!(flush.destroy_callback_executions().len(), 1);
+    assert!(!flush.public_effect_execution_enabled());
+    assert!(!flush.public_act_compatibility_claimed());
+    assert!(!flush.scheduler_driven_passive_execution_enabled());
+    let record = flush.records()[0];
+    assert_eq!(record.phase(), PendingPassiveEffectPhase::Unmount);
+    assert_eq!(
+        record.unmount_origin(),
+        Some(PendingPassiveUnmountOrigin::DeletedSubtree {
+            nearest_mounted_ancestor: finished_work,
+        })
+    );
+    assert_eq!(record.effect_instance(), Some(queued_passive.instance()));
+    assert_eq!(record.destroy_callback(), Some(fixture.passive_destroy));
+    assert!(record.destroy_callback_invoked());
+    let clear = flush.destroy_handle_clears()[0];
+    assert_eq!(clear.clear_order(), 0);
+    assert_eq!(clear.root(), root_id);
+    assert_eq!(clear.finished_work(), finished_work);
+    assert_eq!(clear.fiber(), fixture.deleted_function);
+    assert_eq!(clear.phase(), PendingPassiveEffectPhase::Unmount);
+    assert_eq!(clear.pending_order(), queued_passive.unmount_order());
+    assert_eq!(clear.effect(), Some(queued_passive.effect()));
+    assert_eq!(clear.instance(), queued_passive.instance());
+    assert_eq!(clear.destroy_callback(), fixture.passive_destroy);
+    assert_eq!(
+        clear.stored_destroy_before_clear(),
+        Some(fixture.passive_destroy)
+    );
+    assert_eq!(clear.stored_destroy_after_clear(), None);
+    assert!(clear.proves_destroy_handle_cleared_before_execution());
+    assert_eq!(destroy_executor.clear_observations(), &[clear]);
+    assert_eq!(
+        destroy_executor.calls(),
+        &[flush.destroy_callback_executions()[0].request()]
+    );
+    assert_eq!(
+        flush.destroy_callback_executions()[0].unmount_origin(),
+        Some(PendingPassiveUnmountOrigin::DeletedSubtree {
+            nearest_mounted_ancestor: finished_work,
+        })
+    );
+    assert_eq!(
+        hook_store
+            .hook_effects()
+            .get_instance(queued_passive.instance())
+            .unwrap()
+            .destroy(),
+        None
+    );
+    assert!(
+        store
+            .root(root_id)
+            .unwrap()
+            .scheduling()
+            .pending_passive()
+            .is_empty()
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
 fn passive_effects_deleted_subtree_destroy_executor_consumes_private_order_metadata() {
     let (mut store, root_id, host) = root_store();
     update_container(
@@ -5349,6 +5971,7 @@ fn deletion_ref_passive_cleanup_execution_orders_nested_host_refs_before_passive
     assert_eq!(host.operations(), Vec::<&'static str>::new());
 }
 
+#[test]
 fn passive_effects_deleted_subtree_destroy_executor_rejects_non_deleted_unmounts() {
     let (mut store, root_id, host) = root_store();
     let previous_current = store.root(root_id).unwrap().current();

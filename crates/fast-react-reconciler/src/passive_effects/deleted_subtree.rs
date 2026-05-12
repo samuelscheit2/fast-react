@@ -4,6 +4,7 @@ use std::fmt::{self, Display, Formatter};
 use fast_react_core::{FiberId, HookEffectCallbackHandle, RefHandle, StateNodeHandle};
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
+use crate::function_component::FunctionComponentHookRenderStore;
 use crate::host_tokens::HostFiberTokenId;
 use crate::root_commit::{
     FunctionComponentDeletedSubtreePassiveEffectsSnapshot,
@@ -395,6 +396,29 @@ pub(crate) fn flush_passive_effects_after_commit_with_deleted_subtree_destroy_ex
         store,
         commit,
         super::PassiveEffectRecordSource::CommittedDeletedSubtreeEffects,
+        None,
+        Some(destroy_executor),
+        None,
+    )
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private deleted-subtree passive destroy clear-before-invoke diagnostic for deterministic canaries"
+)]
+pub(crate) fn flush_passive_effects_after_commit_with_deleted_subtree_destroy_handle_clear_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    commit: &HostRootCommitRecord,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    destroy_executor: &mut impl PassiveEffectDestroyCallbackExecutor,
+) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
+    super::flush_passive_effects_after_commit_inner(
+        store,
+        commit,
+        super::PassiveEffectRecordSource::CommittedDeletedSubtreeEffects,
+        Some(hook_store),
         Some(destroy_executor),
         None,
     )
