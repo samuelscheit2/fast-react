@@ -46,13 +46,9 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current root head is main `5a831318` (`Refresh docs
-after scheduler currentness repair`). Worker 1239 has clean post-merge source
-and verification audits; Worker 1243's scheduler row/evidence source validation
-has a post-merge audit blocker and is under follow-up repair. Do not treat that
-scheduler source-validation slice as final until Worker 1245 lands and audits
-cleanly. Accepted implementation, cleanup, planning, and docs-only history that
-is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan lists
-only current/future work.
+after scheduler currentness repair`). Accepted implementation, cleanup,
+planning, and docs-only history that is not under active repair is recorded in
+`MASTER_PROGRESS.md`; this plan lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 Worker 1219's docs-only branch is superseded by main `8f611f0e` and is not
@@ -61,21 +57,27 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Worker 1245 repairs the remaining scheduler root currentness false green:
-  inherited non-claim variant metadata injected through `Object.prototype` must
-  fail closed for both local observation rows and `behaviorEvidence`.
-- Worker 1250 is the primary Rust behavior lane: private HostRoot update-queue
-  payloads should flow through render, complete, and commit for minimal host
-  mount/update/cleanup evidence.
-- Worker 1251 is the public React DOM behavior lane: extend the accepted
-  fake-DOM root lifecycle from a flat `div`/text node to one nested host shape
-  while preserving unsupported-surface blockers.
-- Worker 1252 is the test-renderer behavior lane: add a private package-root
-  create bridge that consumes source-owned Rust/native-shaped host-output
-  evidence while public test-renderer APIs remain blocked.
-- No unaccepted clean candidate worktrees are currently ready for merge. Keep
-  these candidate worktrees retained until their source and verification audits
-  finish.
+- Active Worker 1245 repairs the remaining scheduler root currentness false
+  green: inherited non-claim variant metadata injected through
+  `Object.prototype` must fail closed for both local observation rows and
+  `behaviorEvidence`.
+- Active Worker 1246 hardens react-test-renderer placeholder-surface
+  currentness so `placeholder-present` requires exact package-root, JS, CJS dev,
+  CJS prod, and shallow placeholder/blocker surfaces with public compatibility
+  still blocked.
+- Active Worker 1247 adds a private/test-only committed-fiber inspection
+  consumer for the accepted sync-flush minimal HostRoot placement canary.
+- Active Worker 1248 adds explicit public-facade conformance rows and hostile
+  false-green tests for the already accepted fake-DOM `render(null)` cleanup and
+  idempotent unmount behavior.
+- Active Worker 1249 runs in the pre-created
+  `worker/1245-conformance-discovery-template-import-false-green` branch after
+  id reconciliation; it hardens conformance discovery so nested template literal
+  import-looking text cannot cover missing gates.
+- Clean idle worktrees exist for `worker/1250-rust-hostroot-update-render-commit`,
+  `worker/1251-react-dom-nested-fakedom-lifecycle`, and
+  `worker/1252-test-renderer-private-create-bridge`. Do not consume, delete, or
+  treat them as accepted evidence without a fresh owner/prompt and state check.
 
 Current project-owned source/test large-file baseline after accepted
 implementation/evidence baseline main `4aa248fb`,
