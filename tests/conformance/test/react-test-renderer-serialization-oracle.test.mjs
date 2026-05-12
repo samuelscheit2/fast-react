@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent,
   findReactTestRendererSerializationObservation,
   readCheckedReactTestRendererSerializationOracle,
   readCheckedReactTestRendererSerializationOracleText
@@ -85,11 +86,37 @@ test("react-test-renderer serialization oracle keeps local Fast React status exp
     oracle.localFastReactStatus,
     REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
   );
+  assert.doesNotThrow(() =>
+    assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(oracle)
+  );
   assert.equal(
     oracle.intentionalGaps.some(
       (gap) => gap.id === "no-fast-react-test-renderer-comparison"
     ),
     true
+  );
+});
+
+test("react-test-renderer serialization oracle rejects stale or unsafe local Fast React status", () => {
+  const staleOracle = JSON.parse(JSON.stringify(oracle));
+  staleOracle.localFastReactStatus.status = "not-present-in-workspace";
+  assert.throws(
+    () =>
+      assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
+        staleOracle
+      ),
+    /local-fast-react-status-source-mismatch/u
+  );
+
+  const claimedOracle = JSON.parse(JSON.stringify(oracle));
+  claimedOracle.localFastReactStatus.comparedToReactTestRenderer = true;
+  claimedOracle.localFastReactStatus.behaviorCompatibilityClaimed = true;
+  assert.throws(
+    () =>
+      assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
+        claimedOracle
+      ),
+    /local-fast-react-status-claims-fast-react-comparison/u
   );
 });
 
