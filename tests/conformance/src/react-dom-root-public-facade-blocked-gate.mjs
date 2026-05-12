@@ -161,6 +161,16 @@ function minimalPublicDivTextApi(text) {
   return `ReactDOMClient.createRoot(container).render(React.createElement("div", { id: ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID)} }, ${JSON.stringify(text)}))`;
 }
 
+const PUBLIC_ROOT_RENDER_INITIAL_API =
+  "react-dom/client.createRoot(...).render(initial)";
+const MINIMAL_PUBLIC_DIV_TEXT_RENDER_API =
+  minimalPublicDivTextApi(MINIMAL_PUBLIC_DIV_TEXT);
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API = minimalPublicDivTextApi(
+  MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+);
+const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API =
+  `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.unmount()`;
+
 export const REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS =
   Object.freeze([
     privatePromotion503533Row({
@@ -486,7 +496,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
   Object.freeze([
     Object.freeze({
       id: "public-create-root-render-initial",
-      publicApi: "react-dom/client.createRoot(container).render(element)",
+      publicApi: PUBLIC_ROOT_RENDER_INITIAL_API,
       scenarioId: "initial-host-render",
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
@@ -495,7 +505,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
     }),
     Object.freeze({
       id: "public-create-root-render-div-text",
-      publicApi: minimalPublicDivTextApi(MINIMAL_PUBLIC_DIV_TEXT),
+      publicApi: MINIMAL_PUBLIC_DIV_TEXT_RENDER_API,
       scenarioId: "initial-host-render",
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
@@ -516,7 +526,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
     }),
     Object.freeze({
       id: "public-create-root-render-update",
-      publicApi: minimalPublicDivTextApi(MINIMAL_PUBLIC_DIV_TEXT_UPDATE),
+      publicApi: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API,
       scenarioId: "update-host-render",
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
@@ -537,7 +547,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
     }),
     Object.freeze({
       id: "public-create-root-unmount-call",
-      publicApi: `${minimalPublicDivTextApi(MINIMAL_PUBLIC_DIV_TEXT)}; root.unmount()`,
+      publicApi: MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API,
       scenarioId: "root-unmount",
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
@@ -766,6 +776,7 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
   clientRootOracle,
   localPublicFacadeBoundary = inspectReactDomRootPublicFacadeBoundary(),
   privateRootBridgeBoundary = inspectReactDomPrivateRootBridgeBoundary(),
+  publicFacadeLifecycleRows = REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
   rootRenderGateResult: providedRootRenderGateResult = null
 } = {}) {
   const failures = [];
@@ -797,6 +808,7 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
   });
   validatePublicFacadeBoundary({
     localPublicFacadeBoundary,
+    publicFacadeLifecycleRows,
     blockedPublicFacadeRows,
     failures
   });
@@ -2528,6 +2540,7 @@ function validatePublicFacadeScenarioAdmissions({
 
 function validatePublicFacadeBoundary({
   localPublicFacadeBoundary,
+  publicFacadeLifecycleRows,
   blockedPublicFacadeRows,
   failures
 }) {
@@ -2631,6 +2644,7 @@ function validatePublicFacadeBoundary({
 
   validatePublicRootLifecycleBlocked({
     publicRootLifecycle: localPublicFacadeBoundary.publicRootLifecycle,
+    publicFacadeLifecycleRows,
     blockedPublicFacadeRows,
     failures
   });
@@ -2816,6 +2830,7 @@ function validatePublicRootExportBlocked({
 
 function validatePublicRootLifecycleBlocked({
   publicRootLifecycle,
+  publicFacadeLifecycleRows,
   blockedPublicFacadeRows,
   failures
 }) {
@@ -2826,33 +2841,52 @@ function validatePublicRootLifecycleBlocked({
     return;
   }
 
+  const lifecycleRowSource = Array.isArray(publicFacadeLifecycleRows)
+    ? publicFacadeLifecycleRows
+    : [];
   const lifecycleRows = [
     {
       key: "renderInitial",
-      expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[0],
-      expectedLabel: "react-dom/client.createRoot(...).render(initial)"
+      expected: lifecycleRowSource[0],
+      expectedId: "public-create-root-render-initial",
+      expectedLabel: PUBLIC_ROOT_RENDER_INITIAL_API
     },
     {
       key: "renderDivText",
-      expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1],
-      expectedLabel:
-        REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1].publicApi
+      expected: lifecycleRowSource[1],
+      expectedId: "public-create-root-render-div-text",
+      expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_RENDER_API
     },
     {
       key: "renderUpdate",
-      expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2],
-      expectedLabel:
-        REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2].publicApi
+      expected: lifecycleRowSource[2],
+      expectedId: "public-create-root-render-update",
+      expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API
     },
     {
       key: "unmount",
-      expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[3],
-      expectedLabel:
-        REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[3].publicApi
+      expected: lifecycleRowSource[3],
+      expectedId: "public-create-root-unmount-call",
+      expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API
     }
   ];
 
-  for (const { expected, expectedLabel, key } of lifecycleRows) {
+  for (const { expected, expectedId, expectedLabel, key } of lifecycleRows) {
+    if (
+      !expected ||
+      expected.id !== expectedId ||
+      expected.publicApi !== expectedLabel
+    ) {
+      failures.push({
+        gateStatus: "public-root-lifecycle-row-public-api-label-mismatch",
+        id: expected?.id ?? expectedId,
+        expectedId,
+        publicApi: expected?.publicApi ?? null,
+        expectedPublicApi: expectedLabel
+      });
+      continue;
+    }
+
     const operation = publicRootLifecycle[key];
     if (!operation) {
       failures.push({
@@ -2911,7 +2945,7 @@ function validatePublicRootLifecycleBlocked({
         minimalHostOutputAdmission: expected.minimalHostOutputAdmission,
         mutationCount: getRootFacadeMutationCount(operation.sideEffects),
         privateBridgeEvidence: "wrapped-private-facade-host-output",
-        publicApi: expected.publicApi,
+        publicApi: expectedLabel,
         renderReturnType: operation.value.type,
         scenarioId: expected.scenarioId
       });
@@ -2995,7 +3029,7 @@ function validatePublicRootLifecycleBlocked({
         controlledDomShim: operation.controlledDomShim ?? false,
         controlledDomSnapshot: operation.controlledDomSnapshot ?? null,
         privateBridgeEvidence: "separate",
-        publicApi: expected.publicApi,
+        publicApi: expectedLabel,
         scenarioId: expected.scenarioId
       });
       continue;
@@ -3296,7 +3330,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
   return {
     renderInitial: attemptChainedPublicRootOperation({
       domContainer,
-      label: "react-dom/client.createRoot(...).render(initial)",
+      label: PUBLIC_ROOT_RENDER_INITIAL_API,
       listenerRegistry,
       reactDomClient,
       rootMarkers,
@@ -3311,7 +3345,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
     }),
     renderDivText: attemptControlledPublicRootRenderDivTextOperation({
       domContainer,
-      label: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1].publicApi,
+      label: MINIMAL_PUBLIC_DIV_TEXT_RENDER_API,
       listenerRegistry,
       React,
       reactDomClient,
@@ -3319,7 +3353,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
     }),
     renderUpdate: attemptControlledPublicRootRenderUpdateOperation({
       domContainer,
-      label: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2].publicApi,
+      label: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API,
       listenerRegistry,
       React,
       reactDomClient,
@@ -3327,7 +3361,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
     }),
     unmount: attemptControlledPublicRootUnmountOperation({
       domContainer,
-      label: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[3].publicApi,
+      label: MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API,
       listenerRegistry,
       React,
       reactDomClient,

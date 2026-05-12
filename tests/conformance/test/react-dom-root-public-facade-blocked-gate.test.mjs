@@ -108,6 +108,20 @@ const MINIMAL_PUBLIC_DIV_TEXT_ESCAPED = "hello &amp; &lt; &gt;";
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE = "again & < >";
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED = "again &amp; &lt; &gt;";
 const MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED = "app&amp;&lt;&gt;&quot;";
+const SIMPLE_PUBLIC_DIV_TEXT_API =
+  'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))';
+
+function minimalPublicDivTextApi(text) {
+  return `ReactDOMClient.createRoot(container).render(React.createElement("div", { id: ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID)} }, ${JSON.stringify(text)}))`;
+}
+
+const MINIMAL_PUBLIC_DIV_TEXT_RENDER_API =
+  minimalPublicDivTextApi(MINIMAL_PUBLIC_DIV_TEXT);
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API = minimalPublicDivTextApi(
+  MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+);
+const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API =
+  `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.unmount()`;
 
 const MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT = Object.freeze({
   containerChildCount: 1,
@@ -198,7 +212,7 @@ function assertMinimalPublicDivTextLifecycle(publicBoundary) {
   const renderDivText = publicBoundary.publicRootLifecycle.renderDivText;
   assert.equal(
     renderDivText.label,
-    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1].publicApi
+    MINIMAL_PUBLIC_DIV_TEXT_RENDER_API
   );
   assert.equal(renderDivText.status, "ok");
   assert.equal(renderDivText.value.type, "undefined");
@@ -235,7 +249,7 @@ function assertMinimalPublicDivTextUpdateLifecycle(publicBoundary) {
   const renderUpdate = publicBoundary.publicRootLifecycle.renderUpdate;
   assert.equal(
     renderUpdate.label,
-    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2].publicApi
+    MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API
   );
   assert.equal(renderUpdate.status, "ok");
   assert.equal(renderUpdate.value.type, "undefined");
@@ -276,7 +290,7 @@ function assertMinimalPublicDivTextUnmountLifecycle(publicBoundary) {
   const unmount = publicBoundary.publicRootLifecycle.unmount;
   assert.equal(
     unmount.label,
-    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[3].publicApi
+    MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API
   );
   assert.equal(unmount.status, "ok");
   assert.equal(unmount.value.type, "undefined");
@@ -4695,6 +4709,17 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
     lifecycleRows.map((row) => row.id),
     REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS.map((row) => row.id)
   );
+  assert.deepEqual(
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS.map(
+      (row) => row.publicApi
+    ),
+    [
+      "react-dom/client.createRoot(...).render(initial)",
+      MINIMAL_PUBLIC_DIV_TEXT_RENDER_API,
+      MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API,
+      MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API
+    ]
+  );
   const expectedBlockedLifecycleOperations = new Map([
     ["public-create-root-render-initial", "root.render"]
   ]);
@@ -4955,6 +4980,36 @@ test("React DOM public root facade gate records minimal public div text render",
       falseGreenCase.label
     );
   }
+
+  const staleLifecycleRows = clone(
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
+  );
+  staleLifecycleRows[1].publicApi = SIMPLE_PUBLIC_DIV_TEXT_API;
+  const staleLifecycleRowGate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: publicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary(),
+    publicFacadeLifecycleRows: staleLifecycleRows
+  });
+  assert.equal(staleLifecycleRowGate.ok, false);
+  assert.equal(
+    staleLifecycleRowGate.blockedPublicFacadeRows.some(
+      (row) => row.id === "public-create-root-render-div-text"
+    ),
+    false
+  );
+  assert.ok(
+    staleLifecycleRowGate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+          "public-root-lifecycle-row-public-api-label-mismatch" &&
+        failure.id === "public-create-root-render-div-text" &&
+        failure.publicApi === SIMPLE_PUBLIC_DIV_TEXT_API &&
+        failure.expectedPublicApi === MINIMAL_PUBLIC_DIV_TEXT_RENDER_API
+    )
+  );
 });
 
 test("React DOM public root facade gate rejects premature public hydrateRoot behavior", () => {

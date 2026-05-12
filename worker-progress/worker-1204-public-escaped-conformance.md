@@ -5,6 +5,7 @@
 - Updated the public root facade conformance lifecycle rows so the admitted fake-DOM div/text render path uses hostile `id = 'app&<>"'` and text containing `&`, `<`, and `>`.
 - The conformance gate now expects escaped attribute/text serialization in `innerHTML` while preserving raw `textContent`, raw `getAttribute("id")`, same-root update reuse, rendered-root unmount cleanup, empty output after unmount, and zero listener/root-marker leaks.
 - Added false-green coverage proving the gate fails when snapshots omit children, first-element-child fields, `innerHTML`, `tagName`, mutation logs, escaped serialized attr/text, or side-effect blockers.
+- Repaired the source-audit finding that lifecycle API label evidence was self-referential: operation labels and validator expected labels now come from independent hostile-label constants, and lifecycle row `publicApi` labels must match those constants before rows can be admitted.
 - Public compatibility remains blocked and `compatibilityClaimed: false`.
 
 ## Changed Files
@@ -29,13 +30,18 @@
 - `npm --prefix tests/conformance run root-public-facade:conformance`
 - `node --test packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js`
 - `git diff --check`
+- `rg -n "LIFECYCLE_BLOCKED_ROWS\\[[123]\\]\\.publicApi|expectedLabel:\\s*REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS|label:\\s*REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS" tests/conformance/src/react-dom-root-public-facade-blocked-gate.mjs tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
+- `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
+- `npm --prefix tests/conformance run root-public-facade:conformance`
+- `node --test packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js`
+- `git diff --check`
 
 ## Verification
 
-- PASS: `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs` (`42` tests passed).
-- PASS: `npm --prefix tests/conformance run root-public-facade:conformance` (`Failures: 0`; public compatibility remains blocked).
-- PASS: `node --test packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js` (`4` tests passed).
-- PASS: `git diff --check`.
+- PASS: `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs` (`42` tests passed) after the label repair.
+- PASS: `npm --prefix tests/conformance run root-public-facade:conformance` (`Failures: 0`; public compatibility remains blocked) after the label repair.
+- PASS: `node --test packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js` (`4` tests passed) after the label repair.
+- PASS: `git diff --check` after the label repair.
 
 ## Evidence
 
@@ -44,11 +50,13 @@
 - The update row still asserts `hostNodeReused: true`.
 - The unmount row still asserts empty controlled DOM output, cleanup mutation log, `duplicateRootTrackingCleared: true`, and zero listener/root-marker leaks.
 - Negative cases mutate the local public facade boundary and fail the gate when required snapshot fields or side-effect blockers are missing/incorrect.
+- The repair adds a stale-row negative case that mutates `public-create-root-render-div-text.publicApi` back to the simple `id="app"` / `"text"` label and proves the gate rejects it with `public-root-lifecycle-row-public-api-label-mismatch` without reporting that lifecycle row as valid.
 
 ## Audit, Review, Or Nested-Agent Findings
 
 - No nested agents were used.
 - Worker 1202 audit gap addressed: conformance rows no longer rely on simple `id="app"` / `text` values for the admitted public fake-DOM render path.
+- Source audit finding addressed: lifecycle API label evidence no longer reads expected labels back from `REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[n].publicApi`, and stale/simple public API labels now fail closed.
 
 ## Risks Or Blockers
 
@@ -62,3 +70,4 @@
 ## Commit
 
 - `097304c7ab0efc4921babd0deae3542e6b002344` `Add escaped public facade conformance evidence`
+- Repair commit pending.
