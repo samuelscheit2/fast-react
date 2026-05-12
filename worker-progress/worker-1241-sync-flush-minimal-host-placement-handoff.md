@@ -41,6 +41,16 @@
 - `git diff --check`: passed.
 - Independent review additionally ran `cargo test -p fast-react-reconciler sync_flush_private_host_mutation_minimal_placement_matrix_executes_canaries`, which passed.
 
+## Follow-up Verification 2026-05-12
+- Confirmed the committed wrong-root canary remains sound and fails through `StaleFinishedWorkHandoff` before source resolution, adapter calls, host-node publication, or host operations.
+- `cargo test -p fast-react-reconciler --all-features sync_flush_minimal_host_placement_rejects_cross_root_record_before_source_adapter_or_host_canary`: 1 passed.
+- `cargo test -p fast-react-reconciler --all-features sync_flush_minimal_host_placement`: 9 passed.
+- `cargo test -p fast-react-reconciler --all-features root_scheduler_sync_flush_records_roots_in_scheduled_order_and_renders_for_commit_handoff`: 1 passed.
+- `cargo test -p fast-react-reconciler --all-features root_work_loop_minimal`: 18 passed.
+- `cargo check -p fast-react-reconciler --all-features`: passed.
+- `cargo fmt --all --check`: passed.
+- `git diff --check`: passed.
+
 ## Audit, Review, Or Nested-Agent Findings
 - Independent diff review found no blockers.
 - Review confirmed the new sync-flush minimal host placement record/error/helpers are `#[cfg(test)] pub(crate)` and the test re-export is `#[cfg(test)] pub(crate)`.
