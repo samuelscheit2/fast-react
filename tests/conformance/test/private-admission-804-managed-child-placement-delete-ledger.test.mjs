@@ -223,12 +223,27 @@ test("private admission 804 rejects missing complete-work and host-work source e
   );
 });
 
-test("private admission 804 rejects stale host-work slice and cleanup ordering evidence", () => {
+test("private admission 804 rejects stale source paths, slices, and cleanup ordering evidence", () => {
   const baseRow = rowByWorker(worker785);
   const gate = evaluatePrivateAdmission804Gate({
     rowOverrides: {
       [worker785]: {
         evidence: withPatchedEvidenceRows(baseRow, {
+          "complete-work-managed-child-metadata": {
+            path: "crates/fast-react-reconciler/src/complete_work.rs",
+            sliceEnd:
+              "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub(crate) struct HostRootOneLevelChildSetCompletionRecord"
+          },
+          "root-commit-managed-child-request-record": {
+            path: "crates/fast-react-reconciler/src/root_commit.rs",
+            sliceEnd:
+              "#[cfg(test)]\n#[derive(Debug, Clone, PartialEq, Eq)]\npub(crate) enum HostRootContextProviderUpdateCommitHandoffErrorForCanary"
+          },
+          "root-commit-validation-before-current-switch": {
+            path: "crates/fast-react-reconciler/src/root_commit.rs",
+            sliceEnd:
+              "#[cfg(test)]\nfn managed_child_complete_metadata_matches_mutation("
+          },
           "host-work-managed-child-execution-diagnostic": {
             sliceEnd:
               "#[derive(Debug, Clone, PartialEq, Eq)]\nenum TestHostRootManagedChildExecutionErrorForCanary"
@@ -242,6 +257,10 @@ test("private admission 804 rejects stale host-work slice and cleanup ordering e
               "TestHostRootDeletionCleanupAction::DetachDeletedInstance",
               "blockers: TEST_HOST_ROOT_MANAGED_CHILD_EXECUTION_BLOCKERS"
             ]
+          },
+          "host-work-managed-child-delete-cleanup": {
+            path: "crates/fast-react-reconciler/src/host_work.rs",
+            sliceEnd: "fn apply_test_host_root_mutation_record("
           }
         })
       }
@@ -254,6 +273,21 @@ test("private admission 804 rejects stale host-work slice and cleanup ordering e
   assertViolationIds(gate, ["private-managed-child-evidence-mismatch"]);
   assertEvidenceRoleRecognized(
     gate,
+    "complete-work-managed-child-metadata",
+    false
+  );
+  assertEvidenceRoleRecognized(
+    gate,
+    "root-commit-managed-child-request-record",
+    false
+  );
+  assertEvidenceRoleRecognized(
+    gate,
+    "root-commit-validation-before-current-switch",
+    false
+  );
+  assertEvidenceRoleRecognized(
+    gate,
     "host-work-managed-child-execution-diagnostic",
     false
   );
@@ -261,6 +295,28 @@ test("private admission 804 rejects stale host-work slice and cleanup ordering e
     gate,
     "host-work-managed-child-apply-handoff",
     false
+  );
+  assertEvidenceRoleRecognized(
+    gate,
+    "host-work-managed-child-delete-cleanup",
+    false
+  );
+
+  const completeWorkEvidence = evidenceRowByRole(
+    gate,
+    "complete-work-managed-child-metadata"
+  );
+  assert.equal(
+    completeWorkEvidence.sliceError,
+    "sliceStart not found in crates/fast-react-reconciler/src/complete_work.rs"
+  );
+  const rootCommitEvidence = evidenceRowByRole(
+    gate,
+    "root-commit-managed-child-request-record"
+  );
+  assert.equal(
+    rootCommitEvidence.sliceError,
+    "sliceStart not found in crates/fast-react-reconciler/src/root_commit.rs"
   );
 
   const diagnosticEvidence = evidenceRowByRole(
