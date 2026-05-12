@@ -9,16 +9,19 @@ Complete.
 - Hardened `tests/conformance/test/conformance-test-discovery.test.mjs` so
   package-script coverage follows a deterministic static relative `.mjs` import
   graph from script-covered entries, not only direct wrapper imports.
+- Repaired the sidecar bridge blocker: recursive static import discovery now
+  follows only required executable conformance entries, and the coverage pass
+  also ignores any supplied non-required import edge before enqueueing it.
 - Preserved Worker 955 behavior: required executable gates remain
   `test/**/*.mjs` and `src/**/*.test.mjs`; direct `scripts.test` matches still
   count; direct wrapper imports still count; comments, strings, templates,
   dynamic imports, and bare/package imports do not create coverage.
 - Kept coverage fail-closed: only required executable gate entries are counted
-  as covered, even when traversal sees an in-repo sidecar module, and missed
-  standalone gates remain reported as uncovered.
+  as covered, and non-required sidecars under directories such as `fixtures/`
+  cannot bridge coverage into a missed required gate.
 - Added focused hostile fixtures for wrapper -> intermediate wrapper -> gate
-  coverage, cyclic wrapper imports, and dynamic/comment/string false-green
-  attempts that must not cover a missed gate.
+  coverage, fixture-mediated bridge rejection, cyclic wrapper imports, and
+  dynamic/comment/string false-green attempts that must not cover a missed gate.
 
 ## Changed Files
 
@@ -36,17 +39,23 @@ Complete.
 ## Evidence Gathered
 
 - Read `WORKER_BRIEF.md` and Worker 955's accepted discovery-gate report.
-- The focused discovery suite now passes with 11 tests.
+- The focused discovery suite now passes with 12 tests.
 - The transitive wrapper fixture proves `test/root-wrapper.test.mjs` covers
   `test/intermediate-wrapper.mjs`, which in turn covers
   `test/final-gate.mjs`.
+- The sidecar bridge fixture proves `test/root-wrapper.test.mjs` importing
+  `fixtures/sidecar.mjs`, which imports `test/missed-gate.mjs`, still leaves the
+  missed required gate uncovered.
+- The sidecar bridge fixture also checks the coverage analyzer directly with
+  the old bridged map shape so a non-required sidecar cannot be enqueued as a
+  bridge even if such an edge is supplied.
 - The hostile recursive fixture proves a cycle between `test/cycle-a.mjs` and
   `test/cycle-b.mjs` terminates deterministically, while
   `test/missed-gate.mjs` stays uncovered when only mentioned by comments,
   string/template literals, or `import("./missed-gate.mjs")`.
-- The hostile fixture also imports a non-required
-  `fixtures/unrelated-sidecar.mjs`; traversal can inspect it, but it does not
-  appear in `coveredEntries` because it is not a required executable gate.
+- The hostile fixture still imports a non-required
+  `fixtures/unrelated-sidecar.mjs`; it is excluded from recursive discovery and
+  does not appear in `coveredEntries`.
 
 ## Audit, Review, Or Nested-Agent Findings
 
@@ -54,6 +63,9 @@ Complete.
   filesystem discovery and still built wrapper coverage from direct static
   imports of direct-covered entries. This repair implements the missing
   transitive import traversal and adds regression coverage for that blocker.
+- Follow-up audit found non-required sidecars could still bridge traversal into
+  required missed gates. This repair constrains both discovery and coverage
+  enqueueing to required conformance entries.
 - No nested agents were used.
 
 ## Risks Or Blockers

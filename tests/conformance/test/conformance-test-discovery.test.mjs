@@ -23,7 +23,8 @@ test("workspace conformance test script covers every executable conformance test
   });
   const importedEntriesByEntry = await discoverStaticImportsForEntries({
     root: conformanceRoot,
-    entries: directAnalysis.directCoveredEntries
+    entries: directAnalysis.directCoveredEntries,
+    requiredEntries
   });
   const analysis = analyzeConformanceTestScriptCoverage({
     testScript: packageJson.scripts.test,
@@ -280,7 +281,8 @@ test("static import graph discovery follows transitive wrapper coverage", async 
     });
     const importedEntriesByEntry = await discoverStaticImportsForEntries({
       root,
-      entries: directAnalysis.directCoveredEntries
+      entries: directAnalysis.directCoveredEntries,
+      requiredEntries
     });
     const analysis = analyzeConformanceTestScriptCoverage({
       testScript: "node --test test/*.test.mjs",
@@ -302,6 +304,69 @@ test("static import graph discovery follows transitive wrapper coverage", async 
     assert.deepEqual(analysis.importCoveredEntries, [
       "test/final-gate.mjs",
       "test/intermediate-wrapper.mjs"
+    ]);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("static import coverage does not bridge through non-required fixtures", async () => {
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "fast-react-conformance-discovery-")
+  );
+
+  try {
+    await writeConformanceFixtureFile(
+      root,
+      "test/root-wrapper.test.mjs",
+      'import "../fixtures/sidecar.mjs";\n'
+    );
+    await writeConformanceFixtureFile(
+      root,
+      "fixtures/sidecar.mjs",
+      'import "../test/missed-gate.mjs";\n'
+    );
+    await writeConformanceFixtureFile(root, "test/missed-gate.mjs");
+    await writeConformanceFixtureFile(root, "src/source-helper.mjs");
+
+    const requiredEntries = await discoverRequiredConformanceTestEntries(root);
+    const directAnalysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries
+    });
+    const importedEntriesByEntry = await discoverStaticImportsForEntries({
+      root,
+      entries: directAnalysis.directCoveredEntries,
+      requiredEntries
+    });
+    const analysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries,
+      importedEntriesByEntry
+    });
+    const sidecarBridgeAnalysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries,
+      importedEntriesByEntry: new Map([
+        ["fixtures/sidecar.mjs", ["test/missed-gate.mjs"]],
+        ["test/root-wrapper.test.mjs", ["fixtures/sidecar.mjs"]]
+      ])
+    });
+
+    assert.deepEqual(requiredEntries, [
+      "test/missed-gate.mjs",
+      "test/root-wrapper.test.mjs"
+    ]);
+    assert.deepEqual(importedEntriesByEntry, new Map([
+      ["test/root-wrapper.test.mjs", []]
+    ]));
+    assert.deepEqual(analysis.coveredEntries, ["test/root-wrapper.test.mjs"]);
+    assert.deepEqual(analysis.uncoveredEntries, ["test/missed-gate.mjs"]);
+    assert.deepEqual(sidecarBridgeAnalysis.coveredEntries, [
+      "test/root-wrapper.test.mjs"
+    ]);
+    assert.deepEqual(sidecarBridgeAnalysis.uncoveredEntries, [
+      "test/missed-gate.mjs"
     ]);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
@@ -362,7 +427,8 @@ test("recursive static import coverage is cycle-safe and ignores false-green imp
     });
     const importedEntriesByEntry = await discoverStaticImportsForEntries({
       root,
-      entries: directAnalysis.directCoveredEntries
+      entries: directAnalysis.directCoveredEntries,
+      requiredEntries
     });
     const analysis = analyzeConformanceTestScriptCoverage({
       testScript: "node --test test/*.test.mjs",
@@ -371,17 +437,12 @@ test("recursive static import coverage is cycle-safe and ignores false-green imp
     });
 
     assert.deepEqual(importedEntriesByEntry, new Map([
-      ["fixtures/unrelated-sidecar.mjs", []],
       ["test/cycle-a.mjs", ["test/cycle-b.mjs"]],
       ["test/cycle-b.mjs", ["test/cycle-a.mjs"]],
       ["test/nonstatic-wrapper.mjs", []],
       [
         "test/root-wrapper.test.mjs",
-        [
-          "fixtures/unrelated-sidecar.mjs",
-          "test/cycle-a.mjs",
-          "test/nonstatic-wrapper.mjs"
-        ]
+        ["test/cycle-a.mjs", "test/nonstatic-wrapper.mjs"]
       ]
     ]));
     assert.deepEqual(analysis.coveredEntries, [
@@ -415,10 +476,12 @@ async function discoverRequiredConformanceTestEntries(root) {
 
 async function discoverStaticImportsForEntries({
   root,
-  entries
+  entries,
+  requiredEntries
 }) {
   const importsByEntry = new Map();
   const pendingEntries = [...entries].sort(compareEntries);
+  const requiredEntrySet = new Set(requiredEntries);
   const visitedEntries = new Set();
 
   while (pendingEntries.length > 0) {
@@ -432,11 +495,14 @@ async function discoverStaticImportsForEntries({
     const importedEntries = discoverStaticRelativeMjsImportsFromSource({
       entry,
       source
-    });
-    const inRootEntries = importedEntries.filter(isConformanceRelativeEntry);
-    importsByEntry.set(entry, inRootEntries);
+    }).filter(
+      (importedEntry) =>
+        isConformanceRelativeEntry(importedEntry) &&
+        requiredEntrySet.has(importedEntry)
+    );
+    importsByEntry.set(entry, importedEntries);
 
-    for (const importedEntry of inRootEntries) {
+    for (const importedEntry of importedEntries) {
       if (!visitedEntries.has(importedEntry)) {
         pendingEntries.push(importedEntry);
       }
@@ -811,7 +877,11 @@ function analyzeConformanceTestScriptCoverage({
     visitedEntries.add(entry);
 
     for (const importedEntry of importedEntriesByEntry.get(entry) ?? []) {
-      if (requiredEntrySet.has(importedEntry) && !covered.has(importedEntry)) {
+      if (!requiredEntrySet.has(importedEntry)) {
+        continue;
+      }
+
+      if (!covered.has(importedEntry)) {
         covered.add(importedEntry);
       }
 
