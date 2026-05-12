@@ -133,19 +133,21 @@ const SCHEDULER_ROOT_CURRENTNESS_BEHAVIOR_EVIDENCE_KEYS = Object.freeze([
   "compatibilityClaimed"
 ]);
 
-const CLEAN_OBJECT_PROTOTYPE_KEYS = Object.freeze([
-  "constructor",
-  "__defineGetter__",
-  "__defineSetter__",
-  "hasOwnProperty",
-  "__lookupGetter__",
-  "__lookupSetter__",
-  "isPrototypeOf",
-  "propertyIsEnumerable",
-  "toString",
-  "valueOf",
-  "__proto__",
-  "toLocaleString"
+const SCHEDULER_ROOT_CURRENTNESS_SOURCE_METADATA_KEYS = Object.freeze([
+  "actualEntrypoint",
+  "actualSourcePath",
+  "entrypoint",
+  "sourcePath",
+  "packageName",
+  "packageSourcePath",
+  "sourceRole",
+  "behaviorEvidenceKind",
+  "behaviorEvidenceAllowed",
+  "directDeepCjsImport",
+  "variantBoundaryEvidence",
+  "privateAdmission886Evidence",
+  "requiredTokens",
+  "missingTokens"
 ]);
 
 export function evaluateSchedulerRootCurrentnessGate({
@@ -761,6 +763,7 @@ function sourceRowMatchesDefinition(row, definition) {
   return (
     hasPlainObjectPrototype(row) &&
     !objectHasPublicClaim(row) &&
+    !objectHasInheritedSourceMetadata(row) &&
     keyManifest.missing.length === 0 &&
     keyManifest.unexpected.length === 0 &&
     ownKeysAreEnumerableDataProperties(row, expectedSourceRowKeys(definition)) &&
@@ -820,6 +823,7 @@ function localObservationRowMatchesExpected(row, { mode, scenarioId }) {
   return (
     hasPlainObjectPrototype(row) &&
     !objectHasPublicClaim(row) &&
+    !objectHasInheritedSourceMetadata(row) &&
     keyManifest.missing.length === 0 &&
     keyManifest.unexpected.length === 0 &&
     ownKeysAreEnumerableDataProperties(
@@ -1016,22 +1020,39 @@ function descriptorIsAccessor(descriptor) {
 }
 
 function hasPlainObjectPrototype(value) {
-  return (
-    Object.getPrototypeOf(value) === Object.prototype &&
-    objectPrototypeHasOnlyCleanProperties()
+  return Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function objectHasInheritedSourceMetadata(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  let prototype = Object.getPrototypeOf(value);
+  while (prototype) {
+    for (const key of Reflect.ownKeys(prototype)) {
+      if (isSchedulerRootSourceMetadataName(key)) {
+        return true;
+      }
+    }
+    prototype = Object.getPrototypeOf(prototype);
+  }
+
+  return false;
+}
+
+function isSchedulerRootSourceMetadataName(key) {
+  const normalizedKey = normalizeClaimName(formatMetadataPropertyKey(key));
+  return SCHEDULER_ROOT_CURRENTNESS_SOURCE_METADATA_KEYS.some(
+    (metadataKey) => normalizeClaimName(metadataKey) === normalizedKey
   );
 }
 
-function objectPrototypeHasOnlyCleanProperties() {
-  const keyManifest = compareStringSets(
-    CLEAN_OBJECT_PROTOTYPE_KEYS,
-    ownPropertyKeyNames(Object.prototype)
-  );
-  return (
-    keyManifest.missing.length === 0 &&
-    keyManifest.unexpected.length === 0 &&
-    keyManifest.duplicates.length === 0
-  );
+function formatMetadataPropertyKey(key) {
+  if (typeof key === "symbol") {
+    return key.description ?? key.toString();
+  }
+  return key;
 }
 
 function formatPropertyKey(key) {
@@ -1060,6 +1081,7 @@ function isPublicRootBehaviorEvidence(evidence) {
   return (
     hasPlainObjectPrototype(evidence) &&
     !objectHasPublicClaim(evidence) &&
+    !objectHasInheritedSourceMetadata(evidence) &&
     keyManifest.missing.length === 0 &&
     keyManifest.unexpected.length === 0 &&
     ownKeysAreEnumerableDataProperties(

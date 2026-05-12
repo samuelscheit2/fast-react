@@ -40,6 +40,57 @@ const EXPECTED_TIMEOUTS = new Map([
   ["idle", "1073741823ms"]
 ]);
 
+const OBJECT_PROTOTYPE_VARIANT_SOURCE_FIELD_CASES = [
+  {
+    label: "native actual entrypoint",
+    properties: {
+      actualEntrypoint: "scheduler/native"
+    }
+  },
+  {
+    label: "mock actual entrypoint",
+    properties: {
+      actualEntrypoint: "scheduler/unstable_mock"
+    }
+  },
+  {
+    label: "postTask actual entrypoint",
+    properties: {
+      actualEntrypoint: "scheduler/unstable_post_task"
+    }
+  },
+  {
+    label: "deep CJS actual source path",
+    properties: {
+      actualSourcePath: "packages/scheduler/cjs/scheduler.production.js"
+    }
+  },
+  {
+    label: "postTask source path",
+    properties: {
+      sourcePath: "packages/scheduler/src/forks/SchedulerPostTask.js"
+    }
+  },
+  {
+    label: "mock entrypoint",
+    properties: {
+      entrypoint: "scheduler/unstable_mock"
+    }
+  },
+  {
+    label: "mock package name",
+    properties: {
+      packageName: "scheduler/unstable_mock"
+    }
+  },
+  {
+    label: "variant package source path",
+    properties: {
+      packageSourcePath: "packages/scheduler/src/forks/SchedulerPostTask.js"
+    }
+  }
+];
+
 let cachedBaselineGate = null;
 
 test("Scheduler root currentness gate records current local root rows without public compatibility claims", () => {
@@ -1134,19 +1185,12 @@ test("Scheduler root currentness gate rejects Object.prototype snake_case compat
 });
 
 test("Scheduler root currentness gate rejects Object.prototype non-claim variant fields on local rows", () => {
-  const localObservationRows = cloneJson(baselineGate().localObservationRows);
-  const sourceRows = cloneJson(baselineGate().sourceRows);
-
-  withTemporaryObjectPrototypeProperties(
-    {
-      actualEntrypoint: "scheduler/native",
-      actualSourcePath:
-        "packages/scheduler/src/forks/SchedulerPostTask.js"
-    },
-    () => {
+  for (const fieldCase of OBJECT_PROTOTYPE_VARIANT_SOURCE_FIELD_CASES) {
+    const { label, properties } = fieldCase;
+    withTemporaryObjectPrototypeProperties(properties, () => {
       const gate = evaluateWithBaselineRows({
-        localObservationRows,
-        sourceRows
+        localObservationRows: cloneJson(baselineGate().localObservationRows),
+        sourceRows: cloneJson(baselineGate().sourceRows)
       });
 
       assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
@@ -1155,26 +1199,20 @@ test("Scheduler root currentness gate rejects Object.prototype non-claim variant
           gate,
           "scheduler-root-currentness-local-observation-row-identity-mismatch"
         ).rowIds,
-        expectedCurrentnessRowIds()
+        expectedCurrentnessRowIds(),
+        label
       );
-    }
-  );
+    });
+  }
 });
 
 test("Scheduler root currentness gate rejects Object.prototype non-claim variant fields on behavior evidence", () => {
-  const localObservationRows = cloneJson(baselineGate().localObservationRows);
-  const sourceRows = cloneJson(baselineGate().sourceRows);
-
-  withTemporaryObjectPrototypeProperties(
-    {
-      actualEntrypoint: "scheduler/unstable_post_task",
-      actualSourcePath:
-        "packages/scheduler/src/forks/SchedulerPostTask.js"
-    },
-    () => {
+  for (const fieldCase of OBJECT_PROTOTYPE_VARIANT_SOURCE_FIELD_CASES) {
+    const { label, properties } = fieldCase;
+    withTemporaryObjectPrototypeProperties(properties, () => {
       const gate = evaluateWithBaselineRows({
-        localObservationRows,
-        sourceRows
+        localObservationRows: cloneJson(baselineGate().localObservationRows),
+        sourceRows: cloneJson(baselineGate().sourceRows)
       });
 
       assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
@@ -1183,10 +1221,11 @@ test("Scheduler root currentness gate rejects Object.prototype non-claim variant
           gate,
           "scheduler-root-currentness-variant-or-deep-cjs-evidence-used"
         ).rowIds,
-        expectedCurrentnessRowIds()
+        expectedCurrentnessRowIds(),
+        label
       );
-    }
-  );
+    });
+  }
 });
 
 test("Scheduler root currentness gate rejects non-claim behavior evidence variant fields", () => {
