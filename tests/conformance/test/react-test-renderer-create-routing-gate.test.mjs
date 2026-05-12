@@ -2881,6 +2881,105 @@ test("react-test-renderer package root hidden create bridge returns private root
     false,
     "package-root create bridge rejects public serialization claims"
   );
+  const missingEmbeddedAdmissionHandoff = { ...handoff };
+  delete missingEmbeddedAdmissionHandoff.createRouteAdmission;
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      missingEmbeddedAdmissionHandoff
+    ),
+    false,
+    "package-root create bridge rejects handoff without embedded admission"
+  );
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      {
+        ...handoff,
+        createRouteAdmission: {
+          ...handoff.createRouteAdmission,
+          rustAdmissionMetadata: {
+            ...handoff.createRouteAdmission.rustAdmissionMetadata,
+            metadataId: "fast-react-test-renderer-stale-create-route-admission"
+          }
+        }
+      }
+    ),
+    false,
+    "package-root create bridge rejects mismatched admission metadata"
+  );
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      {
+        ...handoff,
+        workLoopFinishedWorkPreflight: {
+          ...handoff.workLoopFinishedWorkPreflight,
+          renderLanesBits: 2
+        }
+      }
+    ),
+    false,
+    "package-root create bridge rejects mismatched handoff preflight lanes"
+  );
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      withHiddenTrueProperty(handoff, "publicToJSONAvailable")
+    ),
+    false,
+    "package-root create bridge rejects hidden public serialization aliases"
+  );
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      withProxyInTrapTrueProperty(handoff, "packageCompatibilityAvailable")
+    ),
+    false,
+    "package-root create bridge rejects proxy-hidden package compatibility aliases"
+  );
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      {
+        ...handoff,
+        hostOutput: {
+          ...handoff.hostOutput,
+          producedFromJs: true
+        }
+      }
+    ),
+    false,
+    "package-root create bridge rejects host-output produced-from-JS aliases"
+  );
+
+  const mutableAdmissionDiagnostic =
+    createRustCreateRouteAdmissionDiagnosticSource(admission);
+  mutableAdmissionDiagnostic.rootCreateExecutionEvidence = {
+    ...admission.rootCreateExecutionEvidence
+  };
+  const mutableAdmissionConsumption =
+    bridge.consumeAcceptedRustRootCreateRouteAdmission(
+      createRequest,
+      mutableAdmissionDiagnostic
+    );
+  mutableAdmissionDiagnostic.rootCreateExecutionEvidence
+    .publicTestInstanceAvailable = true;
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      mutableAdmissionConsumption,
+      handoff
+    ),
+    false,
+    "package-root create bridge rejects source-smuggled TestInstance claims"
+  );
 
   const rootError = captureThrown(() => renderer.root);
   assertCreateRoutingGate(rootError, entry.entrypoint);
