@@ -1,6 +1,6 @@
 # Fast React Master Progress
 
-Last updated: 2026-05-12
+Last updated: 2026-05-13
 
 This file owns accepted history only. Current queues, next actions, and future
 sequencing belong in `MASTER_PLAN.md`.
@@ -39,11 +39,15 @@ sequencing belong in `MASTER_PLAN.md`.
   hidden, inherited, non-enumerable, symbol, accessor, snake_case,
   dash-separated, and `Object.prototype` compatibility-claim bypasses. No public
   Scheduler timing, root, package, or broad compatibility claim is opened.
-- Worker 1243 repair `fc263bef` closed a follow-up scheduler-root false green:
-  caller-provided local observation rows now need exact expected row/source
-  identity and descriptor shape, and `behaviorEvidence` now rejects extra,
-  missing, hidden, inherited, symbol, accessor-backed, claim-like, or mismatched
-  variant/source fields before a row can count as current root evidence.
+- Worker 1243 repair `fc263bef` closed the first follow-up scheduler-root false
+  green for own and custom-prototype row/evidence smuggling: caller-provided
+  local observation rows now need exact expected row/source identity and
+  descriptor shape, and `behaviorEvidence` rejects own extra, missing, hidden,
+  symbol, accessor-backed, claim-like, or mismatched variant/source fields
+  before a row can count as current root evidence. A later post-merge source
+  audit found a remaining `Object.prototype` inherited non-claim variant-field
+  path, so the scheduler row/evidence source-validation slice is under active
+  follow-up repair rather than fully accepted as clean.
 - Worker 1239 aligned the react-test-renderer serialization oracle and local
   source status with the current workspace placeholder package:
   `status: "placeholder-present"` with comparison and compatibility claims
@@ -53,15 +57,14 @@ sequencing belong in `MASTER_PLAN.md`.
   and mutated frozen blocker records. Public `toJSON`, `toTree`,
   `ReactTestInstance`, JS/CJS/package compatibility, native bridge execution,
   and broad renderer compatibility remain blocked.
-- Accepted validation includes clean independent source and verification audits
-  for Worker 1243 after multiple hostile-source repairs, clean source and
-  verification audits for the Worker 1243 repair, plus final clean source and
-  verification audits for Worker 1239. Root reruns passed Worker 1243's focused
-  scheduler root currentness tests before and after repair (24/24, then 29/29),
-  companion Scheduler/root conformance suite (111/111), scheduler workspace
-  check, package-surface guard, import smoke, and `git diff --check`; and Worker
-  1239's oracle test (28/28), local-gate test (46/46), combined serialization
-  script (74/74), package-surface guard, import smoke, and `git diff --check`.
+- Accepted validation includes clean post-merge source and verification audits
+  for Worker 1239. Worker 1243's original focused checks and first repair
+  checks passed, but the first repair has a post-merge source blocker for
+  inherited non-claim variant metadata on `Object.prototype`; treat its
+  scheduler row/evidence source-validation claim as provisional until the
+  follow-up repair is accepted. Root reruns passed Worker 1239's oracle test
+  (28/28), local-gate test (46/46), combined serialization script (74/74),
+  package-surface guard, import smoke, and `git diff --check`.
 - The accepted implementation/evidence baseline is main `4aa248fb` after Worker
   1243 merge `83fe318d`, Worker 1239 merge `df39570c`, and Worker 1243 repair
   merge `4aa248fb`, plus worker commits `47ee1b17`, `06e7a3e6`, `8820cf9c`,

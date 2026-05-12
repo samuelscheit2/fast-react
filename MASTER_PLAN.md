@@ -1,6 +1,6 @@
 # Fast React Master Plan
 
-Last updated: 2026-05-12
+Last updated: 2026-05-13
 
 This file owns current and future work only. Accepted history belongs in
 `MASTER_PROGRESS.md`; durable orchestration policy belongs in `ORCHESTRATOR.md`;
@@ -45,11 +45,14 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Latest accepted implementation/evidence baseline is
-main `4aa248fb` (`Merge worker 1243 scheduler currentness source validation`).
-Accepted implementation, cleanup, planning, and docs-only history through that
-baseline is recorded in `MASTER_PROGRESS.md`; this plan lists only
-current/future work.
+Top-level cap: 30 workers. Current root head is main `5a831318` (`Refresh docs
+after scheduler currentness repair`). Worker 1239 has clean post-merge source
+and verification audits; Worker 1243's scheduler row/evidence source validation
+has a post-merge audit blocker and is under follow-up repair. Do not treat that
+scheduler source-validation slice as final until Worker 1245 lands and audits
+cleanly. Accepted implementation, cleanup, planning, and docs-only history that
+is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan lists
+only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 Worker 1219's docs-only branch is superseded by main `8f611f0e` and is not
@@ -58,30 +61,21 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Accepted implementation/evidence facts through baseline main `4aa248fb` are
-  recorded in `MASTER_PROGRESS.md`.
-- No unaccepted clean candidate worktrees are currently ready for merge.
-- Next root-render sequencing after the accepted private NAPI metadata JSON
-  adapter/roundtrip, private HTML-like host commit canary, and native React DOM
-  render handoff admission, plus the minimal public
-  `react-dom/client.createRoot(container)` ->
-  `root.render(React.createElement('div', {id?}, text|number))` fake-DOM
-  host-output path, same-root repeat div/text fake-DOM update, rendered-root
-  unmount cleanup, aligned public-unmount smoke, and test/conformance/smoke-only
-  public fake-DOM observability for that already accepted lifecycle, is to
-  preserve hostile escaped public conformance for that same fake-DOM lifecycle,
-  the private reconciler diagnostic path, source-owned execution-surface
-  blockers, recursive conformance discovery, repaired no-load native metadata
-  source ledgers, refreshed private-admission source ledgers, React DOM
-  native-compatibility alias denylists, public render capability and wrapper
-  execution rejection matrices, React Children source-owned currentness
-  hardening through hostile freeze/proxy replacements, exact-two/exact-three
-  private same-transition currentness canaries, sync-flush minimal host
-  placement evidence, passive destroy clear-before-invoke evidence, and
-  public/native/browser-DOM capability rejection, scheduler root currentness
-  completeness, scheduler local-row/behavior-evidence source validation, and
-  react-test-renderer serialization local-status currentness while proving any
-  later private NAPI/adapter handoff or broader public root lifecycle extension.
+- Worker 1245 repairs the remaining scheduler root currentness false green:
+  inherited non-claim variant metadata injected through `Object.prototype` must
+  fail closed for both local observation rows and `behaviorEvidence`.
+- Worker 1250 is the primary Rust behavior lane: private HostRoot update-queue
+  payloads should flow through render, complete, and commit for minimal host
+  mount/update/cleanup evidence.
+- Worker 1251 is the public React DOM behavior lane: extend the accepted
+  fake-DOM root lifecycle from a flat `div`/text node to one nested host shape
+  while preserving unsupported-surface blockers.
+- Worker 1252 is the test-renderer behavior lane: add a private package-root
+  create bridge that consumes source-owned Rust/native-shaped host-output
+  evidence while public test-renderer APIs remain blocked.
+- No unaccepted clean candidate worktrees are currently ready for merge. Keep
+  these candidate worktrees retained until their source and verification audits
+  finish.
 
 Current project-owned source/test large-file baseline after accepted
 implementation/evidence baseline main `4aa248fb`,

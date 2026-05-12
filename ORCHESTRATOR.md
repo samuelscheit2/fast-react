@@ -74,6 +74,19 @@ The orchestrator goal is continuous. Do not call
 - Prefer independent lanes by touched surface, risk class, and verification
   gate. When a task is blocked on audit or a long-running command, use the
   wait time for useful scouts, repairs, pre-audits, or merge-prep work.
+- Keep the active mix weighted toward behavior-bearing implementation. A
+  behavior-bearing worker changes production or private execution behavior; a
+  conformance matrix, ledger, blocker, alias rejection, or docs-only change
+  does not count unless it closes a named audit blocker.
+- Every gate, currentness, blocker, or ledger worker must name the next
+  behavior-bearing worker it enables. If there is no credible follow-on
+  implementation slice, defer the gate work.
+- Use surface reservations for high-conflict files before spawning workers.
+  Reserve one writer at a time for large facades and gates such as
+  `packages/react-dom/src/client/root-bridge.js`,
+  `packages/react-test-renderer/index.js`, and broad scheduler currentness
+  files; keep Rust reconciler, React DOM, test-renderer, and scheduler lanes
+  parallel when their write scopes are separate.
 - Run research, audit, repair, and verification work in parallel when their
   inputs are independent. Serialize only the operations that must be serialized:
   accepting evidence, resolving conflicts, merging to the root branch, and
@@ -84,6 +97,9 @@ The orchestrator goal is continuous. Do not call
 - Do not keep completed agents open as a substitute for durable state. Record
   their useful output in worker reports, coordination docs, or followup prompts,
   then close them once no more interaction is needed.
+- Keep candidate worktrees under a retention lock until all required source and
+  verification audits finish. Do not prune a candidate worktree while an audit
+  still references it.
 - When throughput drops, identify the actual bottleneck before spawning more
   workers. Common bottlenecks are serial merge bandwidth, stale state, missing
   audit evidence, flaky or overly broad verification, unclear ownership, and
