@@ -46,18 +46,20 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline before this docs
-refresh is main `2593a5fe` (`Merge worker 1029 sync flush root record split`).
+refresh is main `1027e9ad` (`Merge worker 1034 test renderer host output split`).
 Accepted implementation history still includes the post-Worker-997 batch:
 Workers 986, 987, 992, 1000, 998, 978, 999, 990, 967, 996, 994, and 989.
-Accepted organization-only cleanup history now includes Workers 1002-1029:
+Accepted organization-only cleanup history now includes Workers 1002-1034:
 Rust test-module extractions, the test-renderer facade/root/diagnostics splits,
 the N-API root bridge request split, the root work-loop test split, the
 `root_commit` errors/effects/deletions/refs splits, root-commit/host-work test
 splits, the function-component handles/errors, effects, deletions, and hook
 records splits, the `complete_work` split, the `root_work_loop`
 render/preflight splits, the `host_work` payload/mutation/update helper split,
-and the `sync_flush` root-record split. These cleanups make no runtime or
-public compatibility claim.
+the `sync_flush` root-record split, the test-renderer test extraction to
+`crates/fast-react-test-renderer/src/tests.rs`, and the test-renderer
+`root_impl` create-route, update-route, host-output, and fixture splits. These
+cleanups make no runtime or public compatibility claim.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
@@ -68,9 +70,10 @@ Current orchestration queue:
 - No implementation worker output is listed as live accepted input in this plan
   snapshot.
 
-Current large-file baseline after accepted Workers 1025-1029:
+Current large-file baseline after accepted Workers 1031-1034:
 
-- `fast-react-test-renderer/src/lib.rs`: 25,886 lines
+- `fast-react-test-renderer/src/tests.rs`: 13,597 lines
+- `fast-react-test-renderer/src/lib.rs`: 9,879 lines
 - `root_commit.rs`: 9,862 lines
 - `function_component.rs`: 9,235 lines
 - `root_work_loop.rs`: 8,751 lines
@@ -79,14 +82,13 @@ Current large-file baseline after accepted Workers 1025-1029:
 - `function_component/tests.rs`: 7,968 lines
 - `fast-react-napi/src/lib.rs`: 7,728 lines
 - `sync_flush.rs`: 7,235 lines
-- `complete_work.rs`: 3,356 lines
 
 Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
 Accepted private compatibility evidence through `8a3b4042`, accepted
-organization-only cleanup through `2593a5fe`, plus audit policy through
+organization-only cleanup through `1027e9ad`, plus audit policy through
 `732a6b21`, still keeps public root/render/unmount, `act`,
 `react-dom/test-utils.act`, `flushSync`, Scheduler timing, hydration,
 resources/forms, public input/change or controlled-input behavior,
@@ -101,7 +103,7 @@ canonical evidence requirements.
 ## Near-Term Sequencing
 
 1. Treat accepted compatibility evidence through `8a3b4042`, plus the
-   organization-only cleanup history through `2593a5fe`, as private evidence
+   organization-only cleanup history through `1027e9ad`, as private evidence
    or file-organization evidence only. Public package, root, native, React DOM,
    test-renderer, Scheduler, `act`, `react-dom/test-utils.act`, hydration,
    resource/form, public controlled-input, serialization, React Children

@@ -29,6 +29,42 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1035 Docs Refresh and Workers 1031-1034 Test Renderer Splits
+
+- Worker 1035 refreshed master docs after accepted organization-only cleanup
+  Workers 1031-1034. This is a docs-only refresh and makes no runtime or
+  public compatibility claim.
+- Worker 1031 extracted the `fast-react-test-renderer` inline
+  `#[cfg(test)] mod tests` body from
+  `crates/fast-react-test-renderer/src/lib.rs` into
+  `crates/fast-react-test-renderer/src/tests.rs`, preserving the crate-root
+  test module path and private test access.
+- Worker 1032 moved the `TestRendererRoot` create-route preflight, admission,
+  and native bridge handoff methods into
+  `crates/fast-react-test-renderer/src/root_impl/create_route.rs`.
+- Worker 1033 moved the `TestRendererRoot` update-route admission and native
+  bridge helper methods into
+  `crates/fast-react-test-renderer/src/root_impl/update_route.rs`.
+- Worker 1034 moved host-output render, commit, update, placement, sibling
+  insertion, and unmount canary implementations into
+  `crates/fast-react-test-renderer/src/root_impl/host_output.rs`, and moved
+  tightly related host-output fixture helpers into
+  `crates/fast-react-test-renderer/src/root_impl/fixtures.rs`.
+- Accepted orchestrator validation for the final main state passed
+  `cargo test -p fast-react-test-renderer --lib` with 182 tests,
+  `cargo test -p fast-react-reconciler` with 886 unit tests plus 1 doc-test,
+  `cargo fmt --all --check`, `git diff --check`,
+  `npm run check:package-surface` under Node 26.1.0, and
+  `node tests/smoke/import-entrypoints.mjs` under Node 26.1.0. npm emitted
+  only the known `minimum-release-age` warning during package-surface
+  validation.
+- The accepted state for this cleanup batch is main `1027e9ad` after merge
+  commits `147c51e3`, `ce759a89`, `16bb61c7`, and `1027e9ad`. These changes
+  improve file organization only. Public React DOM roots,
+  test-renderer/native behavior, hooks, Scheduler timing, hydration, events,
+  resources/forms, package compatibility, and broad renderer compatibility
+  remain blocked unless separately proven.
+
 ### Worker 1030 Docs Refresh and Workers 1025-1029 Cleanup Splits
 
 - Worker 1030 refreshed master docs after accepted organization-only cleanup
