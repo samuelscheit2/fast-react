@@ -46,7 +46,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline before this docs
-refresh is main `965d1e62` (`Merge worker 1077 public render conformance gate`).
+refresh is main `b99841e3` (`Merge worker 1085 minimal complete work host`).
 Accepted implementation history still includes the post-Worker-997 batch:
 Workers 986, 987, 992, 1000, 998, 978, 999, 990, 967, 996, 994, and 989.
 Accepted organization-only cleanup history now includes Workers 1002-1062:
@@ -77,25 +77,35 @@ test-only HostRoot mount reconciliation canary, a diagnostic
 HostComponent/HostText mutation execution gate that still reports blocked, and
 a public render conformance probe that still expects public `createRoot` to
 throw before `root.render` and leave the DOM shim empty.
+Accepted root-render helper input also includes Workers 1083-1085: the public
+facade blocked gate was split into a dedicated conformance module, a narrow
+production-compiled HostRoot -> HostComponent -> HostText render-shape helper
+was added, and a transactional minimal complete-work host helper was added.
+These helpers remain private/crate-internal and do not commit, mutate DOM, or
+unblock public React DOM root rendering.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted facts through main `965d1e62` are recorded in
+- Accepted facts through main `b99841e3` are recorded in
   `MASTER_PROGRESS.md`.
-- No unreviewed implementation worker output is listed as live accepted input
-  in this plan snapshot.
+- No later worker output is listed as live accepted input in this plan
+  snapshot.
+- Immediate root-render sequencing is render-complete handoff from the accepted
+  render-shape helper into the accepted complete-work helper, then
+  commit/mutation/private metadata, then JS/public facade admission only after
+  fail-closed native/Rust evidence exists.
 
-Current large-file baseline after accepted main `965d1e62`:
+Current large-file baseline after accepted main `b99841e3`:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,390 lines
 - `packages/react-test-renderer/cjs/react-test-renderer.development.js`: 23,803 lines
 - `packages/react-test-renderer/cjs/react-test-renderer.production.js`: 20,750 lines
 - `tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`: 18,216 lines
-- `tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs`: 15,434 lines
 - `packages/react-test-renderer/index.js`: 15,407 lines
 - `packages/react-dom/src/resource-form-internals-gate.js`: 14,641 lines
+- `tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs`: 12,192 lines
 - `packages/react-dom/src/client/controlled-restore-queue.js`: 10,949 lines
 - `packages/react-dom/src/events/plugin-event-system.js`: 9,533 lines
 - `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: 8,553 lines
@@ -105,9 +115,9 @@ verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
 Accepted private compatibility evidence through `8aee0fcd`, accepted public
-root-render blocked evidence through `965d1e62`, accepted organization-only
-cleanup through `75fb1a47`, plus audit policy through `732a6b21`, still keeps
-public root/render/unmount, `act`,
+root-render blocked evidence and private minimal root-render helpers through
+`b99841e3`, accepted organization-only cleanup through `75fb1a47`, plus audit
+policy through `732a6b21`, still keeps public root/render/unmount, `act`,
 `react-dom/test-utils.act`, `flushSync`, Scheduler timing, hydration,
 resources/forms, public input/change or controlled-input behavior,
 serialization, native/reconciler execution, React Children traversal parity,
@@ -121,14 +131,15 @@ canonical evidence requirements.
 ## Near-Term Sequencing
 
 1. Treat accepted compatibility evidence through `8aee0fcd`, Worker 1077's
-   public root-render blocked gate through `965d1e62`, and organization-only
-   cleanup history through `75fb1a47` as private evidence, negative public
-   evidence, or file-organization evidence only. Public package, root, native,
-   React DOM, test-renderer, Scheduler, `act`, `react-dom/test-utils.act`,
-   hydration, resource/form, public controlled-input, serialization, React
-   Children lazy/full traversal, unsupported hook, event dispatch, and
-   `flushSync` compatibility still require fail-closed gates and dual-run
-   oracle evidence.
+   public root-render blocked gate as preserved through Worker 1083's split,
+   Workers 1084-1085 as private minimal render-shape and complete-work helper
+   input only, and organization-only cleanup history through `75fb1a47` as
+   private evidence, negative public evidence, or file-organization evidence
+   only. Public package, root, native, React DOM, test-renderer, Scheduler,
+   `act`, `react-dom/test-utils.act`, hydration, resource/form, public
+   controlled-input, serialization, React Children lazy/full traversal,
+   unsupported hook, event dispatch, and `flushSync` compatibility still
+   require fail-closed gates and dual-run oracle evidence.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct
@@ -162,9 +173,11 @@ canonical evidence requirements.
   943, 948, 954, 973, 980, 982, 985, 991, 997, and 998, plus Worker 966's
   refreshed private admission 804 managed-child source-token ledger, Worker
   1074's minimal root element resolver, Worker 1075's test-only HostRoot mount
-  reconciliation canary, and Worker 1076's blocked host mutation execution gate,
-  toward
-  managed-child, HostText, multi-child, sync-flush delete/post-passive, root
+  reconciliation canary, Worker 1076's blocked host mutation execution gate,
+  Worker 1084's narrow production HostRoot/HostComponent/HostText render-shape
+  helper, and Worker 1085's transactional minimal complete-work host helper
+  toward a render-complete handoff first, then managed-child, HostText,
+  multi-child, sync-flush delete/post-passive, root
   child replacement/delete-plus-place continuation, FunctionComponent
   deletion/render-phase update/bailout blocker coverage, HostRoot update-queue
   lane handoff, finished-work commit queue-lane consumer, direct
@@ -212,7 +225,8 @@ canonical evidence requirements.
   Worker 915 symbol-only client facade gates, Worker 958 private input/change
   extraction and controlled-restore queue currentness, and Worker 990
   controlled input/event blocker hardening as diagnostic input, plus Worker
-  1077's public render blocked conformance probe as negative evidence only.
+  1077's public render blocked conformance probe and Worker 1083's
+  public-facade gate split as negative evidence only.
   Worker 920's HostNodeStore payload currentness can inform fake/native host
   update handoffs only when scoped root/fiber/token/phase/target identity is
   preserved. Workers 958 and 990 input/change evidence is consumable only when
@@ -319,10 +333,11 @@ canonical evidence requirements.
   oracle repair, and Worker 989's private admission 729-731 false-green sweep as
   private fail-closed evidence only.
 - Root-render conformance harness follow-ups can consume Worker 1065's repaired
-  source scanners and Worker 1077's public render blocked probe only as
-  current fail-closed evidence. Public root rendering remains blocked until a
-  later worker proves public `createRoot().render(...)` execution, DOM mutation,
-  listener/root marker behavior, and package compatibility against React 19.2.6.
+  source scanners, Worker 1077's public render blocked probe, and Worker
+  1083's public-facade gate split only as current fail-closed evidence. Public
+  root rendering remains blocked until a later worker proves public
+  `createRoot().render(...)` execution, DOM mutation, listener/root marker
+  behavior, and package compatibility against React 19.2.6.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, the text-patch admission ledger, Worker 887's
