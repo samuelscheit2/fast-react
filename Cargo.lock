@@ -17,6 +17,7 @@ dependencies = [
 name = "fast-react-napi"
 version = "0.0.0"
 dependencies = [
+ "fast-react-core",
  "fast-react-reconciler",
  "fast-react-test-renderer",
  "serde_json",
