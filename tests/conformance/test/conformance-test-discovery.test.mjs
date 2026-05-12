@@ -164,6 +164,36 @@ test("static wrapper import discovery ignores import-looking string literals", (
   ]);
 });
 
+test("static wrapper import discovery skips nested template literal imports", () => {
+  const requiredEntries = [
+    "test/real-gate.mjs",
+    "test/root-render-gate.test.mjs",
+    "test/template-false-green-gate.mjs"
+  ];
+  const wrapperEntry = "test/root-render-gate.test.mjs";
+  const importedEntries = discoverRequiredStaticImportsFromSource({
+    entry: wrapperEntry,
+    source: [
+      "const hostile = `${`",
+      'import "./template-false-green-gate.mjs";',
+      "`}`;",
+      'import "./real-gate.mjs";'
+    ].join("\n"),
+    requiredEntries
+  });
+  const analysis = analyzeConformanceTestScriptCoverage({
+    testScript: "node --test test/*.test.mjs",
+    requiredEntries,
+    importedEntriesByEntry: new Map([[wrapperEntry, importedEntries]])
+  });
+
+  assert.deepEqual(importedEntries, ["test/real-gate.mjs"]);
+  assert.deepEqual(analysis.importCoveredEntries, ["test/real-gate.mjs"]);
+  assert.deepEqual(analysis.uncoveredEntries, [
+    "test/template-false-green-gate.mjs"
+  ]);
+});
+
 test("discovery helper accepts deterministic broad patterns when they cover every required entry", () => {
   const requiredEntries = [
     "test/existing-oracle.test.mjs",
@@ -304,6 +334,79 @@ test("static import graph discovery follows transitive wrapper coverage", async 
     assert.deepEqual(analysis.importCoveredEntries, [
       "test/final-gate.mjs",
       "test/intermediate-wrapper.mjs"
+    ]);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("static import graph discovery does not bridge through nested template imports", async () => {
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "fast-react-conformance-discovery-")
+  );
+
+  try {
+    await writeConformanceFixtureFile(
+      root,
+      "test/root-wrapper.test.mjs",
+      'import "./template-wrapper.mjs";\n'
+    );
+    await writeConformanceFixtureFile(
+      root,
+      "test/template-wrapper.mjs",
+      [
+        "const hostile = `${`",
+        'import "./bridge-wrapper.mjs";',
+        "`}`;",
+        'import "./real-leaf.mjs";',
+        ""
+      ].join("\n")
+    );
+    await writeConformanceFixtureFile(
+      root,
+      "test/bridge-wrapper.mjs",
+      'import "./missed-gate.mjs";\n'
+    );
+    await writeConformanceFixtureFile(root, "test/missed-gate.mjs");
+    await writeConformanceFixtureFile(root, "test/real-leaf.mjs");
+    await writeConformanceFixtureFile(root, "src/source-helper.mjs");
+
+    const requiredEntries = await discoverRequiredConformanceTestEntries(root);
+    const directAnalysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries
+    });
+    const importedEntriesByEntry = await discoverStaticImportsForEntries({
+      root,
+      entries: directAnalysis.directCoveredEntries,
+      requiredEntries
+    });
+    const analysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries,
+      importedEntriesByEntry
+    });
+
+    assert.deepEqual(requiredEntries, [
+      "test/bridge-wrapper.mjs",
+      "test/missed-gate.mjs",
+      "test/real-leaf.mjs",
+      "test/root-wrapper.test.mjs",
+      "test/template-wrapper.mjs"
+    ]);
+    assert.deepEqual(importedEntriesByEntry, new Map([
+      ["test/real-leaf.mjs", []],
+      ["test/root-wrapper.test.mjs", ["test/template-wrapper.mjs"]],
+      ["test/template-wrapper.mjs", ["test/real-leaf.mjs"]]
+    ]));
+    assert.deepEqual(analysis.coveredEntries, [
+      "test/real-leaf.mjs",
+      "test/root-wrapper.test.mjs",
+      "test/template-wrapper.mjs"
+    ]);
+    assert.deepEqual(analysis.uncoveredEntries, [
+      "test/bridge-wrapper.mjs",
+      "test/missed-gate.mjs"
     ]);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
@@ -775,13 +878,60 @@ function skipStringLiteral(source, startIndex) {
 }
 
 function skipTemplateLiteral(source, startIndex) {
-  for (let index = startIndex + 1; index < source.length; index += 1) {
+  let index = startIndex + 1;
+
+  while (index < source.length) {
     const character = source[index];
+    const nextCharacter = source[index + 1];
 
     if (character === "\\") {
-      index += 1;
+      index += 2;
+    } else if (character === "$" && nextCharacter === "{") {
+      index = skipTemplateExpression(source, index + 2) + 1;
     } else if (character === "`") {
       return index;
+    } else {
+      index += 1;
+    }
+  }
+
+  return source.length - 1;
+}
+
+function skipTemplateExpression(source, startIndex) {
+  let braceDepth = 1;
+
+  for (let index = startIndex; index < source.length; index += 1) {
+    const character = source[index];
+    const nextCharacter = source[index + 1];
+
+    if (character === "/" && nextCharacter === "/") {
+      index = skipLineComment(source, index);
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "*") {
+      index = skipBlockComment(source, index);
+      continue;
+    }
+
+    if (character === "'" || character === "\"") {
+      index = skipStringLiteral(source, index);
+      continue;
+    }
+
+    if (character === "`") {
+      index = skipTemplateLiteral(source, index);
+      continue;
+    }
+
+    if (character === "{") {
+      braceDepth += 1;
+    } else if (character === "}") {
+      braceDepth -= 1;
+      if (braceDepth === 0) {
+        return index;
+      }
     }
   }
 
