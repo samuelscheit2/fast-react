@@ -46,7 +46,8 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline before this docs
-refresh is main `14b121ce` (`Merge worker 1097 private host output gate split`).
+refresh is main `7f11c4b4`
+(`Merge worker 1116 native no load guard ledger fix`).
 Accepted implementation history still includes the post-Worker-997 batch:
 Workers 986, 987, 992, 1000, 998, 978, 999, 990, 967, 996, 994, and 989.
 Accepted organization-only cleanup history now includes Workers 1002-1062:
@@ -84,26 +85,30 @@ was added, and a transactional minimal complete-work host helper was added.
 These helpers remain private/crate-internal and do not commit, mutate DOM, or
 unblock public React DOM root rendering.
 Accepted root-render implementation input now also includes Workers 1090,
-1095, 1096, and 1097: a private minimal render->complete handoff, a private
-minimal HostRoot placement commit executor, JS admission for Rust-shaped private
-root work-loop metadata with capability-claim rejection, and a split private
-host-output conformance gate. These are private diagnostics and helper paths
+1095, 1096, 1097, 1111, 1110, and 1116: a private minimal render->complete
+handoff, a private minimal HostRoot placement commit executor, JS admission for
+Rust-shaped private root work-loop metadata with capability-claim rejection, a
+split private host-output conformance gate, a private minimal
+render->complete->commit placement diagnostic, a private symbol-backed native
+placeholder factory for Rust work-loop metadata, and a repaired native no-load
+guard ledger source mapping. These are private diagnostics and helper paths
 only; public React DOM root rendering remains blocked.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted facts through main `14b121ce` are recorded in
+- Accepted facts through main `7f11c4b4` are recorded in
   `MASTER_PROGRESS.md`.
 - No later worker output is listed as live accepted input in this plan
   snapshot.
-- Immediate root-render sequencing is a private end-to-end
-  render/complete/commit diagnostic path, then native/bindings metadata
-  export/admission, then public root lifecycle prerequisites. JS/public facade
-  admission remains blocked until fail-closed native/Rust evidence exists.
+- Immediate root-render sequencing is to bridge the private native metadata
+  factory, repaired no-load guard ledger evidence, and Rust private diagnostic
+  evidence toward package-private admission. Public root lifecycle
+  prerequisites remain required before any public `createRoot().render(...)`
+  path.
 
-Current large-file baseline after accepted main `14b121ce`:
+Current large-file baseline after accepted main `7f11c4b4`:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,515 lines
 - `packages/react-test-renderer/cjs/react-test-renderer.development.js`: 23,803 lines
@@ -123,7 +128,7 @@ lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 Accepted private compatibility evidence through `8aee0fcd`, accepted public
 root-render blocked evidence and private minimal root-render helpers through
 `b99841e3`, accepted private render/complete/commit helper and metadata/gate
-evidence through `14b121ce`, accepted organization-only cleanup through
+evidence through `7f11c4b4`, accepted organization-only cleanup through
 `75fb1a47`, plus audit policy through `732a6b21`, still keeps public
 root/render/unmount, `act`,
 `react-dom/test-utils.act`, `flushSync`, Scheduler timing, hydration,
@@ -141,9 +146,11 @@ canonical evidence requirements.
 1. Treat accepted compatibility evidence through `8aee0fcd`, Worker 1077's
    public root-render blocked gate as preserved through Worker 1083's split,
    Workers 1084-1085 as private minimal render-shape and complete-work helper
-   input, Workers 1090 and 1096 as private render/complete/placement execution
-   helpers, Worker 1095 as private JS metadata admission with capability-claim
-   rejection, Worker 1097 as conformance-gate organization evidence, and
+   input, Workers 1090, 1096, and 1111 as private render/complete/placement
+   execution helpers, Worker 1095 as private JS metadata admission with
+   capability-claim rejection, Worker 1097 as conformance-gate organization
+   evidence, Worker 1110 as a private native placeholder metadata factory,
+   Worker 1116 as the repaired private native no-load guard ledger mapping, and
    cleanup history through `75fb1a47` as private evidence, negative public
    evidence, or file-organization evidence only. Public package, root, native,
    React DOM, test-renderer, Scheduler, `act`, `react-dom/test-utils.act`,
@@ -187,10 +194,11 @@ canonical evidence requirements.
   reconciliation canary, Worker 1076's blocked host mutation execution gate,
   Worker 1084's narrow production HostRoot/HostComponent/HostText render-shape
   helper, and Worker 1085's transactional minimal complete-work host helper
-  plus Worker 1090's private minimal render->complete handoff and Worker
-  1096's private minimal HostRoot placement executor toward a private
-  end-to-end render/complete/commit diagnostic path first, then managed-child,
-  HostText, multi-child, sync-flush delete/post-passive, root
+  plus Worker 1090's private minimal render->complete handoff, Worker 1096's
+  private minimal HostRoot placement executor, and Worker 1111's private
+  minimal render->complete->commit diagnostic toward package-private admission
+  evidence first, then managed-child, HostText, multi-child, sync-flush
+  delete/post-passive, root
   child replacement/delete-plus-place continuation, FunctionComponent
   deletion/render-phase update/bailout blocker coverage, HostRoot update-queue
   lane handoff, finished-work commit queue-lane consumer, direct
@@ -241,8 +249,11 @@ canonical evidence requirements.
   1077's public render blocked conformance probe and Worker 1083's
   public-facade gate split as negative evidence only, Worker 1095's Rust-shaped
   private root work-loop metadata admission with public/native/DOM
-  capability-claim rejection, and Worker 1097's private host-output gate split
-  as conformance organization evidence only.
+  capability-claim rejection, Worker 1097's private host-output gate split as
+  conformance organization evidence only, Worker 1110's private symbol-backed
+  native metadata factory as package-private bridge input only, and Worker
+  1116's no-load guard ledger fix as private native-generation currentness
+  evidence.
   Worker 920's HostNodeStore payload currentness can inform fake/native host
   update handoffs only when scoped root/fiber/token/phase/target identity is
   preserved. Workers 958 and 990 input/change evidence is consumable only when
@@ -251,7 +262,8 @@ canonical evidence requirements.
   alias rejection are preserved. Any real native/Rust execution or public facade
   work still must prove scheduling, commit, cleanup, DOM output,
   listener/event/ref behavior, controlled input behavior, hydration boundaries,
-  native/bindings metadata export/admission, public/browser
+  native/bindings metadata export/admission, Worker 1116 no-load guard ledger
+  currentness, public/browser
   DOM/hydration/event/ref/package/native/Rust alias rejection, and package
   compatibility.
 - Resource and form work can consume accepted Worker 856's root execution
@@ -291,8 +303,10 @@ canonical evidence requirements.
   cleanup currentness admission ledger, Worker 924's worker-thread/environment
   cleanup currentness, Worker 940's cleanup re-entry/retirement currentness,
   Worker 951's cleanup-hook worker-thread/source-row currentness hardening,
-  Worker 953's path/slice evidence-context hardening, and Worker 993's
-  cleanup worker-thread/source provenance.
+  Worker 953's path/slice evidence-context hardening, Worker 993's cleanup
+  worker-thread/source provenance, Worker 1110's private symbol-backed metadata
+  factory, and Worker 1116's repaired no-load guard source mapping as private
+  native-generation currentness evidence.
   Executable native addon loading, cleanup hooks, scheduling,
   renderer/reconciler output, worker-thread teardown, public no-stale-value
   behavior, public native compatibility, and package exports remain blocked.
@@ -351,10 +365,12 @@ canonical evidence requirements.
   private fail-closed evidence only.
 - Root-render conformance harness follow-ups can consume Worker 1065's repaired
   source scanners, Worker 1077's public render blocked probe, Worker 1083's
-  public-facade gate split, and Worker 1097's private host-output split only as
-  current fail-closed or organization evidence. Public root rendering remains
-  blocked until a later worker proves public `createRoot().render(...)`
-  execution, DOM mutation, listener/root marker behavior, and package
+  public-facade gate split, Worker 1097's private host-output split, Worker
+  1111's private minimal placement diagnostic, and Worker 1110's native
+  placeholder metadata factory only as current fail-closed, package-private, or
+  organization evidence. Public root rendering remains blocked until a later
+  worker proves public `createRoot().render(...)` execution, DOM mutation,
+  listener/root marker behavior, lifecycle prerequisites, and package
   compatibility against React 19.2.6.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
