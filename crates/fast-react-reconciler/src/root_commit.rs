@@ -2699,6 +2699,16 @@ impl HostRootCommitRecord {
 
     #[doc(hidden)]
     #[must_use]
+    pub fn host_component_text_mutation_execution_gate(&self) -> HostRootHostMutationExecutionGate {
+        materialize_host_root_host_mutation_execution_gate(
+            self.root,
+            self.current,
+            &self.mutation_apply_log,
+        )
+    }
+
+    #[doc(hidden)]
+    #[must_use]
     pub fn test_only_host_parent_placement_apply_count_for_canary(&self) -> usize {
         self.mutation_apply_log
             .records()
@@ -4709,6 +4719,173 @@ pub(crate) enum HostRootMutationApplyRecordKind {
     SkipDeletedNonHostFiber,
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostRootHostMutationExecutionGateStatus {
+    NoHostMutations,
+    BlockedUntilProductionCompleteCommitPromotion,
+}
+
+impl HostRootHostMutationExecutionGateStatus {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NoHostMutations => "no-host-mutations",
+            Self::BlockedUntilProductionCompleteCommitPromotion => {
+                "blocked-until-production-complete-commit-promotion"
+            }
+        }
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostRootHostMutationExecutionBlocker {
+    ProductionCompleteWorkUnavailable,
+    ProductionHostMutationApplyUnavailable,
+    PublicDomCompatibilityUnclaimed,
+}
+
+impl HostRootHostMutationExecutionBlocker {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ProductionCompleteWorkUnavailable => "production-complete-work-unavailable",
+            Self::ProductionHostMutationApplyUnavailable => {
+                "production-host-mutation-apply-unavailable"
+            }
+            Self::PublicDomCompatibilityUnclaimed => "public-dom-compatibility-unclaimed",
+        }
+    }
+}
+
+const HOST_ROOT_HOST_MUTATION_EXECUTION_BLOCKERS: [HostRootHostMutationExecutionBlocker; 3] = [
+    HostRootHostMutationExecutionBlocker::ProductionCompleteWorkUnavailable,
+    HostRootHostMutationExecutionBlocker::ProductionHostMutationApplyUnavailable,
+    HostRootHostMutationExecutionBlocker::PublicDomCompatibilityUnclaimed,
+];
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostRootHostMutationExecutionGate {
+    root: FiberRootId,
+    finished_work: FiberId,
+    mutation_apply_record_count: usize,
+    host_component_record_count: usize,
+    host_text_record_count: usize,
+    placement_record_count: usize,
+    update_record_count: usize,
+    deletion_record_count: usize,
+    blocked_record_count: usize,
+    status: HostRootHostMutationExecutionGateStatus,
+    blockers: [HostRootHostMutationExecutionBlocker; 3],
+}
+
+impl HostRootHostMutationExecutionGate {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn mutation_apply_record_count(self) -> usize {
+        self.mutation_apply_record_count
+    }
+
+    #[must_use]
+    pub const fn host_component_record_count(self) -> usize {
+        self.host_component_record_count
+    }
+
+    #[must_use]
+    pub const fn host_text_record_count(self) -> usize {
+        self.host_text_record_count
+    }
+
+    #[must_use]
+    pub const fn placement_record_count(self) -> usize {
+        self.placement_record_count
+    }
+
+    #[must_use]
+    pub const fn update_record_count(self) -> usize {
+        self.update_record_count
+    }
+
+    #[must_use]
+    pub const fn deletion_record_count(self) -> usize {
+        self.deletion_record_count
+    }
+
+    #[must_use]
+    pub const fn blocked_record_count(self) -> usize {
+        self.blocked_record_count
+    }
+
+    #[must_use]
+    pub const fn status(self) -> HostRootHostMutationExecutionGateStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn status_name(self) -> &'static str {
+        self.status.as_str()
+    }
+
+    #[must_use]
+    pub const fn blockers(&self) -> &[HostRootHostMutationExecutionBlocker; 3] {
+        &self.blockers
+    }
+
+    #[must_use]
+    pub const fn host_mutation_execution_blocked(self) -> bool {
+        matches!(
+            self.status,
+            HostRootHostMutationExecutionGateStatus::BlockedUntilProductionCompleteCommitPromotion
+        )
+    }
+
+    #[must_use]
+    pub const fn requires_production_complete_work_promotion(self) -> bool {
+        self.host_mutation_execution_blocked()
+    }
+
+    #[must_use]
+    pub const fn requires_production_host_mutation_apply(self) -> bool {
+        self.host_mutation_execution_blocked()
+    }
+
+    #[must_use]
+    pub const fn production_complete_work_promoted(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn production_host_mutation_apply_promoted(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_dom_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn test_renderer_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub fn blockers_intact(self) -> bool {
+        self.blockers == HOST_ROOT_HOST_MUTATION_EXECUTION_BLOCKERS
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HostRootPlacementApplyDiagnosticForCanary {
     root: FiberRootId,
@@ -5759,6 +5936,61 @@ const fn host_root_mutation_phase_record_flag(kind: HostRootMutationPhaseRecordK
     match kind {
         HostRootMutationPhaseRecordKind::Placement => FiberFlags::PLACEMENT,
         HostRootMutationPhaseRecordKind::Update => FiberFlags::UPDATE,
+    }
+}
+
+fn materialize_host_root_host_mutation_execution_gate(
+    root: FiberRootId,
+    finished_work: FiberId,
+    mutation_apply_log: &HostRootMutationApplyLog,
+) -> HostRootHostMutationExecutionGate {
+    let mut host_component_record_count = 0;
+    let mut host_text_record_count = 0;
+    let mut placement_record_count = 0;
+    let mut update_record_count = 0;
+    let mut deletion_record_count = 0;
+
+    for record in mutation_apply_log.records() {
+        if !is_supported_host_root_mutation_child(record.tag()) {
+            continue;
+        }
+
+        match record.tag() {
+            FiberTag::HostComponent => host_component_record_count += 1,
+            FiberTag::HostText => host_text_record_count += 1,
+            _ => {}
+        }
+
+        match record.source() {
+            HostRootMutationApplyRecordSource::MutationPhase(
+                HostRootMutationPhaseRecordKind::Placement,
+            ) => placement_record_count += 1,
+            HostRootMutationApplyRecordSource::MutationPhase(
+                HostRootMutationPhaseRecordKind::Update,
+            ) => update_record_count += 1,
+            HostRootMutationApplyRecordSource::DeletionList(_) => deletion_record_count += 1,
+        }
+    }
+
+    let blocked_record_count = host_component_record_count + host_text_record_count;
+    let status = if blocked_record_count == 0 {
+        HostRootHostMutationExecutionGateStatus::NoHostMutations
+    } else {
+        HostRootHostMutationExecutionGateStatus::BlockedUntilProductionCompleteCommitPromotion
+    };
+
+    HostRootHostMutationExecutionGate {
+        root,
+        finished_work,
+        mutation_apply_record_count: mutation_apply_log.len(),
+        host_component_record_count,
+        host_text_record_count,
+        placement_record_count,
+        update_record_count,
+        deletion_record_count,
+        blocked_record_count,
+        status,
+        blockers: HOST_ROOT_HOST_MUTATION_EXECUTION_BLOCKERS,
     }
 }
 
