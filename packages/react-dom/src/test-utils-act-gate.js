@@ -2853,11 +2853,14 @@ function isAcceptedPublicReactDomTestUtilsActBlockedCurrentnessReport(
 }
 
 function validatePublicReactDomTestUtilsActBlockedCurrentnessReport(report) {
-  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+  if (!isObjectLike(report)) {
     return 'public-react-dom-test-utils-act-currentness-not-frozen';
   }
   if (!publicTestUtilsActBlockedCurrentnessReports.has(report)) {
     return 'public-react-dom-test-utils-act-currentness-source-proof';
+  }
+  if (!Object.isFrozen(report)) {
+    return 'public-react-dom-test-utils-act-currentness-not-frozen';
   }
   if (
     report.kind !== publicTestUtilsActBlockedCurrentnessKind ||
