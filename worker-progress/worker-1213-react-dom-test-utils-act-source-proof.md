@@ -52,4 +52,4 @@
 
 ## Commit
 
-- Final commit hash is reported by the worker final summary after the commit is created.
+- Source-proof hardening commit: `75d83fe40c69553b03ef6c0a74d4887008ca9dfb` (`Harden React DOM test-utils act source proof`).
