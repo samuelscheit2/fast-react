@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete pending commit.
+Complete.
 
 ## Summary
 
@@ -101,4 +101,4 @@ Notes:
 
 ## Commit Hash
 
-- Pending until commit; final hash will be reported in the worker summary.
+- `4aae30a7` (`Add scheduler native entry currentness gate`).
