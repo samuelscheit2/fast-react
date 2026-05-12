@@ -14,6 +14,12 @@ still says `not-present-in-workspace` while the placeholder package is present,
 rejects `placeholder-present` if placeholder markers are removed, and rejects
 local status records that claim Fast React comparison or compatibility.
 
+Audit repair: serialization public-claim detection now also rejects
+`oracle.evidenceClaims.fastReactComparedToReactTestRenderer = true`, matching
+the error-surface gate's claim source coverage. Local status validation now
+treats `compatibilityClaimed` as an explicit false field alongside
+`behaviorCompatibilityClaimed`.
+
 Hardened source-owned blocker inputs by freezing local status, public
 unblocking requirements, private requirement rows, and serialization scenario
 admissions. Tests assert mutation attempts throw and public blocker output
@@ -47,8 +53,8 @@ git diff --check
 ## Verification Results
 
 - `node --test tests/conformance/test/react-test-renderer-serialization-oracle.test.mjs`: passed, 12 tests.
-- `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, 30 tests.
-- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: passed, 42 tests.
+- `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, 31 tests.
+- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: passed, 43 tests.
 - `npm run check:package-surface`: passed.
 - `node tests/smoke/import-entrypoints.mjs`: passed.
 - `git diff --check`: passed.
@@ -60,11 +66,12 @@ git diff --check
   facade as present and placeholder-backed.
 - The checked oracle and source-owned target record now both use
   `status: "placeholder-present"` with false `comparedToReactTestRenderer` and
-  false `behaviorCompatibilityClaimed`.
+  false `behaviorCompatibilityClaimed` plus false `compatibilityClaimed`.
 - Hostile tests now cover:
   - stale oracle `not-present-in-workspace` with the placeholder package present;
   - stale `placeholder-present` after placeholder markers are removed;
   - local Fast React comparison or compatibility claims;
+  - evidence-level Fast React comparison claims;
   - mutation attempts against frozen status/admission/blocker source records.
 - Public `toJSON`, `toTree`, TestInstance wrappers, JS facade routing, native
   bridge execution, and broad public renderer compatibility remain blocked.
@@ -75,6 +82,8 @@ git diff --check
 - Scope stayed within the serialization oracle/local gate and the worker report.
 - The checked oracle reader now throws on source/status drift before returning a
   parsed checked artifact.
+- Source audit blockers were addressed without reverting the prior
+  `3eab522f` fix.
 
 ## Risks Or Blockers
 

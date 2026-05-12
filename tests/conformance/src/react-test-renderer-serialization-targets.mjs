@@ -53,6 +53,7 @@ export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS =
     status: "placeholder-present",
     comparedToReactTestRenderer: false,
     behaviorCompatibilityClaimed: false,
+    compatibilityClaimed: false,
     reason:
       "The current workspace has a local JS react-test-renderer placeholder package for private diagnostics, but no public Fast React test-renderer compatibility package to execute in this conformance oracle."
   });

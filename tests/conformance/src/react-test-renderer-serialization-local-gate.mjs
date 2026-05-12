@@ -476,9 +476,13 @@ export function evaluateReactTestRendererSerializationLocalGate({
   const publicCompatibilityClaimed = Boolean(
     oracle.conformanceClaims?.compatibilityClaimed ||
       oracle.conformanceClaims?.fastReactBehaviorCompatible ||
+      oracle.evidenceClaims?.fastReactComparedToReactTestRenderer ||
       oracle.localFastReactStatus?.behaviorCompatibilityClaimed ||
+      oracle.localFastReactStatus?.compatibilityClaimed ||
       REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
-        .behaviorCompatibilityClaimed
+        .behaviorCompatibilityClaimed ||
+      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
+        .compatibilityClaimed
   );
   const publicCompatibilityBlockers =
     REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS.filter(
@@ -2483,6 +2487,19 @@ function appendLocalFastReactStatusClaimViolations({
       freezeRecord({
         id: "local-fast-react-status-claims-compatibility",
         source: sourceName,
+        field: "behaviorCompatibilityClaimed",
+        reason:
+          "The React-only serialization oracle must not claim Fast React react-test-renderer compatibility."
+      })
+    );
+  }
+
+  if (status.compatibilityClaimed !== false) {
+    violations.push(
+      freezeRecord({
+        id: "local-fast-react-status-claims-compatibility",
+        source: sourceName,
+        field: "compatibilityClaimed",
         reason:
           "The React-only serialization oracle must not claim Fast React react-test-renderer compatibility."
       })

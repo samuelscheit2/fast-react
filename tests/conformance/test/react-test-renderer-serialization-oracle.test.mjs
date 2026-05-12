@@ -111,12 +111,23 @@ test("react-test-renderer serialization oracle rejects stale or unsafe local Fas
   const claimedOracle = JSON.parse(JSON.stringify(oracle));
   claimedOracle.localFastReactStatus.comparedToReactTestRenderer = true;
   claimedOracle.localFastReactStatus.behaviorCompatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.compatibilityClaimed = true;
   assert.throws(
     () =>
       assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
         claimedOracle
       ),
     /local-fast-react-status-claims-fast-react-comparison/u
+  );
+
+  const compatibilityClaimedOracle = JSON.parse(JSON.stringify(oracle));
+  compatibilityClaimedOracle.localFastReactStatus.compatibilityClaimed = true;
+  assert.throws(
+    () =>
+      assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
+        compatibilityClaimedOracle
+      ),
+    /local-fast-react-status-claims-compatibility/u
   );
 });
 

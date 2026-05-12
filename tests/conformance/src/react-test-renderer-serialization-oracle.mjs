@@ -72,6 +72,16 @@ export function validateReactTestRendererSerializationOracleLocalFastReactStatus
   if (actual.behaviorCompatibilityClaimed !== false) {
     violations.push({
       id: "local-fast-react-status-claims-compatibility",
+      field: "behaviorCompatibilityClaimed",
+      reason:
+        "The React-only serialization oracle must not claim Fast React react-test-renderer compatibility."
+    });
+  }
+
+  if (actual.compatibilityClaimed !== false) {
+    violations.push({
+      id: "local-fast-react-status-claims-compatibility",
+      field: "compatibilityClaimed",
       reason:
         "The React-only serialization oracle must not claim Fast React react-test-renderer compatibility."
     });
