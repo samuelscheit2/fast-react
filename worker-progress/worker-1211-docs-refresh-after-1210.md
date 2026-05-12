@@ -39,4 +39,5 @@
 
 ## Commit
 
-- Pending.
+- Docs refresh commit: `5e99e61a` (`Refresh docs after worker 1210`),
+  merged by `e561dd91`.
