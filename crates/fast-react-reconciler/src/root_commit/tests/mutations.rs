@@ -219,7 +219,7 @@ fn minimal_host_root_placement_commit_appends_completed_component_to_container()
     let (mut store, root_id, mut host) = root_store();
     update_container(&mut store, root_id, RootElementHandle::from_raw(48), None).unwrap();
     let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
-    let (complete_work, host_nodes) = complete_minimal_host_root_component_text_for_commit(
+    let (complete_work, mut host_nodes) = complete_minimal_host_root_component_text_for_commit(
         &mut store,
         root_id,
         &mut host,
@@ -238,7 +238,7 @@ fn minimal_host_root_placement_commit_appends_completed_component_to_container()
     let placement = commit_minimal_host_root_component_text_placement(
         &mut store,
         &mut host,
-        &host_nodes,
+        &mut host_nodes,
         complete_work,
         &commit,
     )
@@ -293,6 +293,90 @@ fn minimal_host_root_placement_commit_appends_completed_component_to_container()
     );
     assert!(!post_commit_gate.production_host_mutation_apply_promoted());
     assert!(!post_commit_gate.public_dom_compatibility_claimed());
+    assert!(host_nodes.is_empty());
+}
+
+#[test]
+fn minimal_host_root_placement_commit_consumes_detached_records_against_replay() {
+    let (mut store, root_id, mut host) = root_store();
+    update_container(&mut store, root_id, RootElementHandle::from_raw(51), None).unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    let (complete_work, mut host_nodes) = complete_minimal_host_root_component_text_for_commit(
+        &mut store,
+        root_id,
+        &mut host,
+        render.finished_work(),
+    );
+    let commit = commit_finished_host_root(&mut store, render).unwrap();
+
+    commit_minimal_host_root_component_text_placement(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        complete_work,
+        &commit,
+    )
+    .unwrap();
+    let operations_after_first_commit = host.operations();
+    assert_eq!(
+        operations_after_first_commit
+            .iter()
+            .filter(|operation| **operation == "append_child_to_container")
+            .count(),
+        1
+    );
+    assert!(host_nodes.is_empty());
+
+    let error = commit_minimal_host_root_component_text_placement(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        complete_work,
+        &commit,
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        error,
+        MinimalHostRootPlacementCommitError::HostNode(_)
+    ));
+    assert_eq!(host.operations(), operations_after_first_commit);
+}
+
+#[test]
+fn minimal_host_root_placement_commit_resets_after_append_failure() {
+    let (mut store, root_id, mut host) = root_store();
+    update_container(&mut store, root_id, RootElementHandle::from_raw(52), None).unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    let (complete_work, mut host_nodes) = complete_minimal_host_root_component_text_for_commit(
+        &mut store,
+        root_id,
+        &mut host,
+        render.finished_work(),
+    );
+    let operations_before_commit_attempt = host.operations();
+    host.fail_append_child_to_container();
+    let commit = commit_finished_host_root(&mut store, render).unwrap();
+
+    let error = commit_minimal_host_root_component_text_placement(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        complete_work,
+        &commit,
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        error,
+        MinimalHostRootPlacementCommitError::Host(_)
+    ));
+    let mut expected_operations = operations_before_commit_attempt;
+    expected_operations.push("prepare_for_commit");
+    expected_operations.push("append_child_to_container");
+    expected_operations.push("reset_after_commit");
+    assert_eq!(host.operations(), expected_operations);
+    assert_eq!(host_nodes.len(), 2);
 }
 
 #[test]
@@ -300,7 +384,7 @@ fn minimal_host_root_placement_commit_rejects_sibling_insert_before() {
     let (mut store, root_id, mut host) = root_store();
     update_container(&mut store, root_id, RootElementHandle::from_raw(49), None).unwrap();
     let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
-    let (complete_work, host_nodes) = complete_minimal_host_root_component_text_for_commit(
+    let (complete_work, mut host_nodes) = complete_minimal_host_root_component_text_for_commit(
         &mut store,
         root_id,
         &mut host,
@@ -341,7 +425,7 @@ fn minimal_host_root_placement_commit_rejects_sibling_insert_before() {
     let error = commit_minimal_host_root_component_text_placement(
         &mut store,
         &mut host,
-        &host_nodes,
+        &mut host_nodes,
         complete_work,
         &commit,
     )
@@ -381,7 +465,7 @@ fn minimal_host_root_placement_commit_rejects_missing_host_node_evidence() {
     let error = commit_minimal_host_root_component_text_placement(
         &mut store,
         &mut host,
-        &host_nodes,
+        &mut host_nodes,
         complete_work,
         &commit,
     )

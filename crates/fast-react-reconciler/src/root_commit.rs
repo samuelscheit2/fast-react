@@ -5256,7 +5256,7 @@ impl From<HostNodeValidationError> for MinimalHostRootPlacementCommitError {
 pub(crate) fn commit_minimal_host_root_component_text_placement<H>(
     store: &mut FiberRootStore<H>,
     host: &mut H,
-    host_nodes: &HostNodeStore<H>,
+    host_nodes: &mut HostNodeStore<H>,
     complete_work: MinimalHostRootCompleteWorkRecord,
     commit: &HostRootCommitRecord,
 ) -> Result<MinimalHostRootPlacementCommitRecord, MinimalHostRootPlacementCommitError>
@@ -5269,15 +5269,36 @@ where
         let container = store.root(request.root())?.container_info();
         host.prepare_for_commit(container)?
     };
-    let instance =
-        host_nodes.instance(request.component_state_node(), request.component_scope())?;
-    {
-        let container = store.root_mut(request.root())?.container_info_mut();
-        host.append_child_to_container(container, HostChild::Instance(instance))?;
+    let append_result: Result<(), MinimalHostRootPlacementCommitError> = {
+        match host_nodes.instance(request.component_state_node(), request.component_scope()) {
+            Ok(instance) => match store.root_mut(request.root()) {
+                Ok(root) => host
+                    .append_child_to_container(
+                        root.container_info_mut(),
+                        HostChild::Instance(instance),
+                    )
+                    .map_err(Into::into),
+                Err(error) => Err(error.into()),
+            },
+            Err(error) => Err(error.into()),
+        }
+    };
+    let reset_result: Result<(), MinimalHostRootPlacementCommitError> = {
+        match store.root(request.root()) {
+            Ok(root) => host
+                .reset_after_commit(root.container_info(), commit_state)
+                .map_err(Into::into),
+            Err(error) => Err(error.into()),
+        }
+    };
+
+    if let Err(error) = append_result {
+        return Err(error);
     }
-    {
-        let container = store.root(request.root())?.container_info();
-        host.reset_after_commit(container, commit_state)?;
+    host_nodes.remove_instance(request.component_state_node(), request.component_scope())?;
+    host_nodes.remove_text(request.text_state_node(), request.text_scope())?;
+    if let Err(error) = reset_result {
+        return Err(error);
     }
 
     Ok(MinimalHostRootPlacementCommitRecord {

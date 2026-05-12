@@ -8,6 +8,8 @@ Notes:
 - Added a crate-private executor that consumes minimal complete-work metadata, host node store evidence, and a HostRoot commit record.
 - The executor validates the single append-to-container apply record and calls prepare_for_commit, append_child_to_container, and reset_after_commit.
 - Public render wiring and global HostRoot host mutation gates remain blocked.
+- Follow-up audit fix: successful placement now consumes detached HostComponent/HostText records to block replay.
+- Follow-up audit fix: reset_after_commit is attempted after prepare even when append_child_to_container fails.
 
 Verification:
 - cargo test -p fast-react-reconciler complete_work_minimal_host
