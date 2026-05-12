@@ -61,7 +61,7 @@ Current orchestration queue:
 - Accepted implementation/evidence facts through baseline main `5dcea2a9` are
   recorded in `MASTER_PROGRESS.md`.
 - Active, unaccepted workers: none. The queue is ready for the next scheduling
-  decision after cleanup of completed, clean worker worktrees.
+  decision.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
   render handoff admission, plus the minimal public
