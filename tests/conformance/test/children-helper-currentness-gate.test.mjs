@@ -840,6 +840,27 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
     }),
     "children-traversal-currentness-source-proof"
   );
+  const mutableReport = createChildrenCurrentnessReportWithFreezeBypass(
+    () => true
+  );
+  assert.equal(Object.isFrozen(mutableReport), false);
+  assertCurrentnessRejected(
+    mutableReport,
+    "children-traversal-currentness-not-frozen"
+  );
+  const reportWithMutableBehavior =
+    createChildrenCurrentnessReportWithFreezeBypass(
+      isChildrenTraversalBehaviorCurrentnessRecord
+    );
+  assert.equal(Object.isFrozen(reportWithMutableBehavior), true);
+  assert.equal(
+    Object.isFrozen(reportWithMutableBehavior.behaviorCurrentness),
+    false
+  );
+  assertCurrentnessRejected(
+    reportWithMutableBehavior,
+    "children-traversal-currentness-behavior-probes"
+  );
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
       sourceReport: {
@@ -1382,6 +1403,33 @@ function assertCurrentnessRejected(report, reason) {
       return true;
     },
     reason
+  );
+}
+
+function createChildrenCurrentnessReportWithFreezeBypass(shouldBypassFreeze) {
+  const originalFreeze = Object.freeze;
+  Object.freeze = (value) => {
+    if (shouldBypassFreeze(value)) {
+      return value;
+    }
+
+    return originalFreeze(value);
+  };
+
+  try {
+    return childrenHelper.createChildrenTraversalCurrentnessReport();
+  } finally {
+    Object.freeze = originalFreeze;
+  }
+}
+
+function isChildrenTraversalBehaviorCurrentnessRecord(value) {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    Object.hasOwn(value, "nullishTopLevelCurrent") &&
+    Object.hasOwn(value, "ownerDispatcherRootPrerequisitesBlocked") &&
+    Object.hasOwn(value, "compatibilityClaimed")
   );
 }
 

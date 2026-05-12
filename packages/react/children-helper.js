@@ -1466,11 +1466,15 @@ function isChildrenTraversalCurrentnessReport(report) {
 }
 
 function validateChildrenTraversalCurrentnessReport(report) {
-  if (
-    report === null ||
-    typeof report !== 'object' ||
-    !childrenTraversalCurrentnessReports.has(report)
-  ) {
+  if (report === null || typeof report !== 'object') {
+    return 'children-traversal-currentness-source-proof';
+  }
+
+  if (!Object.isFrozen(report)) {
+    return 'children-traversal-currentness-not-frozen';
+  }
+
+  if (!childrenTraversalCurrentnessReports.has(report)) {
     return 'children-traversal-currentness-source-proof';
   }
 
@@ -1598,7 +1602,11 @@ function validateChildrenTraversalCurrentnessReport(report) {
 }
 
 function isAcceptedChildrenTraversalBehaviorCurrentness(currentness) {
-  if (currentness === null || typeof currentness !== 'object') {
+  if (
+    currentness === null ||
+    typeof currentness !== 'object' ||
+    !Object.isFrozen(currentness)
+  ) {
     return false;
   }
 
