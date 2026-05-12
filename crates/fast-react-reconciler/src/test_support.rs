@@ -5,8 +5,9 @@ use std::cell::RefCell;
 use fast_react_core::{ElementTypeHandle, PropsHandle};
 use fast_react_host_config::{
     HostCapability, HostCapabilitySet, HostChild, HostCommit, HostCreation, HostFiberTokenRef,
-    HostIdentityAndContext, HostMicrotaskCallback, HostPostPaintCallback, HostResult,
-    HostScheduling, HostTimeoutCallback, HostTypes, InitialChildrenFinalization, MutationHost,
+    HostHandleKind, HostIdentityAndContext, HostMicrotaskCallback, HostOperationError,
+    HostPostPaintCallback, HostResult, HostScheduling, HostTimeoutCallback, HostTypes,
+    InitialChildrenFinalization, MutationHost,
 };
 
 use crate::RootElementHandle;
@@ -91,6 +92,7 @@ pub struct RecordingHost {
     operations: RefCell<Vec<&'static str>>,
     next_instance_id: u64,
     next_text_id: u64,
+    fail_append_child_to_container: bool,
 }
 
 impl RecordingHost {
@@ -102,6 +104,10 @@ impl RecordingHost {
     pub fn operations(&self) -> Vec<&'static str> {
         self.operations.borrow().clone()
     }
+
+    pub fn fail_append_child_to_container(&mut self) {
+        self.fail_append_child_to_container = true;
+    }
 }
 
 impl Default for RecordingHost {
@@ -110,6 +116,7 @@ impl Default for RecordingHost {
             operations: RefCell::new(Vec::new()),
             next_instance_id: 1,
             next_text_id: 1,
+            fail_append_child_to_container: false,
         }
     }
 }
@@ -432,6 +439,13 @@ impl MutationHost for RecordingHost {
         _child: HostChild<'_, Self>,
     ) -> HostResult<()> {
         self.record("append_child_to_container");
+        if self.fail_append_child_to_container {
+            return Err(HostOperationError::invalid_handle(
+                self.renderer_name(),
+                HostHandleKind::Container,
+            )
+            .into());
+        }
         Ok(())
     }
 
