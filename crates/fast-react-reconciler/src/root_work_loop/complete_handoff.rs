@@ -258,6 +258,11 @@ pub struct MinimalHostRootRenderCompletePlacementDiagnostic {
     component_props: PropsHandle,
     text_props: PropsHandle,
     text_content: String,
+    root_child_tag_name: &'static str,
+    completed_child_tag_name: &'static str,
+    host_text_child_tag_name: &'static str,
+    child_tag_names: [&'static str; 2],
+    minimal_host_root_component_text_path_proven: bool,
     render_lanes: Lanes,
     root_child_count: usize,
     component_child_count: usize,
@@ -284,6 +289,7 @@ pub struct MinimalHostRootRenderCompletePlacementDiagnostic {
     public_root_rendering_claimed: bool,
     public_root_rendering_blocked: bool,
     public_compatibility_blocked: bool,
+    effects_refs_and_hydration_blocked: bool,
     public_renderer_package_behavior_exposed: bool,
     react_dom_compatibility_claimed: bool,
     test_renderer_compatibility_claimed: bool,
@@ -297,6 +303,15 @@ impl MinimalHostRootRenderCompletePlacementDiagnostic {
         let commit = record.commit();
         let placement = record.placement_commit();
         let gate = commit.host_component_text_mutation_execution_gate();
+        let root_child_tag_name = root_work_loop_minimal_fiber_tag_name(render.root_child_tag());
+        let host_text_child_tag_name =
+            root_work_loop_minimal_fiber_tag_name(render.text_child_tag());
+        let minimal_host_root_component_text_path_proven =
+            render.proves_minimal_host_component_with_text_child();
+        let public_renderer_package_behavior_exposed =
+            placement.public_renderer_package_behavior_exposed();
+        let react_dom_compatibility_claimed = placement.react_dom_compatibility_claimed();
+        let test_renderer_compatibility_claimed = placement.test_renderer_compatibility_claimed();
 
         Self {
             root: complete_handoff.root(),
@@ -310,6 +325,11 @@ impl MinimalHostRootRenderCompletePlacementDiagnostic {
             component_props: render.root_child_props(),
             text_props: render.text_child_props(),
             text_content: render.text_child_text().to_owned(),
+            root_child_tag_name,
+            completed_child_tag_name: root_child_tag_name,
+            host_text_child_tag_name,
+            child_tag_names: [root_child_tag_name, host_text_child_tag_name],
+            minimal_host_root_component_text_path_proven,
             render_lanes: complete_handoff.render_lanes(),
             root_child_count: render.root_child_count(),
             component_child_count: render.component_child_count(),
@@ -342,10 +362,12 @@ impl MinimalHostRootRenderCompletePlacementDiagnostic {
             public_root_rendering_claimed: record.public_root_rendering_claimed(),
             public_root_rendering_blocked: record.public_root_rendering_blocked(),
             public_compatibility_blocked: record.public_compatibility_blocked(),
-            public_renderer_package_behavior_exposed: placement
-                .public_renderer_package_behavior_exposed(),
-            react_dom_compatibility_claimed: placement.react_dom_compatibility_claimed(),
-            test_renderer_compatibility_claimed: placement.test_renderer_compatibility_claimed(),
+            effects_refs_and_hydration_blocked: !public_renderer_package_behavior_exposed
+                && !react_dom_compatibility_claimed
+                && !test_renderer_compatibility_claimed,
+            public_renderer_package_behavior_exposed,
+            react_dom_compatibility_claimed,
+            test_renderer_compatibility_claimed,
         }
     }
 
@@ -402,6 +424,31 @@ impl MinimalHostRootRenderCompletePlacementDiagnostic {
     #[must_use]
     pub fn text_content(&self) -> &str {
         &self.text_content
+    }
+
+    #[must_use]
+    pub const fn root_child_tag_name(&self) -> &'static str {
+        self.root_child_tag_name
+    }
+
+    #[must_use]
+    pub const fn completed_child_tag_name(&self) -> &'static str {
+        self.completed_child_tag_name
+    }
+
+    #[must_use]
+    pub const fn host_text_child_tag_name(&self) -> &'static str {
+        self.host_text_child_tag_name
+    }
+
+    #[must_use]
+    pub const fn child_tag_names(&self) -> [&'static str; 2] {
+        self.child_tag_names
+    }
+
+    #[must_use]
+    pub const fn minimal_host_root_component_text_path_proven(&self) -> bool {
+        self.minimal_host_root_component_text_path_proven
     }
 
     #[must_use]
@@ -540,6 +587,11 @@ impl MinimalHostRootRenderCompletePlacementDiagnostic {
     }
 
     #[must_use]
+    pub const fn effects_refs_and_hydration_blocked(&self) -> bool {
+        self.effects_refs_and_hydration_blocked
+    }
+
+    #[must_use]
     pub const fn public_renderer_package_behavior_exposed(&self) -> bool {
         self.public_renderer_package_behavior_exposed
     }
@@ -552,6 +604,20 @@ impl MinimalHostRootRenderCompletePlacementDiagnostic {
     #[must_use]
     pub const fn test_renderer_compatibility_claimed(&self) -> bool {
         self.test_renderer_compatibility_claimed
+    }
+}
+
+const fn root_work_loop_minimal_fiber_tag_name(tag: FiberTag) -> &'static str {
+    match tag {
+        FiberTag::HostComponent => "HostComponent",
+        FiberTag::HostText => "HostText",
+        FiberTag::HostRoot => "HostRoot",
+        FiberTag::FunctionComponent => "FunctionComponent",
+        FiberTag::ContextProvider => "ContextProvider",
+        FiberTag::Fragment => "Fragment",
+        FiberTag::Suspense => "Suspense",
+        FiberTag::Offscreen => "Offscreen",
+        _ => "Other",
     }
 }
 

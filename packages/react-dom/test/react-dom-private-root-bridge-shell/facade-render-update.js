@@ -2708,6 +2708,8 @@ test('private react-dom/client facade rejects Rust root work-loop metadata capab
     'root_scheduled',
     'compatibilityClaimed',
     'compatibility_claimed',
+    'publicNativeCompatibility',
+    'public_native_compatibility',
     'publicRootCompatibilitySurface',
     'public_root_compatibility_surface',
     'publicRootRenderCompatibilityClaimed',

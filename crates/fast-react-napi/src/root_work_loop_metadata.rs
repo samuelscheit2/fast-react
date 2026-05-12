@@ -88,8 +88,8 @@ pub(crate) struct RootWorkLoopFinishedWorkMetadataFacade {
     root_id: String,
     root_tag: String,
     render_update_id: String,
-    host_type: &'static str,
-    host_output_shape: &'static str,
+    host_type: String,
+    host_output_shape: String,
     host_component_count: u32,
     host_text_count: u32,
     text_content: String,
@@ -112,13 +112,13 @@ impl RootWorkLoopFinishedWorkMetadataFacade {
     }
 
     #[must_use]
-    pub(crate) const fn host_type(&self) -> &'static str {
-        self.host_type
+    pub(crate) fn host_type(&self) -> &str {
+        &self.host_type
     }
 
     #[must_use]
-    pub(crate) const fn host_output_shape(&self) -> &'static str {
-        self.host_output_shape
+    pub(crate) fn host_output_shape(&self) -> &str {
+        &self.host_output_shape
     }
 
     #[must_use]
@@ -137,33 +137,33 @@ impl RootWorkLoopFinishedWorkMetadataFacade {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RootWorkLoopFinishedWorkCompleteWorkMetadata {
-    root_child_tag: &'static str,
-    completed_child_tag: &'static str,
-    host_text_child_tag: &'static str,
-    child_tags: [&'static str; 2],
+    root_child_tag: String,
+    completed_child_tag: String,
+    host_text_child_tag: String,
+    child_tags: [String; 2],
 }
 
 impl RootWorkLoopFinishedWorkCompleteWorkMetadata {
     #[must_use]
-    pub(crate) const fn root_child_tag(self) -> &'static str {
-        self.root_child_tag
+    pub(crate) fn root_child_tag(&self) -> &str {
+        &self.root_child_tag
     }
 
     #[must_use]
-    pub(crate) const fn completed_child_tag(self) -> &'static str {
-        self.completed_child_tag
+    pub(crate) fn completed_child_tag(&self) -> &str {
+        &self.completed_child_tag
     }
 
     #[must_use]
-    pub(crate) const fn host_text_child_tag(self) -> &'static str {
-        self.host_text_child_tag
+    pub(crate) fn host_text_child_tag(&self) -> &str {
+        &self.host_text_child_tag
     }
 
     #[must_use]
-    pub(crate) const fn child_tags(self) -> [&'static str; 2] {
-        self.child_tags
+    pub(crate) fn child_tags(&self) -> [&str; 2] {
+        [&self.child_tags[0], &self.child_tags[1]]
     }
 }
 
@@ -259,15 +259,15 @@ impl RootWorkLoopFinishedWorkCommitMetadata {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RootWorkLoopFinishedWorkPlacementMetadata {
-    tag: &'static str,
+    tag: String,
     apply_kind: String,
     sibling_status: &'static str,
 }
 
 impl RootWorkLoopFinishedWorkPlacementMetadata {
     #[must_use]
-    pub(crate) const fn tag(&self) -> &'static str {
-        self.tag
+    pub(crate) fn tag(&self) -> &str {
+        &self.tag
     }
 
     #[must_use]
@@ -351,7 +351,14 @@ impl Error for RootWorkLoopFinishedWorkMetadataError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RootWorkLoopFinishedWorkDiagnosticEvidence {
+    host_type: String,
+    host_output_shape: String,
     text_content: String,
+    root_child_tag: String,
+    completed_child_tag: String,
+    host_text_child_tag: String,
+    child_tags: [String; 2],
+    minimal_host_root_component_text_path_proven: bool,
     render_lanes_bits: u32,
     root_child_count: usize,
     component_child_count: usize,
@@ -373,6 +380,7 @@ pub(crate) struct RootWorkLoopFinishedWorkDiagnosticEvidence {
     public_root_rendering_claimed: bool,
     public_root_rendering_blocked: bool,
     public_compatibility_blocked: bool,
+    effects_refs_and_hydration_blocked: bool,
     public_renderer_package_behavior_exposed: bool,
     react_dom_compatibility_claimed: bool,
     test_renderer_compatibility_claimed: bool,
@@ -381,9 +389,18 @@ pub(crate) struct RootWorkLoopFinishedWorkDiagnosticEvidence {
 impl RootWorkLoopFinishedWorkDiagnosticEvidence {
     pub(crate) fn from_private_reconciler_diagnostic(
         diagnostic: &fast_react_reconciler::MinimalHostRootRenderCompletePlacementDiagnostic,
+        host_type: &str,
     ) -> Self {
         Self {
+            host_type: host_type.to_owned(),
+            host_output_shape: HOST_OUTPUT_SHAPE_HOST_COMPONENT.to_owned(),
             text_content: diagnostic.text_content().to_owned(),
+            root_child_tag: diagnostic.root_child_tag_name().to_owned(),
+            completed_child_tag: diagnostic.completed_child_tag_name().to_owned(),
+            host_text_child_tag: diagnostic.host_text_child_tag_name().to_owned(),
+            child_tags: diagnostic.child_tag_names().map(str::to_owned),
+            minimal_host_root_component_text_path_proven: diagnostic
+                .minimal_host_root_component_text_path_proven(),
             render_lanes_bits: diagnostic.render_lanes_bits(),
             root_child_count: diagnostic.root_child_count(),
             component_child_count: diagnostic.component_child_count(),
@@ -407,6 +424,7 @@ impl RootWorkLoopFinishedWorkDiagnosticEvidence {
             public_root_rendering_claimed: diagnostic.public_root_rendering_claimed(),
             public_root_rendering_blocked: diagnostic.public_root_rendering_blocked(),
             public_compatibility_blocked: diagnostic.public_compatibility_blocked(),
+            effects_refs_and_hydration_blocked: diagnostic.effects_refs_and_hydration_blocked(),
             public_renderer_package_behavior_exposed: diagnostic
                 .public_renderer_package_behavior_exposed(),
             react_dom_compatibility_claimed: diagnostic.react_dom_compatibility_claimed(),
@@ -417,6 +435,19 @@ impl RootWorkLoopFinishedWorkDiagnosticEvidence {
 
 #[cfg(test)]
 impl RootWorkLoopFinishedWorkDiagnosticEvidence {
+    pub(crate) fn with_host_type_for_test(mut self, host_type: impl Into<String>) -> Self {
+        self.host_type = host_type.into();
+        self
+    }
+
+    pub(crate) fn with_host_output_shape_for_test(
+        mut self,
+        host_output_shape: impl Into<String>,
+    ) -> Self {
+        self.host_output_shape = host_output_shape.into();
+        self
+    }
+
     pub(crate) fn with_placement_mutation_kind_for_test(
         mut self,
         placement_mutation_kind: impl Into<String>,
@@ -427,6 +458,44 @@ impl RootWorkLoopFinishedWorkDiagnosticEvidence {
 
     pub(crate) fn with_text_content_for_test(mut self, text_content: impl Into<String>) -> Self {
         self.text_content = text_content.into();
+        self
+    }
+
+    pub(crate) fn with_root_child_tag_for_test(
+        mut self,
+        root_child_tag: impl Into<String>,
+    ) -> Self {
+        self.root_child_tag = root_child_tag.into();
+        self
+    }
+
+    pub(crate) fn with_completed_child_tag_for_test(
+        mut self,
+        completed_child_tag: impl Into<String>,
+    ) -> Self {
+        self.completed_child_tag = completed_child_tag.into();
+        self
+    }
+
+    pub(crate) fn with_host_text_child_tag_for_test(
+        mut self,
+        host_text_child_tag: impl Into<String>,
+    ) -> Self {
+        self.host_text_child_tag = host_text_child_tag.into();
+        self
+    }
+
+    pub(crate) fn with_child_tags_for_test(mut self, child_tags: [&str; 2]) -> Self {
+        self.child_tags = child_tags.map(str::to_owned);
+        self
+    }
+
+    pub(crate) const fn with_minimal_host_root_component_text_path_proven_for_test(
+        mut self,
+        minimal_host_root_component_text_path_proven: bool,
+    ) -> Self {
+        self.minimal_host_root_component_text_path_proven =
+            minimal_host_root_component_text_path_proven;
         self
     }
 
@@ -458,6 +527,14 @@ impl RootWorkLoopFinishedWorkDiagnosticEvidence {
         self.public_dom_compatibility_claimed = public_dom_compatibility_claimed;
         self
     }
+
+    pub(crate) const fn with_effects_refs_and_hydration_blocked_for_test(
+        mut self,
+        effects_refs_and_hydration_blocked: bool,
+    ) -> Self {
+        self.effects_refs_and_hydration_blocked = effects_refs_and_hydration_blocked;
+        self
+    }
 }
 
 pub(crate) fn root_work_loop_finished_work_metadata_for_canary(
@@ -481,9 +558,16 @@ pub(crate) fn root_work_loop_finished_work_metadata_for_canary(
         root_id,
         root_tag,
         render_update_id,
+        HOST_TYPE_DIV.to_owned(),
+        HOST_OUTPUT_SHAPE_HOST_COMPONENT.to_owned(),
         EXPECTED_HOST_COMPONENT_COUNT as u32,
         EXPECTED_HOST_TEXT_COUNT as u32,
         TEXT_CONTENT_TEXT.to_owned(),
+        HOST_COMPONENT_TAG.to_owned(),
+        HOST_COMPONENT_TAG.to_owned(),
+        HOST_TEXT_TAG.to_owned(),
+        [HOST_COMPONENT_TAG.to_owned(), HOST_TEXT_TAG.to_owned()],
+        HOST_COMPONENT_TAG.to_owned(),
         placement_apply_kind,
         true,
         true,
@@ -506,8 +590,10 @@ pub(crate) fn root_work_loop_finished_work_metadata_from_private_reconciler_diag
     validate_text_content(text_content)?;
 
     let diagnostic = crate::native_root_work_loop_minimal_placement_diagnostic_for_private_bridge();
-    let evidence =
-        RootWorkLoopFinishedWorkDiagnosticEvidence::from_private_reconciler_diagnostic(&diagnostic);
+    let evidence = RootWorkLoopFinishedWorkDiagnosticEvidence::from_private_reconciler_diagnostic(
+        &diagnostic,
+        host_type,
+    );
 
     root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
         root_id,
@@ -550,13 +636,20 @@ pub(crate) fn root_work_loop_finished_work_metadata_from_diagnostic_evidence_for
         root_id,
         root_tag,
         render_update_id,
+        evidence.host_type.clone(),
+        evidence.host_output_shape.clone(),
         host_component_count,
         host_text_count,
         evidence.text_content.clone(),
+        evidence.root_child_tag.clone(),
+        evidence.completed_child_tag.clone(),
+        evidence.host_text_child_tag.clone(),
+        evidence.child_tags.clone(),
+        evidence.root_child_tag.clone(),
         evidence.placement_mutation_kind.clone(),
         evidence.host_mutation_execution_blocked,
         evidence.public_root_rendering_blocked,
-        evidence.public_compatibility_blocked,
+        evidence.effects_refs_and_hydration_blocked,
     ))
 }
 
@@ -564,9 +657,16 @@ fn root_work_loop_finished_work_metadata_from_accepted_values(
     root_id: String,
     root_tag: String,
     render_update_id: String,
+    host_type: String,
+    host_output_shape: String,
     host_component_count: u32,
     host_text_count: u32,
     text_content: String,
+    root_child_tag: String,
+    completed_child_tag: String,
+    host_text_child_tag: String,
+    child_tags: [String; 2],
+    placement_tag: String,
     placement_apply_kind: String,
     mutation_execution_blocked: bool,
     public_root_rendering_blocked: bool,
@@ -577,17 +677,17 @@ fn root_work_loop_finished_work_metadata_from_accepted_values(
             root_id,
             root_tag,
             render_update_id,
-            host_type: HOST_TYPE_DIV,
-            host_output_shape: HOST_OUTPUT_SHAPE_HOST_COMPONENT,
+            host_type,
+            host_output_shape,
             host_component_count,
             host_text_count,
             text_content,
         },
         complete_work: RootWorkLoopFinishedWorkCompleteWorkMetadata {
-            root_child_tag: HOST_COMPONENT_TAG,
-            completed_child_tag: HOST_COMPONENT_TAG,
-            host_text_child_tag: HOST_TEXT_TAG,
-            child_tags: [HOST_COMPONENT_TAG, HOST_TEXT_TAG],
+            root_child_tag,
+            completed_child_tag,
+            host_text_child_tag,
+            child_tags,
         },
         pending: RootWorkLoopFinishedWorkPendingMetadata {
             records_finished_work: true,
@@ -607,7 +707,7 @@ fn root_work_loop_finished_work_metadata_from_accepted_values(
             effects_refs_and_hydration_blocked,
         },
         placement: RootWorkLoopFinishedWorkPlacementMetadata {
-            tag: HOST_COMPONENT_TAG,
+            tag: placement_tag,
             apply_kind: placement_apply_kind,
             sibling_status: SIBLING_STATUS_APPEND,
         },
@@ -664,8 +764,34 @@ fn validate_placement_apply_kind(
 fn validate_diagnostic_evidence(
     evidence: &RootWorkLoopFinishedWorkDiagnosticEvidence,
 ) -> Result<(), RootWorkLoopFinishedWorkMetadataError> {
+    require_diagnostic_value("host_type", HOST_TYPE_DIV, &evidence.host_type)?;
+    require_diagnostic_value(
+        "host_output_shape",
+        HOST_OUTPUT_SHAPE_HOST_COMPONENT,
+        &evidence.host_output_shape,
+    )?;
     validate_placement_apply_kind(&evidence.placement_mutation_kind)?;
     require_diagnostic_value("text_content", TEXT_CONTENT_TEXT, &evidence.text_content)?;
+    require_diagnostic_value(
+        "root_child_tag",
+        HOST_COMPONENT_TAG,
+        &evidence.root_child_tag,
+    )?;
+    require_diagnostic_value(
+        "completed_child_tag",
+        HOST_COMPONENT_TAG,
+        &evidence.completed_child_tag,
+    )?;
+    require_diagnostic_value(
+        "host_text_child_tag",
+        HOST_TEXT_TAG,
+        &evidence.host_text_child_tag,
+    )?;
+    require_diagnostic_child_tags(&evidence.child_tags)?;
+    require_proven(
+        evidence.minimal_host_root_component_text_path_proven,
+        "minimal_host_root_component_text_path_proven",
+    )?;
     if evidence.render_lanes_bits != Lanes::DEFAULT.bits() {
         return Err(
             RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
@@ -751,6 +877,10 @@ fn validate_diagnostic_evidence(
         evidence.public_compatibility_blocked,
         "public_compatibility_blocked",
     )?;
+    require_proven(
+        evidence.effects_refs_and_hydration_blocked,
+        "effects_refs_and_hydration_blocked",
+    )?;
     reject_public_claim(
         evidence.public_renderer_package_behavior_exposed,
         "public_renderer_package_behavior_exposed",
@@ -763,6 +893,22 @@ fn validate_diagnostic_evidence(
         evidence.test_renderer_compatibility_claimed,
         "test_renderer_compatibility_claimed",
     )?;
+
+    Ok(())
+}
+
+fn require_diagnostic_child_tags(
+    actual: &[String; 2],
+) -> Result<(), RootWorkLoopFinishedWorkMetadataError> {
+    if actual[0] != HOST_COMPONENT_TAG || actual[1] != HOST_TEXT_TAG {
+        return Err(
+            RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+                field: "child_tags",
+                expected: "HostComponent,HostText",
+                actual: format!("{},{}", actual[0], actual[1]),
+            },
+        );
+    }
 
     Ok(())
 }

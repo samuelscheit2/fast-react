@@ -183,6 +183,7 @@ fn assert_cleanup_generation_currentness_rejection(
 fn private_root_work_loop_diagnostic_evidence() -> RootWorkLoopFinishedWorkDiagnosticEvidence {
     RootWorkLoopFinishedWorkDiagnosticEvidence::from_private_reconciler_diagnostic(
         &native_root_work_loop_minimal_placement_diagnostic_for_private_bridge(),
+        "div",
     )
 }
 
@@ -434,8 +435,10 @@ fn native_private_root_work_loop_finished_work_metadata_from_diagnostic_preserve
 #[test]
 fn native_private_root_work_loop_finished_work_metadata_uses_diagnostic_evidence() {
     let diagnostic = native_root_work_loop_minimal_placement_diagnostic_for_private_bridge();
-    let evidence =
-        RootWorkLoopFinishedWorkDiagnosticEvidence::from_private_reconciler_diagnostic(&diagnostic);
+    let evidence = RootWorkLoopFinishedWorkDiagnosticEvidence::from_private_reconciler_diagnostic(
+        &diagnostic,
+        "div",
+    );
     let metadata = root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
         "native-root-work-loop-root:diagnostic",
         "ConcurrentRoot",
@@ -450,7 +453,26 @@ fn native_private_root_work_loop_finished_work_metadata_uses_diagnostic_evidence
         metadata.placement().apply_kind(),
         diagnostic.placement_mutation_kind()
     );
+    assert_eq!(metadata.facade().host_type(), "div");
+    assert_eq!(metadata.facade().host_output_shape(), "host-component");
     assert_eq!(metadata.facade().text_content(), diagnostic.text_content());
+    assert_eq!(
+        metadata.complete_work().root_child_tag(),
+        diagnostic.root_child_tag_name()
+    );
+    assert_eq!(
+        metadata.complete_work().completed_child_tag(),
+        diagnostic.completed_child_tag_name()
+    );
+    assert_eq!(
+        metadata.complete_work().host_text_child_tag(),
+        diagnostic.host_text_child_tag_name()
+    );
+    assert_eq!(
+        metadata.complete_work().child_tags(),
+        diagnostic.child_tag_names()
+    );
+    assert_eq!(metadata.placement().tag(), diagnostic.root_child_tag_name());
     assert_eq!(
         metadata.facade().host_component_count(),
         u32::try_from(diagnostic.root_child_count()).unwrap()
@@ -469,8 +491,9 @@ fn native_private_root_work_loop_finished_work_metadata_uses_diagnostic_evidence
     );
     assert_eq!(
         metadata.commit().effects_refs_and_hydration_blocked(),
-        diagnostic.public_compatibility_blocked()
+        diagnostic.effects_refs_and_hydration_blocked()
     );
+    assert!(diagnostic.minimal_host_root_component_text_path_proven());
     assert!(diagnostic.render_complete_handoff_proven());
     assert!(diagnostic.private_render_complete_placement_proven());
     assert!(diagnostic.host_mutation_gate_blockers_intact());
@@ -669,6 +692,80 @@ fn native_private_root_work_loop_finished_work_metadata_rejects_hostile_diagnost
         }
     );
 
+    let evidence =
+        private_root_work_loop_diagnostic_evidence().with_host_output_shape_for_test("host-text");
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+            field: "host_output_shape",
+            expected: "host-component",
+            actual: "host-text".to_string()
+        }
+    );
+
+    let evidence =
+        private_root_work_loop_diagnostic_evidence().with_root_child_tag_for_test("HostText");
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+            field: "root_child_tag",
+            expected: "HostComponent",
+            actual: "HostText".to_string()
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_child_tags_for_test(["HostText", "HostComponent"]);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+            field: "child_tags",
+            expected: "HostComponent,HostText",
+            actual: "HostText,HostComponent".to_string()
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_minimal_host_root_component_text_path_proven_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "minimal_host_root_component_text_path_proven"
+        }
+    );
+
     let evidence = private_root_work_loop_diagnostic_evidence().with_root_child_count_for_test(2);
     assert_eq!(
         root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
@@ -720,6 +817,23 @@ fn native_private_root_work_loop_finished_work_metadata_rejects_hostile_diagnost
         .unwrap_err(),
         RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
             field: "host_mutation_execution_blocked"
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_effects_refs_and_hydration_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "effects_refs_and_hydration_blocked"
         }
     );
 

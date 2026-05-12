@@ -882,6 +882,11 @@ fn root_work_loop_minimal_render_complete_placement_diagnostic_exports_private_b
     assert_eq!(diagnostic.component_props(), props);
     assert_eq!(diagnostic.text_props(), text_props);
     assert_eq!(diagnostic.text_content(), "text");
+    assert_eq!(diagnostic.root_child_tag_name(), "HostComponent");
+    assert_eq!(diagnostic.completed_child_tag_name(), "HostComponent");
+    assert_eq!(diagnostic.host_text_child_tag_name(), "HostText");
+    assert_eq!(diagnostic.child_tag_names(), ["HostComponent", "HostText"]);
+    assert!(diagnostic.minimal_host_root_component_text_path_proven());
     assert_eq!(diagnostic.render_lanes(), Lanes::DEFAULT);
     assert_ne!(diagnostic.render_lanes_bits(), 0);
     assert_eq!(diagnostic.root_child_count(), 1);
@@ -913,6 +918,7 @@ fn root_work_loop_minimal_render_complete_placement_diagnostic_exports_private_b
     assert!(!diagnostic.public_root_rendering_claimed());
     assert!(diagnostic.public_root_rendering_blocked());
     assert!(diagnostic.public_compatibility_blocked());
+    assert!(diagnostic.effects_refs_and_hydration_blocked());
     assert!(!diagnostic.public_renderer_package_behavior_exposed());
     assert!(!diagnostic.react_dom_compatibility_claimed());
     assert!(!diagnostic.test_renderer_compatibility_claimed());
