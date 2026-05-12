@@ -29,6 +29,49 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1050 Docs Refresh and Workers 1036-1049 Cleanup Splits
+
+- Worker 1050 refreshed master docs after accepted organization-only cleanup
+  Workers 1036-1049. This is a docs-only refresh and makes no runtime or
+  public compatibility claim.
+- Workers 1036, 1037, 1038, 1047, and 1048 split additional
+  `fast-react-test-renderer` `TestRendererRoot` private implementation
+  clusters into `root_impl/` child modules for unmount routes, lifecycle
+  execution, TestInstance/getInstance diagnostics, act diagnostics, and
+  error-boundary diagnostics.
+- Worker 1040 kept the test-renderer test hub and moved all 182 test
+  functions into focused `crates/fast-react-test-renderer/src/tests/` child
+  modules.
+- Worker 1041 split root-commit record and diagnostics types into
+  `root_commit/record.rs`.
+- Worker 1042 split the test-only root-work-loop complete-work/commit-handoff
+  records and helpers into `root_work_loop/complete_handoff.rs`.
+- Worker 1043 split host-work root replacement request, evidence, and
+  execution helpers into `host_work/root_replacement.rs`.
+- Worker 1044 split root-scheduler act continuation and scheduler-bridge act
+  helpers into `root_scheduler/act.rs`.
+- Worker 1045 split function-component effect metadata, queues, dependency
+  phases, and helpers into `function_component/effects.rs`.
+- Worker 1046 split sync-flush tests into a facade plus child modules for root
+  commit continuation, host mutations, act, and callbacks.
+- Worker 1049 extracted the `fast-react-napi` inline tests into
+  `crates/fast-react-napi/src/tests.rs`.
+- Accepted orchestrator validation for the final main state passed
+  `cargo test -p fast-react-test-renderer --lib` with 182 tests,
+  `cargo test -p fast-react-reconciler` with 886 unit tests plus 1 doc-test,
+  `cargo test -p fast-react-napi --lib` with 79 tests,
+  `cargo check -p fast-react-reconciler`, `cargo fmt --all --check`,
+  `git diff --check`, `npm run check:package-surface` under Node 26.1.0, and
+  `node tests/smoke/import-entrypoints.mjs` under Node 26.1.0.
+- The accepted state for this cleanup batch is main `ab2814c7` after merge
+  commits `3d0aaa42`, `842195a6`, `eb9c8f8a`, `7724873a`, `7eaf7cab`,
+  `864c1e63`, `dc4fcfa4`, `f1048fa4`, `e182d7a5`, `08d65c77`,
+  `c5e3053f`, `ac75adb2`, and `ab2814c7`. These changes improve file
+  organization only. Public React DOM roots, test-renderer/native behavior,
+  hooks, Scheduler timing, hydration, events, resources/forms, package
+  compatibility, and broad renderer compatibility remain blocked unless
+  separately proven.
+
 ### Worker 1035 Docs Refresh and Workers 1031-1034 Test Renderer Splits
 
 - Worker 1035 refreshed master docs after accepted organization-only cleanup
