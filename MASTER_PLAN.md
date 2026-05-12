@@ -45,18 +45,32 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current accepted branch baseline is main
-`88ce0ff4` (`Merge worker 1206 report follow-up`). Accepted
-implementation, cleanup, planning, and docs-only history through that commit is
-recorded in `MASTER_PROGRESS.md`; this plan lists only current/future work.
+Top-level cap: 30 workers. Current main/docs head is main `6242abab`
+(`Merge worker 1212 docs report hash repair`). Latest accepted
+implementation/evidence baseline remains main `88ce0ff4` (`Merge worker 1206
+report follow-up`) because `88ce0ff4..6242abab` is docs/worker-progress only.
+Accepted implementation, cleanup, planning, and docs-only history through that
+baseline is recorded in `MASTER_PROGRESS.md`; this plan lists only
+current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted facts through main `88ce0ff4` are recorded in
-  `MASTER_PROGRESS.md`.
-- No implementation workers are active in this snapshot.
+- Accepted implementation/evidence facts through baseline main `88ce0ff4` are
+  recorded in `MASTER_PROGRESS.md`.
+- Active, unaccepted workers:
+  - Worker 1213: `react-dom/test-utils.act` blocked-currentness source-proof
+    hardening; branch/worktree
+    `worker/1213-react-dom-test-utils-act-source-proof`,
+    `/Users/user/Developer/Developer/fast-react-worktrees/worker-1213-react-dom-test-utils-act-source-proof`.
+  - Worker 1214: public `flushSync` blocked-currentness source-proof
+    hardening; branch/worktree
+    `worker/1214-react-dom-flush-sync-source-proof`,
+    `/Users/user/Developer/Developer/fast-react-worktrees/worker-1214-react-dom-flush-sync-source-proof`.
+  - Worker 1215: Rust transition queue-lane currentness consumer;
+    branch/worktree `worker/1215-transition-queue-lane-currentness`,
+    `/Users/user/Developer/Developer/fast-react-worktrees/worker-1215-transition-queue-lane-currentness`.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
   render handoff admission, plus the minimal public
@@ -73,7 +87,8 @@ Current orchestration queue:
   any later private NAPI/adapter handoff or broader public root lifecycle
   extension.
 
-Current project-owned source/test large-file baseline after main `88ce0ff4`,
+Current project-owned source/test large-file baseline after accepted
+implementation/evidence baseline main `88ce0ff4`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -97,7 +112,8 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `88ce0ff4` includes only
+Accepted compatibility evidence through accepted implementation/evidence
+baseline main `88ce0ff4` includes only
 the minimal public fake-DOM div/text `createRoot().render(...)` path above,
 Worker 1194's same-root repeat fake-DOM div/text update and rendered-root
 unmount cleanup, Worker 1200's smoke alignment with those expectations, and
@@ -140,7 +156,8 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `88ce0ff4` as
+1. Treat accepted compatibility evidence through accepted
+   implementation/evidence baseline main `88ce0ff4` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, Worker 1176's narrow public fake-DOM
    host-output proof, Worker 1194's narrow public same-root repeat div/text

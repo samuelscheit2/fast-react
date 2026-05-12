@@ -35,4 +35,6 @@
 
 ## Commit
 
-- Pending.
+- Docs refresh commit: `b6e1bd36` (`Refresh docs after worker 1206`).
+- Merge/main head after report hash repair: `6242abab` (`Merge worker 1212
+  docs report hash repair`).
