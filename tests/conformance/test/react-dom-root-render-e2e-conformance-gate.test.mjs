@@ -907,7 +907,19 @@ function assertPublicCreateRootMinimalHostOutput(document) {
   assert.equal(container.firstChild.nodeName, "DIV");
   assert.equal(container.textContent, "hello");
   assert.deepEqual(attributeEntries(container.firstChild), [["id", "app"]]);
-  assert.throws(() => root.render(React.createElement("div", null, "again")), {
+  const hostNode = container.firstChild;
+  assert.equal(
+    root.render(React.createElement("div", { id: "app" }, "again")),
+    undefined
+  );
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild, hostNode);
+  assert.equal(container.textContent, "again");
+  assert.deepEqual(attributeEntries(container.firstChild), [["id", "app"]]);
+  assert.equal(root.unmount(), undefined);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(container.textContent, "");
+  assert.throws(() => root.render(React.createElement("div", null, "stale")), {
     code: "FAST_REACT_UNIMPLEMENTED",
     exportName: "createRoot().render"
   });
@@ -915,6 +927,10 @@ function assertPublicCreateRootMinimalHostOutput(document) {
     code: "FAST_REACT_UNIMPLEMENTED",
     exportName: "createRoot().unmount"
   });
+  const recreatedRoot = reactDomClient.createRoot(container);
+  assert.equal(recreatedRoot.render(React.createElement("div", null, 42)), undefined);
+  assert.equal(container.textContent, "42");
+  assert.equal(recreatedRoot.unmount(), undefined);
 }
 
 function createEventTarget(target) {
