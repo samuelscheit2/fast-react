@@ -46,7 +46,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Latest accepted implementation/evidence baseline is
-main `b7096a16` (`Merge branch 'worker/1242-repair-package-unmount-expectations'`).
+main `df39570c` (`Merge worker 1239 test renderer status gates`).
 Accepted implementation, cleanup, planning, and docs-only history through that
 baseline is recorded in `MASTER_PROGRESS.md`; this plan lists only
 current/future work.
@@ -58,12 +58,12 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Accepted implementation/evidence facts through baseline main `b7096a16` are
+- Accepted implementation/evidence facts through baseline main `df39570c` are
   recorded in `MASTER_PROGRESS.md`.
-- Unowned, unaccepted clean candidate worktrees that need reconciliation before
-  any audit, merge, or cleanup: Worker 1239
-  `worker/1239-test-renderer-local-status-currentness` and Worker 1243
-  `worker/1243-scheduler-root-currentness-completeness`.
+- No unaccepted clean candidate worktrees are currently ready for merge. The
+  stale Worker 1243 repair worktree contains uncommitted follow-up scheduler
+  gate edits under separate reconciliation; do not consume them as accepted
+  evidence until they are repaired, audited, verified, and merged.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
   render handoff admission, plus the minimal public
@@ -81,11 +81,13 @@ Current orchestration queue:
   hardening through hostile freeze/proxy replacements, exact-two/exact-three
   private same-transition currentness canaries, sync-flush minimal host
   placement evidence, passive destroy clear-before-invoke evidence, and
-  public/native/browser-DOM capability rejection while proving any later private
-  NAPI/adapter handoff or broader public root lifecycle extension.
+  public/native/browser-DOM capability rejection, scheduler root currentness
+  completeness, and react-test-renderer serialization local-status currentness
+  while proving any later private NAPI/adapter handoff or broader public root
+  lifecycle extension.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `b7096a16`,
+implementation/evidence baseline main `df39570c`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,564 lines
@@ -96,7 +98,7 @@ excluding generated oracle JSON and package CJS published artifacts:
 - `tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs`: 10,282 lines
 - `packages/react-dom/src/events/plugin-event-system.js`: 9,533 lines
 - `crates/fast-react-reconciler/src/root_scheduler/tests.rs`: 9,283 lines
-- `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: 8,553 lines
+- `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: 8,809 lines
 - `crates/fast-react-reconciler/src/root_scheduler.rs`: 8,545 lines
 
 Do not run a broad large-file cleanup lane before public React DOM root/render
@@ -110,7 +112,7 @@ verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
 Accepted compatibility evidence through accepted implementation/evidence
-baseline main `b7096a16` remains narrow. The only public React DOM root behavior
+baseline main `df39570c` remains narrow. The only public React DOM root behavior
 accepted so far is the fake-DOM div/text `createRoot().render(...)` lifecycle:
 initial render, same-root div/text/id update, id removal, `render(null)` cleanup,
 rendered-root unmount cleanup, idempotent repeated unmount, recreate-after-unmount,
@@ -125,8 +127,12 @@ currentness hardening against nested mutable evidence plus hostile
 `Object.freeze` replacement, clone/proxy, stale source-report, public-alias, and
 proxy-trap paths, exact-three private same-transition queue-lane currentness
 evidence, refreshed private-admission 727/728, 739/745, and 804 source ledgers,
-private sync-flush minimal host placement evidence, and private passive destroy
-clear-before-invoke evidence.
+private sync-flush minimal host placement evidence, private passive destroy
+clear-before-invoke evidence, scheduler root currentness coverage for all
+accepted Scheduler root scenarios with exact row/source manifests and
+claim-alias blockers, and react-test-renderer serialization oracle/local-status
+gates for the current placeholder package while public test-renderer behavior
+remains blocked.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -145,7 +151,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through baseline main `b7096a16` as
+1. Treat accepted compatibility evidence through baseline main `df39570c` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, and the narrow fake-DOM public div/text
    lifecycle evidence described above, including `render(null)` cleanup and
@@ -153,10 +159,11 @@ canonical evidence requirements.
    wrapper execution blockers, private native metadata and admission ledgers,
    React DOM private denylist parity, React Children freeze/proxy currentness
    hardening, exact-two/exact-three private same-transition currentness,
-   sync-flush placement, and passive destroy evidence are blockers and
+   sync-flush placement, passive destroy evidence, scheduler root currentness
+   completeness, and test-renderer serialization status gates are blockers and
    currentness evidence only; they do not open broader public root, native,
    browser DOM, component rendering, Children traversal, package, Scheduler,
-   effects, or renderer compatibility.
+   effects, test-renderer, or renderer compatibility.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct

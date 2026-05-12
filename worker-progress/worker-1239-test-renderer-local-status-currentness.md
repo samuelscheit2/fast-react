@@ -30,7 +30,7 @@ status. This covers `fastReactComparedToReactTestRenderer`,
 Final audit repair: the checked oracle assertion path now also validates
 `conformanceClaims` and `evidenceClaims`, not only `localFastReactStatus`.
 Conformance/evidence aliases now fail before the oracle can be accepted, and
-the local-gate evidence alias tests cover each field independently.
+the local-gate alias tests cover each conformance/evidence field independently.
 
 Hardened source-owned blocker inputs by freezing local status, public
 unblocking requirements, private requirement rows, and serialization scenario
@@ -54,6 +54,7 @@ node --check tests/conformance/src/react-test-renderer-serialization-targets.mjs
 node --check tests/conformance/src/react-test-renderer-serialization-oracle.mjs
 node --check tests/conformance/src/react-test-renderer-serialization-local-gate.mjs
 node --check tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs
+node --check tests/conformance/test/react-test-renderer-serialization-oracle.test.mjs
 node --test tests/conformance/test/react-test-renderer-serialization-oracle.test.mjs
 node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs
 npm run test:react-test-renderer:serialization --workspace @fast-react/conformance
@@ -64,9 +65,14 @@ git diff --check
 
 ## Verification Results
 
-- `node --test tests/conformance/test/react-test-renderer-serialization-oracle.test.mjs`: passed, 18 tests.
-- `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, 34 tests.
-- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: passed, 52 tests.
+- `node --check tests/conformance/src/react-test-renderer-serialization-targets.mjs`: passed, no output.
+- `node --check tests/conformance/src/react-test-renderer-serialization-oracle.mjs`: passed, no output.
+- `node --check tests/conformance/src/react-test-renderer-serialization-local-gate.mjs`: passed, no output.
+- `node --check tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, no output.
+- `node --check tests/conformance/test/react-test-renderer-serialization-oracle.test.mjs`: passed, no output.
+- `node --test tests/conformance/test/react-test-renderer-serialization-oracle.test.mjs`: passed, 28 tests.
+- `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, 46 tests.
+- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: passed, 74 tests.
 - `npm run check:package-surface`: passed.
 - `node tests/smoke/import-entrypoints.mjs`: passed.
 - `git diff --check`: passed.
@@ -87,7 +93,8 @@ git diff --check
     compatibility claim aliases;
   - oracle assertion rejection for evidence-level comparison and compatibility
     claim aliases;
-  - local gate rejection for each evidence-level claim alias independently;
+  - local gate rejection for each conformance/evidence claim alias
+    independently;
   - local status comparison, package compatibility, and public compatibility
     aliases;
   - mutation attempts against frozen status/admission/blocker source records.

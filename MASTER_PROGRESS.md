@@ -29,6 +29,38 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1243 and 1239 Scheduler/Test-Renderer Currentness Gates
+
+- Worker 1243 extended the scheduler root currentness gate to all 11 accepted
+  Scheduler root scenarios, including task object shape, didTimeout, and
+  priority context rows. It now requires exact local row/source manifests,
+  exact row identity, root package/source identity, and public-root-only behavior
+  evidence while rejecting deep CJS, native, mock, postTask, private variant,
+  hidden, inherited, non-enumerable, symbol, accessor, snake_case,
+  dash-separated, and `Object.prototype` compatibility-claim bypasses. No public
+  Scheduler timing, root, package, or broad compatibility claim is opened.
+- Worker 1239 aligned the react-test-renderer serialization oracle and local
+  source status with the current workspace placeholder package:
+  `status: "placeholder-present"` with comparison and compatibility claims
+  false. Checked-oracle and local-gate validation now fail closed for stale
+  absent/present package status, removed placeholder markers, conformance and
+  evidence comparison/compatibility aliases, local Fast React status aliases,
+  and mutated frozen blocker records. Public `toJSON`, `toTree`,
+  `ReactTestInstance`, JS/CJS/package compatibility, native bridge execution,
+  and broad renderer compatibility remain blocked.
+- Accepted validation includes clean independent source and verification audits
+  for Worker 1243 after multiple hostile-source repairs, plus final clean source
+  and verification audits for Worker 1239. Root reruns passed Worker 1243's
+  focused scheduler root currentness test (24/24), companion Scheduler/root
+  conformance suite (111/111), scheduler workspace check, package-surface guard,
+  import smoke, and `git diff --check`; and Worker 1239's oracle test (28/28),
+  local-gate test (46/46), combined serialization script (74/74),
+  package-surface guard, import smoke, and `git diff --check`.
+- The accepted implementation/evidence baseline is main `df39570c` after Worker
+  1243 merge `83fe318d` and Worker 1239 merge `df39570c`, plus worker commits
+  `47ee1b17`, `06e7a3e6`, `8820cf9c`, `9573c1fb`, `d37dd78c`, `7eb44753`,
+  `3eab522f`, `bf4bc9a8`, `73c1d266`, and `679c2cde`.
+
 ### Workers 1241, 1242, and 1244 Sync-Flush, Root Null Cleanup, and Passive Destroy Canaries
 
 - Worker 1241 added a crate-private/test-only sync-flush minimal HostRoot
