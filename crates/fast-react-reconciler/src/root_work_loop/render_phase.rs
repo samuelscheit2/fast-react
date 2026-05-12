@@ -1,20 +1,19 @@
-#[cfg(test)]
 use std::error::Error;
-#[cfg(test)]
 use std::fmt::{self, Display, Formatter};
 
-#[cfg(test)]
 use fast_react_core::bubble_properties;
-#[cfg(test)]
-use fast_react_core::{ElementTypeHandle, FiberFlags, FiberTag, FiberTopologyError};
-use fast_react_core::{FiberId, Lanes, PropsHandle, StateHandle, UpdateQueueHandle};
+use fast_react_core::{
+    ElementTypeHandle, FiberFlags, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle,
+    StateHandle, UpdateQueueHandle,
+};
 use fast_react_host_config::HostTypes;
 
 #[cfg(test)]
 use crate::test_support::{TestHostNode, TestHostTree};
 use crate::{
-    FiberRootId, FiberRootStore, RootElementHandle, RootRenderExitStatus,
-    RootSchedulerCallbackHandle, create_host_root_work_in_progress,
+    FiberRootId, FiberRootStore, RootElementHandle, RootElementResolution,
+    RootElementResolutionError, RootElementSource, RootRenderExitStatus,
+    RootSchedulerCallbackHandle, create_host_root_work_in_progress, resolve_root_element,
 };
 
 use super::RootWorkLoopError;
@@ -93,6 +92,230 @@ impl HostRootRenderPhaseRecord {
     #[must_use]
     pub const fn remaining_lanes(self) -> Lanes {
         self.remaining_lanes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootMinimalElementRenderPhaseRecord {
+    render: HostRootRenderPhaseRecord,
+    host_root_work_in_progress: FiberId,
+    root_element: RootElementHandle,
+    root_child: FiberId,
+    root_child_tag: FiberTag,
+    root_child_element_type: ElementTypeHandle,
+    root_child_props: PropsHandle,
+    text_child: FiberId,
+    text_child_tag: FiberTag,
+    text_child_props: PropsHandle,
+    text_child_text: String,
+    render_lanes: Lanes,
+    root_child_count: usize,
+    component_child_count: usize,
+    public_compatibility_claimed: bool,
+}
+
+impl HostRootMinimalElementRenderPhaseRecord {
+    #[must_use]
+    pub(crate) const fn render(&self) -> HostRootRenderPhaseRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.render.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn current(&self) -> FiberId {
+        self.render.current()
+    }
+
+    #[must_use]
+    pub(crate) const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    pub(crate) const fn root_element(&self) -> RootElementHandle {
+        self.root_element
+    }
+
+    #[must_use]
+    pub(crate) const fn root_child(&self) -> FiberId {
+        self.root_child
+    }
+
+    #[must_use]
+    pub(crate) const fn root_child_tag(&self) -> FiberTag {
+        self.root_child_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn root_child_element_type(&self) -> ElementTypeHandle {
+        self.root_child_element_type
+    }
+
+    #[must_use]
+    pub(crate) const fn root_child_props(&self) -> PropsHandle {
+        self.root_child_props
+    }
+
+    #[must_use]
+    pub(crate) const fn text_child(&self) -> FiberId {
+        self.text_child
+    }
+
+    #[must_use]
+    pub(crate) const fn text_child_tag(&self) -> FiberTag {
+        self.text_child_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn text_child_props(&self) -> PropsHandle {
+        self.text_child_props
+    }
+
+    #[must_use]
+    pub(crate) fn text_child_text(&self) -> &str {
+        &self.text_child_text
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(&self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn root_child_count(&self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub(crate) const fn component_child_count(&self) -> usize {
+        self.component_child_count
+    }
+
+    #[must_use]
+    pub(crate) const fn public_compatibility_claimed(&self) -> bool {
+        self.public_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn public_compatibility_blocked(&self) -> bool {
+        !self.public_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) fn proves_minimal_host_component_with_text_child(&self) -> bool {
+        self.root_child_tag == FiberTag::HostComponent
+            && self.text_child_tag == FiberTag::HostText
+            && self.root_child_count == 1
+            && self.component_child_count == 1
+            && self.root_element.is_some()
+            && self.render.resulting_element() == self.root_element
+            && self.render.work_in_progress() == self.host_root_work_in_progress
+            && !self.public_compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HostRootMinimalElementRenderPhaseError {
+    RenderPhase(RootWorkLoopError),
+    RootElementResolution(RootElementResolutionError),
+    FiberTopology(FiberTopologyError),
+    ExistingCurrentChild {
+        root: FiberRootId,
+        current: FiberId,
+        child: FiberId,
+    },
+    ExistingWorkInProgressChild {
+        root: FiberRootId,
+        work_in_progress: FiberId,
+        child: FiberId,
+    },
+    ExpectedHostComponentRoot {
+        root: FiberRootId,
+        element: RootElementHandle,
+    },
+    ExpectedSingleHostTextChild {
+        root: FiberRootId,
+        element: RootElementHandle,
+    },
+}
+
+impl Display for HostRootMinimalElementRenderPhaseError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RenderPhase(error) => Display::fmt(error, formatter),
+            Self::RootElementResolution(error) => Display::fmt(error, formatter),
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::ExistingCurrentChild {
+                root,
+                current,
+                child,
+            } => write!(
+                formatter,
+                "root {} current HostRoot fiber {} already has child {}; minimal root element render only admits an empty current child list",
+                root.raw(),
+                current.slot().get(),
+                child.slot().get()
+            ),
+            Self::ExistingWorkInProgressChild {
+                root,
+                work_in_progress,
+                child,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} already has child {}; minimal root element render only admits a fresh child list",
+                root.raw(),
+                work_in_progress.slot().get(),
+                child.slot().get()
+            ),
+            Self::ExpectedHostComponentRoot { root, element } => write!(
+                formatter,
+                "root {} element {} must resolve to one HostComponent for minimal root element render",
+                root.raw(),
+                element.raw()
+            ),
+            Self::ExpectedSingleHostTextChild { root, element } => write!(
+                formatter,
+                "root {} HostComponent element {} must have exactly one HostText child for minimal root element render",
+                root.raw(),
+                element.raw()
+            ),
+        }
+    }
+}
+
+impl Error for HostRootMinimalElementRenderPhaseError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::RenderPhase(error) => Some(error),
+            Self::RootElementResolution(error) => Some(error),
+            Self::FiberTopology(error) => Some(error),
+            Self::ExistingCurrentChild { .. }
+            | Self::ExistingWorkInProgressChild { .. }
+            | Self::ExpectedHostComponentRoot { .. }
+            | Self::ExpectedSingleHostTextChild { .. } => None,
+        }
+    }
+}
+
+impl From<RootWorkLoopError> for HostRootMinimalElementRenderPhaseError {
+    fn from(error: RootWorkLoopError) -> Self {
+        Self::RenderPhase(error)
+    }
+}
+
+impl From<RootElementResolutionError> for HostRootMinimalElementRenderPhaseError {
+    fn from(error: RootElementResolutionError) -> Self {
+        Self::RootElementResolution(error)
+    }
+}
+
+impl From<FiberTopologyError> for HostRootMinimalElementRenderPhaseError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
     }
 }
 
@@ -489,6 +712,108 @@ pub fn render_host_root_for_lanes<H: HostTypes>(
         applied_update_count: process_result.applied_update_count(),
         skipped_update_count: process_result.skipped_update_count(),
         remaining_lanes: process_result.remaining_lanes(),
+    })
+}
+
+pub(crate) fn render_host_root_for_lanes_with_minimal_root_element<H, S>(
+    store: &mut FiberRootStore<H>,
+    root_id: FiberRootId,
+    render_lanes: Lanes,
+    source: &S,
+) -> Result<HostRootMinimalElementRenderPhaseRecord, HostRootMinimalElementRenderPhaseError>
+where
+    H: HostTypes,
+    S: RootElementSource + ?Sized,
+{
+    let render = render_host_root_for_lanes(store, root_id, render_lanes)?;
+    if let Some(child) = store.fiber_arena().get(render.current())?.child() {
+        return Err(
+            HostRootMinimalElementRenderPhaseError::ExistingCurrentChild {
+                root: root_id,
+                current: render.current(),
+                child,
+            },
+        );
+    }
+    if let Some(child) = store.fiber_arena().get(render.work_in_progress())?.child() {
+        return Err(
+            HostRootMinimalElementRenderPhaseError::ExistingWorkInProgressChild {
+                root: root_id,
+                work_in_progress: render.work_in_progress(),
+                child,
+            },
+        );
+    }
+
+    let element = render.resulting_element();
+    let resolution = resolve_root_element(source, element)?;
+    let public_compatibility_claimed = resolution.public_compatibility_claimed();
+    let RootElementResolution::HostComponent(component) = resolution else {
+        return Err(
+            HostRootMinimalElementRenderPhaseError::ExpectedHostComponentRoot {
+                root: root_id,
+                element,
+            },
+        );
+    };
+    let Some(text_child) = component.text_child() else {
+        return Err(
+            HostRootMinimalElementRenderPhaseError::ExpectedSingleHostTextChild {
+                root: root_id,
+                element,
+            },
+        );
+    };
+
+    let mode = store.fiber_arena().get(render.work_in_progress())?.mode();
+    let root_child = store.fiber_arena_mut().create_fiber(
+        FiberTag::HostComponent,
+        None,
+        component.props(),
+        mode,
+    );
+    let text =
+        store
+            .fiber_arena_mut()
+            .create_fiber(FiberTag::HostText, None, text_child.props(), mode);
+    {
+        let root_child_node = store.fiber_arena_mut().get_mut(root_child)?;
+        root_child_node.set_element_type(component.element_type());
+        root_child_node.set_lanes(render_lanes);
+        root_child_node.merge_flags(FiberFlags::PLACEMENT);
+    }
+    {
+        let text_node = store.fiber_arena_mut().get_mut(text)?;
+        text_node.set_lanes(render_lanes);
+    }
+
+    store.fiber_arena_mut().set_children(root_child, &[text])?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[root_child])?;
+    let bubbled = bubble_properties(store.fiber_arena(), render.work_in_progress())?;
+    {
+        let host_root = store.fiber_arena_mut().get_mut(render.work_in_progress())?;
+        host_root.set_child_lanes(bubbled.child_lanes());
+        host_root.set_subtree_flags(bubbled.subtree_flags());
+    }
+
+    Ok(HostRootMinimalElementRenderPhaseRecord {
+        render,
+        host_root_work_in_progress: render.work_in_progress(),
+        root_element: element,
+        root_child,
+        root_child_tag: FiberTag::HostComponent,
+        root_child_element_type: component.element_type(),
+        root_child_props: component.props(),
+        text_child: text,
+        text_child_tag: FiberTag::HostText,
+        text_child_props: text_child.props(),
+        text_child_text: text_child.text().to_owned(),
+        render_lanes,
+        root_child_count: 1,
+        component_child_count: 1,
+        public_compatibility_claimed,
     })
 }
 
