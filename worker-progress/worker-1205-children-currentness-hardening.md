@@ -98,4 +98,4 @@ Repair after source audit: the first hardening checked `Object.isFrozen(report)`
 ## Commit
 
 - Implementation commit: `bcb3fb84c3eb98e21f66ce2eff80f06fdadbc1d8`.
-- Repair commit: pending.
+- Repair commit: `832dba1c1250dd131fd7500e123bc763f6747963`.
