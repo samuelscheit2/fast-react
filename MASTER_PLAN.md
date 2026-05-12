@@ -46,31 +46,31 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline before this docs
-refresh is main `284949c1` (`Remove stale root commit effect import`).
+refresh is main `4f9994eb` (`Merge worker 1022 root commit refs split`).
 Accepted implementation history still includes the post-Worker-997 batch:
 Workers 986, 987, 992, 1000, 998, 978, 999, 990, 967, 996, 994, and 989.
-Accepted organization-only cleanup history now includes Workers 1002-1017:
-Rust test-module extractions, the test-renderer facade split, the N-API root
-bridge request split, the root work-loop test split, the `root_commit` error
-module split, root-commit/host-work test splits, and the function-component
-handles/errors, effects, and deletions splits. These cleanups make no runtime
-or public compatibility claim. Worker 853's competing test-renderer branch was
-rejected as redundant after Worker 844 was accepted; do not use it as accepted
-input.
+Accepted organization-only cleanup history now includes Workers 1002-1023:
+Rust test-module extractions, the test-renderer facade/root/diagnostics splits,
+the N-API root bridge request split, the root work-loop test split, the
+`root_commit` errors/effects/deletions/refs splits, root-commit/host-work test
+splits, and the function-component handles/errors, effects, deletions, and hook
+records splits. These cleanups make no runtime or public compatibility claim.
+Worker 853's competing test-renderer branch was rejected as redundant after
+Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Worker 1020: test-renderer root implementation split.
-- Worker 1021: test-renderer diagnostics split.
-- Worker 1022: `root_commit` refs split.
-- Worker 1023: `function_component` hook-record split.
+- Root post-merge broad validation for current main completed successfully;
+  accepted results are recorded in `MASTER_PROGRESS.md`.
+- No implementation worker output is listed as live accepted input in this plan
+  snapshot.
 
-Do not consume future active worker outputs as accepted evidence until reviewed,
-verified, and merged to main. When any active repair or audit lane lands, move
-the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
+Do not consume future worker outputs as accepted evidence until reviewed,
+verified, and merged to main. When any active repair, audit, or validation lane
+lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
 Accepted private compatibility evidence through `8a3b4042`, accepted
-organization-only cleanup through `284949c1`, plus audit policy through
+organization-only cleanup through `4f9994eb`, plus audit policy through
 `732a6b21`, still keeps public root/render/unmount, `act`,
 `react-dom/test-utils.act`, `flushSync`, Scheduler timing, hydration,
 resources/forms, public input/change or controlled-input behavior,
@@ -85,7 +85,7 @@ canonical evidence requirements.
 ## Near-Term Sequencing
 
 1. Treat accepted compatibility evidence through `8a3b4042`, plus the
-   organization-only cleanup history through `284949c1`, as private evidence
+   organization-only cleanup history through `4f9994eb`, as private evidence
    or file-organization evidence only. Public package, root, native, React DOM,
    test-renderer, Scheduler, `act`, `react-dom/test-utils.act`, hydration,
    resource/form, public controlled-input, serialization, React Children
@@ -117,9 +117,8 @@ canonical evidence requirements.
   JS facade files when the change preserves module paths, exports, public API
   shape, runtime behavior, and existing blocker language. Treat these as
   organization-only workers requiring focused tests, package-surface/import
-  smoke when facades are touched, and no compatibility claims. Active cleanup
-  candidates are listed in the current orchestration queue above; wait for
-  review before listing follow-on splits.
+  smoke when facades are touched, and no compatibility claims. Keep future
+  cleanup candidates general until a concrete worker is assigned and reviewed.
 - Rust root/sync-flush/function/deletion execution can extend accepted Workers
   855, 860, 862-867, 878-879, 889-890, 896, 898, 904, 906-907, 917-921, 936,
   943, 948, 954, 973, 980, 982, 985, 991, 997, and 998, plus Worker 966's
