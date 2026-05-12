@@ -568,6 +568,7 @@ test("React DOM public root facade inspection records current placeholder bounda
 
   for (const operation of [
     publicBoundary.publicRootLifecycle.renderInitial,
+    publicBoundary.publicRootLifecycle.renderDivText,
     publicBoundary.publicRootLifecycle.renderUpdate,
     publicBoundary.publicRootLifecycle.unmount
   ]) {
@@ -582,6 +583,19 @@ test("React DOM public root facade inspection records current placeholder bounda
     assert.equal(operation.sideEffects.listenerRegistrationCount, 0);
     assert.equal(operation.sideEffects.containerMarker.propertyCount, 0);
   }
+
+  const renderDivText = publicBoundary.publicRootLifecycle.renderDivText;
+  assert.equal(renderDivText.controlledDomShim, true);
+  assert.equal(renderDivText.renderElementType, "div");
+  assert.equal(renderDivText.renderTextContent, "text");
+  assert.deepEqual(renderDivText.controlledDomSnapshot, {
+    containerChildCount: 0,
+    containerChildNodeNames: [],
+    containerMutationLog: [],
+    containerTextContent: "",
+    ownerDocumentChildCount: 0,
+    ownerDocumentMutationLog: []
+  });
 });
 
 test("React DOM client private facade adapter is symbol-only and routes to private records", () => {
@@ -4424,6 +4438,19 @@ test("React DOM public root facade update and unmount rows stay blocked apart fr
     assert.equal(row.mutationCount, 0);
     assert.equal(row.privateBridgeEvidence, "separate");
   }
+  const publicDivTextRow = lifecycleRows.find(
+    (row) => row.id === "public-create-root-render-div-text"
+  );
+  assert.ok(publicDivTextRow);
+  assert.equal(publicDivTextRow.controlledDomShim, true);
+  assert.deepEqual(publicDivTextRow.controlledDomSnapshot, {
+    containerChildCount: 0,
+    containerChildNodeNames: [],
+    containerMutationLog: [],
+    containerTextContent: "",
+    ownerDocumentChildCount: 0,
+    ownerDocumentMutationLog: []
+  });
   assert.ok(
     gate.blockedPublicFacadeRows.every((row) => !row.id.startsWith("private-"))
   );
@@ -4489,6 +4516,46 @@ test("React DOM public root facade gate rejects premature public createRoot beha
       (failure) =>
         failure.gateStatus ===
         "public-root-object-created-while-facade-blocked"
+    )
+  );
+});
+
+test("React DOM public root facade gate rejects premature public div text render", () => {
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  const prematurePublicBoundary = clone(publicBoundary);
+  prematurePublicBoundary.publicRootLifecycle.renderDivText = {
+    ...prematurePublicBoundary.publicRootLifecycle.renderDivText,
+    status: "ok",
+    value: {
+      type: "undefined"
+    },
+    blockedAt: null,
+    createRootAttempt: {
+      status: "ok",
+      value: {
+        keys: ["render", "unmount"],
+        type: "object"
+      }
+    },
+    lifecycleOperationAttempted: true,
+    rootObjectCreated: true
+  };
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: prematurePublicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
+  });
+
+  assert.equal(gate.ok, false);
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+          "public-root-lifecycle-operation-not-placeholder-blocked" &&
+        failure.id === "public-create-root-render-div-text"
     )
   );
 });
