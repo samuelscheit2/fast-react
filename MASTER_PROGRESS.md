@@ -29,6 +29,43 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1120, 1126, 1130, and 1129 Diagnostic-Backed NAPI Metadata
+
+- Worker 1120 exported the doc-hidden reconciler diagnostic API
+  `describe_minimal_host_root_render_complete_placement_for_private_bridge` and
+  `MinimalHostRootRenderCompletePlacementDiagnostic` for the private HostRoot ->
+  HostComponent -> HostText render/complete/placement canary. The accepted API
+  exposes only the primitive diagnostic values needed by later bridges;
+  `HostNodeStore`, complete handoff records, placement commit records, and other
+  private records remain unexposed.
+- Worker 1126 added a focused `bindings/node` contract test for the private
+  root work-loop metadata factory. The factory stays reachable only through the
+  private `Symbol.for` key, remains non-enumerable and frozen, has no ESM named
+  export, and rejects public string-key leaks plus native/DOM/public capability
+  claims.
+- Worker 1130 added the Rust-only `fast-react-napi` root work-loop metadata
+  shape module. It preserves caller-supplied root/update ids while failing
+  closed for empty caller ids, unsupported host/text canary values, and
+  non-canonical placement apply kinds.
+- Worker 1129 added a crate-private `fast-react-napi` diagnostic probe that
+  consumes the Worker 1120 reconciler diagnostic through `TestRenderer`. The
+  probe asserts the minimal placement evidence while keeping host mutation
+  execution, public root rendering, public renderer package behavior, and
+  React DOM/test-renderer compatibility claims blocked.
+- Accepted validation evidence for this batch includes Worker 1120's focused
+  reconciler root-work-loop tests, all-features reconciler check, formatting,
+  and `git diff --check`; Worker 1126's contract test wired into
+  `bindings/node` `check` and the package-surface guard; Worker 1130's focused
+  `fast-react-napi` metadata-shape unit tests; and Worker 1129's focused
+  `native_root_work_loop_minimal_placement_diagnostic_consumes_private_reconciler_bridge`
+  unit test.
+- The accepted state for this batch is main `e94d5b44` after merge commits
+  `a0864d7e`, `274866a3`, `a11ef1df`, and `e94d5b44`, plus worker commits
+  `2455312a`, `61236819`, `0ad8bd4e`, and `bb05d6af`. No N-API `.node`
+  loading, public root render/update/unmount behavior, public DOM mutation,
+  Scheduler/act timing, package exports, or broad renderer compatibility is
+  enabled by this batch.
+
 ### Workers 1111, 1110, and 1116 Private Root Render Native Bridge Evidence
 
 - Worker 1111 added a crate-private diagnostic helper that composes the minimal
