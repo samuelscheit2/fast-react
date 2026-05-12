@@ -4,6 +4,8 @@
 worker-progress/*.codex.log
 worker-progress/*.exitcode
 worker-progress/quarantine/
+docs/orchestration/runs/*.codex.log
+docs/orchestration/runs/*.exitcode
 
 # Rust
 target/

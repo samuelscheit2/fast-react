@@ -2,7 +2,9 @@
 
 Last updated: 2026-05-13
 
-This file owns current and future work only. Accepted history belongs in
+This file is the human-readable current and future work plan. Machine-readable
+live task state and deterministic transitions belong in
+`docs/orchestration/state.json`. Accepted history belongs in
 `MASTER_PROGRESS.md`; durable orchestration policy belongs in `ORCHESTRATOR.md`;
 worker-facing rules belong in `WORKER_BRIEF.md`.
 
@@ -45,8 +47,8 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current root head is main `340e4072` (`Merge worker
-1248 public null unmount conformance hardening`). Accepted implementation, cleanup,
+Top-level cap: 30 workers. Current root head is main `3f51cf33` (`Record
+workers 1245 and 1248 acceptance`). Accepted implementation, cleanup,
 planning, and docs-only history that is not under active repair is recorded in
 `MASTER_PROGRESS.md`; this plan lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
