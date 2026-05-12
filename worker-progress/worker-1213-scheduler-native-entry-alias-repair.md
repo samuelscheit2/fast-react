@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete pending commit.
+Complete - repair commit recorded.
 
 ## Summary
 
@@ -39,6 +39,9 @@ Complete pending commit.
 - Existing stale schema, stale source, missing row, mode mismatch, source alias,
   and public-claim smuggling blockers remain covered by the native-entry oracle
   test file.
+- Follow-up source and verification audits were clean: no source or test files
+  were edited for this report-hash follow-up, and the verification evidence
+  remains tied to the repair commit below.
 
 ## Commands Run
 
@@ -50,6 +53,9 @@ Complete pending commit.
 - `npm run check:package-surface`
 - `node tests/smoke/import-entrypoints.mjs`
 - `git diff --check`
+- `git status --short --branch`
+- `git log --oneline --decorate -5`
+- `git status --short`
 
 ## Verification Results
 
@@ -77,6 +83,8 @@ Notes:
 - Repair was driven by the Worker 1206 audit blocker: aliased native/default
   behavior evidence could pass the currentness gate when the local row was
   otherwise current.
+- Follow-up audit found the worktree clean before the report-only update and
+  confirmed this follow-up did not edit source or test files.
 - No nested agents were used.
 
 ## Risks Or Blockers
@@ -90,6 +98,6 @@ Notes:
 - Keep running these hostile evidence canaries whenever Scheduler native-entry
   currentness rows or source-boundary gates are refreshed.
 
-## Commit Hash
+## Repair Commit Hash
 
 - 94025d2acf85d84d6cd2830cf3bc35bc2d9c8878
