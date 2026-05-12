@@ -89,10 +89,12 @@ pub use root_commit::{HostRootCommitRecord, RootCommitError, commit_finished_hos
 pub use root_config::{
     PendingChildrenHandle, PendingCommitCancelHandle, PendingCommitHandle, PendingPassiveState,
     RootCacheHandle, RootCallbackPriority, RootContextHandle, RootDefaultTransitionIndicatorHandle,
-    RootElementHandle, RootErrorCallbackHandle, RootFormStateHandle, RootHydrationCallbacksHandle,
-    RootKind, RootLifecycleState, RootOptions, RootRecoverableErrorCallbackHandle,
-    RootRenderExitStatus, RootSchedulerCallbackHandle, RootSuspenseBoundarySetHandle, RootTag,
-    RootTransitionCallbacksHandle, RootWorkStatus, UnsupportedHydrationKind,
+    RootElementHandle, RootElementResolution, RootElementResolutionError, RootElementSource,
+    RootErrorCallbackHandle, RootFormStateHandle, RootHostComponentElement, RootHostTextChild,
+    RootHydrationCallbacksHandle, RootKind, RootLifecycleState, RootOptions,
+    RootRecoverableErrorCallbackHandle, RootRenderExitStatus, RootSchedulerCallbackHandle,
+    RootSuspenseBoundarySetHandle, RootTag, RootTransitionCallbacksHandle, RootWorkStatus,
+    UnsupportedHydrationKind, resolve_root_element,
 };
 pub use root_scheduler::{
     RootScheduleMicrotaskResult, RootSchedulerCallbackExecutionRecord,
