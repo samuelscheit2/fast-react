@@ -45,8 +45,8 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current root head is main `5a831318` (`Refresh docs
-after scheduler currentness repair`). Accepted implementation, cleanup,
+Top-level cap: 30 workers. Current root head is main `594b2687` (`Merge worker
+1249 conformance discovery template import guard`). Accepted implementation, cleanup,
 planning, and docs-only history that is not under active repair is recorded in
 `MASTER_PROGRESS.md`; this plan lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
@@ -70,10 +70,6 @@ Current orchestration queue:
 - Active Worker 1248 adds explicit public-facade conformance rows and hostile
   false-green tests for the already accepted fake-DOM `render(null)` cleanup and
   idempotent unmount behavior.
-- Active Worker 1249 runs in the pre-created
-  `worker/1245-conformance-discovery-template-import-false-green` branch after
-  id reconciliation; it hardens conformance discovery so nested template literal
-  import-looking text cannot cover missing gates.
 - Clean idle worktrees exist for `worker/1250-rust-hostroot-update-render-commit`,
   `worker/1251-react-dom-nested-fakedom-lifecycle`, and
   `worker/1252-test-renderer-private-create-bridge`. Do not consume, delete, or

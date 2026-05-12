@@ -29,6 +29,23 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1249 Conformance Discovery Template Import Guard
+
+- Worker 1249 hardened the conformance discovery static-import scanner so
+  import-looking text inside nested template literals cannot cover a missing
+  required executable gate. Real top-level static imports after the nested
+  template are still discovered, transitive wrapper coverage cannot bridge
+  through the fake template import, and existing comment, string, simple
+  template, dynamic import, sidecar, and cycle-safe discovery behavior remains
+  covered. This is conformance harness hardening only; no package/runtime
+  behavior or compatibility claim changed.
+- Accepted validation includes clean independent source and verification audits.
+  Root reruns passed `node --check` and `node --test` for
+  `tests/conformance/test/conformance-test-discovery.test.mjs` (14/14),
+  package-surface guard, import smoke, and `git diff --check`.
+- The accepted state is main `594b2687` after Worker 1249 merge `594b2687` and
+  worker commit `54a4a733`.
+
 ### Workers 1243, 1243 Repair, and 1239 Scheduler/Test-Renderer Currentness Gates
 
 - Worker 1243 extended the scheduler root currentness gate to all 11 accepted
