@@ -5,6 +5,7 @@ mod fixtures;
 mod host_output;
 mod lifecycle;
 mod lifecycle_execution;
+mod serialization_execution;
 mod test_instance;
 mod unmount_route;
 mod update_route;
