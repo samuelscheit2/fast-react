@@ -29,7 +29,7 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-### Workers 1194 and 1200 Public Root Lifecycle Minimal Slice
+### Workers 1194, 1200, and 1202 Public Root Lifecycle Minimal Slice
 
 - Worker 1194 opened the next narrow public
   `react-dom/client.createRoot(container)` lifecycle slice after Worker 1176's
@@ -52,16 +52,33 @@ sequencing belong in `MASTER_PLAN.md`.
   public unmount clears fake-DOM output without marker/listener side effects,
   and render-after-unmount plus repeated unmount still throw
   `FAST_REACT_UNIMPLEMENTED`.
+- Worker 1202 added test/conformance/smoke-only public fake-DOM observability
+  for the already accepted minimal createRoot div/text lifecycle. The accepted
+  evidence covers observable `children`, `firstElementChild`, `innerHTML`, and
+  `tagName`; text escaping for `&`, `<`, and `>`; accepted string `id`
+  escaping for `&`, `<`, `>`, and `"`; and unsupported `className` plus
+  non-string/non-number object-id paths failing closed without marker,
+  listener, or host-output leakage.
+- Worker 1202 kept production runtime source unchanged. Its public facade and
+  conformance rows still report broad public root, hydration, events, refs,
+  Scheduler/act/flushSync, resources/forms, controlled inputs, browser DOM
+  mutation, and compatibility claims as blocked outside this narrow fake-DOM
+  observable lifecycle slice.
+- Worker 1202's accepted audits were clean after the observable `children`
+  helper was narrowed to public fake-DOM evidence, avoiding leakage into the
+  private nested-host-output path.
 - Accepted validation for this slice includes `npm --prefix packages/react-dom
   run check`, focused public root facade and root-render E2E conformance tests,
   `npm --prefix tests/conformance run root-public-facade:conformance`,
   `npm --prefix tests/conformance run root-render-e2e:conformance`, the
-  repaired `tests/smoke/react-dom-private-root-bridge-shell.mjs`, and
-  `git diff --check` under the Node 26.1.0 environment recorded by the worker
-  reports.
-- The accepted state is main `8a84a8dc` after docs-only Worker 1192
-  `6c440daa`, Worker 1194 merge `eeb25b09`, and Worker 1200 merge
-  `8a84a8dc`, plus worker commits `0f11d44f`, `feea75d1`, and `bb1756fe`.
+  repaired `tests/smoke/react-dom-private-root-bridge-shell.mjs`, Worker
+  1202's focused public facade gate, private root bridge shell, smoke, and
+  public facade conformance checks, and `git diff --check` under the Node
+  26.1.0 environment recorded by the worker reports.
+- The accepted state is main `6f7f50dc` after docs-only Worker 1192
+  `6c440daa`, Worker 1194 merge `eeb25b09`, Worker 1200 merge `8a84a8dc`,
+  and Worker 1202 merge `6f7f50dc`, plus worker commits `0f11d44f`,
+  `feea75d1`, `bb1756fe`, and `1ad2caa8`.
   Real `.node` loading/N-API runtime, browser DOM compatibility, broad public
   root render/update/unmount compatibility beyond the minimal fake-DOM
   div/text lifecycle slice, refs/listeners/events/hydration,
