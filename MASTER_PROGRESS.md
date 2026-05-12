@@ -29,6 +29,33 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1206 Scheduler Native Entry Currentness
+
+- Worker 1206 added a conformance-only Scheduler native-entry currentness gate
+  that reruns current local native-entry observations through the existing
+  native-entry probe path and compares them to checked native-entry oracle
+  rows.
+- The accepted gate covers `scheduler-native-wrapper`,
+  `scheduler-cjs-native-development`, and
+  `scheduler-cjs-native-production`, binding source rows to accepted Worker
+  937 Scheduler variant currentness and Worker 886 private context only.
+- The gate rejects stale source currentness, stale schema, missing local rows,
+  mode mismatch, native/default/deep-CJS aliasing, generic/package/public
+  claim smuggling, public Scheduler timing claims, native runtime execution
+  claims, and root/act/mock/postTask/package compatibility claims.
+- No Scheduler runtime source, manifests, generated oracle JSON, package
+  exports, React DOM, React Children, React.act, or hook dispatcher files were
+  changed. Public Scheduler timing/root/act/mock/postTask/native runtime,
+  package, and broad compatibility remain blocked.
+- Accepted validation includes Scheduler native-entry syntax and conformance
+  tests, Scheduler variant/Worker 886/public timing cross-checks,
+  `npm run check --workspace scheduler`, package-surface guard, import smoke,
+  and `git diff --check`. Independent source and verification audits were
+  clean after a report-staleness repair.
+- The accepted state is main `88ce0ff4` after Worker 1206 merge `7ce58393`
+  and report follow-up merge `88ce0ff4`, plus worker/report commits
+  `7e2e349a`, `4143674c`, `0bec7a71`, `4807e3c2`, and `657770f6`.
+
 ### Workers 1207, 1208, and 1210 Currentness Source-Proof Hardening
 
 - Worker 1208 hardened five private hook-dispatcher currentness validators:

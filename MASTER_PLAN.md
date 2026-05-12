@@ -46,7 +46,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline is main
-`00bb3d21` (`Merge worker 1210 React act placeholder audit repair`). Accepted
+`88ce0ff4` (`Merge worker 1206 report follow-up`). Accepted
 implementation, cleanup, planning, and docs-only history through that commit is
 recorded in `MASTER_PROGRESS.md`; this plan lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
@@ -54,11 +54,9 @@ Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted facts through main `00bb3d21` are recorded in
+- Accepted facts through main `88ce0ff4` are recorded in
   `MASTER_PROGRESS.md`.
-- Active Worker 1206 is assigned to Scheduler native-entry currentness.
-  Touched surface: Scheduler package native-entry/currentness gates. Merge
-  status: active/unmerged; no Worker 1206 output is accepted input yet.
+- No implementation workers are active in this snapshot.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
   render handoff admission, plus the minimal public
@@ -75,7 +73,7 @@ Current orchestration queue:
   any later private NAPI/adapter handoff or broader public root lifecycle
   extension.
 
-Current project-owned source/test large-file baseline after main `00bb3d21`,
+Current project-owned source/test large-file baseline after main `88ce0ff4`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -99,7 +97,7 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `00bb3d21` includes only
+Accepted compatibility evidence through current main `88ce0ff4` includes only
 the minimal public fake-DOM div/text `createRoot().render(...)` path above,
 Worker 1194's same-root repeat fake-DOM div/text update and rendered-root
 unmount cleanup, Worker 1200's smoke alignment with those expectations, and
@@ -122,7 +120,10 @@ public `React.act` blocked-currentness source-proof/freeze validation; its
 `reactDomClientRootPlaceholder: false` assertion is justified by the accepted
 minimal `react-dom/client.createRoot` fake-DOM lifecycle, while public
 `React.act` remains blocked. Worker 1210 documents that assertion as audit
-repair evidence only.
+repair evidence only. Worker 1206 adds only a conformance Scheduler
+native-entry currentness gate that reruns current local native-entry
+observations and binds native wrapper/direct native CJS source rows to accepted
+Worker 937/886 private Scheduler variant context.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -139,7 +140,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `00bb3d21` as
+1. Treat accepted compatibility evidence through current main `88ce0ff4` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, Worker 1176's narrow public fake-DOM
    host-output proof, Worker 1194's narrow public same-root repeat div/text
@@ -171,7 +172,11 @@ canonical evidence requirements.
    `reactDomClientRootPlaceholder: false` evidence follows from the accepted
    minimal `react-dom/client.createRoot` fake-DOM lifecycle, not from public
    `React.act` compatibility. Worker 1210 only records the audit repair that
-   made this assertion explicit.
+   made this assertion explicit. Worker 1206 proves only Scheduler
+   native-entry currentness for the native wrapper and direct native CJS rows,
+   binding them to Worker 937/886 private source context while preserving
+   public Scheduler timing, root, act, mock, postTask, native runtime, package,
+   and broad compatibility blockers.
    Broad public root render/update/unmount, broad native, browser DOM,
    test-renderer, Scheduler, public `React.act` compatibility, act queue
    flushing, callbacks, thenables, renderer/root/Scheduler execution,
