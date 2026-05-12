@@ -29,6 +29,46 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1213 and 1214 Source-Proof Hardening Batch
+
+- Worker 1213 repaired the Scheduler native-entry currentness gate after an
+  independent source audit found that aliased default Scheduler behavior
+  evidence could pass as native-entry behavior evidence. The repair now requires
+  accepted behavior evidence to name the expected native entrypoint and keeps
+  `defaultEntrypointRelationshipObserved` false before a row can pass.
+- Worker 1213 added hostile Scheduler native-entry tests for
+  `behaviorEvidence.entrypoint = "scheduler"` and
+  `defaultEntrypointRelationshipObserved = true`. Both fail closed with the
+  native/default/deep-CJS evidence violation while preserving stale schema,
+  stale source, missing-row, mode-mismatch, source-alias, and public-claim
+  blockers.
+- Worker 1213 also hardened the public
+  `react-dom/test-utils.act` blocked-currentness report validator so object-like
+  caller reports prove module-local WeakSet ownership before frozen-state or
+  shape inspection. Tests cover frozen and mutable forged clones, hostile
+  proxies with zero traps, and helper-owned mutable reports.
+- Worker 1214 applied the same source-proof-before-freeze pattern to the public
+  `react-dom` and `react-dom/profiling` `flushSync` blocked-currentness report
+  validator. Tests cover frozen and mutable forged clones, hostile proxies with
+  zero traps, and helper-owned mutable reports.
+- No public Scheduler native/runtime/package/root/act/mock/postTask behavior,
+  public `react-dom/test-utils.act` callback/thenable behavior, public
+  `flushSync` callback/thenable/root/Scheduler behavior, DOM/native mutation,
+  renderer/effect execution, package-surface change, or broad compatibility was
+  opened by this batch.
+- Accepted validation includes clean independent source and verification audits
+  for the Scheduler repair, `react-dom/test-utils.act`, and `flushSync`
+  hardenings; root reruns of the Scheduler native-entry and Scheduler
+  variant/Worker 886/public timing currentness tests; root reruns of the
+  React DOM test-utils act and flushSync tests; `npm run check --workspace
+  @fast-react/react-dom`, `npm run check --workspace scheduler`, package-surface
+  guard, import smoke, and `git diff --check`.
+- The accepted state is main `d694d902` after Worker 1213 test-utils act merge
+  `661bdaf3`, Worker 1213 Scheduler repair merge `4e507dd6`, and Worker 1214
+  flushSync merge `d694d902`, plus worker/report commits `75d83fe4`,
+  `f6c3aebb`, `94025d2a`, `0356767a`, `807aafab`, `0216b937`, `9ef36d3e`,
+  `a96bd93f`, and `fd518bb9`.
+
 ### Worker 1206 Scheduler Native Entry Currentness
 
 - Worker 1206 added a conformance-only Scheduler native-entry currentness gate
