@@ -29,6 +29,41 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1091 Docs Refresh and Workers 1083-1085 Root Render Helpers
+
+- Worker 1091 refreshed master docs for current main `b99841e3`
+  (`Merge worker 1085 minimal complete work host`). This is a docs-only
+  refresh and makes no runtime or public compatibility claim.
+- Worker 1083 split the React DOM public root-facade blocked gate into
+  `tests/conformance/src/react-dom-root-public-facade-blocked-gate.mjs`, kept
+  the root-render E2E gate as the compatibility surface, and preserved the
+  private 503-533 promotion-rejection metadata imports. Public
+  `createRoot().render(...)` remains blocked.
+- Worker 1084 added the crate-internal
+  `render_host_root_for_lanes_with_minimal_root_element` helper. It admits only
+  the narrow HostRoot -> HostComponent -> HostText work-in-progress shape,
+  records no public compatibility claim, and does not commit or mutate host
+  containers.
+- Worker 1085 made `complete_work` production-compiled for a crate-private
+  minimal HostRoot -> HostComponent -> HostText complete-work path, using
+  generic host creation hooks and detached `HostNodeStore` records. A repair
+  made host record insertion and fiber completion transactional after
+  create/append/finalize hooks succeed.
+- Accepted worker validation evidence for this batch includes Worker 1083's
+  focused public-facade/root-render Node tests, the `root-public-facade` and
+  `root-render-e2e` conformance scripts under Node 26.1.0, and
+  `git diff --check`; Worker 1085's focused `complete_work` and
+  `root_commit_host_component_text_mutation_execution_gate` Rust tests,
+  `cargo check -p fast-react-reconciler`, `cargo fmt --all --check`, and
+  `git diff --check`. Worker 1084's concise progress report records scope and
+  follow-up contract but no separate command transcript.
+- The accepted state for this batch is main `b99841e3` after merge commits
+  `4b37384f`, `4155d581`, and `b99841e3`, plus worker commits `306a1b15`,
+  `b9427c38`, `d382890a`, and `68a0fc51`. Public React DOM root rendering,
+  public update/unmount behavior, DOM mutation, listener/ref behavior,
+  Scheduler/act timing, JS admission, package compatibility, and broad
+  renderer compatibility remain blocked unless separately proven.
+
 ### Worker 1078 Docs Refresh and Workers 1065/1074-1077 Root Render Gates
 
 - Worker 1078 refreshed master docs for current main `965d1e62`
