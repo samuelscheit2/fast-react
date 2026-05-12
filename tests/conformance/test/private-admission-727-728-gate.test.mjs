@@ -102,7 +102,9 @@ const expectedCurrentUnmountIdentityDiagnostics = [
 const expectedCurrentUnmountIdentityEvidenceRoles = [
   "current-worker-730-unmount-ref-passive-cleanup-dependency",
   "current-worker-733-unmount-finished-work-identity-report",
-  "current-worker-733-unmount-finished-work-identity-rust-proof",
+  "current-worker-733-unmount-finished-work-identity-diagnostic-source",
+  "current-worker-733-unmount-finished-work-identity-unmount-native-consumer-source",
+  "current-worker-733-unmount-finished-work-identity-validator-source",
   "current-worker-754-cjs-unmount-finished-work-identity-report",
   "current-worker-754-cjs-development-tojson-unmount-identity-source",
   "current-worker-754-cjs-development-totree-unmount-identity-source",
@@ -765,6 +767,59 @@ test("private admission 727-728 gate rejects row override spoofing over current 
   } finally {
     workspace.cleanup();
   }
+});
+
+test("private admission 727-728 gate rejects stale Worker 733 pre-split Rust source authority", () => {
+  const staleRustSourcePath = "crates/fast-react-test-renderer/src/lib.rs";
+  const diagnosticRole =
+    "current-worker-733-unmount-finished-work-identity-diagnostic-source";
+  const consumerRole =
+    "current-worker-733-unmount-finished-work-identity-unmount-native-consumer-source";
+  const validatorRole =
+    "current-worker-733-unmount-finished-work-identity-validator-source";
+  const staleRoles = [diagnosticRole, consumerRole, validatorRole];
+  const gate = evaluatePrivateAdmission727728Gate({
+    currentUnmountIdentityEvidenceOverrides: {
+      [diagnosticRole]: {
+        path: staleRustSourcePath
+      },
+      [consumerRole]: {
+        path: staleRustSourcePath
+      },
+      [validatorRole]: {
+        path: staleRustSourcePath
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_727_728_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.currentUnmountIdentityEvidenceRecognized, false);
+  assert.equal(gate.currentUnmountIdentityEvidenceContractRecognized, false);
+  assertViolationIds(gate, [
+    "current-unmount-identity-evidence-not-recognized",
+    "current-unmount-identity-evidence-contract-mismatch"
+  ]);
+
+  for (const role of staleRoles) {
+    const evidenceRow = gate.currentUnmountIdentityEvidenceByRole[role];
+    assert.notEqual(evidenceRow, undefined, role);
+    assert.equal(evidenceRow.path, staleRustSourcePath, role);
+    assert.equal(evidenceRow.recognized, false, role);
+    assert.match(evidenceRow.sliceError, /^slice-start-not-found: /, role);
+  }
+
+  const contractViolation = gate.violations.find(
+    (violation) =>
+      violation.id === "current-unmount-identity-evidence-contract-mismatch"
+  );
+  assert.notEqual(contractViolation, undefined);
+  assert.deepEqual(
+    contractViolation.evidence[0].evidenceLocationMismatches.map(
+      (mismatch) => mismatch.role
+    ),
+    staleRoles
+  );
 });
 
 test("private admission 727-728 gate rejects comment, string, template, and regex spoofed current source identity", () => {

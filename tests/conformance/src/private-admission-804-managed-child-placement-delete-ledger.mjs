@@ -15,9 +15,13 @@ export const PRIVATE_ADMISSION_804_VIOLATION_STATUS =
 
 const worker785 = "worker-785-reconciler-managed-child-placement-delete-handoff";
 
-const completeWorkPath = "crates/fast-react-reconciler/src/complete_work.rs";
-const rootCommitPath = "crates/fast-react-reconciler/src/root_commit.rs";
+const completeWorkPath =
+  "crates/fast-react-reconciler/src/complete_work/managed_child.rs";
+const rootCommitPath =
+  "crates/fast-react-reconciler/src/root_commit/managed_child.rs";
 const hostWorkPath = "crates/fast-react-reconciler/src/host_work.rs";
+const hostWorkDeletionPath =
+  "crates/fast-react-reconciler/src/host_work/deletions.rs";
 const packageSurfaceGuardPath = "tests/smoke/package-surface-guard.mjs";
 const importSmokePath = "tests/smoke/import-entrypoints.mjs";
 const rustSourceEvidenceType = "source-owned-rust-implementation-slice";
@@ -83,7 +87,8 @@ const privateAdmission804Rows = freezeArray([
     rustImplementationPaths: freezeArray([
       completeWorkPath,
       rootCommitPath,
-      hostWorkPath
+      hostWorkPath,
+      hostWorkDeletionPath
     ]),
     requiredCapabilities: PRIVATE_ADMISSION_804_REQUIRED_CAPABILITIES,
     acceptedStatusIdentifiers:
@@ -95,7 +100,7 @@ const privateAdmission804Rows = freezeArray([
         sliceStart:
           "pub(crate) enum HostComponentManagedChildMutationKindForCanary {",
         sliceEnd:
-          "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub(crate) struct HostRootOneLevelChildSetCompletionRecord",
+          "pub(crate) fn host_component_managed_child_sibling_order_complete_work_record_for_canary(",
         tokens: [
           "pub(crate) enum HostComponentManagedChildMutationKindForCanary",
           "Self::Placement => \"managed-child-placement\"",
@@ -141,8 +146,7 @@ const privateAdmission804Rows = freezeArray([
         path: rootCommitPath,
         sliceStart:
           "pub(crate) struct HostRootManagedChildCommitHandoffRecordForCanary {",
-        sliceEnd:
-          "#[cfg(test)]\n#[derive(Debug, Clone, PartialEq, Eq)]\npub(crate) enum HostRootContextProviderUpdateCommitHandoffErrorForCanary",
+        sliceEnd: "impl Display for HostRootManagedChildCommitHandoffErrorForCanary",
         tokens: [
           "pub(crate) struct HostRootManagedChildCommitHandoffRecordForCanary",
           "complete_work: HostComponentManagedChildCompleteWorkRecordForCanary",
@@ -180,8 +184,7 @@ const privateAdmission804Rows = freezeArray([
         path: rootCommitPath,
         sliceStart:
           "pub(crate) fn commit_managed_child_complete_work_handoff_for_canary<H: HostTypes>(",
-        sliceEnd:
-          "#[cfg(test)]\nfn managed_child_complete_metadata_matches_mutation(",
+        sliceEnd: "fn managed_child_sibling_order_complete_metadata_matches_mutation",
         tokens: [
           "validate_host_root_finished_work_pending_commit_for_canary(store, render, pending)?;",
           "validate_managed_child_commit_metadata_for_canary(",
@@ -247,7 +250,6 @@ const privateAdmission804Rows = freezeArray([
           "if apply.records().len() != 1",
           "managed_child_apply_status_matches_kind(mutation_status, handoff.kind())",
           "apply_test_host_root_deletion_cleanup(",
-          "TestHostRootDeletionCleanupAction::DetachDeletedInstance",
           "cleanup_apply.applied_record_count()",
           "blockers: TEST_HOST_ROOT_MANAGED_CHILD_EXECUTION_BLOCKERS",
           "const fn managed_child_apply_status_matches_kind",
@@ -283,9 +285,9 @@ const privateAdmission804Rows = freezeArray([
       }),
       evidenceData({
         role: "host-work-managed-child-delete-cleanup",
-        path: hostWorkPath,
+        path: hostWorkDeletionPath,
         sliceStart: "fn apply_test_host_root_deletion_cleanup(",
-        sliceEnd: "fn apply_test_host_root_mutation_record(",
+        sliceEnd: "fn apply_deleted_text_cleanup_record(",
         tokens: [
           "fn apply_test_host_root_deletion_cleanup",
           "commit.host_node_deletion_cleanup_log().records()",

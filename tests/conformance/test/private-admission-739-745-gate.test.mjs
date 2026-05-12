@@ -428,6 +428,60 @@ test("private admission 739-745 gate rejects removing Worker 745 sibling identit
   }
 });
 
+test("private admission 739-745 gate rejects stale Worker 745 pre-split source paths", () => {
+  const baseRow = rowByWorker(worker745);
+  const gate = evaluatePrivateAdmission739745Gate({
+    rowOverrides: {
+      [worker745]: {
+        evidence: withPatchedEvidenceRows(baseRow, {
+          "worker-745-identity-constants-rust-proof": {
+            path: testRendererRustSourcePath
+          },
+          "worker-745-identity-tests-rust-proof": {
+            path: testRendererRustSourcePath
+          }
+        })
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_739_745_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.evidenceRecognized, false);
+  assertEvidenceRoleRecognized(
+    gate,
+    worker745,
+    "worker-745-identity-constants-rust-proof",
+    false
+  );
+  assertEvidenceRoleRecognized(
+    gate,
+    worker745,
+    "worker-745-identity-tests-rust-proof",
+    false
+  );
+  assertViolationIds(gate, ["private-admission-evidence-token-missing"]);
+
+  const constantsEvidence = evidenceRowByRole(
+    gate,
+    worker745,
+    "worker-745-identity-constants-rust-proof"
+  );
+  assert.match(
+    constantsEvidence.sliceError,
+    /^slice-start-not-found: pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_DIAGNOSTIC_NAME/
+  );
+  const testsEvidence = evidenceRowByRole(
+    gate,
+    worker745,
+    "worker-745-identity-tests-rust-proof"
+  );
+  assert.match(
+    testsEvidence.sliceError,
+    /^slice-start-not-found: fn root_private_to_json_sibling_text_finished_work_identity_gate_consumes_real_output_report_and_route/
+  );
+});
+
 test("private admission 739-745 gate rejects public, native, JS, CJS, and package claims", () => {
   const gate = evaluatePrivateAdmission739745Gate({
     rowOverrides: {
@@ -697,11 +751,28 @@ function assertEvidenceRoleRecognized(
   role,
   expectedRecognized
 ) {
-  const evidenceRow = gate.rowsByWorker[workerId].evidence.find(
-    (row) => row.role === role
-  );
+  const evidenceRow = evidenceRowByRole(gate, workerId, role);
   assert.notEqual(evidenceRow, undefined, role);
   assert.equal(evidenceRow.recognized, expectedRecognized, role);
+}
+
+function evidenceRowByRole(gate, workerId, role) {
+  return gate.rowsByWorker[workerId].evidence.find((row) => row.role === role);
+}
+
+function rowByWorker(workerId) {
+  const row = PRIVATE_ADMISSION_739_745_ROWS.find(
+    (candidate) => candidate.workerId === workerId
+  );
+  assert.notEqual(row, undefined, workerId);
+  return row;
+}
+
+function withPatchedEvidenceRows(row, patchesByRole) {
+  return row.evidence.map((evidenceRow) => {
+    const patch = patchesByRole[evidenceRow.role];
+    return patch === undefined ? evidenceRow : { ...evidenceRow, ...patch };
+  });
 }
 
 function createWorkspaceWithMutatedEvidenceFile({

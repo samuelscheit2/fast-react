@@ -770,7 +770,7 @@ const rowData739745 = Object.freeze([
       }),
       evidenceData({
         role: "worker-745-identity-constants-rust-proof",
-        path: "crates/fast-react-test-renderer/src/lib.rs",
+        path: "crates/fast-react-test-renderer/src/diagnostics/constants.rs",
         sliceStart:
           "pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_DIAGNOSTIC_NAME",
         sliceEnd:
@@ -817,7 +817,7 @@ const rowData739745 = Object.freeze([
         sliceStart:
           "fn validate_private_to_json_sibling_text_finished_work_identity_gate_for_canary(",
         sliceEnd:
-          "fn validate_private_to_json_sibling_snapshot_finished_work_identity_blocker_for_diagnostics(",
+          "fn validate_private_to_json_multi_child_host_text_finished_work_identity_gate_for_canary(",
         tokens: [
           "sibling-text-finished-work-identity-diagnostic-mismatch",
           "sibling-text-report-row-or-shape-mismatch",
@@ -831,7 +831,7 @@ const rowData739745 = Object.freeze([
       }),
       evidenceData({
         role: "worker-745-identity-tests-rust-proof",
-        path: "crates/fast-react-test-renderer/src/lib.rs",
+        path: "crates/fast-react-test-renderer/src/tests/json_serialization.rs",
         sliceStart:
           "fn root_private_to_json_sibling_text_finished_work_identity_gate_consumes_real_output_report_and_route()",
         sliceEnd:

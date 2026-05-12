@@ -164,7 +164,9 @@ export const PRIVATE_ADMISSION_727_728_REQUIRED_CURRENT_UNMOUNT_IDENTITY_EVIDENC
   freezeArray([
     "current-worker-730-unmount-ref-passive-cleanup-dependency",
     "current-worker-733-unmount-finished-work-identity-report",
-    "current-worker-733-unmount-finished-work-identity-rust-proof",
+    "current-worker-733-unmount-finished-work-identity-diagnostic-source",
+    "current-worker-733-unmount-finished-work-identity-unmount-native-consumer-source",
+    "current-worker-733-unmount-finished-work-identity-validator-source",
     "current-worker-754-cjs-unmount-finished-work-identity-report",
     "current-worker-754-cjs-development-tojson-unmount-identity-source",
     "current-worker-754-cjs-development-totree-unmount-identity-source",
@@ -379,19 +381,93 @@ const privateAdmission727728CurrentUnmountIdentityEvidenceData = Object.freeze([
     ]
   }),
   evidenceData({
-    role: "current-worker-733-unmount-finished-work-identity-rust-proof",
-    path: "crates/fast-react-test-renderer/src/lib.rs",
-    sliceStart:
-      "fn root_private_to_json_unmount_native_execution_requires_finished_work_identity_gate()",
-    sliceEnd:
-      "fn root_private_to_json_nested_host_output_update_row_records_nested_text_rows()",
+    role: "current-worker-733-unmount-finished-work-identity-diagnostic-source",
+    path: "crates/fast-react-test-renderer/src/diagnostics/json.rs",
+    sliceStart: "pub struct TestRendererPrivateSerializationFinishedWorkIdentityGate {",
+    sliceEnd: "pub struct TestRendererPrivateUnmountNestedSourceReportAdmissionGate {",
     tokens: [
-      "fn root_private_to_json_unmount_native_execution_requires_finished_work_identity_gate()",
-      "fn root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate()",
-      "reason: \"finished-work-identity-missing\"",
-      "reason: \"unmount-admission-finished-work-identity-mismatch\"",
-      "reason: \"finished-work-identity-source-report-mismatch\"",
-      "reason: \"public-or-native-compatibility-claim\""
+      "pub struct TestRendererPrivateSerializationFinishedWorkIdentityGate",
+      "diagnostic_name: &'static str",
+      "status: &'static str",
+      "root: FiberRootId",
+      "public_surface: &'static str",
+      "source_serialization_diagnostic_name: &'static str",
+      "host_output_update_kind: TestRendererRootUpdateKind",
+      "render_finished_work: TestRendererFiberHandleDiagnostics",
+      "commit_current: TestRendererFiberHandleDiagnostics",
+      "report_finished_work: TestRendererFiberHandleDiagnostics",
+      "consumes_committed_host_root_finished_work_identity: bool",
+      "consumes_committed_host_root_finished_work_lanes: bool",
+      "consumes_private_to_json_evidence: bool",
+      "consumes_private_to_tree_evidence: bool",
+      "public_to_json_available: bool",
+      "public_to_tree_available: bool",
+      "public_test_instance_available: bool",
+      "public_serialization_available: bool",
+      "compatibility_claimed: bool",
+      "pub const fn consumes_committed_host_root_finished_work_identity(self) -> bool",
+      "pub const fn consumes_committed_host_root_finished_work_lanes(self) -> bool",
+      "pub const fn public_to_json_available(self) -> bool",
+      "pub const fn public_to_tree_available(self) -> bool",
+      "pub const fn compatibility_claimed(self) -> bool"
+    ]
+  }),
+  evidenceData({
+    role: "current-worker-733-unmount-finished-work-identity-unmount-native-consumer-source",
+    path: "crates/fast-react-test-renderer/src/root_impl/serialization_execution.rs",
+    sliceStart:
+      "pub fn describe_private_to_json_after_unmount_native_execution_for_canary(",
+    sliceEnd:
+      "pub fn describe_private_unmount_nested_source_report_admission_gate_for_canary(",
+    tokens: [
+      "pub fn describe_private_to_json_after_unmount_native_execution_for_canary",
+      "pub fn describe_private_to_tree_after_unmount_native_execution_for_canary",
+      "self.validate_private_serialization_finished_work_identity_for_native_execution(",
+      "\"create().unmount -> create().toJSON\"",
+      "\"create().unmount -> create().toTree\"",
+      "TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME",
+      "TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME",
+      "TestRendererRootUpdateKind::Unmount",
+      "self.validate_private_unmount_native_execution_matches_handoff_for_canary(",
+      "consumes_accepted_native_unmount_execution_record: true",
+      "consumes_private_to_json_evidence: true",
+      "consumes_private_to_tree_evidence: true",
+      "source_finished_work_identity_diagnostic_name: None",
+      "public_to_json_available: false",
+      "public_to_tree_available: false",
+      "native_bridge_available: false",
+      "native_execution_available: false",
+      "compatibility_claimed: false"
+    ]
+  }),
+  evidenceData({
+    role: "current-worker-733-unmount-finished-work-identity-validator-source",
+    path: "crates/fast-react-test-renderer/src/root_impl/serialization_execution.rs",
+    sliceStart:
+      "fn validate_private_serialization_finished_work_identity_for_native_execution(",
+    sliceEnd:
+      "pub(crate) fn validate_private_to_json_sibling_snapshot_finished_work_identity_blocker_for_diagnostics(",
+    tokens: [
+      "fn validate_private_serialization_finished_work_identity_for_native_execution",
+      "return Err(\"finished-work-identity-missing\");",
+      "TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME",
+      "TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS",
+      "finished-work-identity-root-mismatch",
+      "finished-work-identity-stale",
+      "finished-work-identity-public-surface-mismatch",
+      "finished-work-identity-source-report-mismatch",
+      "finished-work-identity-host-output-kind-mismatch",
+      "identity.render_finished_work() != identity.commit_current()",
+      "!identity.consumes_committed_host_root_finished_work_identity()",
+      "identity.render_lanes_bits() == 0",
+      "!identity.consumes_committed_host_root_finished_work_lanes()",
+      "identity.consumes_private_to_json_evidence() != consumes_private_to_json_evidence",
+      "identity.public_to_json_available()",
+      "identity.public_to_tree_available()",
+      "identity.public_test_instance_available()",
+      "identity.public_serialization_available()",
+      "identity.compatibility_claimed()",
+      "public-or-native-compatibility-claim"
     ]
   }),
   evidenceData({
@@ -657,7 +733,8 @@ export const PRIVATE_ADMISSION_727_728_WORKERS = freezeArray(
 export function evaluatePrivateAdmission727728Gate({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT,
   rowOverrides = {},
-  skippedRowOverrides = {}
+  skippedRowOverrides = {},
+  currentUnmountIdentityEvidenceOverrides = {}
 } = {}) {
   const fileCache = new Map();
   const rows = PRIVATE_ADMISSION_727_728_ROWS.map((baseRow) => {
@@ -678,7 +755,10 @@ export function evaluatePrivateAdmission727728Gate({
     PRIVATE_ADMISSION_727_728_CURRENT_UNMOUNT_IDENTITY_EVIDENCE.map(
       (evidenceRow) =>
         evaluateEvidenceRow({
-          evidenceRow,
+          evidenceRow: mergeEvidenceOverride(
+            evidenceRow,
+            currentUnmountIdentityEvidenceOverrides[evidenceRow.role] ?? {}
+          ),
           fileCache,
           workspaceRoot
         })
@@ -1360,6 +1440,13 @@ function mergeRowOverride(baseRow, override) {
       ...baseRow.publicCompatibilityClaims,
       ...(override.publicCompatibilityClaims ?? {})
     })
+  });
+}
+
+function mergeEvidenceOverride(baseEvidence, override) {
+  return freezeRecord({
+    ...baseEvidence,
+    ...override
   });
 }
 
