@@ -103,3 +103,4 @@ Notes:
 
 - Implementation commit: `7e2e349a` (`Add scheduler native entry currentness gate`).
 - Report repair commit: `4143674c` (`Record worker 1206 report hash`).
+- Final report commit: `0bec7a71` (`Record worker 1206 final report hash`).
