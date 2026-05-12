@@ -403,6 +403,81 @@ test("scheduler native entry currentness rejects public timing, native runtime, 
   ]);
 });
 
+test("scheduler native entry currentness rejects default scheduler behavior evidence aliases", () => {
+  const baseline = baselineNativeEntryCurrentnessGate();
+  const hostileRowId = "node-development:native-entry-loading";
+  const localObservationRows = baseline.localObservationRows.map((row) =>
+    row.rowId === hostileRowId
+      ? {
+          ...row,
+          behaviorEvidence: {
+            ...row.behaviorEvidence,
+            entrypoint: "scheduler"
+          }
+        }
+      : row
+  );
+
+  const gate = evaluateSchedulerNativeEntryCurrentnessGate({
+    localObservationRows,
+    sourceRows: baseline.sourceRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_NATIVE_ENTRY_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.currentnessRowsMatched, false);
+  assert.equal(gate.sourceRowsCurrent, true);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.deepEqual(violationIds(gate), [
+    "scheduler-native-entry-currentness-native-default-deep-cjs-evidence-used"
+  ]);
+  assert.equal(
+    currentnessRow(gate, hostileRowId).status,
+    "native-entry-alias-or-public-behavior-evidence-used"
+  );
+  assert.equal(
+    currentnessRow(gate, hostileRowId).behaviorEvidence.entrypoint,
+    "scheduler"
+  );
+});
+
+test("scheduler native entry currentness rejects default-entrypoint relationship behavior evidence", () => {
+  const baseline = baselineNativeEntryCurrentnessGate();
+  const hostileRowId = "node-production:native-default-relationship";
+  const localObservationRows = baseline.localObservationRows.map((row) =>
+    row.rowId === hostileRowId
+      ? {
+          ...row,
+          behaviorEvidence: {
+            ...row.behaviorEvidence,
+            defaultEntrypointRelationshipObserved: true
+          }
+        }
+      : row
+  );
+
+  const gate = evaluateSchedulerNativeEntryCurrentnessGate({
+    localObservationRows,
+    sourceRows: baseline.sourceRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_NATIVE_ENTRY_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.currentnessRowsMatched, false);
+  assert.equal(gate.sourceRowsCurrent, true);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.deepEqual(violationIds(gate), [
+    "scheduler-native-entry-currentness-native-default-deep-cjs-evidence-used"
+  ]);
+  assert.equal(
+    currentnessRow(gate, hostileRowId).status,
+    "native-entry-alias-or-public-behavior-evidence-used"
+  );
+  assert.equal(
+    currentnessRow(gate, hostileRowId).behaviorEvidence
+      .defaultEntrypointRelationshipObserved,
+    true
+  );
+});
+
 test("scheduler native entry currentness rejects stale schema, missing local rows, mode mismatch, and native/default aliasing", () => {
   const baseline = baselineNativeEntryCurrentnessGate();
   const staleOracle = cloneJson(oracle);
@@ -1060,6 +1135,14 @@ function assertNativeSourceRow(row, expected) {
 
 function violationIds(gate) {
   return gate.violations.map((violation) => violation.id);
+}
+
+function currentnessRow(gate, rowId) {
+  const row = gate.currentnessRows.find(
+    (candidate) => candidate.rowId === rowId
+  );
+  assert.ok(row, `${rowId} currentness row should exist`);
+  return row;
 }
 
 function cloneJson(value) {
