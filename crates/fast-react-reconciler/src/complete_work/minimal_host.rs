@@ -373,13 +373,6 @@ where
             &component_context,
         )?
     };
-    let text_state_node = host_nodes.insert_text(text_scope, text_instance);
-    complete_fiber_common(
-        store,
-        shape.text,
-        text_state_node,
-        InitialChildrenFinalization::NoCommitMount,
-    )?;
 
     let component_scope = issue_creation_host_node_scope(
         store,
@@ -403,8 +396,7 @@ where
         )?
     };
     {
-        let child = host_nodes.text(text_state_node, text_scope)?;
-        host.append_detached_initial_child(&mut instance, DetachedHostChild::text(child))?;
+        host.append_detached_initial_child(&mut instance, DetachedHostChild::text(&text_instance))?;
     }
     let component_finalization = {
         let container = store.root(request.root())?.container_info();
@@ -416,6 +408,14 @@ where
             &root_context,
         )?
     };
+
+    let text_state_node = host_nodes.insert_text(text_scope, text_instance);
+    complete_fiber_common(
+        store,
+        shape.text,
+        text_state_node,
+        InitialChildrenFinalization::NoCommitMount,
+    )?;
     let component_state_node = host_nodes.insert_instance(component_scope, instance);
     complete_fiber_common(
         store,
@@ -617,8 +617,8 @@ mod tests {
     use super::*;
     use fast_react_core::{FiberMode, PropsHandle};
     use fast_react_host_config::{
-        HostCapability, HostCapabilitySet, HostChild, HostIdentityAndContext, HostOperationError,
-        HostResult,
+        HostCapability, HostCapabilitySet, HostChild, HostHandleKind, HostIdentityAndContext,
+        HostOperationError, HostResult,
     };
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -651,12 +651,20 @@ mod tests {
         Text(String),
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum MinimalHostFailure {
+        CreateInstance,
+        AppendInitialChild,
+        FinalizeInitialChildren,
+    }
+
     #[derive(Debug, Clone)]
     struct TestHost {
         operations: Vec<&'static str>,
         should_set_text_content: bool,
         reject_empty_token: bool,
         finalization: InitialChildrenFinalization,
+        fail_at: Option<MinimalHostFailure>,
     }
 
     impl Default for TestHost {
@@ -666,6 +674,7 @@ mod tests {
                 should_set_text_content: false,
                 reject_empty_token: true,
                 finalization: InitialChildrenFinalization::NoCommitMount,
+                fail_at: None,
             }
         }
     }
@@ -682,6 +691,18 @@ mod tests {
                     token.phase(),
                     token.target(),
                     fast_react_host_config::HostFiberTokenViolation::Invalid,
+                )
+                .into())
+            } else {
+                Ok(())
+            }
+        }
+
+        fn configured_failure(&self, failure: MinimalHostFailure) -> HostResult<()> {
+            if self.fail_at == Some(failure) {
+                Err(HostOperationError::invalid_handle(
+                    self.renderer_name(),
+                    HostHandleKind::Instance,
                 )
                 .into())
             } else {
@@ -777,6 +798,7 @@ mod tests {
         ) -> HostResult<Self::Instance> {
             self.record("create_instance");
             self.reject_invalid_token(token)?;
+            self.configured_failure(MinimalHostFailure::CreateInstance)?;
             Ok(TestInstance {
                 token: *token.token(),
                 ty: *ty,
@@ -805,6 +827,7 @@ mod tests {
             child: HostChild<'_, Self>,
         ) -> HostResult<()> {
             self.record("append_initial_child");
+            self.configured_failure(MinimalHostFailure::AppendInitialChild)?;
             match child {
                 HostChild::Instance(instance) => {
                     parent.children.push(TestChild::Instance(instance.ty));
@@ -825,6 +848,7 @@ mod tests {
             _context: &Self::HostContext,
         ) -> HostResult<InitialChildrenFinalization> {
             self.record("finalize_initial_children");
+            self.configured_failure(MinimalHostFailure::FinalizeInitialChildren)?;
             Ok(self.finalization)
         }
 
@@ -938,6 +962,42 @@ mod tests {
         )
     }
 
+    fn assert_no_published_host_completion(
+        store: &FiberRootStore<TestHost>,
+        host_nodes: &HostNodeStore<TestHost>,
+        fixture: MinimalTreeFixture,
+    ) {
+        assert!(host_nodes.is_empty());
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(fixture.component)
+                .unwrap()
+                .state_node(),
+            StateNodeHandle::NONE
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(fixture.component)
+                .unwrap()
+                .memoized_props(),
+            PropsHandle::NONE
+        );
+        assert_eq!(
+            store.fiber_arena().get(fixture.text).unwrap().state_node(),
+            StateNodeHandle::NONE
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(fixture.text)
+                .unwrap()
+                .memoized_props(),
+            PropsHandle::NONE
+        );
+    }
+
     #[test]
     fn complete_work_minimal_host_root_component_text_creates_detached_host_records() {
         let (mut store, fixture) = minimal_tree();
@@ -1002,6 +1062,69 @@ mod tests {
                 "finalize_initial_children"
             ]
         );
+    }
+
+    #[test]
+    fn complete_work_minimal_host_failure_after_text_creation_leaves_no_published_state() {
+        for (failure, expected_operations) in [
+            (
+                MinimalHostFailure::CreateInstance,
+                vec!["create_text_instance", "create_instance"],
+            ),
+            (
+                MinimalHostFailure::AppendInitialChild,
+                vec![
+                    "create_text_instance",
+                    "create_instance",
+                    "append_initial_child",
+                ],
+            ),
+            (
+                MinimalHostFailure::FinalizeInitialChildren,
+                vec![
+                    "create_text_instance",
+                    "create_instance",
+                    "append_initial_child",
+                    "finalize_initial_children",
+                ],
+            ),
+        ] {
+            let (mut store, fixture) = minimal_tree();
+            let mut host = TestHost {
+                fail_at: Some(failure),
+                ..TestHost::default()
+            };
+            let mut host_nodes = HostNodeStore::<TestHost>::new();
+            let mut token_factory = TokenFactory::default();
+
+            let error = complete_fixture(
+                &mut store,
+                fixture,
+                &mut host,
+                &mut host_nodes,
+                &mut token_factory,
+            )
+            .unwrap_err();
+
+            assert!(matches!(error, MinimalHostCompleteWorkError::Host(_)));
+            assert_eq!(host.operations, expected_operations);
+            assert_no_published_host_completion(&store, &host_nodes, fixture);
+
+            let mut retry_host = TestHost::default();
+            let mut retry_token_factory = TokenFactory::default();
+            let retry_record = complete_fixture(
+                &mut store,
+                fixture,
+                &mut retry_host,
+                &mut host_nodes,
+                &mut retry_token_factory,
+            )
+            .unwrap();
+            assert_eq!(retry_record.component(), fixture.component);
+            assert_eq!(retry_record.text(), fixture.text);
+            assert_eq!(host_nodes.instance_count(), 1);
+            assert_eq!(host_nodes.text_count(), 1);
+        }
     }
 
     #[test]

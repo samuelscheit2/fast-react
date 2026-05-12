@@ -14,3 +14,7 @@ Verification:
 - `cargo check -p fast-react-reconciler`
 - `cargo fmt --all --check`
 - `git diff --check`
+
+Follow-up:
+- Delayed host record insertion and fiber completion until after component create/append/finalize hooks all succeed.
+- Added regression coverage for failures after text creation proving retry leaves no preexisting state nodes or host records.
