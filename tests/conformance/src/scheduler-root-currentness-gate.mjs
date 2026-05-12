@@ -13,7 +13,7 @@ import {
   findSchedulerRootObservation,
   readCheckedSchedulerRootOracle
 } from "./scheduler-root-oracle.mjs";
-import { SCHEDULER_ROOT_SCENARIOS } from "./scheduler-root-scenarios.mjs";
+import { SCHEDULER_ROOT_SCENARIO_IDS } from "./scheduler-root-scenarios.mjs";
 import {
   SCHEDULER_ROOT_FAST_REACT_TARGET,
   SCHEDULER_ROOT_ORACLE_ARTIFACT_PATH,
@@ -35,11 +35,14 @@ export const SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS =
 
 export const SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS = Object.freeze([
   "scheduler-root-export-shape",
+  "scheduler-root-task-object-shape",
   "scheduler-root-priority-ordering",
   "scheduler-root-equal-priority-fifo",
   "scheduler-root-delayed-callbacks",
   "scheduler-root-cancellation",
   "scheduler-root-continuations",
+  "scheduler-root-did-timeout",
+  "scheduler-root-priority-context",
   "scheduler-root-yield-paint-frame-rate",
   "scheduler-root-node-host-transport"
 ]);
@@ -149,17 +152,77 @@ export function evaluateSchedulerRootCurrentnessGate({
     );
   }
 
-  const scenarioManifest = compareStringSets(
-    SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS,
-    SCHEDULER_ROOT_SCENARIOS.map((scenario) => scenario.id)
+  const sourceScenarioManifest = compareStringSets(
+    SCHEDULER_ROOT_SCENARIO_IDS,
+    SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS
   );
-  if (scenarioManifest.missing.length > 0) {
+  const checkedOracleScenarioManifest = compareStringSets(
+    Array.isArray(oracle?.scenarios)
+      ? oracle.scenarios.map((scenario) => scenario.id)
+      : [],
+    SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS
+  );
+  const missingCurrentnessScenarioIds = uniqueStrings([
+    ...sourceScenarioManifest.missing,
+    ...checkedOracleScenarioManifest.missing
+  ]);
+  const unexpectedCurrentnessScenarioIds = uniqueStrings([
+    ...sourceScenarioManifest.unexpected,
+    ...checkedOracleScenarioManifest.unexpected
+  ]);
+  if (
+    missingCurrentnessScenarioIds.length > 0 ||
+    unexpectedCurrentnessScenarioIds.length > 0
+  ) {
     violations.push(
       violation("scheduler-root-currentness-scenario-manifest-mismatch", {
-        missingScenarioIds: scenarioManifest.missing
+        missingScenarioIds: missingCurrentnessScenarioIds,
+        unexpectedScenarioIds: unexpectedCurrentnessScenarioIds
       })
     );
   }
+
+  const expectedSourceRowIds =
+    SCHEDULER_ROOT_CURRENTNESS_SOURCE_ROW_DEFINITIONS.map(
+      (definition) => definition.rowId
+    );
+  const sourceRowManifest = compareStringSets(
+    expectedSourceRowIds,
+    effectiveSourceRows.map((row) => row.rowId)
+  );
+  const sourceRowManifestViolates =
+    sourceRowManifest.missing.length > 0 ||
+    sourceRowManifest.unexpected.length > 0 ||
+    sourceRowManifest.duplicates.length > 0;
+  if (sourceRowManifestViolates) {
+    violations.push(
+      violation("scheduler-root-currentness-source-row-manifest-mismatch", {
+        missingRowIds: sourceRowManifest.missing,
+        unexpectedRowIds: sourceRowManifest.unexpected,
+        duplicateRowIds: sourceRowManifest.duplicates
+      })
+    );
+  }
+
+  const sourceRowsById = new Map(
+    effectiveSourceRows.map((row) => [row.rowId, row])
+  );
+  const sourceRowIdentityMismatchRows =
+    SCHEDULER_ROOT_CURRENTNESS_SOURCE_ROW_DEFINITIONS
+      .filter((definition) => sourceRowsById.has(definition.rowId))
+      .filter(
+        (definition) =>
+          !sourceRowMatchesDefinition(
+            sourceRowsById.get(definition.rowId),
+            definition
+          )
+      )
+      .map((definition) => definition.rowId);
+  pushIdsViolation(
+    violations,
+    "scheduler-root-currentness-source-row-identity-mismatch",
+    sourceRowIdentityMismatchRows
+  );
 
   const sourceRowViolations = effectiveSourceRows.filter(
     (row) => row.status !== "current-source-row-present"
@@ -177,6 +240,26 @@ export function evaluateSchedulerRootCurrentnessGate({
       violation("scheduler-root-currentness-private-886-context-not-accepted", {
         status: privateVariantBoundaryContext.status,
         compatibilityClaimed: privateVariantBoundaryContext.compatibilityClaimed
+      })
+    );
+  }
+
+  const expectedLocalObservationRowKeys =
+    collectExpectedSchedulerRootCurrentnessRowKeys();
+  const localObservationManifest = compareStringSets(
+    expectedLocalObservationRowKeys,
+    effectiveLocalObservationRows.map((row) => row.rowId)
+  );
+  if (
+    localObservationManifest.missing.length > 0 ||
+    localObservationManifest.unexpected.length > 0 ||
+    localObservationManifest.duplicates.length > 0
+  ) {
+    violations.push(
+      violation("scheduler-root-currentness-local-observation-manifest-mismatch", {
+        missingRowIds: localObservationManifest.missing,
+        unexpectedRowIds: localObservationManifest.unexpected,
+        duplicateRowIds: localObservationManifest.duplicates
       })
     );
   }
@@ -253,8 +336,8 @@ export function evaluateSchedulerRootCurrentnessGate({
         checkedComparison.compatibilityClaimed === false &&
         checkedComparison.firstDifferencePath === null;
       const rowCompatibilityClaimed =
-        localRow.compatibilityClaimed !== false ||
-        localRow.behaviorEvidence?.compatibilityClaimed !== false;
+        objectHasPublicClaim(localRow) ||
+        objectHasPublicClaim(localRow.behaviorEvidence);
       let status = "current-local-root-observation-matches-checked-oracle";
 
       if (!modeMatches) {
@@ -360,7 +443,10 @@ export function evaluateSchedulerRootCurrentnessGate({
     );
   const blockedPublicClaimsRecognized =
     publicCompatibilityClaimIds.length === 0;
-  const sourceRowsCurrent = sourceRowViolations.length === 0;
+  const sourceRowsCurrent =
+    sourceRowViolations.length === 0 &&
+    !sourceRowManifestViolates &&
+    sourceRowIdentityMismatchRows.length === 0;
   const acceptedPrivateVariantBoundaryContext =
     privateVariantBoundaryContext.acceptedAsPrivateContextOnly;
   const compatibilityClaimed =
@@ -403,6 +489,9 @@ export function evaluateSchedulerRootCurrentnessGate({
       delayedCallbacks: true,
       cancellation: true,
       continuations: true,
+      taskObjectShape: true,
+      didTimeout: true,
+      priorityContextApis: true,
       shouldYieldAndRequestPaint: true,
       nodeHostCallbackTransport: true,
       publicSchedulerTimingCompatibilityBlocked: true,
@@ -482,6 +571,16 @@ export function inspectSchedulerRootCurrentnessSourceRows({
       });
     })
   );
+}
+
+function collectExpectedSchedulerRootCurrentnessRowKeys() {
+  const rowKeys = [];
+  for (const mode of SCHEDULER_ROOT_PROBE_MODES) {
+    for (const scenarioId of SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS) {
+      rowKeys.push(`${mode.id}:${scenarioId}`);
+    }
+  }
+  return freezeArray(rowKeys);
 }
 
 function runCurrentSchedulerRootProbe({
@@ -577,6 +676,69 @@ function schedulerRootOracleSchemaIsCurrent(oracle) {
   );
 }
 
+function sourceRowMatchesDefinition(row, definition) {
+  if (!row || typeof row !== "object") {
+    return false;
+  }
+
+  const keyManifest = compareStringSets(
+    expectedSourceRowKeys(definition),
+    ownPropertyKeyNames(row)
+  );
+  const modeMatches =
+    definition.modeId === undefined
+      ? row.modeId === undefined
+      : row.modeId === definition.modeId;
+
+  return (
+    hasPlainObjectPrototype(row) &&
+    !objectHasPublicClaim(row) &&
+    keyManifest.missing.length === 0 &&
+    keyManifest.unexpected.length === 0 &&
+    ownKeysAreEnumerableDataProperties(row, expectedSourceRowKeys(definition)) &&
+    row.rowId === definition.rowId &&
+    row.entrypoint === definition.entrypoint &&
+    row.sourcePath === definition.sourcePath &&
+    row.sourceRole === definition.sourceRole &&
+    row.behaviorEvidenceAllowed === definition.behaviorEvidenceAllowed &&
+    modeMatches &&
+    row.exists === true &&
+    Array.isArray(row.requiredTokens) &&
+    sameStringArray(row.requiredTokens, definition.requiredTokens) &&
+    Array.isArray(row.missingTokens) &&
+    row.missingTokens.length === 0 &&
+    row.directDeepCjsImport === /\/cjs\//u.test(definition.sourcePath) &&
+    row.variantBoundaryEvidence === false &&
+    row.privateAdmission886Evidence === false &&
+    row.compatibilityClaimed === false &&
+    row.status === "current-source-row-present"
+  );
+}
+
+function expectedSourceRowKeys(definition) {
+  const keys = [
+    "rowId",
+    "entrypoint",
+    "sourcePath",
+    "sourceRole",
+    "behaviorEvidenceAllowed",
+    "requiredTokens",
+    "exists",
+    "missingTokens",
+    "directDeepCjsImport",
+    "variantBoundaryEvidence",
+    "privateAdmission886Evidence",
+    "compatibilityClaimed",
+    "status"
+  ];
+
+  if (definition.modeId !== undefined) {
+    keys.push("modeId");
+  }
+
+  return freezeArray(keys);
+}
+
 function tryFindSchedulerRootObservation(oracle, modeId, scenarioId) {
   try {
     return findSchedulerRootObservation(oracle, modeId, scenarioId);
@@ -615,13 +777,13 @@ function findPublicCompatibilityClaimIds({
   }
 
   for (const [claim, value] of Object.entries(oracle?.conformanceClaims ?? {})) {
-    if (/compatible|compatibilityClaimed/u.test(claim) && value === true) {
+    if (isCompatibilityClaimName(claim) && value === true) {
       claimIds.push(`oracle.conformanceClaims.${claim}`);
     }
   }
 
   for (const [claim, value] of Object.entries(oracle?.evidenceClaims ?? {})) {
-    if (/compatible|compatibilityClaimed/u.test(claim) && value === true) {
+    if (isCompatibilityClaimName(claim) && value === true) {
       claimIds.push(`oracle.evidenceClaims.${claim}`);
     }
   }
@@ -643,15 +805,123 @@ function findPublicCompatibilityClaimIds({
   }
 
   for (const row of localObservationRows) {
-    if (row.compatibilityClaimed !== false) {
-      claimIds.push(`${rowKey(row)}.compatibilityClaimed`);
-    }
-    if (row.behaviorEvidence?.compatibilityClaimed !== false) {
-      claimIds.push(`${rowKey(row)}.behaviorEvidence.compatibilityClaimed`);
-    }
+    pushObjectPublicClaimIds(claimIds, row, rowKey(row));
+    pushObjectPublicClaimIds(
+      claimIds,
+      row.behaviorEvidence,
+      `${rowKey(row)}.behaviorEvidence`
+    );
   }
 
-  return freezeArray(claimIds);
+  return freezeArray(uniqueStrings(claimIds));
+}
+
+function isCompatibilityClaimName(claim) {
+  const normalizedClaim = normalizeClaimName(claim);
+  return (
+    normalizedClaim.includes("compatible") ||
+    normalizedClaim.includes("compatibilityclaimed")
+  );
+}
+
+function isBlockedPublicClaimName(claim) {
+  const normalizedClaim = normalizeClaimName(claim);
+  return (
+    SCHEDULER_ROOT_CURRENTNESS_BLOCKED_PUBLIC_CLAIMS.some(
+      (blockedClaim) => normalizeClaimName(blockedClaim) === normalizedClaim
+    ) ||
+    isCompatibilityClaimName(claim)
+  );
+}
+
+function normalizeClaimName(claim) {
+  return String(claim).replace(/[_-]/gu, "").toLowerCase();
+}
+
+function objectHasPublicClaim(value) {
+  return findObjectPublicClaimNames(value).length > 0;
+}
+
+function pushObjectPublicClaimIds(claimIds, value, prefix) {
+  for (const claim of findObjectPublicClaimNames(value)) {
+    claimIds.push(`${prefix}.${claim}`);
+  }
+}
+
+function findObjectPublicClaimNames(value) {
+  if (!value || typeof value !== "object") {
+    return freezeArray([]);
+  }
+
+  const claimNames = [];
+  pushOwnPublicClaimNames(claimNames, value);
+  pushInheritedPublicClaimNames(claimNames, value);
+  return uniqueStrings(claimNames);
+}
+
+function pushOwnPublicClaimNames(claimNames, value) {
+  for (const key of Reflect.ownKeys(value)) {
+    pushPublicClaimNameForDescriptor(
+      claimNames,
+      key,
+      Reflect.getOwnPropertyDescriptor(value, key)
+    );
+  }
+}
+
+function pushInheritedPublicClaimNames(claimNames, value) {
+  let prototype = Object.getPrototypeOf(value);
+  while (prototype) {
+    for (const key of Reflect.ownKeys(prototype)) {
+      pushPublicClaimNameForDescriptor(
+        claimNames,
+        key,
+        Reflect.getOwnPropertyDescriptor(prototype, key)
+      );
+    }
+    prototype = Object.getPrototypeOf(prototype);
+  }
+}
+
+function pushPublicClaimNameForDescriptor(claimNames, key, descriptor) {
+  const claim = formatPropertyKey(key);
+  if (!descriptor || !isBlockedPublicClaimName(claim)) {
+    return;
+  }
+
+  if (descriptorIsAccessor(descriptor) || descriptor.value !== false) {
+    claimNames.push(claim);
+  }
+}
+
+function ownPropertyKeyNames(value) {
+  return freezeArray(Reflect.ownKeys(value).map(formatPropertyKey));
+}
+
+function ownKeysAreEnumerableDataProperties(value, expectedKeys) {
+  return expectedKeys.every((key) => {
+    const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+    return (
+      descriptor !== undefined &&
+      descriptor.enumerable === true &&
+      !descriptorIsAccessor(descriptor)
+    );
+  });
+}
+
+function descriptorIsAccessor(descriptor) {
+  return (
+    Object.prototype.hasOwnProperty.call(descriptor, "get") ||
+    Object.prototype.hasOwnProperty.call(descriptor, "set")
+  );
+}
+
+function hasPlainObjectPrototype(value) {
+  return Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function formatPropertyKey(key) {
+  return typeof key === "symbol" ? key.toString() : key;
 }
 
 function comparableObservation(observation) {
@@ -789,8 +1059,27 @@ function violation(id, details) {
 function compareStringSets(expected, actual) {
   return {
     missing: freezeArray(expected.filter((value) => !actual.includes(value))),
-    unexpected: freezeArray(actual.filter((value) => !expected.includes(value)))
+    unexpected: freezeArray(actual.filter((value) => !expected.includes(value))),
+    duplicates: findDuplicateStrings(actual)
   };
+}
+
+function uniqueStrings(values) {
+  return freezeArray([...new Set(values)]);
+}
+
+function findDuplicateStrings(values) {
+  const seen = new Set();
+  const duplicates = [];
+
+  for (const value of values) {
+    if (seen.has(value) && !duplicates.includes(value)) {
+      duplicates.push(value);
+    }
+    seen.add(value);
+  }
+
+  return freezeArray(duplicates);
 }
 
 function sameStringArray(left, right) {
