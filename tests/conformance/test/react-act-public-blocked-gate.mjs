@@ -157,6 +157,26 @@ assertCurrentnessRejected(
   "public-react-act-currentness-source-proof"
 );
 assertCurrentnessRejected(
+  {
+    ...currentnessReport
+  },
+  "public-react-act-currentness-source-proof"
+);
+const hostileForgedCurrentnessReport =
+  createHostilePublicReactActCurrentnessProxy();
+assertCurrentnessRejected(
+  hostileForgedCurrentnessReport.proxy,
+  "public-react-act-currentness-source-proof"
+);
+assert.equal(hostileForgedCurrentnessReport.getTrapCount(), 0);
+const mutableCurrentnessReport =
+  createPublicReactActCurrentnessReportWithFreezeBypass(reactGate);
+assert.equal(Object.isFrozen(mutableCurrentnessReport), false);
+assertCurrentnessRejected(
+  mutableCurrentnessReport,
+  "public-react-act-currentness-not-frozen"
+);
+assertCurrentnessRejected(
   reactGate.createPublicReactActBlockedCurrentnessReport({
     publicReactActCompatibilityClaimed: true
   }),
@@ -281,4 +301,44 @@ function replaceCurrentnessScenario(report, index, overrides) {
         }
       : scenario
   );
+}
+
+function createHostilePublicReactActCurrentnessProxy() {
+  let trapCount = 0;
+  const throwTrap = (trapName) => {
+    trapCount += 1;
+    throw new Error(`forged proxy ${trapName} trap should not be reached`);
+  };
+
+  return {
+    proxy: new Proxy(
+      {},
+      {
+        get() {
+          throwTrap("get");
+        },
+        getOwnPropertyDescriptor() {
+          throwTrap("getOwnPropertyDescriptor");
+        },
+        isExtensible() {
+          throwTrap("isExtensible");
+        },
+        ownKeys() {
+          throwTrap("ownKeys");
+        }
+      }
+    ),
+    getTrapCount: () => trapCount
+  };
+}
+
+function createPublicReactActCurrentnessReportWithFreezeBypass(gate) {
+  const originalFreeze = Object.freeze;
+
+  Object.freeze = (value) => value;
+  try {
+    return gate.createPublicReactActBlockedCurrentnessReport();
+  } finally {
+    Object.freeze = originalFreeze;
+  }
 }

@@ -4782,11 +4782,14 @@ function isAcceptedPublicReactActBlockedCurrentnessReport(report) {
 }
 
 function validatePublicReactActBlockedCurrentnessReport(report) {
-  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+  if (!isObjectLike(report)) {
     return 'public-react-act-currentness-not-frozen';
   }
   if (!publicReactActBlockedCurrentnessReports.has(report)) {
     return 'public-react-act-currentness-source-proof';
+  }
+  if (!Object.isFrozen(report)) {
+    return 'public-react-act-currentness-not-frozen';
   }
   if (
     report.kind !== publicReactActBlockedCurrentnessKind ||
