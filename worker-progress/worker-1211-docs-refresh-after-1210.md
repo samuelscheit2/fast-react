@@ -41,3 +41,5 @@
 
 - Docs refresh commit: `5e99e61a` (`Refresh docs after worker 1210`),
   merged by `e561dd91`.
+- Hash-repair commit: `335dce1f` (`Record worker 1211 docs refresh commit
+  hash`).
