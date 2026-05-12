@@ -46,8 +46,8 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline before this docs
-refresh is main `e94d5b44`
-(`Merge worker 1129 NAPI reconciler diagnostic probe`).
+refresh is main `15432066`
+(`Merge worker 1133 NAPI diagnostic-backed metadata`).
 Accepted implementation history still includes the post-Worker-997 batch:
 Workers 986, 987, 992, 1000, 998, 978, 999, 990, 967, 996, 994, and 989.
 Accepted organization-only cleanup history now includes Workers 1002-1062:
@@ -85,7 +85,7 @@ was added, and a transactional minimal complete-work host helper was added.
 These helpers remain private/crate-internal and do not commit, mutate DOM, or
 unblock public React DOM root rendering.
 Accepted root-render implementation input now also includes Workers 1090,
-1095, 1096, 1097, 1111, 1110, 1116, 1120, 1126, 1130, and 1129: a private
+1095, 1096, 1097, 1111, 1110, 1116, 1120, 1126, 1130, 1129, and 1133: a private
 minimal render->complete handoff, a private minimal HostRoot placement commit
 executor, JS admission for Rust-shaped private root work-loop metadata with
 capability-claim rejection, a split private host-output conformance gate, a
@@ -94,7 +94,9 @@ symbol-backed native placeholder factory for Rust work-loop metadata, a
 repaired native no-load guard ledger source mapping, a doc-hidden reconciler
 diagnostic API, a symbol-only native private metadata factory contract, a
 crate-private Rust NAPI metadata shape module, and a crate-private NAPI
-diagnostic probe through TestRenderer. These are private diagnostics, contract
+diagnostic probe through TestRenderer, plus diagnostic-backed `fast-react-napi`
+metadata with source-owned execution-surface blocker proof and React DOM native
+compatibility alias denylist parity. These are private diagnostics, contract
 tests, and helper paths only; no HostNodeStore/private records, N-API `.node`
 behavior, or public React DOM root rendering is exposed.
 Worker 853's competing test-renderer branch was rejected as redundant after
@@ -102,20 +104,21 @@ Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted facts through main `e94d5b44` are recorded in
+- Accepted facts through main `15432066` are recorded in
   `MASTER_PROGRESS.md`.
 - No later worker output is listed as live accepted input in this plan
   snapshot.
-- Immediate root-render sequencing is to connect the private reconciler
-  diagnostic, symbol-only native metadata factory contract, Rust metadata shape
-  validation, NAPI diagnostic probe, and repaired no-load guard ledger evidence
-  into diagnostic-backed package-private NAPI metadata admission. Public root
+- Next root-render sequencing after diagnostic-backed package-private NAPI
+  metadata is to preserve the private reconciler diagnostic path, source-owned
+  execution-surface blockers, repaired no-load guard ledger evidence, React DOM
+  native-compatibility alias denylists, and public/native/DOM capability
+  rejection while proving any later private NAPI/adapter handoff. Public root
   lifecycle prerequisites remain required before any public
   `createRoot().render(...)` path.
 
-Current large-file baseline after accepted main `e94d5b44`:
+Current large-file baseline after accepted main `15432066`:
 
-- `packages/react-dom/src/client/root-bridge.js`: 29,515 lines
+- `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
 - `packages/react-test-renderer/cjs/react-test-renderer.development.js`: 23,803 lines
 - `packages/react-test-renderer/cjs/react-test-renderer.production.js`: 20,750 lines
 - `tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`: 18,216 lines
@@ -133,7 +136,7 @@ lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 Accepted private compatibility evidence through `8aee0fcd`, accepted public
 root-render blocked evidence and private minimal root-render helpers through
 `b99841e3`, accepted private render/complete/commit helper, metadata/gate, and
-diagnostic-backed NAPI metadata evidence through `e94d5b44`, accepted
+diagnostic-backed NAPI metadata evidence through `15432066`, accepted
 organization-only cleanup through `75fb1a47`, plus audit policy through
 `732a6b21`, still keeps public
 root/render/unmount, `act`,
@@ -160,8 +163,10 @@ canonical evidence requirements.
    Worker 1120 as a doc-hidden reconciler placement diagnostic export, Worker
    1126 as native private metadata factory contract evidence, Worker 1130 as
    crate-private Rust metadata shape validation, Worker 1129 as a crate-private
-   NAPI diagnostic probe, and cleanup history through `75fb1a47` as private
-   evidence, negative public evidence, or file-organization evidence only.
+   NAPI diagnostic probe, Worker 1133 as diagnostic-backed NAPI metadata
+   admission with source-owned execution-surface blockers and native-compatibility
+   alias denylists, and cleanup history through `75fb1a47` as private evidence,
+   negative public evidence, or file-organization evidence only.
    Public package, root, native, React DOM, test-renderer, Scheduler, `act`,
    `react-dom/test-utils.act`, hydration, resource/form, public
    controlled-input, serialization, React Children lazy/full traversal,
@@ -263,8 +268,9 @@ canonical evidence requirements.
   native metadata factory as package-private bridge input only, Worker 1116's
   no-load guard ledger fix as private native-generation currentness evidence,
   Worker 1126's symbol-only factory contract as package-surface evidence,
-  Worker 1130's Rust metadata shape validation, and Worker 1129's NAPI
-  diagnostic probe as package-private bridge input only.
+  Worker 1130's Rust metadata shape validation, Worker 1129's NAPI diagnostic
+  probe, and Worker 1133's diagnostic-backed NAPI metadata admission as
+  package-private bridge input only.
   Worker 920's HostNodeStore payload currentness can inform fake/native host
   update handoffs only when scoped root/fiber/token/phase/target identity is
   preserved. Workers 958 and 990 input/change evidence is consumable only when
@@ -318,8 +324,9 @@ canonical evidence requirements.
   worker-thread/source provenance, Worker 1110's private symbol-backed metadata
   factory, Worker 1116's repaired no-load guard source mapping, Worker 1126's
   private native metadata factory contract, Worker 1130's crate-private NAPI
-  metadata shape, and Worker 1129's crate-private diagnostic probe as private
-  native-generation currentness evidence.
+  metadata shape, Worker 1129's crate-private diagnostic probe, and Worker
+  1133's diagnostic-backed NAPI metadata with source-owned blocker evidence as
+  private native-generation currentness evidence.
   Executable native addon loading, cleanup hooks, scheduling,
   renderer/reconciler output, worker-thread teardown, public no-stale-value
   behavior, public native compatibility, and package exports remain blocked.
@@ -381,12 +388,13 @@ canonical evidence requirements.
   public-facade gate split, Worker 1097's private host-output split, Worker
   1111's private minimal placement diagnostic, Worker 1110's native placeholder
   metadata factory, Worker 1120's reconciler diagnostic export, Worker 1126's
-  native factory contract, Worker 1130's Rust metadata shape, and Worker 1129's
-  NAPI diagnostic probe only as current fail-closed, package-private, or
-  organization evidence. Public root rendering remains blocked until a later
-  worker proves public `createRoot().render(...)` execution, DOM mutation,
-  listener/root marker behavior, lifecycle prerequisites, and package
-  compatibility against React 19.2.6.
+  native factory contract, Worker 1130's Rust metadata shape, Worker 1129's
+  NAPI diagnostic probe, and Worker 1133's diagnostic-backed NAPI metadata only
+  as current fail-closed, package-private, or organization evidence. Public
+  root rendering remains blocked until a later worker proves public
+  `createRoot().render(...)` execution, DOM mutation, listener/root marker
+  behavior, lifecycle prerequisites, and package compatibility against React
+  19.2.6.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, the text-patch admission ledger, Worker 887's

@@ -29,6 +29,36 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1133 NAPI Diagnostic-Backed Metadata
+
+- Worker 1133 connected the `fast-react-napi` root work-loop metadata shape to
+  the private reconciler minimal placement diagnostic. The accepted path keeps
+  caller-owned root/update ids, copies canonical host/text counts, text content,
+  placement kind, and blocker booleans from validated diagnostic evidence, and
+  rejects public/native/DOM compatibility claims.
+- Audit repairs made the metadata evidence source-owned by validating the
+  reconciler diagnostic tag/path and deriving execution-surface blockers from
+  current commit/ref/effect/passive/hydration state instead of local constants.
+  Pending passive rows, recorded effects, missing proofs, mismatched canary
+  shapes, and stale source evidence fail closed.
+- React DOM private bridge repairs added denylist parity for public native
+  compatibility aliases, including camelCase and snake_case claimed/surface
+  forms, while preserving public root rendering, native loading, and DOM
+  mutation blockers.
+- Accepted validation after merge passed `cargo test -p fast-react-napi --lib`,
+  `cargo test -p fast-react-reconciler root_work_loop_minimal_render_complete_placement --lib`,
+  `cargo test -p fast-react-reconciler root_commit::tests::effects --lib`, both
+  focused all-features placement diagnostic tests, `node
+  packages/react-dom/test/react-dom-private-root-bridge-shell.test.js`,
+  `npm --prefix bindings/node run check`, `cargo fmt --all --check`, and
+  `git diff --check`.
+- The accepted state is main `15432066` after merge commit `15432066`, on top
+  of docs-only `ffeb64f8`, plus worker repair commits `2651253a`, `bce64358`,
+  `616e5b77`, `1a28e8ae`, and `5f0c4411`. N-API `.node` loading, public
+  React DOM root render/update/unmount behavior, public DOM mutation,
+  Scheduler/act timing, package exports, public native compatibility, and broad
+  renderer compatibility remain blocked.
+
 ### Workers 1120, 1126, 1130, and 1129 Diagnostic-Backed NAPI Metadata
 
 - Worker 1120 exported the doc-hidden reconciler diagnostic API
