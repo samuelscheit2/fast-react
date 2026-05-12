@@ -426,6 +426,63 @@ fn same_transition_multi_update_queue_lane_scheduler_handoff(
     (first, second, requests, execution, queue_handoff)
 }
 
+fn entangled_transition_queue_lane_scheduler_handoff(
+    store: &mut FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    first_lane: Lane,
+    second_lane: Lane,
+    first_element: RootElementHandle,
+    second_element: RootElementHandle,
+) -> (
+    UpdateContainerResult,
+    UpdateContainerResult,
+    RootEntangledTransitionLaneSchedulerRequestRecordForCanary,
+    RootSchedulerCallbackExecutionRecord,
+    HostRootUpdateQueueLaneHandoffRecordForCanary,
+) {
+    let first =
+        update_container_transition_for_canary(store, root_id, first_lane, first_element, None)
+            .unwrap();
+    let second =
+        update_container_transition_for_canary(store, root_id, second_lane, second_element, None)
+            .unwrap();
+    let request =
+        record_entangled_transition_lane_scheduler_request_from_update_diagnostics_for_canary(
+            store, &first, &second,
+        )
+        .unwrap();
+    let processed = process_root_schedule_in_microtask(store).unwrap();
+    assert_eq!(processed.records().len(), 1);
+    assert_eq!(
+        processed.records()[0].outcome(),
+        RootTaskScheduleOutcome::Scheduled
+    );
+    let callback = store
+        .scheduler_bridge()
+        .callback_requests()
+        .iter()
+        .rev()
+        .copied()
+        .find(|callback| callback.root() == root_id)
+        .unwrap();
+    let execution = execute_scheduled_root_callback(store, callback).unwrap();
+    assert_eq!(
+        execution.status(),
+        RootSchedulerCallbackExecutionStatus::Rendered
+    );
+    assert_eq!(execution.selected_lanes(), request.selected_lanes());
+    let render = execution.render_phase().unwrap();
+    let queue_handoff = host_root_update_queue_lane_handoff_for_canary(
+        store,
+        root_id,
+        &[first.clone(), second.clone()],
+        render,
+    )
+    .unwrap();
+
+    (first, second, request, execution, queue_handoff)
+}
+
 fn expired_default_sync_queue_lane_scheduler_handoff(
     store: &mut FiberRootStore<RecordingHost>,
     root_id: FiberRootId,
@@ -1495,6 +1552,252 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
     assert!(replay.commit().is_none());
     assert_eq!(store.root(root_id).unwrap().current(), committed_current);
     assert_eq!(replay_host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_entangled_queue_lane_continuation_accepts_two_transition_lanes() {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let entangled_lanes = Lanes::from(Lane::TRANSITION_1).merge_lane(Lane::TRANSITION_2);
+    let second_element = RootElementHandle::from_raw(122102);
+    let (first, second, request, execution, queue_handoff) =
+        entangled_transition_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            Lane::TRANSITION_2,
+            RootElementHandle::from_raw(122101),
+            second_element,
+        );
+    let render = execution.render_phase().unwrap();
+
+    let continuation =
+        execute_entangled_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            request,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        continuation.status(),
+        RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::RenderedAndCommitted
+    );
+    assert_eq!(continuation.root(), root_id);
+    assert_eq!(continuation.request(), request);
+    assert_eq!(request.root(), root_id);
+    assert_eq!(request.fiber(), current);
+    assert_eq!(request.queue(), first.queue());
+    assert_eq!(request.first().sequence(), 0);
+    assert_eq!(request.first().update(), first.update());
+    assert_eq!(request.first().lane(), Lane::TRANSITION_1);
+    assert_eq!(request.second().sequence(), 1);
+    assert_eq!(request.second().update(), second.update());
+    assert_eq!(request.second().lane(), Lane::TRANSITION_2);
+    assert_eq!(
+        request.update_sequence_ids(),
+        [first.update(), second.update()]
+    );
+    assert_eq!(request.selected_lanes(), entangled_lanes);
+    assert_eq!(request.entangled_lanes(), entangled_lanes);
+    assert_eq!(request.root_pending_lanes_after_enqueue(), entangled_lanes);
+    assert_eq!(
+        request.root_entangled_lanes_after_enqueue(),
+        entangled_lanes
+    );
+    assert_eq!(request.current_event_transition_lane_before(), Lane::NO);
+    assert_eq!(request.current_event_transition_lane_after(), Lane::NO);
+    assert!(request.routed_to_private_root_scheduler());
+    assert!(!request.public_scheduler_compatibility_claimed());
+    assert_eq!(continuation.callback_execution(), execution);
+    assert_eq!(continuation.callback_node(), execution.callback_node());
+    assert_eq!(
+        continuation.current_callback_node(),
+        execution.callback_node()
+    );
+    assert_eq!(continuation.selected_lanes(), entangled_lanes);
+    assert_eq!(continuation.current_event_transition_lane(), Lane::NO);
+    assert_eq!(continuation.root_current_before_continuation(), current);
+    assert_eq!(
+        continuation.root_pending_lanes_before_continuation(),
+        entangled_lanes
+    );
+    assert_eq!(
+        continuation.root_entangled_lanes_before_continuation(),
+        entangled_lanes
+    );
+    assert!(continuation.did_execute_entangled_transition_queue_lane_scheduler_continuation());
+    assert!(continuation.accepted_entangled_transition_scheduler_evidence_for_canary());
+    assert!(continuation.accepted_root_scheduler_execution_evidence_for_canary());
+    assert!(continuation.accepted_root_commit_execution_evidence_for_canary());
+    assert!(continuation.accepted_queue_lane_handoff_evidence_for_canary());
+    assert!(
+        continuation
+            .routed_through_entangled_transition_queue_lane_and_commit_evidence_for_canary()
+    );
+    assert!(
+        continuation
+            .treats_entangled_transition_host_root_updates_as_current_only_with_queue_lane_handoff_for_canary()
+    );
+    assert!(!continuation.public_root_compatibility_claimed());
+    assert!(!continuation.public_scheduler_timing_compatibility_claimed());
+    assert!(!continuation.public_transition_hooks_compatibility_claimed());
+    assert!(!continuation.public_act_compatibility_claimed());
+    assert!(!continuation.react_dom_compatibility_claimed());
+    assert!(!continuation.test_renderer_compatibility_claimed());
+    assert!(!continuation.package_compatibility_claimed());
+    assert!(!continuation.renderer_compatibility_claimed());
+    assert!(!continuation.executes_public_effects());
+
+    let identity = continuation.finished_work_handoff_identity().unwrap();
+    assert_eq!(identity.root(), root_id);
+    assert_eq!(identity.previous_current(), current);
+    assert_eq!(
+        identity.pending_work_before_commit(),
+        Some(render.finished_work())
+    );
+    assert_eq!(identity.finished_work(), render.finished_work());
+    assert_eq!(identity.selected_lanes(), entangled_lanes);
+    assert_eq!(identity.render_lanes(), entangled_lanes);
+    assert_eq!(identity.finished_lanes(), entangled_lanes);
+    assert!(identity.accepted_for_root_scheduler_commit_handoff());
+
+    let queue_commit_handoff = continuation.queue_commit_handoff().unwrap();
+    assert_eq!(queue_commit_handoff.queue_handoff(), &queue_handoff);
+    assert_eq!(
+        queue_commit_handoff.update_sequence_ids(),
+        &[first.update(), second.update()]
+    );
+    assert_eq!(queue_commit_handoff.selected_lanes(), entangled_lanes);
+    assert_eq!(queue_commit_handoff.finished_lanes(), entangled_lanes);
+    assert_eq!(queue_commit_handoff.remaining_lanes(), Lanes::NO);
+    assert_eq!(queue_commit_handoff.applied_update_count(), 2);
+    assert_eq!(queue_commit_handoff.skipped_update_count(), 0);
+    assert_eq!(queue_commit_handoff.resulting_element(), second_element);
+    assert!(queue_commit_handoff.proves_queue_lane_handoff_gated_current_switch());
+
+    let commit = continuation.commit().unwrap();
+    assert_eq!(commit.root(), root_id);
+    assert_eq!(commit.previous_current(), current);
+    assert_eq!(commit.current(), render.finished_work());
+    assert_eq!(commit.finished_work(), render.finished_work());
+    assert_eq!(commit.finished_lanes(), entangled_lanes);
+    assert_eq!(commit.remaining_lanes(), Lanes::NO);
+    assert_eq!(commit.pending_lanes(), Lanes::NO);
+    assert_eq!(
+        store.root(root_id).unwrap().current(),
+        render.finished_work()
+    );
+    assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().pending_lanes(),
+        Lanes::NO
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_entangled_queue_lane_continuation_rejects_missing_entanglement_and_one_selected_lane()
+ {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (_first, _second, request, execution, queue_handoff) =
+        entangled_transition_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            Lane::TRANSITION_2,
+            RootElementHandle::from_raw(122103),
+            RootElementHandle::from_raw(122104),
+        );
+    let mut missing_entanglement = request;
+    missing_entanglement.second.entangled_lanes_after_enqueue = Lanes::from(Lane::TRANSITION_1);
+
+    let rejected =
+        execute_entangled_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            missing_entanglement,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        rejected.status(),
+        RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByTransitionEntanglementMismatch
+    );
+    assert!(rejected.blocked_by_transition_entanglement());
+    assert!(rejected.commit().is_none());
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+
+    let mut one_selected_lane = execution;
+    one_selected_lane.selected_lanes = Lanes::from(Lane::TRANSITION_1);
+    let rejected =
+        execute_entangled_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            request,
+            one_selected_lane,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        rejected.status(),
+        RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByLaneMismatch
+    );
+    assert!(rejected.blocked_by_lane_mismatch());
+    assert!(rejected.commit().is_none());
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_entangled_queue_lane_continuation_rejects_duplicate_update_rows() {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (first, second, request, execution, queue_handoff) =
+        entangled_transition_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            Lane::TRANSITION_2,
+            RootElementHandle::from_raw(122105),
+            RootElementHandle::from_raw(122106),
+        );
+    let mut duplicate = queue_handoff.clone();
+    duplicate.update_records[1] = duplicate.update_records[0];
+
+    let rejected =
+        execute_entangled_transition_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            request,
+            execution,
+            Some(&duplicate),
+        )
+        .unwrap();
+
+    assert_eq!(
+        rejected.status(),
+        RootEntangledTransitionSchedulerQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+    );
+    assert_eq!(
+        rejected.queue_handoff_error(),
+        Some(
+            &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandoffNotSourceOwned {
+                root: root_id,
+                queue: queue_handoff.current_update_queue(),
+                expected_updates: vec![first.update(), second.update()],
+                actual_updates: vec![first.update(), first.update()],
+                records_in_sequence_order: false
+            }
+        )
+    );
+    assert!(rejected.commit().is_none());
+    assert!(!rejected.accepted_queue_lane_handoff_evidence_for_canary());
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
 }
 
 #[test]
