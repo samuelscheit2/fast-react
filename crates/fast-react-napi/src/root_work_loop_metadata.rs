@@ -8,6 +8,7 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::Lanes;
+use serde_json::{Map, Value};
 
 pub(crate) const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE: &str =
     "fast-react-reconciler.root-work-loop.finished-work-handoff";
@@ -31,6 +32,51 @@ const EXPECTED_DETACHED_INSTANCE_COUNT: usize = 1;
 const EXPECTED_DETACHED_TEXT_COUNT: usize = 1;
 const EXPECTED_HOST_NODE_COUNT_AFTER_COMPLETE_WORK: usize = 2;
 const EXPECTED_HOST_NODE_COUNT_AFTER_PLACEMENT: usize = 0;
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_JSON_FIELDS: &[&str] = &[
+    "source",
+    "status",
+    "metadataRevision",
+    "facade",
+    "completeWork",
+    "pending",
+    "commit",
+    "placement",
+];
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACADE_JSON_FIELDS: &[&str] = &[
+    "rootId",
+    "rootTag",
+    "renderUpdateId",
+    "hostType",
+    "hostOutputShape",
+    "hostComponentCount",
+    "hostTextCount",
+    "textContent",
+];
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_COMPLETE_WORK_JSON_FIELDS: &[&str] = &[
+    "rootChildTag",
+    "completedChildTag",
+    "hostTextChildTag",
+    "childTags",
+];
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_PENDING_JSON_FIELDS: &[&str] = &[
+    "recordsFinishedWork",
+    "pendingWorkMatchesFinishedWork",
+    "renderLanes",
+    "finishedLanes",
+    "remainingLanes",
+];
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_COMMIT_JSON_FIELDS: &[&str] = &[
+    "commitOrderAfterPendingRecord",
+    "consumedFinishedWorkRecord",
+    "finishedWorkAfterCommit",
+    "finishedLanesAfterCommit",
+    "renderPhaseWorkAfterCommit",
+    "mutationExecutionBlocked",
+    "publicRootRenderingBlocked",
+    "effectsRefsAndHydrationBlocked",
+];
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_PLACEMENT_JSON_FIELDS: &[&str] =
+    &["tag", "applyKind", "siblingStatus"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RootWorkLoopFinishedWorkMetadata {
@@ -86,7 +132,7 @@ impl RootWorkLoopFinishedWorkMetadata {
 #[must_use]
 pub(crate) fn root_work_loop_finished_work_metadata_json_value(
     metadata: &RootWorkLoopFinishedWorkMetadata,
-) -> serde_json::Value {
+) -> Value {
     let facade = metadata.facade();
     let complete_work = metadata.complete_work();
     let pending = metadata.pending();
@@ -136,6 +182,247 @@ pub(crate) fn root_work_loop_finished_work_metadata_json_value(
             "siblingStatus": placement.sibling_status()
         }
     })
+}
+
+#[must_use]
+pub(crate) fn root_work_loop_finished_work_metadata_json_string(
+    metadata: &RootWorkLoopFinishedWorkMetadata,
+) -> String {
+    serde_json::to_string(&root_work_loop_finished_work_metadata_json_value(metadata))
+        .expect("root work-loop metadata JSON value must serialize")
+}
+
+pub(crate) fn root_work_loop_finished_work_metadata_from_json_str_for_private_bridge(
+    metadata_json: &str,
+) -> Result<RootWorkLoopFinishedWorkMetadata, RootWorkLoopFinishedWorkMetadataError> {
+    let metadata_json = serde_json::from_str(metadata_json).map_err(|error| {
+        RootWorkLoopFinishedWorkMetadataError::JsonParseError {
+            message: error.to_string(),
+        }
+    })?;
+
+    root_work_loop_finished_work_metadata_from_json_value_for_private_bridge(&metadata_json)
+}
+
+pub(crate) fn root_work_loop_finished_work_metadata_from_json_value_for_private_bridge(
+    metadata_json: &Value,
+) -> Result<RootWorkLoopFinishedWorkMetadata, RootWorkLoopFinishedWorkMetadataError> {
+    let metadata = require_json_object_fields(
+        metadata_json,
+        "metadata",
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_JSON_FIELDS,
+    )?;
+    require_json_exact_string(
+        metadata,
+        "source",
+        "source",
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE,
+    )?;
+    require_json_exact_string(
+        metadata,
+        "status",
+        "status",
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
+    )?;
+    require_json_exact_string(
+        metadata,
+        "metadataRevision",
+        "metadataRevision",
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION,
+    )?;
+
+    let facade = require_json_object_fields(
+        require_json_field(metadata, "facade", "facade")?,
+        "facade",
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACADE_JSON_FIELDS,
+    )?;
+    let root_id = non_empty_caller_id(
+        require_json_string(facade, "rootId", "facade.rootId")?.to_owned(),
+        "facade.rootId",
+    )?;
+    let root_tag = non_empty_caller_id(
+        require_json_string(facade, "rootTag", "facade.rootTag")?.to_owned(),
+        "facade.rootTag",
+    )?;
+    let render_update_id = non_empty_caller_id(
+        require_json_string(facade, "renderUpdateId", "facade.renderUpdateId")?.to_owned(),
+        "facade.renderUpdateId",
+    )?;
+    let host_type = require_json_string(facade, "hostType", "facade.hostType")?.to_owned();
+    validate_host_type(&host_type)?;
+    let host_output_shape = require_json_exact_string(
+        facade,
+        "hostOutputShape",
+        "facade.hostOutputShape",
+        HOST_OUTPUT_SHAPE_HOST_COMPONENT,
+    )?
+    .to_owned();
+    let host_component_count = require_json_exact_u32(
+        facade,
+        "hostComponentCount",
+        "facade.hostComponentCount",
+        EXPECTED_HOST_COMPONENT_COUNT as u32,
+    )?;
+    let host_text_count = require_json_exact_u32(
+        facade,
+        "hostTextCount",
+        "facade.hostTextCount",
+        EXPECTED_HOST_TEXT_COUNT as u32,
+    )?;
+    let text_content = require_json_string(facade, "textContent", "facade.textContent")?.to_owned();
+    validate_text_content(&text_content)?;
+
+    let complete_work = require_json_object_fields(
+        require_json_field(metadata, "completeWork", "completeWork")?,
+        "completeWork",
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_COMPLETE_WORK_JSON_FIELDS,
+    )?;
+    let root_child_tag = require_json_exact_string(
+        complete_work,
+        "rootChildTag",
+        "completeWork.rootChildTag",
+        HOST_COMPONENT_TAG,
+    )?
+    .to_owned();
+    let completed_child_tag = require_json_exact_string(
+        complete_work,
+        "completedChildTag",
+        "completeWork.completedChildTag",
+        HOST_COMPONENT_TAG,
+    )?
+    .to_owned();
+    let host_text_child_tag = require_json_exact_string(
+        complete_work,
+        "hostTextChildTag",
+        "completeWork.hostTextChildTag",
+        HOST_TEXT_TAG,
+    )?
+    .to_owned();
+    let child_tags = require_json_child_tags(
+        require_json_field(complete_work, "childTags", "completeWork.childTags")?,
+        "completeWork.childTags",
+    )?;
+
+    let pending = require_json_object_fields(
+        require_json_field(metadata, "pending", "pending")?,
+        "pending",
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_PENDING_JSON_FIELDS,
+    )?;
+    require_json_exact_bool(
+        pending,
+        "recordsFinishedWork",
+        "pending.recordsFinishedWork",
+        true,
+    )?;
+    require_json_exact_bool(
+        pending,
+        "pendingWorkMatchesFinishedWork",
+        "pending.pendingWorkMatchesFinishedWork",
+        true,
+    )?;
+    require_json_exact_string(pending, "renderLanes", "pending.renderLanes", DEFAULT_LANES)?;
+    require_json_exact_string(
+        pending,
+        "finishedLanes",
+        "pending.finishedLanes",
+        DEFAULT_LANES,
+    )?;
+    require_json_exact_string(
+        pending,
+        "remainingLanes",
+        "pending.remainingLanes",
+        NO_LANES,
+    )?;
+
+    let commit = require_json_object_fields(
+        require_json_field(metadata, "commit", "commit")?,
+        "commit",
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_COMMIT_JSON_FIELDS,
+    )?;
+    require_json_exact_bool(
+        commit,
+        "commitOrderAfterPendingRecord",
+        "commit.commitOrderAfterPendingRecord",
+        true,
+    )?;
+    require_json_exact_bool(
+        commit,
+        "consumedFinishedWorkRecord",
+        "commit.consumedFinishedWorkRecord",
+        true,
+    )?;
+    require_json_null(
+        commit,
+        "finishedWorkAfterCommit",
+        "commit.finishedWorkAfterCommit",
+    )?;
+    require_json_exact_string(
+        commit,
+        "finishedLanesAfterCommit",
+        "commit.finishedLanesAfterCommit",
+        NO_LANES,
+    )?;
+    require_json_null(
+        commit,
+        "renderPhaseWorkAfterCommit",
+        "commit.renderPhaseWorkAfterCommit",
+    )?;
+    let mutation_execution_blocked = require_json_exact_bool(
+        commit,
+        "mutationExecutionBlocked",
+        "commit.mutationExecutionBlocked",
+        true,
+    )?;
+    let public_root_rendering_blocked = require_json_exact_bool(
+        commit,
+        "publicRootRenderingBlocked",
+        "commit.publicRootRenderingBlocked",
+        true,
+    )?;
+    let effects_refs_and_hydration_blocked = require_json_exact_bool(
+        commit,
+        "effectsRefsAndHydrationBlocked",
+        "commit.effectsRefsAndHydrationBlocked",
+        true,
+    )?;
+
+    let placement = require_json_object_fields(
+        require_json_field(metadata, "placement", "placement")?,
+        "placement",
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_PLACEMENT_JSON_FIELDS,
+    )?;
+    let placement_tag =
+        require_json_exact_string(placement, "tag", "placement.tag", HOST_COMPONENT_TAG)?
+            .to_owned();
+    let placement_apply_kind =
+        require_json_string(placement, "applyKind", "placement.applyKind")?.to_owned();
+    validate_placement_apply_kind(&placement_apply_kind)?;
+    require_json_exact_string(
+        placement,
+        "siblingStatus",
+        "placement.siblingStatus",
+        SIBLING_STATUS_APPEND,
+    )?;
+
+    Ok(root_work_loop_finished_work_metadata_from_accepted_values(
+        root_id,
+        root_tag,
+        render_update_id,
+        host_type,
+        host_output_shape,
+        host_component_count,
+        host_text_count,
+        text_content,
+        root_child_tag,
+        completed_child_tag,
+        host_text_child_tag,
+        child_tags,
+        placement_tag,
+        placement_apply_kind,
+        mutation_execution_blocked,
+        public_root_rendering_blocked,
+        effects_refs_and_hydration_blocked,
+    ))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -338,6 +625,23 @@ impl RootWorkLoopFinishedWorkPlacementMetadata {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RootWorkLoopFinishedWorkMetadataError {
+    JsonParseError {
+        message: String,
+    },
+    JsonAdmissionExpectedObject {
+        field: &'static str,
+        actual: String,
+    },
+    JsonAdmissionFieldSetMismatch {
+        object: &'static str,
+        expected: String,
+        actual: String,
+    },
+    JsonAdmissionUnsupportedValue {
+        field: &'static str,
+        expected: &'static str,
+        actual: String,
+    },
     EmptyCallerId {
         field: &'static str,
     },
@@ -366,6 +670,30 @@ pub(crate) enum RootWorkLoopFinishedWorkMetadataError {
 impl Display for RootWorkLoopFinishedWorkMetadataError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::JsonParseError { message } => write!(
+                formatter,
+                "native root work-loop finished-work metadata JSON could not be parsed: {message}"
+            ),
+            Self::JsonAdmissionExpectedObject { field, actual } => write!(
+                formatter,
+                "native root work-loop finished-work metadata JSON admission expected {field} object, got {actual}"
+            ),
+            Self::JsonAdmissionFieldSetMismatch {
+                object,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "native root work-loop finished-work metadata JSON admission expected {object} fields [{expected}], got [{actual}]"
+            ),
+            Self::JsonAdmissionUnsupportedValue {
+                field,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "native root work-loop finished-work metadata JSON admission expected {field} {expected}, got {actual}"
+            ),
             Self::EmptyCallerId { field } => write!(
                 formatter,
                 "native root work-loop finished-work metadata canary requires non-empty {field}"
@@ -808,6 +1136,219 @@ fn root_work_loop_finished_work_metadata_from_accepted_values(
             apply_kind: placement_apply_kind,
             sibling_status: SIBLING_STATUS_APPEND,
         },
+    }
+}
+
+fn require_json_object_fields<'a>(
+    value: &'a Value,
+    field: &'static str,
+    expected_fields: &[&'static str],
+) -> Result<&'a Map<String, Value>, RootWorkLoopFinishedWorkMetadataError> {
+    let object = value.as_object().ok_or_else(|| {
+        RootWorkLoopFinishedWorkMetadataError::JsonAdmissionExpectedObject {
+            field,
+            actual: json_actual(value),
+        }
+    })?;
+
+    let mut expected = expected_fields.to_vec();
+    expected.sort_unstable();
+
+    let mut actual = object.keys().map(String::as_str).collect::<Vec<_>>();
+    actual.sort_unstable();
+
+    if actual != expected {
+        return Err(
+            RootWorkLoopFinishedWorkMetadataError::JsonAdmissionFieldSetMismatch {
+                object: field,
+                expected: expected.join(","),
+                actual: actual.join(","),
+            },
+        );
+    }
+
+    Ok(object)
+}
+
+fn require_json_field<'a>(
+    object: &'a Map<String, Value>,
+    key: &'static str,
+    field: &'static str,
+) -> Result<&'a Value, RootWorkLoopFinishedWorkMetadataError> {
+    object.get(key).ok_or_else(|| {
+        RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+            field,
+            expected: "present",
+            actual: "missing".to_owned(),
+        }
+    })
+}
+
+fn require_json_string<'a>(
+    object: &'a Map<String, Value>,
+    key: &'static str,
+    field: &'static str,
+) -> Result<&'a str, RootWorkLoopFinishedWorkMetadataError> {
+    let value = require_json_field(object, key, field)?;
+
+    value.as_str().ok_or_else(|| {
+        RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+            field,
+            expected: "string",
+            actual: json_actual(value),
+        }
+    })
+}
+
+fn require_json_exact_string<'a>(
+    object: &'a Map<String, Value>,
+    key: &'static str,
+    field: &'static str,
+    expected: &'static str,
+) -> Result<&'a str, RootWorkLoopFinishedWorkMetadataError> {
+    let actual = require_json_string(object, key, field)?;
+
+    if actual != expected {
+        return Err(
+            RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+                field,
+                expected,
+                actual: actual.to_owned(),
+            },
+        );
+    }
+
+    Ok(actual)
+}
+
+fn require_json_exact_bool(
+    object: &Map<String, Value>,
+    key: &'static str,
+    field: &'static str,
+    expected: bool,
+) -> Result<bool, RootWorkLoopFinishedWorkMetadataError> {
+    let value = require_json_field(object, key, field)?;
+
+    match value.as_bool() {
+        Some(actual) if actual == expected => Ok(actual),
+        Some(actual) => Err(
+            RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+                field,
+                expected: json_bool_label(expected),
+                actual: actual.to_string(),
+            },
+        ),
+        None => Err(
+            RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+                field,
+                expected: json_bool_label(expected),
+                actual: json_actual(value),
+            },
+        ),
+    }
+}
+
+fn require_json_exact_u32(
+    object: &Map<String, Value>,
+    key: &'static str,
+    field: &'static str,
+    expected: u32,
+) -> Result<u32, RootWorkLoopFinishedWorkMetadataError> {
+    let value = require_json_field(object, key, field)?;
+
+    let actual = value.as_u64().and_then(|actual| u32::try_from(actual).ok());
+    match actual {
+        Some(actual) if actual == expected => Ok(actual),
+        Some(actual) => Err(
+            RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+                field,
+                expected: json_u32_label(expected),
+                actual: actual.to_string(),
+            },
+        ),
+        None => Err(
+            RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+                field,
+                expected: json_u32_label(expected),
+                actual: json_actual(value),
+            },
+        ),
+    }
+}
+
+fn require_json_null(
+    object: &Map<String, Value>,
+    key: &'static str,
+    field: &'static str,
+) -> Result<(), RootWorkLoopFinishedWorkMetadataError> {
+    let value = require_json_field(object, key, field)?;
+
+    if !value.is_null() {
+        return Err(
+            RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+                field,
+                expected: "null",
+                actual: json_actual(value),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+fn require_json_child_tags(
+    value: &Value,
+    field: &'static str,
+) -> Result<[String; 2], RootWorkLoopFinishedWorkMetadataError> {
+    let Some(tags) = value.as_array() else {
+        return Err(
+            RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+                field,
+                expected: r#"["HostComponent","HostText"]"#,
+                actual: json_actual(value),
+            },
+        );
+    };
+
+    if tags.len() != 2 {
+        return Err(
+            RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+                field,
+                expected: r#"["HostComponent","HostText"]"#,
+                actual: json_actual(value),
+            },
+        );
+    }
+
+    let first = tags[0].as_str();
+    let second = tags[1].as_str();
+    if first != Some(HOST_COMPONENT_TAG) || second != Some(HOST_TEXT_TAG) {
+        return Err(
+            RootWorkLoopFinishedWorkMetadataError::JsonAdmissionUnsupportedValue {
+                field,
+                expected: r#"["HostComponent","HostText"]"#,
+                actual: json_actual(value),
+            },
+        );
+    }
+
+    Ok([HOST_COMPONENT_TAG.to_owned(), HOST_TEXT_TAG.to_owned()])
+}
+
+fn json_actual(value: &Value) -> String {
+    value.to_string()
+}
+
+fn json_bool_label(value: bool) -> &'static str {
+    if value { "true" } else { "false" }
+}
+
+fn json_u32_label(value: u32) -> &'static str {
+    match value {
+        0 => "0",
+        1 => "1",
+        2 => "2",
+        _ => "u32",
     }
 }
 
