@@ -449,16 +449,7 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
       exportName: 'createRoot().render'
     }
   );
-  assert.throws(
-    () => {
-      createRootResult.unmount();
-    },
-    {
-      code: 'FAST_REACT_UNIMPLEMENTED',
-      entrypoint: 'react-dom/client',
-      exportName: 'createRoot().unmount'
-    }
-  );
+  assert.equal(createRootResult.unmount(), undefined);
   assert.equal(createRootContainer.childNodes.length, 0);
   assert.equal(createRootContainer.children.length, 0);
   assert.equal(createRootContainer.firstElementChild, null);
