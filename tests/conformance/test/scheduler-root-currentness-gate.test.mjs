@@ -665,6 +665,33 @@ test("Scheduler root currentness gate fails closed for symbol source row fields"
   );
 });
 
+test("Scheduler root currentness gate fails closed for Object.prototype source row claim aliases", () => {
+  withTemporaryObjectPrototypeProperties(
+    {
+      public_package_compatibility_claimed: true
+    },
+    () => {
+      const gate = evaluateWithBaselineRows({
+        sourceRows: cloneJson(baselineGate().sourceRows)
+      });
+
+      assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+      assert.equal(gate.sourceRowsCurrent, false);
+      assert.deepEqual(
+        violationById(
+          gate,
+          "scheduler-root-currentness-source-row-identity-mismatch"
+        ).rowIds,
+        [
+          "scheduler-root-wrapper-source",
+          "scheduler-root-development-cjs-source-context",
+          "scheduler-root-production-cjs-source-context"
+        ]
+      );
+    }
+  );
+});
+
 test("Scheduler root currentness gate fails closed for production/development mode mismatch", () => {
   const localObservationRows = cloneJson(baselineGate().localObservationRows);
   localObservationRows.find(
@@ -931,6 +958,42 @@ test("Scheduler root currentness gate rejects non-enumerable snake_case compatib
   );
 });
 
+test("Scheduler root currentness gate rejects Object.prototype snake_case compatibility aliases on local rows and behavior evidence", () => {
+  withTemporaryObjectPrototypeProperties(
+    {
+      public_native_compatibility_claimed: true,
+      public_package_compatibility_claimed: true
+    },
+    () => {
+      const gate = evaluateWithBaselineRows({
+        localObservationRows: cloneJson(baselineGate().localObservationRows)
+      });
+      const publicClaimRows = violationById(
+        gate,
+        "scheduler-root-currentness-public-compatibility-claim-detected"
+      ).rowIds;
+
+      assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+      assert.ok(
+        publicClaimRows.includes(
+          "default-node-development:scheduler-root-export-shape.public_native_compatibility_claimed"
+        )
+      );
+      assert.ok(
+        publicClaimRows.includes(
+          "default-node-development:scheduler-root-export-shape.behaviorEvidence.public_package_compatibility_claimed"
+        )
+      );
+      assert.ok(
+        violationById(
+          gate,
+          "scheduler-root-currentness-row-compatibility-claim-detected"
+        ).rowIds.includes("default-node-development:scheduler-root-export-shape")
+      );
+    }
+  );
+});
+
 test("Scheduler root currentness gate rejects variant, deep-CJS, native, mock, or postTask evidence as root behavior evidence", () => {
   const localObservationRows = cloneJson(baselineGate().localObservationRows);
   rowById(
@@ -1072,6 +1135,35 @@ function rowById(rows, rowId) {
   const row = rows.find((candidate) => candidate.rowId === rowId);
   assert.ok(row, `missing row ${rowId}`);
   return row;
+}
+
+function withTemporaryObjectPrototypeProperties(properties, callback) {
+  const originalDescriptors = new Map();
+
+  for (const key of Object.keys(properties)) {
+    originalDescriptors.set(
+      key,
+      Object.getOwnPropertyDescriptor(Object.prototype, key)
+    );
+    Object.defineProperty(Object.prototype, key, {
+      value: properties[key],
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  }
+
+  try {
+    callback();
+  } finally {
+    for (const [key, descriptor] of originalDescriptors) {
+      if (descriptor) {
+        Object.defineProperty(Object.prototype, key, descriptor);
+      } else {
+        delete Object.prototype[key];
+      }
+    }
+  }
 }
 
 function assertViolation(gate, id) {

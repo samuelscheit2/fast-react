@@ -10,6 +10,7 @@
 - Second audit repair: local observation manifests now use exact `rowId` values, and source row identity now rejects extra fields such as injected public claim aliases or forged identity fields.
 - Third audit repair: local row/evidence claim scanning now normalizes snake_case and dash-separated aliases, blocking forms such as `public_native_compatibility_claimed`.
 - Fourth audit repair: local row/evidence claim scanning now uses descriptor and prototype traversal, and source row identity now uses `Reflect.ownKeys` plus enumerable data-property checks to reject inherited, non-enumerable, symbol, and accessor-backed fields.
+- Fifth audit repair: inherited claim scanning now includes `Object.prototype`, and source row identity rejects source rows when public compatibility claim aliases are inherited from `Object.prototype`.
 
 ## Changed Files
 
@@ -35,6 +36,7 @@
 - Second follow-up focused currentness test passed with 17 tests, including forged local `rowId` and extra source-row field identity bypass cases.
 - Third follow-up focused currentness test passed with 18 tests, including snake_case compatibility aliases on local rows and behavior evidence.
 - Fourth follow-up focused currentness test passed with 22 tests, including inherited and non-enumerable local/evidence snake_case claims plus inherited, non-enumerable, symbol, and accessor-backed source row fields.
+- Fifth follow-up focused currentness test passed with 24 tests, including temporary `Object.prototype` native/package claim aliases for local rows, behavior evidence, and source rows.
 - Companion Scheduler/root/blocker/variant conformance suite passed with 111 tests.
 - Scheduler workspace check, package surface guard, smoke import checks, and diff whitespace check passed.
 - Negative evidence now rejects deep CJS, native, mock, postTask, and private variant evidence as root behavior evidence.
@@ -49,6 +51,7 @@
 - Second source audit found row identity bypasses for forged local `rowId` values and extra source row fields; both were repaired with exact manifest/key validation.
 - Third source audit found snake_case public compatibility aliases on local row/evidence fields; normalized claim matching now rejects those aliases.
 - Fourth source audit found inherited and non-enumerable hidden-field bypasses on local row/evidence/source rows; descriptor/prototype-aware validation now rejects those cases.
+- Fifth source audit found inherited claim fields on `Object.prototype`; prototype traversal now includes `Object.prototype` and tests restore temporary prototype fields safely.
 
 ## Risks Or Blockers
 

@@ -692,6 +692,7 @@ function sourceRowMatchesDefinition(row, definition) {
 
   return (
     hasPlainObjectPrototype(row) &&
+    !objectHasPublicClaim(row) &&
     keyManifest.missing.length === 0 &&
     keyManifest.unexpected.length === 0 &&
     ownKeysAreEnumerableDataProperties(row, expectedSourceRowKeys(definition)) &&
@@ -870,7 +871,7 @@ function pushOwnPublicClaimNames(claimNames, value) {
 
 function pushInheritedPublicClaimNames(claimNames, value) {
   let prototype = Object.getPrototypeOf(value);
-  while (prototype && prototype !== Object.prototype) {
+  while (prototype) {
     for (const key of Reflect.ownKeys(prototype)) {
       pushPublicClaimNameForDescriptor(
         claimNames,
