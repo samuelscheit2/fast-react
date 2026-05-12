@@ -25,6 +25,19 @@ const {
   createTextNode,
   attributeEntries
 } = require('./context.js');
+const native = require(
+  path.resolve(__dirname, '../../../../bindings/node/index.cjs')
+);
+const nativeRootWorkLoopFinishedWorkMetadataFactorySymbol = Symbol.for(
+  'fast.react_native.private_root_work_loop_finished_work_metadata_factory'
+);
+const createNativeRootWorkLoopFinishedWorkMetadataForCanary =
+  native[nativeRootWorkLoopFinishedWorkMetadataFactorySymbol];
+
+assert.equal(
+  typeof createNativeRootWorkLoopFinishedWorkMetadataForCanary,
+  'function'
+);
 
 test('private react-dom/client facade adapter routes root calls to bridge records', () => {
   const document = createDocument('private-client-facade-adapter');
@@ -2468,13 +2481,24 @@ test('private react-dom/client facade render native handoff consumes Rust root w
   });
   const root = adapter.createRoot(container);
   const create = adapter.getRootCreateRecord(root);
-  const metadata = createRootWorkLoopFinishedWorkMetadata({
+  const metadata = createNativeRootWorkLoopFinishedWorkMetadataForCanary({
     hostType: 'div',
     renderUpdateId: 'facade-rust-update:1',
     rootId: create.rootId,
     rootTag: create.rootTag,
     textContent: 'text'
   });
+
+  assert.equal(Object.isFrozen(metadata), true);
+  assert.equal(Object.isFrozen(metadata.facade), true);
+  assert.equal(Object.isFrozen(metadata.completeWork), true);
+  assert.equal(Object.isFrozen(metadata.completeWork.childTags), true);
+  assert.equal(Object.isFrozen(metadata.pending), true);
+  assert.equal(Object.isFrozen(metadata.commit), true);
+  assert.equal(Object.isFrozen(metadata.placement), true);
+  assert.equal(metadata.facade.hostOutputShape, 'host-component');
+  assert.equal(metadata.facade.hostComponentCount, 1);
+  assert.equal(metadata.facade.hostTextCount, 1);
 
   const handoff = adapter.renderNativeHandoff(root, element, {
     rustRootWorkLoopFinishedWorkMetadata: metadata
@@ -2589,6 +2613,12 @@ test('private react-dom/client facade render native handoff consumes Rust root w
     diagnostic.rootWorkLoopFinishedWorkMetadata.metadataRevision,
     metadata.metadataRevision
   );
+  assert.equal(
+    rootWorkLoopPayload.normalizedMetadata.hostOutputShape,
+    'host-component'
+  );
+  assert.equal(rootWorkLoopPayload.normalizedMetadata.hostComponentCount, 1);
+  assert.equal(rootWorkLoopPayload.normalizedMetadata.hostTextCount, 1);
 
   assert.equal(container.childNodes.length, 1);
   assert.equal(container.firstChild, hostNode);
@@ -2695,14 +2725,37 @@ test('private react-dom/client facade rejects Rust root work-loop metadata capab
     const container = createElement('DIV', document);
     const root = adapter.createRoot(container);
     const create = adapter.getRootCreateRecord(root);
-    const metadata = createRootWorkLoopFinishedWorkMetadata({
-      hostType: 'div',
-      renderUpdateId: 'facade-rust-claim-update:1',
-      rootId: create.rootId,
-      rootTag: create.rootTag,
-      textContent: 'text'
+    const baseMetadata =
+      createNativeRootWorkLoopFinishedWorkMetadataForCanary({
+        hostType: 'div',
+        renderUpdateId: 'facade-rust-claim-update:1',
+        rootId: create.rootId,
+        rootTag: create.rootTag,
+        textContent: 'text'
+      });
+    const metadata = Object.freeze({
+      ...baseMetadata,
+      [claimField]: true
     });
-    metadata[claimField] = true;
+
+    assert.throws(
+      () =>
+        createNativeRootWorkLoopFinishedWorkMetadataForCanary({
+          hostType: 'div',
+          renderUpdateId: 'facade-rust-claim-update:1',
+          rootId: create.rootId,
+          rootTag: create.rootTag,
+          textContent: 'text',
+          [claimField]: true
+        }),
+      {
+        code:
+          'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_CAPABILITY_CLAIM'
+      },
+      `${claimField} factory`
+    );
+    assert.equal(Object.isFrozen(baseMetadata), true);
+    assert.equal(Object.isFrozen(metadata), true);
 
     assert.throws(
       () =>
@@ -2728,6 +2781,66 @@ test('private react-dom/client facade rejects Rust root work-loop metadata capab
       null
     );
   }
+});
+
+test('private react-dom/client facade rejects invalid native Rust root work-loop metadata factory inputs', () => {
+  assert.throws(
+    () =>
+      createNativeRootWorkLoopFinishedWorkMetadataForCanary({
+        hostType: 'span',
+        renderUpdateId: 'facade-rust-invalid-update:1',
+        rootId: 'facade-rust-invalid-root:1',
+        rootTag: 'ConcurrentRoot',
+        textContent: 'text'
+      }),
+    {
+      code:
+        'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_INVALID_OPTIONS'
+    }
+  );
+  assert.throws(
+    () =>
+      createNativeRootWorkLoopFinishedWorkMetadataForCanary({
+        hostType: 'div',
+        renderUpdateId: 'facade-rust-invalid-update:1',
+        rootId: 'facade-rust-invalid-root:1',
+        rootTag: 'ConcurrentRoot',
+        textContent: 'not text'
+      }),
+    {
+      code:
+        'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_INVALID_OPTIONS'
+    }
+  );
+  assert.throws(
+    () =>
+      createNativeRootWorkLoopFinishedWorkMetadataForCanary({
+        hostType: 'div',
+        renderUpdateId: '',
+        rootId: 'facade-rust-invalid-root:1',
+        rootTag: 'ConcurrentRoot',
+        textContent: 'text'
+      }),
+    {
+      code:
+        'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_INVALID_OPTIONS'
+    }
+  );
+  assert.throws(
+    () =>
+      createNativeRootWorkLoopFinishedWorkMetadataForCanary({
+        hostType: 'div',
+        publicRootExecution: true,
+        renderUpdateId: 'facade-rust-invalid-update:1',
+        rootId: 'facade-rust-invalid-root:1',
+        rootTag: 'ConcurrentRoot',
+        textContent: 'text'
+      }),
+    {
+      code:
+        'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_CAPABILITY_CLAIM'
+    }
+  );
 });
 
 test('private react-dom/client facade host-output update diagnostic routes root.render through fake DOM', () => {
