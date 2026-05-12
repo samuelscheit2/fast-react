@@ -93,6 +93,7 @@ use crate::root_work_loop_metadata::{
     root_work_loop_finished_work_metadata_for_canary,
     root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary,
     root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary,
+    root_work_loop_finished_work_metadata_json_value,
 };
 use crate::test_renderer_root_execution_bridge::{
     TestRendererNativeRootExecutionBridge, TestRendererNativeRootExecutionBridgeError,
@@ -384,6 +385,101 @@ fn native_private_root_work_loop_finished_work_metadata_from_diagnostic_matches_
         .unwrap();
 
     assert_eq!(diagnostic_backed, canary);
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_json_value_uses_js_field_names() {
+    let metadata =
+        root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary(
+            "native-root-work-loop-root:json",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:json",
+            "div",
+            "text",
+        )
+        .unwrap();
+
+    let metadata_json = root_work_loop_finished_work_metadata_json_value(&metadata);
+
+    assert_eq!(
+        metadata_json,
+        serde_json::json!({
+            "source": "fast-react-reconciler.root-work-loop.finished-work-handoff",
+            "status": "accepted-private-root-work-loop-finished-work-handoff-metadata",
+            "metadataRevision": "root-work-loop-finished-work-handoff-2026-05-10",
+            "facade": {
+                "rootId": "native-root-work-loop-root:json",
+                "rootTag": "ConcurrentRoot",
+                "renderUpdateId": "native-root-work-loop-update:json",
+                "hostType": "div",
+                "hostOutputShape": "host-component",
+                "hostComponentCount": 1,
+                "hostTextCount": 1,
+                "textContent": "text"
+            },
+            "completeWork": {
+                "rootChildTag": "HostComponent",
+                "completedChildTag": "HostComponent",
+                "hostTextChildTag": "HostText",
+                "childTags": ["HostComponent", "HostText"]
+            },
+            "pending": {
+                "recordsFinishedWork": true,
+                "pendingWorkMatchesFinishedWork": true,
+                "renderLanes": "Default",
+                "finishedLanes": "Default",
+                "remainingLanes": "NoLanes"
+            },
+            "commit": {
+                "commitOrderAfterPendingRecord": true,
+                "consumedFinishedWorkRecord": true,
+                "finishedWorkAfterCommit": null,
+                "finishedLanesAfterCommit": "NoLanes",
+                "renderPhaseWorkAfterCommit": null,
+                "mutationExecutionBlocked": true,
+                "publicRootRenderingBlocked": true,
+                "effectsRefsAndHydrationBlocked": true
+            },
+            "placement": {
+                "tag": "HostComponent",
+                "applyKind": "append-placement-to-container",
+                "siblingStatus": "append"
+            }
+        })
+    );
+
+    let metadata_object = metadata_json.as_object().unwrap();
+    assert!(!metadata_object.contains_key("metadata_revision"));
+    assert!(
+        !metadata_json["facade"]
+            .as_object()
+            .unwrap()
+            .contains_key("root_id")
+    );
+    assert!(
+        !metadata_json["completeWork"]
+            .as_object()
+            .unwrap()
+            .contains_key("child_tags")
+    );
+    assert!(
+        !metadata_json["pending"]
+            .as_object()
+            .unwrap()
+            .contains_key("records_finished_work")
+    );
+    assert!(
+        !metadata_json["commit"]
+            .as_object()
+            .unwrap()
+            .contains_key("finished_work_after_commit")
+    );
+    assert!(
+        !metadata_json["placement"]
+            .as_object()
+            .unwrap()
+            .contains_key("apply_kind")
+    );
 }
 
 #[test]
@@ -926,6 +1022,36 @@ fn native_private_root_work_loop_finished_work_metadata_rejects_hostile_diagnost
             field: "public_dom_compatibility_claimed"
         }
     );
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_json_conversion_requires_valid_metadata() {
+    let evidence =
+        private_root_work_loop_diagnostic_evidence().with_host_output_shape_for_test("host-text");
+    let mut attempted_json_conversion = false;
+    let error = root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+        "native-root-work-loop-root:json",
+        "ConcurrentRoot",
+        "native-root-work-loop-update:json",
+        "div",
+        "text",
+        &evidence,
+    )
+    .map(|metadata| {
+        attempted_json_conversion = true;
+        root_work_loop_finished_work_metadata_json_value(&metadata)
+    })
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+            field: "host_output_shape",
+            expected: "host-component",
+            actual: "host-text".to_string()
+        }
+    );
+    assert!(!attempted_json_conversion);
 }
 
 #[test]
