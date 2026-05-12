@@ -1488,6 +1488,10 @@ function validateChildrenTraversalCurrentnessReport(report) {
     return 'children-traversal-currentness-source-proof';
   }
 
+  if (!isChildrenTraversalCurrentnessSourceEvidenceFrozen()) {
+    return 'children-traversal-currentness-nested-source-evidence-not-frozen';
+  }
+
   if (
     !ownDataPropertyKeysEqual(
       report,
@@ -1599,6 +1603,41 @@ function validateChildrenTraversalCurrentnessReport(report) {
   }
 
   return null;
+}
+
+function isChildrenTraversalCurrentnessSourceEvidenceFrozen() {
+  return (
+    isDeepFrozenDataGraph(privateChildrenTraversalCurrentnessMetadata) &&
+    isDeepFrozenDataGraph(childrenTraversalCurrentnessReportFieldNames)
+  );
+}
+
+function isDeepFrozenDataGraph(value, seen = new WeakSet()) {
+  if (value === null || typeof value !== 'object') {
+    return true;
+  }
+
+  if (seen.has(value)) {
+    return true;
+  }
+  seen.add(value);
+
+  if (!Object.isFrozen(value)) {
+    return false;
+  }
+
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor === undefined || !Object.hasOwn(descriptor, 'value')) {
+      return false;
+    }
+
+    if (!isDeepFrozenDataGraph(descriptor.value, seen)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function isAcceptedChildrenTraversalBehaviorCurrentness(currentness) {

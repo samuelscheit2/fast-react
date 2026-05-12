@@ -831,6 +831,69 @@ test("private Children traversal currentness does not consume the public Map war
   ]);
 });
 
+test("private Children traversal currentness rejects mutable module-load source evidence", () => {
+  const compromisedChildrenHelper =
+    loadFreshChildrenHelperWithModuleLoadFreezeBypass();
+  const report =
+    compromisedChildrenHelper.createChildrenTraversalCurrentnessReport();
+
+  assert.equal(Object.isFrozen(report), true);
+  assert.equal(
+    Object.isFrozen(
+      compromisedChildrenHelper.privateChildrenTraversalCurrentnessMetadata
+    ),
+    false
+  );
+  assert.equal(Object.isFrozen(report.sourceReport), false);
+  assert.equal(Object.isFrozen(report.sourceAnchors), false);
+  assert.equal(
+    Object.isFrozen(report.lazyRendererBlockerSourceRows[0].symbols),
+    false
+  );
+  assert.equal(
+    report.sourceReport,
+    compromisedChildrenHelper.privateChildrenTraversalCurrentnessMetadata
+      .sourceReport
+  );
+  assert.equal(
+    report.lazyEvidence,
+    compromisedChildrenHelper.privateChildrenTraversalCurrentnessMetadata
+      .lazyEvidence
+  );
+
+  assertCurrentnessRejectedBy(
+    compromisedChildrenHelper,
+    report,
+    "children-traversal-currentness-nested-source-evidence-not-frozen"
+  );
+  assert.equal(
+    compromisedChildrenHelper.validateChildrenTraversalCurrentnessReport(
+      new Proxy(
+        {},
+        {
+          get() {
+            throw new Error("forged proxy get trap should not be reached");
+          },
+          getOwnPropertyDescriptor() {
+            throw new Error(
+              "forged proxy descriptor trap should not be reached"
+            );
+          },
+          isExtensible() {
+            throw new Error(
+              "forged proxy isExtensible trap should not be reached"
+            );
+          },
+          ownKeys() {
+            throw new Error("forged proxy ownKeys trap should not be reached");
+          }
+        }
+      )
+    ),
+    "children-traversal-currentness-source-proof"
+  );
+});
+
 test("private Children traversal currentness rejects forged, stale, and overbroad claims", () => {
   const report = childrenHelper.createChildrenTraversalCurrentnessReport();
 
@@ -1384,13 +1447,17 @@ function captureConsoleWarn(fn) {
 }
 
 function assertCurrentnessRejected(report, reason) {
+  assertCurrentnessRejectedBy(childrenHelper, report, reason);
+}
+
+function assertCurrentnessRejectedBy(helper, report, reason) {
   assert.equal(
-    childrenHelper.validateChildrenTraversalCurrentnessReport(report),
+    helper.validateChildrenTraversalCurrentnessReport(report),
     reason
   );
-  assert.equal(childrenHelper.isChildrenTraversalCurrentnessReport(report), false);
+  assert.equal(helper.isChildrenTraversalCurrentnessReport(report), false);
   assert.throws(
-    () => childrenHelper.consumeChildrenTraversalCurrentnessReport(report),
+    () => helper.consumeChildrenTraversalCurrentnessReport(report),
     (error) => {
       assert.equal(error.name, "FastReactUnimplementedError");
       assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
@@ -1434,6 +1501,26 @@ function assertCurrentnessRejected(report, reason) {
     },
     reason
   );
+}
+
+function loadFreshChildrenHelperWithModuleLoadFreezeBypass() {
+  const specifier = "../../../packages/react/children-helper.js";
+  const resolved = require.resolve(specifier);
+  const previousCachedModule = require.cache[resolved];
+  delete require.cache[resolved];
+
+  const originalFreeze = Object.freeze;
+  Object.freeze = (value) => value;
+
+  try {
+    return require(specifier);
+  } finally {
+    Object.freeze = originalFreeze;
+    delete require.cache[resolved];
+    if (previousCachedModule !== undefined) {
+      require.cache[resolved] = previousCachedModule;
+    }
+  }
 }
 
 function createChildrenCurrentnessReportWithFreezeBypass(shouldBypassFreeze) {
