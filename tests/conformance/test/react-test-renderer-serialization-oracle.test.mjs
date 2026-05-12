@@ -13,6 +13,8 @@ import {
   evaluateReactTestRendererSerializationLocalGate
 } from "../src/react-test-renderer-serialization-local-gate.mjs";
 import {
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS,
   REACT_TEST_RENDERER_SERIALIZATION_ORACLE_ARTIFACT_PATH,
   REACT_TEST_RENDERER_SERIALIZATION_PROBE_MODES,
@@ -147,6 +149,50 @@ test("react-test-renderer serialization oracle rejects stale or unsafe local Fas
     /local-fast-react-status-claims-compatibility/u
   );
 });
+
+for (const { container, field, violationId } of [
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS.map(
+    (field) => ({
+      container: "conformanceClaims",
+      field,
+      violationId: "oracle-conformance-claims-fast-react-comparison"
+    })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS.map(
+    (field) => ({
+      container: "conformanceClaims",
+      field,
+      violationId: "oracle-conformance-claims-compatibility"
+    })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS.map(
+    (field) => ({
+      container: "evidenceClaims",
+      field,
+      violationId: "oracle-evidence-claims-fast-react-comparison"
+    })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS.map(
+    (field) => ({
+      container: "evidenceClaims",
+      field,
+      violationId: "oracle-evidence-claims-compatibility"
+    })
+  )
+]) {
+  test(`react-test-renderer serialization oracle rejects ${container}.${field}`, () => {
+    const claimedOracle = JSON.parse(JSON.stringify(oracle));
+    claimedOracle[container][field] = true;
+
+    assert.throws(
+      () =>
+        assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
+          claimedOracle
+        ),
+      new RegExp(violationId, "u")
+    );
+  });
+}
 
 test("react-test-renderer serialization oracle remains public-compatibility blocked after private diagnostics are ready", () => {
   const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });

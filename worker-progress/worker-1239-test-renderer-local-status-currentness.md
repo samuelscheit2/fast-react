@@ -27,6 +27,11 @@ status. This covers `fastReactComparedToReactTestRenderer`,
 `fastReactBehaviorCompatible`, `packageCompatibilityClaimed`, and
 `publicCompatibilityClaimed` in addition to the original fields.
 
+Final audit repair: the checked oracle assertion path now also validates
+`conformanceClaims` and `evidenceClaims`, not only `localFastReactStatus`.
+Conformance/evidence aliases now fail before the oracle can be accepted, and
+the local-gate evidence alias tests cover each field independently.
+
 Hardened source-owned blocker inputs by freezing local status, public
 unblocking requirements, private requirement rows, and serialization scenario
 admissions. Tests assert mutation attempts throw and public blocker output
@@ -59,9 +64,9 @@ git diff --check
 
 ## Verification Results
 
-- `node --test tests/conformance/test/react-test-renderer-serialization-oracle.test.mjs`: passed, 12 tests.
-- `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, 32 tests.
-- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: passed, 44 tests.
+- `node --test tests/conformance/test/react-test-renderer-serialization-oracle.test.mjs`: passed, 18 tests.
+- `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, 34 tests.
+- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: passed, 52 tests.
 - `npm run check:package-surface`: passed.
 - `node tests/smoke/import-entrypoints.mjs`: passed.
 - `git diff --check`: passed.
@@ -78,8 +83,11 @@ git diff --check
   - stale oracle `not-present-in-workspace` with the placeholder package present;
   - stale `placeholder-present` after placeholder markers are removed;
   - local Fast React comparison or compatibility claims;
-  - conformance-level Fast React comparison claims;
-  - evidence-level Fast React comparison and compatibility claims;
+  - oracle assertion rejection for conformance-level comparison and
+    compatibility claim aliases;
+  - oracle assertion rejection for evidence-level comparison and compatibility
+    claim aliases;
+  - local gate rejection for each evidence-level claim alias independently;
   - local status comparison, package compatibility, and public compatibility
     aliases;
   - mutation attempts against frozen status/admission/blocker source records.
@@ -96,6 +104,8 @@ git diff --check
   `3eab522f` fix.
 - Remaining source audit blockers from `bf4bc9a8` were addressed without
   reverting earlier accepted work.
+- Final source audit blockers from `73c1d266` were addressed without reverting
+  earlier accepted work.
 
 ## Risks Or Blockers
 

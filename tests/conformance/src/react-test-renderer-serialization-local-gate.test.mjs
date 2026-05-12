@@ -23,6 +23,8 @@ import {
   REACT_TEST_RENDERER_SERIALIZATION_SCENARIO_IDS
 } from "./react-test-renderer-serialization-scenarios.mjs";
 import {
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
 } from "./react-test-renderer-serialization-targets.mjs";
 import {
@@ -6138,56 +6140,44 @@ test("react-test-renderer serialization gate rejects premature public compatibil
   );
 });
 
-test("react-test-renderer serialization gate rejects conformance-level Fast React comparison claims", () => {
-  const comparisonClaimOracle = JSON.parse(JSON.stringify(oracle));
-  comparisonClaimOracle.conformanceClaims.fastReactComparedToReactTestRenderer =
-    true;
+for (const { container, field } of [
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS.map(
+    (field) => ({ container: "conformanceClaims", field })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS.map(
+    (field) => ({ container: "conformanceClaims", field })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS.map(
+    (field) => ({ container: "evidenceClaims", field })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS.map(
+    (field) => ({ container: "evidenceClaims", field })
+  )
+]) {
+  test(`react-test-renderer serialization gate rejects ${container}.${field}`, () => {
+    const claimOracle = JSON.parse(JSON.stringify(oracle));
+    claimOracle[container][field] = true;
 
-  const gate = evaluateReactTestRendererSerializationLocalGate({
-    oracle: comparisonClaimOracle
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle: claimOracle
+    });
+
+    assert.equal(gate.status, "blocked-with-violations");
+    assert.equal(gate.privateDiagnosticsReady, true);
+    assert.equal(gate.publicCompatibilityReady, false);
+    assert.equal(gate.publicCompatibilityClaimed, true);
+    assert.deepEqual(
+      gate.violations.map((violation) => violation.id),
+      ["compatibility-claimed-before-public-serialization-support"]
+    );
+    assert.deepEqual(gate.violations[0].blockers, [
+      "public-to-json-api",
+      "public-to-tree-api",
+      "public-test-instance-wrappers",
+      "public-js-react-test-renderer-routing"
+    ]);
   });
-
-  assert.equal(gate.status, "blocked-with-violations");
-  assert.equal(gate.privateDiagnosticsReady, true);
-  assert.equal(gate.publicCompatibilityReady, false);
-  assert.equal(gate.publicCompatibilityClaimed, true);
-  assert.deepEqual(
-    gate.violations.map((violation) => violation.id),
-    ["compatibility-claimed-before-public-serialization-support"]
-  );
-  assert.deepEqual(gate.violations[0].blockers, [
-    "public-to-json-api",
-    "public-to-tree-api",
-    "public-test-instance-wrappers",
-    "public-js-react-test-renderer-routing"
-  ]);
-});
-
-test("react-test-renderer serialization gate rejects evidence-level Fast React comparison and compatibility claims", () => {
-  const evidenceClaimOracle = JSON.parse(JSON.stringify(oracle));
-  evidenceClaimOracle.evidenceClaims.fastReactComparedToReactTestRenderer = true;
-  evidenceClaimOracle.evidenceClaims.fastReactBehaviorCompatible = true;
-  evidenceClaimOracle.evidenceClaims.compatibilityClaimed = true;
-
-  const gate = evaluateReactTestRendererSerializationLocalGate({
-    oracle: evidenceClaimOracle
-  });
-
-  assert.equal(gate.status, "blocked-with-violations");
-  assert.equal(gate.privateDiagnosticsReady, true);
-  assert.equal(gate.publicCompatibilityReady, false);
-  assert.equal(gate.publicCompatibilityClaimed, true);
-  assert.deepEqual(
-    gate.violations.map((violation) => violation.id),
-    ["compatibility-claimed-before-public-serialization-support"]
-  );
-  assert.deepEqual(gate.violations[0].blockers, [
-    "public-to-json-api",
-    "public-to-tree-api",
-    "public-test-instance-wrappers",
-    "public-js-react-test-renderer-routing"
-  ]);
-});
+}
 
 test("react-test-renderer serialization gate rejects stale absent oracle status for the placeholder package", () => {
   const staleOracle = JSON.parse(JSON.stringify(oracle));

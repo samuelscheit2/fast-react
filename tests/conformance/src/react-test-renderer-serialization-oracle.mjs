@@ -80,8 +80,52 @@ export function validateReactTestRendererSerializationOracleLocalFastReactStatus
       "The React-only serialization oracle must not claim Fast React react-test-renderer compatibility.",
     violations
   });
+  appendOracleClaimViolations({
+    status: oracle?.conformanceClaims,
+    source: "oracle.conformanceClaims",
+    comparisonViolationId:
+      "oracle-conformance-claims-fast-react-comparison",
+    compatibilityViolationId:
+      "oracle-conformance-claims-compatibility",
+    violations
+  });
+  appendOracleClaimViolations({
+    status: oracle?.evidenceClaims,
+    source: "oracle.evidenceClaims",
+    comparisonViolationId: "oracle-evidence-claims-fast-react-comparison",
+    compatibilityViolationId: "oracle-evidence-claims-compatibility",
+    violations
+  });
 
   return violations;
+}
+
+function appendOracleClaimViolations({
+  status,
+  source,
+  comparisonViolationId,
+  compatibilityViolationId,
+  violations
+}) {
+  appendLocalFastReactStatusClaimViolations({
+    status,
+    fields: REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+    id: comparisonViolationId,
+    reason:
+      "The React-only serialization oracle must not claim a Fast React comparison.",
+    source,
+    violations
+  });
+  appendLocalFastReactStatusClaimViolations({
+    status,
+    fields:
+      REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS,
+    id: compatibilityViolationId,
+    reason:
+      "The React-only serialization oracle must not claim Fast React react-test-renderer compatibility.",
+    source,
+    violations
+  });
 }
 
 function appendLocalFastReactStatusClaimViolations({
@@ -89,15 +133,24 @@ function appendLocalFastReactStatusClaimViolations({
   fields,
   id,
   reason,
+  source,
   violations
 }) {
+  if (!status || typeof status !== "object") {
+    return;
+  }
+
   for (const field of fields) {
     if (Object.hasOwn(status, field) && status[field] !== false) {
-      violations.push({
+      const violation = {
         id,
         field,
         reason
-      });
+      };
+      if (source) {
+        violation.source = source;
+      }
+      violations.push(violation);
     }
   }
 }
