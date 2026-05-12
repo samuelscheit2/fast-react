@@ -1126,6 +1126,10 @@ function createPublicRenderCapabilityRejectionCases() {
       )
     }),
     () => ({
+      label: 'unsupported-id-object',
+      element: React.createElement('div', {id: {}}, 'blocked id')
+    }),
+    () => ({
       label: 'unsupported-link-resource-type',
       element: React.createElement('link', {
         href: '/blocked.css',
