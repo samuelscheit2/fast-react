@@ -434,7 +434,19 @@ function assertPrivateGenerationAdmissionLedger(native) {
     ledger.sourceWorker,
     'worker-873-native-lifecycle-no-stale-execution'
   );
-  assert.equal(ledger.sourceFile, 'crates/fast-react-napi/src/lib.rs');
+  assert.equal(
+    ledger.sourceFile,
+    'crates/fast-react-napi/src/root_bridge_requests/mod.rs'
+  );
+  assert.ok(Object.isFrozen(ledger.sourceFiles));
+  assert.deepEqual(ledger.sourceFiles, [
+    'crates/fast-react-napi/src/root_bridge_requests/mod.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/json_transport.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/batch_lifecycle_algorithms.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/errors.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/json_transport_parser.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/batch_lifecycle.rs'
+  ]);
   assert.equal(ledger.sourceOwnedEvidenceRequired, true);
   assert.equal(ledger.blockedPrivateEvidenceOnly, true);
   assert.equal(ledger.publicAdmission, false);
@@ -475,10 +487,23 @@ function assertPrivateGenerationAdmissionLedger(native) {
     'stale-caller-public-claim-source-row-validator',
     'single-consume-generation-replay-guard'
   ]);
+  assert.deepEqual(ledger.rows.map((row) => row.sourceFile), [
+    'crates/fast-react-napi/src/root_bridge_requests/mod.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/json_transport.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/json_transport.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/batch_lifecycle_algorithms.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/json_transport_parser.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/json_transport_parser.rs'
+  ]);
 
-  const rustSource = fs.readFileSync(
-    path.resolve(__dirname, '../../../crates/fast-react-napi/src/lib.rs'),
-    'utf8'
+  const rustSourceByFile = new Map(
+    ledger.sourceFiles.map((sourceFile) => [
+      sourceFile,
+      fs.readFileSync(
+        path.resolve(__dirname, '../../../', sourceFile),
+        'utf8'
+      )
+    ])
   );
   const workerProgress = fs.readFileSync(
     path.resolve(__dirname, '../../../', ledger.sourceWorkerProgress),
@@ -488,6 +513,7 @@ function assertPrivateGenerationAdmissionLedger(native) {
 
   for (const row of ledger.rows) {
     assert.ok(Object.isFrozen(row), row.id);
+    assert.ok(Object.isFrozen(row.sourceFiles), row.id);
     assert.ok(Object.isFrozen(row.sourceIdentifiers), row.id);
     assert.deepEqual(Object.keys(row), ledger.generationAdmissionRowFields);
     assert.equal(
@@ -495,7 +521,13 @@ function assertPrivateGenerationAdmissionLedger(native) {
       'source-owned-rust-identifier-set',
       row.id
     );
-    assert.equal(row.sourceFile, 'crates/fast-react-napi/src/lib.rs', row.id);
+    assert.equal(row.sourceFile, row.sourceFiles[0], row.id);
+    for (const sourceFile of row.sourceFiles) {
+      assert.ok(
+        rustSourceByFile.has(sourceFile),
+        `${row.id} source file ${sourceFile}`
+      );
+    }
     assert.equal(row.sourceOwnedEvidence, true, row.id);
     assert.equal(row.blockedPrivateEvidence, true, row.id);
     assert.equal(row.publicAdmission, false, row.id);
@@ -506,9 +538,14 @@ function assertPrivateGenerationAdmissionLedger(native) {
     assert.equal(row.sourceSyntaxOnly, false, row.id);
     assert.equal(row.compatibilityAlias, null, row.id);
     assertNoNativeGenerationLedgerExecution(row, row.id);
+    const rowRustSources = row.sourceFiles.map((sourceFile) =>
+      rustSourceByFile.get(sourceFile)
+    );
     for (const sourceIdentifier of row.sourceIdentifiers) {
       assert.ok(
-        rustSource.includes(sourceIdentifier),
+        rowRustSources.some((rustSource) =>
+          rustSource.includes(sourceIdentifier)
+        ),
         `${row.id} source identifier ${sourceIdentifier}`
       );
     }
