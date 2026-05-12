@@ -116,11 +116,10 @@ Current orchestration queue:
   lifecycle prerequisites remain required before any public
   `createRoot().render(...)` path.
 
-Current large-file baseline after accepted main `15432066`:
+Current project-owned source/test large-file baseline after main `4d9b7712`,
+excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
-- `packages/react-test-renderer/cjs/react-test-renderer.development.js`: 23,803 lines
-- `packages/react-test-renderer/cjs/react-test-renderer.production.js`: 20,750 lines
 - `tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`: 18,216 lines
 - `packages/react-test-renderer/index.js`: 15,407 lines
 - `packages/react-dom/src/resource-form-internals-gate.js`: 14,641 lines
@@ -128,6 +127,14 @@ Current large-file baseline after accepted main `15432066`:
 - `tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs`: 10,258 lines
 - `packages/react-dom/src/events/plugin-event-system.js`: 9,533 lines
 - `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: 8,553 lines
+- `crates/fast-react-reconciler/src/function_component.rs`: 8,343 lines
+- `packages/react-dom/test/resource-form-unsupported-gates/resource-hints.js`: 8,265 lines
+
+Do not run a broad large-file cleanup lane before public React DOM root/render
+work. Prefer a single behavior-preserving `root-bridge.js` facade split only if
+the orchestrator can reserve that file; defer unrelated resource/form,
+controlled-input, event, hydration, test-renderer, and N-API splits until those
+behavior lanes need them.
 
 Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
