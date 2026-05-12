@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::Lanes;
+use fast_react_core::{FiberId, Lanes};
 
 use crate::host_work::{
     HostWorkError, HostWorkResult, TestHostRootDeletionCleanupApplyResult,
@@ -258,6 +258,10 @@ pub(crate) enum QueuedMinimalHostRootCommitError {
     MissingPreviousHostWorkForCleanup {
         root: FiberRootId,
     },
+    UpdatedPreviousHostWorkCleanupUnsupported {
+        root: FiberRootId,
+        updated_fiber: FiberId,
+    },
     MissingRootElement {
         root: FiberRootId,
         element: RootElementHandle,
@@ -304,6 +308,15 @@ impl Display for QueuedMinimalHostRootCommitError {
                 formatter,
                 "queued minimal HostRoot cleanup for root {} requires mounted host work",
                 root.raw()
+            ),
+            Self::UpdatedPreviousHostWorkCleanupUnsupported {
+                root,
+                updated_fiber,
+            } => write!(
+                formatter,
+                "queued minimal HostRoot cleanup for root {} cannot consume updated host work fiber {:?} before ownership transfer is proven",
+                root.raw(),
+                updated_fiber
             ),
             Self::MissingRootElement { root, element } => write!(
                 formatter,
@@ -365,6 +378,7 @@ impl Error for QueuedMinimalHostRootCommitError {
             Self::FinishedWorkCommit(error) => Some(error),
             Self::PreviousHostWorkRootMismatch { .. }
             | Self::MissingPreviousHostWorkForCleanup { .. }
+            | Self::UpdatedPreviousHostWorkCleanupUnsupported { .. }
             | Self::MissingRootElement { .. }
             | Self::ExpectedHostComponentRoot { .. }
             | Self::ExpectedSingleHostTextChild { .. }
@@ -439,6 +453,12 @@ pub(crate) fn enqueue_render_complete_commit_minimal_host_root_for_canary(
         return Err(
             QueuedMinimalHostRootCommitError::MissingPreviousHostWorkForCleanup { root: root_id },
         );
+    }
+
+    if element.is_none()
+        && let Some(previous) = previous_host_work.as_ref()
+    {
+        validate_cleanup_previous_host_work_is_mount_owned(store, root_id, previous)?;
     }
 
     if element.is_some() {
@@ -681,6 +701,31 @@ fn validate_render_consumed_queued_update(
         update_lanes,
         applied_update_count: render.applied_update_count(),
     })
+}
+
+fn validate_cleanup_previous_host_work_is_mount_owned(
+    store: &FiberRootStore<RecordingHost>,
+    root: FiberRootId,
+    previous: &HostWorkResult,
+) -> Result<(), QueuedMinimalHostRootCommitError> {
+    for &fiber in previous.completed_children() {
+        let node = store
+            .fiber_arena()
+            .get(fiber)
+            .map_err(HostWorkError::from)?;
+        // Updated WIP fibers still rely on detached host records owned by their
+        // original alternates; cleanup needs an explicit ownership-transfer proof.
+        if node.alternate().is_some() {
+            return Err(
+                QueuedMinimalHostRootCommitError::UpdatedPreviousHostWorkCleanupUnsupported {
+                    root,
+                    updated_fiber: fiber,
+                },
+            );
+        }
+    }
+
+    Ok(())
 }
 
 fn validate_minimal_host_component_with_text_source(

@@ -181,6 +181,107 @@ fn root_work_loop_queued_minimal_host_root_null_cleanup_consumes_sync_root_updat
 }
 
 #[test]
+fn root_work_loop_queued_minimal_host_root_rejects_update_then_cleanup_before_publication() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut source = TestHostTree::new();
+    let initial = source.insert_host_element_with_text("article", "queued mount");
+    let mounted = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        initial,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        None,
+        QUEUED_MINIMAL_SOURCE_ORDER + 40,
+        QUEUED_MINIMAL_COMMIT_ORDER + 40,
+    )
+    .unwrap();
+    let updated_element = source.insert_host_element_with_text("article", "queued update");
+    let updated = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        updated_element,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        Some(mounted.into_host_work()),
+        QUEUED_MINIMAL_SOURCE_ORDER + 50,
+        QUEUED_MINIMAL_COMMIT_ORDER + 50,
+    )
+    .unwrap();
+    let updated_root_child = updated.host_work().root_child().unwrap();
+    assert!(
+        store
+            .fiber_arena()
+            .get(updated_root_child)
+            .unwrap()
+            .alternate()
+            .is_some()
+    );
+
+    let current_before = store.root(root_id).unwrap().current();
+    let current_child_before = store.fiber_arena().get(current_before).unwrap().child();
+    let finished_work_before = store.root(root_id).unwrap().finished_work();
+    let finished_lanes_before = store.root(root_id).unwrap().finished_lanes();
+    let pending_lanes_before = store.root(root_id).unwrap().lanes().pending_lanes();
+    let render_phase_work_before = store.root(root_id).unwrap().scheduling().work_in_progress();
+    let operations_before = host.operations();
+    assert_eq!(current_host_root_element(&store, root_id), updated_element);
+    assert_eq!(current_child_before, Some(updated_root_child));
+    assert_eq!(finished_work_before, None);
+    assert_eq!(finished_lanes_before, Lanes::NO);
+    assert_eq!(pending_lanes_before, Lanes::NO);
+
+    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        RootElementHandle::NONE,
+        QueuedMinimalHostRootUpdatePriority::Sync,
+        Lanes::SYNC,
+        &source,
+        Some(updated.into_host_work()),
+        QUEUED_MINIMAL_SOURCE_ORDER + 60,
+        QUEUED_MINIMAL_COMMIT_ORDER + 60,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        QueuedMinimalHostRootCommitError::UpdatedPreviousHostWorkCleanupUnsupported {
+            root: root_id,
+            updated_fiber: updated_root_child,
+        }
+    );
+    assert_eq!(host.operations(), operations_before);
+    assert_eq!(current_host_root_element(&store, root_id), updated_element);
+    assert_eq!(store.root(root_id).unwrap().current(), current_before);
+    assert_eq!(
+        store.fiber_arena().get(current_before).unwrap().child(),
+        current_child_before
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().finished_work(),
+        finished_work_before
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().finished_lanes(),
+        finished_lanes_before
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().pending_lanes(),
+        pending_lanes_before
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().scheduling().work_in_progress(),
+        render_phase_work_before
+    );
+}
+
+#[test]
 fn root_work_loop_queued_minimal_host_root_rejects_wrong_root_previous_host_work_before_enqueue() {
     let mut store = FiberRootStore::<RecordingHost>::new();
     let first_root = store
