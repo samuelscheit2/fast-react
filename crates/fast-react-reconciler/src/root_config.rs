@@ -1,11 +1,14 @@
-//! Reconciler root configuration and inert root-level handles.
+//! Reconciler root configuration, inert root-level handles, and root element resolution.
 //!
 //! This module models the configuration/state shape needed to create an
 //! internal FiberRoot. It deliberately does not schedule work, enqueue
 //! HostRoot updates, call host APIs, flush passive effects, or expose public
 //! React DOM root behavior.
 
-use fast_react_core::{FiberId, FiberMode, Lane, Lanes};
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+
+use fast_react_core::{ElementTypeHandle, FiberId, FiberMode, Lane, Lanes, PropsHandle};
 
 use crate::FiberRootId;
 
@@ -78,6 +81,272 @@ opaque_root_handle!(RootTransitionCallbacksHandle);
 opaque_root_handle!(PendingChildrenHandle);
 opaque_root_handle!(PendingCommitCancelHandle);
 opaque_root_handle!(PendingCommitHandle);
+
+/// Bridge-facing text child admitted by the minimal root element resolver.
+///
+/// This deliberately represents only a primitive text child under a single
+/// host component. It is not a public React child reconciliation surface.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RootHostTextChild {
+    text: String,
+    props: PropsHandle,
+}
+
+impl RootHostTextChild {
+    pub fn new(
+        text: impl Into<String>,
+        props: PropsHandle,
+    ) -> Result<Self, RootElementResolutionError> {
+        if props.is_none() {
+            return Err(RootElementResolutionError::MissingHostTextProps);
+        }
+
+        Ok(Self {
+            text: text.into(),
+            props,
+        })
+    }
+
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    #[must_use]
+    pub const fn props(&self) -> PropsHandle {
+        self.props
+    }
+
+    #[must_use]
+    pub fn into_text(self) -> String {
+        self.text
+    }
+}
+
+/// Bridge-facing host component admitted as the only non-null root shape.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RootHostComponentElement {
+    element: RootElementHandle,
+    element_type: ElementTypeHandle,
+    props: PropsHandle,
+    text_child: Option<RootHostTextChild>,
+}
+
+impl RootHostComponentElement {
+    pub fn new(
+        element: RootElementHandle,
+        element_type: ElementTypeHandle,
+        props: PropsHandle,
+    ) -> Result<Self, RootElementResolutionError> {
+        if element.is_none() {
+            return Err(RootElementResolutionError::MissingHostComponentElement);
+        }
+        if element_type.is_none() {
+            return Err(RootElementResolutionError::MissingHostComponentType { element });
+        }
+        if props.is_none() {
+            return Err(RootElementResolutionError::MissingHostComponentProps { element });
+        }
+
+        Ok(Self {
+            element,
+            element_type,
+            props,
+            text_child: None,
+        })
+    }
+
+    #[must_use]
+    pub fn with_text_child(mut self, text_child: RootHostTextChild) -> Self {
+        self.text_child = Some(text_child);
+        self
+    }
+
+    #[must_use]
+    pub const fn element(&self) -> RootElementHandle {
+        self.element
+    }
+
+    #[must_use]
+    pub const fn element_type(&self) -> ElementTypeHandle {
+        self.element_type
+    }
+
+    #[must_use]
+    pub const fn props(&self) -> PropsHandle {
+        self.props
+    }
+
+    #[must_use]
+    pub fn text_child(&self) -> Option<&RootHostTextChild> {
+        self.text_child.as_ref()
+    }
+
+    #[must_use]
+    pub fn has_text_child(&self) -> bool {
+        self.text_child.is_some()
+    }
+}
+
+/// Minimal resolved root element shape for future root render entrypoints.
+///
+/// `RootElementHandle::NONE` resolves to `Null`. Any non-null handle must be
+/// supplied by a `RootElementSource` as one host component with at most one text
+/// child. Fragments, arrays, function components, portals, nested host
+/// components, multiple children, and root text nodes remain fail-closed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RootElementResolution {
+    Null,
+    HostComponent(RootHostComponentElement),
+}
+
+impl RootElementResolution {
+    #[must_use]
+    pub const fn null() -> Self {
+        Self::Null
+    }
+
+    #[must_use]
+    pub const fn host_component(component: RootHostComponentElement) -> Self {
+        Self::HostComponent(component)
+    }
+
+    #[must_use]
+    pub const fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
+    #[must_use]
+    pub const fn is_host_component(&self) -> bool {
+        matches!(self, Self::HostComponent(_))
+    }
+
+    #[must_use]
+    pub fn host_component_ref(&self) -> Option<&RootHostComponentElement> {
+        match self {
+            Self::HostComponent(component) => Some(component),
+            Self::Null => None,
+        }
+    }
+
+    #[must_use]
+    pub fn into_host_component(self) -> Option<RootHostComponentElement> {
+        match self {
+            Self::HostComponent(component) => Some(component),
+            Self::Null => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn public_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+/// Source contract for resolving opaque root element handles.
+///
+/// Implementors should return `Ok(None)` only when a non-null handle is unknown.
+/// Unsupported shapes should return `UnsupportedRootElement` with a narrow
+/// reason. Callers should go through `resolve_root_element` so null and handle
+/// identity checks stay centralized.
+pub trait RootElementSource {
+    fn resolve_root_host_component(
+        &self,
+        element: RootElementHandle,
+    ) -> Result<Option<RootHostComponentElement>, RootElementResolutionError>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RootElementResolutionError {
+    MissingRootElement {
+        element: RootElementHandle,
+    },
+    MissingHostComponentElement,
+    MissingHostComponentType {
+        element: RootElementHandle,
+    },
+    MissingHostComponentProps {
+        element: RootElementHandle,
+    },
+    MissingHostTextProps,
+    HostComponentElementMismatch {
+        requested: RootElementHandle,
+        resolved: RootElementHandle,
+    },
+    UnsupportedRootElement {
+        element: RootElementHandle,
+        reason: &'static str,
+    },
+}
+
+impl Display for RootElementResolutionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingRootElement { element } => write!(
+                formatter,
+                "root element handle {} could not be resolved to the supported root element shape",
+                element.raw()
+            ),
+            Self::MissingHostComponentElement => {
+                formatter.write_str("resolved root host component is missing its element handle")
+            }
+            Self::MissingHostComponentType { element } => write!(
+                formatter,
+                "root host component element {} is missing its element type handle",
+                element.raw()
+            ),
+            Self::MissingHostComponentProps { element } => write!(
+                formatter,
+                "root host component element {} is missing its props handle",
+                element.raw()
+            ),
+            Self::MissingHostTextProps => {
+                formatter.write_str("root host text child is missing its props handle")
+            }
+            Self::HostComponentElementMismatch {
+                requested,
+                resolved,
+            } => write!(
+                formatter,
+                "root element handle {} resolved to host component element {}",
+                requested.raw(),
+                resolved.raw()
+            ),
+            Self::UnsupportedRootElement { element, reason } => write!(
+                formatter,
+                "root element handle {} resolved to an unsupported root element shape: {reason}",
+                element.raw()
+            ),
+        }
+    }
+}
+
+impl Error for RootElementResolutionError {}
+
+pub fn resolve_root_element<S>(
+    source: &S,
+    element: RootElementHandle,
+) -> Result<RootElementResolution, RootElementResolutionError>
+where
+    S: RootElementSource + ?Sized,
+{
+    if element.is_none() {
+        return Ok(RootElementResolution::Null);
+    }
+
+    let Some(component) = source.resolve_root_host_component(element)? else {
+        return Err(RootElementResolutionError::MissingRootElement { element });
+    };
+
+    if component.element() != element {
+        return Err(RootElementResolutionError::HostComponentElementMismatch {
+            requested: element,
+            resolved: component.element(),
+        });
+    }
+
+    Ok(RootElementResolution::HostComponent(component))
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RootTag {
@@ -871,7 +1140,60 @@ impl Default for RootCallbackPriority {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+
     use super::*;
+
+    #[derive(Debug)]
+    struct StaticRootElementSource {
+        expected: RootElementHandle,
+        component: Option<RootHostComponentElement>,
+        error: Option<RootElementResolutionError>,
+        calls: Cell<usize>,
+    }
+
+    impl StaticRootElementSource {
+        fn new(expected: RootElementHandle, component: Option<RootHostComponentElement>) -> Self {
+            Self {
+                expected,
+                component,
+                error: None,
+                calls: Cell::new(0),
+            }
+        }
+
+        fn unsupported(element: RootElementHandle, reason: &'static str) -> Self {
+            Self {
+                expected: element,
+                component: None,
+                error: Some(RootElementResolutionError::UnsupportedRootElement { element, reason }),
+                calls: Cell::new(0),
+            }
+        }
+
+        fn calls(&self) -> usize {
+            self.calls.get()
+        }
+    }
+
+    impl RootElementSource for StaticRootElementSource {
+        fn resolve_root_host_component(
+            &self,
+            element: RootElementHandle,
+        ) -> Result<Option<RootHostComponentElement>, RootElementResolutionError> {
+            self.calls.set(self.calls.get() + 1);
+
+            if let Some(error) = &self.error {
+                return Err(error.clone());
+            }
+
+            if element == self.expected {
+                Ok(self.component.clone())
+            } else {
+                Ok(None)
+            }
+        }
+    }
 
     #[test]
     fn root_config_default_options_are_concurrent_client_ready() {
@@ -1010,6 +1332,152 @@ mod tests {
         assert_eq!(boundary.raw(), 4);
         assert_eq!(tree_context.raw(), 5);
         assert_eq!(errors.raw(), 6);
+    }
+
+    #[test]
+    fn root_element_resolution_maps_none_to_null_without_source_lookup() {
+        let source = StaticRootElementSource::new(RootElementHandle::from_raw(91), None);
+
+        let resolution = resolve_root_element(&source, RootElementHandle::NONE).unwrap();
+
+        assert_eq!(resolution, RootElementResolution::Null);
+        assert!(resolution.is_null());
+        assert!(!resolution.is_host_component());
+        assert_eq!(resolution.host_component_ref(), None);
+        assert!(!resolution.public_compatibility_claimed());
+        assert_eq!(source.calls(), 0);
+    }
+
+    #[test]
+    fn root_element_resolution_accepts_single_host_component_with_optional_text_child() {
+        let element = RootElementHandle::from_raw(101);
+        let element_type = ElementTypeHandle::from_raw(102);
+        let props = PropsHandle::from_raw(103);
+        let text_props = PropsHandle::from_raw(104);
+        let text_child = RootHostTextChild::new("text", text_props).unwrap();
+        let component = RootHostComponentElement::new(element, element_type, props)
+            .unwrap()
+            .with_text_child(text_child);
+        let source = StaticRootElementSource::new(element, Some(component.clone()));
+
+        let resolution = resolve_root_element(&source, element).unwrap();
+
+        assert_eq!(source.calls(), 1);
+        assert!(resolution.is_host_component());
+        assert!(!resolution.public_compatibility_claimed());
+
+        let resolved = resolution.host_component_ref().unwrap();
+        assert_eq!(resolved.element(), element);
+        assert_eq!(resolved.element_type(), element_type);
+        assert_eq!(resolved.props(), props);
+        assert!(resolved.has_text_child());
+
+        let child = resolved.text_child().unwrap();
+        assert_eq!(child.text(), "text");
+        assert_eq!(child.props(), text_props);
+        assert_eq!(child.clone().into_text(), "text");
+        assert_eq!(resolution.into_host_component(), Some(component));
+    }
+
+    #[test]
+    fn root_element_resolution_accepts_host_component_without_text_child() {
+        let element = RootElementHandle::from_raw(111);
+        let component = RootHostComponentElement::new(
+            element,
+            ElementTypeHandle::from_raw(112),
+            PropsHandle::from_raw(113),
+        )
+        .unwrap();
+        let source = StaticRootElementSource::new(element, Some(component));
+
+        let resolution = resolve_root_element(&source, element).unwrap();
+        let resolved = resolution.host_component_ref().unwrap();
+
+        assert!(!resolved.has_text_child());
+        assert_eq!(resolved.text_child(), None);
+        assert_eq!(source.calls(), 1);
+    }
+
+    #[test]
+    fn root_element_resolution_fails_closed_for_missing_or_mismatched_non_null_element() {
+        let requested = RootElementHandle::from_raw(121);
+        let missing_source = StaticRootElementSource::new(RootElementHandle::from_raw(122), None);
+
+        assert_eq!(
+            resolve_root_element(&missing_source, requested),
+            Err(RootElementResolutionError::MissingRootElement { element: requested })
+        );
+        assert_eq!(missing_source.calls(), 1);
+
+        let resolved = RootElementHandle::from_raw(123);
+        let component = RootHostComponentElement::new(
+            resolved,
+            ElementTypeHandle::from_raw(124),
+            PropsHandle::from_raw(125),
+        )
+        .unwrap();
+        let mismatch_source = StaticRootElementSource::new(requested, Some(component));
+
+        assert_eq!(
+            resolve_root_element(&mismatch_source, requested),
+            Err(RootElementResolutionError::HostComponentElementMismatch {
+                requested,
+                resolved,
+            })
+        );
+        assert_eq!(mismatch_source.calls(), 1);
+    }
+
+    #[test]
+    fn root_element_resolution_constructors_reject_missing_required_handles() {
+        let element = RootElementHandle::from_raw(131);
+
+        assert_eq!(
+            RootHostComponentElement::new(
+                RootElementHandle::NONE,
+                ElementTypeHandle::from_raw(132),
+                PropsHandle::from_raw(133),
+            ),
+            Err(RootElementResolutionError::MissingHostComponentElement)
+        );
+        assert_eq!(
+            RootHostComponentElement::new(
+                element,
+                ElementTypeHandle::NONE,
+                PropsHandle::from_raw(134),
+            ),
+            Err(RootElementResolutionError::MissingHostComponentType { element })
+        );
+        assert_eq!(
+            RootHostComponentElement::new(
+                element,
+                ElementTypeHandle::from_raw(135),
+                PropsHandle::NONE,
+            ),
+            Err(RootElementResolutionError::MissingHostComponentProps { element })
+        );
+        assert_eq!(
+            RootHostTextChild::new("text", PropsHandle::NONE),
+            Err(RootElementResolutionError::MissingHostTextProps)
+        );
+    }
+
+    #[test]
+    fn root_element_resolution_source_can_fail_closed_for_unsupported_shapes() {
+        let element = RootElementHandle::from_raw(141);
+        let source = StaticRootElementSource::unsupported(
+            element,
+            "root text, fragments, arrays, and nested host components are not admitted",
+        );
+
+        assert_eq!(
+            resolve_root_element(&source, element),
+            Err(RootElementResolutionError::UnsupportedRootElement {
+                element,
+                reason: "root text, fragments, arrays, and nested host components are not admitted",
+            })
+        );
+        assert_eq!(source.calls(), 1);
     }
 
     fn root_id() -> FiberRootId {
