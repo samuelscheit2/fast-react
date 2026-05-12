@@ -10,6 +10,12 @@ impl HostFiberTokenFactory<RecordingHost> for RootCommitTokenFactory {
     }
 }
 
+impl HostFiberTokenFactory<HtmlLikeHost> for RootCommitTokenFactory {
+    fn create_host_fiber_token(&mut self, token_id: HostFiberTokenId) -> FakeHostFiberToken {
+        FakeHostFiberToken(token_id.raw())
+    }
+}
+
 fn complete_minimal_host_root_component_text_for_commit(
     store: &mut FiberRootStore<RecordingHost>,
     root_id: FiberRootId,
@@ -67,6 +73,122 @@ fn complete_minimal_host_root_component_text_for_commit(
     .unwrap();
 
     (complete_work, host_nodes)
+}
+
+#[test]
+fn minimal_host_root_placement_commit_mutates_html_like_container_to_div_text() {
+    let mut host = HtmlLikeHost::default();
+    let mut store = FiberRootStore::<HtmlLikeHost>::new();
+    let root_id = store
+        .create_client_root(HtmlLikeContainer::new(), RootOptions::new())
+        .unwrap();
+    update_container(&mut store, root_id, RootElementHandle::from_raw(56), None).unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    let finished_work = render.finished_work();
+    let previous_current = render.current();
+    let mode = store.fiber_arena().get(finished_work).unwrap().mode();
+    let component = store.fiber_arena_mut().create_fiber(
+        FiberTag::HostComponent,
+        None,
+        PropsHandle::from_raw(8_101),
+        mode,
+    );
+    {
+        let node = store.fiber_arena_mut().get_mut(component).unwrap();
+        node.set_flags(FiberFlags::PLACEMENT);
+    }
+    let text = store.fiber_arena_mut().create_fiber(
+        FiberTag::HostText,
+        None,
+        PropsHandle::from_raw(8_102),
+        mode,
+    );
+    store
+        .fiber_arena_mut()
+        .set_children(component, &[text])
+        .unwrap();
+    store
+        .fiber_arena_mut()
+        .set_children(finished_work, &[component])
+        .unwrap();
+
+    let mut host_nodes = HostNodeStore::new();
+    let mut token_factory = RootCommitTokenFactory;
+    let complete_work = complete_minimal_host_root_component_text(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        MinimalHostRootCompleteWorkRequest::new(root_id, finished_work, &"div", &(), "text"),
+    )
+    .unwrap();
+
+    assert_eq!(host_nodes.len(), 2);
+    assert_eq!(
+        store.root(root_id).unwrap().container_info().serialize(),
+        ""
+    );
+    assert_eq!(host.operations(), &[] as &[&'static str]);
+
+    let commit = commit_finished_host_root(&mut store, render).unwrap();
+    let gate = commit.host_component_text_mutation_execution_gate();
+    assert_eq!(
+        gate.status(),
+        HostRootHostMutationExecutionGateStatus::BlockedUntilProductionCompleteCommitPromotion
+    );
+    assert!(!gate.production_host_mutation_apply_promoted());
+    assert!(!gate.public_dom_compatibility_claimed());
+    assert!(!gate.test_renderer_compatibility_claimed());
+    let execution_surfaces = commit.execution_surface_blockers();
+    assert!(execution_surfaces.refs_execution_blocked());
+    assert!(execution_surfaces.effects_execution_blocked());
+    assert!(execution_surfaces.hydration_execution_blocked());
+    assert!(execution_surfaces.effects_refs_and_hydration_execution_surfaces_blocked());
+
+    let placement = commit_minimal_host_root_component_text_placement(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        complete_work,
+        &commit,
+    )
+    .unwrap();
+
+    assert_eq!(placement.root(), root_id);
+    assert_eq!(placement.previous_current(), previous_current);
+    assert_eq!(placement.finished_work(), finished_work);
+    assert_eq!(placement.component(), component);
+    assert_eq!(placement.text(), text);
+    assert_eq!(
+        placement.component_state_node(),
+        complete_work.component_state_node()
+    );
+    assert_eq!(placement.text_state_node(), complete_work.text_state_node());
+    assert_eq!(placement.component_scope(), complete_work.component_scope());
+    assert_eq!(placement.text_scope(), complete_work.text_scope());
+    assert_eq!(
+        placement.mutation_kind(),
+        HostRootMutationApplyRecordKind::AppendPlacementToContainer
+    );
+    assert!(placement.prepared_for_commit());
+    assert!(placement.appended_child_to_container());
+    assert!(placement.reset_after_commit());
+    assert!(placement.private_root_placement_only());
+    assert!(!placement.public_dom_compatibility_claimed());
+    assert!(!placement.public_root_rendering_claimed());
+    assert!(placement.public_root_rendering_blocked());
+    assert!(!placement.public_renderer_package_behavior_exposed());
+    assert!(!placement.react_dom_compatibility_claimed());
+    assert!(!placement.test_renderer_compatibility_claimed());
+    assert_eq!(
+        host.operations(),
+        &["prepare", "append-to-container", "reset"]
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().container_info().serialize(),
+        "<div>text</div>"
+    );
+    assert!(host_nodes.is_empty());
 }
 
 #[test]
