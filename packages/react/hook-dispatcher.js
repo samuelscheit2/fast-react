@@ -4753,8 +4753,8 @@ function validateUseRefHookCurrentnessReport(report) {
     report.version !== useRefHookCurrentnessReportVersion ||
     report.status !== useRefHookCurrentnessStatus ||
     report.compatibilityTarget !== 'react@19.2.6' ||
-    !hasSameStringArray(report.hookNames, useRefHookNames) ||
-    !hasSameStringArray(
+    !hasSameFrozenStringArray(report.hookNames, useRefHookNames) ||
+    !hasSameFrozenStringArray(
       report.surfaceCurrentnessFieldNames,
       useRefHookSurfaceCurrentnessFieldNames
     ) ||
@@ -4768,7 +4768,7 @@ function validateUseRefHookCurrentnessReport(report) {
   }
 
   if (
-    !hasSameRecordArrayFields(
+    !hasSameFrozenRecordArrayFields(
       report.publicShapeBlockers,
       useRefHookPublicShapeBlockers,
       useRefHookPublicShapeBlockerFields
@@ -4778,7 +4778,7 @@ function validateUseRefHookCurrentnessReport(report) {
   }
 
   if (
-    !hasSameRecordFields(
+    !hasSameFrozenRecordFields(
       report.sourceReport,
       useRefHookSourceReport,
       useRefHookSourceReportFieldNames
@@ -4788,7 +4788,7 @@ function validateUseRefHookCurrentnessReport(report) {
   }
 
   if (
-    !hasSameRecordFields(
+    !hasSameFrozenRecordFields(
       report.blockerCurrentness,
       useRefHookBlockerCurrentness,
       useRefHookBlockerCurrentnessFieldNames
@@ -4840,7 +4840,7 @@ function validateUseRefHookExecutionEvidence(report) {
     report.version !== useRefHookExecutionEvidenceReportVersion ||
     report.status !== useRefHookExecutionEvidenceStatus ||
     report.compatibilityTarget !== 'react@19.2.6' ||
-    !hasSameStringArray(report.hookNames, useRefHookNames) ||
+    !hasSameFrozenStringArray(report.hookNames, useRefHookNames) ||
     report.publicRootlessInvalidHookBlocked !== true ||
     report.genericDispatcherForwardingBlocked !== true ||
     report.privateDispatcherRequired !== true
@@ -4849,7 +4849,7 @@ function validateUseRefHookExecutionEvidence(report) {
   }
 
   if (
-    !hasSameRecordFields(
+    !hasSameFrozenRecordFields(
       report.sourceReport,
       useRefHookExecutionSourceReport,
       useRefHookExecutionSourceReportFieldNames
@@ -4921,8 +4921,8 @@ function validateUseRefHookRendererLifecycleBlockerReport(report) {
     report.version !== useRefHookRendererLifecycleBlockerReportVersion ||
     report.status !== useRefHookRendererLifecycleBlockerStatus ||
     report.compatibilityTarget !== 'react@19.2.6' ||
-    !hasSameStringArray(report.hookNames, useRefHookNames) ||
-    !hasSameStringArray(
+    !hasSameFrozenStringArray(report.hookNames, useRefHookNames) ||
+    !hasSameFrozenStringArray(
       report.blockerRowFieldNames,
       useRefHookRendererLifecycleBlockerRowFieldNames
     )
@@ -4931,7 +4931,7 @@ function validateUseRefHookRendererLifecycleBlockerReport(report) {
   }
 
   if (
-    !hasSameRecordFields(
+    !hasSameFrozenRecordFields(
       report.sourceReport,
       useRefHookRendererLifecycleBlockerSourceReport,
       useRefHookRendererLifecycleBlockerSourceReportFieldNames
@@ -5042,8 +5042,8 @@ function validateContextHookRendererReadinessReport(report) {
     report.version !== contextHookRendererReadinessReportVersion ||
     report.status !== contextHookRendererReadinessStatus ||
     report.compatibilityTarget !== 'react@19.2.6' ||
-    !hasSameStringArray(report.hookNames, contextHookNames) ||
-    !hasSameStringArray(
+    !hasSameFrozenStringArray(report.hookNames, contextHookNames) ||
+    !hasSameFrozenStringArray(
       report.readinessRowFieldNames,
       contextHookRendererReadinessRowFieldNames
     )
@@ -5052,7 +5052,7 @@ function validateContextHookRendererReadinessReport(report) {
   }
 
   if (
-    !hasSameRecordFields(
+    !hasSameFrozenRecordFields(
       report.sourceReport,
       contextHookRendererReadinessSourceReport,
       contextHookRendererReadinessSourceReportFieldNames
@@ -5150,8 +5150,11 @@ function validateUnsupportedPlaceholderHookCurrentnessReport(report) {
     report.version !== unsupportedPlaceholderHookCurrentnessReportVersion ||
     report.status !== unsupportedPlaceholderHookCurrentnessStatus ||
     report.compatibilityTarget !== 'react@19.2.6' ||
-    !hasSameStringArray(report.hookNames, unsupportedPlaceholderHookNames) ||
-    !hasSameStringArray(
+    !hasSameFrozenStringArray(
+      report.hookNames,
+      unsupportedPlaceholderHookNames
+    ) ||
+    !hasSameFrozenStringArray(
       report.surfaceCurrentnessFieldNames,
       unsupportedPlaceholderHookSurfaceCurrentnessFieldNames
     ) ||
@@ -5163,7 +5166,7 @@ function validateUnsupportedPlaceholderHookCurrentnessReport(report) {
   }
 
   if (
-    !hasSameRecordArrayFields(
+    !hasSameFrozenRecordArrayFields(
       report.publicShapeBlockers,
       unsupportedPlaceholderHookPublicShapeBlockers,
       unsupportedPlaceholderHookPublicShapeBlockerFields
@@ -5173,7 +5176,7 @@ function validateUnsupportedPlaceholderHookCurrentnessReport(report) {
   }
 
   if (
-    !hasSameRecordFields(
+    !hasSameFrozenRecordFields(
       report.sourceReport,
       unsupportedPlaceholderHookSourceReport,
       unsupportedPlaceholderHookSourceReportFieldNames
@@ -5183,7 +5186,7 @@ function validateUnsupportedPlaceholderHookCurrentnessReport(report) {
   }
 
   if (
-    !hasSameRecordFields(
+    !hasSameFrozenRecordFields(
       report.blockerCurrentness,
       unsupportedPlaceholderHookBlockerCurrentness,
       unsupportedPlaceholderHookBlockerCurrentnessFieldNames
@@ -5294,6 +5297,14 @@ function hasSameStringArray(actual, expected) {
   return true;
 }
 
+function hasSameFrozenStringArray(actual, expected) {
+  return (
+    Array.isArray(actual) &&
+    Object.isFrozen(actual) &&
+    hasSameStringArray(actual, expected)
+  );
+}
+
 function hasSamePublicShapeBlockers(actual, expected) {
   if (!Array.isArray(actual) || actual.length !== expected.length) {
     return false;
@@ -5331,6 +5342,14 @@ function hasSameRecordFields(actual, expected, fieldNames) {
   return true;
 }
 
+function hasSameFrozenRecordFields(actual, expected, fieldNames) {
+  return (
+    isObjectLike(actual) &&
+    Object.isFrozen(actual) &&
+    hasSameRecordFields(actual, expected, fieldNames)
+  );
+}
+
 function hasSameRecordArrayFields(actual, expected, fieldNames) {
   if (!Array.isArray(actual) || actual.length !== expected.length) {
     return false;
@@ -5345,8 +5364,32 @@ function hasSameRecordArrayFields(actual, expected, fieldNames) {
   return true;
 }
 
+function hasSameFrozenRecordArrayFields(actual, expected, fieldNames) {
+  if (
+    !Array.isArray(actual) ||
+    !Object.isFrozen(actual) ||
+    actual.length !== expected.length
+  ) {
+    return false;
+  }
+
+  for (let index = 0; index < expected.length; index += 1) {
+    if (
+      !hasSameFrozenRecordFields(actual[index], expected[index], fieldNames)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function hasSameUseRefSurfaceCurrentnessRows(actual, expected) {
-  if (!Array.isArray(actual) || actual.length !== expected.length) {
+  if (
+    !Array.isArray(actual) ||
+    !Object.isFrozen(actual) ||
+    actual.length !== expected.length
+  ) {
     return false;
   }
 
@@ -5374,7 +5417,11 @@ function hasSameUseRefSurfaceCurrentnessRow(actual, expected) {
 }
 
 function hasSameUseRefRendererLifecycleBlockerRows(actual, expected) {
-  if (!Array.isArray(actual) || actual.length !== expected.length) {
+  if (
+    !Array.isArray(actual) ||
+    !Object.isFrozen(actual) ||
+    actual.length !== expected.length
+  ) {
     return false;
   }
 
@@ -5476,6 +5523,7 @@ function hasSourceOwnedUseRefRefObject(report) {
     report.sourceOwnedRefObject === true &&
     identity.sourceOwnedRefObject === true &&
     isObjectLike(identity.mountRefObject) &&
+    Object.isFrozen(identity.mountRefObject) &&
     useRefHookExecutionRefObjects.has(identity.mountRefObject)
   );
 }
@@ -5592,7 +5640,11 @@ function hasBlockedUseRefRendererLifecycleCompatibilityClaims(report) {
 }
 
 function hasSameContextRendererReadinessRows(actual, expected) {
-  if (!Array.isArray(actual) || actual.length !== expected.length) {
+  if (
+    !Array.isArray(actual) ||
+    !Object.isFrozen(actual) ||
+    actual.length !== expected.length
+  ) {
     return false;
   }
 
@@ -5733,7 +5785,11 @@ function hasBlockedContextHookRendererReadinessCompatibilityClaims(report) {
 }
 
 function hasSameSurfaceCurrentnessRows(actual, expected) {
-  if (!Array.isArray(actual) || actual.length !== expected.length) {
+  if (
+    !Array.isArray(actual) ||
+    !Object.isFrozen(actual) ||
+    actual.length !== expected.length
+  ) {
     return false;
   }
 
@@ -5760,7 +5816,7 @@ function hasSameSurfaceCurrentnessRow(actual, expected) {
         fieldName
       )
     ) {
-      if (!hasSameStringArray(actualValue, expectedValue)) {
+      if (!hasSameFrozenStringArray(actualValue, expectedValue)) {
         return false;
       }
       continue;
@@ -5801,7 +5857,7 @@ function hasBlockedUnsupportedPlaceholderHookCallbackInvocations(report) {
     }
   }
 
-  return hasSameRecordFields(
+  return hasSameFrozenRecordFields(
     report.callbackInvocationReport,
     unsupportedPlaceholderHookCallbackInvocationReport,
     unsupportedPlaceholderHookCallbackInvocationReportFieldNames
@@ -5815,7 +5871,7 @@ function hasBlockedUnsupportedPlaceholderHookExternalStoreInvocations(report) {
     }
   }
 
-  return hasSameRecordFields(
+  return hasSameFrozenRecordFields(
     report.externalStoreInvocationReport,
     unsupportedPlaceholderHookExternalStoreInvocationReport,
     unsupportedPlaceholderHookExternalStoreInvocationReportFieldNames
@@ -5829,7 +5885,7 @@ function hasBlockedUnsupportedPlaceholderHookIdGeneration(report) {
     }
   }
 
-  return hasSameRecordFields(
+  return hasSameFrozenRecordFields(
     report.idGenerationReport,
     unsupportedPlaceholderHookIdGenerationReport,
     unsupportedPlaceholderHookIdGenerationReportFieldNames
