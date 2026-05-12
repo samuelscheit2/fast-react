@@ -556,6 +556,10 @@ impl<H: HostTypes> FiberRoot<H> {
         &self.container_info
     }
 
+    pub(crate) fn container_info_mut(&mut self) -> &mut H::Container {
+        &mut self.container_info
+    }
+
     #[must_use]
     pub const fn current(&self) -> FiberId {
         self.current

@@ -3,7 +3,9 @@ use crate::begin_work::{BeginWorkRequest, unsupported_offscreen_begin_work_recor
 use crate::complete_work::{
     HostComponentDangerousHtmlTextResetPayloadKindForCanary,
     HostComponentManagedChildCompleteWorkRecordForCanary,
-    HostComponentManagedChildMutationKindForCanary,
+    HostComponentManagedChildMutationKindForCanary, HostFiberTokenFactory,
+    MinimalHostRootCompleteWorkRecord, MinimalHostRootCompleteWorkRequest,
+    complete_minimal_host_root_component_text,
     complete_offscreen_visibility_transition_blocker_for_test,
     host_component_dangerous_html_text_reset_complete_work_record_for_canary,
     host_component_managed_child_complete_work_record_for_canary,
@@ -15,6 +17,7 @@ use crate::function_component::{
     FunctionComponentEffectPhase, FunctionComponentEffectRegistration,
     FunctionComponentHookRenderState, FunctionComponentHookRenderStore,
 };
+use crate::host_nodes::HostNodeStore;
 use crate::passive_effects::{
     PASSIVE_EFFECT_CALLBACK_INVOCATION_GATE_BLOCKERS, PassiveEffectCallbackInvocationErrorHandle,
     PassiveEffectCallbackInvocationGateStatus, PassiveEffectCallbackInvocationKind,
@@ -29,12 +32,12 @@ use crate::root_callbacks::{
     RootUpdateCallbackInvocationGateStatus, RootUpdateCallbackInvocationRequest,
     RootUpdateCallbackInvocationStatus, RootUpdateCallbackInvocationTestControl,
 };
-use crate::test_support::{FakeContainer, RecordingHost};
+use crate::test_support::{FakeContainer, FakeHostFiberToken, RecordingHost};
 use crate::unsupported_features::{OFFSCREEN_UNSUPPORTED_FEATURE, SUSPENSE_UNSUPPORTED_FEATURE};
 use crate::{
-    RootElementHandle, RootOptions, RootTaskScheduleOutcome, RootUpdateCallbackHandle,
-    RootUpdateCallbackRecord, RootUpdateCallbackVisibility, UpdateId, ensure_root_is_scheduled,
-    process_root_schedule_in_microtask, render_host_root_for_lanes,
+    HostFiberTokenId, RootElementHandle, RootOptions, RootTaskScheduleOutcome,
+    RootUpdateCallbackHandle, RootUpdateCallbackRecord, RootUpdateCallbackVisibility, UpdateId,
+    ensure_root_is_scheduled, process_root_schedule_in_microtask, render_host_root_for_lanes,
     render_host_root_via_scheduler_callback, update_container,
 };
 use fast_react_core::{

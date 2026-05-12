@@ -18,10 +18,14 @@ use fast_react_core::{
     HookEffectId, HookEffectInstanceId, HookListId, Lanes, PropsHandle, RootFinishedLanes,
     StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
-use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
+use fast_react_host_config::{
+    HostChild, HostCommit, HostError, HostFiberTokenPhase, HostFiberTokenTarget, HostTypes,
+    InitialChildrenFinalization, MutationHost,
+};
 
 #[cfg(test)]
 use crate::RootElementHandle;
+use crate::complete_work::MinimalHostRootCompleteWorkRecord;
 #[cfg(test)]
 use crate::complete_work::{
     HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
@@ -41,6 +45,7 @@ use crate::function_component::{
     FunctionComponentHookRenderState, FunctionComponentHookRenderStore,
     FunctionComponentLayoutEffectMetadata, FunctionComponentPassiveEffectMetadata,
 };
+use crate::host_nodes::{HostNodeScope, HostNodeStore, HostNodeValidationError};
 use crate::root_callbacks::materialize_root_update_callback_invocation_gate;
 use crate::root_config::{
     PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveState,
@@ -4884,6 +4889,574 @@ impl HostRootHostMutationExecutionGate {
     pub fn blockers_intact(self) -> bool {
         self.blockers == HOST_ROOT_HOST_MUTATION_EXECUTION_BLOCKERS
     }
+}
+
+#[allow(
+    dead_code,
+    reason = "private minimal host placement execution is consumed by focused commit promotion tests before public rendering is enabled"
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MinimalHostRootPlacementCommitRequest {
+    root: FiberRootId,
+    previous_current: FiberId,
+    finished_work: FiberId,
+    component: FiberId,
+    text: FiberId,
+    component_state_node: StateNodeHandle,
+    text_state_node: StateNodeHandle,
+    component_scope: HostNodeScope,
+    text_scope: HostNodeScope,
+    mutation: HostRootMutationApplyRecord,
+}
+
+#[allow(
+    dead_code,
+    reason = "private minimal host placement execution is consumed by focused commit promotion tests before public rendering is enabled"
+)]
+impl MinimalHostRootPlacementCommitRequest {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn component(self) -> FiberId {
+        self.component
+    }
+
+    #[must_use]
+    pub(crate) const fn text(self) -> FiberId {
+        self.text
+    }
+
+    #[must_use]
+    pub(crate) const fn component_state_node(self) -> StateNodeHandle {
+        self.component_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn text_state_node(self) -> StateNodeHandle {
+        self.text_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn component_scope(self) -> HostNodeScope {
+        self.component_scope
+    }
+
+    #[must_use]
+    pub(crate) const fn text_scope(self) -> HostNodeScope {
+        self.text_scope
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation(self) -> HostRootMutationApplyRecord {
+        self.mutation
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "private minimal host placement execution is consumed by focused commit promotion tests before public rendering is enabled"
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MinimalHostRootPlacementCommitRecord {
+    root: FiberRootId,
+    previous_current: FiberId,
+    finished_work: FiberId,
+    component: FiberId,
+    text: FiberId,
+    component_state_node: StateNodeHandle,
+    text_state_node: StateNodeHandle,
+    component_scope: HostNodeScope,
+    text_scope: HostNodeScope,
+    mutation_kind: HostRootMutationApplyRecordKind,
+    prepared_for_commit: bool,
+    appended_child_to_container: bool,
+    reset_after_commit: bool,
+}
+
+#[allow(
+    dead_code,
+    reason = "private minimal host placement execution is consumed by focused commit promotion tests before public rendering is enabled"
+)]
+impl MinimalHostRootPlacementCommitRecord {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn component(self) -> FiberId {
+        self.component
+    }
+
+    #[must_use]
+    pub(crate) const fn text(self) -> FiberId {
+        self.text
+    }
+
+    #[must_use]
+    pub(crate) const fn component_state_node(self) -> StateNodeHandle {
+        self.component_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn text_state_node(self) -> StateNodeHandle {
+        self.text_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn component_scope(self) -> HostNodeScope {
+        self.component_scope
+    }
+
+    #[must_use]
+    pub(crate) const fn text_scope(self) -> HostNodeScope {
+        self.text_scope
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation_kind(self) -> HostRootMutationApplyRecordKind {
+        self.mutation_kind
+    }
+
+    #[must_use]
+    pub(crate) const fn prepared_for_commit(self) -> bool {
+        self.prepared_for_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn appended_child_to_container(self) -> bool {
+        self.appended_child_to_container
+    }
+
+    #[must_use]
+    pub(crate) const fn reset_after_commit(self) -> bool {
+        self.reset_after_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn private_root_placement_only(self) -> bool {
+        matches!(
+            self.mutation_kind,
+            HostRootMutationApplyRecordKind::AppendPlacementToContainer
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn public_dom_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_renderer_package_behavior_exposed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "private minimal host placement execution is consumed by focused commit promotion tests before public rendering is enabled"
+)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum MinimalHostRootPlacementCommitError {
+    RootStore(FiberRootStoreError),
+    Host(HostError),
+    HostNode(HostNodeValidationError),
+    CompleteWorkRootMismatch {
+        complete_root: FiberRootId,
+        commit_root: FiberRootId,
+    },
+    CompleteWorkFinishedWorkMismatch {
+        root: FiberRootId,
+        complete_finished_work: FiberId,
+        commit_finished_work: FiberId,
+    },
+    StoreCurrentMismatch {
+        root: FiberRootId,
+        expected_current: FiberId,
+        actual_current: FiberId,
+    },
+    ComponentFinalizationRequiresCommitMount {
+        root: FiberRootId,
+        component: FiberId,
+        finalization: InitialChildrenFinalization,
+    },
+    ExpectedSingleRootPlacementAppend {
+        root: FiberRootId,
+        finished_work: FiberId,
+        mutation_record_count: usize,
+        append_record_count: usize,
+    },
+    InvalidRootPlacementApplyRecord {
+        root: FiberRootId,
+        finished_work: FiberId,
+        component: FiberId,
+        reason: &'static str,
+    },
+}
+
+impl Display for MinimalHostRootPlacementCommitError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootStore(error) => Display::fmt(error, formatter),
+            Self::Host(error) => Display::fmt(error, formatter),
+            Self::HostNode(error) => Display::fmt(error, formatter),
+            Self::CompleteWorkRootMismatch {
+                complete_root,
+                commit_root,
+            } => write!(
+                formatter,
+                "minimal HostRoot placement commit complete-work root {} does not match commit root {}",
+                complete_root.raw(),
+                commit_root.raw()
+            ),
+            Self::CompleteWorkFinishedWorkMismatch {
+                root,
+                complete_finished_work,
+                commit_finished_work,
+            } => write!(
+                formatter,
+                "root {} minimal HostRoot placement commit complete-work finished work fiber slot {} does not match commit finished work fiber slot {}",
+                root.raw(),
+                complete_finished_work.slot().get(),
+                commit_finished_work.slot().get()
+            ),
+            Self::StoreCurrentMismatch {
+                root,
+                expected_current,
+                actual_current,
+            } => write!(
+                formatter,
+                "root {} minimal HostRoot placement commit expected current fiber slot {}, found store current fiber slot {}",
+                root.raw(),
+                expected_current.slot().get(),
+                actual_current.slot().get()
+            ),
+            Self::ComponentFinalizationRequiresCommitMount {
+                root,
+                component,
+                finalization,
+            } => write!(
+                formatter,
+                "root {} minimal HostRoot placement commit cannot execute component fiber slot {} finalization {:?} without commit_mount support",
+                root.raw(),
+                component.slot().get(),
+                finalization
+            ),
+            Self::ExpectedSingleRootPlacementAppend {
+                root,
+                finished_work,
+                mutation_record_count,
+                append_record_count,
+            } => write!(
+                formatter,
+                "root {} finished work fiber slot {} expected exactly one append-placement-to-container apply record and no other mutation records, found {} mutation records and {} root append records",
+                root.raw(),
+                finished_work.slot().get(),
+                mutation_record_count,
+                append_record_count
+            ),
+            Self::InvalidRootPlacementApplyRecord {
+                root,
+                finished_work,
+                component,
+                reason,
+            } => write!(
+                formatter,
+                "root {} finished work fiber slot {} rejected minimal HostRoot placement apply record for component fiber slot {}: {}",
+                root.raw(),
+                finished_work.slot().get(),
+                component.slot().get(),
+                reason
+            ),
+        }
+    }
+}
+
+impl Error for MinimalHostRootPlacementCommitError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::RootStore(error) => Some(error),
+            Self::Host(error) => Some(error),
+            Self::HostNode(error) => Some(error),
+            Self::CompleteWorkRootMismatch { .. }
+            | Self::CompleteWorkFinishedWorkMismatch { .. }
+            | Self::StoreCurrentMismatch { .. }
+            | Self::ComponentFinalizationRequiresCommitMount { .. }
+            | Self::ExpectedSingleRootPlacementAppend { .. }
+            | Self::InvalidRootPlacementApplyRecord { .. } => None,
+        }
+    }
+}
+
+impl From<FiberRootStoreError> for MinimalHostRootPlacementCommitError {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::RootStore(error)
+    }
+}
+
+impl From<HostError> for MinimalHostRootPlacementCommitError {
+    fn from(error: HostError) -> Self {
+        Self::Host(error)
+    }
+}
+
+impl From<HostNodeValidationError> for MinimalHostRootPlacementCommitError {
+    fn from(error: HostNodeValidationError) -> Self {
+        Self::HostNode(error)
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "private minimal host placement execution is intentionally not wired into public root commit yet"
+)]
+pub(crate) fn commit_minimal_host_root_component_text_placement<H>(
+    store: &mut FiberRootStore<H>,
+    host: &mut H,
+    host_nodes: &HostNodeStore<H>,
+    complete_work: MinimalHostRootCompleteWorkRecord,
+    commit: &HostRootCommitRecord,
+) -> Result<MinimalHostRootPlacementCommitRecord, MinimalHostRootPlacementCommitError>
+where
+    H: HostCommit + MutationHost,
+{
+    let request =
+        validate_minimal_host_root_placement_commit(store, host_nodes, complete_work, commit)?;
+    let commit_state = {
+        let container = store.root(request.root())?.container_info();
+        host.prepare_for_commit(container)?
+    };
+    let instance =
+        host_nodes.instance(request.component_state_node(), request.component_scope())?;
+    {
+        let container = store.root_mut(request.root())?.container_info_mut();
+        host.append_child_to_container(container, HostChild::Instance(instance))?;
+    }
+    {
+        let container = store.root(request.root())?.container_info();
+        host.reset_after_commit(container, commit_state)?;
+    }
+
+    Ok(MinimalHostRootPlacementCommitRecord {
+        root: request.root(),
+        previous_current: request.previous_current(),
+        finished_work: request.finished_work(),
+        component: request.component(),
+        text: request.text(),
+        component_state_node: request.component_state_node(),
+        text_state_node: request.text_state_node(),
+        component_scope: request.component_scope(),
+        text_scope: request.text_scope(),
+        mutation_kind: request.mutation().kind(),
+        prepared_for_commit: true,
+        appended_child_to_container: true,
+        reset_after_commit: true,
+    })
+}
+
+fn validate_minimal_host_root_placement_commit<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    host_nodes: &HostNodeStore<H>,
+    complete_work: MinimalHostRootCompleteWorkRecord,
+    commit: &HostRootCommitRecord,
+) -> Result<MinimalHostRootPlacementCommitRequest, MinimalHostRootPlacementCommitError> {
+    if complete_work.root() != commit.root() {
+        return Err(
+            MinimalHostRootPlacementCommitError::CompleteWorkRootMismatch {
+                complete_root: complete_work.root(),
+                commit_root: commit.root(),
+            },
+        );
+    }
+
+    if complete_work.host_root_work_in_progress() != commit.current() {
+        return Err(
+            MinimalHostRootPlacementCommitError::CompleteWorkFinishedWorkMismatch {
+                root: commit.root(),
+                complete_finished_work: complete_work.host_root_work_in_progress(),
+                commit_finished_work: commit.current(),
+            },
+        );
+    }
+
+    let store_current = store.root(commit.root())?.current();
+    if store_current != commit.current() {
+        return Err(MinimalHostRootPlacementCommitError::StoreCurrentMismatch {
+            root: commit.root(),
+            expected_current: commit.current(),
+            actual_current: store_current,
+        });
+    }
+
+    if complete_work
+        .component_finalization()
+        .requires_commit_mount()
+    {
+        return Err(
+            MinimalHostRootPlacementCommitError::ComponentFinalizationRequiresCommitMount {
+                root: complete_work.root(),
+                component: complete_work.component(),
+                finalization: complete_work.component_finalization(),
+            },
+        );
+    }
+
+    host_nodes.instance(
+        complete_work.component_state_node(),
+        complete_work.component_scope(),
+    )?;
+    host_nodes.text(complete_work.text_state_node(), complete_work.text_scope())?;
+
+    let apply_records = commit.mutation_apply_log().records();
+    let append_record_count = apply_records
+        .iter()
+        .filter(|record| {
+            record.kind() == HostRootMutationApplyRecordKind::AppendPlacementToContainer
+        })
+        .count();
+    if apply_records.len() != 1 || append_record_count != 1 {
+        return Err(
+            MinimalHostRootPlacementCommitError::ExpectedSingleRootPlacementAppend {
+                root: commit.root(),
+                finished_work: commit.current(),
+                mutation_record_count: apply_records.len(),
+                append_record_count,
+            },
+        );
+    }
+
+    let mutation = apply_records[0];
+    validate_minimal_host_root_placement_apply_record(mutation, complete_work, commit)?;
+
+    Ok(MinimalHostRootPlacementCommitRequest {
+        root: commit.root(),
+        previous_current: commit.previous_current(),
+        finished_work: commit.current(),
+        component: complete_work.component(),
+        text: complete_work.text(),
+        component_state_node: complete_work.component_state_node(),
+        text_state_node: complete_work.text_state_node(),
+        component_scope: complete_work.component_scope(),
+        text_scope: complete_work.text_scope(),
+        mutation,
+    })
+}
+
+fn validate_minimal_host_root_placement_apply_record(
+    mutation: HostRootMutationApplyRecord,
+    complete_work: MinimalHostRootCompleteWorkRecord,
+    commit: &HostRootCommitRecord,
+) -> Result<(), MinimalHostRootPlacementCommitError> {
+    let invalid = |reason| MinimalHostRootPlacementCommitError::InvalidRootPlacementApplyRecord {
+        root: commit.root(),
+        finished_work: commit.current(),
+        component: complete_work.component(),
+        reason,
+    };
+
+    if mutation.root() != commit.root() {
+        return Err(invalid("root mismatch"));
+    }
+    if mutation.host_root() != commit.current() {
+        return Err(invalid("host root mismatch"));
+    }
+    if mutation.source()
+        != HostRootMutationApplyRecordSource::MutationPhase(
+            HostRootMutationPhaseRecordKind::Placement,
+        )
+    {
+        return Err(invalid("expected placement mutation source"));
+    }
+    if mutation.parent() != commit.current() {
+        return Err(invalid("parent must be committed HostRoot"));
+    }
+    if mutation.parent_tag() != FiberTag::HostRoot {
+        return Err(invalid("parent tag must be HostRoot"));
+    }
+    if !mutation.parent_state_node().is_none() {
+        return Err(invalid("HostRoot parent state node must be empty"));
+    }
+    if mutation.fiber() != complete_work.component() {
+        return Err(invalid("fiber must match completed component"));
+    }
+    if mutation.alternate_fiber().is_some() {
+        return Err(invalid("component placement must not have an alternate"));
+    }
+    if mutation.tag() != FiberTag::HostComponent {
+        return Err(invalid("placed fiber tag must be HostComponent"));
+    }
+    if mutation.kind() != HostRootMutationApplyRecordKind::AppendPlacementToContainer {
+        return Err(invalid("expected append placement to container"));
+    }
+    if mutation.effect_flag() != FiberFlags::PLACEMENT {
+        return Err(invalid("effect flag must be Placement"));
+    }
+    if mutation.lanes() != commit.finished_lanes() {
+        return Err(invalid("lanes must match commit finished lanes"));
+    }
+    if mutation.state_node() != complete_work.component_state_node() {
+        return Err(invalid(
+            "state node must match completed component instance",
+        ));
+    }
+
+    let Some(sibling) = mutation.placement_sibling() else {
+        return Err(invalid("placement sibling record is required"));
+    };
+    if sibling.status() != HostRootPlacementSiblingStatus::Append
+        || sibling.sibling().is_some()
+        || sibling.sibling_tag().is_some()
+        || !sibling.sibling_state_node().is_none()
+        || sibling.skipped_pending_sibling_count() != 0
+        || sibling.can_insert_before()
+    {
+        return Err(invalid("placement sibling must be append-only"));
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

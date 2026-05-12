@@ -1,6 +1,74 @@
 use super::helpers::*;
 use super::*;
 
+#[derive(Debug, Default)]
+struct RootCommitTokenFactory;
+
+impl HostFiberTokenFactory<RecordingHost> for RootCommitTokenFactory {
+    fn create_host_fiber_token(&mut self, token_id: HostFiberTokenId) -> FakeHostFiberToken {
+        FakeHostFiberToken(token_id.raw())
+    }
+}
+
+fn complete_minimal_host_root_component_text_for_commit(
+    store: &mut FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    host: &mut RecordingHost,
+    host_root_work_in_progress: FiberId,
+) -> (
+    MinimalHostRootCompleteWorkRecord,
+    HostNodeStore<RecordingHost>,
+) {
+    let mode = store
+        .fiber_arena()
+        .get(host_root_work_in_progress)
+        .unwrap()
+        .mode();
+    let component = store.fiber_arena_mut().create_fiber(
+        FiberTag::HostComponent,
+        None,
+        PropsHandle::from_raw(8_001),
+        mode,
+    );
+    {
+        let node = store.fiber_arena_mut().get_mut(component).unwrap();
+        node.set_flags(FiberFlags::PLACEMENT);
+    }
+    let text = store.fiber_arena_mut().create_fiber(
+        FiberTag::HostText,
+        None,
+        PropsHandle::from_raw(8_002),
+        mode,
+    );
+    store
+        .fiber_arena_mut()
+        .set_children(component, &[text])
+        .unwrap();
+    store
+        .fiber_arena_mut()
+        .set_children(host_root_work_in_progress, &[component])
+        .unwrap();
+
+    let mut host_nodes = HostNodeStore::new();
+    let mut token_factory = RootCommitTokenFactory;
+    let complete_work = complete_minimal_host_root_component_text(
+        store,
+        host,
+        &mut host_nodes,
+        &mut token_factory,
+        MinimalHostRootCompleteWorkRequest::new(
+            root_id,
+            host_root_work_in_progress,
+            &"section",
+            &(),
+            "hello",
+        ),
+    )
+    .unwrap();
+
+    (complete_work, host_nodes)
+}
+
 #[test]
 fn root_commit_records_host_root_child_placement_metadata_without_host_mutation() {
     let (mut store, root_id, host) = root_store();
@@ -144,6 +212,186 @@ fn root_commit_host_component_text_mutation_execution_gate_blocks_production_hos
         render.finished_work()
     );
     assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn minimal_host_root_placement_commit_appends_completed_component_to_container() {
+    let (mut store, root_id, mut host) = root_store();
+    update_container(&mut store, root_id, RootElementHandle::from_raw(48), None).unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    let (complete_work, host_nodes) = complete_minimal_host_root_component_text_for_commit(
+        &mut store,
+        root_id,
+        &mut host,
+        render.finished_work(),
+    );
+
+    let commit = commit_finished_host_root(&mut store, render).unwrap();
+    let gate = commit.host_component_text_mutation_execution_gate();
+    assert_eq!(
+        gate.status(),
+        HostRootHostMutationExecutionGateStatus::BlockedUntilProductionCompleteCommitPromotion
+    );
+    assert!(!gate.production_host_mutation_apply_promoted());
+    assert!(!gate.public_dom_compatibility_claimed());
+
+    let placement = commit_minimal_host_root_component_text_placement(
+        &mut store,
+        &mut host,
+        &host_nodes,
+        complete_work,
+        &commit,
+    )
+    .unwrap();
+
+    assert_eq!(placement.root(), root_id);
+    assert_eq!(placement.previous_current(), commit.previous_current());
+    assert_eq!(placement.finished_work(), commit.current());
+    assert_eq!(placement.component(), complete_work.component());
+    assert_eq!(placement.text(), complete_work.text());
+    assert_eq!(
+        placement.component_state_node(),
+        complete_work.component_state_node()
+    );
+    assert_eq!(placement.text_state_node(), complete_work.text_state_node());
+    assert_eq!(placement.component_scope(), complete_work.component_scope());
+    assert_eq!(placement.text_scope(), complete_work.text_scope());
+    assert_eq!(
+        placement.mutation_kind(),
+        HostRootMutationApplyRecordKind::AppendPlacementToContainer
+    );
+    assert!(placement.prepared_for_commit());
+    assert!(placement.appended_child_to_container());
+    assert!(placement.reset_after_commit());
+    assert!(placement.private_root_placement_only());
+    assert!(!placement.public_dom_compatibility_claimed());
+    assert!(!placement.public_root_rendering_claimed());
+    assert!(placement.public_root_rendering_blocked());
+    assert!(!placement.public_renderer_package_behavior_exposed());
+    assert!(!placement.react_dom_compatibility_claimed());
+    assert!(!placement.test_renderer_compatibility_claimed());
+    assert_eq!(
+        host.operations(),
+        vec![
+            "root_host_context",
+            "child_host_context",
+            "should_set_text_content",
+            "create_text_instance",
+            "create_instance",
+            "append_initial_child",
+            "finalize_initial_children",
+            "prepare_for_commit",
+            "append_child_to_container",
+            "reset_after_commit",
+        ]
+    );
+
+    let post_commit_gate = commit.host_component_text_mutation_execution_gate();
+    assert_eq!(
+        post_commit_gate.status(),
+        HostRootHostMutationExecutionGateStatus::BlockedUntilProductionCompleteCommitPromotion
+    );
+    assert!(!post_commit_gate.production_host_mutation_apply_promoted());
+    assert!(!post_commit_gate.public_dom_compatibility_claimed());
+}
+
+#[test]
+fn minimal_host_root_placement_commit_rejects_sibling_insert_before() {
+    let (mut store, root_id, mut host) = root_store();
+    update_container(&mut store, root_id, RootElementHandle::from_raw(49), None).unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    let (complete_work, host_nodes) = complete_minimal_host_root_component_text_for_commit(
+        &mut store,
+        root_id,
+        &mut host,
+        render.finished_work(),
+    );
+    let mode = store
+        .fiber_arena()
+        .get(render.finished_work())
+        .unwrap()
+        .mode();
+    let stable_text = store.fiber_arena_mut().create_fiber(
+        FiberTag::HostText,
+        None,
+        PropsHandle::from_raw(8_003),
+        mode,
+    );
+    {
+        let node = store.fiber_arena_mut().get_mut(stable_text).unwrap();
+        node.set_state_node(StateNodeHandle::from_raw(8_004));
+        node.set_memoized_props(PropsHandle::from_raw(8_003));
+    }
+    store
+        .fiber_arena_mut()
+        .set_children(
+            render.finished_work(),
+            &[complete_work.component(), stable_text],
+        )
+        .unwrap();
+
+    let operations_before_commit_attempt = host.operations();
+    let commit = commit_finished_host_root(&mut store, render).unwrap();
+    assert_eq!(commit.mutation_apply_log().len(), 1);
+    assert_eq!(
+        commit.mutation_apply_log().records()[0].kind(),
+        HostRootMutationApplyRecordKind::InsertPlacementInContainerBefore
+    );
+
+    let error = commit_minimal_host_root_component_text_placement(
+        &mut store,
+        &mut host,
+        &host_nodes,
+        complete_work,
+        &commit,
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        error,
+        MinimalHostRootPlacementCommitError::ExpectedSingleRootPlacementAppend {
+            mutation_record_count: 1,
+            append_record_count: 0,
+            ..
+        }
+    ));
+    assert_eq!(host.operations(), operations_before_commit_attempt);
+}
+
+#[test]
+fn minimal_host_root_placement_commit_rejects_missing_host_node_evidence() {
+    let (mut store, root_id, mut host) = root_store();
+    update_container(&mut store, root_id, RootElementHandle::from_raw(50), None).unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    let (complete_work, mut host_nodes) = complete_minimal_host_root_component_text_for_commit(
+        &mut store,
+        root_id,
+        &mut host,
+        render.finished_work(),
+    );
+    host_nodes
+        .remove_instance(
+            complete_work.component_state_node(),
+            complete_work.component_scope(),
+        )
+        .unwrap();
+    let operations_before_commit_attempt = host.operations();
+
+    let commit = commit_finished_host_root(&mut store, render).unwrap();
+    let error = commit_minimal_host_root_component_text_placement(
+        &mut store,
+        &mut host,
+        &host_nodes,
+        complete_work,
+        &commit,
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        error,
+        MinimalHostRootPlacementCommitError::HostNode(_)
+    ));
+    assert_eq!(host.operations(), operations_before_commit_attempt);
 }
 
 #[test]
