@@ -236,6 +236,14 @@ impl From<WorkInProgressError> for RootWorkLoopError {
 
 mod render_phase;
 
+#[allow(
+    unused_imports,
+    reason = "crate-internal minimal root render record/error are reserved for the complete-work integration path"
+)]
+pub(crate) use render_phase::{
+    HostRootMinimalElementRenderPhaseError, HostRootMinimalElementRenderPhaseRecord,
+    render_host_root_for_lanes_with_minimal_root_element,
+};
 #[cfg(test)]
 #[allow(
     unused_imports,

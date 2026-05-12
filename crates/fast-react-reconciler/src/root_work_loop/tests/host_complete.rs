@@ -1,4 +1,60 @@
 use super::*;
+use std::cell::Cell;
+
+use crate::{
+    RootElementResolutionError, RootElementSource, RootHostComponentElement, RootHostTextChild,
+};
+
+#[derive(Debug)]
+struct StaticRootElementSource {
+    expected: RootElementHandle,
+    component: Option<RootHostComponentElement>,
+    error: Option<RootElementResolutionError>,
+    calls: Cell<usize>,
+}
+
+impl StaticRootElementSource {
+    fn new(expected: RootElementHandle, component: Option<RootHostComponentElement>) -> Self {
+        Self {
+            expected,
+            component,
+            error: None,
+            calls: Cell::new(0),
+        }
+    }
+
+    fn unsupported(element: RootElementHandle, reason: &'static str) -> Self {
+        Self {
+            expected: element,
+            component: None,
+            error: Some(RootElementResolutionError::UnsupportedRootElement { element, reason }),
+            calls: Cell::new(0),
+        }
+    }
+
+    fn calls(&self) -> usize {
+        self.calls.get()
+    }
+}
+
+impl RootElementSource for StaticRootElementSource {
+    fn resolve_root_host_component(
+        &self,
+        element: RootElementHandle,
+    ) -> Result<Option<RootHostComponentElement>, RootElementResolutionError> {
+        self.calls.set(self.calls.get() + 1);
+
+        if let Some(error) = &self.error {
+            return Err(error.clone());
+        }
+
+        if element == self.expected {
+            Ok(self.component.clone())
+        } else {
+            Ok(None)
+        }
+    }
+}
 
 #[test]
 fn root_work_loop_preflight_fails_closed_through_begin_work_for_unhandled_child_tags() {
@@ -115,6 +171,268 @@ fn root_work_loop_reconciles_host_root_mount_to_host_component_with_text_child()
             .render_exit_status(),
         RootRenderExitStatus::Completed
     );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_work_loop_minimal_root_element_render_builds_host_component_with_text_wip_shape() {
+    let (mut store, root_id, host) = root_store();
+    let element = RootElementHandle::from_raw(7_101);
+    let element_type = ElementTypeHandle::from_raw(7_102);
+    let props = PropsHandle::from_raw(7_103);
+    let text_props = PropsHandle::from_raw(7_104);
+    let component = RootHostComponentElement::new(element, element_type, props)
+        .unwrap()
+        .with_text_child(RootHostTextChild::new("text", text_props).unwrap());
+    let source = StaticRootElementSource::new(element, Some(component));
+    let current = store.root(root_id).unwrap().current();
+    update_container(&mut store, root_id, element, None).unwrap();
+
+    let record = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let render = record.render();
+
+    assert_eq!(source.calls(), 1);
+    assert_eq!(record.root(), root_id);
+    assert_eq!(record.current(), current);
+    assert_eq!(
+        record.host_root_work_in_progress(),
+        render.work_in_progress()
+    );
+    assert_eq!(record.root_element(), element);
+    assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+    assert_eq!(record.root_child_tag(), FiberTag::HostComponent);
+    assert_eq!(record.root_child_element_type(), element_type);
+    assert_eq!(record.root_child_props(), props);
+    assert_eq!(record.text_child_tag(), FiberTag::HostText);
+    assert_eq!(record.text_child_props(), text_props);
+    assert_eq!(record.text_child_text(), "text");
+    assert_eq!(record.root_child_count(), 1);
+    assert_eq!(record.component_child_count(), 1);
+    assert!(!record.public_compatibility_claimed());
+    assert!(record.public_compatibility_blocked());
+    assert!(record.proves_minimal_host_component_with_text_child());
+
+    let host_root = store
+        .fiber_arena()
+        .get(record.host_root_work_in_progress())
+        .unwrap();
+    assert_eq!(host_root.tag(), FiberTag::HostRoot);
+    assert_eq!(host_root.child(), Some(record.root_child()));
+    assert_eq!(host_root.child_lanes(), Lanes::DEFAULT);
+    assert!(
+        host_root
+            .subtree_flags()
+            .contains_all(FiberFlags::PLACEMENT)
+    );
+
+    let child = store.fiber_arena().get(record.root_child()).unwrap();
+    assert_eq!(child.tag(), FiberTag::HostComponent);
+    assert_eq!(
+        child.return_fiber(),
+        Some(record.host_root_work_in_progress())
+    );
+    assert_eq!(child.sibling(), None);
+    assert_eq!(child.child(), Some(record.text_child()));
+    assert_eq!(child.element_type(), element_type);
+    assert_eq!(child.pending_props(), props);
+    assert_eq!(child.state_node(), StateNodeHandle::NONE);
+    assert_eq!(child.lanes(), Lanes::DEFAULT);
+    assert!(child.flags().contains_all(FiberFlags::PLACEMENT));
+
+    let text = store.fiber_arena().get(record.text_child()).unwrap();
+    assert_eq!(text.tag(), FiberTag::HostText);
+    assert_eq!(text.return_fiber(), Some(record.root_child()));
+    assert_eq!(text.sibling(), None);
+    assert_eq!(text.child(), None);
+    assert_eq!(text.pending_props(), text_props);
+    assert_eq!(text.state_node(), StateNodeHandle::NONE);
+    assert_eq!(text.lanes(), Lanes::DEFAULT);
+    assert_eq!(text.flags(), FiberFlags::NO);
+
+    assert_eq!(render.resulting_element(), element);
+    assert_eq!(render.applied_update_count(), 1);
+    assert_eq!(render.skipped_update_count(), 0);
+    assert_eq!(render.remaining_lanes(), Lanes::NO);
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_work_loop_minimal_root_element_render_fails_closed_for_null_and_missing_text_child() {
+    let (mut null_store, null_root, null_host) = root_store();
+    let null_source = StaticRootElementSource::new(RootElementHandle::from_raw(7_201), None);
+    let null_current = null_store.root(null_root).unwrap().current();
+    update_container(&mut null_store, null_root, RootElementHandle::NONE, None).unwrap();
+
+    let null_error = render_host_root_for_lanes_with_minimal_root_element(
+        &mut null_store,
+        null_root,
+        Lanes::DEFAULT,
+        &null_source,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        null_error,
+        HostRootMinimalElementRenderPhaseError::ExpectedHostComponentRoot {
+            root: null_root,
+            element: RootElementHandle::NONE,
+        }
+    );
+    assert_eq!(null_source.calls(), 0);
+    let null_work_in_progress = null_store
+        .root(null_root)
+        .unwrap()
+        .scheduling()
+        .work_in_progress()
+        .unwrap();
+    assert_eq!(
+        null_store
+            .fiber_arena()
+            .get(null_work_in_progress)
+            .unwrap()
+            .child(),
+        None
+    );
+    assert_eq!(null_store.root(null_root).unwrap().current(), null_current);
+    assert_eq!(null_host.operations(), Vec::<&'static str>::new());
+
+    let (mut store, root_id, host) = root_store();
+    let element = RootElementHandle::from_raw(7_211);
+    let component = RootHostComponentElement::new(
+        element,
+        ElementTypeHandle::from_raw(7_212),
+        PropsHandle::from_raw(7_213),
+    )
+    .unwrap();
+    let source = StaticRootElementSource::new(element, Some(component));
+    let current = store.root(root_id).unwrap().current();
+    update_container(&mut store, root_id, element, None).unwrap();
+
+    let error = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        HostRootMinimalElementRenderPhaseError::ExpectedSingleHostTextChild {
+            root: root_id,
+            element,
+        }
+    );
+    assert_eq!(source.calls(), 1);
+    let work_in_progress = store
+        .root(root_id)
+        .unwrap()
+        .scheduling()
+        .work_in_progress()
+        .unwrap();
+    assert_eq!(
+        store.fiber_arena().get(work_in_progress).unwrap().child(),
+        None
+    );
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_work_loop_minimal_root_element_render_propagates_unsupported_resolver_shapes() {
+    for (offset, reason) in [
+        (
+            0,
+            "root text is not admitted by minimal root element render",
+        ),
+        (
+            1,
+            "multiple root children are not admitted by minimal root element render",
+        ),
+        (
+            2,
+            "nested host components are not admitted by minimal root element render",
+        ),
+    ] {
+        let (mut store, root_id, host) = root_store();
+        let element = RootElementHandle::from_raw(7_301 + offset);
+        let source = StaticRootElementSource::unsupported(element, reason);
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, element, None).unwrap();
+
+        let error = render_host_root_for_lanes_with_minimal_root_element(
+            &mut store,
+            root_id,
+            Lanes::DEFAULT,
+            &source,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootMinimalElementRenderPhaseError::RootElementResolution(
+                RootElementResolutionError::UnsupportedRootElement { element, reason },
+            )
+        );
+        assert_eq!(source.calls(), 1);
+        let work_in_progress = store
+            .root(root_id)
+            .unwrap()
+            .scheduling()
+            .work_in_progress()
+            .unwrap();
+        assert_eq!(
+            store.fiber_arena().get(work_in_progress).unwrap().child(),
+            None
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+}
+
+#[test]
+fn root_work_loop_minimal_root_element_render_rejects_existing_current_child_before_resolving() {
+    let (mut store, root_id, host) = root_store();
+    let element = RootElementHandle::from_raw(7_401);
+    let component = RootHostComponentElement::new(
+        element,
+        ElementTypeHandle::from_raw(7_402),
+        PropsHandle::from_raw(7_403),
+    )
+    .unwrap()
+    .with_text_child(RootHostTextChild::new("blocked", PropsHandle::from_raw(7_404)).unwrap());
+    let source = StaticRootElementSource::new(element, Some(component));
+    let current = store.root(root_id).unwrap().current();
+    let existing_child = attach_wip_child_with_tag(&mut store, current, FiberTag::HostComponent);
+    update_container(&mut store, root_id, element, None).unwrap();
+
+    let error = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        HostRootMinimalElementRenderPhaseError::ExistingCurrentChild {
+            root: root_id,
+            current,
+            child: existing_child,
+        }
+    );
+    assert_eq!(source.calls(), 0);
+    assert_eq!(store.root(root_id).unwrap().current(), current);
     assert_eq!(host.operations(), Vec::<&'static str>::new());
 }
 
