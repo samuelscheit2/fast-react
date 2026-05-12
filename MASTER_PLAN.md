@@ -46,7 +46,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline is main
-`6f7f50dc` (`Merge worker 1202 public fake DOM observability`). Accepted
+`2a0fa13d` (`Merge worker 1205 children currentness hardening`). Accepted
 implementation, cleanup, planning, and docs-only history through that commit is
 recorded in `MASTER_PROGRESS.md`; this plan lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
@@ -54,10 +54,17 @@ Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted facts through main `6f7f50dc` are recorded in
+- Accepted facts through main `2a0fa13d` are recorded in
   `MASTER_PROGRESS.md`.
-- No later worker output is listed as live accepted input in this plan
-  snapshot.
+- Active Worker 1206 is assigned to Scheduler native-entry currentness.
+  Touched surface: Scheduler package native-entry/currentness gates. Merge
+  status: active/unmerged; no Worker 1206 output is accepted input yet.
+- Active Worker 1207 is assigned to public React.act currentness hardening.
+  Touched surface: React `act` public blocked-currentness evidence. Merge
+  status: active/unmerged; no Worker 1207 output is accepted input yet.
+- Active Worker 1208 is assigned to hook currentness source-proof hardening.
+  Touched surface: React hook facade currentness/source-proof blocker gates.
+  Merge status: active/unmerged; no Worker 1208 output is accepted input yet.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
   render handoff admission, plus the minimal public
@@ -66,13 +73,15 @@ Current orchestration queue:
   host-output path, same-root repeat div/text fake-DOM update, rendered-root
   unmount cleanup, aligned public-unmount smoke, and test/conformance/smoke-only
   public fake-DOM observability for that already accepted lifecycle, is to
-  preserve the private
-  reconciler diagnostic path, source-owned execution-surface blockers, repaired
-  no-load guard ledger evidence, React DOM native-compatibility alias denylists,
-  and public/native/browser-DOM capability rejection while proving any later
-  private NAPI/adapter handoff or broader public root lifecycle extension.
+  preserve hostile escaped public conformance for that same fake-DOM lifecycle,
+  the private reconciler diagnostic path, source-owned execution-surface
+  blockers, repaired no-load guard ledger evidence, React DOM
+  native-compatibility alias denylists, React Children source-owned currentness
+  hardening, and public/native/browser-DOM capability rejection while proving
+  any later private NAPI/adapter handoff or broader public root lifecycle
+  extension.
 
-Current project-owned source/test large-file baseline after main `6f7f50dc`,
+Current project-owned source/test large-file baseline after main `2a0fa13d`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -96,14 +105,19 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `6f7f50dc` includes only
+Accepted compatibility evidence through current main `2a0fa13d` includes only
 the minimal public fake-DOM div/text `createRoot().render(...)` path above,
 Worker 1194's same-root repeat fake-DOM div/text update and rendered-root
 unmount cleanup, Worker 1200's smoke alignment with those expectations, and
 Worker 1202's narrow test/conformance/smoke-only public fake-DOM observability
 for that accepted lifecycle: `children`, `firstElementChild`, `innerHTML`,
 `tagName`, escaped text/id serialization, and unsupported `className` plus
-object-id fail-closed output-leakage checks.
+object-id fail-closed output-leakage checks. Worker 1204 adds hostile escaped
+public facade conformance and false-green coverage for that same narrow
+fake-DOM lifecycle only. Worker 1205 adds private React Children traversal
+currentness hardening only: helper-owned reports must remain frozen, mutable
+helper-created reports fail closed, caller-shaped evidence/proxies fail source
+proof first, and public compatibility flags stay false.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 `act`, `react-dom/test-utils.act`, `flushSync`, Scheduler timing,
@@ -118,7 +132,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `6f7f50dc` as
+1. Treat accepted compatibility evidence through current main `2a0fa13d` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, Worker 1176's narrow public fake-DOM
    host-output proof, Worker 1194's narrow public same-root repeat div/text
@@ -138,6 +152,11 @@ canonical evidence requirements.
    `tagName`, escaped text/id serialization, and unsupported `className` plus
    object-id fail-closed output-leakage checks for the already accepted public
    fake-DOM div/text lifecycle.
+   Worker 1204 proves only hostile escaped public facade conformance,
+   snapshot-field/side-effect false-green checks, and independent lifecycle
+   label evidence for that same public fake-DOM lifecycle. Worker 1205 proves
+   only private React Children traversal currentness immutability/source-proof
+   hardening with public compatibility flags still false.
    Broad public root render/update/unmount, broad native, browser DOM,
    test-renderer, Scheduler, `act`, `react-dom/test-utils.act`, hydration,
    refs/listeners/events, resource/form, public controlled-input,
@@ -306,7 +325,8 @@ canonical evidence requirements.
 - React Children helper work can consume accepted Worker 950's private
   source-owned traversal currentness report, Worker 972's lazy traversal oracle,
   Worker 976's lazy renderer blockers, and Worker 995's portal/ref/owner
-  blockers only as fail-closed evidence. Full traversal parity, public package
+  blockers, plus Worker 1205's frozen/source-proof currentness hardening, only
+  as fail-closed evidence. Full traversal parity, public package
   compatibility, renderer/root/portal execution, owner/ref integration, and
   package-wide React behavior remain blocked until separately oracle-backed.
 - React hook facade work can consume accepted Worker 916 transition blocker
@@ -367,11 +387,12 @@ canonical evidence requirements.
   1194's minimal repeat div/text fake-DOM update and rendered-root unmount rows
   and Worker 1200's aligned smoke repair, plus Worker 1202's observable
   fake-DOM `children`, `firstElementChild`, `innerHTML`, `tagName`, and
-  escaped serialization evidence for that lifecycle only. Broader public root
-  rendering remains blocked outside that accepted fake-DOM div/text lifecycle
-  slice until later workers prove additional render/update/unmount shapes,
-  browser DOM mutation, listener/root marker behavior, lifecycle prerequisites,
-  and package compatibility against React 19.2.6.
+  escaped serialization evidence, plus Worker 1204's hostile escaped public
+  facade conformance/false-green hardening, for that lifecycle only. Broader
+  public root rendering remains blocked outside that accepted fake-DOM div/text
+  lifecycle slice until later workers prove additional render/update/unmount
+  shapes, browser DOM mutation, listener/root marker behavior, lifecycle
+  prerequisites, and package compatibility against React 19.2.6.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, the text-patch admission ledger, Worker 887's
