@@ -680,11 +680,6 @@
           "version": "0.0.0-fast-react-dom-placeholder",
           "unsupportedExports": [
             {
-              "exportName": "createRoot",
-              "functionName": "createRoot",
-              "length": 0
-            },
-            {
               "exportName": "hydrateRoot",
               "functionName": "hydrateRoot",
               "length": 0

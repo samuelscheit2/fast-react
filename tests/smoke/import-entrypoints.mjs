@@ -334,7 +334,7 @@ const reactDomDefaultEntrypoints = [
     keys: reactDomClientKeys,
     resolvedFileName: 'client.js',
     specifier: '@fast-react/react-dom/client',
-    unsupportedExport: 'createRoot'
+    unsupportedExport: 'hydrateRoot'
   },
   {
     fileName: 'server.node.js',

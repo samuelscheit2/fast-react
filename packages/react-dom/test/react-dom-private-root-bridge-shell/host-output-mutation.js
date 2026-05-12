@@ -30,7 +30,8 @@ const {
   createDocument,
   createElement,
   createTextNode,
-  attributeEntries
+  attributeEntries,
+  assertPublicCreateRootMinimalHostOutput
 } = require('./context.js');
 
 test('private initial host output handoff applies and cleans fake-DOM host nodes', () => {
@@ -203,9 +204,8 @@ test('private initial host output handoff applies and cleans fake-DOM host nodes
 test('private root render host-output consumes accepted Rust metadata and renders fake DOM only', () => {
   const document = createDocument('private-root-render-host-output');
   const container = createElement('DIV', document);
-  const publicContainer = createElement(
-    'DIV',
-    createDocument('private-root-render-host-output-public')
+  const publicDocument = createDocument(
+    'private-root-render-host-output-public'
   );
   const element = {
     props: {
@@ -422,11 +422,7 @@ test('private root render host-output consumes accepted Rust metadata and render
       message: /unrendered private root/
     }
   );
-  assert.throws(() => reactDomClient.createRoot(publicContainer), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot'
-  });
+  assertPublicCreateRootMinimalHostOutput(publicDocument);
 
   const serialized = JSON.stringify(record);
   assert.equal(serialized.includes('__mutationLog'), false);
@@ -440,9 +436,8 @@ test('private root render host-output consumes accepted Rust metadata and render
 test('private root render host-output creates nested fake-DOM host output only', () => {
   const document = createDocument('private-root-render-nested-host-output');
   const container = createElement('DIV', document);
-  const publicContainer = createElement(
-    'DIV',
-    createDocument('private-root-render-nested-host-output-public')
+  const publicDocument = createDocument(
+    'private-root-render-nested-host-output-public'
   );
   const childElement = {
     props: {
@@ -649,11 +644,7 @@ test('private root render host-output creates nested fake-DOM host output only',
   assert.equal(rootMarkers.getContainerRoot(container), null);
   assert.equal(listenerRegistry.hasListeningMarker(container), false);
   assert.equal(listenerRegistry.hasListeningMarker(document), false);
-  assert.throws(() => reactDomClient.createRoot(publicContainer), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot'
-  });
+  assertPublicCreateRootMinimalHostOutput(publicDocument);
 
   const serialized = JSON.stringify(record);
   assert.equal(serialized.includes('__mutationLog'), false);

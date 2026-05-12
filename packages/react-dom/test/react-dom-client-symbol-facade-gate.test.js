@@ -6,6 +6,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const packageRoot = path.resolve(__dirname, '..');
+const React = require(path.resolve(packageRoot, '..', 'react', 'index.js'));
 const reactDomClient = require(path.join(packageRoot, 'client.js'));
 const profiling = require(path.join(packageRoot, 'profiling.js'));
 const packageJson = require(path.join(packageRoot, 'package.json'));
@@ -110,7 +111,7 @@ test('react-dom/client private facade symbols are non-enumerable descriptor-stab
   );
 });
 
-test('public createRoot and hydrateRoot placeholders throw before root or DOM side effects', () => {
+test('public createRoot exposes only minimal host-output render while hydrateRoot stays blocked', () => {
   const adapter =
     reactDomClient.createRoot[
       rootBridge.privateRootPublicFacadeAdapterSymbol
@@ -143,18 +144,26 @@ test('public createRoot and hydrateRoot placeholders throw before root or DOM si
     preflight: profilingPreflight
   });
 
-  const createRootDocument = createDocument('public-create-root-placeholder');
-  const createRootContainer = createElement('DIV', createRootDocument);
-  let createRootResult;
+  const createRootOptionsDocument = createDocument(
+    'public-create-root-options-blocked'
+  );
+  const createRootOptionsContainer = createElement(
+    'DIV',
+    createRootOptionsDocument
+  );
+  let createRootOptionsResult;
   let callbackCalls = 0;
 
   assert.throws(
     () => {
-      createRootResult = reactDomClient.createRoot(createRootContainer, {
-        onRecoverableError() {
-          callbackCalls++;
+      createRootOptionsResult = reactDomClient.createRoot(
+        createRootOptionsContainer,
+        {
+          onRecoverableError() {
+            callbackCalls++;
+          }
         }
-      });
+      );
     },
     {
       code: 'FAST_REACT_UNIMPLEMENTED',
@@ -162,10 +171,147 @@ test('public createRoot and hydrateRoot placeholders throw before root or DOM si
       exportName: 'createRoot'
     }
   );
-  assert.equal(createRootResult, undefined);
+  assert.equal(createRootOptionsResult, undefined);
   assert.equal(callbackCalls, 0);
-  assert.equal(typeof createRootResult?.render, 'undefined');
-  assertContainerUntouched(createRootContainer, createRootDocument);
+  assertContainerUntouched(
+    createRootOptionsContainer,
+    createRootOptionsDocument
+  );
+
+  const createRootDocument = createDocument('public-create-root-minimal');
+  const createRootContainer = createRootDocument.createElement('div');
+  const createRootResult = reactDomClient.createRoot(createRootContainer);
+
+  assert.deepEqual(Object.keys(createRootResult), ['render', 'unmount']);
+  assert.equal(createRootResult.render.length, 1);
+  assert.equal(createRootResult.unmount.length, 0);
+  assert.equal(
+    createRootResult.render(
+      React.createElement('div', {id: 'app'}, 'hello')
+    ),
+    undefined
+  );
+  assert.equal(createRootContainer.childNodes.length, 1);
+  assert.equal(createRootContainer.firstChild.nodeName, 'DIV');
+  assert.equal(createRootContainer.firstChild.getAttribute('id'), 'app');
+  assert.equal(createRootContainer.textContent, 'hello');
+  assert.throws(
+    () => {
+      createRootResult.render(
+        React.createElement('div', null, 'callback'),
+        function unsupportedRenderCallback() {}
+      );
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot().render'
+    }
+  );
+  assert.throws(
+    () => {
+      createRootResult.render(React.createElement('div', null, 'again'));
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot().render'
+    }
+  );
+  assert.equal(createRootContainer.childNodes.length, 1);
+  assert.equal(createRootContainer.textContent, 'hello');
+  assert.throws(
+    () => {
+      const unsupportedPropsDocument = createDocument(
+        'public-create-root-unsupported-props'
+      );
+      const unsupportedPropsRoot = reactDomClient.createRoot(
+        unsupportedPropsDocument.createElement('div')
+      );
+      unsupportedPropsRoot.render(
+        React.createElement('div', {className: 'blocked'}, 'blocked')
+      );
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot().render'
+    }
+  );
+  assertPublicRenderFailureDoesNotLeak(
+    React.createElement('span', null, 'blocked type'),
+    'unsupported-type'
+  );
+  assertPublicRenderFailureDoesNotLeak(
+    [
+      React.createElement('div', null, 'blocked array')
+    ],
+    'unsupported-array'
+  );
+  assertPublicRenderFailureDoesNotLeak(
+    React.createElement(
+      Symbol.for('react.fragment'),
+      null,
+      React.createElement('div', null, 'blocked fragment')
+    ),
+    'unsupported-fragment'
+  );
+  assertPublicRenderFailureDoesNotLeak(
+    React.createElement(
+      'div',
+      null,
+      React.createElement('span', null, 'blocked nested')
+    ),
+    'unsupported-nested'
+  );
+  assertPublicRenderFailureDoesNotLeak(
+    React.createElement(function UnsupportedComponent() {
+      return React.createElement('div', null, 'blocked component');
+    }),
+    'unsupported-component'
+  );
+
+  const duplicateRootDocument = createDocument('public-create-root-duplicate');
+  const duplicateRootContainer = createElement('DIV', duplicateRootDocument);
+  reactDomClient.createRoot(duplicateRootContainer);
+  assert.throws(
+    () => {
+      reactDomClient.createRoot(duplicateRootContainer);
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot'
+    }
+  );
+  assertContainerUntouched(duplicateRootContainer, duplicateRootDocument);
+
+  const occupiedRootDocument = createDocument('public-create-root-occupied');
+  const occupiedRootContainer = createElement('DIV', occupiedRootDocument);
+  rootMarkers.markContainerAsRoot({kind: 'occupied'}, occupiedRootContainer);
+  assert.throws(
+    () => {
+      reactDomClient.createRoot(occupiedRootContainer);
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot'
+    }
+  );
+
+  assert.throws(
+    () => {
+      createRootResult.unmount();
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot().unmount'
+    }
+  );
+  assert.equal(createRootContainer.childNodes.length, 1);
+  assert.equal(createRootContainer.textContent, 'hello');
 
   const hydrateRootDocument = createDocument('public-hydrate-root-placeholder');
   const hydrateRootContainer = createElement('DIV', hydrateRootDocument);
@@ -253,7 +399,7 @@ test('public createRoot and hydrateRoot placeholders throw before root or DOM si
   assert.equal(Object.hasOwn(reactDomClient, 'unstable_batchedUpdates'), false);
 });
 
-test('public placeholders do not invoke private lifecycle facade factories', () => {
+test('public createRoot invokes only the private adapter factory while other public placeholders stay inert', () => {
   const result = JSON.parse(
     execFileSync(
       process.execPath,
@@ -267,14 +413,14 @@ test('public placeholders do not invoke private lifecycle facade factories', () 
     )
   );
 
-  assert.deepEqual(result.factoryCalls, []);
+  assert.deepEqual(result.factoryCalls, [
+    'createPrivateRootPublicFacadeAdapter',
+    'adapter.createRoot'
+  ]);
   assert.deepEqual(result.publicCalls, [
     {
-      code: 'FAST_REACT_UNIMPLEMENTED',
-      entrypoint: 'react-dom/client',
-      exportName: 'createRoot',
       label: 'createRoot',
-      status: 'throws'
+      status: 'ok'
     },
     {
       code: 'FAST_REACT_UNIMPLEMENTED',
@@ -500,6 +646,32 @@ function assertContainerUntouched(container, document) {
   assert.equal(document.__mutationLog.length, 0);
 }
 
+function assertPublicRenderFailureDoesNotLeak(element, label) {
+  const document = createDocument(`public-create-root-${label}`);
+  const container = document.createElement('div');
+  document.__mutationLog.length = 0;
+  const root = reactDomClient.createRoot(container);
+
+  assert.throws(
+    () => {
+      root.render(element);
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot().render'
+    }
+  );
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+}
+
 function createDocument(label) {
   const document = createEventTarget({
     label,
@@ -511,35 +683,102 @@ function createDocument(label) {
     label: `${label}-window`,
     nodeName: 'window'
   });
+  document.createElement = function createFakeElement(tagName) {
+    const nodeName = String(tagName).toUpperCase();
+    this.__mutationLog.push({
+      nodeName,
+      type: 'createElement'
+    });
+    return createElement(nodeName, this);
+  };
+  document.createTextNode = function createFakeTextNode(text) {
+    const value = String(text);
+    this.__mutationLog.push({
+      type: 'createTextNode',
+      value
+    });
+    return createTextNode(value, this);
+  };
   return document;
 }
 
 function createElement(nodeName, ownerDocument) {
   return createEventTarget({
+    attributes: new Map(),
     nodeName,
     nodeType: ELEMENT_NODE,
     ownerDocument
   });
 }
 
+function createTextNode(text, ownerDocument) {
+  const target = createEventTarget({
+    nodeName: '#text',
+    nodeType: 3,
+    ownerDocument
+  });
+  let textValue = String(text);
+  Object.defineProperties(target, {
+    data: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return textValue;
+      },
+      set(value) {
+        textValue = String(value);
+      }
+    },
+    nodeValue: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return textValue;
+      },
+      set(value) {
+        textValue = String(value);
+      }
+    },
+    textContent: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return textValue;
+      },
+      set(value) {
+        textValue = String(value);
+      }
+    }
+  });
+  return target;
+}
+
 function createEventTarget(fields) {
-  return {
+  const target = {
     ...fields,
+    attributeLog: [],
+    attributes: fields.attributes || new Map(),
     childNodes: [],
     __mutationLog: [],
+    __removals: [],
     __registrations: [],
     addEventListener(type, listener, options) {
       this.__registrations.push({listener, options, type});
     },
     removeEventListener(type, listener, options) {
-      this.__registrations.push({
-        listener,
-        options,
-        removed: true,
-        type
-      });
+      const index = this.__registrations.findIndex(
+        (entry) =>
+          entry.listener === listener &&
+          entry.options === options &&
+          entry.type === type
+      );
+      if (index !== -1) {
+        this.__registrations.splice(index, 1);
+      }
+      this.__removals.push({listener, options, type});
     },
     appendChild(child) {
+      detachChildFromParent(child);
       this.childNodes.push(child);
       child.parentNode = this;
       this.__mutationLog.push({child, type: 'appendChild'});
@@ -553,15 +792,75 @@ function createEventTarget(fields) {
       return child;
     },
     removeChild(child) {
-      const index = this.childNodes.indexOf(child);
-      if (index !== -1) {
-        this.childNodes.splice(index, 1);
-      }
+      detachChildFromParent(child);
       child.parentNode = null;
       this.__mutationLog.push({child, type: 'removeChild'});
       return child;
+    },
+    setAttribute(name, value) {
+      const attributeName = String(name);
+      const stringValue = String(value);
+      this.attributes.set(attributeName, stringValue);
+      this.attributeLog.push(['setAttribute', attributeName, stringValue]);
+    },
+    removeAttribute(name) {
+      const attributeName = String(name);
+      const hadAttribute = this.attributes.has(attributeName);
+      this.attributes.delete(attributeName);
+      this.attributeLog.push(['removeAttribute', attributeName, hadAttribute]);
+    },
+    getAttribute(name) {
+      const attributeName = String(name);
+      return this.attributes.has(attributeName)
+        ? this.attributes.get(attributeName)
+        : null;
     }
   };
+  let textContent = '';
+  Object.defineProperties(target, {
+    firstChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[0] || null;
+      }
+    },
+    textContent: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (this.childNodes.length > 0) {
+          return this.childNodes.map((child) => child.textContent).join('');
+        }
+        return textContent;
+      },
+      set(value) {
+        for (const child of [...this.childNodes]) {
+          detachChildFromParent(child);
+        }
+        textContent = String(value);
+        this.__mutationLog.push({type: 'textContent', value});
+      }
+    }
+  });
+  return target;
+}
+
+function detachChildFromParent(child) {
+  if (child == null || typeof child !== 'object') {
+    throw new Error('Expected a fake-DOM child object.');
+  }
+  if (child.parentNode === null || child.parentNode === undefined) {
+    child.parentNode = null;
+    return;
+  }
+
+  const siblings = child.parentNode.childNodes;
+  const index = siblings.indexOf(child);
+  if (index !== -1) {
+    siblings.splice(index, 1);
+  }
+  child.parentNode = null;
 }
 
 function createLifecycleFactorySpyScript(packageRootPath) {
@@ -607,6 +906,23 @@ require.cache[rootBridgeCacheKey] = {
 function createPrivateLifecycleFacadeFactorySpy(key) {
   return function privateLifecycleFacadeFactorySpy(...args) {
     factoryCalls.push(key);
+    if (key === 'createPrivateRootPublicFacadeAdapter') {
+      return {
+        args,
+        createRoot() {
+          factoryCalls.push('adapter.createRoot');
+          return {
+            render() {
+              factoryCalls.push('root.render');
+            },
+            unmount() {
+              factoryCalls.push('root.unmount');
+            }
+          };
+        },
+        key
+      };
+    }
     return {args, key};
   };
 }

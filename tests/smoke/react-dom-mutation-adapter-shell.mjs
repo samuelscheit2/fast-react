@@ -25,8 +25,11 @@ const reactDomClient = require(
 
 function runSmokeChecks() {
   assert.equal(typeof reactDomClient.createRoot, 'function');
-  assert.throws(() => reactDomClient.createRoot({nodeType: 1}), {
+  assert.throws(() => reactDomClient.createRoot(createElement('div'), {}), {
     code: 'FAST_REACT_UNIMPLEMENTED'
+  });
+  assert.throws(() => reactDomClient.createRoot({}), {
+    code: 'FAST_REACT_DOM_INVALID_CONTAINER'
   });
 
   assert.equal(domHost.shouldSetTextContent('div', {children: 'hello'}), true);
