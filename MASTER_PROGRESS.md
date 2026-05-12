@@ -29,6 +29,43 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1144, 1148, 1147, 1157, and 1156 Private Handoff Batch
+
+- Worker 1144 added the crate-private root work-loop metadata JSON value
+  adapter for the already validated Rust metadata shape. It projects the
+  JS-facing camelCase canary fields while keeping hostile diagnostic evidence
+  rejected before conversion.
+- Worker 1148 produced the accepted large-file split plan. It keeps broad
+  large-file cleanup blocked before public React DOM root/render work and
+  recommends only an optional behavior-preserving `root-bridge.js` facade split
+  if the orchestrator can reserve that file.
+- Worker 1147 added crate-private JSON string/value admission helpers for root
+  work-loop finished-work metadata and focused Rust tests for exact-shape
+  roundtrip plus hostile JSON rejection. No N-API dependency, `.node` loading,
+  public React DOM facade, or DOM mutation path was added.
+- Worker 1157 added a `#[cfg(test)]` HTML-like host with in-memory container,
+  element, and text storage, plus a private HostRoot -> HostComponent(div) ->
+  HostText(text) placement commit canary that serializes to `<div>text</div>`.
+  The canary keeps public compatibility surfaces blocked.
+- Worker 1156 added a symbol-private CommonJS native React DOM render handoff
+  admission canary. It validates create/render native request rows through the
+  existing private bridge gate, checks exact Worker 1147 JSON keys, and rejects
+  public/native/browser-DOM claim smuggling across string and symbol keys.
+- Accepted validation for this batch includes `cargo test -p fast-react-napi
+  --lib`, focused `fast-react-napi` metadata tests, focused reconciler
+  placement/root-work-loop tests, `npm --prefix bindings/node run check`,
+  `node --test packages/react-dom/test/react-dom-private-root-bridge-shell.test.js`,
+  package-surface/import smoke, benchmark manifest checks, `cargo fmt --all
+  --check`, and `git diff --check`.
+- The accepted state is main `b44d8e03` after merge commits `4d9b7712`,
+  `f92eb2be`, `ce6b6031`, `142d6fbd`, and `b44d8e03`, plus worker/fix commits
+  `4b40771f`, `829faf0a`, `dd64eb87`, `c86498aa`, `c685d82c`, `780cb3b5`,
+  and `a0640c51`. Public root rendering, real `.node` loading/N-API runtime,
+  browser DOM compatibility, public React DOM root render/update/unmount,
+  refs/listeners/events/hydration, Scheduler/act/flushSync/test-renderer public
+  behavior, package exports, public native compatibility, and broad
+  package/renderer compatibility remain blocked.
+
 ### Worker 1133 NAPI Diagnostic-Backed Metadata
 
 - Worker 1133 connected the `fast-react-napi` root work-loop metadata shape to
