@@ -133,6 +133,23 @@ const SCHEDULER_ROOT_CURRENTNESS_BEHAVIOR_EVIDENCE_KEYS = Object.freeze([
   "compatibilityClaimed"
 ]);
 
+const SCHEDULER_ROOT_CURRENTNESS_SOURCE_METADATA_KEYS = Object.freeze([
+  "actualEntrypoint",
+  "actualSourcePath",
+  "entrypoint",
+  "sourcePath",
+  "packageName",
+  "packageSourcePath",
+  "sourceRole",
+  "behaviorEvidenceKind",
+  "behaviorEvidenceAllowed",
+  "directDeepCjsImport",
+  "variantBoundaryEvidence",
+  "privateAdmission886Evidence",
+  "requiredTokens",
+  "missingTokens"
+]);
+
 export function evaluateSchedulerRootCurrentnessGate({
   oracle = readCheckedSchedulerRootOracle(),
   localObservationRows = null,
@@ -746,6 +763,7 @@ function sourceRowMatchesDefinition(row, definition) {
   return (
     hasPlainObjectPrototype(row) &&
     !objectHasPublicClaim(row) &&
+    !objectHasInheritedSourceMetadata(row) &&
     keyManifest.missing.length === 0 &&
     keyManifest.unexpected.length === 0 &&
     ownKeysAreEnumerableDataProperties(row, expectedSourceRowKeys(definition)) &&
@@ -805,6 +823,7 @@ function localObservationRowMatchesExpected(row, { mode, scenarioId }) {
   return (
     hasPlainObjectPrototype(row) &&
     !objectHasPublicClaim(row) &&
+    !objectHasInheritedSourceMetadata(row) &&
     keyManifest.missing.length === 0 &&
     keyManifest.unexpected.length === 0 &&
     ownKeysAreEnumerableDataProperties(
@@ -1004,6 +1023,38 @@ function hasPlainObjectPrototype(value) {
   return Object.getPrototypeOf(value) === Object.prototype;
 }
 
+function objectHasInheritedSourceMetadata(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  let prototype = Object.getPrototypeOf(value);
+  while (prototype) {
+    for (const key of Reflect.ownKeys(prototype)) {
+      if (isSchedulerRootSourceMetadataName(key)) {
+        return true;
+      }
+    }
+    prototype = Object.getPrototypeOf(prototype);
+  }
+
+  return false;
+}
+
+function isSchedulerRootSourceMetadataName(key) {
+  const normalizedKey = normalizeClaimName(formatMetadataPropertyKey(key));
+  return SCHEDULER_ROOT_CURRENTNESS_SOURCE_METADATA_KEYS.some(
+    (metadataKey) => normalizeClaimName(metadataKey) === normalizedKey
+  );
+}
+
+function formatMetadataPropertyKey(key) {
+  if (typeof key === "symbol") {
+    return key.description ?? key.toString();
+  }
+  return key;
+}
+
 function formatPropertyKey(key) {
   return typeof key === "symbol" ? key.toString() : key;
 }
@@ -1030,6 +1081,7 @@ function isPublicRootBehaviorEvidence(evidence) {
   return (
     hasPlainObjectPrototype(evidence) &&
     !objectHasPublicClaim(evidence) &&
+    !objectHasInheritedSourceMetadata(evidence) &&
     keyManifest.missing.length === 0 &&
     keyManifest.unexpected.length === 0 &&
     ownKeysAreEnumerableDataProperties(
