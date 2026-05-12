@@ -29,6 +29,46 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1194 and 1200 Public Root Lifecycle Minimal Slice
+
+- Worker 1194 opened the next narrow public
+  `react-dom/client.createRoot(container)` lifecycle slice after Worker 1176's
+  first div/text fake-DOM render. The accepted path supports repeat
+  `root.render(React.createElement('div', {id?}, text|number))` calls on the
+  same root, returns `undefined`, and mutates the existing fake-DOM `DIV` text
+  output without replacing the host node.
+- Worker 1194 also admitted `root.unmount()` after an accepted minimal render.
+  It returns `undefined`, clears fake-DOM host output, clears duplicate-root
+  tracking for that container, leaves root/listener marker side effects absent,
+  and permits a later `createRoot(container)` on the same container.
+- Worker 1194 kept render-after-unmount, repeated unmount, unmount before the
+  accepted render, unsupported render arguments/shapes/props, options,
+  hydrateRoot, profiling createRoot, browser DOM compatibility, events,
+  listeners, refs, Scheduler/act/flushSync, portals, resources/forms,
+  controlled inputs, and broad public React DOM root compatibility fail-closed.
+- Worker 1200 repaired the private root-bridge shell smoke to match Worker
+  1194's accepted public minimal lifecycle expectations. The smoke now asserts
+  repeat public render updates the same fake-DOM host node, rendered-root
+  public unmount clears fake-DOM output without marker/listener side effects,
+  and render-after-unmount plus repeated unmount still throw
+  `FAST_REACT_UNIMPLEMENTED`.
+- Accepted validation for this slice includes `npm --prefix packages/react-dom
+  run check`, focused public root facade and root-render E2E conformance tests,
+  `npm --prefix tests/conformance run root-public-facade:conformance`,
+  `npm --prefix tests/conformance run root-render-e2e:conformance`, the
+  repaired `tests/smoke/react-dom-private-root-bridge-shell.mjs`, and
+  `git diff --check` under the Node 26.1.0 environment recorded by the worker
+  reports.
+- The accepted state is main `8a84a8dc` after docs-only Worker 1192
+  `6c440daa`, Worker 1194 merge `eeb25b09`, and Worker 1200 merge
+  `8a84a8dc`, plus worker commits `0f11d44f`, `feea75d1`, and `bb1756fe`.
+  Real `.node` loading/N-API runtime, browser DOM compatibility, broad public
+  root render/update/unmount compatibility beyond the minimal fake-DOM
+  div/text lifecycle slice, refs/listeners/events/hydration,
+  Scheduler/act/flushSync, test-renderer public behavior, resources/forms,
+  public input/change or controlled-input behavior, public native
+  compatibility, and broad package/renderer compatibility remain blocked.
+
 ### Worker 1176 Public CreateRoot Minimal Host Output
 
 - Worker 1176 opened the narrow public
