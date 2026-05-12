@@ -41,6 +41,7 @@ use crate::root_updates::{
     HostRootUpdateQueueLaneHandoffErrorForCanary, HostRootUpdateQueueLaneHandoffRecordForCanary,
     commit_host_root_update_queue_lane_handoff_with_finished_work_pending_commit_for_canary,
     validate_host_root_update_queue_lane_handoff_for_commit_for_canary,
+    validate_host_root_update_queue_lane_handoff_record_for_canary,
 };
 #[cfg(test)]
 use crate::scheduler_bridge::SchedulerActContinuationStatus;
@@ -3926,6 +3927,7 @@ fn validate_transition_same_lane_multi_update_queue_handoff_for_commit_for_canar
         requests,
         queue_handoff,
     )?;
+    validate_host_root_update_queue_lane_handoff_record_for_canary(store, queue_handoff)?;
 
     for record in queue_handoff.update_records() {
         let actual_lanes = store
