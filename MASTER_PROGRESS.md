@@ -29,6 +29,45 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1107 Docs Refresh and Workers 1090/1095-1097 Root Render Private Handoffs
+
+- Worker 1107 refreshed master docs for current main `14b121ce`
+  (`Merge worker 1097 private host output gate split`). This is a docs-only
+  refresh and makes no runtime or public compatibility claim.
+- Worker 1090 added a production-compiled, crate-private minimal
+  render->complete handoff in `root_work_loop::complete_handoff`. It keeps
+  legacy test-host handoffs behind `#[cfg(test)]`, validates live WIP child/text
+  identity, and rejects stale records, adapter failures, and mismatched WIP
+  shapes before host creation.
+- Worker 1096 added a crate-private minimal HostRoot placement commit executor
+  that consumes minimal complete-work metadata, `HostNodeStore` evidence, and a
+  HostRoot commit record. Follow-up hardening consumes detached
+  HostComponent/HostText records after successful placement to block replay and
+  attempts `reset_after_commit` after prepared append failures.
+- Worker 1095 added JS/package-side admission for Rust-shaped private root
+  work-loop finished-work metadata via `rustRootWorkLoopFinishedWorkMetadata`.
+  Follow-up hardening rejects truthy public/native/DOM capability claims and
+  snake_case capability-claim aliases before raw metadata storage.
+- Worker 1097 split the private host-output diagnostic gate, fake-DOM harness,
+  host-output validation, and shared cross-root helpers into
+  `tests/conformance/src/react-dom-root-render-e2e-private-host-output-gate.mjs`
+  while keeping the root-render E2E conformance module as the compatibility
+  import/re-export surface.
+- Accepted validation evidence for this batch includes
+  `cargo test -p fast-react-reconciler --lib` with 920 tests passed, reconciler
+  `cargo check` variants, `cargo fmt --all --check`, `git diff --check`,
+  root-render and public-facade conformance scripts, the React DOM private root
+  bridge package test with 75 tests passed, and root conformance Node tests with
+  69 tests passed.
+- The accepted state for this batch is main `14b121ce` after merge commits
+  `935e1116`, `52438f5e`, `2004a8d7`, and `14b121ce`, plus worker/fix commits
+  `8dd9eed5`, `23de5e01`, `6346414c`, `caf48624`, `6226fb3a`, `385061ea`,
+  `731ff2e2`, and `6240b016`. Public React DOM root rendering, public
+  update/unmount behavior, public DOM mutation, listener/ref behavior,
+  Scheduler/act timing, public facade admission, native/bindings metadata
+  export, package compatibility, and broad renderer compatibility remain
+  blocked unless separately proven.
+
 ### Worker 1091 Docs Refresh and Workers 1083-1085 Root Render Helpers
 
 - Worker 1091 refreshed master docs for current main `b99841e3`
