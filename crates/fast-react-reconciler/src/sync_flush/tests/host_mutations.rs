@@ -7,6 +7,7 @@ use crate::complete_work::HostFiberTokenFactory;
 use crate::host_nodes::HostNodeStore;
 use crate::private_fiber_inspection::{
     SyncFlushMinimalHostPlacementCommittedFiberInspectionError,
+    SyncFlushMinimalHostPlacementCompatibilityClaimForCanary,
     inspect_sync_flush_minimal_host_placement_committed_fiber_tree,
     record_sync_flush_minimal_host_placement_committed_fiber_source,
 };
@@ -824,42 +825,31 @@ fn sync_flush_minimal_host_placement_fiber_inspection_rejects_public_compat_clai
     )
     .unwrap();
 
-    let react_dom_error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
-        &fixture.store,
-        source.with_react_dom_compatibility_claimed_for_canary(),
-    )
-    .unwrap_err();
-    assert!(matches!(
-        react_dom_error,
-        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CompatibilityClaim {
-            surface: "React DOM",
-        }
-    ));
-
-    let scheduler_error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
-        &fixture.store,
-        source.with_scheduler_compatibility_claimed_for_canary(),
-    )
-    .unwrap_err();
-    assert!(matches!(
-        scheduler_error,
-        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CompatibilityClaim {
-            surface: "Scheduler",
-        }
-    ));
-
-    let refs_effects_hydration_error =
-        inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
+    let claims = [
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::PublicRootRendering,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::PublicFlushSync,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::ReactDom,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::TestRendererPublic,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::NativeExecution,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::BroadRenderer,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::Act,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::Scheduler,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::RefsEffectsHydration,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::Package,
+    ];
+    for claim in claims {
+        let error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
             &fixture.store,
-            source.with_refs_effects_hydration_claimed_for_canary(),
+            source.with_compatibility_claim_for_canary(claim),
         )
         .unwrap_err();
-    assert!(matches!(
-        refs_effects_hydration_error,
-        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CompatibilityClaim {
-            surface: "refs/effects/hydration execution",
-        }
-    ));
+        assert!(matches!(
+            error,
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CompatibilityClaim {
+                surface,
+            } if surface == claim.surface()
+        ));
+    }
 }
 
 #[test]

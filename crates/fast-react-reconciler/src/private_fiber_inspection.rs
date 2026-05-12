@@ -1509,6 +1509,40 @@ pub(crate) struct SyncFlushMinimalHostPlacementCommittedFiberSource {
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SyncFlushMinimalHostPlacementCompatibilityClaimForCanary {
+    PublicRootRendering,
+    PublicFlushSync,
+    ReactDom,
+    TestRendererPublic,
+    NativeExecution,
+    BroadRenderer,
+    Act,
+    Scheduler,
+    RefsEffectsHydration,
+    Package,
+}
+
+#[cfg(test)]
+impl SyncFlushMinimalHostPlacementCompatibilityClaimForCanary {
+    #[must_use]
+    pub(crate) const fn surface(self) -> &'static str {
+        match self {
+            Self::PublicRootRendering => "public root rendering",
+            Self::PublicFlushSync => "public flushSync",
+            Self::ReactDom => "React DOM",
+            Self::TestRendererPublic => "react-test-renderer public",
+            Self::NativeExecution => "native execution",
+            Self::BroadRenderer => "broad renderer",
+            Self::Act => "act",
+            Self::Scheduler => "Scheduler",
+            Self::RefsEffectsHydration => "refs/effects/hydration execution",
+            Self::Package => "package",
+        }
+    }
+}
+
+#[cfg(test)]
 #[allow(
     dead_code,
     reason = "test-only sync-flush minimal placement fiber source exposes focused hostile tamper hooks"
@@ -1833,20 +1867,42 @@ impl SyncFlushMinimalHostPlacementCommittedFiberSource {
     }
 
     #[must_use]
-    pub(crate) const fn with_react_dom_compatibility_claimed_for_canary(mut self) -> Self {
-        self.react_dom_compatibility_claimed = true;
-        self
-    }
-
-    #[must_use]
-    pub(crate) const fn with_scheduler_compatibility_claimed_for_canary(mut self) -> Self {
-        self.scheduler_compatibility_claimed = true;
-        self
-    }
-
-    #[must_use]
-    pub(crate) const fn with_refs_effects_hydration_claimed_for_canary(mut self) -> Self {
-        self.refs_effects_hydration_execution_claimed = true;
+    pub(crate) const fn with_compatibility_claim_for_canary(
+        mut self,
+        claim: SyncFlushMinimalHostPlacementCompatibilityClaimForCanary,
+    ) -> Self {
+        match claim {
+            SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::PublicRootRendering => {
+                self.public_root_rendering_claimed = true;
+            }
+            SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::PublicFlushSync => {
+                self.public_flush_sync_compatibility_claimed = true;
+            }
+            SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::ReactDom => {
+                self.react_dom_compatibility_claimed = true;
+            }
+            SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::TestRendererPublic => {
+                self.test_renderer_public_compatibility_claimed = true;
+            }
+            SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::NativeExecution => {
+                self.native_execution_compatibility_claimed = true;
+            }
+            SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::BroadRenderer => {
+                self.broad_renderer_compatibility_claimed = true;
+            }
+            SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::Act => {
+                self.act_compatibility_claimed = true;
+            }
+            SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::Scheduler => {
+                self.scheduler_compatibility_claimed = true;
+            }
+            SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::RefsEffectsHydration => {
+                self.refs_effects_hydration_execution_claimed = true;
+            }
+            SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::Package => {
+                self.package_compatibility_claimed = true;
+            }
+        }
         self
     }
 }

@@ -5,6 +5,7 @@
 - The consumer records source evidence from `SyncFlushMinimalHostPlacementCommitRecordForCanary`, re-inspects the live committed fiber tree, and proves the exact `HostRoot->HostComponent->HostText` shape.
 - Validation ties `root.current`, `placement.commit().current()`, and `rendered_record.render_phase().finished_work()` together, requires `root.finished_work == None` and `root.finished_lanes == Lanes::NO`, and checks root element, props/text props, state nodes, root token, alternates, current rows, and lane metadata.
 - Public React DOM, public test-renderer, native, Scheduler, act, refs/effects/hydration, package, public root rendering, public flushSync, and broad renderer compatibility remain blocked/false.
+- Repair: added table-style compatibility-claim tamper coverage for all ten source flags handled by `compatibility_claimed()`.
 
 ## Changed Files
 - `crates/fast-react-reconciler/src/private_fiber_inspection.rs`
@@ -13,6 +14,7 @@
 
 ## Commands Run
 - `cargo test -p fast-react-reconciler --all-features sync_flush_minimal_host_placement_private_fiber_inspection_committed_fiber_inspection`
+- `cargo test -p fast-react-reconciler --all-features sync_flush_minimal_host_placement_fiber_inspection`
 - `cargo test -p fast-react-reconciler --all-features sync_flush_minimal_host_placement`
 - `cargo test -p fast-react-reconciler --all-features committed_fiber_inspection`
 - `cargo test -p fast-react-reconciler --all-features private_fiber_inspection`
@@ -23,6 +25,7 @@
 
 ## Evidence Gathered
 - Focused sync-flush placement fiber-inspection matrix: 1 passed.
+- Repair-focused `sync_flush_minimal_host_placement_fiber_inspection`: 7 passed, with public root rendering, public flushSync, React DOM, react-test-renderer public, native execution, broad renderer, act, Scheduler, refs/effects/hydration, and package claim tampering all rejected through `CompatibilityClaim`.
 - `sync_flush_minimal_host_placement`: 17 passed, including the new committed-fiber inspection positive canary and hostile cloned-row, stale-current, tampered fiber id, tampered state-node, cross-root source, stale finished metadata, and compatibility-claim canaries.
 - `committed_fiber_inspection`: 9 passed.
 - `private_fiber_inspection`: 24 passed.
@@ -34,6 +37,7 @@
 ## Audit, Review, Or Nested-Agent Findings
 - A read-only nested explorer confirmed the existing direct multi-child source-bound inspection pattern, the sync-flush minimal placement record access path, and that no sync-flush/root-record accessor was strictly required.
 - Local diff review confirmed no `lib.rs` public exports were added and no public React DOM/test-renderer/native/Scheduler/act/package surface was opened.
+- Independent source audit found the original compatibility-claim hostile test only covered React DOM, Scheduler, and refs/effects/hydration. Repaired by adding a test-only `SyncFlushMinimalHostPlacementCompatibilityClaimForCanary` enum and iterating every claim flag in the hostile test.
 
 ## Risks Or Blockers
 - No blockers remain.
