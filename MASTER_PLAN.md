@@ -45,29 +45,19 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current main/docs head is main `6242abab`
-(`Merge worker 1212 docs report hash repair`). Latest accepted
-implementation/evidence baseline remains main `88ce0ff4` (`Merge worker 1206
-report follow-up`) because `88ce0ff4..6242abab` is docs/worker-progress only.
-Accepted implementation, cleanup, planning, and docs-only history through that
-baseline is recorded in `MASTER_PROGRESS.md`; this plan lists only
-current/future work.
+Top-level cap: 30 workers. Current main/docs head and latest accepted
+implementation/evidence baseline are main `d694d902` (`Merge worker 1214
+flushSync source proof`). Accepted implementation, cleanup, planning, and
+docs-only history through that baseline is recorded in `MASTER_PROGRESS.md`;
+this plan lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted implementation/evidence facts through baseline main `88ce0ff4` are
+- Accepted implementation/evidence facts through baseline main `d694d902` are
   recorded in `MASTER_PROGRESS.md`.
 - Active, unaccepted workers:
-  - Worker 1213: `react-dom/test-utils.act` blocked-currentness source-proof
-    hardening; branch/worktree
-    `worker/1213-react-dom-test-utils-act-source-proof`,
-    `/Users/user/Developer/Developer/fast-react-worktrees/worker-1213-react-dom-test-utils-act-source-proof`.
-  - Worker 1214: public `flushSync` blocked-currentness source-proof
-    hardening; branch/worktree
-    `worker/1214-react-dom-flush-sync-source-proof`,
-    `/Users/user/Developer/Developer/fast-react-worktrees/worker-1214-react-dom-flush-sync-source-proof`.
   - Worker 1215: Rust transition queue-lane currentness consumer;
     branch/worktree `worker/1215-transition-queue-lane-currentness`,
     `/Users/user/Developer/Developer/fast-react-worktrees/worker-1215-transition-queue-lane-currentness`.
@@ -88,7 +78,7 @@ Current orchestration queue:
   extension.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `88ce0ff4`,
+implementation/evidence baseline main `d694d902`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -113,7 +103,7 @@ verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
 Accepted compatibility evidence through accepted implementation/evidence
-baseline main `88ce0ff4` includes only
+baseline main `d694d902` includes only
 the minimal public fake-DOM div/text `createRoot().render(...)` path above,
 Worker 1194's same-root repeat fake-DOM div/text update and rendered-root
 unmount cleanup, Worker 1200's smoke alignment with those expectations, and
@@ -139,7 +129,12 @@ minimal `react-dom/client.createRoot` fake-DOM lifecycle, while public
 repair evidence only. Worker 1206 adds only a conformance Scheduler
 native-entry currentness gate that reruns current local native-entry
 observations and binds native wrapper/direct native CJS source rows to accepted
-Worker 937/886 private Scheduler variant context.
+Worker 937/886 private Scheduler variant context. Worker 1213 closes the
+Scheduler native/default behavior-evidence alias false green for that gate
+only. Worker 1213 also hardens the public
+`react-dom/test-utils.act` blocked-currentness report source-proof/freeze
+ordering only. Worker 1214 hardens the public `flushSync`
+blocked-currentness report source-proof/freeze ordering only.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -147,8 +142,10 @@ renderer/root/Scheduler execution, `react-dom/test-utils.act`, `flushSync`,
 Scheduler timing,
 test-renderer public behavior, resources/forms, public input/change or
 controlled-input behavior, serialization, React Children traversal parity,
-unsupported hook behavior, broad hook/useRef/context compatibility, package
-compatibility, and broad renderer compatibility remain blocked.
+unsupported hook behavior, broad hook/useRef/context compatibility, public
+`react-dom/test-utils.act` callback/thenable behavior, public `flushSync`
+callback/thenable/root/Scheduler behavior, package compatibility, and broad
+renderer compatibility remain blocked.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -157,7 +154,7 @@ canonical evidence requirements.
 ## Near-Term Sequencing
 
 1. Treat accepted compatibility evidence through accepted
-   implementation/evidence baseline main `88ce0ff4` as
+   implementation/evidence baseline main `d694d902` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, Worker 1176's narrow public fake-DOM
    host-output proof, Worker 1194's narrow public same-root repeat div/text
@@ -193,16 +190,21 @@ canonical evidence requirements.
    native-entry currentness for the native wrapper and direct native CJS rows,
    binding them to Worker 937/886 private source context while preserving
    public Scheduler timing, root, act, mock, postTask, native runtime, package,
-   and broad compatibility blockers.
+   and broad compatibility blockers. Worker 1213 proves only the Scheduler
+   native/default behavior-evidence alias repair for that gate, and separately
+   proves only source-proof/freeze hardening of the public
+   `react-dom/test-utils.act` blocked-currentness report. Worker 1214 proves
+   only source-proof/freeze hardening of the public `flushSync`
+   blocked-currentness report.
    Broad public root render/update/unmount, broad native, browser DOM,
    test-renderer, Scheduler, public `React.act` compatibility, act queue
    flushing, callbacks, thenables, renderer/root/Scheduler execution,
    `react-dom/test-utils.act`, hydration, refs/listeners/events, resource/form,
    public controlled-input,
    serialization, React Children lazy/full traversal, unsupported hook,
-   `flushSync`, real `.node` loading/N-API runtime, broad package, and broad
-   renderer compatibility still require fail-closed gates and dual-run oracle
-   evidence.
+   public `flushSync` callback/thenable/root/Scheduler behavior, real `.node`
+   loading/N-API runtime, broad package, and broad renderer compatibility still
+   require fail-closed gates and dual-run oracle evidence.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct
@@ -333,8 +335,10 @@ canonical evidence requirements.
   blocked-currentness gate, plus Worker 930's public
   `react-dom/test-utils.act` blocked-currentness gate, plus Worker 1207's
   source-proof/freeze hardening of the public `React.act`
-  blocked-currentness report. Public `React.act` compatibility, act queue
-  flushing, callbacks, thenables, public test-utils act
+  blocked-currentness report, plus Worker 1213's source-proof/freeze hardening
+  of the public `react-dom/test-utils.act` blocked-currentness report. Public
+  `React.act` compatibility, act queue flushing, callbacks, thenables, public
+  test-utils act
   callback/thenable/warning behavior, public root work, passive effect
   execution, renderer/root/Scheduler execution, Scheduler timing, renderer
   behavior, and package compatibility remain blocked.
@@ -342,7 +346,8 @@ canonical evidence requirements.
   source-owned public `react-dom` and `react-dom/profiling` blocked-currentness
   report and Worker 986's refreshed blocked-currentness rows only as
   negative/private evidence, plus Worker 953's caller-override and
-  non-enumerable-claim rejection hardening. Callback execution,
+  non-enumerable-claim rejection hardening, plus Worker 1214's source-proof
+  hardening for the public `flushSync` blocked-currentness report. Callback execution,
   return/thenable compatibility, public root execution, Scheduler queue
   draining, act/test-utils routing, DOM mutation, passive effects,
   package/profiling compatibility, and hydration-only evidence remain blocked.
