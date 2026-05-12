@@ -29,7 +29,7 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-### Workers 1243 and 1239 Scheduler/Test-Renderer Currentness Gates
+### Workers 1243, 1243 Repair, and 1239 Scheduler/Test-Renderer Currentness Gates
 
 - Worker 1243 extended the scheduler root currentness gate to all 11 accepted
   Scheduler root scenarios, including task object shape, didTimeout, and
@@ -39,6 +39,11 @@ sequencing belong in `MASTER_PLAN.md`.
   hidden, inherited, non-enumerable, symbol, accessor, snake_case,
   dash-separated, and `Object.prototype` compatibility-claim bypasses. No public
   Scheduler timing, root, package, or broad compatibility claim is opened.
+- Worker 1243 repair `fc263bef` closed a follow-up scheduler-root false green:
+  caller-provided local observation rows now need exact expected row/source
+  identity and descriptor shape, and `behaviorEvidence` now rejects extra,
+  missing, hidden, inherited, symbol, accessor-backed, claim-like, or mismatched
+  variant/source fields before a row can count as current root evidence.
 - Worker 1239 aligned the react-test-renderer serialization oracle and local
   source status with the current workspace placeholder package:
   `status: "placeholder-present"` with comparison and compatibility claims
@@ -49,17 +54,19 @@ sequencing belong in `MASTER_PLAN.md`.
   `ReactTestInstance`, JS/CJS/package compatibility, native bridge execution,
   and broad renderer compatibility remain blocked.
 - Accepted validation includes clean independent source and verification audits
-  for Worker 1243 after multiple hostile-source repairs, plus final clean source
-  and verification audits for Worker 1239. Root reruns passed Worker 1243's
-  focused scheduler root currentness test (24/24), companion Scheduler/root
-  conformance suite (111/111), scheduler workspace check, package-surface guard,
-  import smoke, and `git diff --check`; and Worker 1239's oracle test (28/28),
-  local-gate test (46/46), combined serialization script (74/74),
-  package-surface guard, import smoke, and `git diff --check`.
-- The accepted implementation/evidence baseline is main `df39570c` after Worker
-  1243 merge `83fe318d` and Worker 1239 merge `df39570c`, plus worker commits
-  `47ee1b17`, `06e7a3e6`, `8820cf9c`, `9573c1fb`, `d37dd78c`, `7eb44753`,
-  `3eab522f`, `bf4bc9a8`, `73c1d266`, and `679c2cde`.
+  for Worker 1243 after multiple hostile-source repairs, clean source and
+  verification audits for the Worker 1243 repair, plus final clean source and
+  verification audits for Worker 1239. Root reruns passed Worker 1243's focused
+  scheduler root currentness tests before and after repair (24/24, then 29/29),
+  companion Scheduler/root conformance suite (111/111), scheduler workspace
+  check, package-surface guard, import smoke, and `git diff --check`; and Worker
+  1239's oracle test (28/28), local-gate test (46/46), combined serialization
+  script (74/74), package-surface guard, import smoke, and `git diff --check`.
+- The accepted implementation/evidence baseline is main `4aa248fb` after Worker
+  1243 merge `83fe318d`, Worker 1239 merge `df39570c`, and Worker 1243 repair
+  merge `4aa248fb`, plus worker commits `47ee1b17`, `06e7a3e6`, `8820cf9c`,
+  `9573c1fb`, `d37dd78c`, `7eb44753`, `3eab522f`, `bf4bc9a8`, `73c1d266`,
+  `679c2cde`, and `fc263bef`.
 
 ### Workers 1241, 1242, and 1244 Sync-Flush, Root Null Cleanup, and Passive Destroy Canaries
 
