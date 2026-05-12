@@ -46,7 +46,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Latest accepted implementation/evidence baseline is
-main `5dcea2a9` (`Merge worker 1234 Children currentness freeze authority`).
+main `2f50c20c` (`Merge branch 'worker/1240-conformance-private-admission-ledger-refresh'`).
 Accepted implementation, cleanup, planning, and docs-only history through that
 baseline is recorded in `MASTER_PROGRESS.md`; this plan lists only
 current/future work.
@@ -58,10 +58,16 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Accepted implementation/evidence facts through baseline main `5dcea2a9` are
+- Accepted implementation/evidence facts through baseline main `2f50c20c` are
   recorded in `MASTER_PROGRESS.md`.
-- Active, unaccepted workers: none. The queue is ready for the next scheduling
-  decision.
+- Completed, unaccepted worker pending root-owned audit and merge decision:
+  Worker 1241 `worker/1241-sync-flush-minimal-host-placement-handoff`.
+- Unowned, unaccepted clean candidate worktrees that need reconciliation before
+  any audit, merge, or cleanup: Worker 1239
+  `worker/1239-test-renderer-local-status-currentness`, Worker 1242
+  `worker/1242-react-dom-null-render-idempotent-unmount`, Worker 1243
+  `worker/1243-scheduler-root-currentness-completeness`, and Worker 1244
+  `worker/1244-passive-destroy-clear-before-invoke`.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
   render handoff admission, plus the minimal public
@@ -73,14 +79,16 @@ Current orchestration queue:
   preserve hostile escaped public conformance for that same fake-DOM lifecycle,
   the private reconciler diagnostic path, source-owned execution-surface
   blockers, recursive conformance discovery, repaired no-load native metadata
-  source ledgers, React DOM native-compatibility alias denylists, public render
-  capability rejection matrices, React Children source-owned currentness
-  hardening through hostile freeze/proxy replacements, and
-  public/native/browser-DOM capability rejection while proving any later private
-  NAPI/adapter handoff or broader public root lifecycle extension.
+  source ledgers, refreshed private-admission source ledgers, React DOM
+  native-compatibility alias denylists, public render capability and wrapper
+  execution rejection matrices, React Children source-owned currentness
+  hardening through hostile freeze/proxy replacements, exact-two/exact-three
+  private same-transition currentness canaries, and public/native/browser-DOM
+  capability rejection while proving any later private NAPI/adapter handoff or
+  broader public root lifecycle extension.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `5dcea2a9`,
+implementation/evidence baseline main `2f50c20c`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -90,9 +98,9 @@ excluding generated oracle JSON and package CJS published artifacts:
 - `packages/react-dom/src/client/controlled-restore-queue.js`: 10,949 lines
 - `tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs`: 10,278 lines
 - `packages/react-dom/src/events/plugin-event-system.js`: 9,533 lines
+- `crates/fast-react-reconciler/src/root_scheduler/tests.rs`: 9,283 lines
 - `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: 8,553 lines
-- `crates/fast-react-reconciler/src/function_component.rs`: 8,343 lines
-- `packages/react-dom/test/resource-form-unsupported-gates/resource-hints.js`: 8,265 lines
+- `crates/fast-react-reconciler/src/root_scheduler.rs`: 8,545 lines
 
 Do not run a broad large-file cleanup lane before public React DOM root/render
 work. Prefer a single behavior-preserving `root-bridge.js` facade split only if
@@ -105,7 +113,7 @@ verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
 Accepted compatibility evidence through accepted implementation/evidence
-baseline main `5dcea2a9` remains narrow. The only public React DOM root behavior
+baseline main `2f50c20c` remains narrow. The only public React DOM root behavior
 accepted so far is the fake-DOM div/text `createRoot().render(...)` lifecycle:
 initial render, same-root div/text/id update, id removal, rendered-root unmount
 cleanup, recreate-after-unmount, and the test/conformance/smoke-only observable
@@ -113,9 +121,13 @@ fake-DOM fields already recorded in progress. Recent accepted evidence adds
 recursive conformance discovery coverage, no-load private native metadata source
 ledgers with exact capability-claim blockers, React DOM private subpath/native
 alias denylists, public render capability rejection rows, aligned smoke and
-conformance rejection matrices, and private React Children currentness hardening
-against nested mutable evidence plus hostile `Object.freeze` replacement,
-clone/proxy, stale source-report, public-alias, and proxy-trap paths.
+conformance rejection matrices, public component-wrapper render execution
+blockers for function/memo/forwardRef/lazy element types, private React Children
+currentness hardening against nested mutable evidence plus hostile
+`Object.freeze` replacement, clone/proxy, stale source-report, public-alias, and
+proxy-trap paths, exact-three private same-transition queue-lane currentness
+evidence, and refreshed private-admission 727/728, 739/745, and 804 source
+ledgers.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -134,14 +146,16 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through baseline main `5dcea2a9` as
+1. Treat accepted compatibility evidence through baseline main `2f50c20c` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, and the narrow fake-DOM public div/text
    lifecycle evidence described above. Public render capability rejection rows,
-   private native metadata ledgers, React DOM private denylist parity, and React
-   Children freeze/proxy currentness hardening are blockers and currentness
-   evidence only; they do not open broader public root, native, browser DOM,
-   Children traversal, package, or renderer compatibility.
+   public wrapper execution blockers, private native metadata and admission
+   ledgers, React DOM private denylist parity, React Children freeze/proxy
+   currentness hardening, and exact-two/exact-three private same-transition
+   currentness are blockers and currentness evidence only; they do not open
+   broader public root, native, browser DOM, component rendering, Children
+   traversal, package, Scheduler, or renderer compatibility.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct
@@ -193,10 +207,11 @@ canonical evidence requirements.
   currentness, Worker 980 expired queue-lane currentness, Worker 982 root
   work-loop bailout, Worker 985 render-phase root consumption, Worker 991
   HostWork delete/place continuation, Worker 997 hook pending-ring currentness,
-  and Worker 998 HostText commit currentness shapes only as private test-host
-  canaries or blocked diagnostics with source-owned commit, host-node,
-  root/lane, scheduler, queue/handoff, store-backed row lane metadata,
-  topology, replay, ref/passive, and cleanup validation. Public React
+  Worker 998 HostText commit currentness, and Worker 1237 exact-two/exact-three
+  same-transition currentness shapes only as private test-host canaries or
+  blocked diagnostics with source-owned commit, host-node, root/lane, scheduler,
+  queue/handoff, store-backed row lane metadata, topology, replay, ref/passive,
+  and cleanup validation. Public React
   DOM/test-renderer roots and public `flushSync` remain blocked.
 - Test-renderer package-root/native work should use accepted Worker 844
   package-root native execution parity, Workers 859 and 868 Rust private
@@ -242,8 +257,9 @@ canonical evidence requirements.
   probe, Worker 1133's diagnostic-backed NAPI metadata admission as
   package-private bridge input only, Worker 1228's repaired no-load private
   native metadata source ledger, Worker 1233's React DOM private subpath/native
-  alias denylist parity, and Workers 1232/1235 public render capability
-  rejection matrices as negative evidence only.
+  alias denylist parity, Workers 1232/1235 public render capability rejection
+  matrices, and Worker 1238 public wrapper execution blockers as negative
+  evidence only.
   Worker 920's HostNodeStore payload currentness can inform fake/native host
   update handoffs only when scoped root/fiber/token/phase/target identity is
   preserved. Workers 958 and 990 input/change evidence is consumable only when
@@ -372,8 +388,8 @@ canonical evidence requirements.
   performance compatibility claims. Benchmark harness follow-ups can also
   consume Worker 994's command-provenance currentness hardening without treating
   it as a performance claim.
-- Conformance harness follow-ups can also consume accepted Workers 964 and 978
-  private admission 727-728 ledger refreshes, Worker 967's serialization/local
+- Conformance harness follow-ups can also consume accepted Workers 964, 978, and
+  1240 private admission ledger refreshes, Worker 967's serialization/local
   oracle repair, and Worker 989's private admission 729-731 false-green sweep as
   private fail-closed evidence only.
 - Root-render conformance harness follow-ups can consume Worker 1065's repaired
@@ -391,8 +407,9 @@ canonical evidence requirements.
   facade conformance/false-green hardening, Worker 1220's
   recreate-after-unmount evidence, Worker 1221's id/text update and id-removal
   hardening, Worker 1228's repaired private native metadata ledger, Worker
-  1233's private React DOM subpath/native alias denylist parity, and Workers
-  1232/1235 public render capability rejection matrix coverage, for that
+  1233's private React DOM subpath/native alias denylist parity, Workers
+  1232/1235 public render capability rejection matrix coverage, and Worker
+  1238's public component-wrapper execution blockers, for that
   lifecycle and blocker surface only. Broader
   public root rendering remains blocked outside that accepted fake-DOM div/text
   lifecycle slice until later workers prove additional render/update/unmount

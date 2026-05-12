@@ -29,6 +29,42 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1237, 1238, and 1240 Exact-Three, Public Wrapper Blockers, and Private Ledger Refresh
+
+- Worker 1237 repaired the orphaned exact-three Rust branch as a bounded
+  private/test-only extension. Exact-two same-transition queue-lane
+  continuation/currentness remains accepted, exact-three is now accepted, and
+  fourth rows, forged/reordered/stale source sequences, wrong-lane metadata,
+  cross-root handoffs, skipped-lane smuggling, replay, and stale live queues
+  fail closed. No broad N-row batching or public Scheduler/root/renderer/package
+  compatibility is claimed.
+- Worker 1238 added public `createRoot().render(...)` blocker evidence for
+  unsupported function, memo, forwardRef, and lazy element wrappers. Package and
+  smoke coverage prove those wrappers do not invoke component bodies, render
+  functions, refs, lazy loaders, private adapter handoffs, listeners, or fake-DOM
+  mutations while the accepted minimal div/text fake-DOM lifecycle remains
+  preserved.
+- Worker 1240 refreshed static private-admission source-currentness ledgers for
+  727/728, 739/745, and 804 after accepted module splits. The ledgers now point
+  at current test-renderer and reconciler split source paths, and stale
+  pre-split `lib.rs`/wrapper-file path and cleanup-ordering evidence fails
+  closed without admitting public/native/package/JS/CJS compatibility.
+- Accepted validation includes clean independent source and verification audits
+  for Workers 1237 and 1240, plus post-merge independent source and
+  verification audits for Worker 1238. Root reruns passed Worker 1237's focused
+  `root_updates`, `root_scheduler_transition`,
+  `root_scheduler_queue_lane_continuation`, and same-transition multi-update
+  Rust tests, `cargo check -p fast-react-reconciler --all-features`, `cargo fmt
+  --all --check`, and `git diff --check`; Worker 1238's React DOM package
+  symbol-facade test, private root-bridge smoke, public-facade conformance gate,
+  root-render E2E conformance gate, `@fast-react/react-dom` check,
+  package-surface guard, import smoke, and `git diff --check`; and Worker 1240's
+  focused private-admission tests, serialization-local gate, conformance
+  discovery test, package-surface guard, import smoke, and `git diff --check`.
+- The accepted implementation/evidence baseline is main `2f50c20c` after Worker
+  1238 merge `029dc8b9`, Worker 1237 merge `3c4e250e`, and Worker 1240 merge
+  `2f50c20c`, plus worker commits `eb92c4e1`, `16ecdbb7`, and `2d215fde`.
+
 ### Workers 1227, 1228, and 1232-1235 Discovery, Native Metadata, Public Render, and Children Hardening
 
 - Worker 1227 hardened the conformance test discovery gate so executable
