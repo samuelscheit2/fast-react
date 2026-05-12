@@ -36,16 +36,24 @@ export const PRIVATE_ADMISSION_1228_SURFACES = freezeArray([
 ]);
 
 export const PRIVATE_ADMISSION_1228_BLOCKED_CLAIMS = freezeArray([
+  "runtimeExecutionClaimed",
+  "publicRuntimeExecutionClaimed",
+  "nativeLoadAttempted",
   "nativeAddonLoaded",
   "nativeAddonLoadAttempted",
   "nativeExecution",
   "publicNativeExecution",
   "nodeWorkerThreadsExecution",
   "workerThreadCreationAttempted",
+  "workerThreadLoadAttempted",
   "childProcessExecution",
+  "childProcessLoadAttempted",
   "httpExecution",
+  "httpLoadAttempted",
   "httpsExecution",
+  "httpsLoadAttempted",
   "napiCleanupHookExecution",
+  "cleanupHookExecutionClaimed",
   "cleanupHookPublicExecutionClaimed",
   "rendererExecution",
   "reconcilerExecution",
@@ -55,6 +63,7 @@ export const PRIVATE_ADMISSION_1228_BLOCKED_CLAIMS = freezeArray([
   "packageCompatibilityClaimed",
   "packageExportCompatibility",
   "packageExportCompatibilityClaimed",
+  "packageExportsChanged",
   "nativePrivateSubpathsExported",
   "compatibilityClaimed"
 ]);
@@ -113,14 +122,23 @@ export const PRIVATE_ADMISSION_1228_REQUIRED_SOURCE_IDENTIFIERS =
       "createNativeRootWorkLoopFinishedWorkMetadataForCanary,",
       "'publicRootExecution'",
       "'publicRootCompatibilitySurface'",
+      "'runtimeExecutionClaimed'",
+      "'publicRuntimeExecutionClaimed'",
       "'packageExportCompatibilityClaimed'",
+      "'packageExportsChanged'",
       "'nativePrivateSubpathsExported'",
       "enumerable: false",
       "configurable: false",
       "writable: false",
+      "row.nativeLoadAttempted === true",
       "row.nativeAddonLoadAttempted === true",
+      "row.workerThreadLoadAttempted === true",
       "row.workerThreadCreationAttempted === true",
+      "row.childProcessLoadAttempted === true",
+      "row.httpLoadAttempted === true",
+      "row.httpsLoadAttempted === true",
       "row.napiCleanupHookExecution === true",
+      "row.cleanupHookExecutionClaimed === true",
       "row.cleanupHookPublicExecutionClaimed === true",
       "nodeWorkerThreadsExecution: false",
       "childProcessExecution: false",
@@ -185,14 +203,23 @@ const privateAdmission1228Rows = freezeArray([
           "function validateNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRow(",
           "row?.testTitleEvidence === true",
           "row?.errorMessageEvidence === true",
+          "'runtimeExecutionClaimed'",
+          "'publicRuntimeExecutionClaimed'",
+          "'packageExportsChanged'",
+          "row.nativeLoadAttempted === true",
           "row.nativeAddonLoaded === true",
           "row.nativeAddonLoadAttempted === true",
           "row.nodeWorkerThreadsExecution === true",
           "row.workerThreadCreationAttempted === true",
+          "row.workerThreadLoadAttempted === true",
           "row.childProcessExecution === true",
+          "row.childProcessLoadAttempted === true",
           "row.httpExecution === true",
+          "row.httpLoadAttempted === true",
           "row.httpsExecution === true",
+          "row.httpsLoadAttempted === true",
           "row.napiCleanupHookExecution === true",
+          "row.cleanupHookExecutionClaimed === true",
           "row.cleanupHookPublicExecutionClaimed === true",
           "row.rendererExecution === true",
           "row.reconcilerExecution === true",
@@ -213,6 +240,19 @@ const privateAdmission1228Rows = freezeArray([
           "rustSource.includes(rustIdentifier)",
           "root-work-loop-metadata-test-title-evidence",
           "root-work-loop-metadata-error-message-evidence",
+          "runtimeExecutionClaimed",
+          "workerThreadLoadAttempted",
+          "childProcessLoadAttempted",
+          "httpLoadAttempted",
+          "httpsLoadAttempted",
+          "publicRuntimeExecutionClaimed",
+          "nativeLoadAttempted",
+          "cleanupHookExecutionClaimed",
+          "packageExportsChanged",
+          "fullCanonicalKnownFieldCases",
+          "packageExportCompatibility",
+          "proseEvidence",
+          "errorMessageEvidence",
           "root-work-loop-metadata-worker-network-claim",
           "root-work-loop-metadata-renderer-reconciler-claim",
           "root-work-loop-metadata-package-export-claim",
@@ -457,18 +497,18 @@ export function evaluatePrivateAdmission1228Gate({
     .map((row) => row.surfaceId);
 
   const nativeRuntimeClaimIds = publicBlockerClaimViolations.filter((claimId) =>
-    /\.(?:nativeAddonLoaded|nativeAddonLoadAttempted|nativeExecution|publicNativeExecution)$/.test(
+    /\.(?:runtimeExecutionClaimed|publicRuntimeExecutionClaimed|nativeLoadAttempted|nativeAddonLoaded|nativeAddonLoadAttempted|nativeExecution|publicNativeExecution)$/.test(
       claimId
     )
   );
   const workerChildNetworkClaimIds = publicBlockerClaimViolations.filter(
     (claimId) =>
-      /\.(?:nodeWorkerThreadsExecution|workerThreadCreationAttempted|childProcessExecution|httpExecution|httpsExecution)$/.test(
+      /\.(?:nodeWorkerThreadsExecution|workerThreadCreationAttempted|workerThreadLoadAttempted|childProcessExecution|childProcessLoadAttempted|httpExecution|httpLoadAttempted|httpsExecution|httpsLoadAttempted)$/.test(
         claimId
       )
   );
   const cleanupHookClaimIds = publicBlockerClaimViolations.filter((claimId) =>
-    /\.(?:napiCleanupHookExecution|cleanupHookPublicExecutionClaimed)$/.test(
+    /\.(?:napiCleanupHookExecution|cleanupHookExecutionClaimed|cleanupHookPublicExecutionClaimed)$/.test(
       claimId
     )
   );
@@ -482,7 +522,7 @@ export function evaluatePrivateAdmission1228Gate({
       )
     );
   const packageExportClaimIds = publicBlockerClaimViolations.filter((claimId) =>
-    /\.(?:packageCompatibilityClaimed|packageExportCompatibility|packageExportCompatibilityClaimed|nativePrivateSubpathsExported)$/.test(
+    /\.(?:packageCompatibilityClaimed|packageExportCompatibility|packageExportCompatibilityClaimed|packageExportsChanged|nativePrivateSubpathsExported)$/.test(
       claimId
     )
   );
