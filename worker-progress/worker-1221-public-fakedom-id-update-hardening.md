@@ -36,11 +36,23 @@ Accepted main merge-parent content also brought in:
 
 ## Commands Run
 
-- `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs` - pass, 43/43
-- `npm --prefix tests/conformance run root-public-facade:conformance` - pass
-- `node tests/smoke/react-dom-private-root-bridge-shell.mjs` - pass
-- `node --test packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js` - pass, 4/4
-- `git diff --check` - pass
+- `git status --short --branch --untracked-files=all` - clean on
+  `worker/1221-public-fakedom-id-update-hardening`
+- `rg -n "<<<<<<<|=======|>>>>>>>" tests/conformance/src/react-dom-root-public-facade-blocked-gate.mjs tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
+  - pass, no conflict markers
+- `node --test packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js`
+  - pass, 4/4
+- `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
+  - pass, 43/43
+- `npm --prefix tests/conformance run root-public-facade:conformance`
+  - pass, 24 blocked public facade rows, failures 0
+- `npm --prefix tests/conformance run root-render-e2e:conformance`
+  - pass, 20 blocked unsupported rows, failures 0
+- `npm --prefix packages/react-dom run check` - pass, 236/236 plus
+  `tests/smoke/import-entrypoints.mjs`
+- `npm run check:package-surface` - pass
+- `node tests/smoke/import-entrypoints.mjs` - pass
+- `git diff --check` - pass after final report update
 - `git diff --cached --check` - pass before the repair merge commit
 
 ## Evidence Gathered
@@ -66,6 +78,9 @@ Accepted main merge-parent content also brought in:
   missing fresh render attr evidence, hostile fresh-render HTML escaping,
   incomplete fresh unmount mutation logs, listener/root marker leaks, stale
   lifecycle labels, and compatibility claims.
+- `MASTER_PLAN.md` matches the `main` merge parent (`7d775144`) exactly, so the
+  worker branch did not reintroduce stale plan text while preserving the
+  accepted Worker 1220 and entangled-transition reports from main.
 
 ## Audit / Review Notes
 
@@ -110,3 +125,4 @@ Accepted main merge-parent content also brought in:
 - Original implementation commit: `8618da92847fb9527434485631c865d724a08b07`
 - Original report commit: `28c474dbdf98bf05b442ffcca3e8ff6af89f4031`
 - Repair merge commit: `fec9b390733a8681772afb6192afdb2996dd450b`
+- Final verification report update: this commit
