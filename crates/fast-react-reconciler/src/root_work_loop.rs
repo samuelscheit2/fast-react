@@ -286,6 +286,15 @@ pub(crate) use complete_handoff::{
     commit_minimal_root_element_render_complete_handoff_to_host_placement,
     handoff_minimal_root_element_render_to_complete_work,
 };
+#[allow(
+    unused_imports,
+    reason = "narrow private-bridge diagnostic API is exported without exposing private render/commit records"
+)]
+pub use complete_handoff::{
+    MinimalHostRootRenderCompletePlacementDiagnostic,
+    MinimalHostRootRenderCompletePlacementDiagnosticError,
+    describe_minimal_host_root_render_complete_placement_for_private_bridge,
+};
 mod context_provider;
 
 #[cfg(test)]

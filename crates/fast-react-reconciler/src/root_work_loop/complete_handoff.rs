@@ -7,7 +7,8 @@ use fast_react_core::{ElementTypeHandle, FiberId, FiberTag, Lanes, PropsHandle};
 use fast_react_host_config::{HostCommit, HostCreation, HostTypes, MutationHost};
 
 use crate::{
-    FiberRootId, FiberRootStore, FiberRootStoreError, RootElementHandle, RootRenderExitStatus,
+    FiberRootId, FiberRootStore, FiberRootStoreError, HostFiberTokenId, RootElementHandle,
+    RootElementSource, RootRenderExitStatus,
     complete_work::{
         HostFiberTokenFactory, MinimalHostCompleteWorkError, MinimalHostRootCompleteWorkRecord,
         MinimalHostRootCompleteWorkRequest, complete_minimal_host_root_component_text,
@@ -44,11 +45,14 @@ use crate::{
     test_support::{RecordingHost, TestHostTree},
 };
 
-use super::HostRootMinimalElementRenderPhaseRecord;
 #[cfg(test)]
 use super::HostRootRenderPhaseRecord;
 #[cfg(test)]
 use super::{HostRootChildBeginWorkPreflightError, validate_host_root_child_preflight};
+use super::{
+    HostRootMinimalElementRenderPhaseError, HostRootMinimalElementRenderPhaseRecord,
+    render_host_root_for_lanes_with_minimal_root_element,
+};
 
 pub(crate) trait HostRootMinimalRenderCompleteHandoffAdapter<H: HostTypes> {
     type Error;
@@ -238,6 +242,453 @@ impl HostRootMinimalRenderCompletePlacementCommitRecord {
             && self.public_root_rendering_blocked()
             && self.public_compatibility_blocked()
     }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MinimalHostRootRenderCompletePlacementDiagnostic {
+    root: FiberRootId,
+    previous_current: FiberId,
+    host_root_work_in_progress: FiberId,
+    finished_work: FiberId,
+    component: FiberId,
+    text: FiberId,
+    root_element: RootElementHandle,
+    component_element_type: ElementTypeHandle,
+    component_props: PropsHandle,
+    text_props: PropsHandle,
+    text_content: String,
+    render_lanes: Lanes,
+    root_child_count: usize,
+    component_child_count: usize,
+    detached_instance_count: usize,
+    detached_text_count: usize,
+    host_node_count_after_complete_work: usize,
+    host_node_count_after_placement: usize,
+    component_state_node_raw: u64,
+    text_state_node_raw: u64,
+    component_token: HostFiberTokenId,
+    text_token: HostFiberTokenId,
+    placement_mutation_kind: &'static str,
+    prepared_for_commit: bool,
+    appended_child_to_container: bool,
+    reset_after_commit: bool,
+    private_root_placement_only: bool,
+    host_mutation_gate_status: &'static str,
+    host_mutation_gate_blockers_intact: bool,
+    host_mutation_execution_blocked: bool,
+    production_host_mutation_apply_promoted: bool,
+    render_complete_handoff_proven: bool,
+    private_render_complete_placement_proven: bool,
+    public_dom_compatibility_claimed: bool,
+    public_root_rendering_claimed: bool,
+    public_root_rendering_blocked: bool,
+    public_compatibility_blocked: bool,
+    public_renderer_package_behavior_exposed: bool,
+    react_dom_compatibility_claimed: bool,
+    test_renderer_compatibility_claimed: bool,
+}
+
+impl MinimalHostRootRenderCompletePlacementDiagnostic {
+    fn from_record(record: &HostRootMinimalRenderCompletePlacementCommitRecord) -> Self {
+        let complete_handoff = record.complete_handoff();
+        let render = complete_handoff.render();
+        let complete_work = record.complete_work();
+        let commit = record.commit();
+        let placement = record.placement_commit();
+        let gate = commit.host_component_text_mutation_execution_gate();
+
+        Self {
+            root: complete_handoff.root(),
+            previous_current: commit.previous_current(),
+            host_root_work_in_progress: complete_handoff.host_root_work_in_progress(),
+            finished_work: commit.finished_work(),
+            component: complete_handoff.component(),
+            text: complete_handoff.text(),
+            root_element: complete_handoff.root_element(),
+            component_element_type: render.root_child_element_type(),
+            component_props: render.root_child_props(),
+            text_props: render.text_child_props(),
+            text_content: render.text_child_text().to_owned(),
+            render_lanes: complete_handoff.render_lanes(),
+            root_child_count: render.root_child_count(),
+            component_child_count: render.component_child_count(),
+            detached_instance_count: complete_handoff.detached_instance_count(),
+            detached_text_count: complete_handoff.detached_text_count(),
+            host_node_count_after_complete_work: record.host_node_count_after_complete_work(),
+            host_node_count_after_placement: record.host_node_count_after_placement(),
+            component_state_node_raw: complete_work.component_state_node().raw(),
+            text_state_node_raw: complete_work.text_state_node().raw(),
+            component_token: complete_work.component_scope().token_id(),
+            text_token: complete_work.text_scope().token_id(),
+            placement_mutation_kind: if placement.private_root_placement_only() {
+                "append-placement-to-container"
+            } else {
+                "unsupported-private-root-placement"
+            },
+            prepared_for_commit: placement.prepared_for_commit(),
+            appended_child_to_container: placement.appended_child_to_container(),
+            reset_after_commit: placement.reset_after_commit(),
+            private_root_placement_only: placement.private_root_placement_only(),
+            host_mutation_gate_status: gate.status_name(),
+            host_mutation_gate_blockers_intact: gate.blockers_intact(),
+            host_mutation_execution_blocked: gate.host_mutation_execution_blocked(),
+            production_host_mutation_apply_promoted: gate.production_host_mutation_apply_promoted(),
+            render_complete_handoff_proven: complete_handoff
+                .proves_minimal_render_complete_handoff(),
+            private_render_complete_placement_proven: record
+                .proves_private_minimal_render_complete_placement_commit(),
+            public_dom_compatibility_claimed: record.public_dom_compatibility_claimed(),
+            public_root_rendering_claimed: record.public_root_rendering_claimed(),
+            public_root_rendering_blocked: record.public_root_rendering_blocked(),
+            public_compatibility_blocked: record.public_compatibility_blocked(),
+            public_renderer_package_behavior_exposed: placement
+                .public_renderer_package_behavior_exposed(),
+            react_dom_compatibility_claimed: placement.react_dom_compatibility_claimed(),
+            test_renderer_compatibility_claimed: placement.test_renderer_compatibility_claimed(),
+        }
+    }
+
+    #[must_use]
+    pub const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn previous_current(&self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    pub const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn component(&self) -> FiberId {
+        self.component
+    }
+
+    #[must_use]
+    pub const fn text(&self) -> FiberId {
+        self.text
+    }
+
+    #[must_use]
+    pub const fn root_element(&self) -> RootElementHandle {
+        self.root_element
+    }
+
+    #[must_use]
+    pub const fn component_element_type(&self) -> ElementTypeHandle {
+        self.component_element_type
+    }
+
+    #[must_use]
+    pub const fn component_props(&self) -> PropsHandle {
+        self.component_props
+    }
+
+    #[must_use]
+    pub const fn text_props(&self) -> PropsHandle {
+        self.text_props
+    }
+
+    #[must_use]
+    pub fn text_content(&self) -> &str {
+        &self.text_content
+    }
+
+    #[must_use]
+    pub const fn render_lanes(&self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn render_lanes_bits(&self) -> u32 {
+        self.render_lanes.bits()
+    }
+
+    #[must_use]
+    pub const fn root_child_count(&self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub const fn component_child_count(&self) -> usize {
+        self.component_child_count
+    }
+
+    #[must_use]
+    pub const fn detached_instance_count(&self) -> usize {
+        self.detached_instance_count
+    }
+
+    #[must_use]
+    pub const fn detached_text_count(&self) -> usize {
+        self.detached_text_count
+    }
+
+    #[must_use]
+    pub const fn host_node_count_after_complete_work(&self) -> usize {
+        self.host_node_count_after_complete_work
+    }
+
+    #[must_use]
+    pub const fn host_node_count_after_placement(&self) -> usize {
+        self.host_node_count_after_placement
+    }
+
+    #[must_use]
+    pub const fn component_state_node_raw(&self) -> u64 {
+        self.component_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn text_state_node_raw(&self) -> u64 {
+        self.text_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn component_token(&self) -> HostFiberTokenId {
+        self.component_token
+    }
+
+    #[must_use]
+    pub const fn text_token(&self) -> HostFiberTokenId {
+        self.text_token
+    }
+
+    #[must_use]
+    pub const fn placement_mutation_kind(&self) -> &'static str {
+        self.placement_mutation_kind
+    }
+
+    #[must_use]
+    pub const fn prepared_for_commit(&self) -> bool {
+        self.prepared_for_commit
+    }
+
+    #[must_use]
+    pub const fn appended_child_to_container(&self) -> bool {
+        self.appended_child_to_container
+    }
+
+    #[must_use]
+    pub const fn reset_after_commit(&self) -> bool {
+        self.reset_after_commit
+    }
+
+    #[must_use]
+    pub const fn private_root_placement_only(&self) -> bool {
+        self.private_root_placement_only
+    }
+
+    #[must_use]
+    pub const fn host_mutation_gate_status(&self) -> &'static str {
+        self.host_mutation_gate_status
+    }
+
+    #[must_use]
+    pub const fn host_mutation_gate_blockers_intact(&self) -> bool {
+        self.host_mutation_gate_blockers_intact
+    }
+
+    #[must_use]
+    pub const fn host_mutation_execution_blocked(&self) -> bool {
+        self.host_mutation_execution_blocked
+    }
+
+    #[must_use]
+    pub const fn production_host_mutation_apply_promoted(&self) -> bool {
+        self.production_host_mutation_apply_promoted
+    }
+
+    #[must_use]
+    pub const fn render_complete_handoff_proven(&self) -> bool {
+        self.render_complete_handoff_proven
+    }
+
+    #[must_use]
+    pub const fn private_render_complete_placement_proven(&self) -> bool {
+        self.private_render_complete_placement_proven
+    }
+
+    #[must_use]
+    pub const fn public_dom_compatibility_claimed(&self) -> bool {
+        self.public_dom_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn public_root_rendering_claimed(&self) -> bool {
+        self.public_root_rendering_claimed
+    }
+
+    #[must_use]
+    pub const fn public_root_rendering_blocked(&self) -> bool {
+        self.public_root_rendering_blocked
+    }
+
+    #[must_use]
+    pub const fn public_compatibility_blocked(&self) -> bool {
+        self.public_compatibility_blocked
+    }
+
+    #[must_use]
+    pub const fn public_renderer_package_behavior_exposed(&self) -> bool {
+        self.public_renderer_package_behavior_exposed
+    }
+
+    #[must_use]
+    pub const fn react_dom_compatibility_claimed(&self) -> bool {
+        self.react_dom_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn test_renderer_compatibility_claimed(&self) -> bool {
+        self.test_renderer_compatibility_claimed
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MinimalHostRootRenderCompletePlacementDiagnosticError {
+    Render { message: String },
+    CompletePlacement { message: String },
+}
+
+impl MinimalHostRootRenderCompletePlacementDiagnosticError {
+    fn render(error: HostRootMinimalElementRenderPhaseError) -> Self {
+        Self::Render {
+            message: error.to_string(),
+        }
+    }
+
+    fn complete_placement<E: Display>(
+        error: HostRootMinimalRenderCompletePlacementCommitError<E>,
+    ) -> Self {
+        Self::CompletePlacement {
+            message: error.to_string(),
+        }
+    }
+
+    #[must_use]
+    pub fn message(&self) -> &str {
+        match self {
+            Self::Render { message } | Self::CompletePlacement { message } => message,
+        }
+    }
+}
+
+impl Display for MinimalHostRootRenderCompletePlacementDiagnosticError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.message())
+    }
+}
+
+impl Error for MinimalHostRootRenderCompletePlacementDiagnosticError {}
+
+struct MinimalHostRootDiagnosticTokenFactory<F> {
+    create_host_fiber_token: F,
+}
+
+impl<H, F> HostFiberTokenFactory<H> for MinimalHostRootDiagnosticTokenFactory<F>
+where
+    H: HostTypes,
+    F: FnMut(HostFiberTokenId) -> H::HostFiberToken,
+{
+    fn create_host_fiber_token(&mut self, token_id: HostFiberTokenId) -> H::HostFiberToken {
+        (self.create_host_fiber_token)(token_id)
+    }
+}
+
+struct MinimalHostRootDiagnosticAdapter<AdaptType, AdaptProps> {
+    adapt_host_component_type: AdaptType,
+    adapt_host_component_props: AdaptProps,
+}
+
+impl<H, AdaptType, AdaptProps, E> HostRootMinimalRenderCompleteHandoffAdapter<H>
+    for MinimalHostRootDiagnosticAdapter<AdaptType, AdaptProps>
+where
+    H: HostTypes,
+    AdaptType: FnMut(RootElementHandle, ElementTypeHandle) -> Result<Option<H::Type>, E>,
+    AdaptProps: FnMut(RootElementHandle, PropsHandle) -> Result<Option<H::Props>, E>,
+{
+    type Error = E;
+
+    fn adapt_host_component_type(
+        &mut self,
+        element: RootElementHandle,
+        element_type: ElementTypeHandle,
+    ) -> Result<Option<H::Type>, Self::Error> {
+        (self.adapt_host_component_type)(element, element_type)
+    }
+
+    fn adapt_host_component_props(
+        &mut self,
+        element: RootElementHandle,
+        props: PropsHandle,
+    ) -> Result<Option<H::Props>, Self::Error> {
+        (self.adapt_host_component_props)(element, props)
+    }
+}
+
+#[doc(hidden)]
+pub fn describe_minimal_host_root_render_complete_placement_for_private_bridge<
+    H,
+    S,
+    CreateToken,
+    AdaptType,
+    AdaptProps,
+    E,
+>(
+    store: &mut FiberRootStore<H>,
+    host: &mut H,
+    root_id: FiberRootId,
+    render_lanes: Lanes,
+    source: &S,
+    create_host_fiber_token: CreateToken,
+    adapt_host_component_type: AdaptType,
+    adapt_host_component_props: AdaptProps,
+) -> Result<
+    MinimalHostRootRenderCompletePlacementDiagnostic,
+    MinimalHostRootRenderCompletePlacementDiagnosticError,
+>
+where
+    H: HostCreation + HostCommit + MutationHost,
+    S: RootElementSource + ?Sized,
+    CreateToken: FnMut(HostFiberTokenId) -> H::HostFiberToken,
+    AdaptType: FnMut(RootElementHandle, ElementTypeHandle) -> Result<Option<H::Type>, E>,
+    AdaptProps: FnMut(RootElementHandle, PropsHandle) -> Result<Option<H::Props>, E>,
+    E: Display,
+{
+    let render =
+        render_host_root_for_lanes_with_minimal_root_element(store, root_id, render_lanes, source)
+            .map_err(MinimalHostRootRenderCompletePlacementDiagnosticError::render)?;
+    let mut host_nodes = HostNodeStore::<H>::new();
+    let mut token_factory = MinimalHostRootDiagnosticTokenFactory {
+        create_host_fiber_token,
+    };
+    let mut adapter = MinimalHostRootDiagnosticAdapter {
+        adapt_host_component_type,
+        adapt_host_component_props,
+    };
+    let record = commit_minimal_root_element_render_complete_handoff_to_host_placement(
+        store,
+        host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .map_err(MinimalHostRootRenderCompletePlacementDiagnosticError::complete_placement)?;
+
+    Ok(MinimalHostRootRenderCompletePlacementDiagnostic::from_record(&record))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

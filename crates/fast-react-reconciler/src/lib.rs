@@ -110,9 +110,13 @@ pub use root_updates::{
     update_container, update_container_sync,
 };
 pub use root_work_loop::{
-    HostRootRenderPhaseRecord, RootWorkLoopError, SchedulerCallbackHostRootRenderResult,
-    SchedulerCallbackRenderStatus, SchedulerCallbackValidationRecord, render_host_root_for_lanes,
-    render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
+    HostRootRenderPhaseRecord, MinimalHostRootRenderCompletePlacementDiagnostic,
+    MinimalHostRootRenderCompletePlacementDiagnosticError, RootWorkLoopError,
+    SchedulerCallbackHostRootRenderResult, SchedulerCallbackRenderStatus,
+    SchedulerCallbackValidationRecord,
+    describe_minimal_host_root_render_complete_placement_for_private_bridge,
+    render_host_root_for_lanes, render_host_root_via_scheduler_callback,
+    validate_scheduled_host_root_callback,
 };
 pub use scheduler_bridge::{
     FAKE_ACT_CALLBACK_NODE, SchedulerActQueueRequest, SchedulerActQueueTaskKind, SchedulerBridge,
