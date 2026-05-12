@@ -932,6 +932,13 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "controlled-input"
     }),
     publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-component",
+      label: "unsupported-component",
+      publicApi: "root.render(<UnsupportedComponent />)",
+      category: "browser-dom-expansion",
+      blockedSurface: "component"
+    }),
+    publicFacadeCapabilityRejectionRow({
       id: "public-hydrateroot-options-callbacks-rejected",
       label: "unsupported-hydrateRoot-options-callbacks",
       publicApi:
