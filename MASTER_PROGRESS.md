@@ -29,6 +29,39 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1176 Public CreateRoot Minimal Host Output
+
+- Worker 1176 opened the narrow public
+  `react-dom/client.createRoot(container)` facade only far enough to return a
+  frozen minimal root object with enumerable `render` and `unmount` methods.
+  Root options, duplicate roots, existing root markers, profiling createRoot,
+  hydrateRoot, and broad compatibility claims still fail closed.
+- The accepted public render path is one initial
+  `root.render(React.createElement('div', {id?}, text|number))` call routed
+  through the private fake-DOM adapter. It returns `undefined` and appends one
+  fake-DOM `DIV` with the expected optional id and text content while broader
+  element shapes, extra render arguments, updates, and unmount cleanup remain
+  blocked before additional marker, listener, or mutation side effects.
+- Follow-up repair `6d984a49` fixed the minimal createRoot conformance
+  wrappers so the public-facade and root-render gates record the accepted
+  minimal row without widening unsupported compatibility rows.
+- Follow-up repair `6a495ab7` made `createRoot` reject extra arguments before
+  root creation, preserving the options/callback/scheduler fail-closed
+  boundary.
+- Accepted validation includes the focused React DOM client facade gate,
+  root-public-facade and root-render E2E conformance tests, the private root
+  bridge shell, `npm --prefix packages/react-dom run check`, package-surface
+  and import smoke, React DOM private bridge and mutation adapter smoke,
+  `npm --prefix bindings/node run check`, and `git diff --check`.
+- The accepted state is main `5043c3bd` after merge commit `5043c3bd`, on top
+  of Worker 1168's docs refresh `ca1f40bc`, plus worker/repair commits
+  `f424edfb`, `6d984a49`, and `6a495ab7`. Real `.node` loading/N-API runtime,
+  browser DOM compatibility, public root update/unmount, broad public root
+  rendering, refs/listeners/events/hydration, Scheduler/act/flushSync,
+  test-renderer public behavior, resources/forms, public input/change or
+  controlled-input behavior, public native compatibility, and broad
+  package/renderer compatibility remain blocked.
+
 ### Workers 1144, 1148, 1147, 1157, and 1156 Private Handoff Batch
 
 - Worker 1144 added the crate-private root work-loop metadata JSON value
