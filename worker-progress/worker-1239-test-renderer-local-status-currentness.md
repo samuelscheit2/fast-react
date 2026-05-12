@@ -20,6 +20,13 @@ the error-surface gate's claim source coverage. Local status validation now
 treats `compatibilityClaimed` as an explicit false field alongside
 `behaviorCompatibilityClaimed`.
 
+Second audit repair: claim detection now uses shared comparison and
+compatibility claim-field sets so aliases fail closed across
+`conformanceClaims`, `evidenceClaims`, oracle local status, and source local
+status. This covers `fastReactComparedToReactTestRenderer`,
+`fastReactBehaviorCompatible`, `packageCompatibilityClaimed`, and
+`publicCompatibilityClaimed` in addition to the original fields.
+
 Hardened source-owned blocker inputs by freezing local status, public
 unblocking requirements, private requirement rows, and serialization scenario
 admissions. Tests assert mutation attempts throw and public blocker output
@@ -53,8 +60,8 @@ git diff --check
 ## Verification Results
 
 - `node --test tests/conformance/test/react-test-renderer-serialization-oracle.test.mjs`: passed, 12 tests.
-- `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, 31 tests.
-- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: passed, 43 tests.
+- `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: passed, 32 tests.
+- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: passed, 44 tests.
 - `npm run check:package-surface`: passed.
 - `node tests/smoke/import-entrypoints.mjs`: passed.
 - `git diff --check`: passed.
@@ -71,7 +78,10 @@ git diff --check
   - stale oracle `not-present-in-workspace` with the placeholder package present;
   - stale `placeholder-present` after placeholder markers are removed;
   - local Fast React comparison or compatibility claims;
-  - evidence-level Fast React comparison claims;
+  - conformance-level Fast React comparison claims;
+  - evidence-level Fast React comparison and compatibility claims;
+  - local status comparison, package compatibility, and public compatibility
+    aliases;
   - mutation attempts against frozen status/admission/blocker source records.
 - Public `toJSON`, `toTree`, TestInstance wrappers, JS facade routing, native
   bridge execution, and broad public renderer compatibility remain blocked.
@@ -84,6 +94,8 @@ git diff --check
   parsed checked artifact.
 - Source audit blockers were addressed without reverting the prior
   `3eab522f` fix.
+- Remaining source audit blockers from `bf4bc9a8` were addressed without
+  reverting earlier accepted work.
 
 ## Risks Or Blockers
 

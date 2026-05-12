@@ -6138,9 +6138,36 @@ test("react-test-renderer serialization gate rejects premature public compatibil
   );
 });
 
-test("react-test-renderer serialization gate rejects evidence-level Fast React comparison claims", () => {
+test("react-test-renderer serialization gate rejects conformance-level Fast React comparison claims", () => {
+  const comparisonClaimOracle = JSON.parse(JSON.stringify(oracle));
+  comparisonClaimOracle.conformanceClaims.fastReactComparedToReactTestRenderer =
+    true;
+
+  const gate = evaluateReactTestRendererSerializationLocalGate({
+    oracle: comparisonClaimOracle
+  });
+
+  assert.equal(gate.status, "blocked-with-violations");
+  assert.equal(gate.privateDiagnosticsReady, true);
+  assert.equal(gate.publicCompatibilityReady, false);
+  assert.equal(gate.publicCompatibilityClaimed, true);
+  assert.deepEqual(
+    gate.violations.map((violation) => violation.id),
+    ["compatibility-claimed-before-public-serialization-support"]
+  );
+  assert.deepEqual(gate.violations[0].blockers, [
+    "public-to-json-api",
+    "public-to-tree-api",
+    "public-test-instance-wrappers",
+    "public-js-react-test-renderer-routing"
+  ]);
+});
+
+test("react-test-renderer serialization gate rejects evidence-level Fast React comparison and compatibility claims", () => {
   const evidenceClaimOracle = JSON.parse(JSON.stringify(oracle));
   evidenceClaimOracle.evidenceClaims.fastReactComparedToReactTestRenderer = true;
+  evidenceClaimOracle.evidenceClaims.fastReactBehaviorCompatible = true;
+  evidenceClaimOracle.evidenceClaims.compatibilityClaimed = true;
 
   const gate = evaluateReactTestRendererSerializationLocalGate({
     oracle: evidenceClaimOracle
@@ -6252,13 +6279,23 @@ test("react-test-renderer serialization gate rejects placeholder oracle status a
 test("react-test-renderer serialization gate rejects local Fast React comparison or compatibility status claims", () => {
   const claimedOracle = JSON.parse(JSON.stringify(oracle));
   claimedOracle.localFastReactStatus.comparedToReactTestRenderer = true;
+  claimedOracle.localFastReactStatus.fastReactComparedToReactTestRenderer = true;
   claimedOracle.localFastReactStatus.behaviorCompatibilityClaimed = true;
   claimedOracle.localFastReactStatus.compatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.packageCompatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.publicCompatibilityClaimed = true;
 
   const gate = evaluateReactTestRendererSerializationLocalGate({
     oracle: claimedOracle
   });
   const violationIds = gate.violations.map((violation) => violation.id);
+  const comparisonClaimFields = gate.violations
+    .filter(
+      (violation) =>
+        violation.id ===
+        "local-fast-react-status-claims-fast-react-comparison"
+    )
+    .map((violation) => violation.field);
   const compatibilityClaimFields = gate.violations
     .filter(
       (violation) =>
@@ -6274,13 +6311,19 @@ test("react-test-renderer serialization gate rejects local Fast React comparison
     ),
     true
   );
+  assert.deepEqual(comparisonClaimFields, [
+    "comparedToReactTestRenderer",
+    "fastReactComparedToReactTestRenderer"
+  ]);
   assert.equal(
     violationIds.includes("local-fast-react-status-claims-compatibility"),
     true
   );
   assert.deepEqual(compatibilityClaimFields, [
     "behaviorCompatibilityClaimed",
-    "compatibilityClaimed"
+    "compatibilityClaimed",
+    "packageCompatibilityClaimed",
+    "publicCompatibilityClaimed"
   ]);
   assert.equal(
     violationIds.includes(

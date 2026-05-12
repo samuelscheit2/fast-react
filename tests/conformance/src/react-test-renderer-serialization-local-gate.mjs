@@ -9,6 +9,8 @@ import {
   REACT_TEST_RENDERER_SERIALIZATION_SCENARIO_IDS
 } from "./react-test-renderer-serialization-scenarios.mjs";
 import {
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
 } from "./react-test-renderer-serialization-targets.mjs";
 
@@ -474,15 +476,14 @@ export function evaluateReactTestRendererSerializationLocalGate({
         scenario.compatibilityClaimed
     );
   const publicCompatibilityClaimed = Boolean(
-    oracle.conformanceClaims?.compatibilityClaimed ||
-      oracle.conformanceClaims?.fastReactBehaviorCompatible ||
-      oracle.evidenceClaims?.fastReactComparedToReactTestRenderer ||
-      oracle.localFastReactStatus?.behaviorCompatibilityClaimed ||
-      oracle.localFastReactStatus?.compatibilityClaimed ||
-      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
-        .behaviorCompatibilityClaimed ||
-      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
-        .compatibilityClaimed
+    hasReactTestRendererSerializationFastReactClaim(oracle.conformanceClaims) ||
+      hasReactTestRendererSerializationFastReactClaim(oracle.evidenceClaims) ||
+      hasReactTestRendererSerializationFastReactClaim(
+        oracle.localFastReactStatus
+      ) ||
+      hasReactTestRendererSerializationFastReactClaim(
+        REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
+      )
   );
   const publicCompatibilityBlockers =
     REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS.filter(
@@ -2471,40 +2472,58 @@ function appendLocalFastReactStatusClaimViolations({
     return;
   }
 
-  if (status.comparedToReactTestRenderer !== false) {
-    violations.push(
-      freezeRecord({
-        id: "local-fast-react-status-claims-fast-react-comparison",
-        source: sourceName,
-        reason:
-          "The React-only serialization oracle must not claim a Fast React react-test-renderer comparison."
-      })
-    );
+  appendLocalFastReactStatusClaimFieldViolations({
+    status,
+    sourceName,
+    fields: REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+    id: "local-fast-react-status-claims-fast-react-comparison",
+    reason:
+      "The React-only serialization oracle must not claim a Fast React react-test-renderer comparison.",
+    violations
+  });
+  appendLocalFastReactStatusClaimFieldViolations({
+    status,
+    sourceName,
+    fields:
+      REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS,
+    id: "local-fast-react-status-claims-compatibility",
+    reason:
+      "The React-only serialization oracle must not claim Fast React react-test-renderer compatibility.",
+    violations
+  });
+}
+
+function appendLocalFastReactStatusClaimFieldViolations({
+  status,
+  sourceName,
+  fields,
+  id,
+  reason,
+  violations
+}) {
+  for (const field of fields) {
+    if (Object.hasOwn(status, field) && status[field] !== false) {
+      violations.push(
+        freezeRecord({
+          id,
+          source: sourceName,
+          field,
+          reason
+        })
+      );
+    }
+  }
+}
+
+function hasReactTestRendererSerializationFastReactClaim(record) {
+  if (!record || typeof record !== "object") {
+    return false;
   }
 
-  if (status.behaviorCompatibilityClaimed !== false) {
-    violations.push(
-      freezeRecord({
-        id: "local-fast-react-status-claims-compatibility",
-        source: sourceName,
-        field: "behaviorCompatibilityClaimed",
-        reason:
-          "The React-only serialization oracle must not claim Fast React react-test-renderer compatibility."
-      })
-    );
-  }
-
-  if (status.compatibilityClaimed !== false) {
-    violations.push(
-      freezeRecord({
-        id: "local-fast-react-status-claims-compatibility",
-        source: sourceName,
-        field: "compatibilityClaimed",
-        reason:
-          "The React-only serialization oracle must not claim Fast React react-test-renderer compatibility."
-      })
-    );
-  }
+  return [
+    ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+    ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS
+  ].some((field) => Object.hasOwn(record, field) && record[field] !== false);
 }
 
 function expectedReactTestRendererSerializationLocalFastReactStatus(localChecks) {

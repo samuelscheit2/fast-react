@@ -110,8 +110,11 @@ test("react-test-renderer serialization oracle rejects stale or unsafe local Fas
 
   const claimedOracle = JSON.parse(JSON.stringify(oracle));
   claimedOracle.localFastReactStatus.comparedToReactTestRenderer = true;
+  claimedOracle.localFastReactStatus.fastReactComparedToReactTestRenderer = true;
   claimedOracle.localFastReactStatus.behaviorCompatibilityClaimed = true;
   claimedOracle.localFastReactStatus.compatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.packageCompatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.publicCompatibilityClaimed = true;
   assert.throws(
     () =>
       assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
@@ -120,8 +123,22 @@ test("react-test-renderer serialization oracle rejects stale or unsafe local Fas
     /local-fast-react-status-claims-fast-react-comparison/u
   );
 
+  const comparisonClaimedOracle = JSON.parse(JSON.stringify(oracle));
+  comparisonClaimedOracle.localFastReactStatus.fastReactComparedToReactTestRenderer =
+    true;
+  assert.throws(
+    () =>
+      assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
+        comparisonClaimedOracle
+      ),
+    /local-fast-react-status-claims-fast-react-comparison/u
+  );
+
   const compatibilityClaimedOracle = JSON.parse(JSON.stringify(oracle));
-  compatibilityClaimedOracle.localFastReactStatus.compatibilityClaimed = true;
+  compatibilityClaimedOracle.localFastReactStatus.packageCompatibilityClaimed =
+    true;
+  compatibilityClaimedOracle.localFastReactStatus.publicCompatibilityClaimed =
+    true;
   assert.throws(
     () =>
       assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(

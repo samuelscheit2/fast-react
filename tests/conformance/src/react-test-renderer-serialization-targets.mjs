@@ -58,6 +58,22 @@ export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS =
       "The current workspace has a local JS react-test-renderer placeholder package for private diagnostics, but no public Fast React test-renderer compatibility package to execute in this conformance oracle."
   });
 
+export const REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS =
+  freezeArray([
+    "comparedToReactTestRenderer",
+    "fastReactComparedToReactTestRenderer",
+    "fullDualRunOracleExists"
+  ]);
+
+export const REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS =
+  freezeArray([
+    "behaviorCompatibilityClaimed",
+    "fastReactBehaviorCompatible",
+    "compatibilityClaimed",
+    "packageCompatibilityClaimed",
+    "publicCompatibilityClaimed"
+  ]);
+
 export const REACT_TEST_RENDERER_SERIALIZATION_PACKAGES = [
   REACT_TEST_RENDERER_SERIALIZATION_TARGET,
   ...REACT_TEST_RENDERER_SERIALIZATION_SUPPORTING_TARGETS
@@ -94,4 +110,8 @@ export const REACT_TEST_RENDERER_SERIALIZATION_SOURCE_DOCUMENTS = [
 
 function freezeRecord(value) {
   return Object.freeze(value);
+}
+
+function freezeArray(value) {
+  return Object.freeze([...value]);
 }
