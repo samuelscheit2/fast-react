@@ -56,6 +56,17 @@ const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
 );
 const require = createRequire(import.meta.url);
 
+const MINIMAL_PUBLIC_CREATE_ROOT_SCENARIO_ID = "create-root-no-render";
+
+function isMinimalPublicCreateRootKnownMismatch({ scenarioId, comparison }) {
+  return (
+    scenarioId === MINIMAL_PUBLIC_CREATE_ROOT_SCENARIO_ID &&
+    comparison?.status === "known-mismatch" &&
+    comparison.compatibilityClaimed === false &&
+    comparison.firstDifferencePath !== null
+  );
+}
+
 export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_GATE_ID =
   "react-dom-root-public-facade-blocked-gate-1";
 
@@ -866,7 +877,7 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
 
   if (result.summary.blockedPublicFacadeRowCount > 0) {
     lines.push(
-      "Compatibility remains blocked; public createRoot/hydrateRoot/root lifecycle behavior is still placeholder-only."
+      "Compatibility remains blocked; minimal public createRoot/div-text rendering is scoped while hydrateRoot, updates, unmount lifecycle, and broad root behavior stay fail-closed."
     );
   }
   if (result.summary.blockedPrivateBridgeRowCount > 0) {
@@ -2440,9 +2451,13 @@ function validatePublicFacadeScenarioAdmissions({
         continue;
       }
       if (
-        comparison.status === "unsupported-placeholder" &&
-        comparison.compatibilityClaimed === false &&
-        comparison.firstDifferencePath !== null
+        (comparison.status === "unsupported-placeholder" &&
+          comparison.compatibilityClaimed === false &&
+          comparison.firstDifferencePath !== null) ||
+        isMinimalPublicCreateRootKnownMismatch({
+          scenarioId,
+          comparison
+        })
       ) {
         blockedScenarioModeRows.push({
           modeId: mode.id,
