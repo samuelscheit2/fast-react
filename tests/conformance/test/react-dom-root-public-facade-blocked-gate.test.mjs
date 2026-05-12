@@ -103,23 +103,33 @@ const hydrateRootLifecycleBoundaryBlockedFields = Object.freeze([
 ]);
 
 const MINIMAL_PUBLIC_DIV_TEXT_ID = 'app&<>"';
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID = 'next&<>"';
 const MINIMAL_PUBLIC_DIV_TEXT = "hello & < >";
 const MINIMAL_PUBLIC_DIV_TEXT_ESCAPED = "hello &amp; &lt; &gt;";
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE = "again & < >";
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED = "again &amp; &lt; &gt;";
+const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL = "id removed & < >";
+const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_ESCAPED =
+  "id removed &amp; &lt; &gt;";
 const MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED = "app&amp;&lt;&gt;&quot;";
+const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID_ESCAPED = "next&amp;&lt;&gt;&quot;";
 const SIMPLE_PUBLIC_DIV_TEXT_API =
   'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))';
 
-function minimalPublicDivTextApi(text) {
-  return `ReactDOMClient.createRoot(container).render(React.createElement("div", { id: ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID)} }, ${JSON.stringify(text)}))`;
+function minimalPublicDivTextApi(text, id = MINIMAL_PUBLIC_DIV_TEXT_ID) {
+  const props =
+    id === null ? "null" : `{ id: ${JSON.stringify(id)} }`;
+  return `ReactDOMClient.createRoot(container).render(React.createElement("div", ${props}, ${JSON.stringify(text)}))`;
 }
 
 const MINIMAL_PUBLIC_DIV_TEXT_RENDER_API =
   minimalPublicDivTextApi(MINIMAL_PUBLIC_DIV_TEXT);
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API = minimalPublicDivTextApi(
-  MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+  MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+  MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID
 );
+const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API =
+  `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.render(React.createElement("div", null, ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL)}))`;
 const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API =
   `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.unmount()`;
 
@@ -130,8 +140,13 @@ const MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT = Object.freeze({
   containerFirstElementChildAttributes: Object.freeze([
     Object.freeze(["id", MINIMAL_PUBLIC_DIV_TEXT_ID])
   ]),
+  containerFirstElementChildGetAttributeId: MINIMAL_PUBLIC_DIV_TEXT_ID,
   containerFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_ESCAPED,
   containerFirstElementChildNodeName: "DIV",
+  containerFirstElementChildStoredPropsChildren: MINIMAL_PUBLIC_DIV_TEXT,
+  containerFirstElementChildStoredPropsHasId: true,
+  containerFirstElementChildStoredPropsId: MINIMAL_PUBLIC_DIV_TEXT_ID,
+  containerFirstElementChildStoredPropsSameObject: true,
   containerFirstElementChildTagName: "DIV",
   containerFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_TEXT,
   containerInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_ESCAPED}</div>`,
@@ -145,15 +160,43 @@ const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_SNAPSHOT = Object.freeze({
   containerChildNodeNames: Object.freeze(["DIV"]),
   containerChildrenCount: 1,
   containerFirstElementChildAttributes: Object.freeze([
-    Object.freeze(["id", MINIMAL_PUBLIC_DIV_TEXT_ID])
+    Object.freeze(["id", MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID])
   ]),
+  containerFirstElementChildGetAttributeId: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID,
   containerFirstElementChildInnerHTML: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED,
   containerFirstElementChildNodeName: "DIV",
+  containerFirstElementChildStoredPropsChildren:
+    MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+  containerFirstElementChildStoredPropsHasId: true,
+  containerFirstElementChildStoredPropsId: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID,
+  containerFirstElementChildStoredPropsSameObject: true,
   containerFirstElementChildTagName: "DIV",
   containerFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
-  containerInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED}</div>`,
+  containerInnerHTML: `<div id="${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED}</div>`,
   containerMutationLog: Object.freeze([Object.freeze(["appendChild", "DIV"])]),
   containerTextContent: MINIMAL_PUBLIC_DIV_TEXT_UPDATE,
+  ownerDocumentChildCount: 0,
+  ownerDocumentMutationLog: Object.freeze([])
+});
+const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_SNAPSHOT = Object.freeze({
+  containerChildCount: 1,
+  containerChildNodeNames: Object.freeze(["DIV"]),
+  containerChildrenCount: 1,
+  containerFirstElementChildAttributes: Object.freeze([]),
+  containerFirstElementChildGetAttributeId: null,
+  containerFirstElementChildInnerHTML:
+    MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_ESCAPED,
+  containerFirstElementChildNodeName: "DIV",
+  containerFirstElementChildStoredPropsChildren:
+    MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL,
+  containerFirstElementChildStoredPropsHasId: false,
+  containerFirstElementChildStoredPropsId: null,
+  containerFirstElementChildStoredPropsSameObject: true,
+  containerFirstElementChildTagName: "DIV",
+  containerFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL,
+  containerInnerHTML: `<div>${MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_ESCAPED}</div>`,
+  containerMutationLog: Object.freeze([Object.freeze(["appendChild", "DIV"])]),
+  containerTextContent: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL,
   ownerDocumentChildCount: 0,
   ownerDocumentMutationLog: Object.freeze([])
 });
@@ -162,8 +205,13 @@ const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_SNAPSHOT = Object.freeze({
   containerChildNodeNames: Object.freeze([]),
   containerChildrenCount: 0,
   containerFirstElementChildAttributes: null,
+  containerFirstElementChildGetAttributeId: null,
   containerFirstElementChildInnerHTML: null,
   containerFirstElementChildNodeName: null,
+  containerFirstElementChildStoredPropsChildren: null,
+  containerFirstElementChildStoredPropsHasId: null,
+  containerFirstElementChildStoredPropsId: null,
+  containerFirstElementChildStoredPropsSameObject: null,
   containerFirstElementChildTagName: null,
   containerFirstElementChildTextContent: null,
   containerInnerHTML: "",
@@ -286,6 +334,48 @@ function assertMinimalPublicDivTextUpdateLifecycle(publicBoundary) {
   );
 }
 
+function assertMinimalPublicDivTextIdRemovalLifecycle(publicBoundary) {
+  const renderIdRemoval =
+    publicBoundary.publicRootLifecycle.renderIdRemoval;
+  assert.equal(
+    renderIdRemoval.label,
+    MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API
+  );
+  assert.equal(renderIdRemoval.status, "ok");
+  assert.equal(renderIdRemoval.value.type, "undefined");
+  assert.equal(renderIdRemoval.compatibilityClaimed, false);
+  assert.equal(renderIdRemoval.controlledDomShim, true);
+  assert.equal(renderIdRemoval.renderElementType, "div");
+  assert.equal(
+    renderIdRemoval.renderTextContent,
+    MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL
+  );
+  assert.equal(renderIdRemoval.hostNodeReused, true);
+  assert.equal(renderIdRemoval.rootObjectCreated, true);
+  assert.equal(renderIdRemoval.lifecycleOperationAttempted, true);
+  assert.equal(renderIdRemoval.createRootAttempt.status, "ok");
+  assert.deepEqual(
+    renderIdRemoval.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_SNAPSHOT
+  );
+  assert.equal(renderIdRemoval.sideEffects.mutationCount, 1);
+  assert.equal(renderIdRemoval.sideEffects.listenerRegistrationCount, 0);
+  assert.equal(
+    renderIdRemoval.sideEffects.ownerDocumentListenerRegistrationCount,
+    0
+  );
+  assert.equal(renderIdRemoval.sideEffects.ownerDocumentMutationCount, 0);
+  assert.equal(renderIdRemoval.sideEffects.containerMarker.propertyCount, 0);
+  assert.equal(
+    renderIdRemoval.sideEffects.containerListeningMarker.propertyCount,
+    0
+  );
+  assert.equal(
+    renderIdRemoval.sideEffects.ownerDocumentListeningMarker.propertyCount,
+    0
+  );
+}
+
 function assertMinimalPublicDivTextUnmountLifecycle(publicBoundary) {
   const unmount = publicBoundary.publicRootLifecycle.unmount;
   assert.equal(
@@ -340,6 +430,7 @@ function assertMinimalPublicRootBoundary(publicBoundary) {
   );
   assertMinimalPublicDivTextLifecycle(publicBoundary);
   assertMinimalPublicDivTextUpdateLifecycle(publicBoundary);
+  assertMinimalPublicDivTextIdRemovalLifecycle(publicBoundary);
   assertMinimalPublicDivTextUnmountLifecycle(publicBoundary);
 }
 
@@ -902,6 +993,52 @@ test("React DOM public createRoot rejects explicit options and extra arguments",
   );
   assert.equal(container.firstChild.textContent, MINIMAL_PUBLIC_DIV_TEXT);
   assert.equal(container.textContent, MINIMAL_PUBLIC_DIV_TEXT);
+  const initialHostNode = container.firstChild;
+
+  assert.equal(
+    root.render(
+      React.createElement(
+        "div",
+        { id: MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID },
+        MINIMAL_PUBLIC_DIV_TEXT_UPDATE
+      )
+    ),
+    undefined
+  );
+  assert.equal(container.firstChild, initialHostNode);
+  assert.deepEqual(attributeEntries(container.firstChild), [
+    ["id", MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID]
+  ]);
+  assert.equal(
+    container.firstChild.getAttribute("id"),
+    MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID
+  );
+  assert.equal(container.firstChild.textContent, MINIMAL_PUBLIC_DIV_TEXT_UPDATE);
+  assert.equal(container.textContent, MINIMAL_PUBLIC_DIV_TEXT_UPDATE);
+
+  assert.equal(
+    root.render(
+      React.createElement("div", null, MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL)
+    ),
+    undefined
+  );
+  assert.equal(container.firstChild, initialHostNode);
+  assert.deepEqual(attributeEntries(container.firstChild), []);
+  assert.equal(container.firstChild.getAttribute("id"), null);
+  assert.equal(
+    container.firstChild.textContent,
+    MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL
+  );
+  assert.equal(container.textContent, MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL);
+  assert.equal(root.unmount(), undefined);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(container.textContent, "");
+  assert.equal(
+    rootMarkers.inspectContainerRootMarker(container).propertyCount,
+    0
+  );
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
 });
 
 test("React DOM client private facade adapter is symbol-only and routes to private records", () => {
@@ -4717,6 +4854,7 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
       "react-dom/client.createRoot(...).render(initial)",
       MINIMAL_PUBLIC_DIV_TEXT_RENDER_API,
       MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API,
+      MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API,
       MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API
     ]
   );
@@ -4763,6 +4901,23 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
   assert.deepEqual(
     publicUpdateRow.controlledDomSnapshot,
     MINIMAL_PUBLIC_DIV_TEXT_UPDATE_SNAPSHOT
+  );
+  const publicIdRemovalRow = lifecycleRows.find(
+    (row) => row.id === "public-create-root-render-id-removal"
+  );
+  assert.ok(publicIdRemovalRow);
+  assert.equal(publicIdRemovalRow.controlledDomShim, true);
+  assert.equal(publicIdRemovalRow.minimalDivTextHostOutputIdRemoved, true);
+  assert.equal(publicIdRemovalRow.hostNodeReused, true);
+  assert.equal(publicIdRemovalRow.mutationCount, 1);
+  assert.equal(
+    publicIdRemovalRow.privateBridgeEvidence,
+    "wrapped-private-facade-host-output"
+  );
+  assert.equal(publicIdRemovalRow.renderReturnType, "undefined");
+  assert.deepEqual(
+    publicIdRemovalRow.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_SNAPSHOT
   );
   const publicUnmountRow = lifecycleRows.find(
     (row) => row.id === "public-create-root-unmount-call"
@@ -4948,6 +5103,27 @@ test("React DOM public root facade gate records minimal public div text render",
       }
     },
     {
+      label: "serializes raw getAttribute id",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerFirstElementChildGetAttributeId =
+          MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED;
+      }
+    },
+    {
+      label: "serializes stored props id",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerFirstElementChildStoredPropsId =
+          MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED;
+      }
+    },
+    {
+      label: "drops stored props identity",
+      mutate(operation) {
+        operation.controlledDomSnapshot
+          .containerFirstElementChildStoredPropsSameObject = false;
+      }
+    },
+    {
       label: "omits mutation log",
       mutate(operation) {
         delete operation.controlledDomSnapshot.containerMutationLog;
@@ -4976,6 +5152,126 @@ test("React DOM public root facade gate records minimal public div text render",
     assert.ok(
       tamperedGate.failures.some(
         (failure) => failure.id === "public-create-root-render-div-text"
+      ),
+      falseGreenCase.label
+    );
+  }
+
+  const updateFalseGreenCases = [
+    {
+      expectedId: "public-create-root-render-update",
+      label: "uses stale initial id attributes after update",
+      operationKey: "renderUpdate",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerFirstElementChildAttributes = [
+          ["id", MINIMAL_PUBLIC_DIV_TEXT_ID]
+        ];
+        operation.controlledDomSnapshot.containerInnerHTML =
+          `<div id="${MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ESCAPED}</div>`;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-update",
+      label: "omits updated attr fields",
+      operationKey: "renderUpdate",
+      mutate(operation) {
+        delete operation.controlledDomSnapshot
+          .containerFirstElementChildAttributes;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-update",
+      label: "serializes updated getAttribute id",
+      operationKey: "renderUpdate",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerFirstElementChildGetAttributeId =
+          MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID_ESCAPED;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-update",
+      label: "keeps stale stored props id after update",
+      operationKey: "renderUpdate",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerFirstElementChildStoredPropsId =
+          MINIMAL_PUBLIC_DIV_TEXT_ID;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-update",
+      label: "drops updated stored props identity",
+      operationKey: "renderUpdate",
+      mutate(operation) {
+        operation.controlledDomSnapshot
+          .containerFirstElementChildStoredPropsSameObject = false;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-update",
+      label: "claims update compatibility",
+      operationKey: "renderUpdate",
+      mutate(operation) {
+        operation.compatibilityClaimed = true;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-id-removal",
+      label: "keeps stale id after removal",
+      operationKey: "renderIdRemoval",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerFirstElementChildAttributes = [
+          ["id", MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID]
+        ];
+        operation.controlledDomSnapshot.containerInnerHTML =
+          `<div id="${MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID_ESCAPED}">${MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_ESCAPED}</div>`;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-id-removal",
+      label: "retains raw getAttribute id after removal",
+      operationKey: "renderIdRemoval",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerFirstElementChildGetAttributeId =
+          MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-id-removal",
+      label: "retains stored props id after removal",
+      operationKey: "renderIdRemoval",
+      mutate(operation) {
+        operation.controlledDomSnapshot
+          .containerFirstElementChildStoredPropsHasId = true;
+        operation.controlledDomSnapshot.containerFirstElementChildStoredPropsId =
+          MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID;
+      }
+    },
+    {
+      expectedId: "public-create-root-render-id-removal",
+      label: "omits removed attr fields",
+      operationKey: "renderIdRemoval",
+      mutate(operation) {
+        delete operation.controlledDomSnapshot
+          .containerFirstElementChildAttributes;
+      }
+    }
+  ];
+  for (const falseGreenCase of updateFalseGreenCases) {
+    const tamperedBoundary = clone(publicBoundary);
+    falseGreenCase.mutate(
+      tamperedBoundary.publicRootLifecycle[falseGreenCase.operationKey]
+    );
+    const tamperedGate = evaluateReactDomRootPublicFacadeBlockedGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle,
+      clientRootOracle,
+      localPublicFacadeBoundary: tamperedBoundary,
+      privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
+    });
+    assert.equal(tamperedGate.ok, false, falseGreenCase.label);
+    assert.ok(
+      tamperedGate.failures.some(
+        (failure) => failure.id === falseGreenCase.expectedId
       ),
       falseGreenCase.label
     );
