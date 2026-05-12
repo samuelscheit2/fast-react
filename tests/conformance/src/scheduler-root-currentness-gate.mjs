@@ -683,7 +683,7 @@ function sourceRowMatchesDefinition(row, definition) {
 
   const keyManifest = compareStringSets(
     expectedSourceRowKeys(definition),
-    Object.keys(row)
+    ownPropertyKeyNames(row)
   );
   const modeMatches =
     definition.modeId === undefined
@@ -691,8 +691,10 @@ function sourceRowMatchesDefinition(row, definition) {
       : row.modeId === definition.modeId;
 
   return (
+    hasPlainObjectPrototype(row) &&
     keyManifest.missing.length === 0 &&
     keyManifest.unexpected.length === 0 &&
+    ownKeysAreEnumerableDataProperties(row, expectedSourceRowKeys(definition)) &&
     row.rowId === definition.rowId &&
     row.entrypoint === definition.entrypoint &&
     row.sourcePath === definition.sourcePath &&
@@ -836,26 +838,89 @@ function normalizeClaimName(claim) {
 }
 
 function objectHasPublicClaim(value) {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  return Object.entries(value).some(
-    ([claim, claimValue]) =>
-      isBlockedPublicClaimName(claim) && claimValue !== false
-  );
+  return findObjectPublicClaimNames(value).length > 0;
 }
 
 function pushObjectPublicClaimIds(claimIds, value, prefix) {
+  for (const claim of findObjectPublicClaimNames(value)) {
+    claimIds.push(`${prefix}.${claim}`);
+  }
+}
+
+function findObjectPublicClaimNames(value) {
   if (!value || typeof value !== "object") {
+    return freezeArray([]);
+  }
+
+  const claimNames = [];
+  pushOwnPublicClaimNames(claimNames, value);
+  pushInheritedPublicClaimNames(claimNames, value);
+  return uniqueStrings(claimNames);
+}
+
+function pushOwnPublicClaimNames(claimNames, value) {
+  for (const key of Reflect.ownKeys(value)) {
+    pushPublicClaimNameForDescriptor(
+      claimNames,
+      key,
+      Reflect.getOwnPropertyDescriptor(value, key)
+    );
+  }
+}
+
+function pushInheritedPublicClaimNames(claimNames, value) {
+  let prototype = Object.getPrototypeOf(value);
+  while (prototype && prototype !== Object.prototype) {
+    for (const key of Reflect.ownKeys(prototype)) {
+      pushPublicClaimNameForDescriptor(
+        claimNames,
+        key,
+        Reflect.getOwnPropertyDescriptor(prototype, key)
+      );
+    }
+    prototype = Object.getPrototypeOf(prototype);
+  }
+}
+
+function pushPublicClaimNameForDescriptor(claimNames, key, descriptor) {
+  const claim = formatPropertyKey(key);
+  if (!descriptor || !isBlockedPublicClaimName(claim)) {
     return;
   }
 
-  for (const [claim, claimValue] of Object.entries(value)) {
-    if (isBlockedPublicClaimName(claim) && claimValue !== false) {
-      claimIds.push(`${prefix}.${claim}`);
-    }
+  if (descriptorIsAccessor(descriptor) || descriptor.value !== false) {
+    claimNames.push(claim);
   }
+}
+
+function ownPropertyKeyNames(value) {
+  return freezeArray(Reflect.ownKeys(value).map(formatPropertyKey));
+}
+
+function ownKeysAreEnumerableDataProperties(value, expectedKeys) {
+  return expectedKeys.every((key) => {
+    const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+    return (
+      descriptor !== undefined &&
+      descriptor.enumerable === true &&
+      !descriptorIsAccessor(descriptor)
+    );
+  });
+}
+
+function descriptorIsAccessor(descriptor) {
+  return (
+    Object.prototype.hasOwnProperty.call(descriptor, "get") ||
+    Object.prototype.hasOwnProperty.call(descriptor, "set")
+  );
+}
+
+function hasPlainObjectPrototype(value) {
+  return Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function formatPropertyKey(key) {
+  return typeof key === "symbol" ? key.toString() : key;
 }
 
 function comparableObservation(observation) {
