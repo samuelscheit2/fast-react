@@ -47,10 +47,11 @@
 - A hostile proxy rejects with `public-react-act-currentness-source-proof`, and the test asserts its traps were not reached.
 - A source-owned report created while `Object.freeze` is temporarily bypassed rejects with `public-react-act-currentness-not-frozen`.
 - Public React.act compatibility, warning compatibility, queue draining, callback invocation, thenable return, renderer/root execution, package compatibility, and scheduler/root execution remain false or blocked in the conformance assertions.
+- Late source audit found the branch also aligned `reactDomClientRootPlaceholder` to `false`. That reflects already accepted minimal public ReactDOM client fake-DOM root lifecycle evidence, not a new React.act or renderer-root compatibility claim; `rendererRootsReady` remains `false` because `testRendererRootPlaceholder` is still `true`.
 
 ## Risks / Blockers
 
-- No blockers.
+- Late source audit required an explicit note for the root-placeholder assertion alignment.
 - Residual overlap risk is limited to other workers editing the same React.act gate or conformance files.
 
 ## Recommended Next Tasks

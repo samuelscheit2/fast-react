@@ -248,6 +248,9 @@ test("public React.act gate stays blocked until act queue flushing, effects, and
     "public-renderer-roots-placeholder-blocked"
   );
   assert.equal(gate.localChecks.rendererRootsReady, false);
+  // ReactDOM client createRoot is no longer a pure placeholder after the
+  // accepted minimal fake-DOM root lifecycle, but public React.act stays
+  // blocked until every renderer root path is ready.
   assert.equal(gate.localChecks.reactDomClientRootPlaceholder, false);
   assert.equal(gate.localChecks.testRendererRootPlaceholder, true);
 });
