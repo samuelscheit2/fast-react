@@ -29,6 +29,136 @@ fn root_work_loop_preflight_fails_closed_through_begin_work_for_unhandled_child_
 }
 
 #[test]
+fn root_work_loop_reconciles_host_root_mount_to_host_component_with_text_child() {
+    let (mut store, root_id, host) = root_store();
+    let mut source = TestHostTree::new();
+    let element = source.insert_host_element_with_text("div", "mounted");
+    let current = store.root(root_id).unwrap().current();
+    update_container(&mut store, root_id, element, None).unwrap();
+
+    let record = render_host_root_for_lanes_with_test_host_mount_reconciliation(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let render = record.render();
+
+    assert_eq!(record.root(), root_id);
+    assert_eq!(record.current(), current);
+    assert_eq!(
+        record.host_root_work_in_progress(),
+        render.work_in_progress()
+    );
+    assert_eq!(record.root_element(), element);
+    assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+    assert_eq!(record.root_child_tag(), FiberTag::HostComponent);
+    assert_eq!(record.text_child_tag(), FiberTag::HostText);
+    assert_eq!(record.root_child_count(), 1);
+    assert_eq!(record.component_child_count(), 1);
+    assert!(record.proves_single_host_component_with_text_child());
+    assert_eq!(render.resulting_element(), element);
+    assert_eq!(render.applied_update_count(), 1);
+    assert_eq!(render.skipped_update_count(), 0);
+    assert_eq!(render.remaining_lanes(), Lanes::NO);
+
+    let host_root = store
+        .fiber_arena()
+        .get(record.host_root_work_in_progress())
+        .unwrap();
+    assert_eq!(host_root.tag(), FiberTag::HostRoot);
+    assert_eq!(host_root.child(), Some(record.root_child()));
+    assert_eq!(host_root.child_lanes(), Lanes::DEFAULT);
+    assert!(
+        host_root
+            .subtree_flags()
+            .contains_all(FiberFlags::PLACEMENT)
+    );
+
+    let component = store.fiber_arena().get(record.root_child()).unwrap();
+    assert_eq!(component.tag(), FiberTag::HostComponent);
+    assert_eq!(
+        component.return_fiber(),
+        Some(record.host_root_work_in_progress())
+    );
+    assert_eq!(component.sibling(), None);
+    assert_eq!(component.child(), Some(record.text_child()));
+    assert_eq!(component.pending_props(), record.root_child_props());
+    assert_eq!(component.element_type(), record.root_child_element_type());
+    assert_eq!(component.state_node(), StateNodeHandle::NONE);
+    assert_eq!(component.lanes(), Lanes::DEFAULT);
+    assert!(component.flags().contains_all(FiberFlags::PLACEMENT));
+
+    let text = store.fiber_arena().get(record.text_child()).unwrap();
+    assert_eq!(text.tag(), FiberTag::HostText);
+    assert_eq!(text.return_fiber(), Some(record.root_child()));
+    assert_eq!(text.sibling(), None);
+    assert_eq!(text.child(), None);
+    assert_eq!(text.pending_props(), record.text_child_props());
+    assert_eq!(text.state_node(), StateNodeHandle::NONE);
+    assert_eq!(text.lanes(), Lanes::DEFAULT);
+    assert_eq!(text.flags(), FiberFlags::NO);
+
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    assert_eq!(
+        store.root(root_id).unwrap().scheduling().work_in_progress(),
+        Some(record.host_root_work_in_progress())
+    );
+    assert_eq!(
+        store
+            .root(root_id)
+            .unwrap()
+            .scheduling()
+            .render_exit_status(),
+        RootRenderExitStatus::Completed
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_work_loop_host_root_mount_reconciliation_rejects_root_text() {
+    let (mut store, root_id, host) = root_store();
+    let mut source = TestHostTree::new();
+    let element = source.insert_text("root text");
+    let current = store.root(root_id).unwrap().current();
+    update_container(&mut store, root_id, element, None).unwrap();
+
+    let error = render_host_root_for_lanes_with_test_host_mount_reconciliation(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        HostRootMountReconciliationError::ExpectedHostComponentRoot {
+            root: root_id,
+            element,
+            tag: FiberTag::HostText,
+        }
+    );
+    let work_in_progress = store
+        .root(root_id)
+        .unwrap()
+        .scheduling()
+        .work_in_progress()
+        .unwrap();
+    assert_eq!(
+        store.fiber_arena().get(work_in_progress).unwrap().child(),
+        None
+    );
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
 fn root_work_loop_hands_host_component_child_to_test_complete_work() {
     let (mut store, root_id, mut host) = root_store();
     let mut source = TestHostTree::new();

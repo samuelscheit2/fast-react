@@ -236,6 +236,15 @@ impl From<WorkInProgressError> for RootWorkLoopError {
 
 mod render_phase;
 
+#[cfg(test)]
+#[allow(
+    unused_imports,
+    reason = "private HostRoot mount reconciliation canaries import these through the root work-loop test module"
+)]
+use render_phase::{
+    HostRootMountReconciliationError,
+    render_host_root_for_lanes_with_test_host_mount_reconciliation,
+};
 pub use render_phase::{
     HostRootRenderPhaseRecord, SchedulerCallbackHostRootRenderResult,
     SchedulerCallbackRenderStatus, SchedulerCallbackValidationRecord, render_host_root_for_lanes,
