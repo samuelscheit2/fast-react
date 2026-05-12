@@ -68,7 +68,7 @@ mod deletions;
 mod effects;
 mod errors;
 
-use self::effects::{committed_subtree_contains_fiber, record_pending_passive_commit_handoff};
+use self::effects::record_pending_passive_commit_handoff;
 #[allow(
     unused_imports,
     reason = "public deletion cleanup record path is preserved for host-work handoffs"
