@@ -814,14 +814,25 @@ function findPublicCompatibilityClaimIds({
 }
 
 function isCompatibilityClaimName(claim) {
-  return /compatible|compatibilityClaimed/ui.test(claim);
+  const normalizedClaim = normalizeClaimName(claim);
+  return (
+    normalizedClaim.includes("compatible") ||
+    normalizedClaim.includes("compatibilityclaimed")
+  );
 }
 
 function isBlockedPublicClaimName(claim) {
+  const normalizedClaim = normalizeClaimName(claim);
   return (
-    SCHEDULER_ROOT_CURRENTNESS_BLOCKED_PUBLIC_CLAIMS.includes(claim) ||
+    SCHEDULER_ROOT_CURRENTNESS_BLOCKED_PUBLIC_CLAIMS.some(
+      (blockedClaim) => normalizeClaimName(blockedClaim) === normalizedClaim
+    ) ||
     isCompatibilityClaimName(claim)
   );
+}
+
+function normalizeClaimName(claim) {
+  return String(claim).replace(/[_-]/gu, "").toLowerCase();
 }
 
 function objectHasPublicClaim(value) {

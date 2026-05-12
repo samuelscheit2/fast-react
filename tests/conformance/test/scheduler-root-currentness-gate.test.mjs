@@ -720,6 +720,48 @@ test("Scheduler root currentness gate rejects claim-like fields on local rows an
   );
 });
 
+test("Scheduler root currentness gate rejects snake_case compatibility aliases on local rows and behavior evidence", () => {
+  const localObservationRows = cloneJson(baselineGate().localObservationRows);
+  rowById(
+    localObservationRows,
+    "default-node-development:scheduler-root-export-shape"
+  ).public_native_compatibility_claimed = true;
+  const taskShapeRow = rowById(
+    localObservationRows,
+    "default-node-development:scheduler-root-task-object-shape"
+  );
+  taskShapeRow.behaviorEvidence = {
+    ...taskShapeRow.behaviorEvidence,
+    public_package_compatibility_claimed: true
+  };
+
+  const gate = evaluateWithBaselineRows({
+    localObservationRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-row-compatibility-claim-detected"
+    ).rowIds,
+    [
+      "default-node-development:scheduler-root-export-shape",
+      "default-node-development:scheduler-root-task-object-shape"
+    ]
+  );
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-public-compatibility-claim-detected"
+    ).rowIds,
+    [
+      "default-node-development:scheduler-root-export-shape.public_native_compatibility_claimed",
+      "default-node-development:scheduler-root-task-object-shape.behaviorEvidence.public_package_compatibility_claimed"
+    ]
+  );
+});
+
 test("Scheduler root currentness gate rejects variant, deep-CJS, native, mock, or postTask evidence as root behavior evidence", () => {
   const localObservationRows = cloneJson(baselineGate().localObservationRows);
   rowById(
