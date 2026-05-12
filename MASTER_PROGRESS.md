@@ -29,6 +29,52 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1241, 1242, and 1244 Sync-Flush, Root Null Cleanup, and Passive Destroy Canaries
+
+- Worker 1241 added a crate-private/test-only sync-flush minimal HostRoot
+  render -> complete -> host placement canary. It consumes an existing
+  `RootSyncFlushRecord`, validates rendered-awaiting-commit status, sync-only
+  lanes, root/current/finished-work identity, stale/replay evidence, resolver
+  and adapter fail-closed behavior, and pending sync work after a partial
+  one-root commit while keeping public React DOM, public test-renderer, public
+  `flushSync`, browser DOM, effects, refs, hydration, native/package
+  compatibility, and public root rendering blocked. A source-audit residual was
+  repaired with a dedicated wrong-root forged-record canary.
+- Worker 1242 extended only the already accepted fake-DOM public root lifecycle:
+  `root.render(null)` clears active fake-DOM host output and keeps the same root
+  reusable, and public `root.unmount()` is idempotent including repeated unmount
+  and unmount after `render(null)`. Unsupported render shapes, options,
+  callbacks, events, refs, hydration, resources/forms, native/browser DOM, and
+  broad compatibility remain blocked. Worker 1242 repair `7c004395` aligned
+  stale package-level unmount expectations with that accepted behavior while
+  preserving stale `root.render(...)` after unmount fail-closed assertions and
+  duplicate-root guard coverage.
+- Worker 1244 added private Rust/canary passive destroy clear-before-invoke
+  evidence for committed FunctionComponent hook effects and deleted-subtree
+  cleanup. Missing/stale/mismatched hook storage, replay/double consume,
+  executor error after clear, unchanged/wrong-record preservation, returned
+  create destroy persistence, deleted-subtree cleanup, and non-deleted subtree
+  rejection are covered while public `useEffect`, public `act`,
+  scheduler-driven public passive flushing, React DOM, test-renderer,
+  native/package, and broad compatibility remain blocked.
+- Accepted validation includes clean independent source and verification audits
+  for Worker 1241 plus the cross-root repair, post-merge independent source and
+  verification audits for Workers 1242 and 1244, and clean repair audits for
+  Worker 1242 package expectations. Root reruns passed Worker 1241's
+  sync-flush minimal placement, private host mutation, root commit continuation,
+  minimal render/complete placement, and `root_work_loop` Rust filters; Worker
+  1244's focused passive destroy/deleted-subtree/function-component persistence
+  filters plus `passive`; Worker 1242's React DOM package symbol-facade test,
+  `@fast-react/react-dom` check, private root-bridge smoke, public-facade and
+  root-render E2E conformance tests/scripts, package-surface guard, import
+  smoke, `cargo check -p fast-react-reconciler --all-features`,
+  `cargo fmt --all --check`, and `git diff --check`.
+- The accepted implementation/evidence baseline is main `b7096a16` after Worker
+  1244 merge `fd360514`, Worker 1241 merges `4ba62477` and `1dc9c2e7`, Worker
+  1242 merge `b4d58c60`, and Worker 1242 repair merge `b7096a16`, plus worker
+  commits `ad4de57d`, `b9b4fe0d`, `c6ad5527`, `a66cd7bc`, `649c5a65`,
+  `4230d343`, `8f95a2c6`, and `7c004395`.
+
 ### Workers 1237, 1238, and 1240 Exact-Three, Public Wrapper Blockers, and Private Ledger Refresh
 
 - Worker 1237 repaired the orphaned exact-three Rust branch as a bounded
