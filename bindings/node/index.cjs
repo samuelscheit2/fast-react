@@ -15,16 +15,46 @@ const nativeRootBridgeRequestShapeGateStatus =
 const nativeRootWorkLoopFinishedWorkMetadataFactorySymbol = Symbol.for(
   'fast.react_native.private_root_work_loop_finished_work_metadata_factory'
 );
+const nativeReactDomRenderHandoffAdmissionSymbol = Symbol.for(
+  'fast.react_native.private_react_dom_render_handoff_admission'
+);
 const nativeRootWorkLoopFinishedWorkMetadataFactoryErrorCode =
   'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_INVALID_OPTIONS';
 const nativeRootWorkLoopFinishedWorkMetadataFactoryCapabilityClaimErrorCode =
   'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_CAPABILITY_CLAIM';
+const nativeReactDomRenderHandoffAdmissionErrorCode =
+  'FAST_REACT_NAPI_REACT_DOM_RENDER_HANDOFF_ADMISSION_INVALID';
+const nativeReactDomRenderHandoffAdmissionCapabilityClaimErrorCode =
+  'FAST_REACT_NAPI_REACT_DOM_RENDER_HANDOFF_ADMISSION_CAPABILITY_CLAIM';
+const nativeReactDomRenderHandoffAdmissionStatus =
+  'admitted-private-react-dom-render-native-handoff-without-public-native-or-browser-dom-execution';
 const nativeRootWorkLoopFinishedWorkMetadataSource =
   'fast-react-reconciler.root-work-loop.finished-work-handoff';
 const nativeRootWorkLoopFinishedWorkMetadataStatus =
   'accepted-private-root-work-loop-finished-work-handoff-metadata';
 const nativeRootWorkLoopFinishedWorkMetadataRevision =
   'root-work-loop-finished-work-handoff-2026-05-10';
+const nativeReactDomRenderHandoffExpectedKind =
+  'FastReactDomPrivateRootRenderNativeHandoffRecord';
+const nativeReactDomRenderHandoffExpectedType =
+  'fast.react_dom.private_root_render_native_handoff_record';
+const nativeReactDomRenderHandoffExpectedOperation =
+  'private-root-render-native-handoff';
+const nativeReactDomRenderHandoffExpectedEntrypoint = 'react-dom/client';
+const nativeReactDomRenderHandoffExpectedStatus =
+  'accepted-private-root-render-native-handoff-metadata';
+const nativeReactDomRenderHandoffAdapterReadyStatus =
+  'ready-private-react-dom-client-root-public-facade-adapter';
+const nativeReactDomRenderHandoffLifecycleAdmissionStatus =
+  'admitted-private-root-bridge-request-record';
+const nativeReactDomRenderHandoffLifecycleBoundaryStatus =
+  'accepted-private-root-lifecycle-request-boundary';
+const nativeReactDomRenderHandoffHostOutputStatus =
+  'applied-private-root-initial-host-output';
+const nativeReactDomRenderHandoffRootWorkLoopStatus =
+  'accepted-private-root-public-facade-root-work-loop-finished-work';
+const nativeReactDomRenderHandoffNativeHandoffStatus =
+  'mirrored-private-native-root-request-record';
 const nativeRootWorkLoopFinishedWorkMetadataFactoryOptionFields =
   Object.freeze([
     'hostType',
@@ -35,8 +65,16 @@ const nativeRootWorkLoopFinishedWorkMetadataFactoryOptionFields =
   ]);
 const nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields =
   Object.freeze([
+    'addonDomMutation',
+    'addonDomMutationClaimed',
+    'addon_dom_mutation',
+    'addon_dom_mutation_claimed',
+    'browserDomExecution',
+    'browserDomExecutionClaimed',
     'browserDomMutation',
     'browserDomMutationClaimed',
+    'browser_dom_execution',
+    'browser_dom_execution_claimed',
     'browser_dom_mutation',
     'browser_dom_mutation_claimed',
     'compatibilityClaimed',
@@ -64,32 +102,58 @@ const nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields =
     'markerWritesClaimed',
     'marker_writes',
     'marker_writes_claimed',
+    'nativeAddonLoaded',
+    'nativeAddonLoadClaimed',
+    'native_addon_loaded',
+    'native_addon_load_claimed',
+    'nativeDomMutation',
+    'nativeDomMutationClaimed',
     'nativeExecution',
     'nativeExecutionClaimed',
+    'native_dom_mutation',
+    'native_dom_mutation_claimed',
     'native_execution',
     'native_execution_claimed',
     'publicCompatibilityClaimed',
+    'publicCreateRootEnabled',
+    'publicCreateRootEnabledClaimed',
     'publicCreateRootCompatibilityClaimed',
     'publicDomMutationCompatibilityClaimed',
+    'publicHydrateRootEnabled',
+    'publicHydrateRootEnabledClaimed',
     'publicEventCompatibilityClaimed',
     'publicHydrateRootCompatibilityClaimed',
     'publicHydrationCompatibilityClaimed',
     'publicNativeCompatibility',
     'publicRootCompatibilitySurface',
+    'publicRootCreated',
+    'publicRootCreatedClaimed',
     'publicRootExecution',
+    'publicRootExecutionClaimed',
+    'publicRootObjectExposed',
+    'publicRootObjectExposedClaimed',
     'publicRootRenderCompatibilityClaimed',
     'publicRootUnmountCompatibilityClaimed',
     'publicRootUpdateCompatibilityClaimed',
     'publicTestRendererCompatibilityClaimed',
     'public_compatibility_claimed',
+    'public_create_root_enabled',
+    'public_create_root_enabled_claimed',
     'public_create_root_compatibility_claimed',
     'public_dom_mutation_compatibility_claimed',
+    'public_hydrate_root_enabled',
+    'public_hydrate_root_enabled_claimed',
     'public_event_compatibility_claimed',
     'public_hydrate_root_compatibility_claimed',
     'public_hydration_compatibility_claimed',
     'public_native_compatibility',
     'public_root_compatibility_surface',
+    'public_root_created',
+    'public_root_created_claimed',
     'public_root_execution',
+    'public_root_execution_claimed',
+    'public_root_object_exposed',
+    'public_root_object_exposed_claimed',
     'public_root_render_compatibility_claimed',
     'public_root_unmount_compatibility_claimed',
     'public_root_update_compatibility_claimed',
@@ -98,6 +162,10 @@ const nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields =
     'reconcilerExecutionClaimed',
     'reconciler_execution',
     'reconciler_execution_claimed',
+    'rendererExecution',
+    'rendererExecutionClaimed',
+    'renderer_execution',
+    'renderer_execution_claimed',
     'refEffects',
     'refEffectsClaimed',
     'ref_effects',
@@ -107,6 +175,54 @@ const nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields =
     'root_scheduled',
     'root_scheduled_claimed'
   ]);
+const nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFields =
+  Object.freeze([
+    ...nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields,
+    'browserDomCompatibility',
+    'browserDomCompatibilityClaimed',
+    'browser_dom_compatibility',
+    'browser_dom_compatibility_claimed',
+    'fakeDomCompatibility',
+    'fakeDomCompatibilityClaimed',
+    'fakeDomMutationPublicCompatibility',
+    'fakeDomOutputPublicCompatibility',
+    'fake_dom_compatibility',
+    'fake_dom_compatibility_claimed',
+    'fake_dom_mutation_public_compatibility',
+    'fake_dom_output_public_compatibility',
+    'nativeAddonLoaded',
+    'nativeAddonLoadClaimed',
+    'native_addon_loaded',
+    'native_addon_load_claimed',
+    'packageCompatibilityClaimed',
+    'packageExportCompatibility',
+    'packageExportCompatibilityClaimed',
+    'package_compatibility_claimed',
+    'package_export_compatibility',
+    'package_export_compatibility_claimed',
+    'publicNativeCompatibilityClaimed',
+    'publicNativeCompatibilitySurface',
+    'public_native_compatibility_claimed',
+    'public_native_compatibility_surface'
+  ]);
+const nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFieldSet =
+  new Set(nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields);
+const nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimNormalizedFieldSet =
+  new Set(
+    nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields.map(
+      normalizeNativeCapabilityClaimFieldName
+    )
+  );
+const nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFieldSet =
+  new Set(nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFields);
+const nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimNormalizedFieldSet =
+  new Set(
+    nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFields.map(
+      normalizeNativeCapabilityClaimFieldName
+    )
+  );
+const nativeReactDomRenderHandoffAdmissionAllowedTrueClaimPaths =
+  Object.freeze(['renderHandoff.domMutation', 'renderHandoff.fakeDomMutation']);
 const nativeRootBridgeHandleAdmissionPreflightStatus =
   'preflighted-native-root-bridge-real-handle-admission';
 const nativeRootBridgeRustHandleTableAdmissionSmokeStatus =
@@ -3508,6 +3624,75 @@ function hasOwn(object, key) {
   return Object.prototype.hasOwnProperty.call(object, key);
 }
 
+function normalizeNativeCapabilityClaimFieldName(field) {
+  return String(field).replace(/[^a-z0-9]/giu, '').toLowerCase();
+}
+
+function getNativeCapabilityClaimKeyText(key) {
+  if (typeof key === 'symbol') {
+    return Symbol.keyFor(key) ?? key.description ?? '';
+  }
+
+  return String(key);
+}
+
+function getNativeCapabilityClaimFieldForKey(
+  key,
+  blockedFieldSet,
+  blockedNormalizedFieldSet
+) {
+  const keyText = getNativeCapabilityClaimKeyText(key);
+  if (keyText === '') {
+    return null;
+  }
+
+  if (blockedFieldSet.has(keyText)) {
+    return keyText;
+  }
+
+  return blockedNormalizedFieldSet.has(
+    normalizeNativeCapabilityClaimFieldName(keyText)
+  )
+    ? keyText
+    : null;
+}
+
+function isNativeCapabilityClaimDescriptorClaimed(descriptor) {
+  return !hasOwn(descriptor, 'value') || Boolean(descriptor.value);
+}
+
+function formatNativeCapabilityClaimPath(path, key) {
+  if (typeof key !== 'symbol') {
+    return `${path}.${key}`;
+  }
+
+  const registryKey = Symbol.keyFor(key);
+  if (registryKey !== undefined) {
+    return `${path}[Symbol.for(${JSON.stringify(registryKey)})]`;
+  }
+
+  const description = key.description;
+  return description === undefined
+    ? `${path}[Symbol()]`
+    : `${path}[Symbol(${JSON.stringify(description)})]`;
+}
+
+function getNativeCapabilityClaimKeyMetadata(key) {
+  if (typeof key !== 'symbol') {
+    return {
+      keyType: 'string',
+      symbolDescription: null,
+      symbolRegistryKey: null
+    };
+  }
+
+  return {
+    keyType: 'symbol',
+    symbolDescription: key.description ?? null,
+    symbolRegistryKey: Symbol.keyFor(key) ?? null
+  };
+}
+
 function createNativeRootBridgeRequestShapeGate(requests) {
   const requestList = Array.isArray(requests) ? requests : [requests];
   const sequenceState = {
@@ -3726,20 +3911,18 @@ function assertBlockedNativeRootBridgeHandoff(input) {
 }
 
 function assertBlockedNativeRootBridgeHandoffClaims(input) {
-  for (const flag of [
-    'nativeAddonLoaded',
-    'nativeExecution',
-    'rendererExecution',
-    'reconcilerExecution',
-    'domMutation',
-    'markerWrites',
-    'listenerInstallation',
-    'hydration',
-    'eventDispatch',
-    'publicNativeCompatibility',
-    'compatibilityClaimed'
-  ]) {
-    if (input[flag] === true) {
+  for (const key of Reflect.ownKeys(input)) {
+    const descriptor = Object.getOwnPropertyDescriptor(input, key);
+    if (!descriptor) {
+      continue;
+    }
+
+    const flag = getNativeCapabilityClaimFieldForKey(
+      key,
+      nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFieldSet,
+      nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimNormalizedFieldSet
+    );
+    if (flag !== null && isNativeCapabilityClaimDescriptorClaimed(descriptor)) {
       throwNativeRootBridgeRequestShapeError(
         `Native root bridge handoff must not claim ${flag}.`,
         nativeRootBridgeRequestShapeErrorCode,
@@ -5851,6 +6034,629 @@ function assertPositiveSafeInteger(value, field) {
   );
 }
 
+const admitNativeReactDomRenderHandoffForCanary = Object.freeze(
+  function admitNativeReactDomRenderHandoffForCanary(
+    createRecord,
+    renderHandoff,
+    rootWorkLoopFinishedWorkMetadata
+  ) {
+    assertNativeReactDomRenderHandoffAdmissionHasNoCapabilityClaims(
+      createRecord,
+      'createRecord'
+    );
+    const renderNativeRequestRecord =
+      getNativeReactDomRenderHandoffNativeRequestRecord(renderHandoff);
+    assertNativeReactDomRenderHandoffAdmissionHasNoCapabilityClaims(
+      renderNativeRequestRecord,
+      'renderHandoff.nativeRequestRecord'
+    );
+    const requestShapeGate =
+      createNativeReactDomRenderHandoffAdmissionShapeGate([
+        createRecord,
+        renderNativeRequestRecord
+      ]);
+    const [createValidation, renderValidation] =
+      requestShapeGate.validationRecords;
+
+    assertNativeReactDomRenderHandoffRequestKinds(
+      createValidation,
+      renderValidation
+    );
+    const metadataSummary =
+      validateNativeReactDomRootWorkLoopFinishedWorkMetadata(
+        rootWorkLoopFinishedWorkMetadata
+      );
+    const handoffSummary = validateNativeReactDomRenderHandoffRecord({
+      createValidation,
+      metadataSummary,
+      renderHandoff,
+      renderValidation
+    });
+
+    return Object.freeze({
+      admissionStatus: nativeReactDomRenderHandoffAdmissionStatus,
+      operation: 'private-react-dom-render-native-handoff-addon-admission',
+      entrypoint: nativeReactDomRenderHandoffExpectedEntrypoint,
+      requestShapeGateStatus: requestShapeGate.gateStatus,
+      requestCount: requestShapeGate.requestCount,
+      requestShapeGate,
+      createNativeRequestId: createValidation.requestId,
+      createNativeRequestKind: createValidation.kind,
+      renderNativeRequestId: renderValidation.requestId,
+      renderNativeRequestKind: renderValidation.kind,
+      nativeRootId: createValidation.rootId,
+      rootId: handoffSummary.rootId,
+      rootKind: handoffSummary.rootKind,
+      rootTag: handoffSummary.rootTag,
+      renderUpdateId: handoffSummary.renderUpdateId,
+      handoffId: handoffSummary.handoffId,
+      handoffStatus: handoffSummary.handoffStatus,
+      nativeHandoffId: handoffSummary.nativeHandoffId,
+      nativeHandoffStatus: handoffSummary.nativeHandoffStatus,
+      rootWorkLoopFinishedWorkHandoffId:
+        handoffSummary.rootWorkLoopFinishedWorkHandoffId,
+      rootWorkLoopFinishedWorkStatus:
+        handoffSummary.rootWorkLoopFinishedWorkStatus,
+      rootWorkLoopFinishedWorkConsumed:
+        handoffSummary.rootWorkLoopFinishedWorkConsumed,
+      rootWorkLoopPublicRootRenderingBlocked:
+        handoffSummary.rootWorkLoopPublicRootRenderingBlocked,
+      metadataSource: metadataSummary.source,
+      metadataStatus: metadataSummary.status,
+      metadataRevision: metadataSummary.metadataRevision,
+      metadataRootId: metadataSummary.rootId,
+      metadataRenderUpdateId: metadataSummary.renderUpdateId,
+      fakeDomMutationObserved: handoffSummary.fakeDomMutationObserved,
+      fakeDomOutputPublicCompatibility: false,
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rendererExecution: false,
+      reconcilerExecution: false,
+      publicRootExecution: false,
+      browserDomMutation: false,
+      addonDomMutation: false,
+      publicNativeCompatibility: false,
+      publicRootCompatibilitySurface: false,
+      publicRootRenderCompatibilityClaimed: false,
+      compatibilityClaimed: false,
+      compatibilityStatus: 'blocked'
+    });
+  }
+);
+
+function getNativeReactDomRenderHandoffNativeRequestRecord(renderHandoff) {
+  assertNativeReactDomAdmissionObject(
+    renderHandoff,
+    'renderHandoff',
+    'Expected a private React DOM render native handoff record.'
+  );
+  const nativeRequestRecord = getOwnNativeReactDomAdmissionDataField(
+    renderHandoff,
+    'nativeRequestRecord',
+    'renderHandoff.nativeRequestRecord'
+  );
+  assertNativeReactDomAdmissionObject(
+    nativeRequestRecord,
+    'renderHandoff.nativeRequestRecord',
+    'Private React DOM render native handoff requires a native request record.'
+  );
+  return nativeRequestRecord;
+}
+
+function createNativeReactDomRenderHandoffAdmissionShapeGate(records) {
+  try {
+    return createNativeRootBridgeRequestShapeGate(records);
+  } catch (sourceError) {
+    throwNativeReactDomRenderHandoffAdmissionError(
+      'Private React DOM render handoff admission rejected the native root bridge request sequence.',
+      sourceError?.code || nativeReactDomRenderHandoffAdmissionErrorCode,
+      {
+        phase: 'native-root-bridge-request-shape',
+        sourceCode: sourceError?.code || null,
+        sourceName: sourceError?.name || null
+      }
+    );
+  }
+}
+
+function assertNativeReactDomRenderHandoffRequestKinds(
+  createValidation,
+  renderValidation
+) {
+  if (
+    createValidation?.kind === nativeRootBridgeRequestKindCreate &&
+    renderValidation?.kind === nativeRootBridgeRequestKindRender
+  ) {
+    return;
+  }
+
+  throwNativeReactDomRenderHandoffAdmissionError(
+    'Private React DOM render handoff admission requires a create request followed by a render request.',
+    nativeReactDomRenderHandoffAdmissionErrorCode,
+    {
+      createKind: createValidation?.kind ?? null,
+      renderKind: renderValidation?.kind ?? null
+    }
+  );
+}
+
+function validateNativeReactDomRootWorkLoopFinishedWorkMetadata(metadata) {
+  assertNativeReactDomRenderHandoffAdmissionHasNoCapabilityClaims(
+    metadata,
+    'rootWorkLoopFinishedWorkMetadata'
+  );
+
+  const metadataObject = assertNativeReactDomAdmissionObject(
+    metadata,
+    'metadata'
+  );
+  const facade = assertNativeReactDomAdmissionObject(
+    getOwnNativeReactDomAdmissionDataField(
+      metadataObject,
+      'facade',
+      'metadata.facade'
+    ),
+    'metadata.facade'
+  );
+  const rootId = assertNativeReactDomAdmissionNonEmptyString(
+    getOwnNativeReactDomAdmissionDataField(
+      facade,
+      'rootId',
+      'metadata.facade.rootId'
+    ),
+    'metadata.facade.rootId'
+  );
+  const rootTag = assertNativeReactDomAdmissionNonEmptyString(
+    getOwnNativeReactDomAdmissionDataField(
+      facade,
+      'rootTag',
+      'metadata.facade.rootTag'
+    ),
+    'metadata.facade.rootTag'
+  );
+  const renderUpdateId = assertNativeReactDomAdmissionNonEmptyString(
+    getOwnNativeReactDomAdmissionDataField(
+      facade,
+      'renderUpdateId',
+      'metadata.facade.renderUpdateId'
+    ),
+    'metadata.facade.renderUpdateId'
+  );
+
+  assertNativeReactDomAdmissionJsonShape(
+    metadataObject,
+    {
+      source: nativeRootWorkLoopFinishedWorkMetadataSource,
+      status: nativeRootWorkLoopFinishedWorkMetadataStatus,
+      metadataRevision: nativeRootWorkLoopFinishedWorkMetadataRevision,
+      facade: {
+        rootId,
+        rootTag,
+        renderUpdateId,
+        hostType: 'div',
+        hostOutputShape: 'host-component',
+        hostComponentCount: 1,
+        hostTextCount: 1,
+        textContent: 'text'
+      },
+      completeWork: {
+        rootChildTag: 'HostComponent',
+        completedChildTag: 'HostComponent',
+        hostTextChildTag: 'HostText',
+        childTags: ['HostComponent', 'HostText']
+      },
+      pending: {
+        recordsFinishedWork: true,
+        pendingWorkMatchesFinishedWork: true,
+        renderLanes: 'Default',
+        finishedLanes: 'Default',
+        remainingLanes: 'NoLanes'
+      },
+      commit: {
+        commitOrderAfterPendingRecord: true,
+        consumedFinishedWorkRecord: true,
+        finishedWorkAfterCommit: null,
+        finishedLanesAfterCommit: 'NoLanes',
+        renderPhaseWorkAfterCommit: null,
+        mutationExecutionBlocked: true,
+        publicRootRenderingBlocked: true,
+        effectsRefsAndHydrationBlocked: true
+      },
+      placement: {
+        tag: 'HostComponent',
+        applyKind: 'append-placement-to-container',
+        siblingStatus: 'append'
+      }
+    },
+    'metadata'
+  );
+
+  return Object.freeze({
+    source: nativeRootWorkLoopFinishedWorkMetadataSource,
+    status: nativeRootWorkLoopFinishedWorkMetadataStatus,
+    metadataRevision: nativeRootWorkLoopFinishedWorkMetadataRevision,
+    rootId,
+    rootTag,
+    renderUpdateId
+  });
+}
+
+function validateNativeReactDomRenderHandoffRecord({
+  createValidation,
+  metadataSummary,
+  renderHandoff,
+  renderValidation
+}) {
+  assertNativeReactDomRenderHandoffAdmissionHasNoCapabilityClaims(
+    renderHandoff,
+    'renderHandoff',
+    nativeReactDomRenderHandoffAdmissionAllowedTrueClaimPaths
+  );
+
+  assertNativeReactDomAdmissionStaticFields(renderHandoff, 'renderHandoff', [
+    ['$$typeof', nativeReactDomRenderHandoffExpectedType],
+    ['kind', nativeReactDomRenderHandoffExpectedKind],
+    ['operation', nativeReactDomRenderHandoffExpectedOperation],
+    ['entrypoint', nativeReactDomRenderHandoffExpectedEntrypoint],
+    ['handoffStatus', nativeReactDomRenderHandoffExpectedStatus],
+    ['adapterStatus', nativeReactDomRenderHandoffAdapterReadyStatus],
+    [
+      'lifecycleRequestAdmissionStatus',
+      nativeReactDomRenderHandoffLifecycleAdmissionStatus
+    ],
+    [
+      'lifecycleRequestBoundaryStatus',
+      nativeReactDomRenderHandoffLifecycleBoundaryStatus
+    ],
+    ['lifecycleRequestBoundaryAccepted', true],
+    ['lifecycleRequestBoundarySourceOwned', true],
+    ['lifecycleRequestBoundaryCurrent', true],
+    ['hostOutputHandoffStatus', nativeReactDomRenderHandoffHostOutputStatus],
+    [
+      'rootWorkLoopFinishedWorkStatus',
+      nativeReactDomRenderHandoffRootWorkLoopStatus
+    ],
+    ['rootWorkLoopFinishedWorkConsumed', true],
+    ['rootWorkLoopPublicRootRenderingBlocked', true],
+    ['nativeHandoffStatus', nativeReactDomRenderHandoffNativeHandoffStatus],
+    ['nativeRequestKind', nativeRootBridgeRequestKindRender],
+    ['privateFacadeRoot', true],
+    ['facadeOwnershipValidated', true],
+    ['rootWorkLoopEvidenceAccepted', true],
+    ['fakeDomAdmissionAccepted', true],
+    ['nativeRenderRequestMirrored', true],
+    ['fakeDomMutation', true],
+    ['domMutation', true]
+  ]);
+
+  for (const field of [
+    'publicCreateRootEnabled',
+    'publicHydrateRootEnabled',
+    'publicRootCreated',
+    'publicRootObjectExposed',
+    'publicRootExecution',
+    'publicRootCompatibilitySurface',
+    'publicRootRenderCompatibilityClaimed',
+    'nativeExecution',
+    'reconcilerExecution',
+    'rootScheduled',
+    'browserDomMutation',
+    'markerWrites',
+    'listenerInstallation',
+    'hydration',
+    'eventDispatch',
+    'refEffects',
+    'compatibilityClaimed'
+  ]) {
+    assertNativeReactDomAdmissionField(
+      renderHandoff,
+      field,
+      false,
+      `renderHandoff.${field}`
+    );
+  }
+
+  assertNativeReactDomAdmissionField(
+    renderHandoff.nativeRequestRecord,
+    'requestId',
+    renderValidation.requestId,
+    'renderHandoff.nativeRequestRecord.requestId'
+  );
+  assertNativeReactDomAdmissionField(
+    renderHandoff.nativeRequestRecord,
+    'kind',
+    nativeRootBridgeRequestKindRender,
+    'renderHandoff.nativeRequestRecord.kind'
+  );
+  assertNativeReactDomAdmissionField(
+    renderHandoff,
+    'createRequestSequence',
+    createValidation.requestId,
+    'renderHandoff.createRequestSequence'
+  );
+  assertNativeReactDomAdmissionField(
+    renderHandoff,
+    'renderRequestSequence',
+    renderValidation.requestId,
+    'renderHandoff.renderRequestSequence'
+  );
+  assertNativeReactDomAdmissionField(
+    renderHandoff,
+    'rootId',
+    metadataSummary.rootId,
+    'renderHandoff.rootId'
+  );
+  assertNativeReactDomAdmissionField(
+    renderHandoff,
+    'rootTag',
+    metadataSummary.rootTag,
+    'renderHandoff.rootTag'
+  );
+  assertNativeReactDomAdmissionField(
+    renderHandoff,
+    'renderUpdateId',
+    metadataSummary.renderUpdateId,
+    'renderHandoff.renderUpdateId'
+  );
+
+  const rootKind = assertNativeReactDomAdmissionNonEmptyString(
+    getOwnNativeReactDomAdmissionDataField(
+      renderHandoff,
+      'rootKind',
+      'renderHandoff.rootKind'
+    ),
+    'renderHandoff.rootKind'
+  );
+  const handoffId = assertNativeReactDomAdmissionNonEmptyString(
+    getOwnNativeReactDomAdmissionDataField(
+      renderHandoff,
+      'handoffId',
+      'renderHandoff.handoffId'
+    ),
+    'renderHandoff.handoffId'
+  );
+  const nativeHandoffId = assertNativeReactDomAdmissionNonEmptyString(
+    getOwnNativeReactDomAdmissionDataField(
+      renderHandoff,
+      'nativeHandoffId',
+      'renderHandoff.nativeHandoffId'
+    ),
+    'renderHandoff.nativeHandoffId'
+  );
+  const rootWorkLoopFinishedWorkHandoffId =
+    assertNativeReactDomAdmissionNonEmptyString(
+      getOwnNativeReactDomAdmissionDataField(
+        renderHandoff,
+        'rootWorkLoopFinishedWorkHandoffId',
+        'renderHandoff.rootWorkLoopFinishedWorkHandoffId'
+      ),
+      'renderHandoff.rootWorkLoopFinishedWorkHandoffId'
+    );
+
+  return Object.freeze({
+    rootId: metadataSummary.rootId,
+    rootKind,
+    rootTag: metadataSummary.rootTag,
+    renderUpdateId: metadataSummary.renderUpdateId,
+    handoffId,
+    handoffStatus: nativeReactDomRenderHandoffExpectedStatus,
+    nativeHandoffId,
+    nativeHandoffStatus: nativeReactDomRenderHandoffNativeHandoffStatus,
+    rootWorkLoopFinishedWorkHandoffId,
+    rootWorkLoopFinishedWorkStatus:
+      nativeReactDomRenderHandoffRootWorkLoopStatus,
+    rootWorkLoopFinishedWorkConsumed: true,
+    rootWorkLoopPublicRootRenderingBlocked: true,
+    fakeDomMutationObserved: true
+  });
+}
+
+function assertNativeReactDomAdmissionObject(value, path, message) {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return value;
+  }
+
+  throwNativeReactDomRenderHandoffAdmissionError(
+    message || `Expected ${path} to be an object.`,
+    nativeReactDomRenderHandoffAdmissionErrorCode,
+    { path, actual: nativeReactDomAdmissionActual(value) }
+  );
+}
+
+function getOwnNativeReactDomAdmissionDataField(object, field, path) {
+  const descriptor = Object.getOwnPropertyDescriptor(object, field);
+  if (descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+    return descriptor.value;
+  }
+
+  throwNativeReactDomRenderHandoffAdmissionError(
+    `Private React DOM render handoff admission requires data field ${path}.`,
+    nativeReactDomRenderHandoffAdmissionErrorCode,
+    { field, path }
+  );
+}
+
+function assertNativeReactDomAdmissionJsonShape(actual, expected, path) {
+  if (Array.isArray(expected)) {
+    assertNativeReactDomAdmissionExactArray(actual, expected, path);
+    return;
+  }
+
+  if (expected !== null && typeof expected === 'object') {
+    const object = assertNativeReactDomAdmissionObject(actual, path);
+    const expectedFields = Object.keys(expected).sort();
+    const actualFields = Object.getOwnPropertyNames(object).sort();
+    const symbolFields = Object.getOwnPropertySymbols(object);
+    if (symbolFields.length !== 0 || !arrayEquals(actualFields, expectedFields)) {
+      throwNativeReactDomRenderHandoffAdmissionError(
+        `Private React DOM render handoff admission expected exact ${path} metadata fields.`,
+        nativeReactDomRenderHandoffAdmissionErrorCode,
+        {
+          path,
+          expected: expectedFields,
+          actual: actualFields,
+          symbolCount: symbolFields.length
+        }
+      );
+    }
+
+    for (const field of expectedFields) {
+      assertNativeReactDomAdmissionJsonShape(
+        getOwnNativeReactDomAdmissionDataField(
+          object,
+          field,
+          `${path}.${field}`
+        ),
+        expected[field],
+        `${path}.${field}`
+      );
+    }
+    return;
+  }
+
+  assertNativeReactDomAdmissionExactValue(actual, expected, path);
+}
+
+function assertNativeReactDomAdmissionStaticFields(object, path, expectedPairs) {
+  for (const [field, expected] of expectedPairs) {
+    const fieldPath = `${path}.${field}`;
+    const actual = getOwnNativeReactDomAdmissionDataField(
+      object,
+      field,
+      fieldPath
+    );
+    if (Array.isArray(expected)) {
+      assertNativeReactDomAdmissionExactArray(actual, expected, fieldPath);
+    } else {
+      assertNativeReactDomAdmissionExactValue(actual, expected, fieldPath);
+    }
+  }
+}
+
+function assertNativeReactDomAdmissionField(object, field, expected, path) {
+  const actual = getOwnNativeReactDomAdmissionDataField(object, field, path);
+  assertNativeReactDomAdmissionExactValue(actual, expected, path);
+  return actual;
+}
+
+function assertNativeReactDomAdmissionExactValue(actual, expected, path) {
+  if (Object.is(actual, expected)) {
+    return actual;
+  }
+
+  throwNativeReactDomRenderHandoffAdmissionError(
+    `Private React DOM render handoff admission expected ${path} to match.`,
+    nativeReactDomRenderHandoffAdmissionErrorCode,
+    {
+      path,
+      expected,
+      actual: nativeReactDomAdmissionActual(actual)
+    }
+  );
+}
+
+function assertNativeReactDomAdmissionNonEmptyString(value, path) {
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+
+  throwNativeReactDomRenderHandoffAdmissionError(
+    `Private React DOM render handoff admission requires ${path}.`,
+    nativeReactDomRenderHandoffAdmissionErrorCode,
+    { path, actual: nativeReactDomAdmissionActual(value) }
+  );
+}
+
+function assertNativeReactDomAdmissionExactArray(actual, expected, path) {
+  if (
+    Array.isArray(actual) &&
+    actual.length === expected.length &&
+    actual.every((value, index) => Object.is(value, expected[index]))
+  ) {
+    return actual;
+  }
+
+  throwNativeReactDomRenderHandoffAdmissionError(
+    `Private React DOM render handoff admission expected ${path} to match.`,
+    nativeReactDomRenderHandoffAdmissionErrorCode,
+    {
+      path,
+      expected,
+      actual: Array.isArray(actual)
+        ? actual.map(nativeReactDomAdmissionActual)
+        : nativeReactDomAdmissionActual(actual)
+    }
+  );
+}
+
+function assertNativeReactDomRenderHandoffAdmissionHasNoCapabilityClaims(
+  value,
+  label,
+  allowedTruePaths = Object.freeze([])
+) {
+  const seen = new WeakSet();
+
+  function visit(candidate, path) {
+    if (
+      candidate === null ||
+      (typeof candidate !== 'object' && typeof candidate !== 'function') ||
+      seen.has(candidate)
+    ) {
+      return;
+    }
+    seen.add(candidate);
+
+    for (const key of Reflect.ownKeys(candidate)) {
+      const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
+      if (!descriptor) {
+        continue;
+      }
+
+      const childPath = formatNativeCapabilityClaimPath(path, key);
+      const claimField = getNativeCapabilityClaimFieldForKey(
+        key,
+        nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFieldSet,
+        nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimNormalizedFieldSet
+      );
+      if (
+        claimField !== null &&
+        !allowedTruePaths.includes(childPath) &&
+        isNativeCapabilityClaimDescriptorClaimed(descriptor)
+      ) {
+        const keyMetadata = getNativeCapabilityClaimKeyMetadata(key);
+        throwNativeReactDomRenderHandoffAdmissionError(
+          'Private React DOM render handoff admission cannot accept public, native, browser DOM, or compatibility claims.',
+          nativeReactDomRenderHandoffAdmissionCapabilityClaimErrorCode,
+          {
+            field: claimField,
+            path: childPath,
+            label,
+            ...keyMetadata
+          }
+        );
+      }
+
+      if (hasOwn(descriptor, 'value')) {
+        visit(descriptor.value, childPath);
+      }
+    }
+  }
+
+  visit(value, label);
+}
+
+function nativeReactDomAdmissionActual(value) {
+  if (value === null) {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    return 'array';
+  }
+  return typeof value === 'object' || typeof value === 'function'
+    ? typeof value
+    : value;
+}
+
 const createNativeRootWorkLoopFinishedWorkMetadataForCanary = Object.freeze(
   function createNativeRootWorkLoopFinishedWorkMetadataForCanary(options) {
     assertNativeRootWorkLoopFinishedWorkMetadataCanaryOptions(options);
@@ -5976,7 +6782,7 @@ function assertNativeRootWorkLoopFinishedWorkMetadataHasNoCapabilityClaims(
 ) {
   const seen = new WeakSet();
 
-  function visit(candidate) {
+  function visit(candidate, path) {
     if (
       !isNativeRootWorkLoopMetadataObjectLike(candidate) ||
       seen.has(candidate)
@@ -5985,31 +6791,39 @@ function assertNativeRootWorkLoopFinishedWorkMetadataHasNoCapabilityClaims(
     }
     seen.add(candidate);
 
-    for (const key of Object.getOwnPropertyNames(candidate)) {
+    for (const key of Reflect.ownKeys(candidate)) {
       const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
       if (!descriptor) {
         continue;
       }
+      const childPath = formatNativeCapabilityClaimPath(path, key);
+      const claimField = getNativeCapabilityClaimFieldForKey(
+        key,
+        nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFieldSet,
+        nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimNormalizedFieldSet
+      );
       if (
-        nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields.includes(
-          key
-        ) &&
-        (!Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
-          Boolean(descriptor.value))
+        claimField !== null &&
+        isNativeCapabilityClaimDescriptorClaimed(descriptor)
       ) {
+        const keyMetadata = getNativeCapabilityClaimKeyMetadata(key);
         throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
           'Native root work-loop finished-work metadata factory cannot accept public, native, DOM, hydration, event, ref, marker, listener, scheduler, Rust, or compatibility capability claims.',
           nativeRootWorkLoopFinishedWorkMetadataFactoryCapabilityClaimErrorCode,
-          { field: key }
+          {
+            field: claimField,
+            path: childPath,
+            ...keyMetadata
+          }
         );
       }
-      if (Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
-        visit(descriptor.value);
+      if (hasOwn(descriptor, 'value')) {
+        visit(descriptor.value, childPath);
       }
     }
   }
 
-  visit(value);
+  visit(value, 'options');
 }
 
 function isNativeRootWorkLoopMetadataObjectLike(value) {
@@ -6033,6 +6847,28 @@ function throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
   error.rendererExecution = false;
   error.reconcilerExecution = false;
   error.publicNativeCompatibility = false;
+  error.compatibilityClaimed = false;
+  throw error;
+}
+
+function throwNativeReactDomRenderHandoffAdmissionError(
+  message,
+  code,
+  details = {}
+) {
+  const error = new Error(message);
+  error.name = 'FastReactNativeReactDomRenderHandoffAdmissionError';
+  error.code = code;
+  error.details = Object.freeze({ ...details });
+  error.nativeAddonLoaded = false;
+  error.nativeExecution = false;
+  error.rendererExecution = false;
+  error.reconcilerExecution = false;
+  error.publicRootExecution = false;
+  error.browserDomMutation = false;
+  error.publicNativeCompatibility = false;
+  error.publicRootCompatibilitySurface = false;
+  error.publicRootRenderCompatibilityClaimed = false;
   error.compatibilityClaimed = false;
   throw error;
 }
@@ -6211,6 +7047,17 @@ Object.defineProperty(
   nativeRootWorkLoopFinishedWorkMetadataFactorySymbol,
   {
     value: createNativeRootWorkLoopFinishedWorkMetadataForCanary,
+    enumerable: false,
+    configurable: false,
+    writable: false
+  }
+);
+
+Object.defineProperty(
+  module.exports,
+  nativeReactDomRenderHandoffAdmissionSymbol,
+  {
+    value: admitNativeReactDomRenderHandoffForCanary,
     enumerable: false,
     configurable: false,
     writable: false

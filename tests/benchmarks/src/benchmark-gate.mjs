@@ -142,8 +142,10 @@ const ACCEPTED_NPM_COMMAND_PROVENANCE = Object.freeze(new Map([
       packageJsonPath: "bindings/node/package.json",
       scriptName: "check",
       scriptCommand:
-        "node ./test/native-loader.test.cjs && node ./test/native-no-load-guard.test.cjs && node ./test/native-loader-esm.test.mjs",
+        "node ./test/native-react-dom-render-handoff-admission.test.cjs && node ./test/native-private-root-work-loop-metadata-factory.test.cjs && node ./test/native-loader.test.cjs && node ./test/native-no-load-guard.test.cjs && node ./test/native-loader-esm.test.mjs",
       currentTargets: [
+        "bindings/node/test/native-react-dom-render-handoff-admission.test.cjs",
+        "bindings/node/test/native-private-root-work-loop-metadata-factory.test.cjs",
         "bindings/node/test/native-loader.test.cjs",
         "bindings/node/test/native-no-load-guard.test.cjs",
         "bindings/node/test/native-loader-esm.test.mjs"
