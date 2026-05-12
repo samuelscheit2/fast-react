@@ -9,6 +9,7 @@ const {
   assertMountedHostInstanceToken,
   attachHostInstanceNode,
   commitLatestPropsFromMutationHandoff,
+  commitLatestPropsFromMutationHandoffs,
   commitLatestPropsFromMutationRecord,
   createEventTargetDispatchPathRecord,
   createEventTargetNormalizationRecord,
@@ -7897,6 +7898,75 @@ function appendPrivateRootPublicFacadeRenderRecord(
   return record;
 }
 
+function rollbackPrivateRootPublicFacadeRenderRecordAfterFailure({
+  container,
+  lifecycleBoundaryRecordCountBefore,
+  payload,
+  record
+}) {
+  removePrivateRootPublicFacadeRecord(payload.requestRecords, record);
+  removePrivateRootPublicFacadeRecord(payload.renderRecords, record);
+  rootRecordPayloads.delete(record);
+
+  const handleState = getPrivateRootHandleState(payload.rootHandle);
+  if (handleState.latestLifecycleRequestRecord === record) {
+    const previousRequestRecord =
+      getLastPrivateRootPublicFacadeRequestRecord(payload);
+    const previousRenderRecord =
+      getLastPrivateRootPublicFacadeRenderRecord(payload);
+    handleState.lifecycleStatus =
+      previousRequestRecord === null
+        ? ROOT_LIFECYCLE_CREATED
+        : previousRequestRecord.lifecycleStatusAfter;
+    handleState.latestLifecycleRequestRecord = previousRequestRecord;
+    handleState.renderCount =
+      previousRenderRecord === null ? 0 : previousRenderRecord.renderCount;
+    handleState.lifecycleRequestVersion = Math.max(
+      0,
+      handleState.lifecycleRequestVersion - 1
+    );
+  }
+
+  if (
+    typeof lifecycleBoundaryRecordCountBefore === 'number' &&
+    payload.lifecycleRequestBoundaryRecords.length >
+      lifecycleBoundaryRecordCountBefore
+  ) {
+    payload.lifecycleRequestBoundaryRecords.splice(
+      lifecycleBoundaryRecordCountBefore
+    );
+  }
+  const previousBoundary =
+    payload.lifecycleRequestBoundaryRecords[
+      payload.lifecycleRequestBoundaryRecords.length - 1
+    ] || payload.createRecord;
+  recordPrivateRootPublicFacadeLifecycleContainerCurrentness(
+    container,
+    previousBoundary
+  );
+}
+
+function removePrivateRootPublicFacadeRecord(records, record) {
+  const index = records.lastIndexOf(record);
+  if (index !== -1) {
+    records.splice(index, 1);
+  }
+}
+
+function getLastPrivateRootPublicFacadeRequestRecord(payload) {
+  for (let index = payload.requestRecords.length - 1; index >= 0; index--) {
+    return payload.requestRecords[index];
+  }
+  return null;
+}
+
+function getLastPrivateRootPublicFacadeRenderRecord(payload) {
+  for (let index = payload.renderRecords.length - 1; index >= 0; index--) {
+    return payload.renderRecords[index];
+  }
+  return null;
+}
+
 function normalizePrivateRootPublicFacadeRootRenderOptions(args) {
   const second = args.length > 1 ? args[1] : undefined;
   const third = args.length > 2 ? args[2] : undefined;
@@ -9890,6 +9960,8 @@ function updatePrivateRootPublicFacadeNestedActiveHostOutputFromPayload(
     element,
     callback
   );
+  const lifecycleBoundaryRecordCountBefore =
+    payload.lifecycleRequestBoundaryRecords.length;
   assertPrivateRootPublicFacadeLifecycleNewSourceRecord(
     payload,
     createRecord,
@@ -9911,18 +9983,21 @@ function updatePrivateRootPublicFacadeNestedActiveHostOutputFromPayload(
     lifecycleEvidence.lifecycleRequestBoundary;
   const lifecycleRequestBoundaryPayload =
     lifecycleEvidence.lifecycleRequestBoundaryPayload;
-  const childLatestPropsUpdate =
-    commitPublicFacadeNestedChildLatestPropsForUpdate(
-      payload.bridge,
-      updateRecord,
-      normalized
-    );
-  const hostOutputUpdateHandoff =
-    childLatestPropsUpdate.hostOutputUpdateHandoff;
-  const hostOutputUpdatePayload =
-    childLatestPropsUpdate.hostOutputUpdatePayload;
-  const parentLatestPropsCommit =
-    commitPublicFacadeNestedParentLatestPropsForUpdate(normalized);
+  let nestedHostOutputUpdate;
+  try {
+    nestedHostOutputUpdate =
+      commitPublicFacadeNestedLatestPropsForUpdate(updateRecord, normalized);
+  } catch (error) {
+    rollbackPrivateRootPublicFacadeRenderRecordAfterFailure({
+      container: createPayload.container,
+      lifecycleBoundaryRecordCountBefore,
+      payload,
+      record: updateRecord
+    });
+    throw error;
+  }
+  const hostOutputUpdateHandoff = null;
+  const hostOutputUpdatePayload = null;
   const sourceContainerSnapshot =
     createPrivateRootPublicFacadeLifecycleContainerSnapshotRecord({
       before: sourceContainerSnapshotBefore,
@@ -9935,6 +10010,19 @@ function updatePrivateRootPublicFacadeNestedActiveHostOutputFromPayload(
       payload,
       phase: 'update',
       sourceRecord: updateRecord
+    });
+  const nestedHostOutputUpdateCurrent =
+    validatePrivateRootPublicFacadeNestedUpdateNativeHandoffCurrentness({
+      activeRender,
+      createPayload,
+      createRecord,
+      lifecycleRequestAdmission,
+      lifecycleRequestBoundary,
+      nestedHostOutputUpdate,
+      normalized,
+      payload,
+      sourceContainerSnapshot,
+      updateRecord
     });
   const nativeHandoffRecord =
     payload.bridge.createNativeRequestHandoff(updateRecord);
@@ -9954,15 +10042,9 @@ function updatePrivateRootPublicFacadeNestedActiveHostOutputFromPayload(
   const diagnosticId =
     `${rootBridgeState.publicFacadeHostOutputUpdateIdPrefix}:${sequence}`;
   const acceptedCapabilities =
-    hostOutputUpdateHandoff === null
-      ? freezeArray([
-          ...ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
-          ...activeRender.renderPayload.hostOutputHandoff.acceptedCapabilities
-        ])
-      : createPublicFacadeHostOutputUpdateAcceptedCapabilities(
-          hostOutputUpdateHandoff,
-          null
-        );
+    createPublicFacadeNestedActiveHostOutputUpdateAcceptedCapabilities(
+      nestedHostOutputUpdate
+    );
   const diagnosticRecord = freezeRecord({
     $$typeof: privateRootPublicFacadeHostOutputUpdateRecordType,
     kind: 'FastReactDomPrivateRootPublicFacadeHostOutputUpdateDiagnosticRecord',
@@ -10028,33 +10110,20 @@ function updatePrivateRootPublicFacadeNestedActiveHostOutputFromPayload(
     parentHostType: normalized.previous.parentType,
     childHostType: normalized.previous.childType,
     hostType: normalized.next.childType,
-    propertyMutation:
-      hostOutputUpdateHandoff === null
-        ? null
-        : hostOutputUpdateHandoff.propertyMutation,
-    textMutation:
-      hostOutputUpdateHandoff === null
-        ? freezeRecord({
-            newTextLength: null,
-            oldTextLength: null,
-            status: 'not-requested'
-          })
-        : hostOutputUpdateHandoff.textMutation,
+    propertyMutation: nestedHostOutputUpdate.parentPropertyMutation,
+    parentPropertyMutation: nestedHostOutputUpdate.parentPropertyMutation,
+    childPropertyMutation: nestedHostOutputUpdate.childPropertyMutation,
+    textMutation: nestedHostOutputUpdate.textMutation,
     latestPropsPublished:
-      hostOutputUpdateHandoff === null
-        ? childLatestPropsUpdate.latestPropsAfterCommit ===
-          normalized.next.childProps
-        : hostOutputUpdateHandoff.latestPropsPublished,
-    latestPropsPublishOrder:
-      hostOutputUpdateHandoff === null
-        ? 'after-latest-props-commit'
-        : hostOutputUpdateHandoff.latestPropsPublishOrder,
+      nestedHostOutputUpdate.latestPropsPublished,
+    latestPropsPublishOrder: nestedHostOutputUpdate.latestPropsPublishOrder,
     parentLatestPropsPublished:
-      parentLatestPropsCommit.latestPropsAfterCommit ===
-      normalized.next.parentProps,
+      nestedHostOutputUpdate.parentLatestPropsPublished,
     childLatestPropsPublished:
-      getLatestPropsFromHostInstanceToken(normalized.childToken) ===
-      normalized.next.childProps,
+      nestedHostOutputUpdate.childLatestPropsPublished,
+    nestedHostOutputUpdateCurrent,
+    nestedHostOutputUpdateCurrentStatus:
+      nestedHostOutputUpdateCurrent.updateNativeHandoffCurrent,
     sourceContainerSnapshot,
     sourceContainerSnapshotStatus: sourceContainerSnapshot.snapshotStatus,
     sourceContainerSnapshotPhase: sourceContainerSnapshot.phase,
@@ -10113,9 +10182,8 @@ function updatePrivateRootPublicFacadeNestedActiveHostOutputFromPayload(
     lifecycleRequestBoundaryPayload,
     nativeHandoffPayload,
     nativeHandoffRecord,
-    childLatestPropsUpdate,
+    nestedHostOutputUpdate,
     normalizedUpdate: normalized,
-    parentLatestPropsCommit,
     renderRecord: activeRender.renderPayload.renderRecord,
     root: payload.root,
     rootHandle: payload.rootHandle,
@@ -10218,84 +10286,223 @@ function normalizePublicFacadeNestedActiveHostOutputUpdateElement(
   };
 }
 
-function commitPublicFacadeNestedChildLatestPropsForUpdate(
-  bridge,
+function commitPublicFacadeNestedLatestPropsForUpdate(
   updateRecord,
   normalized
 ) {
-  if (normalized.textUpdate !== null) {
-    const hostOutputUpdateHandoff = bridge.applyHostOutputUpdate(
-      updateRecord,
-      {
-        hostInstanceToken: normalized.childToken,
-        nextProps: normalized.next.childProps,
-        tag: normalized.next.childType,
-        textUpdate: normalized.textUpdate
-      }
+  if (
+    getLatestPropsFromHostInstanceToken(normalized.parentToken) !==
+      normalized.previous.parentProps ||
+    getLatestPropsFromHostInstanceToken(normalized.childToken) !==
+      normalized.previous.childProps
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update rejects stale latest props before mutation.'
     );
-    const hostOutputUpdatePayload =
-      rootHostOutputUpdateHandoffPayloads.get(hostOutputUpdateHandoff);
-    if (hostOutputUpdatePayload === undefined) {
-      throwInvalidRootPublicFacadeHostOutputUpdate(
-        'Public-facade nested host-output update requires an applied host-output update handoff.'
-      );
-    }
-    return freezeRecord({
-      hostOutputUpdateHandoff,
-      hostOutputUpdatePayload,
-      latestPropsAfterCommit: getLatestPropsFromHostInstanceToken(
-        normalized.childToken
-      ),
-      latestPropsBeforeCommit: normalized.previous.childProps,
-      latestPropsHandoff: null,
-      latestPropsHandoffPayload: null
-    });
   }
 
-  const latestPropsHandoff = commitDomPropertyUpdateForLatestProps(
-    normalized.childNode,
-    normalized.next.childType,
-    normalized.previous.childProps,
-    normalized.next.childProps
+  let parentPropsHandoff = null;
+  let parentPropsHandoffPayload = null;
+  let parentPropertyMutationEvidence = null;
+  let childPropsHandoff = null;
+  let childPropsHandoffPayload = null;
+  let childPropertyMutationEvidence = null;
+  let textMutationApplied = false;
+  let latestPropsHandoffStale = false;
+  let latestPropsPublishCount = 0;
+
+  try {
+    parentPropsHandoff = commitDomPropertyUpdateForLatestProps(
+      normalized.parentNode,
+      normalized.next.parentType,
+      normalized.previous.parentProps,
+      normalized.next.parentProps
+    );
+    parentPropsHandoffPayload =
+      getDomPropertyUpdateLatestPropsHandoffPayload(parentPropsHandoff);
+    parentPropertyMutationEvidence =
+      createHostOutputPropertyMutationEvidence(parentPropsHandoffPayload);
+
+    childPropsHandoff = commitDomPropertyUpdateForLatestProps(
+      normalized.childNode,
+      normalized.next.childType,
+      normalized.previous.childProps,
+      normalized.next.childProps
+    );
+    childPropsHandoffPayload =
+      getDomPropertyUpdateLatestPropsHandoffPayload(childPropsHandoff);
+    childPropertyMutationEvidence =
+      createHostOutputPropertyMutationEvidence(childPropsHandoffPayload);
+
+    if (normalized.textUpdate !== null) {
+      commitTextUpdate(
+        normalized.textUpdate.textInstance,
+        normalized.textUpdate.oldText,
+        normalized.textUpdate.newText
+      );
+      textMutationApplied = true;
+    }
+
+    if (
+      getLatestPropsFromHostInstanceToken(normalized.parentToken) !==
+        normalized.previous.parentProps ||
+      getLatestPropsFromHostInstanceToken(normalized.childToken) !==
+        normalized.previous.childProps
+    ) {
+      latestPropsHandoffStale = true;
+      throwInvalidRootPublicFacadeHostOutputUpdate(
+        'Public-facade nested host-output update rejects stale latest-props handoffs before publication.'
+      );
+    }
+
+    latestPropsPublishCount = commitLatestPropsFromMutationHandoffs([
+      parentPropsHandoff,
+      childPropsHandoff
+    ]);
+  } catch (error) {
+    let textRollbackApplied = false;
+    let textRollbackError = null;
+    if (textMutationApplied && normalized.textUpdate !== null) {
+      try {
+        rollbackHostOutputTextMutation(normalized.textUpdate);
+        textRollbackApplied = true;
+      } catch (rollbackError) {
+        textRollbackError = rollbackError;
+      }
+    }
+
+    let childPropertyRollbackApplied = false;
+    let childPropertyRollbackRecordCount = 0;
+    let childPropertyRollbackError = null;
+    if (childPropsHandoff !== null) {
+      try {
+        childPropertyRollbackRecordCount =
+          rollbackDomPropertyUpdateLatestPropsHandoff(childPropsHandoff);
+        childPropertyRollbackApplied = true;
+      } catch (rollbackError) {
+        childPropertyRollbackError = rollbackError;
+      }
+    }
+
+    let parentPropertyRollbackApplied = false;
+    let parentPropertyRollbackRecordCount = 0;
+    let parentPropertyRollbackError = null;
+    if (parentPropsHandoff !== null) {
+      try {
+        parentPropertyRollbackRecordCount =
+          rollbackDomPropertyUpdateLatestPropsHandoff(parentPropsHandoff);
+        parentPropertyRollbackApplied = true;
+      } catch (rollbackError) {
+        parentPropertyRollbackError = rollbackError;
+      }
+    }
+
+    attachNestedHostOutputUpdateRollbackEvidence(error, {
+      childPropertyRollbackApplied,
+      childPropertyRollbackError,
+      childPropertyRollbackRecordCount,
+      childPropsHandoff,
+      latestPropsHandoffStale,
+      normalized,
+      parentPropertyRollbackApplied,
+      parentPropertyRollbackError,
+      parentPropertyRollbackRecordCount,
+      parentPropsHandoff,
+      textMutationApplied,
+      textRollbackApplied,
+      textRollbackError
+    });
+    throw error;
+  }
+
+  if (parentPropertyMutationEvidence === null) {
+    parentPropertyMutationEvidence =
+      createHostOutputPropertyMutationEvidence(parentPropsHandoffPayload);
+  }
+  if (childPropertyMutationEvidence === null) {
+    childPropertyMutationEvidence =
+      createHostOutputPropertyMutationEvidence(childPropsHandoffPayload);
+  }
+
+  const parentLatestPropsAfterCommit =
+    getLatestPropsFromHostInstanceToken(normalized.parentToken);
+  const childLatestPropsAfterCommit =
+    getLatestPropsFromHostInstanceToken(normalized.childToken);
+  const parentPropertyMutation =
+    createNestedHostOutputPropertyMutationRecord({
+      handoff: parentPropsHandoff,
+      payload: parentPropsHandoffPayload,
+      propertyMutationEvidence: parentPropertyMutationEvidence,
+      sourceRecord: updateRecord,
+      target: 'parent'
+    });
+  const childPropertyMutation =
+    createNestedHostOutputPropertyMutationRecord({
+      handoff: childPropsHandoff,
+      payload: childPropsHandoffPayload,
+      propertyMutationEvidence: childPropertyMutationEvidence,
+      sourceRecord: updateRecord,
+      target: 'child'
+    });
+  const textMutation = createHostOutputTextMutationSummary(
+    normalized.textUpdate
   );
-  const latestPropsHandoffPayload =
-    getDomPropertyUpdateLatestPropsHandoffPayload(latestPropsHandoff);
-  const latestPropsBeforeCommit = getLatestPropsFromNode(
-    normalized.childNode
-  );
-  const latestPropsAfterCommit =
-    requireLatestPropsCommitResult(latestPropsHandoff);
 
   return freezeRecord({
-    hostOutputUpdateHandoff: null,
-    hostOutputUpdatePayload: null,
-    latestPropsAfterCommit,
-    latestPropsBeforeCommit,
-    latestPropsHandoff,
-    latestPropsHandoffPayload
+    childLatestPropsAfterCommit,
+    childLatestPropsBeforeCommit: normalized.previous.childProps,
+    childLatestPropsPublished:
+      childLatestPropsAfterCommit === normalized.next.childProps,
+    childPropertyMutation,
+    childPropsHandoff,
+    childPropsHandoffPayload,
+    latestPropsPublished:
+      parentLatestPropsAfterCommit === normalized.next.parentProps &&
+      childLatestPropsAfterCommit === normalized.next.childProps,
+    latestPropsPublishCount,
+    latestPropsPublishOrder:
+      normalized.textUpdate === null
+        ? 'after-parent-child-property-mutation'
+        : 'after-parent-child-property-and-text-mutation',
+    parentLatestPropsAfterCommit,
+    parentLatestPropsBeforeCommit: normalized.previous.parentProps,
+    parentLatestPropsPublished:
+      parentLatestPropsAfterCommit === normalized.next.parentProps,
+    parentPropertyMutation,
+    parentPropsHandoff,
+    parentPropsHandoffPayload,
+    textMutation
   });
 }
 
-function commitPublicFacadeNestedParentLatestPropsForUpdate(normalized) {
-  const parentPropsHandoff = commitDomPropertyUpdateForLatestProps(
-    normalized.parentNode,
-    normalized.next.parentType,
-    normalized.previous.parentProps,
-    normalized.next.parentProps
-  );
-  const parentPropsHandoffPayload =
-    getDomPropertyUpdateLatestPropsHandoffPayload(parentPropsHandoff);
-  const latestPropsBeforeCommit = getLatestPropsFromNode(
-    normalized.parentNode
-  );
-  const latestPropsAfterCommit =
-    requireLatestPropsCommitResult(parentPropsHandoff);
+function createNestedHostOutputPropertyMutationRecord({
+  handoff,
+  payload,
+  propertyMutationEvidence,
+  sourceRecord,
+  target
+}) {
+  const latestPropsCommitRecord =
+    payload === null ? null : payload.latestPropsCommitRecord;
 
   return freezeRecord({
-    latestPropsAfterCommit,
-    latestPropsBeforeCommit,
-    parentPropsHandoff,
-    parentPropsHandoffPayload
+    handoffKind: handoff === null ? null : handoff.kind,
+    latestPropsCommitRecordKind:
+      latestPropsCommitRecord === null ? null : latestPropsCommitRecord.kind,
+    latestPropsCommitRecordStatus:
+      latestPropsCommitRecord === null
+        ? null
+        : latestPropsCommitRecord.status,
+    mutationRecordCount: payload === null ? 0 : payload.mutationRecords.length,
+    payloadCount: handoff === null ? 0 : handoff.payloadCount,
+    propertyPayloadEvidence: propertyMutationEvidence,
+    sourceOwned: true,
+    sourceRequestId: sourceRecord.requestId,
+    sourceRequestSequence: sourceRecord.requestSequence,
+    sourceRequestType: sourceRecord.requestType,
+    sourceUpdateId: sourceRecord.updateId,
+    status: handoff === null ? null : handoff.status,
+    target
   });
 }
 
@@ -11082,6 +11289,147 @@ function validatePrivateRootPublicFacadeUpdateNativeHandoffCurrentness({
     lifecycleContainerSnapshotCurrent: true,
     hostOutputUpdateCurrent: true,
     rootCommitHostComponentUpdateCurrent,
+    updateNativeHandoffCurrent: true
+  });
+}
+
+function validatePrivateRootPublicFacadeNestedUpdateNativeHandoffCurrentness({
+  activeRender,
+  createPayload,
+  createRecord,
+  lifecycleRequestAdmission,
+  lifecycleRequestBoundary,
+  nestedHostOutputUpdate,
+  normalized,
+  payload,
+  sourceContainerSnapshot,
+  updateRecord
+}) {
+  const updateValidation = validateHostOutputUpdateRequestRecord(
+    updateRecord,
+    throwInvalidRootPublicFacadeHostOutputUpdate
+  );
+  const lifecycleValidation =
+    validatePrivateRootPublicFacadeLifecycleRequestBoundaryEvidence({
+      container: createPayload.container,
+      createRecord,
+      lifecycleRequestAdmission,
+      lifecycleRequestBoundary,
+      payload,
+      sourceRecord: updateRecord
+    });
+  if (lifecycleValidation === null) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested root.render update native handoff requires source-owned active lifecycle request-boundary evidence for the same update request.'
+    );
+  }
+  if (!lifecycleValidation.containerRequestCurrent) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested root.render update native handoff rejected stale same-container lifecycle request-boundary evidence.'
+    );
+  }
+  if (
+    !privateRootPublicFacadeLifecycleContainerSnapshotCurrent(
+      createPayload.container,
+      updateRecord,
+      sourceContainerSnapshot
+    )
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested root.render update native handoff rejected stale lifecycle container snapshot evidence.'
+    );
+  }
+  if (
+    updateValidation.rootHandleState !==
+    getPrivateRootHandleState(payload.rootHandle)
+  ) {
+    throwForeignRootBridgeRequest();
+  }
+  if (rootNativeHandoffRecords.get(updateRecord) !== undefined) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested root.render update native handoff rejected replayed update currentness.'
+    );
+  }
+  if (rootHostOutputUpdateHandoffRecords.get(updateRecord) !== undefined) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested root.render update rejects child-only host-output update handoff evidence.'
+    );
+  }
+  if (
+    activeRender.hostOutputPayload.active !== true ||
+    activeRender.renderPayload.createRecord !== createRecord ||
+    activeRender.renderPayload.rootHandle !== payload.rootHandle
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested root.render update native handoff requires the current initial nested host-output render.'
+    );
+  }
+  if (
+    activeRender.hostOutputPayload.hostToken !== normalized.parentToken ||
+    activeRender.hostOutputPayload.childHostToken !== normalized.childToken ||
+    activeRender.hostOutputPayload.textToken !== normalized.textToken ||
+    activeRender.hostOutputPayload.hostNode !== normalized.parentNode ||
+    activeRender.hostOutputPayload.childHostNode !== normalized.childNode ||
+    activeRender.hostOutputPayload.textNode !== normalized.textNode ||
+    getRootOwnerFromHostInstanceToken(normalized.parentToken) !==
+      payload.rootHandle.owner ||
+    getRootOwnerFromHostInstanceToken(normalized.childToken) !==
+      payload.rootHandle.owner ||
+    getRootOwnerFromHostInstanceToken(normalized.textToken) !==
+      payload.rootHandle.owner ||
+    getFirstChild(createPayload.container) !== normalized.parentNode ||
+    getFirstChild(normalized.parentNode) !== normalized.childNode ||
+    getFirstChild(normalized.childNode) !== normalized.textNode ||
+    !childNodesMatch(createPayload.container, freezeArray([
+      normalized.parentNode
+    ])) ||
+    !childNodesMatch(normalized.parentNode, freezeArray([
+      normalized.childNode
+    ])) ||
+    !childNodesMatch(normalized.childNode, freezeArray([
+      normalized.textNode
+    ])) ||
+    !childNodesMatch(normalized.textNode, freezeArray([])) ||
+    getLatestPropsFromHostInstanceToken(normalized.parentToken) !==
+      normalized.next.parentProps ||
+    getLatestPropsFromHostInstanceToken(normalized.childToken) !==
+      normalized.next.childProps ||
+    normalized.textNode.nodeValue !== normalized.next.text ||
+    normalized.childNode.textContent !== normalized.next.text ||
+    normalized.parentNode.textContent !== normalized.next.text ||
+    createPayload.container.textContent !== normalized.next.text
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested root.render update native handoff requires active matching fake-DOM host output.'
+    );
+  }
+  if (
+    nestedHostOutputUpdate === null ||
+    nestedHostOutputUpdate === undefined ||
+    nestedHostOutputUpdate.latestPropsPublished !== true ||
+    nestedHostOutputUpdate.parentLatestPropsPublished !== true ||
+    nestedHostOutputUpdate.childLatestPropsPublished !== true ||
+    nestedHostOutputUpdate.parentPropertyMutation.sourceOwned !== true ||
+    nestedHostOutputUpdate.childPropertyMutation.sourceOwned !== true ||
+    nestedHostOutputUpdate.parentPropertyMutation.sourceRequestId !==
+      updateRecord.requestId ||
+    nestedHostOutputUpdate.childPropertyMutation.sourceRequestId !==
+      updateRecord.requestId ||
+    nestedHostOutputUpdate.parentPropertyMutation.sourceUpdateId !==
+      updateRecord.updateId ||
+    nestedHostOutputUpdate.childPropertyMutation.sourceUpdateId !==
+      updateRecord.updateId ||
+    nestedHostOutputUpdate.parentPropertyMutation.target !== 'parent' ||
+    nestedHostOutputUpdate.childPropertyMutation.target !== 'child'
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested root.render update native handoff requires source-owned nested host-output update evidence.'
+    );
+  }
+
+  return freezeRecord({
+    lifecycleContainerSnapshotCurrent: true,
+    nestedHostOutputUpdateCurrent: true,
     updateNativeHandoffCurrent: true
   });
 }
@@ -22859,6 +23207,82 @@ function attachHostOutputUpdateRollbackEvidence(error, options) {
   });
 }
 
+function attachNestedHostOutputUpdateRollbackEvidence(error, options) {
+  if (!isObjectOrFunction(error)) {
+    return;
+  }
+
+  const domPropertyRollbackEvidence = error.domPropertyRollbackEvidence;
+  const internalPropertyMutationAttempted =
+    isObjectOrFunction(domPropertyRollbackEvidence) &&
+    domPropertyRollbackEvidence.mutationAttempted === true;
+  const internalPropertyRollbackAttempted =
+    isObjectOrFunction(domPropertyRollbackEvidence) &&
+    domPropertyRollbackEvidence.rollbackAttempted === true;
+  const internalPropertyRollbackApplied =
+    isObjectOrFunction(domPropertyRollbackEvidence) &&
+    domPropertyRollbackEvidence.rollbackApplied === true;
+  const internalPropertyRollbackRecordCount =
+    isObjectOrFunction(domPropertyRollbackEvidence) &&
+    typeof domPropertyRollbackEvidence.rollbackRecordCount === 'number'
+      ? domPropertyRollbackEvidence.rollbackRecordCount
+      : 0;
+
+  error.privateRootNestedUpdateRollbackEvidence = freezeRecord({
+    kind: 'FastReactDomPrivateRootNestedUpdateRollbackEvidence',
+    latestPropsPublished: false,
+    latestPropsHandoffStale: options.latestPropsHandoffStale,
+    parentLatestPropsRestoredToPrevious:
+      getLatestPropsFromHostInstanceToken(options.normalized.parentToken) ===
+      options.normalized.previous.parentProps,
+    childLatestPropsRestoredToPrevious:
+      getLatestPropsFromHostInstanceToken(options.normalized.childToken) ===
+      options.normalized.previous.childProps,
+    parentPropertyMutationAttempted:
+      options.parentPropsHandoff !== null || internalPropertyMutationAttempted,
+    childPropertyMutationAttempted: options.childPropsHandoff !== null,
+    propertyRollbackAttempted:
+      options.parentPropsHandoff !== null ||
+      options.childPropsHandoff !== null ||
+      internalPropertyRollbackAttempted,
+    parentPropertyRollbackApplied:
+      options.parentPropertyRollbackApplied ||
+      internalPropertyRollbackApplied,
+    childPropertyRollbackApplied: options.childPropertyRollbackApplied,
+    propertyRollbackRecordCount:
+      options.parentPropertyRollbackRecordCount +
+      options.childPropertyRollbackRecordCount +
+      internalPropertyRollbackRecordCount,
+    textMutationRequested: options.normalized.textUpdate !== null,
+    textMutationApplied: options.textMutationApplied,
+    textRollbackAttempted: options.textMutationApplied,
+    textRollbackApplied: options.textRollbackApplied,
+    unsupportedPropertyPayloadRejected:
+      isUnsupportedRootPropertyPayloadError(error),
+    parentPropertyRollbackError:
+      options.parentPropertyRollbackError === null
+        ? null
+        : freezeRecord({
+            code: options.parentPropertyRollbackError.code || null,
+            message: options.parentPropertyRollbackError.message
+          }),
+    childPropertyRollbackError:
+      options.childPropertyRollbackError === null
+        ? null
+        : freezeRecord({
+            code: options.childPropertyRollbackError.code || null,
+            message: options.childPropertyRollbackError.message
+          }),
+    textRollbackError:
+      options.textRollbackError === null
+        ? null
+        : freezeRecord({
+            code: options.textRollbackError.code || null,
+            message: options.textRollbackError.message
+          })
+  });
+}
+
 function isUnsupportedRootPropertyPayloadError(error) {
   return (
     isObjectOrFunction(error) &&
@@ -28450,6 +28874,25 @@ function createPublicFacadeNestedHostOutputUpdateAcceptedCapabilities(
   return freezeArray([
     ...ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
     ...handoff.acceptedCapabilities
+  ]);
+}
+
+function createPublicFacadeNestedActiveHostOutputUpdateAcceptedCapabilities(
+  update
+) {
+  return freezeArray([
+    ...ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES
+      .filter((capability) => capability.id !== 'host-output-update-handoff'),
+    freezeRecord({
+      id: 'source-owned-nested-host-output-update',
+      accepted: true,
+      reason:
+        'The parent and child fake-DOM mutations were applied from one source-owned nested root.render update transaction.'
+    }),
+    ...createHostOutputUpdateAcceptedCapabilities(
+      update.parentPropertyMutation.propertyPayloadEvidence,
+      update.textMutation.status === 'mutated'
+    )
   ]);
 }
 

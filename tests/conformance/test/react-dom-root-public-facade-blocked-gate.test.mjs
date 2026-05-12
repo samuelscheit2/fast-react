@@ -5507,6 +5507,34 @@ test("React DOM public root facade records hostile render capability rejections"
   assert.ok(
     rejectionRows.some(
       (row) =>
+        row.label === "unsupported-nested-span-id-prop" &&
+        row.blockedSurface === "nested-child-prop"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-nested-span-className-prop" &&
+        row.blockedSurface === "nested-child-prop"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-nested-component" &&
+        row.blockedSurface === "nested-component"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-nested-compatibility-alias" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
         row.label === "unsupported-hydrateRoot-options-callbacks" &&
         row.hydrateRootCallbackInvocationCount === 0 &&
         row.postAcceptedRenderRejected === false

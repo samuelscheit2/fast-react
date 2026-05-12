@@ -813,6 +813,36 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "nested-sibling"
     }),
     publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-span-id-prop",
+      label: "unsupported-nested-span-id-prop",
+      publicApi: "root.render(<div><span id=\"blocked\">text</span></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "nested-child-prop"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-span-classname-prop",
+      label: "unsupported-nested-span-className-prop",
+      publicApi:
+        "root.render(<div><span className=\"blocked\">text</span></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "nested-child-prop"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-component",
+      label: "unsupported-nested-component",
+      publicApi: "root.render(<div><Component /></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "nested-component"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-compatibility-alias",
+      label: "unsupported-nested-compatibility-alias",
+      publicApi:
+        "root.render(<div compatibilityClaimed={true}><span>text</span></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-fragment",
       label: "unsupported-fragment",
       publicApi: "root.render(<><div>text</div></>)",
@@ -990,7 +1020,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS = Object.freeze(
       comparedToAcceptedReactDomOracle: true,
       publicCompatibilityClaimed: false,
       reason:
-        "Public React DOM root facade behavior stays blocked outside the admitted fake-DOM div text render, id/text update, id removal update, render(null) cleanup, idempotent unmount cleanup, and recreate-after-unmount path."
+        "Public React DOM root facade behavior stays blocked outside the admitted fake-DOM div text path, narrow div > span nested path, id/text updates, id removal updates, render(null) cleanup, idempotent unmount cleanup, and recreate-after-unmount path."
     })
   )
 );
@@ -3045,7 +3075,7 @@ function validatePublicFacadeBoundary({
       id: "public-root-render",
       gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
       reason:
-        "root.render is exposed only for the minimal div text host-output path; broad render compatibility remains blocked.",
+        "root.render is exposed only for the minimal div text and narrow div > span fake-DOM host-output paths; broad render compatibility remains blocked.",
       compatibilityClaimed: false,
       minimalDivTextHostOutputOnly: true
     });
@@ -3053,7 +3083,7 @@ function validatePublicFacadeBoundary({
       id: "public-root-unmount",
       gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
       reason:
-        "root.unmount is exposed only for cleanup after the minimal div text host-output path; broad unmount compatibility remains blocked.",
+        "root.unmount is exposed only for cleanup after the minimal div text and narrow div > span fake-DOM host-output paths; broad unmount compatibility remains blocked.",
       compatibilityClaimed: false
     });
   }
@@ -3221,7 +3251,7 @@ function validatePublicRootExportBlocked({
       exportName,
       minimalPublicRootObjectExposed: true,
       reason:
-        "Public createRoot may return a minimal root object only for the div text host-output path; broad root compatibility remains blocked."
+        "Public createRoot may return a minimal root object only for the div text and narrow div > span fake-DOM host-output paths; broad root compatibility remains blocked."
     });
     return;
   }

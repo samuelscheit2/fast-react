@@ -489,6 +489,177 @@ test("private facade root.render update mutates one fake DOM property and text p
   );
 });
 
+test("private facade root.render nested update carries source-owned parent mutation evidence", () => {
+  const document = createDocument();
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    nativeEnvironmentId: 845,
+    nativeHandoffIdPrefix: "conformance-nested-update-native",
+    publicFacadeHostOutputRenderIdPrefix: "conformance-nested-update-render",
+    publicFacadeHostOutputUpdateIdPrefix:
+      "conformance-nested-update-diagnostic",
+    requestIdPrefix: "conformance-nested-update-request",
+    rootIdPrefix: "conformance-nested-update-root",
+    updateIdPrefix: "conformance-nested-update"
+  });
+  const root = adapter.createRoot(container);
+  const initialChild = {
+    props: {
+      children: "nested initial"
+    },
+    type: "span"
+  };
+  const nextChild = {
+    props: {
+      children: "nested next"
+    },
+    type: "span"
+  };
+  const initialElement = {
+    props: {
+      children: initialChild,
+      id: "nested-initial"
+    },
+    type: "div"
+  };
+  const nextElement = {
+    props: {
+      children: nextChild,
+      id: "nested-next"
+    },
+    type: "div"
+  };
+  const idOnlyChild = {
+    props: {
+      children: "nested next"
+    },
+    type: "span"
+  };
+  const idOnlyElement = {
+    props: {
+      children: idOnlyChild,
+      id: "nested-final"
+    },
+    type: "div"
+  };
+  const idRemovalChild = {
+    props: {
+      children: "nested next"
+    },
+    type: "span"
+  };
+  const idRemovalElement = {
+    props: {
+      children: idRemovalChild
+    },
+    type: "div"
+  };
+
+  const initialDiagnostic = adapter.renderHostOutput(root, initialElement);
+  const updateDiagnostic = adapter.updateHostOutput(root, nextElement);
+  const parentNode = container.firstChild;
+  const childNode = parentNode.firstChild;
+  const textNode = childNode.firstChild;
+
+  assert.equal(updateDiagnostic.nestedHostOutputUpdate, true);
+  assert.equal(updateDiagnostic.hostOutputUpdateHandoffId, null);
+  assert.equal(updateDiagnostic.hostOutputUpdateStatus, null);
+  assert.equal(updateDiagnostic.propertyMutation, updateDiagnostic.parentPropertyMutation);
+  assert.equal(updateDiagnostic.parentPropertyMutation.target, "parent");
+  assert.equal(updateDiagnostic.childPropertyMutation.target, "child");
+  assert.equal(updateDiagnostic.parentPropertyMutation.sourceOwned, true);
+  assert.equal(updateDiagnostic.childPropertyMutation.sourceOwned, true);
+  assert.equal(
+    updateDiagnostic.parentPropertyMutation.sourceRequestId,
+    updateDiagnostic.updateRequestId
+  );
+  assert.equal(
+    updateDiagnostic.parentPropertyMutation.sourceUpdateId,
+    updateDiagnostic.updateUpdateId
+  );
+  assert.equal(
+    updateDiagnostic.parentPropertyMutation.propertyPayloadEvidence
+      .setAttributeCount,
+    1
+  );
+  assert.equal(
+    updateDiagnostic.childPropertyMutation.propertyPayloadEvidence
+      .mutatingRowCount,
+    0
+  );
+  assert.deepEqual(updateDiagnostic.textMutation, {
+    newTextLength: 11,
+    oldTextLength: 14,
+    status: "mutated"
+  });
+  assert.equal(updateDiagnostic.latestPropsPublished, true);
+  assert.equal(updateDiagnostic.parentLatestPropsPublished, true);
+  assert.equal(updateDiagnostic.childLatestPropsPublished, true);
+  assert.equal(
+    updateDiagnostic.latestPropsPublishOrder,
+    "after-parent-child-property-and-text-mutation"
+  );
+  assert.equal(updateDiagnostic.nestedHostOutputUpdateCurrentStatus, true);
+  assert.equal(parentNode.attributes.get("id"), "nested-next");
+  assert.equal(textNode.nodeValue, "nested next");
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), nextElement.props);
+  assert.equal(componentTree.getLatestPropsFromNode(childNode), nextChild.props);
+
+  const idOnlyDiagnostic = adapter.updateHostOutput(root, idOnlyElement);
+  assert.equal(idOnlyDiagnostic.parentPropertyMutation.target, "parent");
+  assert.equal(idOnlyDiagnostic.parentPropertyMutation.sourceOwned, true);
+  assert.equal(
+    idOnlyDiagnostic.parentPropertyMutation.propertyPayloadEvidence
+      .setAttributeCount,
+    1
+  );
+  assert.deepEqual(idOnlyDiagnostic.textMutation, {
+    newTextLength: null,
+    oldTextLength: null,
+    status: "not-requested"
+  });
+  assert.equal(parentNode.attributes.get("id"), "nested-final");
+  assert.equal(textNode.nodeValue, "nested next");
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), idOnlyElement.props);
+  assert.equal(componentTree.getLatestPropsFromNode(childNode), idOnlyChild.props);
+
+  const idRemovalDiagnostic = adapter.updateHostOutput(root, idRemovalElement);
+  assert.equal(idRemovalDiagnostic.parentPropertyMutation.target, "parent");
+  assert.equal(idRemovalDiagnostic.parentPropertyMutation.sourceOwned, true);
+  assert.equal(
+    idRemovalDiagnostic.parentPropertyMutation.propertyPayloadEvidence
+      .removeAttributeCount,
+    1
+  );
+  assert.deepEqual(idRemovalDiagnostic.textMutation, {
+    newTextLength: null,
+    oldTextLength: null,
+    status: "not-requested"
+  });
+  assert.equal(parentNode.attributes.has("id"), false);
+  assert.equal(textNode.nodeValue, "nested next");
+  assert.equal(
+    componentTree.getLatestPropsFromNode(parentNode),
+    idRemovalElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    idRemovalChild.props
+  );
+
+  const initialPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      initialDiagnostic
+    );
+  initialPayload.bridge.cleanupInitialRenderHostOutput(
+    initialPayload.hostOutputHandoff
+  );
+});
+
 test("root render E2E gate keeps private facade root.unmount cleanup below public compatibility", () => {
   const document = createDocument();
   const container = document.createElement("div");
@@ -957,6 +1128,11 @@ function assertPublicCreateRootMinimalHostOutput(document) {
     { id: "nested-final" },
     React.createElement("span", null, "nested updated")
   );
+  const nestedIdRemovalUpdate = React.createElement(
+    "div",
+    null,
+    React.createElement("span", null, "nested updated")
+  );
 
   assert.equal(nestedRoot.render(nestedInitial), undefined);
   const parentNode = nestedContainer.firstChild;
@@ -998,6 +1174,18 @@ function assertPublicCreateRootMinimalHostOutput(document) {
     nestedIdOnlyUpdate.props.children.props
   );
 
+  assert.equal(nestedRoot.render(nestedIdRemovalUpdate), undefined);
+  assert.equal(nestedContainer.firstChild, parentNode);
+  assert.equal(parentNode.firstChild, childNode);
+  assert.equal(childNode.firstChild, textNode);
+  assert.deepEqual(attributeEntries(parentNode), []);
+  assert.equal(textNode.nodeValue, "nested updated");
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), nestedIdRemovalUpdate.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    nestedIdRemovalUpdate.props.children.props
+  );
+
   assert.equal(nestedRoot.render(null), undefined);
   assert.equal(nestedContainer.childNodes.length, 0);
   assert.equal(componentTree.getLatestPropsFromNode(parentNode), null);
@@ -1015,6 +1203,22 @@ function assertPublicCreateRootMinimalHostOutput(document) {
   assert.equal(nestedFreshRoot.render(nestedUpdate), undefined);
   assert.equal(nestedContainer.textContent, "nested updated");
   assert.equal(nestedFreshRoot.unmount(), undefined);
+
+  const nestedNoIdContainer = document.createElement("div");
+  const nestedNoIdRoot = reactDomClient.createRoot(nestedNoIdContainer);
+  const nestedNoId = React.createElement(
+    "div",
+    null,
+    React.createElement("span", null, "nested no id")
+  );
+  assert.equal(nestedNoIdRoot.render(nestedNoId), undefined);
+  assert.deepEqual(attributeEntries(nestedNoIdContainer.firstChild), []);
+  assert.equal(nestedNoIdContainer.textContent, "nested no id");
+  assert.equal(
+    componentTree.getLatestPropsFromNode(nestedNoIdContainer.firstChild),
+    nestedNoId.props
+  );
+  assert.equal(nestedNoIdRoot.unmount(), undefined);
 }
 
 function createEventTarget(target) {
