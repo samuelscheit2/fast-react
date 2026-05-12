@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -179,6 +180,79 @@ test("discovery helper accepts deterministic broad patterns when they cover ever
     analysis.coveredEntries,
     [...requiredEntries].sort(compareEntries)
   );
+});
+
+test("recursive discovery reports nested test and source gates missed by top-level globs", async () => {
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "fast-react-conformance-discovery-")
+  );
+
+  try {
+    await writeConformanceFixtureFiles(root, [
+      "fixtures/outside-test-src-gate.test.mjs",
+      "scripts/outside-test-src-gate.mjs",
+      "src/deep/missed-source-gate.test.mjs",
+      "src/deep/source-helper.mjs",
+      "src/top-level-source-gate.test.mjs",
+      "test/existing-oracle.test.mjs",
+      "test/nested/missed-conformance-gate.mjs",
+      "test/top-level-conformance-gate.mjs"
+    ]);
+
+    const requiredEntries = await discoverRequiredConformanceTestEntries(root);
+    const analysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.mjs src/*.test.mjs",
+      requiredEntries
+    });
+
+    assert.deepEqual(
+      requiredEntries,
+      [
+        "src/deep/missed-source-gate.test.mjs",
+        "src/top-level-source-gate.test.mjs",
+        "test/existing-oracle.test.mjs",
+        "test/nested/missed-conformance-gate.mjs",
+        "test/top-level-conformance-gate.mjs"
+      ].sort(compareEntries)
+    );
+    assert.deepEqual(
+      analysis.directCoveredEntries,
+      [
+        "src/top-level-source-gate.test.mjs",
+        "test/existing-oracle.test.mjs",
+        "test/top-level-conformance-gate.mjs"
+      ].sort(compareEntries)
+    );
+    assert.deepEqual(analysis.uncoveredEntries, [
+      "src/deep/missed-source-gate.test.mjs",
+      "test/nested/missed-conformance-gate.mjs"
+    ]);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("static wrapper import discovery accepts nested gates imported by covered nested wrappers", () => {
+  const requiredEntries = [
+    "test/nested/root-render-gate.mjs",
+    "test/nested/root-render-gate.test.mjs"
+  ];
+  const wrapperEntry = "test/nested/root-render-gate.test.mjs";
+  const importedEntries = discoverRequiredStaticImportsFromSource({
+    entry: wrapperEntry,
+    source: 'import "./root-render-gate.mjs";\n',
+    requiredEntries
+  });
+  const analysis = analyzeConformanceTestScriptCoverage({
+    testScript: "node --test test/**/*.test.mjs",
+    requiredEntries,
+    importedEntriesByEntry: new Map([[wrapperEntry, importedEntries]])
+  });
+
+  assert.deepEqual(analysis.uncoveredEntries, []);
+  assert.deepEqual(analysis.importCoveredEntries, [
+    "test/nested/root-render-gate.mjs"
+  ]);
 });
 
 async function discoverRequiredConformanceTestEntries(root) {
@@ -505,10 +579,35 @@ function isLineStartBefore(source, index) {
 
 async function discoverMjsFiles(directory, { include, relativePrefix }) {
   const entries = await fs.readdir(directory, { withFileTypes: true });
-  return entries
-    .filter((entry) => entry.isFile() && include(entry.name))
-    .map((entry) => `${relativePrefix}/${entry.name}`)
-    .sort(compareEntries);
+  const discovered = [];
+
+  for (const entry of entries.sort((left, right) =>
+    compareEntries(left.name, right.name)
+  )) {
+    const entryPath = path.join(directory, entry.name);
+    const relativeEntry = `${relativePrefix}/${entry.name}`;
+
+    if (entry.isDirectory()) {
+      discovered.push(
+        ...(await discoverMjsFiles(entryPath, {
+          include,
+          relativePrefix: relativeEntry
+        }))
+      );
+    } else if (entry.isFile() && include(entry.name)) {
+      discovered.push(relativeEntry);
+    }
+  }
+
+  return discovered.sort(compareEntries);
+}
+
+async function writeConformanceFixtureFiles(root, entries) {
+  for (const entry of entries) {
+    const filePath = path.join(root, entry);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, "export {};\n", "utf8");
+  }
 }
 
 function analyzeConformanceTestScriptCoverage({
