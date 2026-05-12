@@ -2454,11 +2454,7 @@ function assertPublicCreateRootMinimalHostOutput(document) {
         exportName: 'createRoot().render'
       }
     );
-    assert.throws(() => root.unmount(), {
-      code: 'FAST_REACT_UNIMPLEMENTED',
-      entrypoint: 'react-dom/client',
-      exportName: 'createRoot().unmount'
-    });
+    assert.equal(root.unmount(), undefined);
     assert.equal(container.childNodes.length, 0);
     assert.equal(container.children.length, 0);
     assert.equal(container.firstElementChild, null);
