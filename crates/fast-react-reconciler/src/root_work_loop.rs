@@ -258,7 +258,6 @@ pub use render_phase::{
     SchedulerCallbackRenderStatus, SchedulerCallbackValidationRecord, render_host_root_for_lanes,
     render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
 };
-#[cfg(test)]
 mod complete_handoff;
 
 #[cfg(test)]
@@ -275,6 +274,15 @@ use complete_handoff::{
     host_root_complete_work_handoff_record_from_host_work,
     validate_completed_host_root_render_for_complete_work_handoff,
     validate_empty_host_root_child_list_for_complete_work_handoff,
+};
+#[allow(
+    unused_imports,
+    reason = "crate-private minimal render/complete handoff is production-compiled before public render consumes it"
+)]
+pub(crate) use complete_handoff::{
+    HostRootMinimalRenderCompleteHandoffAdapter, HostRootMinimalRenderCompleteHandoffError,
+    HostRootMinimalRenderCompleteHandoffRecord,
+    handoff_minimal_root_element_render_to_complete_work,
 };
 mod context_provider;
 

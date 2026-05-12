@@ -1,8 +1,14 @@
 use super::*;
 use std::cell::Cell;
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
 
 use crate::{
-    RootElementResolutionError, RootElementSource, RootHostComponentElement, RootHostTextChild,
+    HostFiberTokenId, RootElementResolutionError, RootElementSource, RootHostComponentElement,
+    RootHostTextChild,
+    complete_work::{HostFiberTokenFactory, MinimalHostCompleteWorkError},
+    host_nodes::HostNodeStore,
+    test_support::{FakeHostChild, FakeHostFiberToken},
 };
 
 #[derive(Debug)]
@@ -54,6 +60,130 @@ impl RootElementSource for StaticRootElementSource {
             Ok(None)
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MinimalHandoffAdapterError {
+    RejectType,
+}
+
+impl Display for MinimalHandoffAdapterError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RejectType => formatter.write_str("test adapter rejected host type"),
+        }
+    }
+}
+
+impl Error for MinimalHandoffAdapterError {}
+
+#[derive(Debug)]
+struct MinimalRecordingHostAdapter {
+    element: RootElementHandle,
+    element_type: ElementTypeHandle,
+    props: PropsHandle,
+    ty: &'static str,
+    type_failure: Option<MinimalHandoffAdapterError>,
+    type_calls: Cell<usize>,
+    props_calls: Cell<usize>,
+}
+
+impl MinimalRecordingHostAdapter {
+    fn new(
+        element: RootElementHandle,
+        element_type: ElementTypeHandle,
+        props: PropsHandle,
+        ty: &'static str,
+    ) -> Self {
+        Self {
+            element,
+            element_type,
+            props,
+            ty,
+            type_failure: None,
+            type_calls: Cell::new(0),
+            props_calls: Cell::new(0),
+        }
+    }
+
+    fn rejecting_type(mut self) -> Self {
+        self.type_failure = Some(MinimalHandoffAdapterError::RejectType);
+        self
+    }
+
+    fn type_calls(&self) -> usize {
+        self.type_calls.get()
+    }
+
+    fn props_calls(&self) -> usize {
+        self.props_calls.get()
+    }
+}
+
+impl HostRootMinimalRenderCompleteHandoffAdapter<RecordingHost> for MinimalRecordingHostAdapter {
+    type Error = MinimalHandoffAdapterError;
+
+    fn adapt_host_component_type(
+        &mut self,
+        element: RootElementHandle,
+        element_type: ElementTypeHandle,
+    ) -> Result<Option<&'static str>, Self::Error> {
+        self.type_calls.set(self.type_calls.get() + 1);
+        if let Some(error) = self.type_failure {
+            return Err(error);
+        }
+
+        Ok((element == self.element && element_type == self.element_type).then_some(self.ty))
+    }
+
+    fn adapt_host_component_props(
+        &mut self,
+        element: RootElementHandle,
+        props: PropsHandle,
+    ) -> Result<Option<()>, Self::Error> {
+        self.props_calls.set(self.props_calls.get() + 1);
+
+        Ok((element == self.element && props == self.props).then_some(()))
+    }
+}
+
+#[derive(Debug, Default)]
+struct MinimalRecordingHostTokenFactory;
+
+impl HostFiberTokenFactory<RecordingHost> for MinimalRecordingHostTokenFactory {
+    fn create_host_fiber_token(&mut self, token_id: HostFiberTokenId) -> FakeHostFiberToken {
+        FakeHostFiberToken(token_id.raw())
+    }
+}
+
+fn minimal_root_component_source(
+    element: RootElementHandle,
+    element_type: ElementTypeHandle,
+    props: PropsHandle,
+    text: &'static str,
+    text_props: PropsHandle,
+) -> StaticRootElementSource {
+    let component = RootHostComponentElement::new(element, element_type, props)
+        .unwrap()
+        .with_text_child(RootHostTextChild::new(text, text_props).unwrap());
+    StaticRootElementSource::new(element, Some(component))
+}
+
+fn assert_minimal_render_complete_handoff_unpublished(
+    store: &FiberRootStore<RecordingHost>,
+    host_nodes: &HostNodeStore<RecordingHost>,
+    component: FiberId,
+    text: FiberId,
+) {
+    assert!(host_nodes.is_empty());
+    assert_eq!(
+        store.fiber_arena().get(component).unwrap().state_node(),
+        StateNodeHandle::NONE
+    );
+    assert_eq!(
+        store.fiber_arena().get(text).unwrap().state_node(),
+        StateNodeHandle::NONE
+    );
 }
 
 #[test]
@@ -433,6 +563,382 @@ fn root_work_loop_minimal_root_element_render_rejects_existing_current_child_bef
     );
     assert_eq!(source.calls(), 0);
     assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_handoff_creates_detached_records_without_public_compatibility()
+ {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = MinimalRecordingHostTokenFactory;
+    let element = RootElementHandle::from_raw(7_501);
+    let element_type = ElementTypeHandle::from_raw(7_502);
+    let props = PropsHandle::from_raw(7_503);
+    let text_props = PropsHandle::from_raw(7_504);
+    let source = minimal_root_component_source(
+        element,
+        element_type,
+        props,
+        "text payload from render record",
+        text_props,
+    );
+    let current = store.root(root_id).unwrap().current();
+    update_container(&mut store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let work_in_progress = render.host_root_work_in_progress();
+    let component = render.root_child();
+    let text_child = render.text_child();
+    let mut adapter = MinimalRecordingHostAdapter::new(element, element_type, props, "section");
+
+    let record = handoff_minimal_root_element_render_to_complete_work(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .unwrap();
+
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 1);
+    assert_eq!(record.root(), root_id);
+    assert_eq!(record.host_root_work_in_progress(), work_in_progress);
+    assert_eq!(record.component(), component);
+    assert_eq!(record.text(), text_child);
+    assert_eq!(record.root_element(), element);
+    assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+    assert_eq!(record.detached_instance_count(), 1);
+    assert_eq!(record.detached_text_count(), 1);
+    assert!(!record.public_dom_compatibility_claimed());
+    assert!(!record.public_compatibility_claimed());
+    assert!(record.public_compatibility_blocked());
+    assert!(record.proves_minimal_render_complete_handoff());
+    assert_eq!(
+        record.render().text_child_text(),
+        "text payload from render record"
+    );
+
+    let complete = record.complete_work();
+    assert_eq!(host_nodes.instance_count(), 1);
+    assert_eq!(host_nodes.text_count(), 1);
+    assert!(!complete.public_dom_compatibility_claimed());
+    let text = host_nodes
+        .text(complete.text_state_node(), complete.text_scope())
+        .unwrap();
+    assert_eq!(text.text(), "text payload from render record");
+    let instance = host_nodes
+        .instance(complete.component_state_node(), complete.component_scope())
+        .unwrap();
+    assert_eq!(instance.ty(), "section");
+    assert_eq!(instance.children(), &[FakeHostChild::Text(text.id())]);
+
+    let component_node = store.fiber_arena().get(component).unwrap();
+    assert_eq!(component_node.state_node(), complete.component_state_node());
+    let text_node = store.fiber_arena().get(text_child).unwrap();
+    assert_eq!(text_node.state_node(), complete.text_state_node());
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    assert_eq!(
+        host.operations(),
+        vec![
+            "root_host_context",
+            "child_host_context",
+            "should_set_text_content",
+            "create_text_instance",
+            "create_instance",
+            "append_initial_child",
+            "finalize_initial_children",
+        ]
+    );
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_handoff_fails_closed_when_adapter_rejects_handles() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = MinimalRecordingHostTokenFactory;
+    let element = RootElementHandle::from_raw(7_601);
+    let element_type = ElementTypeHandle::from_raw(7_602);
+    let props = PropsHandle::from_raw(7_603);
+    let source = minimal_root_component_source(
+        element,
+        element_type,
+        props,
+        "adapter must fail before host work",
+        PropsHandle::from_raw(7_604),
+    );
+    update_container(&mut store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let component = render.root_child();
+    let text = render.text_child();
+    let mut adapter =
+        MinimalRecordingHostAdapter::new(element, element_type, props, "main").rejecting_type();
+
+    let error = handoff_minimal_root_element_render_to_complete_work(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        HostRootMinimalRenderCompleteHandoffError::Adapter(MinimalHandoffAdapterError::RejectType,)
+    );
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 0);
+    assert_minimal_render_complete_handoff_unpublished(&store, &host_nodes, component, text);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_handoff_fails_closed_for_unadapted_props_handle() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = MinimalRecordingHostTokenFactory;
+    let element = RootElementHandle::from_raw(7_621);
+    let element_type = ElementTypeHandle::from_raw(7_622);
+    let props = PropsHandle::from_raw(7_623);
+    let source = minimal_root_component_source(
+        element,
+        element_type,
+        props,
+        "unadapted props must not reach host work",
+        PropsHandle::from_raw(7_624),
+    );
+    update_container(&mut store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let component = render.root_child();
+    let text = render.text_child();
+    let mut adapter = MinimalRecordingHostAdapter::new(
+        element,
+        element_type,
+        PropsHandle::from_raw(99_999),
+        "main",
+    );
+
+    let error = handoff_minimal_root_element_render_to_complete_work(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        HostRootMinimalRenderCompleteHandoffError::UnadaptedHostComponentProps {
+            root: root_id,
+            element,
+            props,
+        }
+    );
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 1);
+    assert_minimal_render_complete_handoff_unpublished(&store, &host_nodes, component, text);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_handoff_rejects_stale_render_record_before_adapter() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = MinimalRecordingHostTokenFactory;
+    let element = RootElementHandle::from_raw(7_641);
+    let element_type = ElementTypeHandle::from_raw(7_642);
+    let props = PropsHandle::from_raw(7_643);
+    let source = minimal_root_component_source(
+        element,
+        element_type,
+        props,
+        "stale render",
+        PropsHandle::from_raw(7_644),
+    );
+    update_container(&mut store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let work_in_progress = render.host_root_work_in_progress();
+    let component = render.root_child();
+    let text = render.text_child();
+    store
+        .root_mut(root_id)
+        .unwrap()
+        .scheduling_mut()
+        .clear_render_phase_work();
+    let mut adapter = MinimalRecordingHostAdapter::new(element, element_type, props, "section");
+
+    let error = handoff_minimal_root_element_render_to_complete_work(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        HostRootMinimalRenderCompleteHandoffError::RenderPhaseWorkMismatch {
+            root: root_id,
+            expected: None,
+            actual: work_in_progress,
+        }
+    );
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert_minimal_render_complete_handoff_unpublished(&store, &host_nodes, component, text);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_handoff_rejects_missing_wip_shape_without_publication() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = MinimalRecordingHostTokenFactory;
+    let element = RootElementHandle::from_raw(7_661);
+    let element_type = ElementTypeHandle::from_raw(7_662);
+    let props = PropsHandle::from_raw(7_663);
+    let source = minimal_root_component_source(
+        element,
+        element_type,
+        props,
+        "missing shape",
+        PropsHandle::from_raw(7_664),
+    );
+    update_container(&mut store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let work_in_progress = render.host_root_work_in_progress();
+    let component = render.root_child();
+    let text = render.text_child();
+    store
+        .fiber_arena_mut()
+        .set_children(work_in_progress, &[])
+        .unwrap();
+    let mut adapter = MinimalRecordingHostAdapter::new(element, element_type, props, "section");
+
+    let error = handoff_minimal_root_element_render_to_complete_work(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        HostRootMinimalRenderCompleteHandoffError::MinimalCompleteWork(
+            MinimalHostCompleteWorkError::ChildCountMismatch {
+                parent: work_in_progress,
+                expected: 1,
+                actual: 0,
+            },
+        )
+    );
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 1);
+    assert_minimal_render_complete_handoff_unpublished(&store, &host_nodes, component, text);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_handoff_rejects_mismatched_wip_shape_without_publication()
+{
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = MinimalRecordingHostTokenFactory;
+    let element = RootElementHandle::from_raw(7_681);
+    let element_type = ElementTypeHandle::from_raw(7_682);
+    let props = PropsHandle::from_raw(7_683);
+    let source = minimal_root_component_source(
+        element,
+        element_type,
+        props,
+        "mismatched shape",
+        PropsHandle::from_raw(7_684),
+    );
+    update_container(&mut store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let work_in_progress = render.host_root_work_in_progress();
+    let component = render.root_child();
+    let text = render.text_child();
+    store
+        .fiber_arena_mut()
+        .set_children(component, &[])
+        .unwrap();
+    store
+        .fiber_arena_mut()
+        .set_children(work_in_progress, &[text])
+        .unwrap();
+    let mut adapter = MinimalRecordingHostAdapter::new(element, element_type, props, "section");
+
+    let error = handoff_minimal_root_element_render_to_complete_work(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        HostRootMinimalRenderCompleteHandoffError::MinimalCompleteWork(
+            MinimalHostCompleteWorkError::UnsupportedRootTextChild {
+                host_root: work_in_progress,
+                text,
+            },
+        )
+    );
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 1);
+    assert_minimal_render_complete_handoff_unpublished(&store, &host_nodes, component, text);
     assert_eq!(host.operations(), Vec::<&'static str>::new());
 }
 
