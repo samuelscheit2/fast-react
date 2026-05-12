@@ -29,7 +29,7 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-### Workers 1111 and 1110 Private Root Render Native Bridge Evidence
+### Workers 1111, 1110, and 1116 Private Root Render Native Bridge Evidence
 
 - Worker 1111 added a crate-private diagnostic helper that composes the minimal
   HostRoot -> HostComponent -> HostText root render through complete-work
@@ -42,21 +42,28 @@ sequencing belong in `MASTER_PLAN.md`.
   helper is not exposed through enumerable CJS keys or named ESM exports, and
   the React DOM private root bridge shell now consumes it while preserving
   public root rendering rejection checks.
+- Worker 1116 repaired the private JSON batch lifecycle generation admission
+  ledger after the N-API root bridge request split by tracking the moved
+  `root_bridge_requests` Rust source files instead of the stale
+  `fast-react-napi/src/lib.rs` path. The generation ledger remains private and
+  non-enumerable, with native addon loading, worker threads, cleanup hooks,
+  renderer/reconciler execution, package exports, and public compatibility
+  claims still closed.
 - Accepted validation evidence for this batch includes
   `cargo test -p fast-react-reconciler --lib` with 924 tests passed,
   reconciler `cargo check` and all-features check variants,
   `cargo fmt --all --check`, `git diff --check`, root-render and public-facade
   conformance scripts, native CJS/ESM/package-surface/import smoke checks, and
-  the React DOM private root bridge shell with 76 tests passed. The native
-  no-load guard still fails on the inherited worker-873 Rust source-identifier
-  ledger assertion.
-- The accepted state for this batch is main `1066e3e7` after merge commits
-  `f6cc5868` and `1066e3e7`, plus worker/fix commits `bd6b595a`, `ab9ab507`,
-  and `f777de15`. Public React DOM root rendering, public update/unmount
-  behavior, public DOM mutation, listener/ref behavior, Scheduler/act timing,
-  public facade admission, native no-load guard currentness, package
-  compatibility, and broad renderer compatibility remain blocked unless
-  separately proven.
+  the React DOM private root bridge shell with 76 tests passed. Worker 1116
+  validation also passed the native no-load guard test, native loader CJS/ESM,
+  package-surface, import-smoke, Node syntax checks, and `git diff --check`.
+- The accepted state for this batch is main `7f11c4b4` after merge commits
+  `f6cc5868`, `1066e3e7`, and `7f11c4b4`, plus worker/fix commits
+  `bd6b595a`, `ab9ab507`, `f777de15`, and `4a0d8308`. Public React DOM root
+  rendering, public update/unmount behavior, public DOM mutation,
+  listener/ref behavior, Scheduler/act timing, public facade admission,
+  package compatibility, and broad renderer compatibility remain blocked
+  unless separately proven.
 
 ### Worker 1107 Docs Refresh and Workers 1090/1095-1097 Root Render Private Handoffs
 
