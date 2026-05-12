@@ -45,8 +45,8 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current root head is main `594b2687` (`Merge worker
-1249 conformance discovery template import guard`). Accepted implementation, cleanup,
+Top-level cap: 30 workers. Current root head is main `340e4072` (`Merge worker
+1248 public null unmount conformance hardening`). Accepted implementation, cleanup,
 planning, and docs-only history that is not under active repair is recorded in
 `MASTER_PROGRESS.md`; this plan lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
@@ -57,19 +57,12 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Active Worker 1245 repairs the remaining scheduler root currentness false
-  green: inherited non-claim variant metadata injected through
-  `Object.prototype` must fail closed for both local observation rows and
-  `behaviorEvidence`.
 - Active Worker 1246 hardens react-test-renderer placeholder-surface
   currentness so `placeholder-present` requires exact package-root, JS, CJS dev,
   CJS prod, and shallow placeholder/blocker surfaces with public compatibility
   still blocked.
 - Active Worker 1247 adds a private/test-only committed-fiber inspection
   consumer for the accepted sync-flush minimal HostRoot placement canary.
-- Active Worker 1248 adds explicit public-facade conformance rows and hostile
-  false-green tests for the already accepted fake-DOM `render(null)` cleanup and
-  idempotent unmount behavior.
 - Clean idle worktrees exist for `worker/1250-rust-hostroot-update-render-commit`,
   `worker/1251-react-dom-nested-fakedom-lifecycle`, and
   `worker/1252-test-renderer-private-create-bridge`. Do not consume, delete, or
@@ -100,13 +93,14 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through accepted implementation/evidence
-baseline main `4aa248fb` remains narrow. The only public React DOM root behavior
+Accepted compatibility evidence through current main `340e4072` remains narrow.
+The only public React DOM root behavior
 accepted so far is the fake-DOM div/text `createRoot().render(...)` lifecycle:
 initial render, same-root div/text/id update, id removal, `render(null)` cleanup,
 rendered-root unmount cleanup, idempotent repeated unmount, recreate-after-unmount,
-and the test/conformance/smoke-only observable fake-DOM fields already recorded
-in progress. Recent accepted evidence adds
+and the test/conformance/smoke-only observable fake-DOM fields plus explicit
+public-facade null/unmount conformance rows already recorded in progress. Recent
+accepted evidence adds
 recursive conformance discovery coverage, no-load private native metadata source
 ledgers with exact capability-claim blockers, React DOM private subpath/native
 alias denylists, public render capability rejection rows, aligned smoke and
@@ -120,7 +114,8 @@ private sync-flush minimal host placement evidence, private passive destroy
 clear-before-invoke evidence, scheduler root currentness coverage for all
 accepted Scheduler root scenarios with exact row/source manifests and
 claim-alias blockers, scheduler local observation row and behavior evidence
-exact-shape validation against source/evidence smuggling, and
+exact-shape validation against source/evidence smuggling including inherited
+`Object.prototype` source-metadata blockers, and
 react-test-renderer serialization oracle/local-status gates for the current
 placeholder package while public test-renderer behavior remains blocked.
 Broader public root render/update/unmount compatibility, real `.node`
@@ -141,7 +136,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through baseline main `4aa248fb` as
+1. Treat accepted compatibility evidence through current main `340e4072` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, and the narrow fake-DOM public div/text
    lifecycle evidence described above, including `render(null)` cleanup and

@@ -29,6 +29,49 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1248 Public Null/Unmount Conformance Hardening
+
+- Worker 1248 added explicit public-facade conformance rows for the already
+  accepted fake-DOM `root.render(null)` cleanup and unmount-after-null
+  idempotence behavior. The rows require ordered source evidence, escaped
+  host-output cleanup snapshots, latest-props cleanup, repeated `render(null)`
+  no-op evidence, same-root rerender after null, unmount-after-null and repeated
+  unmount `undefined` returns, stale `render(null)` fail-closed behavior,
+  duplicate-root cleanup, and no marker/listener/ownerDocument leaks.
+- Hostile coverage now rejects stale, missing, or wrong-order null/unmount rows,
+  stale host output or latest props, missing or extra mutation logs,
+  marker/listener and ownerDocument leaks, duplicate-root tracking drift,
+  second-unmount throws or mutations, stale render-null success, and
+  public/browser/native/root compatibility alias leaks. No runtime behavior or
+  broader public React DOM compatibility claim changed.
+- Accepted validation includes clean independent source and verification audits.
+  Root reruns passed the public-facade conformance gate (46/46),
+  `root-public-facade:conformance` with failures 0, root-render E2E
+  conformance gate (11/11), React DOM package symbol-facade gate (5/5),
+  private root-bridge smoke, package-surface guard, import smoke, and
+  `git diff --check`.
+- The accepted state is main `340e4072` after Worker 1248 merge `340e4072` and
+  worker commit `7fe243bf`.
+
+### Worker 1245 Scheduler Prototype Metadata Repair
+
+- Worker 1245 closed the remaining scheduler root currentness false green from
+  the Worker 1243 repair: inherited non-claim variant/source metadata injected
+  through `Object.prototype` now fails closed for source rows, local observation
+  rows, and nested `behaviorEvidence`.
+- The gate preserves exact own enumerable data-property requirements for
+  expected manifest fields while rejecting inherited `actualEntrypoint`,
+  `actualSourcePath`, `sourcePath`, `entrypoint`, `packageName`, and
+  `packageSourcePath` metadata. Hostile coverage includes native, mock,
+  postTask, deep-CJS, sourcePath, entrypoint, packageName, and
+  packageSourcePath smuggling through local rows and behavior evidence.
+- Accepted validation includes clean independent source and verification audits.
+  Root reruns passed the scheduler-root gate (31/31), companion scheduler/root
+  conformance tests (111/111), `npm run check --workspace scheduler`,
+  package-surface guard, import smoke, and `git diff --check`.
+- The accepted state is main `c03a8b89` after Worker 1245 merge `c03a8b89` and
+  worker commit `63b29a48`.
+
 ### Worker 1249 Conformance Discovery Template Import Guard
 
 - Worker 1249 hardened the conformance discovery static-import scanner so
@@ -63,8 +106,7 @@ sequencing belong in `MASTER_PLAN.md`.
   symbol, accessor-backed, claim-like, or mismatched variant/source fields
   before a row can count as current root evidence. A later post-merge source
   audit found a remaining `Object.prototype` inherited non-claim variant-field
-  path, so the scheduler row/evidence source-validation slice is under active
-  follow-up repair rather than fully accepted as clean.
+  path; Worker 1245 later closed that residual.
 - Worker 1239 aligned the react-test-renderer serialization oracle and local
   source status with the current workspace placeholder package:
   `status: "placeholder-present"` with comparison and compatibility claims
@@ -76,12 +118,11 @@ sequencing belong in `MASTER_PLAN.md`.
   and broad renderer compatibility remain blocked.
 - Accepted validation includes clean post-merge source and verification audits
   for Worker 1239. Worker 1243's original focused checks and first repair
-  checks passed, but the first repair has a post-merge source blocker for
-  inherited non-claim variant metadata on `Object.prototype`; treat its
-  scheduler row/evidence source-validation claim as provisional until the
-  follow-up repair is accepted. Root reruns passed Worker 1239's oracle test
-  (28/28), local-gate test (46/46), combined serialization script (74/74),
-  package-surface guard, import smoke, and `git diff --check`.
+  checks passed; Worker 1245 is the accepted follow-up that closes the later
+  inherited `Object.prototype` source-metadata blocker. Root reruns passed
+  Worker 1239's oracle test (28/28), local-gate test (46/46), combined
+  serialization script (74/74), package-surface guard, import smoke, and
+  `git diff --check`.
 - The accepted implementation/evidence baseline is main `4aa248fb` after Worker
   1243 merge `83fe318d`, Worker 1239 merge `df39570c`, and Worker 1243 repair
   merge `4aa248fb`, plus worker commits `47ee1b17`, `06e7a3e6`, `8820cf9c`,
