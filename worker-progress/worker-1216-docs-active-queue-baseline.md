@@ -73,3 +73,8 @@
 
 - After any active worker is reviewed, verified, and merged, move accepted facts
   into `MASTER_PROGRESS.md` in a separate docs pass.
+
+## Commit
+
+- Docs commit: `39da4bee2ab8bb8d669c3c595f6b75819e9147f6` (`Refresh docs
+  active queue baseline`).
