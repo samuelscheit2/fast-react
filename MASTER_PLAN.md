@@ -45,22 +45,19 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current main/docs head and latest accepted
-implementation/evidence baseline are main `d694d902` (`Merge worker 1214
-flushSync source proof`). Accepted implementation, cleanup, planning, and
-docs-only history through that baseline is recorded in `MASTER_PROGRESS.md`;
-this plan lists only current/future work.
+Top-level cap: 30 workers. Latest accepted implementation/evidence baseline is
+main `f7be6d87` (`Merge worker 1215 transition queue lane currentness`).
+Accepted implementation, cleanup, planning, and docs-only history through that
+baseline is recorded in `MASTER_PROGRESS.md`; this plan lists only
+current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted implementation/evidence facts through baseline main `d694d902` are
+- Accepted implementation/evidence facts through baseline main `f7be6d87` are
   recorded in `MASTER_PROGRESS.md`.
-- Active, unaccepted workers:
-  - Worker 1215: Rust transition queue-lane currentness consumer;
-    branch/worktree `worker/1215-transition-queue-lane-currentness`,
-    `/Users/user/Developer/Developer/fast-react-worktrees/worker-1215-transition-queue-lane-currentness`.
+- Active, unaccepted workers: none currently.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
   render handoff admission, plus the minimal public
@@ -78,7 +75,7 @@ Current orchestration queue:
   extension.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `d694d902`,
+implementation/evidence baseline main `f7be6d87`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -103,7 +100,7 @@ verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
 Accepted compatibility evidence through accepted implementation/evidence
-baseline main `d694d902` includes only
+baseline main `f7be6d87` includes only
 the minimal public fake-DOM div/text `createRoot().render(...)` path above,
 Worker 1194's same-root repeat fake-DOM div/text update and rendered-root
 unmount cleanup, Worker 1200's smoke alignment with those expectations, and
@@ -134,7 +131,11 @@ Scheduler native/default behavior-evidence alias false green for that gate
 only. Worker 1213 also hardens the public
 `react-dom/test-utils.act` blocked-currentness report source-proof/freeze
 ordering only. Worker 1214 hardens the public `flushSync`
-blocked-currentness report source-proof/freeze ordering only.
+blocked-currentness report source-proof/freeze ordering only. Worker 1215 adds
+only private Rust/test-host transition queue-lane commit currentness evidence
+for the accepted root-scheduler transition continuation path by adapting the
+transition continuation into Worker 948's finished-work queue-lane currentness
+consumer, preserving source-token ownership and one-shot consumption.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -154,7 +155,7 @@ canonical evidence requirements.
 ## Near-Term Sequencing
 
 1. Treat accepted compatibility evidence through accepted
-   implementation/evidence baseline main `d694d902` as
+   implementation/evidence baseline main `f7be6d87` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, Worker 1176's narrow public fake-DOM
    host-output proof, Worker 1194's narrow public same-root repeat div/text
@@ -195,7 +196,10 @@ canonical evidence requirements.
    proves only source-proof/freeze hardening of the public
    `react-dom/test-utils.act` blocked-currentness report. Worker 1214 proves
    only source-proof/freeze hardening of the public `flushSync`
-   blocked-currentness report.
+   blocked-currentness report. Worker 1215 proves only private Rust/test-host
+   transition queue-lane commit currentness for accepted transition
+   continuations and does not open public Scheduler/root/React DOM/hooks/act/
+   test-renderer/native/package/renderer compatibility.
    Broad public root render/update/unmount, broad native, browser DOM,
    test-renderer, Scheduler, public `React.act` compatibility, act queue
    flushing, callbacks, thenables, renderer/root/Scheduler execution,

@@ -29,6 +29,35 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1215 Transition Queue-Lane Currentness
+
+- Worker 1215 added a private/test-only transition queue-lane commit currentness
+  consumer for the accepted root-scheduler transition continuation path.
+- The accepted transition continuation now mints the existing Worker 948
+  `RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary` from the
+  same finished-work queue-lane identity used by the sync and expired
+  consumers, and cloned transition records clear that source token.
+- The consumer validates root-scheduler-owned transition wrapper metadata before
+  adapting the record into Worker 948's finished-work queue-lane currentness
+  consumer, preserving one-shot source consumption and existing
+  root/current/finished-work identity, lane, callback, handoff,
+  stale-live-root, replay, cross-root, wrong-lane, and skipped-lane fail-closed
+  checks.
+- No public Scheduler timing, public root, React DOM, transition hook, `act`,
+  test-renderer, native runtime, package, renderer, or broad compatibility was
+  opened by this worker.
+- Accepted validation includes a clean independent source audit after repairing
+  a worker-report commit-hash typo, plus clean independent reruns of
+  `root_scheduler_transition`, `finished_work_queue_lane_commit_currentness`,
+  `root_scheduler_queue_lane_continuation`,
+  `root_scheduler_expired_default_sync_queue_lane_continuation`, `root_updates`,
+  `root_commit`, and `expired_default_sync_queue_lane_currentness`; `cargo check
+  -p fast-react-reconciler --all-features`; `cargo fmt --all --check`; and
+  `git diff --check`.
+- The accepted implementation/evidence baseline is main `f7be6d87` after Worker
+  1215 merge `f7be6d87`, implementation commit
+  `349731613670b390415f1393bd2db346f6c8b6d3`, and report commit `f81951a2`.
+
 ### Workers 1213 and 1214 Source-Proof Hardening Batch
 
 - Worker 1213 repaired the Scheduler native-entry currentness gate after an

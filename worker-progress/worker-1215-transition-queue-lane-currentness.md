@@ -93,7 +93,7 @@
 ## Commit
 
 - Substantive implementation commit:
-  `3497316176d870d51e6e5dc785c52165d17de1d9` (`Add transition queue-lane
+  `349731613670b390415f1393bd2db346f6c8b6d3` (`Add transition queue-lane
   currentness consumer`).
 - Final branch `HEAD` is reported in the worker handoff after the report hash
   commit is created. A commit cannot contain its own final hash in this tracked
