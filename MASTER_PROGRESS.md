@@ -29,6 +29,50 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1204 and 1205 Conformance/Currentness Hardening
+
+- Worker 1204 refreshed the public root facade conformance lifecycle rows for
+  the already accepted fake-DOM div/text `createRoot().render(...)` lifecycle
+  so the admitted path uses hostile text and `id` values containing `&`, `<`,
+  `>`, and `"`. The accepted evidence requires escaped `innerHTML`
+  serialization while preserving raw `textContent`, raw `getAttribute("id")`,
+  same-root update host-node reuse, rendered-root unmount cleanup, empty output
+  after unmount, and zero listener/root-marker leaks.
+- Worker 1204 also added false-green coverage for missing snapshot fields,
+  mutation logs, escaped serialized text/attribute values, and side-effect
+  blockers. A repair decoupled lifecycle API label evidence from the row under
+  test by using independent hostile-label constants and rejecting stale simple
+  `id="app"` / `text` labels.
+- Worker 1205 hardened the private React Children traversal currentness gate.
+  The validator now proves helper ownership before checking object frozen
+  state, rejects mutable helper-created reports with
+  `children-traversal-currentness-not-frozen`, rejects mutable
+  `behaviorCurrentness` evidence through the existing behavior-probe path, and
+  keeps forged mutable objects or hostile proxies on the source-proof failure
+  path before inspecting them.
+- Worker 1205's negative tests cover `Object.freeze` tampering during report
+  creation, mutable helper-owned reports, mutable behavior evidence, forged
+  caller-shaped reports, and hostile proxies. All public compatibility flags
+  remain false, and this does not broaden React Children traversal parity,
+  package exports, renderer/root/portal execution, owner/ref integration, or
+  package-wide React behavior.
+- Accepted validation for this batch includes Worker 1204's public facade gate,
+  root-public-facade conformance, React DOM client symbol facade test, and
+  `git diff --check`; plus Worker 1205's Children currentness gate, Children
+  oracle, `npm run check --workspace @fast-react/react`,
+  `npm run check:package-surface`, import-entrypoints smoke, and
+  `git diff --check`.
+- The accepted state is main `2a0fa13d` after Worker 1204 merge `8ad0a3e3`
+  and Worker 1205 merge `2a0fa13d`, plus worker/repair/report commits
+  `097304c7`, `971e7230`, `a807b528`, `a97a4748`, `bcb3fb84`, `832dba1c`,
+  `00e09307`, and `7a0cccc0`. Public compatibility remains blocked outside
+  Worker 1204's narrow escaped fake-DOM lifecycle evidence and Worker 1205's
+  private Children currentness hardening; browser DOM, generic public root
+  behavior, hydration, refs/listeners/events, Scheduler/act/flushSync,
+  resources/forms, controlled inputs, test-renderer, React Children traversal
+  parity, hooks, package/native/runtime loading, and broad renderer
+  compatibility remain blocked.
+
 ### Workers 1194, 1200, and 1202 Public Root Lifecycle Minimal Slice
 
 - Worker 1194 opened the next narrow public
@@ -75,7 +119,8 @@ sequencing belong in `MASTER_PLAN.md`.
   1202's focused public facade gate, private root bridge shell, smoke, and
   public facade conformance checks, and `git diff --check` under the Node
   26.1.0 environment recorded by the worker reports.
-- The accepted state is main `6f7f50dc` after docs-only Worker 1192
+- The accepted state for this earlier slice was main `6f7f50dc` after
+  docs-only Worker 1192
   `6c440daa`, Worker 1194 merge `eeb25b09`, Worker 1200 merge `8a84a8dc`,
   and Worker 1202 merge `6f7f50dc`, plus worker commits `0f11d44f`,
   `feea75d1`, `bb1756fe`, and `1ad2caa8`.
