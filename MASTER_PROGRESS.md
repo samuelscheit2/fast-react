@@ -29,6 +29,46 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1227, 1228, and 1232-1235 Discovery, Native Metadata, Public Render, and Children Hardening
+
+- Worker 1227 hardened the conformance test discovery gate so executable
+  conformance tests are found recursively rather than only at the first test
+  directory level. A later repair blocked sidecar fixture files from being used
+  as false coverage bridges for real conformance tests.
+- Worker 1228 added a private native metadata no-load source ledger and
+  root-work-loop finished-work metadata factory coverage without requiring a
+  real `.node` addon load. A source audit found that exact omitted capability
+  claim fields could still pass source-currentness validation; the accepted
+  repair closes those exact-claim blockers while preserving public/native/DOM
+  compatibility rejection.
+- Worker 1233 aligned the React DOM private subpath and native-compatibility
+  denylist smoke guard with the accepted package surface so private/native alias
+  routes remain blocked and do not become public compatibility evidence.
+- Worker 1232 added public root render capability rejection coverage for
+  unsupported props, resources, forms, controlled-input shapes, arrays,
+  fragments, components, and other unsupported public render cases. Worker 1235
+  repaired a low audit finding by aligning the smoke and public-facade
+  conformance matrices for `unsupported-id-object` and `unsupported-component`.
+- Worker 1234 hardened private React Children traversal currentness validation
+  against hostile post-load `Object.freeze` replacements. Freeze-return
+  authority, creation-time rejection provenance, clone/proxy replacement
+  rejection, stale source-report hiding, public alias hiding, and proxy-trap
+  fail-closed behavior are now covered while all public Children traversal and
+  package compatibility remains blocked.
+- Accepted validation includes clean independent source and verification audits
+  for Workers 1227, 1228 repair, 1232, 1233, 1235, and 1234. Root reruns passed
+  the conformance discovery test, package-surface and import smokes, Worker
+  1228 native metadata JS/Rust checks, React DOM public facade and root-render
+  E2E conformance gates, `@fast-react/react-dom` package checks, React Children
+  currentness/oracle tests, `@fast-react/react` package checks, and
+  `git diff --check`.
+- The accepted state is main `5dcea2a9` after Worker 1227 merges `a052b2db` and
+  `57094732`, Worker 1228 merges `19b79b44` and `60ccf416`, Worker 1233 merge
+  `ae478b46`, Worker 1232 merge `b0ad9deb`, Worker 1235 repair merge
+  `05b6c08d`, and Worker 1234 merge `5dcea2a9`, plus worker/repair commits
+  `aa375b14`, `1e3d90df`, `d000ad23`, `d46e6148`, `715cd49e`, `11a4f3be`,
+  `993d4ffc`, `1213d954`, `0115aaf9`, `88e5452a`, and `800d580a`.
+
 ### Workers 1224 and 1225 Currentness Freeze/Queue Hardening
 
 - Worker 1224 closed the Worker 1220 Rust audit residual by tightening the
