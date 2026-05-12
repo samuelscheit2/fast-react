@@ -3,7 +3,7 @@
 ## Status
 - Implemented source-proof-first hardening for the assigned private hook report validators.
 - Added focused forged mutable object, hostile proxy, and helper-owned mutable report regressions.
-- Required verification passed; commit pending.
+- Required verification passed.
 
 ## Inspected Validators
 - `validateUseRefHookCurrentnessReport`
@@ -77,4 +77,5 @@
 - The hostile proxy regression is scoped to top-level report validator entry objects. Nested report fields remain protected by source-owned helper reports and existing shape/source tests.
 
 ## Commit
-- Pending.
+- Substantive change commit: `21c04fe2` (`Harden hook dispatcher report source proof`).
+- This report was updated after that commit to record the hash; the final branch `HEAD` is reported in the worker handoff.
