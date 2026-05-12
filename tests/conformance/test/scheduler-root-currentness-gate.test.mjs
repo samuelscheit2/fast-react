@@ -412,6 +412,35 @@ test("Scheduler root currentness gate fails closed for missing current local row
   );
 });
 
+test("Scheduler root currentness gate fails closed for unexpected current local rows", () => {
+  const localObservationRows = cloneJson(baselineGate().localObservationRows);
+  localObservationRows.push({
+    ...localObservationRows[0],
+    rowId: "default-node-development:scheduler-root-unexpected",
+    scenarioId: "scheduler-root-unexpected"
+  });
+
+  const gate = evaluateWithBaselineRows({
+    localObservationRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-local-observation-manifest-mismatch"
+    ),
+    {
+      id: "scheduler-root-currentness-local-observation-manifest-mismatch",
+      missingRowIds: [],
+      unexpectedRowIds: [
+        "default-node-development:scheduler-root-unexpected"
+      ],
+      duplicateRowIds: []
+    }
+  );
+});
+
 test("Scheduler root currentness gate fails closed for missing current local rows for the former coverage gaps", () => {
   const missingScenarioIds = [
     "scheduler-root-task-object-shape",
@@ -441,6 +470,79 @@ test("Scheduler root currentness gate fails closed for missing current local row
       "default-node-development:scheduler-root-did-timeout",
       "default-node-development:scheduler-root-priority-context"
     ]
+  );
+});
+
+test("Scheduler root currentness gate fails closed when source rows are omitted", () => {
+  const gate = evaluateWithBaselineRows({
+    sourceRows: []
+  });
+
+  assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.sourceRowsCurrent, false);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-source-row-manifest-mismatch"
+    ),
+    {
+      id: "scheduler-root-currentness-source-row-manifest-mismatch",
+      missingRowIds: [
+        "scheduler-root-wrapper-source",
+        "scheduler-root-development-cjs-source-context",
+        "scheduler-root-production-cjs-source-context"
+      ],
+      unexpectedRowIds: [],
+      duplicateRowIds: []
+    }
+  );
+});
+
+test("Scheduler root currentness gate fails closed for unexpected or forged source rows", () => {
+  const sourceRows = cloneJson(baselineGate().sourceRows);
+  sourceRows.push({
+    ...sourceRows[0],
+    rowId: "scheduler-root-unexpected-source",
+    sourcePath: "packages/scheduler/native.js"
+  });
+  rowById(
+    sourceRows,
+    "scheduler-root-development-cjs-source-context"
+  ).sourcePath = "packages/scheduler/native.js";
+  rowById(
+    sourceRows,
+    "scheduler-root-production-cjs-source-context"
+  ).status = "current-source-row-stale";
+
+  const gate = evaluateWithBaselineRows({
+    sourceRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.sourceRowsCurrent, false);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-source-row-manifest-mismatch"
+    ).unexpectedRowIds,
+    ["scheduler-root-unexpected-source"]
+  );
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-source-row-identity-mismatch"
+    ).rowIds,
+    [
+      "scheduler-root-development-cjs-source-context",
+      "scheduler-root-production-cjs-source-context"
+    ]
+  );
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-source-row-missing-or-stale"
+    ).rowIds,
+    ["scheduler-root-production-cjs-source-context"]
   );
 });
 
@@ -518,6 +620,48 @@ test("Scheduler root currentness gate fails closed when compatibility flags flip
   assertViolation(
     gate,
     "scheduler-root-currentness-public-compatibility-claim-detected"
+  );
+});
+
+test("Scheduler root currentness gate rejects claim-like fields on local rows and behavior evidence", () => {
+  const localObservationRows = cloneJson(baselineGate().localObservationRows);
+  rowById(
+    localObservationRows,
+    "default-node-development:scheduler-root-export-shape"
+  ).publicNativeCompatibilityClaimed = true;
+  const taskShapeRow = rowById(
+    localObservationRows,
+    "default-node-development:scheduler-root-task-object-shape"
+  );
+  taskShapeRow.behaviorEvidence = {
+    ...taskShapeRow.behaviorEvidence,
+    publicPackageCompatibilityClaimed: true
+  };
+
+  const gate = evaluateWithBaselineRows({
+    localObservationRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-row-compatibility-claim-detected"
+    ).rowIds,
+    [
+      "default-node-development:scheduler-root-export-shape",
+      "default-node-development:scheduler-root-task-object-shape"
+    ]
+  );
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-public-compatibility-claim-detected"
+    ).rowIds,
+    [
+      "default-node-development:scheduler-root-export-shape.publicNativeCompatibilityClaimed",
+      "default-node-development:scheduler-root-task-object-shape.behaviorEvidence.publicPackageCompatibilityClaimed"
+    ]
   );
 });
 

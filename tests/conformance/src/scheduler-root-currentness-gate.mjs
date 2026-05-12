@@ -182,6 +182,48 @@ export function evaluateSchedulerRootCurrentnessGate({
     );
   }
 
+  const expectedSourceRowIds =
+    SCHEDULER_ROOT_CURRENTNESS_SOURCE_ROW_DEFINITIONS.map(
+      (definition) => definition.rowId
+    );
+  const sourceRowManifest = compareStringSets(
+    expectedSourceRowIds,
+    effectiveSourceRows.map((row) => row.rowId)
+  );
+  const sourceRowManifestViolates =
+    sourceRowManifest.missing.length > 0 ||
+    sourceRowManifest.unexpected.length > 0 ||
+    sourceRowManifest.duplicates.length > 0;
+  if (sourceRowManifestViolates) {
+    violations.push(
+      violation("scheduler-root-currentness-source-row-manifest-mismatch", {
+        missingRowIds: sourceRowManifest.missing,
+        unexpectedRowIds: sourceRowManifest.unexpected,
+        duplicateRowIds: sourceRowManifest.duplicates
+      })
+    );
+  }
+
+  const sourceRowsById = new Map(
+    effectiveSourceRows.map((row) => [row.rowId, row])
+  );
+  const sourceRowIdentityMismatchRows =
+    SCHEDULER_ROOT_CURRENTNESS_SOURCE_ROW_DEFINITIONS
+      .filter((definition) => sourceRowsById.has(definition.rowId))
+      .filter(
+        (definition) =>
+          !sourceRowMatchesDefinition(
+            sourceRowsById.get(definition.rowId),
+            definition
+          )
+      )
+      .map((definition) => definition.rowId);
+  pushIdsViolation(
+    violations,
+    "scheduler-root-currentness-source-row-identity-mismatch",
+    sourceRowIdentityMismatchRows
+  );
+
   const sourceRowViolations = effectiveSourceRows.filter(
     (row) => row.status !== "current-source-row-present"
   );
@@ -198,6 +240,26 @@ export function evaluateSchedulerRootCurrentnessGate({
       violation("scheduler-root-currentness-private-886-context-not-accepted", {
         status: privateVariantBoundaryContext.status,
         compatibilityClaimed: privateVariantBoundaryContext.compatibilityClaimed
+      })
+    );
+  }
+
+  const expectedLocalObservationRowKeys =
+    collectExpectedSchedulerRootCurrentnessRowKeys();
+  const localObservationManifest = compareStringSets(
+    expectedLocalObservationRowKeys,
+    effectiveLocalObservationRows.map((row) => rowKey(row))
+  );
+  if (
+    localObservationManifest.missing.length > 0 ||
+    localObservationManifest.unexpected.length > 0 ||
+    localObservationManifest.duplicates.length > 0
+  ) {
+    violations.push(
+      violation("scheduler-root-currentness-local-observation-manifest-mismatch", {
+        missingRowIds: localObservationManifest.missing,
+        unexpectedRowIds: localObservationManifest.unexpected,
+        duplicateRowIds: localObservationManifest.duplicates
       })
     );
   }
@@ -274,8 +336,8 @@ export function evaluateSchedulerRootCurrentnessGate({
         checkedComparison.compatibilityClaimed === false &&
         checkedComparison.firstDifferencePath === null;
       const rowCompatibilityClaimed =
-        localRow.compatibilityClaimed !== false ||
-        localRow.behaviorEvidence?.compatibilityClaimed !== false;
+        objectHasPublicClaim(localRow) ||
+        objectHasPublicClaim(localRow.behaviorEvidence);
       let status = "current-local-root-observation-matches-checked-oracle";
 
       if (!modeMatches) {
@@ -381,7 +443,10 @@ export function evaluateSchedulerRootCurrentnessGate({
     );
   const blockedPublicClaimsRecognized =
     publicCompatibilityClaimIds.length === 0;
-  const sourceRowsCurrent = sourceRowViolations.length === 0;
+  const sourceRowsCurrent =
+    sourceRowViolations.length === 0 &&
+    !sourceRowManifestViolates &&
+    sourceRowIdentityMismatchRows.length === 0;
   const acceptedPrivateVariantBoundaryContext =
     privateVariantBoundaryContext.acceptedAsPrivateContextOnly;
   const compatibilityClaimed =
@@ -508,6 +573,16 @@ export function inspectSchedulerRootCurrentnessSourceRows({
   );
 }
 
+function collectExpectedSchedulerRootCurrentnessRowKeys() {
+  const rowKeys = [];
+  for (const mode of SCHEDULER_ROOT_PROBE_MODES) {
+    for (const scenarioId of SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS) {
+      rowKeys.push(`${mode.id}:${scenarioId}`);
+    }
+  }
+  return freezeArray(rowKeys);
+}
+
 function runCurrentSchedulerRootProbe({
   mode,
   probeFile,
@@ -601,6 +676,36 @@ function schedulerRootOracleSchemaIsCurrent(oracle) {
   );
 }
 
+function sourceRowMatchesDefinition(row, definition) {
+  if (!row || typeof row !== "object") {
+    return false;
+  }
+
+  const modeMatches =
+    definition.modeId === undefined
+      ? row.modeId === undefined
+      : row.modeId === definition.modeId;
+
+  return (
+    row.rowId === definition.rowId &&
+    row.entrypoint === definition.entrypoint &&
+    row.sourcePath === definition.sourcePath &&
+    row.sourceRole === definition.sourceRole &&
+    row.behaviorEvidenceAllowed === definition.behaviorEvidenceAllowed &&
+    modeMatches &&
+    row.exists === true &&
+    Array.isArray(row.requiredTokens) &&
+    sameStringArray(row.requiredTokens, definition.requiredTokens) &&
+    Array.isArray(row.missingTokens) &&
+    row.missingTokens.length === 0 &&
+    row.directDeepCjsImport === /\/cjs\//u.test(definition.sourcePath) &&
+    row.variantBoundaryEvidence === false &&
+    row.privateAdmission886Evidence === false &&
+    row.compatibilityClaimed === false &&
+    row.status === "current-source-row-present"
+  );
+}
+
 function tryFindSchedulerRootObservation(oracle, modeId, scenarioId) {
   try {
     return findSchedulerRootObservation(oracle, modeId, scenarioId);
@@ -667,19 +772,49 @@ function findPublicCompatibilityClaimIds({
   }
 
   for (const row of localObservationRows) {
-    if (row.compatibilityClaimed !== false) {
-      claimIds.push(`${rowKey(row)}.compatibilityClaimed`);
-    }
-    if (row.behaviorEvidence?.compatibilityClaimed !== false) {
-      claimIds.push(`${rowKey(row)}.behaviorEvidence.compatibilityClaimed`);
-    }
+    pushObjectPublicClaimIds(claimIds, row, rowKey(row));
+    pushObjectPublicClaimIds(
+      claimIds,
+      row.behaviorEvidence,
+      `${rowKey(row)}.behaviorEvidence`
+    );
   }
 
-  return freezeArray(claimIds);
+  return freezeArray(uniqueStrings(claimIds));
 }
 
 function isCompatibilityClaimName(claim) {
   return /compatible|compatibilityClaimed/ui.test(claim);
+}
+
+function isBlockedPublicClaimName(claim) {
+  return (
+    SCHEDULER_ROOT_CURRENTNESS_BLOCKED_PUBLIC_CLAIMS.includes(claim) ||
+    isCompatibilityClaimName(claim)
+  );
+}
+
+function objectHasPublicClaim(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  return Object.entries(value).some(
+    ([claim, claimValue]) =>
+      isBlockedPublicClaimName(claim) && claimValue !== false
+  );
+}
+
+function pushObjectPublicClaimIds(claimIds, value, prefix) {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+
+  for (const [claim, claimValue] of Object.entries(value)) {
+    if (isBlockedPublicClaimName(claim) && claimValue !== false) {
+      claimIds.push(`${prefix}.${claim}`);
+    }
+  }
 }
 
 function comparableObservation(observation) {
@@ -817,12 +952,27 @@ function violation(id, details) {
 function compareStringSets(expected, actual) {
   return {
     missing: freezeArray(expected.filter((value) => !actual.includes(value))),
-    unexpected: freezeArray(actual.filter((value) => !expected.includes(value)))
+    unexpected: freezeArray(actual.filter((value) => !expected.includes(value))),
+    duplicates: findDuplicateStrings(actual)
   };
 }
 
 function uniqueStrings(values) {
   return freezeArray([...new Set(values)]);
+}
+
+function findDuplicateStrings(values) {
+  const seen = new Set();
+  const duplicates = [];
+
+  for (const value of values) {
+    if (seen.has(value) && !duplicates.includes(value)) {
+      duplicates.push(value);
+    }
+    seen.add(value);
+  }
+
+  return freezeArray(duplicates);
 }
 
 function sameStringArray(left, right) {
