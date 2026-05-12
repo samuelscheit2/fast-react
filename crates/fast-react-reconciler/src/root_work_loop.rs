@@ -281,7 +281,9 @@ use complete_handoff::{
 )]
 pub(crate) use complete_handoff::{
     HostRootMinimalRenderCompleteHandoffAdapter, HostRootMinimalRenderCompleteHandoffError,
-    HostRootMinimalRenderCompleteHandoffRecord,
+    HostRootMinimalRenderCompleteHandoffRecord, HostRootMinimalRenderCompletePlacementCommitError,
+    HostRootMinimalRenderCompletePlacementCommitRecord,
+    commit_minimal_root_element_render_complete_handoff_to_host_placement,
     handoff_minimal_root_element_render_to_complete_work,
 };
 mod context_provider;

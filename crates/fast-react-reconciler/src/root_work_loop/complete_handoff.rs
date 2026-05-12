@@ -4,7 +4,7 @@ use std::fmt::{self, Display, Formatter};
 #[cfg(test)]
 use fast_react_core::FiberTopologyError;
 use fast_react_core::{ElementTypeHandle, FiberId, FiberTag, Lanes, PropsHandle};
-use fast_react_host_config::{HostCreation, HostTypes};
+use fast_react_host_config::{HostCommit, HostCreation, HostTypes, MutationHost};
 
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, RootElementHandle, RootRenderExitStatus,
@@ -13,10 +13,14 @@ use crate::{
         MinimalHostRootCompleteWorkRequest, complete_minimal_host_root_component_text,
     },
     host_nodes::HostNodeStore,
+    root_commit::{
+        HostRootCommitRecord, MinimalHostRootPlacementCommitError,
+        MinimalHostRootPlacementCommitRecord, RootCommitError, commit_finished_host_root,
+        commit_minimal_host_root_component_text_placement,
+    },
 };
 #[cfg(test)]
 use crate::{
-    HostRootCommitRecord,
     begin_work::{
         HostRootOneLevelChildSet, HostRootOneLevelChildSetBeginWorkError,
         HostRootOneLevelChildSetBeginWorkRecord, HostRootOneLevelChildSetKind,
@@ -148,6 +152,95 @@ impl HostRootMinimalRenderCompleteHandoffRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootMinimalRenderCompletePlacementCommitRecord {
+    complete_handoff: HostRootMinimalRenderCompleteHandoffRecord,
+    commit: HostRootCommitRecord,
+    placement_commit: MinimalHostRootPlacementCommitRecord,
+    host_node_count_after_complete_work: usize,
+    host_node_count_after_placement: usize,
+}
+
+impl HostRootMinimalRenderCompletePlacementCommitRecord {
+    #[must_use]
+    pub(crate) const fn complete_handoff(&self) -> &HostRootMinimalRenderCompleteHandoffRecord {
+        &self.complete_handoff
+    }
+
+    #[must_use]
+    pub(crate) const fn complete_work(&self) -> MinimalHostRootCompleteWorkRecord {
+        self.complete_handoff.complete_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
+    }
+
+    #[must_use]
+    pub(crate) const fn placement_commit(&self) -> MinimalHostRootPlacementCommitRecord {
+        self.placement_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn host_node_count_after_complete_work(&self) -> usize {
+        self.host_node_count_after_complete_work
+    }
+
+    #[must_use]
+    pub(crate) const fn host_node_count_after_placement(&self) -> usize {
+        self.host_node_count_after_placement
+    }
+
+    #[must_use]
+    pub(crate) const fn public_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) fn proves_private_minimal_render_complete_placement_commit(&self) -> bool {
+        let complete_work = self.complete_handoff.complete_work();
+        self.complete_handoff
+            .proves_minimal_render_complete_handoff()
+            && self.commit.root() == self.complete_handoff.root()
+            && self.commit.current() == complete_work.host_root_work_in_progress()
+            && self.commit.finished_work() == complete_work.host_root_work_in_progress()
+            && self.placement_commit.root() == self.commit.root()
+            && self.placement_commit.previous_current() == self.commit.previous_current()
+            && self.placement_commit.finished_work() == self.commit.current()
+            && self.placement_commit.component() == complete_work.component()
+            && self.placement_commit.text() == complete_work.text()
+            && self.placement_commit.component_state_node() == complete_work.component_state_node()
+            && self.placement_commit.text_state_node() == complete_work.text_state_node()
+            && self.placement_commit.component_scope() == complete_work.component_scope()
+            && self.placement_commit.text_scope() == complete_work.text_scope()
+            && self.placement_commit.private_root_placement_only()
+            && self.host_node_count_after_complete_work
+                == self.complete_handoff.detached_instance_count()
+                    + self.complete_handoff.detached_text_count()
+            && self.host_node_count_after_placement == 0
+            && !self.public_dom_compatibility_claimed()
+            && !self.public_root_rendering_claimed()
+            && self.public_root_rendering_blocked()
+            && self.public_compatibility_blocked()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum HostRootMinimalRenderCompleteHandoffError<E> {
     FiberRootStore(FiberRootStoreError),
     Adapter(E),
@@ -189,6 +282,24 @@ pub(crate) enum HostRootMinimalRenderCompleteHandoffError<E> {
         fiber: FiberId,
         expected: FiberTag,
         actual: FiberTag,
+    },
+    LiveComponentElementTypeMismatch {
+        root: FiberRootId,
+        component: FiberId,
+        expected: ElementTypeHandle,
+        actual: ElementTypeHandle,
+    },
+    LiveComponentPropsMismatch {
+        root: FiberRootId,
+        component: FiberId,
+        expected: PropsHandle,
+        actual: PropsHandle,
+    },
+    LiveTextPropsMismatch {
+        root: FiberRootId,
+        text: FiberId,
+        expected: PropsHandle,
+        actual: PropsHandle,
     },
     LiveTextChildrenMismatch {
         root: FiberRootId,
@@ -308,6 +419,45 @@ impl<E: Display> Display for HostRootMinimalRenderCompleteHandoffError<E> {
                 expected,
                 actual
             ),
+            Self::LiveComponentElementTypeMismatch {
+                root,
+                component,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} live HostComponent {} element type handle {} no longer matches minimal render record handle {}",
+                root.raw(),
+                component.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::LiveComponentPropsMismatch {
+                root,
+                component,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} live HostComponent {} props handle {} no longer matches minimal render record handle {}",
+                root.raw(),
+                component.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::LiveTextPropsMismatch {
+                root,
+                text,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} live HostText {} props handle {} no longer matches minimal render record handle {}",
+                root.raw(),
+                text.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
             Self::LiveTextChildrenMismatch {
                 root,
                 text,
@@ -379,11 +529,66 @@ where
             | Self::LiveRootChildMismatch { .. }
             | Self::LiveTextChildMismatch { .. }
             | Self::LiveFiberTagMismatch { .. }
+            | Self::LiveComponentElementTypeMismatch { .. }
+            | Self::LiveComponentPropsMismatch { .. }
+            | Self::LiveTextPropsMismatch { .. }
             | Self::LiveTextChildrenMismatch { .. }
             | Self::PublicCompatibilityClaimed { .. }
             | Self::UnadaptedHostComponentType { .. }
             | Self::UnadaptedHostComponentProps { .. } => None,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HostRootMinimalRenderCompletePlacementCommitError<E> {
+    CompleteHandoff(HostRootMinimalRenderCompleteHandoffError<E>),
+    Commit(RootCommitError),
+    PlacementCommit(MinimalHostRootPlacementCommitError),
+}
+
+impl<E: Display> Display for HostRootMinimalRenderCompletePlacementCommitError<E> {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CompleteHandoff(error) => Display::fmt(error, formatter),
+            Self::Commit(error) => Display::fmt(error, formatter),
+            Self::PlacementCommit(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+impl<E> Error for HostRootMinimalRenderCompletePlacementCommitError<E>
+where
+    E: Error + 'static,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::CompleteHandoff(error) => Some(error),
+            Self::Commit(error) => Some(error),
+            Self::PlacementCommit(error) => Some(error),
+        }
+    }
+}
+
+impl<E> From<HostRootMinimalRenderCompleteHandoffError<E>>
+    for HostRootMinimalRenderCompletePlacementCommitError<E>
+{
+    fn from(error: HostRootMinimalRenderCompleteHandoffError<E>) -> Self {
+        Self::CompleteHandoff(error)
+    }
+}
+
+impl<E> From<RootCommitError> for HostRootMinimalRenderCompletePlacementCommitError<E> {
+    fn from(error: RootCommitError) -> Self {
+        Self::Commit(error)
+    }
+}
+
+impl<E> From<MinimalHostRootPlacementCommitError>
+    for HostRootMinimalRenderCompletePlacementCommitError<E>
+{
+    fn from(error: MinimalHostRootPlacementCommitError) -> Self {
+        Self::PlacementCommit(error)
     }
 }
 
@@ -463,6 +668,55 @@ where
     })
 }
 
+#[allow(
+    dead_code,
+    reason = "private minimal render-to-placement diagnostic is intentionally not wired into public root rendering"
+)]
+pub(crate) fn commit_minimal_root_element_render_complete_handoff_to_host_placement<H, A, T>(
+    store: &mut FiberRootStore<H>,
+    host: &mut H,
+    host_nodes: &mut HostNodeStore<H>,
+    token_factory: &mut T,
+    render: HostRootMinimalElementRenderPhaseRecord,
+    adapter: &mut A,
+) -> Result<
+    HostRootMinimalRenderCompletePlacementCommitRecord,
+    HostRootMinimalRenderCompletePlacementCommitError<A::Error>,
+>
+where
+    H: HostCreation + HostCommit + MutationHost,
+    A: HostRootMinimalRenderCompleteHandoffAdapter<H>,
+    T: HostFiberTokenFactory<H>,
+{
+    let render_for_commit = render.render();
+    let complete_handoff = handoff_minimal_root_element_render_to_complete_work(
+        store,
+        host,
+        host_nodes,
+        token_factory,
+        render,
+        adapter,
+    )?;
+    let host_node_count_after_complete_work = host_nodes.instance_count() + host_nodes.text_count();
+    let commit = commit_finished_host_root(store, render_for_commit)?;
+    let placement_commit = commit_minimal_host_root_component_text_placement(
+        store,
+        host,
+        host_nodes,
+        complete_handoff.complete_work(),
+        &commit,
+    )?;
+    let host_node_count_after_placement = host_nodes.instance_count() + host_nodes.text_count();
+
+    Ok(HostRootMinimalRenderCompletePlacementCommitRecord {
+        complete_handoff,
+        commit,
+        placement_commit,
+        host_node_count_after_complete_work,
+        host_node_count_after_placement,
+    })
+}
+
 fn validate_minimal_render_for_complete_work_handoff<H: HostTypes, E>(
     store: &FiberRootStore<H>,
     render: &HostRootMinimalElementRenderPhaseRecord,
@@ -536,6 +790,26 @@ fn validate_live_minimal_render_tree_matches_record<H: HostTypes, E>(
             },
         );
     }
+    if component.element_type() != render.root_child_element_type() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveComponentElementTypeMismatch {
+                root,
+                component: render.root_child(),
+                expected: render.root_child_element_type(),
+                actual: component.element_type(),
+            },
+        );
+    }
+    if component.pending_props() != render.root_child_props() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveComponentPropsMismatch {
+                root,
+                component: render.root_child(),
+                expected: render.root_child_props(),
+                actual: component.pending_props(),
+            },
+        );
+    }
 
     let component_children = arena
         .child_ids(render.root_child())
@@ -562,6 +836,18 @@ fn validate_live_minimal_render_tree_matches_record<H: HostTypes, E>(
                 fiber: render.text_child(),
                 expected: FiberTag::HostText,
                 actual: text.tag(),
+            },
+        );
+    }
+    // HostText text content is owned by the minimal render record; pending
+    // props are the live same-fiber drift guard.
+    if text.pending_props() != render.text_child_props() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveTextPropsMismatch {
+                root,
+                text: render.text_child(),
+                expected: render.text_child_props(),
+                actual: text.pending_props(),
             },
         );
     }

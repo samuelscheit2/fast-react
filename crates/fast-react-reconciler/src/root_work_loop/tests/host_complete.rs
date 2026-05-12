@@ -662,6 +662,300 @@ fn root_work_loop_minimal_render_complete_handoff_creates_detached_records_witho
 }
 
 #[test]
+fn root_work_loop_minimal_render_complete_placement_commit_appends_div_text_without_public_compatibility()
+ {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = MinimalRecordingHostTokenFactory;
+    let element = RootElementHandle::from_raw(7_551);
+    let element_type = ElementTypeHandle::from_raw(7_552);
+    let props = PropsHandle::from_raw(7_553);
+    let text_props = PropsHandle::from_raw(7_554);
+    let source = minimal_root_component_source(element, element_type, props, "text", text_props);
+    let public_error = crate::render_mutation_placeholder(&mut host).unwrap_err();
+    assert_eq!(
+        public_error,
+        ReconcilerError::unimplemented(MUTATION_RENDER_PLACEHOLDER_FEATURE)
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let current = store.root(root_id).unwrap().current();
+    update_container(&mut store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let work_in_progress = render.host_root_work_in_progress();
+    let component = render.root_child();
+    let text = render.text_child();
+    let mut adapter = MinimalRecordingHostAdapter::new(element, element_type, props, "div");
+
+    let record = commit_minimal_root_element_render_complete_handoff_to_host_placement(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .unwrap();
+
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 1);
+    assert!(record.proves_private_minimal_render_complete_placement_commit());
+    assert_eq!(record.host_node_count_after_complete_work(), 2);
+    assert_eq!(record.host_node_count_after_placement(), 0);
+    assert!(!record.public_dom_compatibility_claimed());
+    assert!(!record.public_root_rendering_claimed());
+    assert!(record.public_root_rendering_blocked());
+    assert!(record.public_compatibility_blocked());
+
+    let complete_handoff = record.complete_handoff();
+    assert_eq!(complete_handoff.root(), root_id);
+    assert_eq!(
+        complete_handoff.host_root_work_in_progress(),
+        work_in_progress
+    );
+    assert_eq!(complete_handoff.component(), component);
+    assert_eq!(complete_handoff.text(), text);
+    assert!(complete_handoff.proves_minimal_render_complete_handoff());
+    let complete = record.complete_work();
+    assert_eq!(complete.root(), root_id);
+    assert_eq!(complete.host_root_work_in_progress(), work_in_progress);
+    assert_eq!(complete.component(), component);
+    assert_eq!(complete.text(), text);
+    assert!(!complete.public_dom_compatibility_claimed());
+
+    let commit = record.commit();
+    assert_eq!(commit.root(), root_id);
+    assert_eq!(commit.previous_current(), current);
+    assert_eq!(commit.current(), work_in_progress);
+    assert_eq!(commit.finished_work(), work_in_progress);
+    assert_eq!(commit.finished_lanes(), Lanes::DEFAULT);
+    assert_eq!(commit.pending_lanes(), Lanes::NO);
+    assert_eq!(commit.mutation_log().len(), 1);
+    assert_eq!(commit.mutation_apply_log().len(), 1);
+    let gate = commit.host_component_text_mutation_execution_gate();
+    assert_eq!(
+        gate.status(),
+        HostRootHostMutationExecutionGateStatus::BlockedUntilProductionCompleteCommitPromotion
+    );
+    assert!(!gate.production_host_mutation_apply_promoted());
+    assert!(!gate.public_dom_compatibility_claimed());
+
+    let placement = record.placement_commit();
+    assert_eq!(placement.root(), root_id);
+    assert_eq!(placement.previous_current(), current);
+    assert_eq!(placement.finished_work(), work_in_progress);
+    assert_eq!(placement.component(), component);
+    assert_eq!(placement.text(), text);
+    assert_eq!(
+        placement.component_state_node(),
+        complete.component_state_node()
+    );
+    assert_eq!(placement.text_state_node(), complete.text_state_node());
+    assert_eq!(placement.component_scope(), complete.component_scope());
+    assert_eq!(placement.text_scope(), complete.text_scope());
+    assert_eq!(
+        placement.mutation_kind(),
+        HostRootMutationApplyRecordKind::AppendPlacementToContainer
+    );
+    assert!(placement.prepared_for_commit());
+    assert!(placement.appended_child_to_container());
+    assert!(placement.reset_after_commit());
+    assert!(placement.private_root_placement_only());
+    assert!(!placement.public_dom_compatibility_claimed());
+    assert!(!placement.public_root_rendering_claimed());
+    assert!(placement.public_root_rendering_blocked());
+    assert!(!placement.public_renderer_package_behavior_exposed());
+    assert!(!placement.react_dom_compatibility_claimed());
+    assert!(!placement.test_renderer_compatibility_claimed());
+
+    assert!(host_nodes.is_empty());
+    assert_eq!(
+        host.operations(),
+        vec![
+            "root_host_context",
+            "child_host_context",
+            "should_set_text_content",
+            "create_text_instance",
+            "create_instance",
+            "append_initial_child",
+            "finalize_initial_children",
+            "prepare_for_commit",
+            "append_child_to_container",
+            "reset_after_commit",
+        ]
+    );
+
+    let committed_root = store.root(root_id).unwrap();
+    assert_eq!(committed_root.current(), work_in_progress);
+    assert_eq!(committed_root.finished_work(), None);
+    assert_eq!(committed_root.finished_lanes(), Lanes::NO);
+    assert_eq!(committed_root.scheduling().work_in_progress(), None);
+    assert_eq!(
+        committed_root.scheduling().render_exit_status(),
+        RootRenderExitStatus::NoWork
+    );
+    assert_eq!(store.fiber_arena().get(current).unwrap().child(), None);
+    assert_eq!(
+        store.fiber_arena().get(work_in_progress).unwrap().child(),
+        Some(component)
+    );
+    let component_node = store.fiber_arena().get(component).unwrap();
+    assert_eq!(component_node.child(), Some(text));
+    assert_eq!(component_node.state_node(), complete.component_state_node());
+    let text_node = store.fiber_arena().get(text).unwrap();
+    assert_eq!(text_node.state_node(), complete.text_state_node());
+
+    let public_error_after_private_commit =
+        crate::render_mutation_placeholder(&mut host).unwrap_err();
+    assert_eq!(
+        public_error_after_private_commit,
+        ReconcilerError::unimplemented(MUTATION_RENDER_PLACEHOLDER_FEATURE)
+    );
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MinimalRenderPayloadDrift {
+    ComponentElementType(ElementTypeHandle),
+    ComponentProps(PropsHandle),
+    TextProps(PropsHandle),
+}
+
+fn assert_minimal_render_complete_placement_payload_drift_rejected_before_side_effects(
+    drift: MinimalRenderPayloadDrift,
+) {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = MinimalRecordingHostTokenFactory;
+    let element = RootElementHandle::from_raw(7_561);
+    let element_type = ElementTypeHandle::from_raw(7_562);
+    let props = PropsHandle::from_raw(7_563);
+    let text_props = PropsHandle::from_raw(7_564);
+    let source = minimal_root_component_source(element, element_type, props, "text", text_props);
+    let current = store.root(root_id).unwrap().current();
+    update_container(&mut store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let work_in_progress = render.host_root_work_in_progress();
+    let component = render.root_child();
+    let text = render.text_child();
+
+    match drift {
+        MinimalRenderPayloadDrift::ComponentElementType(actual) => store
+            .fiber_arena_mut()
+            .get_mut(component)
+            .unwrap()
+            .set_element_type(actual),
+        MinimalRenderPayloadDrift::ComponentProps(actual) => store
+            .fiber_arena_mut()
+            .get_mut(component)
+            .unwrap()
+            .set_pending_props(actual),
+        MinimalRenderPayloadDrift::TextProps(actual) => store
+            .fiber_arena_mut()
+            .get_mut(text)
+            .unwrap()
+            .set_pending_props(actual),
+    }
+
+    let mut adapter = MinimalRecordingHostAdapter::new(element, element_type, props, "div");
+
+    let error = commit_minimal_root_element_render_complete_handoff_to_host_placement(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .unwrap_err();
+
+    let expected = match drift {
+        MinimalRenderPayloadDrift::ComponentElementType(actual) => {
+            HostRootMinimalRenderCompletePlacementCommitError::CompleteHandoff(
+                HostRootMinimalRenderCompleteHandoffError::LiveComponentElementTypeMismatch {
+                    root: root_id,
+                    component,
+                    expected: element_type,
+                    actual,
+                },
+            )
+        }
+        MinimalRenderPayloadDrift::ComponentProps(actual) => {
+            HostRootMinimalRenderCompletePlacementCommitError::CompleteHandoff(
+                HostRootMinimalRenderCompleteHandoffError::LiveComponentPropsMismatch {
+                    root: root_id,
+                    component,
+                    expected: props,
+                    actual,
+                },
+            )
+        }
+        MinimalRenderPayloadDrift::TextProps(actual) => {
+            HostRootMinimalRenderCompletePlacementCommitError::CompleteHandoff(
+                HostRootMinimalRenderCompleteHandoffError::LiveTextPropsMismatch {
+                    root: root_id,
+                    text,
+                    expected: text_props,
+                    actual,
+                },
+            )
+        }
+    };
+    assert_eq!(error, expected);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert_minimal_render_complete_handoff_unpublished(&store, &host_nodes, component, text);
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    assert_eq!(
+        store.root(root_id).unwrap().scheduling().work_in_progress(),
+        Some(work_in_progress)
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let public_error_after_rejection = crate::render_mutation_placeholder(&mut host).unwrap_err();
+    assert_eq!(
+        public_error_after_rejection,
+        ReconcilerError::unimplemented(MUTATION_RENDER_PLACEHOLDER_FEATURE)
+    );
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_placement_commit_rejects_same_fiber_component_type_drift()
+{
+    assert_minimal_render_complete_placement_payload_drift_rejected_before_side_effects(
+        MinimalRenderPayloadDrift::ComponentElementType(ElementTypeHandle::from_raw(7_565)),
+    );
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_placement_commit_rejects_same_fiber_component_props_drift()
+ {
+    assert_minimal_render_complete_placement_payload_drift_rejected_before_side_effects(
+        MinimalRenderPayloadDrift::ComponentProps(PropsHandle::from_raw(7_566)),
+    );
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_placement_commit_rejects_same_fiber_text_props_drift() {
+    assert_minimal_render_complete_placement_payload_drift_rejected_before_side_effects(
+        MinimalRenderPayloadDrift::TextProps(PropsHandle::from_raw(7_567)),
+    );
+}
+
+#[test]
 fn root_work_loop_minimal_render_complete_handoff_fails_closed_when_adapter_rejects_handles() {
     let (mut store, root_id, mut host) = root_store();
     let mut host_nodes = HostNodeStore::<RecordingHost>::new();

@@ -60,7 +60,7 @@ use crate::passive_effects::{
 };
 use crate::root_commit::{
     FunctionComponentDeletedSubtreePendingPassiveCommitHandoff, HostRootDeletionCleanupOrderPhase,
-    HostRootManagedChildCommitExecutionBlockerForCanary,
+    HostRootHostMutationExecutionGateStatus, HostRootManagedChildCommitExecutionBlockerForCanary,
     HostRootManagedChildCommitExecutionStatusForCanary,
     HostRootManagedChildCommitHandoffRecordForCanary,
     HostRootManagedChildSiblingOrderCommitHandoffRecordForCanary, HostRootMutationApplyRecordKind,
