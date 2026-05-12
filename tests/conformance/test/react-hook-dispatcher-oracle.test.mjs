@@ -3317,6 +3317,113 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
   );
 });
 
+test("private hook currentness validators source-proof caller objects before inspection", () => {
+  const useRefCurrentness = hookDispatcher.createUseRefHookCurrentnessReport();
+  assertUseRefCurrentnessRejected(
+    { ...useRefCurrentness },
+    "useRef-hook-currentness-source-proof"
+  );
+  assertHostileReportProxyRejected(
+    assertUseRefCurrentnessRejected,
+    "useRef-hook-currentness-source-proof",
+    "useRef currentness"
+  );
+
+  const useRefExecution = hookDispatcher.createUseRefHookExecutionEvidence();
+  assertUseRefExecutionEvidenceRejected(
+    { ...useRefExecution },
+    "useRef-hook-execution-source-proof"
+  );
+  assertHostileReportProxyRejected(
+    assertUseRefExecutionEvidenceRejected,
+    "useRef-hook-execution-source-proof",
+    "useRef execution"
+  );
+
+  const useRefRendererLifecycle =
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport();
+  assertUseRefRendererLifecycleRejected(
+    { ...useRefRendererLifecycle },
+    "useRef-hook-renderer-lifecycle-source-proof"
+  );
+  assertHostileReportProxyRejected(
+    assertUseRefRendererLifecycleRejected,
+    "useRef-hook-renderer-lifecycle-source-proof",
+    "useRef renderer lifecycle"
+  );
+
+  const contextReadiness =
+    hookDispatcher.createContextHookRendererReadinessReport();
+  assertContextRendererReadinessRejected(
+    { ...contextReadiness },
+    "context-hook-renderer-readiness-source-proof"
+  );
+  assertHostileReportProxyRejected(
+    assertContextRendererReadinessRejected,
+    "context-hook-renderer-readiness-source-proof",
+    "context renderer readiness"
+  );
+
+  const unsupportedCurrentness =
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport();
+  assertUnsupportedCurrentnessRejected(
+    { ...unsupportedCurrentness },
+    "unsupported-placeholder-hook-currentness-source-proof"
+  );
+  assertHostileReportProxyRejected(
+    assertUnsupportedCurrentnessRejected,
+    "unsupported-placeholder-hook-currentness-source-proof",
+    "unsupported placeholder currentness"
+  );
+});
+
+test("private hook currentness validators keep helper-owned mutable reports not-frozen", () => {
+  const useRefCurrentness = withObjectFreezeBypassed(() =>
+    hookDispatcher.createUseRefHookCurrentnessReport()
+  );
+  assert.equal(Object.isFrozen(useRefCurrentness), false);
+  assertUseRefCurrentnessRejected(
+    useRefCurrentness,
+    "useRef-hook-currentness-not-frozen"
+  );
+
+  const useRefExecution = withObjectFreezeBypassed(() =>
+    hookDispatcher.createUseRefHookExecutionEvidence()
+  );
+  assert.equal(Object.isFrozen(useRefExecution), false);
+  assertUseRefExecutionEvidenceRejected(
+    useRefExecution,
+    "useRef-hook-execution-not-frozen"
+  );
+
+  const useRefRendererLifecycle = withObjectFreezeBypassed(() =>
+    hookDispatcher.createUseRefHookRendererLifecycleBlockerReport()
+  );
+  assert.equal(Object.isFrozen(useRefRendererLifecycle), false);
+  assertUseRefRendererLifecycleRejected(
+    useRefRendererLifecycle,
+    "useRef-hook-renderer-lifecycle-not-frozen"
+  );
+
+  const contextReadiness = withObjectFreezeBypassed(() =>
+    hookDispatcher.createContextHookRendererReadinessReport()
+  );
+  assert.equal(Object.isFrozen(contextReadiness), false);
+  assertContextRendererReadinessRejected(
+    contextReadiness,
+    "context-hook-renderer-readiness-not-frozen"
+  );
+
+  const unsupportedCurrentness = withObjectFreezeBypassed(() =>
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport()
+  );
+  assert.equal(Object.isFrozen(unsupportedCurrentness), false);
+  assertUnsupportedCurrentnessRejected(
+    unsupportedCurrentness,
+    "unsupported-placeholder-hook-currentness-not-frozen"
+  );
+});
+
 test("unsupported public placeholder hooks do not call dispatcher methods or user callbacks across root surfaces", () => {
   const calls = [];
   const sideEffects = [];
@@ -3780,6 +3887,47 @@ function assertContextRendererReadinessRejected(
     },
     reason
   );
+}
+
+function assertHostileReportProxyRejected(assertRejected, reason, label) {
+  const hostile = createHostileReportProxy(label);
+  assertRejected(hostile.report, reason);
+  assert.equal(hostile.getTrapCalls(), 0, label);
+}
+
+function createHostileReportProxy(label) {
+  let trapCalls = 0;
+  const trap = () => {
+    trapCalls += 1;
+    throw new Error(`${label} inspected before source proof`);
+  };
+
+  return {
+    report: new Proxy(
+      {},
+      {
+        get: trap,
+        getOwnPropertyDescriptor: trap,
+        getPrototypeOf: trap,
+        isExtensible: trap,
+        ownKeys: trap
+      }
+    ),
+    getTrapCalls() {
+      return trapCalls;
+    }
+  };
+}
+
+function withObjectFreezeBypassed(callback) {
+  const originalFreeze = Object.freeze;
+  Object.freeze = (value) => value;
+
+  try {
+    return callback();
+  } finally {
+    Object.freeze = originalFreeze;
+  }
 }
 
 function assertUseRefExecutionEvidenceRejected(report, reason) {

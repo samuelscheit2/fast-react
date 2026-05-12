@@ -4736,12 +4736,16 @@ function isContextHookRendererReadinessReport(report) {
 }
 
 function validateUseRefHookCurrentnessReport(report) {
-  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+  if (!isObjectLike(report)) {
     return 'useRef-hook-currentness-not-frozen';
   }
 
   if (!useRefHookCurrentnessReports.has(report)) {
     return 'useRef-hook-currentness-source-proof';
+  }
+
+  if (!Object.isFrozen(report)) {
+    return 'useRef-hook-currentness-not-frozen';
   }
 
   if (
@@ -4819,12 +4823,16 @@ function validateUseRefHookCurrentnessReport(report) {
 }
 
 function validateUseRefHookExecutionEvidence(report) {
-  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+  if (!isObjectLike(report)) {
     return 'useRef-hook-execution-not-frozen';
   }
 
   if (!useRefHookExecutionEvidenceReports.has(report)) {
     return 'useRef-hook-execution-source-proof';
+  }
+
+  if (!Object.isFrozen(report)) {
+    return 'useRef-hook-execution-not-frozen';
   }
 
   if (
@@ -4896,12 +4904,16 @@ function validateUseRefHookExecutionEvidence(report) {
 }
 
 function validateUseRefHookRendererLifecycleBlockerReport(report) {
-  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+  if (!isObjectLike(report)) {
     return 'useRef-hook-renderer-lifecycle-not-frozen';
   }
 
   if (!useRefHookRendererLifecycleBlockerReports.has(report)) {
     return 'useRef-hook-renderer-lifecycle-source-proof';
+  }
+
+  if (!Object.isFrozen(report)) {
+    return 'useRef-hook-renderer-lifecycle-not-frozen';
   }
 
   if (
@@ -5013,12 +5025,16 @@ function validateUseRefHookRendererLifecycleBlockerReport(report) {
 }
 
 function validateContextHookRendererReadinessReport(report) {
-  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+  if (!isObjectLike(report)) {
     return 'context-hook-renderer-readiness-not-frozen';
   }
 
   if (!contextHookRendererReadinessReports.has(report)) {
     return 'context-hook-renderer-readiness-source-proof';
+  }
+
+  if (!Object.isFrozen(report)) {
+    return 'context-hook-renderer-readiness-not-frozen';
   }
 
   if (
@@ -5117,12 +5133,16 @@ function isUnsupportedPlaceholderHookCurrentnessReport(report) {
 }
 
 function validateUnsupportedPlaceholderHookCurrentnessReport(report) {
-  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+  if (!isObjectLike(report)) {
     return 'unsupported-placeholder-hook-currentness-not-frozen';
   }
 
   if (!unsupportedPlaceholderHookCurrentnessReports.has(report)) {
     return 'unsupported-placeholder-hook-currentness-source-proof';
+  }
+
+  if (!Object.isFrozen(report)) {
+    return 'unsupported-placeholder-hook-currentness-not-frozen';
   }
 
   if (
