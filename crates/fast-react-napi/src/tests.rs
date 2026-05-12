@@ -88,6 +88,9 @@ use crate::root_bridge_requests::{
     validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows,
     validate_native_root_bridge_worker_thread_cleanup_hook_preflight_rows,
 };
+use crate::root_work_loop_metadata::{
+    RootWorkLoopFinishedWorkMetadataError, root_work_loop_finished_work_metadata_for_canary,
+};
 use crate::test_renderer_root_execution_bridge::{
     TestRendererNativeRootExecutionBridge, TestRendererNativeRootExecutionBridgeError,
 };
@@ -283,6 +286,176 @@ fn native_boundary_unsupported_native_execution_stays_distinct_from_root_validat
         error.code(),
         NativeBoundaryErrorKind::RootBridgeWrongLifecycleOrder.code()
     );
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_shape_matches_canary() {
+    let metadata = root_work_loop_finished_work_metadata_for_canary(
+        "native-root-work-loop-root:1",
+        "ConcurrentRoot",
+        "native-root-work-loop-update:1",
+        "div",
+        "text",
+        "append-placement-to-container",
+    )
+    .unwrap();
+
+    assert_eq!(
+        metadata.source(),
+        "fast-react-reconciler.root-work-loop.finished-work-handoff"
+    );
+    assert_eq!(
+        metadata.status(),
+        "accepted-private-root-work-loop-finished-work-handoff-metadata"
+    );
+    assert_eq!(
+        metadata.metadata_revision(),
+        "root-work-loop-finished-work-handoff-2026-05-10"
+    );
+
+    let facade = metadata.facade();
+    assert_eq!(facade.root_id(), "native-root-work-loop-root:1");
+    assert_eq!(facade.root_tag(), "ConcurrentRoot");
+    assert_eq!(facade.render_update_id(), "native-root-work-loop-update:1");
+    assert_eq!(facade.host_type(), "div");
+    assert_eq!(facade.host_output_shape(), "host-component");
+    assert_eq!(facade.host_component_count(), 1);
+    assert_eq!(facade.host_text_count(), 1);
+    assert_eq!(facade.text_content(), "text");
+
+    let complete_work = metadata.complete_work();
+    assert_eq!(complete_work.root_child_tag(), "HostComponent");
+    assert_eq!(complete_work.completed_child_tag(), "HostComponent");
+    assert_eq!(complete_work.host_text_child_tag(), "HostText");
+    assert_eq!(complete_work.child_tags(), ["HostComponent", "HostText"]);
+
+    let pending = metadata.pending();
+    assert!(pending.records_finished_work());
+    assert!(pending.pending_work_matches_finished_work());
+    assert_eq!(pending.render_lanes(), "Default");
+    assert_eq!(pending.finished_lanes(), "Default");
+    assert_eq!(pending.remaining_lanes(), "NoLanes");
+
+    let commit = metadata.commit();
+    assert!(commit.commit_order_after_pending_record());
+    assert!(commit.consumed_finished_work_record());
+    assert_eq!(commit.finished_work_after_commit(), None);
+    assert_eq!(commit.finished_lanes_after_commit(), "NoLanes");
+    assert_eq!(commit.render_phase_work_after_commit(), None);
+    assert!(commit.mutation_execution_blocked());
+    assert!(commit.public_root_rendering_blocked());
+    assert!(commit.effects_refs_and_hydration_blocked());
+
+    let placement = metadata.placement();
+    assert_eq!(placement.tag(), "HostComponent");
+    assert_eq!(placement.apply_kind(), "append-placement-to-container");
+    assert_eq!(placement.sibling_status(), "append");
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_preserves_caller_ids() {
+    let metadata = root_work_loop_finished_work_metadata_for_canary(
+        "private-root-work-loop-root:99",
+        "LegacyRoot",
+        "private-root-work-loop-update:42",
+        "div",
+        "text",
+        "append-placement-to-container",
+    )
+    .unwrap();
+
+    assert_eq!(
+        metadata.facade().root_id(),
+        "private-root-work-loop-root:99"
+    );
+    assert_eq!(metadata.facade().root_tag(), "LegacyRoot");
+    assert_eq!(
+        metadata.facade().render_update_id(),
+        "private-root-work-loop-update:42"
+    );
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_rejects_unsupported_canary_inputs() {
+    assert_eq!(
+        root_work_loop_finished_work_metadata_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            "insert-placement-in-container-before",
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedPlacementApplyKind {
+            actual: "insert-placement-in-container-before".to_string()
+        }
+    );
+    assert_eq!(
+        root_work_loop_finished_work_metadata_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "span",
+            "text",
+            "append-placement-to-container",
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedHostType {
+            actual: "span".to_string()
+        }
+    );
+    assert_eq!(
+        root_work_loop_finished_work_metadata_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "copy",
+            "append-placement-to-container",
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedTextContent {
+            actual: "copy".to_string()
+        }
+    );
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_rejects_empty_caller_ids() {
+    for (root_id, root_tag, render_update_id, field) in [
+        (
+            "",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "root_id",
+        ),
+        (
+            "native-root-work-loop-root:1",
+            "",
+            "native-root-work-loop-update:1",
+            "root_tag",
+        ),
+        (
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "",
+            "render_update_id",
+        ),
+    ] {
+        assert_eq!(
+            root_work_loop_finished_work_metadata_for_canary(
+                root_id,
+                root_tag,
+                render_update_id,
+                "div",
+                "text",
+                "append-placement-to-container",
+            )
+            .unwrap_err(),
+            RootWorkLoopFinishedWorkMetadataError::EmptyCallerId { field }
+        );
+    }
 }
 
 #[test]

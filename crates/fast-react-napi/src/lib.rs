@@ -10,6 +10,9 @@ use std::fmt::{self, Display, Formatter};
 mod handle_table;
 
 #[allow(dead_code)]
+mod root_work_loop_metadata;
+
+#[allow(dead_code)]
 mod root_bridge_requests;
 
 #[allow(dead_code)]
