@@ -34,6 +34,353 @@ const nativeRootWorkLoopFinishedWorkMetadataStatus =
   'accepted-private-root-work-loop-finished-work-handoff-metadata';
 const nativeRootWorkLoopFinishedWorkMetadataRevision =
   'root-work-loop-finished-work-handoff-2026-05-10';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedgerSymbol =
+  Symbol(
+    'fast.react_native.private_root_work_loop_finished_work_metadata_source_currentness_ledger'
+  );
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedgerStatus =
+  'blocked-private-root-work-loop-finished-work-metadata-source-currentness-ledger';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessModel =
+  'fast-react-napi.RootWorkLoopFinishedWorkMetadataSourceCurrentnessLedger';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessEvaluationMode =
+  'static-source-token-ledger-no-native-load-no-package-export';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessEvidenceKind =
+  'source-owned-rust-identifier-set-and-js-factory-shape';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessAcceptedStatus =
+  'accepted-private-root-work-loop-finished-work-metadata-source-currentness';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedStatus =
+  'rejected-private-root-work-loop-finished-work-metadata-source-currentness';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceFile =
+  'crates/fast-react-napi/src/root_work_loop_metadata.rs';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceWorker =
+  'worker-1228-native-metadata-no-load-source-ledger';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceWorkerProgress =
+  'worker-progress/worker-1228-native-metadata-no-load-source-ledger.md';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes =
+  Object.freeze({
+    callerBuilt:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_CALLER_BUILT',
+    canonicalSetMismatch:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_CANONICAL_SET_MISMATCH',
+    compatibilityClaim:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_COMPATIBILITY_CLAIM',
+    nativeAddonLoadClaim:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_NATIVE_ADDON_LOAD_CLAIM',
+    packageExportClaim:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_PACKAGE_EXPORT_CLAIM',
+    proseEvidence:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_PROSE_EVIDENCE',
+    publicNativeExecutionClaim:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_PUBLIC_NATIVE_EXECUTION_CLAIM',
+    rendererReconcilerOutputClaim:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_RENDERER_RECONCILER_OUTPUT_CLAIM',
+    rustIdentifierMismatch:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_RUST_IDENTIFIER_MISMATCH',
+    sourceRoleMismatch:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_SOURCE_ROLE_MISMATCH',
+    sourceSyntaxOnly:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_SOURCE_SYNTAX_ONLY',
+    staleOrForeign:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_STALE_OR_FOREIGN',
+    workerOrNetworkExecutionClaim:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_METADATA_SOURCE_LEDGER_WORKER_OR_NETWORK_EXECUTION_CLAIM'
+  });
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCaseIds =
+  Object.freeze([
+    'stale-source-path',
+    'missing-rust-identifier',
+    'fake-js-only-row',
+    'public-native-execution-claim',
+    'package-export-claim',
+    'native-addon-load-claim',
+    'worker-network-execution-claim',
+    'renderer-reconciler-output-claim',
+    'compatibility-claim',
+    'prose-evidence',
+    'source-syntax-only-evidence',
+    'canonical-set-mismatch'
+  ]);
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPublicClaimFields =
+  Object.freeze([
+    'nativeExecution',
+    'publicNativeExecution',
+    'publicNativeCompatibility',
+    'publicRootExecution',
+    'publicRootCompatibilitySurface',
+    'publicRootRendering',
+    'publicRootRenderingClaimed'
+  ]);
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPackageClaimFields =
+  Object.freeze([
+    'packageExportCompatibility',
+    'packageExportCompatibilityClaimed',
+    'packageCompatibilityClaimed',
+    'packageExportClaimed',
+    'nativePackageExportClaimed',
+    'nativePrivateSubpathsExported',
+    'nativePackageCompatibilityClaimed',
+    'packageExportsOpened'
+  ]);
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCompatibilityClaimFields =
+  Object.freeze([
+    'compatibilityClaimed',
+    'nativeCompatibilityClaimed',
+    'reactDomCompatibilityClaimed',
+    'testRendererCompatibilityClaimed',
+    'publicCompatibilityClaimed'
+  ]);
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRowFields =
+  Object.freeze([
+    'id',
+    'role',
+    'sourceFile',
+    'sourceFiles',
+    'evidenceKind',
+    'rustIdentifiers',
+    'jsFactoryFields',
+    'jsonFieldPaths',
+    'expectedFactoryValues',
+    'status',
+    'code',
+    'sourceOwnedEvidence',
+    'blockedPrivateEvidence',
+    'publicAdmission',
+    'callerShapedEvidence',
+    'proseEvidence',
+    'testTitleEvidence',
+    'errorMessageEvidence',
+    'sourceSyntaxOnly',
+    'nativeAddonLoaded',
+    'nativeExecution',
+    'nodeWorkerThreadsExecution',
+    'childProcessExecution',
+    'httpExecution',
+    'httpsExecution',
+    'rendererExecution',
+    'reconcilerExecution',
+    'publicNativeCompatibility',
+    'packageExportCompatibility',
+    'compatibilityClaimed',
+    'reactBehaviorError'
+  ]);
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRows =
+  Object.freeze([
+    freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRow({
+      id: 'root-work-loop-metadata-source-status-revision',
+      role: 'source-status-revision-js-rust-constants',
+      rustIdentifiers: [
+        'ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE',
+        'ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS',
+        'ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION'
+      ],
+      jsFactoryFields: ['source', 'status', 'metadataRevision'],
+      jsonFieldPaths: ['source', 'status', 'metadataRevision'],
+      expectedFactoryValues: {
+        source: nativeRootWorkLoopFinishedWorkMetadataSource,
+        status: nativeRootWorkLoopFinishedWorkMetadataStatus,
+        metadataRevision:
+          nativeRootWorkLoopFinishedWorkMetadataRevision
+      }
+    }),
+    freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRow({
+      id: 'root-work-loop-metadata-top-level-json-fields',
+      role: 'top-level-json-field-set',
+      rustIdentifiers: [
+        'ROOT_WORK_LOOP_FINISHED_WORK_METADATA_JSON_FIELDS',
+        'root_work_loop_finished_work_metadata_json_value',
+        'root_work_loop_finished_work_metadata_from_json_value_for_private_bridge'
+      ],
+      jsFactoryFields: [
+        'facade',
+        'completeWork',
+        'pending',
+        'commit',
+        'placement'
+      ],
+      jsonFieldPaths: [
+        'source',
+        'status',
+        'metadataRevision',
+        'facade',
+        'completeWork',
+        'pending',
+        'commit',
+        'placement'
+      ],
+      expectedFactoryValues: {}
+    }),
+    freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRow({
+      id: 'root-work-loop-metadata-facade-canary-values',
+      role: 'facade-json-fields-and-canary-values',
+      rustIdentifiers: [
+        'ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACADE_JSON_FIELDS',
+        'HOST_TYPE_DIV',
+        'TEXT_CONTENT_TEXT',
+        'HOST_OUTPUT_SHAPE_HOST_COMPONENT',
+        'EXPECTED_HOST_COMPONENT_COUNT',
+        'EXPECTED_HOST_TEXT_COUNT'
+      ],
+      jsFactoryFields: [
+        'facade.rootId',
+        'facade.rootTag',
+        'facade.renderUpdateId',
+        'facade.hostType',
+        'facade.hostOutputShape',
+        'facade.hostComponentCount',
+        'facade.hostTextCount',
+        'facade.textContent'
+      ],
+      jsonFieldPaths: [
+        'facade.rootId',
+        'facade.rootTag',
+        'facade.renderUpdateId',
+        'facade.hostType',
+        'facade.hostOutputShape',
+        'facade.hostComponentCount',
+        'facade.hostTextCount',
+        'facade.textContent'
+      ],
+      expectedFactoryValues: {
+        'facade.hostType': 'div',
+        'facade.hostOutputShape': 'host-component',
+        'facade.hostComponentCount': 1,
+        'facade.hostTextCount': 1,
+        'facade.textContent': 'text'
+      }
+    }),
+    freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRow({
+      id: 'root-work-loop-metadata-complete-pending-placement-values',
+      role: 'complete-work-pending-placement-json-fields-and-canary-values',
+      rustIdentifiers: [
+        'ROOT_WORK_LOOP_FINISHED_WORK_METADATA_COMPLETE_WORK_JSON_FIELDS',
+        'ROOT_WORK_LOOP_FINISHED_WORK_METADATA_PENDING_JSON_FIELDS',
+        'ROOT_WORK_LOOP_FINISHED_WORK_METADATA_PLACEMENT_JSON_FIELDS',
+        'HOST_COMPONENT_TAG',
+        'HOST_TEXT_TAG',
+        'DEFAULT_LANES',
+        'NO_LANES',
+        'PLACEMENT_APPLY_KIND_APPEND_TO_CONTAINER',
+        'SIBLING_STATUS_APPEND'
+      ],
+      jsFactoryFields: [
+        'completeWork.rootChildTag',
+        'completeWork.completedChildTag',
+        'completeWork.hostTextChildTag',
+        'completeWork.childTags',
+        'pending.recordsFinishedWork',
+        'pending.pendingWorkMatchesFinishedWork',
+        'pending.renderLanes',
+        'pending.finishedLanes',
+        'pending.remainingLanes',
+        'placement.tag',
+        'placement.applyKind',
+        'placement.siblingStatus'
+      ],
+      jsonFieldPaths: [
+        'completeWork.rootChildTag',
+        'completeWork.completedChildTag',
+        'completeWork.hostTextChildTag',
+        'completeWork.childTags',
+        'pending.recordsFinishedWork',
+        'pending.pendingWorkMatchesFinishedWork',
+        'pending.renderLanes',
+        'pending.finishedLanes',
+        'pending.remainingLanes',
+        'placement.tag',
+        'placement.applyKind',
+        'placement.siblingStatus'
+      ],
+      expectedFactoryValues: {
+        'completeWork.rootChildTag': 'HostComponent',
+        'completeWork.completedChildTag': 'HostComponent',
+        'completeWork.hostTextChildTag': 'HostText',
+        'completeWork.childTags': ['HostComponent', 'HostText'],
+        'pending.recordsFinishedWork': true,
+        'pending.pendingWorkMatchesFinishedWork': true,
+        'pending.renderLanes': 'Default',
+        'pending.finishedLanes': 'Default',
+        'pending.remainingLanes': 'NoLanes',
+        'placement.tag': 'HostComponent',
+        'placement.applyKind': 'append-placement-to-container',
+        'placement.siblingStatus': 'append'
+      }
+    }),
+    freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRow({
+      id: 'root-work-loop-metadata-commit-blocker-booleans',
+      role: 'commit-json-fields-and-private-blocker-booleans',
+      rustIdentifiers: [
+        'ROOT_WORK_LOOP_FINISHED_WORK_METADATA_COMMIT_JSON_FIELDS',
+        'mutation_execution_blocked',
+        'public_root_rendering_blocked',
+        'effects_refs_and_hydration_blocked',
+        'host_mutation_execution_blocked',
+        'public_compatibility_blocked',
+        'effects_refs_and_hydration_execution_surfaces_blocked'
+      ],
+      jsFactoryFields: [
+        'commit.commitOrderAfterPendingRecord',
+        'commit.consumedFinishedWorkRecord',
+        'commit.finishedWorkAfterCommit',
+        'commit.finishedLanesAfterCommit',
+        'commit.renderPhaseWorkAfterCommit',
+        'commit.mutationExecutionBlocked',
+        'commit.publicRootRenderingBlocked',
+        'commit.effectsRefsAndHydrationBlocked'
+      ],
+      jsonFieldPaths: [
+        'commit.commitOrderAfterPendingRecord',
+        'commit.consumedFinishedWorkRecord',
+        'commit.finishedWorkAfterCommit',
+        'commit.finishedLanesAfterCommit',
+        'commit.renderPhaseWorkAfterCommit',
+        'commit.mutationExecutionBlocked',
+        'commit.publicRootRenderingBlocked',
+        'commit.effectsRefsAndHydrationBlocked'
+      ],
+      expectedFactoryValues: {
+        'commit.commitOrderAfterPendingRecord': true,
+        'commit.consumedFinishedWorkRecord': true,
+        'commit.finishedWorkAfterCommit': null,
+        'commit.finishedLanesAfterCommit': 'NoLanes',
+        'commit.renderPhaseWorkAfterCommit': null,
+        'commit.mutationExecutionBlocked': true,
+        'commit.publicRootRenderingBlocked': true,
+        'commit.effectsRefsAndHydrationBlocked': true
+      }
+    }),
+    freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRow({
+      id: 'root-work-loop-metadata-private-factory-options',
+      role: 'private-factory-options-and-rust-canary-entrypoints',
+      rustIdentifiers: [
+        'root_work_loop_finished_work_metadata_for_canary',
+        'root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary',
+        'validate_diagnostic_evidence',
+        'DiagnosticPublicCompatibilityClaim'
+      ],
+      jsFactoryFields: [
+        'options.hostType',
+        'options.renderUpdateId',
+        'options.rootId',
+        'options.rootTag',
+        'options.textContent'
+      ],
+      jsonFieldPaths: [
+        'facade.hostType',
+        'facade.renderUpdateId',
+        'facade.rootId',
+        'facade.rootTag',
+        'facade.textContent'
+      ],
+      expectedFactoryValues: {
+        'facade.hostType': 'div',
+        'facade.textContent': 'text'
+      }
+    })
+  ]);
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedger =
+  createNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedger(
+    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRows
+  );
 const nativeReactDomRenderHandoffExpectedKind =
   'FastReactDomPrivateRootRenderNativeHandoffRecord';
 const nativeReactDomRenderHandoffExpectedType =
@@ -6657,56 +7004,655 @@ function nativeReactDomAdmissionActual(value) {
     : value;
 }
 
-const createNativeRootWorkLoopFinishedWorkMetadataForCanary = Object.freeze(
-  function createNativeRootWorkLoopFinishedWorkMetadataForCanary(options) {
-    assertNativeRootWorkLoopFinishedWorkMetadataCanaryOptions(options);
+function freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRow({
+  id,
+  role,
+  sourceFile =
+    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceFile,
+  sourceFiles = [sourceFile],
+  rustIdentifiers,
+  jsFactoryFields,
+  jsonFieldPaths,
+  expectedFactoryValues
+}) {
+  const normalizedSourceFiles =
+    freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceFiles(
+      sourceFile,
+      sourceFiles
+    );
 
-    const childTags = Object.freeze(['HostComponent', 'HostText']);
-    return Object.freeze({
-      source: nativeRootWorkLoopFinishedWorkMetadataSource,
-      status: nativeRootWorkLoopFinishedWorkMetadataStatus,
-      metadataRevision: nativeRootWorkLoopFinishedWorkMetadataRevision,
-      facade: Object.freeze({
-        rootId: options.rootId,
-        rootTag: options.rootTag,
-        renderUpdateId: options.renderUpdateId,
-        hostType: 'div',
-        hostOutputShape: 'host-component',
-        hostComponentCount: 1,
-        hostTextCount: 1,
-        textContent: 'text'
-      }),
-      completeWork: Object.freeze({
-        rootChildTag: 'HostComponent',
-        completedChildTag: 'HostComponent',
-        hostTextChildTag: 'HostText',
-        childTags
-      }),
-      pending: Object.freeze({
-        recordsFinishedWork: true,
-        pendingWorkMatchesFinishedWork: true,
-        renderLanes: 'Default',
-        finishedLanes: 'Default',
-        remainingLanes: 'NoLanes'
-      }),
-      commit: Object.freeze({
-        commitOrderAfterPendingRecord: true,
-        consumedFinishedWorkRecord: true,
-        finishedWorkAfterCommit: null,
-        finishedLanesAfterCommit: 'NoLanes',
-        renderPhaseWorkAfterCommit: null,
-        mutationExecutionBlocked: true,
-        publicRootRenderingBlocked: true,
-        effectsRefsAndHydrationBlocked: true
-      }),
-      placement: Object.freeze({
-        tag: 'HostComponent',
-        applyKind: 'append-placement-to-container',
-        siblingStatus: 'append'
-      })
-    });
+  return Object.freeze({
+    id,
+    role,
+    sourceFile: normalizedSourceFiles[0],
+    sourceFiles: normalizedSourceFiles,
+    evidenceKind:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessEvidenceKind,
+    rustIdentifiers: Object.freeze([...rustIdentifiers]),
+    jsFactoryFields: Object.freeze([...jsFactoryFields]),
+    jsonFieldPaths: Object.freeze([...jsonFieldPaths]),
+    expectedFactoryValues:
+      freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessValue(
+        expectedFactoryValues
+      ),
+    sourceOwnedEvidence: true,
+    blockedPrivateEvidence: true,
+    publicAdmission: false,
+    callerShapedEvidence: false,
+    proseEvidence: false,
+    testTitleEvidence: false,
+    errorMessageEvidence: false,
+    sourceSyntaxOnly: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    nodeWorkerThreadsExecution: false,
+    childProcessExecution: false,
+    httpExecution: false,
+    httpsExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    packageExportCompatibility: false,
+    compatibilityClaimed: false,
+    reactBehaviorError: false
+  });
+}
+
+function freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceFiles(
+  sourceFile,
+  sourceFiles
+) {
+  const normalizedSourceFiles = [];
+  for (const candidate of [sourceFile, ...arrayFromMaybe(sourceFiles)]) {
+    if (
+      typeof candidate === 'string' &&
+      !normalizedSourceFiles.includes(candidate)
+    ) {
+      normalizedSourceFiles.push(candidate);
+    }
+  }
+
+  return Object.freeze(normalizedSourceFiles);
+}
+
+function freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessValue(
+  value
+) {
+  if (Array.isArray(value)) {
+    return Object.freeze(
+      value.map((item) =>
+        freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessValue(item)
+      )
+    );
+  }
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value).map(([key, item]) => [
+      key,
+      freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessValue(item)
+    ]);
+    return Object.freeze(Object.fromEntries(entries));
+  }
+
+  return value;
+}
+
+function freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedger(
+  ledger
+) {
+  Object.defineProperty(ledger, 'validateSourceCurrentnessRows', {
+    value:
+      validateNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRows,
+    enumerable: false,
+    configurable: false,
+    writable: false
+  });
+
+  return Object.freeze(ledger);
+}
+
+function createNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedger(
+  rows
+) {
+  const normalizedRows =
+    enforceNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalSet(
+      Array.from(
+        rows ?? [],
+        validateNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRow
+      )
+    );
+  const frozenRows = Object.freeze(normalizedRows);
+  const acceptedRows = Object.freeze(
+    frozenRows.filter(
+      (row) =>
+        row.status ===
+        nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessAcceptedStatus
+    )
+  );
+  const rejectedRows = Object.freeze(
+    frozenRows.filter(
+      (row) =>
+        row.status ===
+        nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedStatus
+    )
+  );
+  const canonicalSourceEvidenceAccepted =
+    rejectedRows.length === 0 &&
+    hasExactNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalSet(
+      acceptedRows
+    );
+
+  return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedger({
+    ledgerStatus:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedgerStatus,
+    model: nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessModel,
+    evaluationMode:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessEvaluationMode,
+    sourceWorker:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceWorker,
+    sourceWorkerProgress:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceWorkerProgress,
+    sourceFile:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceFile,
+    sourceFiles:
+      sourceFilesFromNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRows(
+        nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRows
+      ),
+    evidenceKind:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessEvidenceKind,
+    acceptedStatus:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessAcceptedStatus,
+    rejectedStatus:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedStatus,
+    rejectionCodes:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes,
+    rejectionCaseIds:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCaseIds,
+    sourceCurrentnessRowFields:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRowFields,
+    requiredEvidenceIds: Object.freeze(
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRows.map(
+        (row) => row.id
+      )
+    ),
+    requiredEvidenceRoles: Object.freeze(
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRows.map(
+        (row) => row.role
+      )
+    ),
+    sourceOwnedEvidenceRequired: true,
+    blockedPrivateEvidenceOnly: true,
+    publicAdmission: false,
+    canonicalSourceEvidenceAccepted,
+    acceptedEvidenceCount: acceptedRows.length,
+    rejectedEvidenceCount: rejectedRows.length,
+    rows: frozenRows,
+    rejectedRows,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    nodeWorkerThreadsExecution: false,
+    childProcessExecution: false,
+    httpExecution: false,
+    httpsExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    packageExportCompatibility: false,
+    compatibilityClaimed: false,
+    reactBehaviorError: false
+  });
+}
+
+function validateNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRows(
+  rows
+) {
+  return createNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedger(
+    rows
+  );
+}
+
+function validateNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRow(
+  row
+) {
+  if (
+    row?.status ===
+    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedStatus
+  ) {
+    return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+      row,
+      row.code ??
+        nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+          .staleOrForeign
+    );
+  }
+
+  const claimCode =
+    getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(row);
+  if (claimCode !== null) {
+    return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+      row,
+      claimCode
+    );
+  }
+
+  if (
+    row?.proseEvidence === true ||
+    row?.testTitleEvidence === true ||
+    row?.errorMessageEvidence === true ||
+    row?.evidenceKind === 'prose' ||
+    row?.evidenceKind === 'test-title' ||
+    row?.evidenceKind === 'error-message'
+  ) {
+    return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+        .proseEvidence
+    );
+  }
+
+  if (
+    row?.sourceSyntaxOnly === true ||
+    row?.evidenceKind === 'source-syntax'
+  ) {
+    return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+        .sourceSyntaxOnly
+    );
+  }
+
+  if (
+    row?.sourceOwnedEvidence !== true ||
+    row?.blockedPrivateEvidence !== true ||
+    row?.publicAdmission !== false ||
+    row?.callerShapedEvidence === true
+  ) {
+    return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+        .callerBuilt
+    );
+  }
+
+  if (
+    !Array.isArray(row?.rustIdentifiers) ||
+    row.rustIdentifiers.length === 0
+  ) {
+    return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+        .rustIdentifierMismatch
+    );
+  }
+
+  const canonicalRow =
+    getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRow(row);
+  if (canonicalRow === null) {
+    return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+        .staleOrForeign
+    );
+  }
+
+  if (canonicalRow.role !== row.role) {
+    return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+        .sourceRoleMismatch
+    );
+  }
+
+  if (!arrayEquals(row.rustIdentifiers, canonicalRow.rustIdentifiers)) {
+    return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+        .rustIdentifierMismatch
+    );
+  }
+
+  if (
+    row.id !== canonicalRow.id ||
+    row.sourceFile !== canonicalRow.sourceFile ||
+    !arrayEquals(row.sourceFiles, canonicalRow.sourceFiles) ||
+    row.evidenceKind !== canonicalRow.evidenceKind ||
+    row.code != null ||
+    !arrayEquals(row.jsFactoryFields, canonicalRow.jsFactoryFields) ||
+    !arrayEquals(row.jsonFieldPaths, canonicalRow.jsonFieldPaths) ||
+    !nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessValueEquals(
+      row.expectedFactoryValues,
+      canonicalRow.expectedFactoryValues
+    )
+  ) {
+    return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+        .staleOrForeign
+    );
+  }
+
+  return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessAcceptedRow(
+    row
+  );
+}
+
+function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
+  row
+) {
+  if (row === undefined || row === null) {
+    return null;
+  }
+
+  if (
+    row.nativeAddonLoaded === true ||
+    row.nativeAddonLoadAttempted === true ||
+    row.napiCleanupHookExecution === true ||
+    row.cleanupHookPublicExecutionClaimed === true
+  ) {
+    return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+      .nativeAddonLoadClaim;
+  }
+
+  if (
+    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPublicClaimFields.some(
+      (field) => row[field] === true
+    )
+  ) {
+    return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+      .publicNativeExecutionClaim;
+  }
+
+  if (
+    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPackageClaimFields.some(
+      (field) => row[field] === true
+    )
+  ) {
+    return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+      .packageExportClaim;
+  }
+
+  if (
+    row.nodeWorkerThreadsExecution === true ||
+    row.workerThreadCreationAttempted === true ||
+    row.childProcessExecution === true ||
+    row.httpExecution === true ||
+    row.httpsExecution === true ||
+    row.networkExecution === true
+  ) {
+    return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+      .workerOrNetworkExecutionClaim;
+  }
+
+  if (
+    row.rendererExecution === true ||
+    row.reconcilerExecution === true ||
+    row.reactBehaviorError === true
+  ) {
+    return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+      .rendererReconcilerOutputClaim;
+  }
+
+  if (
+    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCompatibilityClaimFields.some(
+      (field) => row[field] === true
+    )
+  ) {
+    return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+      .compatibilityClaim;
+  }
+
+  return null;
+}
+
+function freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessAcceptedRow(
+  row
+) {
+  return Object.freeze({
+    id: row.id,
+    role: row.role,
+    sourceFile: row.sourceFile,
+    sourceFiles: Object.freeze([...row.sourceFiles]),
+    evidenceKind: row.evidenceKind,
+    rustIdentifiers: Object.freeze([...row.rustIdentifiers]),
+    jsFactoryFields: Object.freeze([...row.jsFactoryFields]),
+    jsonFieldPaths: Object.freeze([...row.jsonFieldPaths]),
+    expectedFactoryValues:
+      freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessValue(
+        row.expectedFactoryValues
+      ),
+    status:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessAcceptedStatus,
+    code: null,
+    sourceOwnedEvidence: true,
+    blockedPrivateEvidence: true,
+    publicAdmission: false,
+    callerShapedEvidence: false,
+    proseEvidence: false,
+    testTitleEvidence: false,
+    errorMessageEvidence: false,
+    sourceSyntaxOnly: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    nodeWorkerThreadsExecution: false,
+    childProcessExecution: false,
+    httpExecution: false,
+    httpsExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    packageExportCompatibility: false,
+    compatibilityClaimed: false,
+    reactBehaviorError: false
+  });
+}
+
+function freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+  row,
+  code
+) {
+  return Object.freeze({
+    id: row?.id ?? null,
+    role: row?.role ?? null,
+    sourceFile: row?.sourceFile ?? null,
+    sourceFiles: Object.freeze([...arrayFromMaybe(row?.sourceFiles)]),
+    evidenceKind: row?.evidenceKind ?? null,
+    rustIdentifiers: Object.freeze([...arrayFromMaybe(row?.rustIdentifiers)]),
+    jsFactoryFields: Object.freeze([...arrayFromMaybe(row?.jsFactoryFields)]),
+    jsonFieldPaths: Object.freeze([...arrayFromMaybe(row?.jsonFieldPaths)]),
+    expectedFactoryValues:
+      freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessValue(
+        row?.expectedFactoryValues ?? {}
+      ),
+    status:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedStatus,
+    code,
+    sourceOwnedEvidence: row?.sourceOwnedEvidence === true,
+    blockedPrivateEvidence: row?.blockedPrivateEvidence === true,
+    publicAdmission: false,
+    callerShapedEvidence: row?.callerShapedEvidence === true,
+    proseEvidence: row?.proseEvidence === true,
+    testTitleEvidence: row?.testTitleEvidence === true,
+    errorMessageEvidence: row?.errorMessageEvidence === true,
+    sourceSyntaxOnly: row?.sourceSyntaxOnly === true,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    nodeWorkerThreadsExecution: false,
+    childProcessExecution: false,
+    httpExecution: false,
+    httpsExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    packageExportCompatibility: false,
+    compatibilityClaimed: false,
+    reactBehaviorError: false
+  });
+}
+
+function enforceNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalSet(
+  rows
+) {
+  if (
+    hasExactNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalSet(
+      rows
+    )
+  ) {
+    return rows;
+  }
+
+  return rows.map((row) => {
+    if (
+      row.status ===
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessAcceptedStatus
+    ) {
+      return freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRow(
+        row,
+        nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
+          .canonicalSetMismatch
+      );
+    }
+
+    return row;
+  });
+}
+
+function hasExactNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalSet(
+  rows
+) {
+  if (
+    rows.length !==
+    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRows.length
+  ) {
+    return false;
+  }
+
+  for (const canonicalRow of nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRows) {
+    const matchingRows = rows.filter(
+      (row) =>
+        row.id === canonicalRow.id &&
+        row.role === canonicalRow.role &&
+        row.status ===
+          nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessAcceptedStatus
+    );
+
+    if (matchingRows.length !== 1) {
+      return false;
+    }
+  }
+
+  return rows.every(
+    (row) =>
+      row.status ===
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessAcceptedStatus
+  );
+}
+
+function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRow(
+  row
+) {
+  const byId =
+    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRows.find(
+      (canonicalRow) => canonicalRow.id === row?.id
+    ) ?? null;
+
+  if (byId === null) {
+    return (
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCanonicalRows.find(
+        (canonicalRow) =>
+          row?.sourceFile === canonicalRow.sourceFile &&
+          arrayEquals(row?.sourceFiles, canonicalRow.sourceFiles) &&
+          row?.evidenceKind === canonicalRow.evidenceKind &&
+          arrayEquals(row?.rustIdentifiers, canonicalRow.rustIdentifiers) &&
+          arrayEquals(row?.jsFactoryFields, canonicalRow.jsFactoryFields) &&
+          arrayEquals(row?.jsonFieldPaths, canonicalRow.jsonFieldPaths)
+      ) ?? null
+    );
+  }
+
+  return byId;
+}
+
+function sourceFilesFromNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRows(
+  rows
+) {
+  const sourceFiles = [];
+  for (const row of rows) {
+    for (const sourceFile of row.sourceFiles) {
+      if (!sourceFiles.includes(sourceFile)) {
+        sourceFiles.push(sourceFile);
+      }
+    }
+  }
+
+  return Object.freeze(sourceFiles);
+}
+
+function nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessValueEquals(
+  actual,
+  expected
+) {
+  return JSON.stringify(actual) === JSON.stringify(expected);
+}
+
+function createNativeRootWorkLoopFinishedWorkMetadataForCanary(options) {
+  assertNativeRootWorkLoopFinishedWorkMetadataCanaryOptions(options);
+
+  const childTags = Object.freeze(['HostComponent', 'HostText']);
+  return Object.freeze({
+    source: nativeRootWorkLoopFinishedWorkMetadataSource,
+    status: nativeRootWorkLoopFinishedWorkMetadataStatus,
+    metadataRevision: nativeRootWorkLoopFinishedWorkMetadataRevision,
+    facade: Object.freeze({
+      rootId: options.rootId,
+      rootTag: options.rootTag,
+      renderUpdateId: options.renderUpdateId,
+      hostType: 'div',
+      hostOutputShape: 'host-component',
+      hostComponentCount: 1,
+      hostTextCount: 1,
+      textContent: 'text'
+    }),
+    completeWork: Object.freeze({
+      rootChildTag: 'HostComponent',
+      completedChildTag: 'HostComponent',
+      hostTextChildTag: 'HostText',
+      childTags
+    }),
+    pending: Object.freeze({
+      recordsFinishedWork: true,
+      pendingWorkMatchesFinishedWork: true,
+      renderLanes: 'Default',
+      finishedLanes: 'Default',
+      remainingLanes: 'NoLanes'
+    }),
+    commit: Object.freeze({
+      commitOrderAfterPendingRecord: true,
+      consumedFinishedWorkRecord: true,
+      finishedWorkAfterCommit: null,
+      finishedLanesAfterCommit: 'NoLanes',
+      renderPhaseWorkAfterCommit: null,
+      mutationExecutionBlocked: true,
+      publicRootRenderingBlocked: true,
+      effectsRefsAndHydrationBlocked: true
+    }),
+    placement: Object.freeze({
+      tag: 'HostComponent',
+      applyKind: 'append-placement-to-container',
+      siblingStatus: 'append'
+    })
+  });
+}
+
+Object.defineProperty(
+  createNativeRootWorkLoopFinishedWorkMetadataForCanary,
+  nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedgerSymbol,
+  {
+    value: nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedger,
+    enumerable: false,
+    configurable: false,
+    writable: false
   }
 );
+Object.freeze(createNativeRootWorkLoopFinishedWorkMetadataForCanary);
 
 function assertNativeRootWorkLoopFinishedWorkMetadataCanaryOptions(options) {
   if (!isNativeRootWorkLoopMetadataObjectLike(options)) {
