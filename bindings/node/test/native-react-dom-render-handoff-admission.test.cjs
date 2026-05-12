@@ -345,8 +345,15 @@ function assertFailClosedCases(admit) {
 function assertCapabilityClaimSmugglingRejected(admit) {
   for (const claimField of [
     'publicRootExecution',
+    'publicRootCreated',
+    'publicRootObjectExposed',
+    'publicCreateRootEnabled',
+    'publicHydrateRootEnabled',
     'nativeExecution',
+    'nativeDomMutation',
+    'browserDomExecution',
     'browserDomMutation',
+    'addonDomMutation',
     'publicNativeCompatibility',
     'publicRootCompatibilitySurface',
     'publicRootRenderCompatibilityClaimed',
@@ -371,16 +378,62 @@ function assertCapabilityClaimSmugglingRejected(admit) {
     cleanupFixture(fixture);
   }
 
-  {
-    const fixture = createFixture('create-record-public-claim');
+  for (const claimField of [
+    'publicRootCompatibilitySurface',
+    'publicRootCreated',
+    'addonDomMutation'
+  ]) {
+    const fixture = createFixture(`create-record-${claimField}`);
     const claimedCreateRecord = Object.freeze({
       ...fixture.createHandoff.nativeRequestRecord,
-      publicRootCompatibilitySurface: true
+      [claimField]: true
     });
     assertAdmissionError(
       () => admit(claimedCreateRecord, fixture.renderHandoff, fixture.metadata),
       capabilityClaimCode,
-      'create record public compatibility claim'
+      `create record ${claimField} claim`
+    );
+    cleanupFixture(fixture);
+  }
+
+  for (const claimField of [
+    'addonDomMutation',
+    'nativeDomMutation',
+    'browserDomExecution'
+  ]) {
+    const fixture = createFixture(`render-handoff-${claimField}`);
+    const claimedHandoff = Object.freeze({
+      ...fixture.renderHandoff,
+      [claimField]: true
+    });
+    assertAdmissionError(
+      () =>
+        admit(
+          fixture.createHandoff.nativeRequestRecord,
+          claimedHandoff,
+          fixture.metadata
+        ),
+      capabilityClaimCode,
+      `render handoff ${claimField} claim`
+    );
+    cleanupFixture(fixture);
+  }
+
+  {
+    const fixture = createFixture('render-handoff-symbol-public-root');
+    const claimedHandoff = Object.freeze({
+      ...fixture.renderHandoff,
+      [Symbol.for('publicRootExecution')]: true
+    });
+    assertAdmissionError(
+      () =>
+        admit(
+          fixture.createHandoff.nativeRequestRecord,
+          claimedHandoff,
+          fixture.metadata
+        ),
+      capabilityClaimCode,
+      'render handoff Symbol.for(publicRootExecution) claim'
     );
     cleanupFixture(fixture);
   }

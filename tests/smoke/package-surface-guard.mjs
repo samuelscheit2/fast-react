@@ -196,7 +196,7 @@ const expectedNativePackage = {
     scripts: {
       build: 'cargo build -p fast-react-napi',
       check:
-        'node ./test/native-private-root-work-loop-metadata-factory.test.cjs && node ./test/native-loader.test.cjs && node ./test/native-no-load-guard.test.cjs && node ./test/native-loader-esm.test.mjs',
+        'node ./test/native-react-dom-render-handoff-admission.test.cjs && node ./test/native-private-root-work-loop-metadata-factory.test.cjs && node ./test/native-loader.test.cjs && node ./test/native-no-load-guard.test.cjs && node ./test/native-loader-esm.test.mjs',
       test: 'npm run check'
     },
     engines: {
