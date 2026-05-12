@@ -493,6 +493,367 @@ impl MutationHost for RecordingHost {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HtmlLikeContainer {
+    children: Vec<HtmlLikeNode>,
+}
+
+impl HtmlLikeContainer {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn serialize(&self) -> String {
+        let mut output = String::new();
+        for child in &self.children {
+            child.serialize_into(&mut output);
+        }
+        output
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HtmlLikeElement {
+    ty: &'static str,
+    children: Vec<HtmlLikeNode>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HtmlLikeText {
+    text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HtmlLikeNode {
+    Element(HtmlLikeElement),
+    Text(HtmlLikeText),
+}
+
+impl HtmlLikeNode {
+    fn serialize_into(&self, output: &mut String) {
+        match self {
+            Self::Element(element) => {
+                output.push('<');
+                output.push_str(element.ty);
+                output.push('>');
+                for child in &element.children {
+                    child.serialize_into(output);
+                }
+                output.push_str("</");
+                output.push_str(element.ty);
+                output.push('>');
+            }
+            Self::Text(text) => output.push_str(&text.text),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct HtmlLikeHost {
+    operations: Vec<&'static str>,
+}
+
+impl HtmlLikeHost {
+    #[must_use]
+    pub fn operations(&self) -> &[&'static str] {
+        &self.operations
+    }
+
+    fn record(&mut self, operation: &'static str) {
+        self.operations.push(operation);
+    }
+
+    fn reject_unexpected_mutation<T>(&self, handle: HostHandleKind) -> HostResult<T> {
+        Err(HostOperationError::invalid_handle(self.renderer_name(), handle).into())
+    }
+}
+
+impl HostTypes for HtmlLikeHost {
+    type HostFiberToken = FakeHostFiberToken;
+    type Type = &'static str;
+    type Props = ();
+    type Container = HtmlLikeContainer;
+    type Instance = HtmlLikeElement;
+    type TextInstance = HtmlLikeText;
+    type PublicInstance = ();
+    type HostContext = ();
+    type UpdatePayload = ();
+    type TimeoutHandle = u64;
+    type NoTimeout = ();
+    type CommitState = ();
+    type EventPriority = ();
+    type EventType = ();
+    type EventTimestamp = ();
+    type ActivityInstance = ();
+    type SuspenseInstance = ();
+    type HydratableInstance = ();
+    type FormInstance = ();
+    type ChildSet = ();
+    type Resource = ();
+    type HoistableRoot = ();
+    type TransitionStatus = ();
+    type SuspendedState = ();
+    type RunningViewTransition = ();
+    type ViewTransitionInstance = ();
+    type InstanceMeasurement = ();
+    type EventResponder = ();
+    type GestureTimeline = ();
+    type FragmentInstance = ();
+    type RendererInspectionConfig = ();
+}
+
+impl HostIdentityAndContext for HtmlLikeHost {
+    fn renderer_name(&self) -> &'static str {
+        "html-like-root-model-test-host"
+    }
+
+    fn capabilities(&self) -> HostCapabilitySet {
+        HostCapabilitySet::empty().with(HostCapability::Mutation)
+    }
+
+    fn get_public_instance(&self, _instance: &Self::Instance) -> HostResult<Self::PublicInstance> {
+        Ok(())
+    }
+
+    fn root_host_context(&self, _container: &Self::Container) -> HostResult<Self::HostContext> {
+        Ok(())
+    }
+
+    fn child_host_context(
+        &self,
+        _parent_context: &Self::HostContext,
+        _ty: &Self::Type,
+        _props: &Self::Props,
+    ) -> HostResult<Self::HostContext> {
+        Ok(())
+    }
+}
+
+impl HostCreation for HtmlLikeHost {
+    fn should_set_text_content(
+        &self,
+        _ty: &Self::Type,
+        _props: &Self::Props,
+        _context: &Self::HostContext,
+    ) -> bool {
+        false
+    }
+
+    fn create_instance(
+        &mut self,
+        _token: HostFiberTokenRef<'_, Self>,
+        ty: &Self::Type,
+        _props: &Self::Props,
+        _container: &Self::Container,
+        _context: &Self::HostContext,
+    ) -> HostResult<Self::Instance> {
+        Ok(HtmlLikeElement {
+            ty: *ty,
+            children: Vec::new(),
+        })
+    }
+
+    fn create_text_instance(
+        &mut self,
+        _token: HostFiberTokenRef<'_, Self>,
+        text: &str,
+        _container: &Self::Container,
+        _context: &Self::HostContext,
+    ) -> HostResult<Self::TextInstance> {
+        Ok(HtmlLikeText {
+            text: text.to_owned(),
+        })
+    }
+
+    fn append_initial_child(
+        &mut self,
+        parent: &mut Self::Instance,
+        child: HostChild<'_, Self>,
+    ) -> HostResult<()> {
+        parent.children.push(html_like_node_from_child(child));
+        Ok(())
+    }
+
+    fn finalize_initial_children(
+        &mut self,
+        _instance: &mut Self::Instance,
+        _ty: &Self::Type,
+        _props: &Self::Props,
+        _container: &Self::Container,
+        _context: &Self::HostContext,
+    ) -> HostResult<InitialChildrenFinalization> {
+        Ok(InitialChildrenFinalization::NoCommitMount)
+    }
+
+    fn clone_mutable_instance(
+        &mut self,
+        instance: &Self::Instance,
+        _update_payload: Option<&Self::UpdatePayload>,
+    ) -> HostResult<Self::Instance> {
+        Ok(instance.clone())
+    }
+
+    fn clone_mutable_text_instance(
+        &mut self,
+        text_instance: &Self::TextInstance,
+    ) -> HostResult<Self::TextInstance> {
+        Ok(text_instance.clone())
+    }
+}
+
+impl HostCommit for HtmlLikeHost {
+    fn prepare_for_commit(
+        &mut self,
+        _container: &Self::Container,
+    ) -> HostResult<Self::CommitState> {
+        self.record("prepare");
+        Ok(())
+    }
+
+    fn reset_after_commit(
+        &mut self,
+        _container: &Self::Container,
+        _commit_state: Self::CommitState,
+    ) -> HostResult<()> {
+        self.record("reset");
+        Ok(())
+    }
+
+    fn commit_mount(
+        &mut self,
+        _token: HostFiberTokenRef<'_, Self>,
+        _instance: &mut Self::Instance,
+        _ty: &Self::Type,
+        _props: &Self::Props,
+    ) -> HostResult<()> {
+        Ok(())
+    }
+
+    fn commit_update(
+        &mut self,
+        _token: HostFiberTokenRef<'_, Self>,
+        _instance: &mut Self::Instance,
+        _update_payload: Self::UpdatePayload,
+        _ty: &Self::Type,
+        _old_props: &Self::Props,
+        _new_props: &Self::Props,
+    ) -> HostResult<()> {
+        Ok(())
+    }
+
+    fn commit_text_update(
+        &mut self,
+        _text_instance: &mut Self::TextInstance,
+        _old_text: &str,
+        _new_text: &str,
+    ) -> HostResult<()> {
+        Ok(())
+    }
+
+    fn reset_text_content(&mut self, _instance: &mut Self::Instance) -> HostResult<()> {
+        Ok(())
+    }
+
+    fn hide_instance(&mut self, _instance: &mut Self::Instance) -> HostResult<()> {
+        Ok(())
+    }
+
+    fn unhide_instance(
+        &mut self,
+        _instance: &mut Self::Instance,
+        _props: &Self::Props,
+    ) -> HostResult<()> {
+        Ok(())
+    }
+
+    fn hide_text_instance(&mut self, _text_instance: &mut Self::TextInstance) -> HostResult<()> {
+        Ok(())
+    }
+
+    fn unhide_text_instance(
+        &mut self,
+        _text_instance: &mut Self::TextInstance,
+        _text: &str,
+    ) -> HostResult<()> {
+        Ok(())
+    }
+
+    fn detach_deleted_instance(
+        &mut self,
+        _token: HostFiberTokenRef<'_, Self>,
+        _instance: Self::Instance,
+    ) -> HostResult<()> {
+        Ok(())
+    }
+}
+
+impl MutationHost for HtmlLikeHost {
+    fn append_child(
+        &mut self,
+        _parent: &mut Self::Instance,
+        _child: HostChild<'_, Self>,
+    ) -> HostResult<()> {
+        self.reject_unexpected_mutation(HostHandleKind::Instance)
+    }
+
+    fn append_child_to_container(
+        &mut self,
+        container: &mut Self::Container,
+        child: HostChild<'_, Self>,
+    ) -> HostResult<()> {
+        self.record("append-to-container");
+        container.children.push(html_like_node_from_child(child));
+        Ok(())
+    }
+
+    fn insert_before(
+        &mut self,
+        _parent: &mut Self::Instance,
+        _child: HostChild<'_, Self>,
+        _before_child: HostChild<'_, Self>,
+    ) -> HostResult<()> {
+        self.reject_unexpected_mutation(HostHandleKind::Instance)
+    }
+
+    fn insert_in_container_before(
+        &mut self,
+        _container: &mut Self::Container,
+        _child: HostChild<'_, Self>,
+        _before_child: HostChild<'_, Self>,
+    ) -> HostResult<()> {
+        self.reject_unexpected_mutation(HostHandleKind::Container)
+    }
+
+    fn remove_child(
+        &mut self,
+        _parent: &mut Self::Instance,
+        _child: HostChild<'_, Self>,
+    ) -> HostResult<()> {
+        self.reject_unexpected_mutation(HostHandleKind::Instance)
+    }
+
+    fn remove_child_from_container(
+        &mut self,
+        _container: &mut Self::Container,
+        _child: HostChild<'_, Self>,
+    ) -> HostResult<()> {
+        self.reject_unexpected_mutation(HostHandleKind::Container)
+    }
+
+    fn clear_container(&mut self, _container: &mut Self::Container) -> HostResult<()> {
+        self.reject_unexpected_mutation(HostHandleKind::Container)
+    }
+}
+
+fn html_like_node_from_child(child: HostChild<'_, HtmlLikeHost>) -> HtmlLikeNode {
+    match child {
+        HostChild::Instance(instance) => HtmlLikeNode::Element(instance.clone()),
+        HostChild::Text(text) => HtmlLikeNode::Text(text.clone()),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestHostNode {
     Element(TestHostElement),

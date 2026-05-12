@@ -32,7 +32,9 @@ use crate::root_callbacks::{
     RootUpdateCallbackInvocationGateStatus, RootUpdateCallbackInvocationRequest,
     RootUpdateCallbackInvocationStatus, RootUpdateCallbackInvocationTestControl,
 };
-use crate::test_support::{FakeContainer, FakeHostFiberToken, RecordingHost};
+use crate::test_support::{
+    FakeContainer, FakeHostFiberToken, HtmlLikeContainer, HtmlLikeHost, RecordingHost,
+};
 use crate::unsupported_features::{OFFSCREEN_UNSUPPORTED_FEATURE, SUSPENSE_UNSUPPORTED_FEATURE};
 use crate::{
     HostFiberTokenId, RootElementHandle, RootOptions, RootTaskScheduleOutcome,
