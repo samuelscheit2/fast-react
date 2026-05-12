@@ -485,13 +485,20 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
     Object.freeze({
       id: "public-create-root-render-div-text",
       publicApi:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text"))',
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))',
       scenarioId: "initial-host-render",
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
       compatibilityClaimed: false,
       controlledDomShim: true,
+      expectedChildrenCount: 1,
       expectedChildNodeNames: ["DIV"],
+      expectedFirstElementChildAttributes: [["id", "app"]],
+      expectedFirstElementChildInnerHTML: "text",
+      expectedFirstElementChildNodeName: "DIV",
+      expectedFirstElementChildTagName: "DIV",
+      expectedFirstElementChildTextContent: "text",
+      expectedInnerHTML: '<div id="app">text</div>',
       expectedMutationLog: [["appendChild", "DIV"]],
       expectedTextContent: "text",
       minimalHostOutputAdmission: "render",
@@ -500,13 +507,20 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
     Object.freeze({
       id: "public-create-root-render-update",
       publicApi:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "updated text"))',
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "updated text"))',
       scenarioId: "update-host-render",
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
       compatibilityClaimed: false,
       controlledDomShim: true,
+      expectedChildrenCount: 1,
       expectedChildNodeNames: ["DIV"],
+      expectedFirstElementChildAttributes: [["id", "app"]],
+      expectedFirstElementChildInnerHTML: "updated text",
+      expectedFirstElementChildNodeName: "DIV",
+      expectedFirstElementChildTagName: "DIV",
+      expectedFirstElementChildTextContent: "updated text",
+      expectedInnerHTML: '<div id="app">updated text</div>',
       expectedMutationLog: [["appendChild", "DIV"]],
       expectedTextContent: "updated text",
       minimalHostOutputAdmission: "update",
@@ -515,13 +529,20 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
     Object.freeze({
       id: "public-create-root-unmount-call",
       publicApi:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text")); root.unmount()',
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text")); root.unmount()',
       scenarioId: "root-unmount",
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
       compatibilityClaimed: false,
       controlledDomShim: true,
+      expectedChildrenCount: 0,
       expectedChildNodeNames: [],
+      expectedFirstElementChildAttributes: null,
+      expectedFirstElementChildInnerHTML: null,
+      expectedFirstElementChildNodeName: null,
+      expectedFirstElementChildTagName: null,
+      expectedFirstElementChildTextContent: null,
+      expectedInnerHTML: "",
       expectedMutationLog: [
         ["appendChild", "DIV"],
         ["removeChild", "DIV"]
@@ -2806,19 +2827,19 @@ function validatePublicRootLifecycleBlocked({
       key: "renderDivText",
       expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1],
       expectedLabel:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text"))'
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))'
     },
     {
       key: "renderUpdate",
       expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2],
       expectedLabel:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "updated text"))'
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "updated text"))'
     },
     {
       key: "unmount",
       expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[3],
       expectedLabel:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text")); root.unmount()'
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text")); root.unmount()'
     }
   ];
 
@@ -2985,6 +3006,13 @@ function isPublicRenderControlledDomShimUntouched(snapshot) {
     snapshot &&
     snapshot.containerChildCount === 0 &&
     findFirstDifferencePath(snapshot.containerChildNodeNames, []) === null &&
+    snapshot.containerChildrenCount === 0 &&
+    snapshot.containerFirstElementChildAttributes === null &&
+    snapshot.containerFirstElementChildInnerHTML === null &&
+    snapshot.containerFirstElementChildNodeName === null &&
+    snapshot.containerFirstElementChildTagName === null &&
+    snapshot.containerFirstElementChildTextContent === null &&
+    snapshot.containerInnerHTML === "" &&
     findFirstDifferencePath(snapshot.containerMutationLog, []) === null &&
     snapshot.containerTextContent === "" &&
     snapshot.ownerDocumentChildCount === 0 &&
@@ -3000,6 +3028,20 @@ function isPublicRenderControlledDomShimExpectedSnapshot(snapshot, expected) {
       snapshot.containerChildNodeNames,
       expected.expectedChildNodeNames
     ) === null &&
+    snapshot.containerChildrenCount === expected.expectedChildrenCount &&
+    findFirstDifferencePath(
+      snapshot.containerFirstElementChildAttributes,
+      expected.expectedFirstElementChildAttributes
+    ) === null &&
+    snapshot.containerFirstElementChildInnerHTML ===
+      expected.expectedFirstElementChildInnerHTML &&
+    snapshot.containerFirstElementChildNodeName ===
+      expected.expectedFirstElementChildNodeName &&
+    snapshot.containerFirstElementChildTagName ===
+      expected.expectedFirstElementChildTagName &&
+    snapshot.containerFirstElementChildTextContent ===
+      expected.expectedFirstElementChildTextContent &&
+    snapshot.containerInnerHTML === expected.expectedInnerHTML &&
     findFirstDifferencePath(
       snapshot.containerMutationLog,
       expected.expectedMutationLog
@@ -3258,7 +3300,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
     renderDivText: attemptControlledPublicRootRenderDivTextOperation({
       domContainer,
       label:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text"))',
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))',
       listenerRegistry,
       React,
       reactDomClient,
@@ -3267,7 +3309,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
     renderUpdate: attemptControlledPublicRootRenderUpdateOperation({
       domContainer,
       label:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "updated text"))',
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "updated text"))',
       listenerRegistry,
       React,
       reactDomClient,
@@ -3276,7 +3318,7 @@ function inspectReactDomRootPublicFacadeLifecycle({
     unmount: attemptControlledPublicRootUnmountOperation({
       domContainer,
       label:
-        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text")); root.unmount()',
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text")); root.unmount()',
       listenerRegistry,
       React,
       reactDomClient,
@@ -3370,7 +3412,7 @@ function attemptControlledPublicRootRenderDivTextOperation({
     }
 
     lifecycleOperationAttempted = true;
-    return root.render(React.createElement("div", null, "text"));
+    return root.render(React.createElement("div", { id: "app" }, "text"));
   });
 
   return {
@@ -3431,10 +3473,13 @@ function attemptControlledPublicRootRenderUpdateOperation({
     }
 
     lifecycleOperationAttempted = true;
-    root.render(React.createElement("div", null, "text"));
+    root.render(React.createElement("div", { id: "app" }, "text"));
     const initialHostNode = container.firstChild;
-    const value = root.render(React.createElement("div", null, "updated text"));
-    hostNodeReused = initialHostNode !== null && container.firstChild === initialHostNode;
+    const value = root.render(
+      React.createElement("div", { id: "app" }, "updated text")
+    );
+    hostNodeReused =
+      initialHostNode !== null && container.firstChild === initialHostNode;
     return value;
   });
 
@@ -3497,7 +3542,7 @@ function attemptControlledPublicRootUnmountOperation({
     }
 
     lifecycleOperationAttempted = true;
-    root.render(React.createElement("div", null, "text"));
+    root.render(React.createElement("div", { id: "app" }, "text"));
     const value = root.unmount();
     try {
       reactDomClient.createRoot(container);
@@ -3729,14 +3774,36 @@ function createPublicRenderControlledDomShim({ domContainer, label }) {
 }
 
 function summarizePublicRenderControlledDomShim({ container, ownerDocument }) {
+  const firstElementChild = container.firstElementChild;
   return {
     containerChildCount: container.childNodes.length,
     containerChildNodeNames: summarizeChildNodeNames(container),
+    containerChildrenCount: container.children.length,
+    containerFirstElementChildAttributes:
+      firstElementChild === null ? null : attributeEntries(firstElementChild),
+    containerFirstElementChildInnerHTML:
+      firstElementChild === null ? null : firstElementChild.innerHTML,
+    containerFirstElementChildNodeName:
+      firstElementChild === null ? null : firstElementChild.nodeName,
+    containerFirstElementChildTagName:
+      firstElementChild === null ? null : firstElementChild.tagName,
+    containerFirstElementChildTextContent:
+      firstElementChild === null ? null : firstElementChild.textContent,
+    containerInnerHTML: container.innerHTML,
     containerMutationLog: container.mutationLog.slice(),
     containerTextContent: container.textContent,
     ownerDocumentChildCount: ownerDocument.childNodes.length,
     ownerDocumentMutationLog: ownerDocument.mutationLog.slice()
   };
+}
+
+function attributeEntries(node) {
+  if (!(node.attributes instanceof Map)) {
+    return null;
+  }
+  return [...node.attributes.entries()].sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
 }
 
 function createGateEventTarget(fields) {
@@ -3816,8 +3883,25 @@ class PrivateHostOutputNode {
     return this.childNodes[0] ?? null;
   }
 
+  get children() {
+    return this.childNodes.filter(
+      (child) => child.nodeType === this.ownerDocument?.elementNodeType
+    );
+  }
+
+  get firstElementChild() {
+    return this.children[0] ?? null;
+  }
+
   get lastChild() {
     return this.childNodes[this.childNodes.length - 1] ?? null;
+  }
+
+  get innerHTML() {
+    if (this.childNodes.length > 0) {
+      return this.childNodes.map(serializePrivateHostOutputNode).join("");
+    }
+    return escapePrivateHostOutputText(this.textContent);
   }
 
   get textContent() {
@@ -3938,6 +4022,7 @@ class PrivateHostOutputElement extends PrivateHostOutputNode {
     super(fields);
     this.attributes = new Map();
     this.attributeLog = [];
+    this.tagName = fields.nodeName;
     this._className = "";
     this._id = "";
     this._title = "";
@@ -4035,6 +4120,41 @@ class PrivateHostOutputText extends PrivateHostOutputNode {
     this.writeLog.push(["textContent", text]);
     this._data = text;
   }
+}
+
+function serializePrivateHostOutputNode(node) {
+  if (node instanceof PrivateHostOutputText) {
+    return escapePrivateHostOutputText(node.textContent);
+  }
+  if (node instanceof PrivateHostOutputElement) {
+    const tagName = String(node.nodeName).toLowerCase();
+    return `<${tagName}${serializePrivateHostOutputAttributes(node)}>${node.innerHTML}</${tagName}>`;
+  }
+  return "";
+}
+
+function serializePrivateHostOutputAttributes(node) {
+  if (!(node.attributes instanceof Map) || node.attributes.size === 0) {
+    return "";
+  }
+  return [...node.attributes.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(
+      ([name, value]) =>
+        ` ${name}="${escapePrivateHostOutputAttributeValue(value)}"`
+    )
+    .join("");
+}
+
+function escapePrivateHostOutputText(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function escapePrivateHostOutputAttributeValue(value) {
+  return escapePrivateHostOutputText(value).replaceAll('"', "&quot;");
 }
 
 function assertPrivateHostOutputChild(child) {

@@ -2281,51 +2281,207 @@ function attributeEntries(node) {
   );
 }
 
-function assertPublicCreateRootMinimalHostOutput(document) {
-  const container = document.createElement('div');
-  const root = reactDomClient.createRoot(container);
+function installPublicObservableFakeDom(document) {
+  const createElement = document.createElement;
+  const createTextNode = document.createTextNode;
 
-  assert.deepEqual(Object.keys(root), ['render', 'unmount']);
-  assert.equal(root.render.length, 1);
-  assert.equal(root.unmount.length, 0);
-  assert.equal(
-    root.render(React.createElement('div', {id: 'app'}, 'hello')),
-    undefined
-  );
-  assert.equal(container.childNodes.length, 1);
-  assert.equal(container.firstChild.nodeName, 'DIV');
-  assert.equal(container.firstChild.getAttribute('id'), 'app');
-  assert.equal(container.textContent, 'hello');
-  const hostNode = container.firstChild;
-  assert.equal(
-    root.render(React.createElement('div', {id: 'app'}, 'again')),
-    undefined
-  );
-  assert.equal(container.childNodes.length, 1);
-  assert.equal(container.firstChild, hostNode);
-  assert.equal(container.firstChild.getAttribute('id'), 'app');
-  assert.equal(container.textContent, 'again');
-  assert.equal(root.unmount(), undefined);
-  assert.equal(container.childNodes.length, 0);
-  assert.equal(container.textContent, '');
-  assert.throws(() => root.render(React.createElement('div', null, 'stale')), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot().render'
-  });
-  assert.throws(() => root.unmount(), {
-    code: 'FAST_REACT_UNIMPLEMENTED',
-    entrypoint: 'react-dom/client',
-    exportName: 'createRoot().unmount'
-  });
-  const recreatedRoot = reactDomClient.createRoot(container);
-  assert.equal(
-    recreatedRoot.render(React.createElement('div', null, 42)),
-    undefined
-  );
-  assert.equal(container.textContent, '42');
-  assert.equal(recreatedRoot.unmount(), undefined);
-  assert.equal(container.childNodes.length, 0);
+  document.createElement = function createPublicObservableElement(tagName) {
+    return decoratePublicObservableNode(createElement.call(this, tagName));
+  };
+  document.createTextNode = function createPublicObservableTextNode(text) {
+    return decoratePublicObservableNode(createTextNode.call(this, text));
+  };
+
+  return function restorePublicObservableFakeDom() {
+    document.createElement = createElement;
+    document.createTextNode = createTextNode;
+  };
+}
+
+function decoratePublicObservableNode(node) {
+  if (node == null || typeof node !== 'object') {
+    return node;
+  }
+  if (!Object.prototype.hasOwnProperty.call(node, 'children')) {
+    Object.defineProperty(node, 'children', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes.filter(
+          (child) => child.nodeType === ELEMENT_NODE
+        );
+      }
+    });
+  }
+  if (!Object.prototype.hasOwnProperty.call(node, 'firstElementChild')) {
+    Object.defineProperty(node, 'firstElementChild', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.children[0] || null;
+      }
+    });
+  }
+  if (!Object.prototype.hasOwnProperty.call(node, 'innerHTML')) {
+    Object.defineProperty(node, 'innerHTML', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (this.childNodes.length > 0) {
+          return this.childNodes.map(serializePublicObservableNode).join('');
+        }
+        return escapePublicObservableText(this.textContent);
+      }
+    });
+  }
+  if (
+    node.nodeType === ELEMENT_NODE &&
+    !Object.prototype.hasOwnProperty.call(node, 'tagName')
+  ) {
+    Object.defineProperty(node, 'tagName', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.nodeName;
+      }
+    });
+  }
+  return node;
+}
+
+function serializePublicObservableNode(node) {
+  if (node?.nodeType === TEXT_NODE) {
+    return escapePublicObservableText(node.textContent);
+  }
+  if (node?.nodeType === ELEMENT_NODE) {
+    const tagName = String(node.nodeName).toLowerCase();
+    return `<${tagName}${serializePublicObservableAttributes(node)}>${node.innerHTML}</${tagName}>`;
+  }
+  return '';
+}
+
+function serializePublicObservableAttributes(node) {
+  if (!(node.attributes instanceof Map) || node.attributes.size === 0) {
+    return '';
+  }
+  return [...node.attributes.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(
+      ([name, value]) =>
+        ` ${name}="${escapePublicObservableAttributeValue(String(value))}"`
+    )
+    .join('');
+}
+
+function escapePublicObservableText(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+}
+
+function escapePublicObservableAttributeValue(value) {
+  return escapePublicObservableText(value).replaceAll('"', '&quot;');
+}
+
+function assertPublicCreateRootMinimalHostOutput(document) {
+  const restorePublicObservableFakeDom =
+    installPublicObservableFakeDom(document);
+
+  try {
+    const container = document.createElement('div');
+    const root = reactDomClient.createRoot(container);
+    const escapedPublicId = 'app&<>"';
+
+    assert.deepEqual(Object.keys(root), ['render', 'unmount']);
+    assert.equal(root.render.length, 1);
+    assert.equal(root.unmount.length, 0);
+    assert.equal(
+      root.render(
+        React.createElement('div', {id: escapedPublicId}, 'hello & < >')
+      ),
+      undefined
+    );
+    assert.equal(container.childNodes.length, 1);
+    assert.equal(container.children.length, 1);
+    assert.equal(container.firstElementChild, container.firstChild);
+    assert.equal(container.firstChild.nodeName, 'DIV');
+    assert.equal(container.firstChild.tagName, 'DIV');
+    assert.equal(container.firstChild.getAttribute('id'), escapedPublicId);
+    assert.deepEqual(attributeEntries(container.firstChild), [
+      ['id', escapedPublicId]
+    ]);
+    assert.equal(container.firstChild.textContent, 'hello & < >');
+    assert.equal(container.firstChild.innerHTML, 'hello &amp; &lt; &gt;');
+    assert.equal(container.textContent, 'hello & < >');
+    assert.equal(
+      container.innerHTML,
+      '<div id="app&amp;&lt;&gt;&quot;">hello &amp; &lt; &gt;</div>'
+    );
+    const hostNode = container.firstChild;
+    assert.equal(
+      root.render(
+        React.createElement('div', {id: escapedPublicId}, 'again & < >')
+      ),
+      undefined
+    );
+    assert.equal(container.childNodes.length, 1);
+    assert.equal(container.children.length, 1);
+    assert.equal(container.firstElementChild, hostNode);
+    assert.equal(container.firstChild, hostNode);
+    assert.equal(container.firstChild.getAttribute('id'), escapedPublicId);
+    assert.deepEqual(attributeEntries(container.firstChild), [
+      ['id', escapedPublicId]
+    ]);
+    assert.equal(container.firstChild.textContent, 'again & < >');
+    assert.equal(container.firstChild.innerHTML, 'again &amp; &lt; &gt;');
+    assert.equal(container.textContent, 'again & < >');
+    assert.equal(
+      container.innerHTML,
+      '<div id="app&amp;&lt;&gt;&quot;">again &amp; &lt; &gt;</div>'
+    );
+    assert.equal(root.unmount(), undefined);
+    assert.equal(container.childNodes.length, 0);
+    assert.equal(container.children.length, 0);
+    assert.equal(container.firstElementChild, null);
+    assert.equal(container.textContent, '');
+    assert.equal(container.innerHTML, '');
+    assert.throws(
+      () => root.render(React.createElement('div', null, 'stale')),
+      {
+        code: 'FAST_REACT_UNIMPLEMENTED',
+        entrypoint: 'react-dom/client',
+        exportName: 'createRoot().render'
+      }
+    );
+    assert.throws(() => root.unmount(), {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot().unmount'
+    });
+    assert.equal(container.childNodes.length, 0);
+    assert.equal(container.children.length, 0);
+    assert.equal(container.firstElementChild, null);
+    assert.equal(container.textContent, '');
+    assert.equal(container.innerHTML, '');
+    const recreatedRoot = reactDomClient.createRoot(container);
+    assert.equal(
+      recreatedRoot.render(React.createElement('div', null, 42)),
+      undefined
+    );
+    assert.equal(container.childNodes.length, 1);
+    assert.equal(container.children.length, 1);
+    assert.equal(container.firstElementChild, container.firstChild);
+    assert.equal(container.textContent, '42');
+    assert.equal(container.innerHTML, '<div>42</div>');
+    assert.equal(recreatedRoot.unmount(), undefined);
+    assert.equal(container.childNodes.length, 0);
+    assert.equal(container.children.length, 0);
+    assert.equal(container.firstElementChild, null);
+    assert.equal(container.innerHTML, '');
+  } finally {
+    restorePublicObservableFakeDom();
+  }
 }
 
 module.exports = {

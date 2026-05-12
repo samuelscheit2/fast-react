@@ -105,6 +105,15 @@ const hydrateRootLifecycleBoundaryBlockedFields = Object.freeze([
 const MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT = Object.freeze({
   containerChildCount: 1,
   containerChildNodeNames: Object.freeze(["DIV"]),
+  containerChildrenCount: 1,
+  containerFirstElementChildAttributes: Object.freeze([
+    Object.freeze(["id", "app"])
+  ]),
+  containerFirstElementChildInnerHTML: "text",
+  containerFirstElementChildNodeName: "DIV",
+  containerFirstElementChildTagName: "DIV",
+  containerFirstElementChildTextContent: "text",
+  containerInnerHTML: '<div id="app">text</div>',
   containerMutationLog: Object.freeze([Object.freeze(["appendChild", "DIV"])]),
   containerTextContent: "text",
   ownerDocumentChildCount: 0,
@@ -113,6 +122,15 @@ const MINIMAL_PUBLIC_DIV_TEXT_SNAPSHOT = Object.freeze({
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_SNAPSHOT = Object.freeze({
   containerChildCount: 1,
   containerChildNodeNames: Object.freeze(["DIV"]),
+  containerChildrenCount: 1,
+  containerFirstElementChildAttributes: Object.freeze([
+    Object.freeze(["id", "app"])
+  ]),
+  containerFirstElementChildInnerHTML: "updated text",
+  containerFirstElementChildNodeName: "DIV",
+  containerFirstElementChildTagName: "DIV",
+  containerFirstElementChildTextContent: "updated text",
+  containerInnerHTML: '<div id="app">updated text</div>',
   containerMutationLog: Object.freeze([Object.freeze(["appendChild", "DIV"])]),
   containerTextContent: "updated text",
   ownerDocumentChildCount: 0,
@@ -121,6 +139,13 @@ const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_SNAPSHOT = Object.freeze({
 const MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_SNAPSHOT = Object.freeze({
   containerChildCount: 0,
   containerChildNodeNames: Object.freeze([]),
+  containerChildrenCount: 0,
+  containerFirstElementChildAttributes: null,
+  containerFirstElementChildInnerHTML: null,
+  containerFirstElementChildNodeName: null,
+  containerFirstElementChildTagName: null,
+  containerFirstElementChildTextContent: null,
+  containerInnerHTML: "",
   containerMutationLog: Object.freeze([
     Object.freeze(["appendChild", "DIV"]),
     Object.freeze(["removeChild", "DIV"])
@@ -166,7 +191,7 @@ function assertMinimalPublicDivTextLifecycle(publicBoundary) {
   const renderDivText = publicBoundary.publicRootLifecycle.renderDivText;
   assert.equal(
     renderDivText.label,
-    'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text"))'
+    'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))'
   );
   assert.equal(renderDivText.status, "ok");
   assert.equal(renderDivText.value.type, "undefined");
@@ -203,7 +228,7 @@ function assertMinimalPublicDivTextUpdateLifecycle(publicBoundary) {
   const renderUpdate = publicBoundary.publicRootLifecycle.renderUpdate;
   assert.equal(
     renderUpdate.label,
-    'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "updated text"))'
+    'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "updated text"))'
   );
   assert.equal(renderUpdate.status, "ok");
   assert.equal(renderUpdate.value.type, "undefined");
@@ -241,7 +266,7 @@ function assertMinimalPublicDivTextUnmountLifecycle(publicBoundary) {
   const unmount = publicBoundary.publicRootLifecycle.unmount;
   assert.equal(
     unmount.label,
-    'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text")); root.unmount()'
+    'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text")); root.unmount()'
   );
   assert.equal(unmount.status, "ok");
   assert.equal(unmount.value.type, "undefined");
@@ -833,11 +858,14 @@ test("React DOM public createRoot rejects explicit options and extra arguments",
 
   assert.deepEqual(Object.keys(root), ["render", "unmount"]);
   assert.equal(
-    root.render(React.createElement("div", null, "text")),
+    root.render(React.createElement("div", { id: "app" }, "text")),
     undefined
   );
   assert.equal(container.childNodes.length, 1);
   assert.equal(container.firstChild.nodeName, "DIV");
+  assert.deepEqual(attributeEntries(container.firstChild), [["id", "app"]]);
+  assert.equal(container.firstChild.getAttribute("id"), "app");
+  assert.equal(container.firstChild.textContent, "text");
   assert.equal(container.textContent, "text");
 });
 
