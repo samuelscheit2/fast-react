@@ -46,8 +46,8 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted branch baseline before this docs
-refresh is main `b44d8e03`
-(`Merge worker 1156 native React DOM render handoff admission`). Accepted
+refresh is main `5043c3bd`
+(`Merge worker 1176 public createRoot minimal host output`). Accepted
 implementation, cleanup, planning, and docs-only history through that commit is
 recorded in `MASTER_PROGRESS.md`; this plan lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
@@ -55,20 +55,22 @@ Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
-- Accepted facts through main `b44d8e03` are recorded in
+- Accepted facts through main `5043c3bd` are recorded in
   `MASTER_PROGRESS.md`.
 - No later worker output is listed as live accepted input in this plan
   snapshot.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
-  render handoff admission is to preserve the private reconciler diagnostic
-  path, source-owned execution-surface blockers, repaired no-load guard ledger
+  render handoff admission, plus the minimal public
+  `react-dom/client.createRoot(container)` ->
+  `root.render(React.createElement('div', {id?}, text|number))` fake-DOM
+  host-output path, is to preserve the private reconciler diagnostic path,
+  source-owned execution-surface blockers, repaired no-load guard ledger
   evidence, React DOM native-compatibility alias denylists, and
-  public/native/browser-DOM capability rejection while proving any later private
-  NAPI/adapter handoff. Public root lifecycle prerequisites remain required
-  before any public `createRoot().render(...)` path.
+  public/native/browser-DOM capability rejection while proving any later
+  private NAPI/adapter handoff or public root lifecycle extension.
 
-Current project-owned source/test large-file baseline after main `b44d8e03`,
+Current project-owned source/test large-file baseline after main `5043c3bd`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -76,7 +78,7 @@ excluding generated oracle JSON and package CJS published artifacts:
 - `packages/react-test-renderer/index.js`: 15,407 lines
 - `packages/react-dom/src/resource-form-internals-gate.js`: 14,641 lines
 - `packages/react-dom/src/client/controlled-restore-queue.js`: 10,949 lines
-- `tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs`: 10,258 lines
+- `tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs`: 10,277 lines
 - `packages/react-dom/src/events/plugin-event-system.js`: 9,533 lines
 - `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: 8,553 lines
 - `crates/fast-react-reconciler/src/function_component.rs`: 8,343 lines
@@ -92,14 +94,15 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private compatibility evidence through current main `b44d8e03` still
-keeps public root rendering, public root render/update/unmount, real `.node`
+Accepted compatibility evidence through current main `5043c3bd` includes only
+the minimal public fake-DOM div/text `createRoot().render(...)` path above.
+Public root update/unmount, broader public root rendering, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 `act`, `react-dom/test-utils.act`, `flushSync`, Scheduler timing,
 test-renderer public behavior, resources/forms, public input/change or
 controlled-input behavior, serialization, React Children traversal parity,
 unsupported hook behavior, package compatibility, and broad renderer
-compatibility blocked.
+compatibility remain blocked.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -107,19 +110,22 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `b44d8e03` as
+1. Treat accepted compatibility evidence through current main `5043c3bd` as
    private evidence, negative public evidence, package-private adapter evidence,
-   or file-organization/planning evidence only. In particular, Worker 1148 is
-   large-file planning only; Workers 1144 and 1147 only add crate-private NAPI
-   metadata JSON adapter/admission paths; Worker 1157 proves only a private
-   HTML-like host commit canary; Worker 1156 only admits symbol-private native
-   React DOM render handoff metadata. Public package, root, native, React DOM,
-   browser DOM, test-renderer, Scheduler, `act`, `react-dom/test-utils.act`,
-   hydration, refs/listeners/events, resource/form, public controlled-input,
-   serialization, React Children lazy/full traversal, unsupported hook,
-   `flushSync`, real `.node` loading/N-API runtime, broad package, and broad
-   renderer compatibility still require fail-closed gates and dual-run oracle
-   evidence.
+   file-organization/planning evidence, or Worker 1176's narrow public
+   fake-DOM host-output proof only. In particular, Worker 1148 is large-file
+   planning only; Workers 1144 and 1147 only add crate-private NAPI metadata
+   JSON adapter/admission paths; Worker 1157 proves only a private HTML-like
+   host commit canary; Worker 1156 only admits symbol-private native React DOM
+   render handoff metadata; Worker 1176 proves only minimal public
+   `react-dom/client.createRoot(container)` plus one initial div/text
+   `root.render(...)` through the fake-DOM adapter. Public root update/unmount,
+   broad native, browser DOM, test-renderer, Scheduler, `act`,
+   `react-dom/test-utils.act`, hydration, refs/listeners/events, resource/form,
+   public controlled-input, serialization, React Children lazy/full traversal,
+   unsupported hook, `flushSync`, real `.node` loading/N-API runtime, broad
+   package, and broad renderer compatibility still require fail-closed gates
+   and dual-run oracle evidence.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct
@@ -337,12 +343,11 @@ canonical evidence requirements.
   1111's private minimal placement diagnostic, Worker 1110's native placeholder
   metadata factory, Worker 1120's reconciler diagnostic export, Worker 1126's
   native factory contract, Worker 1130's Rust metadata shape, Worker 1129's
-  NAPI diagnostic probe, and Worker 1133's diagnostic-backed NAPI metadata only
-  as current fail-closed, package-private, or organization evidence. Public
-  root rendering remains blocked until a later worker proves public
-  `createRoot().render(...)` execution, DOM mutation, listener/root marker
-  behavior, lifecycle prerequisites, and package compatibility against React
-  19.2.6.
+  NAPI diagnostic probe, Worker 1133's diagnostic-backed NAPI metadata, and
+  Worker 1176's minimal public div/text fake-DOM host-output row. Broader
+  public root rendering remains blocked until later workers prove update,
+  unmount, browser DOM mutation, listener/root marker behavior, lifecycle
+  prerequisites, and package compatibility against React 19.2.6.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, the text-patch admission ledger, Worker 887's
@@ -368,7 +373,7 @@ canonical evidence requirements.
   accepted host-output update identity, and public blockers before any wider
   serialization or native bridge execution.
 
-Premature until later gates are green: public React DOM root render/unmount,
-public `act`, public `react-dom/test-utils.act`, public `flushSync`, public
-Scheduler timing, public hydration, resources, forms, controlled inputs,
-unsupported hooks, and event dispatch.
+Premature until later gates are green: broad public React DOM root
+render/update/unmount, public `act`, public `react-dom/test-utils.act`, public
+`flushSync`, public Scheduler timing, public hydration, resources, forms,
+controlled inputs, unsupported hooks, and event dispatch.
