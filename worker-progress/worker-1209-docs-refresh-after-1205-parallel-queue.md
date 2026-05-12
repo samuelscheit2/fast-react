@@ -41,6 +41,7 @@
 - `sed -n '29,78p' MASTER_PROGRESS.md`
 - `git diff --name-only`
 - `git add -N worker-progress/worker-1209-docs-refresh-after-1205-parallel-queue.md && git diff --check && rg -n "6f7f50dc|No later worker output|Worker 1204|Worker 1205|Worker 1206|Worker 1207|Worker 1208|2a0fa13d" MASTER_PLAN.md MASTER_PROGRESS.md && git status --short --branch`
+- `git add MASTER_PLAN.md MASTER_PROGRESS.md worker-progress/worker-1209-docs-refresh-after-1205-parallel-queue.md && git commit -m "Refresh docs after worker 1205"`
 
 ## Verification Results
 
@@ -66,4 +67,4 @@
 
 ## Commit
 
-- Pending.
+- Docs refresh commit: `69dda411` (`Refresh docs after worker 1205`).
