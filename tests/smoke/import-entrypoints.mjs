@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
+const packageSurfaceSnapshot = require('./package-surface-snapshot.json');
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',
@@ -30,6 +31,15 @@ function packageFileSubpaths(packageName, files) {
     const extensionless = specifier.replace(/\.(?:cjs|js|json|mjs|node)$/u, '');
     return extensionless === specifier ? [specifier] : [extensionless, specifier];
   });
+}
+
+function assertSortedUnique(values, label) {
+  assert.deepEqual([...values].sort(), values, `${label} must stay sorted`);
+  assert.equal(
+    new Set(values).size,
+    values.length,
+    `${label} must stay unique`
+  );
 }
 
 const defaultReactKeys = [
@@ -520,6 +530,8 @@ const reactDomPrivateDirectFiles = [
   'src/client/dom-container.js',
   'src/client/dom-host-context.js',
   'src/client/dom-namespaces.js',
+  'src/client/dom-property-operations.js',
+  'src/client/hydrate-root-source-ledger.js',
   'src/client/hydration-boundary-gate.js',
   'src/client/hydration-marker-parser.js',
   'src/client/ref-callback-gate.js',
@@ -539,11 +551,23 @@ const reactDomPrivateDirectFiles = [
   'src/events/react-dom-event-listener.js',
   'src/events/root-listeners.js',
   'src/resource-form-gates.js',
+  'src/resource-form-internals-contracts.js',
   'src/resource-form-internals-gate.js',
   'src/shared/create-portal.js',
   'src/shared/flush-sync-guard.js',
+  'src/shared/form-actions.js',
   'src/test-utils-act-gate.js'
 ];
+
+assertSortedUnique(
+  reactDomPrivateDirectFiles,
+  'react-dom private direct-file denylist'
+);
+assert.deepEqual(
+  reactDomPrivateDirectFiles,
+  packageSurfaceSnapshot.packages['react-dom'].privateImplementationFiles,
+  'react-dom private direct-file denylist must match package surface snapshot'
+);
 
 const blockedReactDomExtensionSubpaths = [
   '@fast-react/react-dom/index.js',
@@ -3888,6 +3912,11 @@ async function runReactDomPackageProbe(
           () => require(specifier),
           (error) => error?.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED',
           specifier
+        );
+        await assert.rejects(
+          import(specifier),
+          (error) => error?.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED',
+          specifier + ' ESM'
         );
       }
     })().catch((error) => {
