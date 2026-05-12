@@ -3,6 +3,7 @@
 ## Scope
 
 - Added a crate-private diagnostic helper that composes minimal root render output through complete-work handoff, HostRoot current switch, and minimal HostRoot placement commit.
+- Added follow-up fail-closed live payload validation for same-fiber HostComponent element type, HostComponent props, and HostText props drift before adapter or host calls.
 - Kept the helper private to `fast-react-reconciler` and did not route it into public ReactDOM/root, sync flush, hydration, event, ref, or effect paths.
 
 ## Verification

@@ -283,6 +283,24 @@ pub(crate) enum HostRootMinimalRenderCompleteHandoffError<E> {
         expected: FiberTag,
         actual: FiberTag,
     },
+    LiveComponentElementTypeMismatch {
+        root: FiberRootId,
+        component: FiberId,
+        expected: ElementTypeHandle,
+        actual: ElementTypeHandle,
+    },
+    LiveComponentPropsMismatch {
+        root: FiberRootId,
+        component: FiberId,
+        expected: PropsHandle,
+        actual: PropsHandle,
+    },
+    LiveTextPropsMismatch {
+        root: FiberRootId,
+        text: FiberId,
+        expected: PropsHandle,
+        actual: PropsHandle,
+    },
     LiveTextChildrenMismatch {
         root: FiberRootId,
         text: FiberId,
@@ -401,6 +419,45 @@ impl<E: Display> Display for HostRootMinimalRenderCompleteHandoffError<E> {
                 expected,
                 actual
             ),
+            Self::LiveComponentElementTypeMismatch {
+                root,
+                component,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} live HostComponent {} element type handle {} no longer matches minimal render record handle {}",
+                root.raw(),
+                component.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::LiveComponentPropsMismatch {
+                root,
+                component,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} live HostComponent {} props handle {} no longer matches minimal render record handle {}",
+                root.raw(),
+                component.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::LiveTextPropsMismatch {
+                root,
+                text,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} live HostText {} props handle {} no longer matches minimal render record handle {}",
+                root.raw(),
+                text.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
             Self::LiveTextChildrenMismatch {
                 root,
                 text,
@@ -472,6 +529,9 @@ where
             | Self::LiveRootChildMismatch { .. }
             | Self::LiveTextChildMismatch { .. }
             | Self::LiveFiberTagMismatch { .. }
+            | Self::LiveComponentElementTypeMismatch { .. }
+            | Self::LiveComponentPropsMismatch { .. }
+            | Self::LiveTextPropsMismatch { .. }
             | Self::LiveTextChildrenMismatch { .. }
             | Self::PublicCompatibilityClaimed { .. }
             | Self::UnadaptedHostComponentType { .. }
@@ -730,6 +790,26 @@ fn validate_live_minimal_render_tree_matches_record<H: HostTypes, E>(
             },
         );
     }
+    if component.element_type() != render.root_child_element_type() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveComponentElementTypeMismatch {
+                root,
+                component: render.root_child(),
+                expected: render.root_child_element_type(),
+                actual: component.element_type(),
+            },
+        );
+    }
+    if component.pending_props() != render.root_child_props() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveComponentPropsMismatch {
+                root,
+                component: render.root_child(),
+                expected: render.root_child_props(),
+                actual: component.pending_props(),
+            },
+        );
+    }
 
     let component_children = arena
         .child_ids(render.root_child())
@@ -756,6 +836,18 @@ fn validate_live_minimal_render_tree_matches_record<H: HostTypes, E>(
                 fiber: render.text_child(),
                 expected: FiberTag::HostText,
                 actual: text.tag(),
+            },
+        );
+    }
+    // HostText text content is owned by the minimal render record; pending
+    // props are the live same-fiber drift guard.
+    if text.pending_props() != render.text_child_props() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveTextPropsMismatch {
+                root,
+                text: render.text_child(),
+                expected: render.text_child_props(),
+                actual: text.pending_props(),
             },
         );
     }
