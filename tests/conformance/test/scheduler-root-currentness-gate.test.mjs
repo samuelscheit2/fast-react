@@ -1133,6 +1133,62 @@ test("Scheduler root currentness gate rejects Object.prototype snake_case compat
   );
 });
 
+test("Scheduler root currentness gate rejects Object.prototype non-claim variant fields on local rows", () => {
+  const localObservationRows = cloneJson(baselineGate().localObservationRows);
+  const sourceRows = cloneJson(baselineGate().sourceRows);
+
+  withTemporaryObjectPrototypeProperties(
+    {
+      actualEntrypoint: "scheduler/native",
+      actualSourcePath:
+        "packages/scheduler/src/forks/SchedulerPostTask.js"
+    },
+    () => {
+      const gate = evaluateWithBaselineRows({
+        localObservationRows,
+        sourceRows
+      });
+
+      assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+      assert.deepEqual(
+        violationById(
+          gate,
+          "scheduler-root-currentness-local-observation-row-identity-mismatch"
+        ).rowIds,
+        expectedCurrentnessRowIds()
+      );
+    }
+  );
+});
+
+test("Scheduler root currentness gate rejects Object.prototype non-claim variant fields on behavior evidence", () => {
+  const localObservationRows = cloneJson(baselineGate().localObservationRows);
+  const sourceRows = cloneJson(baselineGate().sourceRows);
+
+  withTemporaryObjectPrototypeProperties(
+    {
+      actualEntrypoint: "scheduler/unstable_post_task",
+      actualSourcePath:
+        "packages/scheduler/src/forks/SchedulerPostTask.js"
+    },
+    () => {
+      const gate = evaluateWithBaselineRows({
+        localObservationRows,
+        sourceRows
+      });
+
+      assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+      assert.deepEqual(
+        violationById(
+          gate,
+          "scheduler-root-currentness-variant-or-deep-cjs-evidence-used"
+        ).rowIds,
+        expectedCurrentnessRowIds()
+      );
+    }
+  );
+});
+
 test("Scheduler root currentness gate rejects non-claim behavior evidence variant fields", () => {
   const localObservationRows = cloneJson(baselineGate().localObservationRows);
   rowById(
@@ -1419,6 +1475,16 @@ function violationById(gate, id) {
   const violation = gate.violations.find((candidate) => candidate.id === id);
   assert.ok(violation, `missing violation ${id}`);
   return violation;
+}
+
+function expectedCurrentnessRowIds() {
+  const rowIds = [];
+  for (const mode of SCHEDULER_ROOT_PROBE_MODES) {
+    for (const scenarioId of SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS) {
+      rowIds.push(`${mode.id}:${scenarioId}`);
+    }
+  }
+  return rowIds;
 }
 
 function cloneJson(value) {

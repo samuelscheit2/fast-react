@@ -133,6 +133,21 @@ const SCHEDULER_ROOT_CURRENTNESS_BEHAVIOR_EVIDENCE_KEYS = Object.freeze([
   "compatibilityClaimed"
 ]);
 
+const CLEAN_OBJECT_PROTOTYPE_KEYS = Object.freeze([
+  "constructor",
+  "__defineGetter__",
+  "__defineSetter__",
+  "hasOwnProperty",
+  "__lookupGetter__",
+  "__lookupSetter__",
+  "isPrototypeOf",
+  "propertyIsEnumerable",
+  "toString",
+  "valueOf",
+  "__proto__",
+  "toLocaleString"
+]);
+
 export function evaluateSchedulerRootCurrentnessGate({
   oracle = readCheckedSchedulerRootOracle(),
   localObservationRows = null,
@@ -1001,7 +1016,22 @@ function descriptorIsAccessor(descriptor) {
 }
 
 function hasPlainObjectPrototype(value) {
-  return Object.getPrototypeOf(value) === Object.prototype;
+  return (
+    Object.getPrototypeOf(value) === Object.prototype &&
+    objectPrototypeHasOnlyCleanProperties()
+  );
+}
+
+function objectPrototypeHasOnlyCleanProperties() {
+  const keyManifest = compareStringSets(
+    CLEAN_OBJECT_PROTOTYPE_KEYS,
+    ownPropertyKeyNames(Object.prototype)
+  );
+  return (
+    keyManifest.missing.length === 0 &&
+    keyManifest.unexpected.length === 0 &&
+    keyManifest.duplicates.length === 0
+  );
 }
 
 function formatPropertyKey(key) {
