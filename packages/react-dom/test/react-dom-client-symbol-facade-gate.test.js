@@ -60,7 +60,7 @@ const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-dangerouslySetInnerHTML-prop',
   'unsupported-keyed-div',
   'unsupported-span-type',
-  'unsupported-nested-child',
+  'unsupported-nested-sibling',
   'unsupported-fragment',
   'unsupported-array',
   'unsupported-suppressHydrationWarning-prop',
@@ -388,6 +388,146 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     '<div>id removed &amp; &lt; &gt;</div>'
   );
   assertNoRootMarkerOrListenerLeak(createRootContainer, createRootDocument);
+
+  const nestedDocument = createDocument('public-create-root-nested');
+  const nestedContainer = nestedDocument.createElement('div');
+  const nestedRoot = reactDomClient.createRoot(nestedContainer);
+  const nestedInitialElement = React.createElement(
+    'div',
+    {id: 'nested&<>"'},
+    React.createElement('span', null, 'nested & < >')
+  );
+  const nestedUpdateElement = React.createElement(
+    'div',
+    {id: 'nested-next&<>"'},
+    React.createElement('span', null, 'nested again & < >')
+  );
+  const nestedIdOnlyUpdateElement = React.createElement(
+    'div',
+    {id: 'nested-final&<>"'},
+    React.createElement('span', null, 'nested again & < >')
+  );
+
+  assert.equal(nestedRoot.render(nestedInitialElement), undefined);
+  assert.equal(nestedContainer.childNodes.length, 1);
+  assert.equal(nestedContainer.children.length, 1);
+  assert.equal(nestedContainer.firstChild.nodeName, 'DIV');
+  assert.equal(
+    nestedContainer.firstChild.getAttribute('id'),
+    'nested&<>"'
+  );
+  assert.equal(nestedContainer.firstChild.childNodes.length, 1);
+  assert.equal(nestedContainer.firstChild.firstChild.nodeName, 'SPAN');
+  assert.equal(
+    nestedContainer.firstChild.firstChild.textContent,
+    'nested & < >'
+  );
+  assert.equal(nestedContainer.textContent, 'nested & < >');
+  assert.equal(
+    nestedContainer.innerHTML,
+    '<div id="nested&amp;&lt;&gt;&quot;"><span>nested &amp; &lt; &gt;</span></div>'
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(nestedContainer.firstChild),
+    nestedInitialElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(
+      nestedContainer.firstChild.firstChild
+    ),
+    nestedInitialElement.props.children.props
+  );
+  assertNoRootMarkerOrListenerLeak(nestedContainer, nestedDocument);
+
+  const nestedParentNode = nestedContainer.firstChild;
+  const nestedChildNode = nestedParentNode.firstChild;
+  const nestedTextNode = nestedChildNode.firstChild;
+  assert.equal(nestedRoot.render(nestedUpdateElement), undefined);
+  assert.equal(nestedContainer.firstChild, nestedParentNode);
+  assert.equal(nestedParentNode.firstChild, nestedChildNode);
+  assert.equal(nestedChildNode.firstChild, nestedTextNode);
+  assert.equal(
+    nestedContainer.firstChild.getAttribute('id'),
+    'nested-next&<>"'
+  );
+  assert.equal(nestedContainer.textContent, 'nested again & < >');
+  assert.equal(
+    nestedContainer.innerHTML,
+    '<div id="nested-next&amp;&lt;&gt;&quot;"><span>nested again &amp; &lt; &gt;</span></div>'
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(nestedParentNode),
+    nestedUpdateElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(nestedChildNode),
+    nestedUpdateElement.props.children.props
+  );
+  assertNoRootMarkerOrListenerLeak(nestedContainer, nestedDocument);
+
+  assert.equal(nestedRoot.render(nestedIdOnlyUpdateElement), undefined);
+  assert.equal(nestedContainer.firstChild, nestedParentNode);
+  assert.equal(nestedParentNode.firstChild, nestedChildNode);
+  assert.equal(nestedChildNode.firstChild, nestedTextNode);
+  assert.equal(
+    nestedContainer.firstChild.getAttribute('id'),
+    'nested-final&<>"'
+  );
+  assert.equal(nestedContainer.textContent, 'nested again & < >');
+  assert.equal(
+    nestedContainer.innerHTML,
+    '<div id="nested-final&amp;&lt;&gt;&quot;"><span>nested again &amp; &lt; &gt;</span></div>'
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(nestedParentNode),
+    nestedIdOnlyUpdateElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(nestedChildNode),
+    nestedIdOnlyUpdateElement.props.children.props
+  );
+  assertNoRootMarkerOrListenerLeak(nestedContainer, nestedDocument);
+
+  assert.equal(nestedRoot.render(null), undefined);
+  assert.equal(nestedContainer.childNodes.length, 0);
+  assert.equal(nestedContainer.children.length, 0);
+  assert.equal(nestedContainer.textContent, '');
+  assert.equal(nestedContainer.innerHTML, '');
+  assert.equal(componentTree.getLatestPropsFromNode(nestedParentNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(nestedChildNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(nestedTextNode), null);
+  assertNoRootMarkerOrListenerLeak(nestedContainer, nestedDocument);
+
+  assert.equal(nestedRoot.render(nestedInitialElement), undefined);
+  assert.notEqual(nestedContainer.firstChild, nestedParentNode);
+  assert.equal(
+    nestedContainer.innerHTML,
+    '<div id="nested&amp;&lt;&gt;&quot;"><span>nested &amp; &lt; &gt;</span></div>'
+  );
+  assert.equal(nestedRoot.unmount(), undefined);
+  assert.equal(nestedRoot.unmount(), undefined);
+  assert.equal(nestedContainer.childNodes.length, 0);
+  assert.equal(nestedContainer.innerHTML, '');
+  assert.throws(
+    () => {
+      nestedRoot.render(nestedInitialElement);
+    },
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED',
+      entrypoint: 'react-dom/client',
+      exportName: 'createRoot().render'
+    }
+  );
+  const nestedFreshRoot = reactDomClient.createRoot(nestedContainer);
+  assert.equal(nestedFreshRoot.render(nestedUpdateElement), undefined);
+  assert.equal(
+    nestedContainer.innerHTML,
+    '<div id="nested-next&amp;&lt;&gt;&quot;"><span>nested again &amp; &lt; &gt;</span></div>'
+  );
+  assert.equal(nestedFreshRoot.unmount(), undefined);
+  assert.equal(nestedContainer.childNodes.length, 0);
+  assertNoRootMarkerOrListenerLeak(nestedContainer, nestedDocument);
+
   for (const createCase of createPublicRenderCapabilityRejectionCaseFactories()) {
     const freshCase = createCase();
     assertPublicRenderFailureDoesNotLeak(
@@ -877,11 +1017,12 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
       element: React.createElement('span', null, 'blocked type')
     }),
     () => ({
-      label: 'unsupported-nested-child',
+      label: 'unsupported-nested-sibling',
       element: React.createElement(
         'div',
         null,
-        React.createElement('span', null, 'blocked nested')
+        React.createElement('span', null, 'blocked nested'),
+        React.createElement('span', null, 'blocked sibling')
       )
     }),
     () => ({
@@ -1980,11 +2121,12 @@ function createCases() {
       element: React.createElement('span', null, 'blocked type')
     },
     {
-      label: 'unsupported-nested-child',
+      label: 'unsupported-nested-sibling',
       element: React.createElement(
         'div',
         null,
-        React.createElement('span', null, 'blocked nested')
+        React.createElement('span', null, 'blocked nested'),
+        React.createElement('span', null, 'blocked sibling')
       )
     },
     {

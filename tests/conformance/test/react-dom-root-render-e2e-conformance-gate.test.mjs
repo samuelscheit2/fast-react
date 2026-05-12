@@ -939,6 +939,82 @@ function assertPublicCreateRootMinimalHostOutput(document) {
   assert.equal(recreatedRoot.render(React.createElement("div", null, 42)), undefined);
   assert.equal(container.textContent, "42");
   assert.equal(recreatedRoot.unmount(), undefined);
+
+  const nestedContainer = document.createElement("div");
+  const nestedRoot = reactDomClient.createRoot(nestedContainer);
+  const nestedInitial = React.createElement(
+    "div",
+    { id: "nested" },
+    React.createElement("span", null, "nested")
+  );
+  const nestedUpdate = React.createElement(
+    "div",
+    { id: "nested-next" },
+    React.createElement("span", null, "nested updated")
+  );
+  const nestedIdOnlyUpdate = React.createElement(
+    "div",
+    { id: "nested-final" },
+    React.createElement("span", null, "nested updated")
+  );
+
+  assert.equal(nestedRoot.render(nestedInitial), undefined);
+  const parentNode = nestedContainer.firstChild;
+  const childNode = parentNode.firstChild;
+  const textNode = childNode.firstChild;
+  assert.equal(parentNode.nodeName, "DIV");
+  assert.deepEqual(attributeEntries(parentNode), [["id", "nested"]]);
+  assert.equal(childNode.nodeName, "SPAN");
+  assert.equal(textNode.nodeValue, "nested");
+  assert.equal(nestedContainer.textContent, "nested");
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), nestedInitial.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    nestedInitial.props.children.props
+  );
+
+  assert.equal(nestedRoot.render(nestedUpdate), undefined);
+  assert.equal(nestedContainer.firstChild, parentNode);
+  assert.equal(parentNode.firstChild, childNode);
+  assert.equal(childNode.firstChild, textNode);
+  assert.deepEqual(attributeEntries(parentNode), [["id", "nested-next"]]);
+  assert.equal(textNode.nodeValue, "nested updated");
+  assert.equal(nestedContainer.textContent, "nested updated");
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), nestedUpdate.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    nestedUpdate.props.children.props
+  );
+
+  assert.equal(nestedRoot.render(nestedIdOnlyUpdate), undefined);
+  assert.equal(nestedContainer.firstChild, parentNode);
+  assert.equal(parentNode.firstChild, childNode);
+  assert.equal(childNode.firstChild, textNode);
+  assert.deepEqual(attributeEntries(parentNode), [["id", "nested-final"]]);
+  assert.equal(textNode.nodeValue, "nested updated");
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), nestedIdOnlyUpdate.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    nestedIdOnlyUpdate.props.children.props
+  );
+
+  assert.equal(nestedRoot.render(null), undefined);
+  assert.equal(nestedContainer.childNodes.length, 0);
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(childNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.equal(nestedRoot.render(nestedInitial), undefined);
+  assert.equal(nestedRoot.unmount(), undefined);
+  assert.equal(nestedRoot.unmount(), undefined);
+  assert.equal(nestedContainer.childNodes.length, 0);
+  assert.throws(() => nestedRoot.render(nestedInitial), {
+    code: "FAST_REACT_UNIMPLEMENTED",
+    exportName: "createRoot().render"
+  });
+  const nestedFreshRoot = reactDomClient.createRoot(nestedContainer);
+  assert.equal(nestedFreshRoot.render(nestedUpdate), undefined);
+  assert.equal(nestedContainer.textContent, "nested updated");
+  assert.equal(nestedFreshRoot.unmount(), undefined);
 }
 
 function createEventTarget(target) {

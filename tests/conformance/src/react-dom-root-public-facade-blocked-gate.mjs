@@ -806,11 +806,11 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "host-type"
     }),
     publicFacadeCapabilityRejectionRow({
-      id: "public-render-unsupported-nested-child",
-      label: "unsupported-nested-child",
-      publicApi: "root.render(<div><span>text</span></div>)",
+      id: "public-render-unsupported-nested-sibling",
+      label: "unsupported-nested-sibling",
+      publicApi: "root.render(<div><span>a</span><span>b</span></div>)",
       category: "browser-dom-expansion",
-      blockedSurface: "nested-child"
+      blockedSurface: "nested-sibling"
     }),
     publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-fragment",

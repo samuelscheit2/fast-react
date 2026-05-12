@@ -54,7 +54,7 @@ const createRoot = defineFunctionShape(function createRoot(
           return undefined;
         }
 
-        assertMinimalHostTextElement(element);
+        assertMinimalHostOutputElement(element);
 
         privateRoot.render(element);
         hostOutputMounted = true;
@@ -139,44 +139,100 @@ function assertUnmountArgumentsSupported(args) {
   }
 }
 
-function assertMinimalHostTextElement(element) {
+function assertMinimalHostOutputElement(element) {
+  assertReactElementObject(
+    element,
+    'Only React element objects created for one HostComponent are supported.'
+  );
+  assertMinimalHostElementType(element, 'div');
+  assertUnkeyedHostElement(element);
+
+  const props = getElementProps(element);
+  assertOnlySupportedHostProps(props, {
+    allowId: true,
+    blockedDetail(name) {
+      return `The public host-output facade currently supports only the id prop; ${name} remains blocked.`;
+    }
+  });
+
+  const children = props.children;
+  if (typeof children === 'string' || typeof children === 'number') {
+    return;
+  }
+
+  assertMinimalNestedHostOutputChild(children);
+}
+
+function assertMinimalNestedHostOutputChild(element) {
+  assertReactElementObject(
+    element,
+    'Only one nested HostComponent child is supported.'
+  );
+  assertMinimalHostElementType(element, 'span');
+  assertUnkeyedHostElement(element);
+
+  const props = getElementProps(element);
+  assertOnlySupportedHostProps(props, {
+    allowId: false,
+    blockedDetail(name) {
+      return `Nested public host-output children currently support only primitive children; ${name} remains blocked.`;
+    }
+  });
+
+  const children = props.children;
+  if (typeof children !== 'string' && typeof children !== 'number') {
+    throwUnsupportedRootRender(
+      'Only one nested HostText string or number child is supported.'
+    );
+  }
+}
+
+function assertReactElementObject(element, detail) {
   if (
     element === null ||
     typeof element !== 'object' ||
     (element.$$typeof !== reactElementType &&
       element.$$typeof !== legacyReactElementType)
   ) {
-    throwUnsupportedRootRender(
-      'Only React element objects created for one HostComponent are supported.'
-    );
+    throwUnsupportedRootRender(detail);
   }
+}
+
+function assertMinimalHostElementType(element, expectedType) {
   if (typeof element.type !== 'string' || element.type === '') {
     throwUnsupportedRootRender(
       'Only string HostComponent element types are supported.'
     );
   }
-  if (element.type !== 'div') {
+  if (element.type !== expectedType) {
     throwUnsupportedRootRender(
-      'Only div HostComponent elements are supported by the public host-output facade.'
+      expectedType === 'div'
+        ? 'Only div HostComponent elements are supported by the public host-output facade.'
+        : 'Only one nested span HostComponent child is supported by the public host-output facade.'
     );
   }
+}
+
+function assertUnkeyedHostElement(element) {
   if (element.key !== null && element.key !== undefined) {
     throwUnsupportedRootRender('Keyed elements remain blocked.');
   }
+}
 
-  const props =
-    element.props !== null && typeof element.props === 'object'
-      ? element.props
-      : {};
+function getElementProps(element) {
+  return element.props !== null && typeof element.props === 'object'
+    ? element.props
+    : {};
+}
+
+function assertOnlySupportedHostProps(props, options) {
   const propNames = Object.keys(props);
   for (const name of propNames) {
     if (name === 'children') {
       continue;
     }
-    if (name !== 'id') {
-      throwUnsupportedRootRender(
-        `The public host-output facade currently supports only the id prop; ${name} remains blocked.`
-      );
+    if (!options.allowId || name !== 'id') {
+      throwUnsupportedRootRender(options.blockedDetail(name));
     }
     if (
       typeof props[name] !== 'string' &&
@@ -186,13 +242,6 @@ function assertMinimalHostTextElement(element) {
         'The public host-output facade supports only string or number id values.'
       );
     }
-  }
-
-  const children = props.children;
-  if (typeof children !== 'string' && typeof children !== 'number') {
-    throwUnsupportedRootRender(
-      'Only one HostText string or number child is supported.'
-    );
   }
 }
 
