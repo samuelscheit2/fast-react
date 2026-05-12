@@ -29,6 +29,47 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1207, 1208, and 1210 Currentness Source-Proof Hardening
+
+- Worker 1208 hardened five private hook-dispatcher currentness validators:
+  `validateUseRefHookCurrentnessReport`,
+  `validateUseRefHookExecutionEvidence`,
+  `validateUseRefHookRendererLifecycleBlockerReport`,
+  `validateContextHookRendererReadinessReport`, and
+  `validateUnsupportedPlaceholderHookCurrentnessReport`. Each now proves
+  private WeakSet source ownership before frozen-state or property inspection
+  for caller-shaped objects and hostile proxies, while helper-owned mutable
+  reports still fail with the existing `...not-frozen` reasons.
+- Worker 1208 added conformance coverage for mutable forged hook reports,
+  hostile proxies with zero trap calls, and helper-owned mutable reports
+  produced while `Object.freeze` is temporarily bypassed. Broad hook,
+  `useRef`, context, unsupported-hook, renderer, Scheduler, `act`, and package
+  compatibility remain blocked.
+- Worker 1207 hardened the public `React.act` blocked-currentness report gate
+  so object-like forged reports prove
+  `publicReactActBlockedCurrentnessReports` source ownership before
+  `Object.isFrozen(report)` or shape inspection. Its tests cover frozen and
+  mutable forged reports, hostile proxies, and helper-owned mutable reports.
+- Worker 1210 repaired a late Worker 1207 source-audit finding by documenting
+  why `reactDomClientRootPlaceholder` is intentionally `false`: accepted
+  minimal public ReactDOM client fake-DOM root lifecycle evidence means
+  `createRoot` is no longer a pure unsupported placeholder, but public
+  `React.act` remains blocked because renderer roots are not ready,
+  `testRendererRootPlaceholder` is still true, and no act queue flushing,
+  callbacks, thenables, renderer/root/Scheduler execution, or public/package
+  compatibility is claimed.
+- Accepted validation includes Worker 1208's hook dispatcher syntax check,
+  hook oracle conformance test, `@fast-react/react` check, package-surface
+  guard, import smoke, and `git diff --check`; Worker 1207's React.act gate
+  and oracle syntax/tests, `@fast-react/react` check, package-surface guard,
+  import smoke, and `git diff --check`; and Worker 1210's React.act oracle and
+  public-blocked gate tests plus package/smoke/diff checks. Independent audits
+  were clean after the Worker 1210 repair.
+- The accepted state is main `00bb3d21` after Worker 1208 merge `fb838b4e`,
+  docs-only Worker 1209 merge `0a16defd`, Worker 1207 merge `9bcbfda7`, and
+  Worker 1210 repair merge `00bb3d21`, plus worker/repair/report commits
+  `21c04fe2`, `445a0319`, `731ea7eb`, `b172d0df`, and `0471624c`.
+
 ### Workers 1204 and 1205 Conformance/Currentness Hardening
 
 - Worker 1204 refreshed the public root facade conformance lifecycle rows for
