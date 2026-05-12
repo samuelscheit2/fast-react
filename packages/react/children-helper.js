@@ -1470,12 +1470,12 @@ function validateChildrenTraversalCurrentnessReport(report) {
     return 'children-traversal-currentness-source-proof';
   }
 
-  if (!Object.isFrozen(report)) {
-    return 'children-traversal-currentness-not-frozen';
-  }
-
   if (!childrenTraversalCurrentnessReports.has(report)) {
     return 'children-traversal-currentness-source-proof';
+  }
+
+  if (!Object.isFrozen(report)) {
+    return 'children-traversal-currentness-not-frozen';
   }
 
   if (

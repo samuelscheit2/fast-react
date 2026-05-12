@@ -840,6 +840,36 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
     }),
     "children-traversal-currentness-source-proof"
   );
+  assertCurrentnessRejected(
+    {
+      ...report
+    },
+    "children-traversal-currentness-source-proof"
+  );
+  assertCurrentnessRejected(
+    new Proxy(
+      {},
+      {
+        get() {
+          throw new Error("forged proxy get trap should not be reached");
+        },
+        getOwnPropertyDescriptor() {
+          throw new Error(
+            "forged proxy descriptor trap should not be reached"
+          );
+        },
+        isExtensible() {
+          throw new Error(
+            "forged proxy isExtensible trap should not be reached"
+          );
+        },
+        ownKeys() {
+          throw new Error("forged proxy ownKeys trap should not be reached");
+        }
+      }
+    ),
+    "children-traversal-currentness-source-proof"
+  );
   const mutableReport = createChildrenCurrentnessReportWithFreezeBypass(
     () => true
   );

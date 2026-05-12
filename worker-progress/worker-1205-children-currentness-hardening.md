@@ -8,6 +8,8 @@ Found one concrete false-green gap: `createChildrenTraversalCurrentnessReport()`
 
 The validator now rejects non-frozen currentness reports with `children-traversal-currentness-not-frozen` and rejects non-frozen `behaviorCurrentness` evidence through the existing `children-traversal-currentness-behavior-probes` path. Focused negative tests create helper-owned reports while temporarily bypassing `Object.freeze` and prove those reports fail closed with all public compatibility flags still false through `assertCurrentnessRejected()`.
 
+Repair after source audit: the first hardening checked `Object.isFrozen(report)` before source proof. That changed forged mutable caller-shaped objects from `children-traversal-currentness-source-proof` to `children-traversal-currentness-not-frozen`, and let hostile proxies throw from `Object.isFrozen` before the currentness gate could reject them. The validator now checks `childrenTraversalCurrentnessReports.has(report)` before `Object.isFrozen(report)`, so caller-shaped evidence fails source proof first while helper-owned mutable reports still fail with `children-traversal-currentness-not-frozen`.
+
 ## Evidence Gathered
 
 - Read `WORKER_BRIEF.md`.
@@ -15,6 +17,8 @@ The validator now rejects non-frozen currentness reports with `children-traversa
 - Inspected `packages/react/children-helper.js` currentness metadata, report creation, validation, consumption, `ownDataPropertyKeysEqual`, and direct Children traversal behavior probes.
 - Inspected `tests/conformance/test/children-helper-currentness-gate.test.mjs` metadata assertions, public-root privacy checks, negative currentness gate tests, and public compatibility false-flag assertions.
 - Probed the identified gap with a one-off Node script that temporarily replaced `Object.freeze` with identity during report creation. The resulting report and `behaviorCurrentness` were not frozen, but current validation returned `null` and `isChildrenTraversalCurrentnessReport()` returned `true`.
+- Source audit found that the first hardening inspected caller-shaped objects with `Object.isFrozen()` before proving helper ownership.
+- Added regression coverage for a mutable forged report and a hostile forged `Proxy` whose traps throw if validation inspects it before WeakSet source proof.
 
 ## Changed Files
 
@@ -50,9 +54,29 @@ The validator now rejects non-frozen currentness reports with `children-traversa
 - `npm run check:package-surface`
 - `node tests/smoke/import-entrypoints.mjs`
 - `git diff --check`
+- Repair pass:
+- `git status --short --branch`
+- `sed -n '1464,1620p' packages/react/children-helper.js`
+- `sed -n '820,900p' tests/conformance/test/children-helper-currentness-gate.test.mjs`
+- `sed -n '1,220p' worker-progress/worker-1205-children-currentness-hardening.md`
+- `node --test tests/conformance/test/children-helper-currentness-gate.test.mjs`
+- `node --test tests/conformance/test/children-helper-oracle.test.mjs`
+- `npm run check --workspace @fast-react/react`
+- `npm run check:package-surface`
+- `node tests/smoke/import-entrypoints.mjs`
+- `git diff --check`
+- `git diff -- packages/react/children-helper.js tests/conformance/test/children-helper-currentness-gate.test.mjs worker-progress/worker-1205-children-currentness-hardening.md`
+- `git status --short`
 
 ## Verification Results
 
+- `node --test tests/conformance/test/children-helper-currentness-gate.test.mjs` passed: 5 tests.
+- `node --test tests/conformance/test/children-helper-oracle.test.mjs` passed: 13 tests.
+- `npm run check --workspace @fast-react/react` passed. npm emitted the existing `minimum-release-age` config warning.
+- `npm run check:package-surface` passed. npm emitted the existing `minimum-release-age` config warning.
+- `node tests/smoke/import-entrypoints.mjs` passed.
+- `git diff --check` passed.
+- Repair verification repeated all required commands after the validation-order fix:
 - `node --test tests/conformance/test/children-helper-currentness-gate.test.mjs` passed: 5 tests.
 - `node --test tests/conformance/test/children-helper-oracle.test.mjs` passed: 13 tests.
 - `npm run check --workspace @fast-react/react` passed. npm emitted the existing `minimum-release-age` config warning.
@@ -74,3 +98,4 @@ The validator now rejects non-frozen currentness reports with `children-traversa
 ## Commit
 
 - Implementation commit: `bcb3fb84c3eb98e21f66ce2eff80f06fdadbc1d8`.
+- Repair commit: pending.
