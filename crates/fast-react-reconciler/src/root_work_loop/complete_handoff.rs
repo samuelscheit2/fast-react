@@ -1,12 +1,22 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberId, FiberTag, FiberTopologyError, Lanes};
-use fast_react_host_config::HostTypes;
+#[cfg(test)]
+use fast_react_core::FiberTopologyError;
+use fast_react_core::{ElementTypeHandle, FiberId, FiberTag, Lanes, PropsHandle};
+use fast_react_host_config::{HostCreation, HostTypes};
 
 use crate::{
-    FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord, RootElementHandle,
-    RootRenderExitStatus,
+    FiberRootId, FiberRootStore, FiberRootStoreError, RootElementHandle, RootRenderExitStatus,
+    complete_work::{
+        HostFiberTokenFactory, MinimalHostCompleteWorkError, MinimalHostRootCompleteWorkRecord,
+        MinimalHostRootCompleteWorkRequest, complete_minimal_host_root_component_text,
+    },
+    host_nodes::HostNodeStore,
+};
+#[cfg(test)]
+use crate::{
+    HostRootCommitRecord,
     begin_work::{
         HostRootOneLevelChildSet, HostRootOneLevelChildSetBeginWorkError,
         HostRootOneLevelChildSetBeginWorkRecord, HostRootOneLevelChildSetKind,
@@ -30,10 +40,547 @@ use crate::{
     test_support::{RecordingHost, TestHostTree},
 };
 
-use super::{
-    HostRootChildBeginWorkPreflightError, HostRootRenderPhaseRecord,
-    validate_host_root_child_preflight,
-};
+use super::HostRootMinimalElementRenderPhaseRecord;
+#[cfg(test)]
+use super::HostRootRenderPhaseRecord;
+#[cfg(test)]
+use super::{HostRootChildBeginWorkPreflightError, validate_host_root_child_preflight};
+
+pub(crate) trait HostRootMinimalRenderCompleteHandoffAdapter<H: HostTypes> {
+    type Error;
+
+    fn adapt_host_component_type(
+        &mut self,
+        element: RootElementHandle,
+        element_type: ElementTypeHandle,
+    ) -> Result<Option<H::Type>, Self::Error>;
+
+    fn adapt_host_component_props(
+        &mut self,
+        element: RootElementHandle,
+        props: PropsHandle,
+    ) -> Result<Option<H::Props>, Self::Error>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootMinimalRenderCompleteHandoffRecord {
+    render: HostRootMinimalElementRenderPhaseRecord,
+    complete_work: MinimalHostRootCompleteWorkRecord,
+}
+
+impl HostRootMinimalRenderCompleteHandoffRecord {
+    #[must_use]
+    pub(crate) const fn render(&self) -> &HostRootMinimalElementRenderPhaseRecord {
+        &self.render
+    }
+
+    #[must_use]
+    pub(crate) const fn complete_work(&self) -> MinimalHostRootCompleteWorkRecord {
+        self.complete_work
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.complete_work.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn host_root_work_in_progress(&self) -> FiberId {
+        self.complete_work.host_root_work_in_progress()
+    }
+
+    #[must_use]
+    pub(crate) const fn component(&self) -> FiberId {
+        self.complete_work.component()
+    }
+
+    #[must_use]
+    pub(crate) const fn text(&self) -> FiberId {
+        self.complete_work.text()
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(&self) -> Lanes {
+        self.render.render_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn root_element(&self) -> RootElementHandle {
+        self.render.root_element()
+    }
+
+    #[must_use]
+    pub(crate) const fn detached_instance_count(&self) -> usize {
+        1
+    }
+
+    #[must_use]
+    pub(crate) const fn detached_text_count(&self) -> usize {
+        1
+    }
+
+    #[must_use]
+    pub(crate) const fn public_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) fn proves_minimal_render_complete_handoff(&self) -> bool {
+        self.render.proves_minimal_host_component_with_text_child()
+            && self.complete_work.root() == self.render.root()
+            && self.complete_work.host_root_work_in_progress()
+                == self.render.host_root_work_in_progress()
+            && self.complete_work.component() == self.render.root_child()
+            && self.complete_work.text() == self.render.text_child()
+            && !self.public_dom_compatibility_claimed()
+            && self.public_compatibility_blocked()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HostRootMinimalRenderCompleteHandoffError<E> {
+    FiberRootStore(FiberRootStoreError),
+    Adapter(E),
+    MinimalCompleteWork(MinimalHostCompleteWorkError),
+    RenderPhaseWorkMismatch {
+        root: FiberRootId,
+        expected: Option<FiberId>,
+        actual: FiberId,
+    },
+    RenderPhaseLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    RenderPhaseNotCompleted {
+        root: FiberRootId,
+        status: RootRenderExitStatus,
+    },
+    MinimalRenderRecordShapeMismatch {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+    },
+    LiveRootChildMismatch {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        expected: FiberId,
+        actual: Option<FiberId>,
+        actual_child_count: usize,
+    },
+    LiveTextChildMismatch {
+        root: FiberRootId,
+        component: FiberId,
+        expected: FiberId,
+        actual: Option<FiberId>,
+        actual_child_count: usize,
+    },
+    LiveFiberTagMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        expected: FiberTag,
+        actual: FiberTag,
+    },
+    LiveTextChildrenMismatch {
+        root: FiberRootId,
+        text: FiberId,
+        actual_child_count: usize,
+    },
+    PublicCompatibilityClaimed {
+        root: FiberRootId,
+        element: RootElementHandle,
+    },
+    UnadaptedHostComponentType {
+        root: FiberRootId,
+        element: RootElementHandle,
+        element_type: ElementTypeHandle,
+    },
+    UnadaptedHostComponentProps {
+        root: FiberRootId,
+        element: RootElementHandle,
+        props: PropsHandle,
+    },
+}
+
+impl<E: Display> Display for HostRootMinimalRenderCompleteHandoffError<E> {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::Adapter(error) => Display::fmt(error, formatter),
+            Self::MinimalCompleteWork(error) => Display::fmt(error, formatter),
+            Self::RenderPhaseWorkMismatch {
+                root,
+                expected,
+                actual,
+            } => {
+                if let Some(expected) = expected {
+                    write!(
+                        formatter,
+                        "root {} minimal render recorded work fiber slot {}, complete-work handoff requested fiber slot {}",
+                        root.raw(),
+                        expected.slot().get(),
+                        actual.slot().get()
+                    )
+                } else {
+                    write!(
+                        formatter,
+                        "root {} has no recorded minimal render work for complete-work handoff requested fiber slot {}",
+                        root.raw(),
+                        actual.slot().get()
+                    )
+                }
+            }
+            Self::RenderPhaseLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} minimal render lanes {:?} do not match complete-work handoff lanes {:?}",
+                root.raw(),
+                expected,
+                actual
+            ),
+            Self::RenderPhaseNotCompleted { root, status } => write!(
+                formatter,
+                "root {} minimal render must be completed before complete-work handoff, found {:?}",
+                root.raw(),
+                status
+            ),
+            Self::MinimalRenderRecordShapeMismatch {
+                root,
+                host_root_work_in_progress,
+            } => write!(
+                formatter,
+                "root {} minimal render record for HostRoot work-in-progress {} does not prove HostRoot -> HostComponent -> HostText",
+                root.raw(),
+                host_root_work_in_progress.slot().get()
+            ),
+            Self::LiveRootChildMismatch {
+                root,
+                host_root_work_in_progress,
+                expected,
+                actual,
+                actual_child_count,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} live child tree no longer matches minimal render record: expected component {}, found {:?} across {} root children",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                expected.slot().get(),
+                actual.map(|fiber| fiber.slot().get()),
+                actual_child_count
+            ),
+            Self::LiveTextChildMismatch {
+                root,
+                component,
+                expected,
+                actual,
+                actual_child_count,
+            } => write!(
+                formatter,
+                "root {} HostComponent {} live text child no longer matches minimal render record: expected text {}, found {:?} across {} component children",
+                root.raw(),
+                component.slot().get(),
+                expected.slot().get(),
+                actual.map(|fiber| fiber.slot().get()),
+                actual_child_count
+            ),
+            Self::LiveFiberTagMismatch {
+                root,
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} live minimal render fiber {} must be {:?}, found {:?}",
+                root.raw(),
+                fiber.slot().get(),
+                expected,
+                actual
+            ),
+            Self::LiveTextChildrenMismatch {
+                root,
+                text,
+                actual_child_count,
+            } => write!(
+                formatter,
+                "root {} live HostText {} must not have children before minimal complete handoff, found {}",
+                root.raw(),
+                text.slot().get(),
+                actual_child_count
+            ),
+            Self::PublicCompatibilityClaimed { root, element } => write!(
+                formatter,
+                "root {} minimal render element {} claimed public compatibility before private complete-work handoff",
+                root.raw(),
+                element.raw()
+            ),
+            Self::UnadaptedHostComponentType {
+                root,
+                element,
+                element_type,
+            } => write!(
+                formatter,
+                "root {} element {} host component type handle {} was not adapted for private complete-work handoff",
+                root.raw(),
+                element.raw(),
+                element_type.raw()
+            ),
+            Self::UnadaptedHostComponentProps {
+                root,
+                element,
+                props,
+            } => write!(
+                formatter,
+                "root {} element {} host component props handle {} was not adapted for private complete-work handoff",
+                root.raw(),
+                element.raw(),
+                props.raw()
+            ),
+        }
+    }
+}
+
+impl<E> From<FiberRootStoreError> for HostRootMinimalRenderCompleteHandoffError<E> {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::FiberRootStore(error)
+    }
+}
+
+impl<E> From<MinimalHostCompleteWorkError> for HostRootMinimalRenderCompleteHandoffError<E> {
+    fn from(error: MinimalHostCompleteWorkError) -> Self {
+        Self::MinimalCompleteWork(error)
+    }
+}
+
+impl<E> Error for HostRootMinimalRenderCompleteHandoffError<E>
+where
+    E: Error + 'static,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberRootStore(error) => Some(error),
+            Self::Adapter(error) => Some(error),
+            Self::MinimalCompleteWork(error) => Some(error),
+            Self::RenderPhaseWorkMismatch { .. }
+            | Self::RenderPhaseLanesMismatch { .. }
+            | Self::RenderPhaseNotCompleted { .. }
+            | Self::MinimalRenderRecordShapeMismatch { .. }
+            | Self::LiveRootChildMismatch { .. }
+            | Self::LiveTextChildMismatch { .. }
+            | Self::LiveFiberTagMismatch { .. }
+            | Self::LiveTextChildrenMismatch { .. }
+            | Self::PublicCompatibilityClaimed { .. }
+            | Self::UnadaptedHostComponentType { .. }
+            | Self::UnadaptedHostComponentProps { .. } => None,
+        }
+    }
+}
+
+pub(crate) fn handoff_minimal_root_element_render_to_complete_work<H, A, T>(
+    store: &mut FiberRootStore<H>,
+    host: &mut H,
+    host_nodes: &mut HostNodeStore<H>,
+    token_factory: &mut T,
+    render: HostRootMinimalElementRenderPhaseRecord,
+    adapter: &mut A,
+) -> Result<
+    HostRootMinimalRenderCompleteHandoffRecord,
+    HostRootMinimalRenderCompleteHandoffError<A::Error>,
+>
+where
+    H: HostCreation,
+    A: HostRootMinimalRenderCompleteHandoffAdapter<H>,
+    T: HostFiberTokenFactory<H>,
+{
+    validate_minimal_render_for_complete_work_handoff(store, &render)?;
+    if !render.proves_minimal_host_component_with_text_child() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::MinimalRenderRecordShapeMismatch {
+                root: render.root(),
+                host_root_work_in_progress: render.host_root_work_in_progress(),
+            },
+        );
+    }
+    if render.public_compatibility_claimed() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::PublicCompatibilityClaimed {
+                root: render.root(),
+                element: render.root_element(),
+            },
+        );
+    }
+    validate_live_minimal_render_tree_matches_record(store, &render)?;
+
+    let component_type = adapter
+        .adapt_host_component_type(render.root_element(), render.root_child_element_type())
+        .map_err(HostRootMinimalRenderCompleteHandoffError::Adapter)?
+        .ok_or(
+            HostRootMinimalRenderCompleteHandoffError::UnadaptedHostComponentType {
+                root: render.root(),
+                element: render.root_element(),
+                element_type: render.root_child_element_type(),
+            },
+        )?;
+    let component_props = adapter
+        .adapt_host_component_props(render.root_element(), render.root_child_props())
+        .map_err(HostRootMinimalRenderCompleteHandoffError::Adapter)?
+        .ok_or(
+            HostRootMinimalRenderCompleteHandoffError::UnadaptedHostComponentProps {
+                root: render.root(),
+                element: render.root_element(),
+                props: render.root_child_props(),
+            },
+        )?;
+
+    let complete_work = complete_minimal_host_root_component_text(
+        store,
+        host,
+        host_nodes,
+        token_factory,
+        MinimalHostRootCompleteWorkRequest::new(
+            render.root(),
+            render.host_root_work_in_progress(),
+            &component_type,
+            &component_props,
+            render.text_child_text(),
+        ),
+    )?;
+
+    Ok(HostRootMinimalRenderCompleteHandoffRecord {
+        render,
+        complete_work,
+    })
+}
+
+fn validate_minimal_render_for_complete_work_handoff<H: HostTypes, E>(
+    store: &FiberRootStore<H>,
+    render: &HostRootMinimalElementRenderPhaseRecord,
+) -> Result<(), HostRootMinimalRenderCompleteHandoffError<E>> {
+    let root_id = render.root();
+    let scheduling = store.root(root_id)?.scheduling();
+
+    if scheduling.work_in_progress() != Some(render.host_root_work_in_progress()) {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::RenderPhaseWorkMismatch {
+                root: root_id,
+                expected: scheduling.work_in_progress(),
+                actual: render.host_root_work_in_progress(),
+            },
+        );
+    }
+
+    if scheduling.work_in_progress_root_render_lanes() != render.render_lanes() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::RenderPhaseLanesMismatch {
+                root: root_id,
+                expected: scheduling.work_in_progress_root_render_lanes(),
+                actual: render.render_lanes(),
+            },
+        );
+    }
+
+    if scheduling.render_exit_status() != RootRenderExitStatus::Completed {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::RenderPhaseNotCompleted {
+                root: root_id,
+                status: scheduling.render_exit_status(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+fn validate_live_minimal_render_tree_matches_record<H: HostTypes, E>(
+    store: &FiberRootStore<H>,
+    render: &HostRootMinimalElementRenderPhaseRecord,
+) -> Result<(), HostRootMinimalRenderCompleteHandoffError<E>> {
+    let root = render.root();
+    let arena = store.fiber_arena();
+    let root_children = arena
+        .child_ids(render.host_root_work_in_progress())
+        .map_err(MinimalHostCompleteWorkError::from)?;
+    if root_children.as_slice() != [render.root_child()] {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveRootChildMismatch {
+                root,
+                host_root_work_in_progress: render.host_root_work_in_progress(),
+                expected: render.root_child(),
+                actual: root_children.first().copied(),
+                actual_child_count: root_children.len(),
+            },
+        );
+    }
+
+    let component = arena
+        .get(render.root_child())
+        .map_err(MinimalHostCompleteWorkError::from)?;
+    if component.tag() != FiberTag::HostComponent {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveFiberTagMismatch {
+                root,
+                fiber: render.root_child(),
+                expected: FiberTag::HostComponent,
+                actual: component.tag(),
+            },
+        );
+    }
+
+    let component_children = arena
+        .child_ids(render.root_child())
+        .map_err(MinimalHostCompleteWorkError::from)?;
+    if component_children.as_slice() != [render.text_child()] {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveTextChildMismatch {
+                root,
+                component: render.root_child(),
+                expected: render.text_child(),
+                actual: component_children.first().copied(),
+                actual_child_count: component_children.len(),
+            },
+        );
+    }
+
+    let text = arena
+        .get(render.text_child())
+        .map_err(MinimalHostCompleteWorkError::from)?;
+    if text.tag() != FiberTag::HostText {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveFiberTagMismatch {
+                root,
+                fiber: render.text_child(),
+                expected: FiberTag::HostText,
+                actual: text.tag(),
+            },
+        );
+    }
+
+    let text_children = arena
+        .child_ids(render.text_child())
+        .map_err(MinimalHostCompleteWorkError::from)?;
+    if !text_children.is_empty() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveTextChildrenMismatch {
+                root,
+                text: render.text_child(),
+                actual_child_count: text_children.len(),
+            },
+        );
+    }
+
+    Ok(())
+}
 
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
