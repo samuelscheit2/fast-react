@@ -13,7 +13,7 @@ import {
   findSchedulerRootObservation,
   readCheckedSchedulerRootOracle
 } from "./scheduler-root-oracle.mjs";
-import { SCHEDULER_ROOT_SCENARIOS } from "./scheduler-root-scenarios.mjs";
+import { SCHEDULER_ROOT_SCENARIO_IDS } from "./scheduler-root-scenarios.mjs";
 import {
   SCHEDULER_ROOT_FAST_REACT_TARGET,
   SCHEDULER_ROOT_ORACLE_ARTIFACT_PATH,
@@ -35,11 +35,14 @@ export const SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS =
 
 export const SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS = Object.freeze([
   "scheduler-root-export-shape",
+  "scheduler-root-task-object-shape",
   "scheduler-root-priority-ordering",
   "scheduler-root-equal-priority-fifo",
   "scheduler-root-delayed-callbacks",
   "scheduler-root-cancellation",
   "scheduler-root-continuations",
+  "scheduler-root-did-timeout",
+  "scheduler-root-priority-context",
   "scheduler-root-yield-paint-frame-rate",
   "scheduler-root-node-host-transport"
 ]);
@@ -149,14 +152,32 @@ export function evaluateSchedulerRootCurrentnessGate({
     );
   }
 
-  const scenarioManifest = compareStringSets(
-    SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS,
-    SCHEDULER_ROOT_SCENARIOS.map((scenario) => scenario.id)
+  const sourceScenarioManifest = compareStringSets(
+    SCHEDULER_ROOT_SCENARIO_IDS,
+    SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS
   );
-  if (scenarioManifest.missing.length > 0) {
+  const checkedOracleScenarioManifest = compareStringSets(
+    Array.isArray(oracle?.scenarios)
+      ? oracle.scenarios.map((scenario) => scenario.id)
+      : [],
+    SCHEDULER_ROOT_CURRENTNESS_SCENARIO_IDS
+  );
+  const missingCurrentnessScenarioIds = uniqueStrings([
+    ...sourceScenarioManifest.missing,
+    ...checkedOracleScenarioManifest.missing
+  ]);
+  const unexpectedCurrentnessScenarioIds = uniqueStrings([
+    ...sourceScenarioManifest.unexpected,
+    ...checkedOracleScenarioManifest.unexpected
+  ]);
+  if (
+    missingCurrentnessScenarioIds.length > 0 ||
+    unexpectedCurrentnessScenarioIds.length > 0
+  ) {
     violations.push(
       violation("scheduler-root-currentness-scenario-manifest-mismatch", {
-        missingScenarioIds: scenarioManifest.missing
+        missingScenarioIds: missingCurrentnessScenarioIds,
+        unexpectedScenarioIds: unexpectedCurrentnessScenarioIds
       })
     );
   }
@@ -403,6 +424,9 @@ export function evaluateSchedulerRootCurrentnessGate({
       delayedCallbacks: true,
       cancellation: true,
       continuations: true,
+      taskObjectShape: true,
+      didTimeout: true,
+      priorityContextApis: true,
       shouldYieldAndRequestPaint: true,
       nodeHostCallbackTransport: true,
       publicSchedulerTimingCompatibilityBlocked: true,
@@ -615,13 +639,13 @@ function findPublicCompatibilityClaimIds({
   }
 
   for (const [claim, value] of Object.entries(oracle?.conformanceClaims ?? {})) {
-    if (/compatible|compatibilityClaimed/u.test(claim) && value === true) {
+    if (isCompatibilityClaimName(claim) && value === true) {
       claimIds.push(`oracle.conformanceClaims.${claim}`);
     }
   }
 
   for (const [claim, value] of Object.entries(oracle?.evidenceClaims ?? {})) {
-    if (/compatible|compatibilityClaimed/u.test(claim) && value === true) {
+    if (isCompatibilityClaimName(claim) && value === true) {
       claimIds.push(`oracle.evidenceClaims.${claim}`);
     }
   }
@@ -652,6 +676,10 @@ function findPublicCompatibilityClaimIds({
   }
 
   return freezeArray(claimIds);
+}
+
+function isCompatibilityClaimName(claim) {
+  return /compatible|compatibilityClaimed/ui.test(claim);
 }
 
 function comparableObservation(observation) {
@@ -791,6 +819,10 @@ function compareStringSets(expected, actual) {
     missing: freezeArray(expected.filter((value) => !actual.includes(value))),
     unexpected: freezeArray(actual.filter((value) => !expected.includes(value)))
   };
+}
+
+function uniqueStrings(values) {
+  return freezeArray([...new Set(values)]);
 }
 
 function sameStringArray(left, right) {
