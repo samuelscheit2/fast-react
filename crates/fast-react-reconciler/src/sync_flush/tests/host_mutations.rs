@@ -769,6 +769,75 @@ fn sync_flush_minimal_host_placement_rejects_non_sync_lanes_before_source_adapte
 }
 
 #[test]
+fn sync_flush_minimal_host_placement_rejects_cross_root_record_before_source_adapter_or_host_canary()
+ {
+    let (mut store, first_root, mut host) = root_store();
+    let second_root = store
+        .create_client_root(FakeContainer::new(3), RootOptions::new())
+        .unwrap();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let element = RootElementHandle::from_raw(8_986);
+    let element_type = ElementTypeHandle::from_raw(8_987);
+    let props = PropsHandle::from_raw(8_988);
+    let rendered_record = render_sync_flush_minimal_record(&mut store, first_root, element);
+    let render_phase = rendered_record.render_phase();
+    let forged = root_sync_flush_record_for_canary(
+        rendered_record.order(),
+        second_root,
+        rendered_record.lanes(),
+        render_phase,
+    );
+    let source = SyncFlushMinimalRootElementSource::unsupported(
+        element,
+        "cross-root record must fail before source resolution",
+    );
+    let mut adapter =
+        SyncFlushMinimalHostAdapter::new(element, element_type, props, "section").rejecting_type();
+
+    let error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            forged,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::StaleFinishedWorkHandoff {
+            root,
+            order,
+            selected_lanes,
+            identity,
+        } if root == second_root
+            && order == rendered_record.order()
+            && selected_lanes == Lanes::SYNC
+            && identity.root() == second_root
+            && identity.render_phase_root() == first_root
+            && !identity.accepted_current_finished_work_record_shape()
+    ));
+    assert_eq!(source.calls(), 0);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert!(host_nodes.is_empty());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+    assert_eq!(
+        store.root(first_root).unwrap().current(),
+        render_phase.current()
+    );
+    assert_eq!(
+        store.root(first_root).unwrap().finished_work(),
+        Some(render_phase.finished_work())
+    );
+    assert_eq!(store.root(second_root).unwrap().finished_work(), None);
+}
+
+#[test]
 fn sync_flush_minimal_host_placement_rejects_existing_current_child_before_source_adapter_or_host_canary()
  {
     let (mut store, root_id, mut host) = root_store();
@@ -918,6 +987,7 @@ fn sync_flush_private_host_mutation_minimal_placement_matrix_executes_canaries()
     sync_flush_minimal_host_placement_rejects_public_compatibility_claim_before_host_publication_canary();
     sync_flush_minimal_host_placement_rejects_stale_status_before_source_adapter_or_host_canary();
     sync_flush_minimal_host_placement_rejects_non_sync_lanes_before_source_adapter_or_host_canary();
+    sync_flush_minimal_host_placement_rejects_cross_root_record_before_source_adapter_or_host_canary();
     sync_flush_minimal_host_placement_rejects_existing_current_child_before_source_adapter_or_host_canary();
     sync_flush_minimal_host_placement_flags_pending_sync_work_after_commit_canary();
 }

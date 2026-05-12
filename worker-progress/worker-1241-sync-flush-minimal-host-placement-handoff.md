@@ -5,6 +5,7 @@
 - The canary consumes an existing `RootSyncFlushRecord`, validates rendered-awaiting-commit status, lane/currentness identity, sync-only lanes, stale finished-work/replay blockers, and recomputed pending sync work before accepting the placement handoff.
 - Factored minimal root element materialization so an existing `HostRootRenderPhaseRecord` can feed the accepted minimal complete/placement path without re-rendering.
 - Kept public React DOM, public test-renderer, public flushSync, browser DOM, effects, refs, hydration, native/package compatibility, and public root rendering surfaces blocked.
+- Post-audit repair added a dedicated wrong-root forged-record negative canary proving root/render-phase-root mismatch fails before source resolution, adapter calls, host calls, or host-node publication.
 
 ## Changed Files
 - `crates/fast-react-reconciler/src/root_work_loop/render_phase.rs`
@@ -24,6 +25,7 @@
 - `cargo test -p fast-react-reconciler --all-features sync_flush_root_commit_continuation`
 - `cargo test -p fast-react-reconciler --all-features root_work_loop`
 - `cargo check -p fast-react-reconciler --all-features`
+- `cargo test -p fast-react-reconciler --all-features sync_flush_private_host_mutation_minimal_placement_matrix_executes_canaries`
 - `cargo fmt --all --check`
 - `git diff --check`
 
@@ -33,6 +35,8 @@
 - `sync_flush_root_commit_continuation`: 8 passed.
 - `root_work_loop`: 139 passed.
 - `cargo check -p fast-react-reconciler --all-features`: passed.
+- Post-audit `sync_flush_private_host_mutation_minimal_placement_matrix_executes_canaries`: 1 passed, with the new cross-root canary included in the matrix wrapper.
+- Post-audit `sync_flush_private_host_mutation`: 8 passed.
 - `cargo fmt --all --check`: passed.
 - `git diff --check`: passed.
 - Independent review additionally ran `cargo test -p fast-react-reconciler sync_flush_private_host_mutation_minimal_placement_matrix_executes_canaries`, which passed.
@@ -42,6 +46,7 @@
 - Review confirmed the new sync-flush minimal host placement record/error/helpers are `#[cfg(test)] pub(crate)` and the test re-export is `#[cfg(test)] pub(crate)`.
 - Review confirmed public `lib.rs` sync-flush exports remain limited to existing public items and the canaries assert public root rendering, public flushSync, React DOM, test-renderer, effects, refs, hydration, and package compatibility remain blocked.
 - Review found requested blocker coverage for replay/stale/lane checks before resolver/adapter calls, resolver/adapter fail-closed behavior without host publication, stale status, non-sync lanes, existing current child, and pending sync work after a partial one-root commit.
+- Source audit requested one repair: add a dedicated wrong-root/cross-root forged-record negative canary. Added `sync_flush_minimal_host_placement_rejects_cross_root_record_before_source_adapter_or_host_canary` and routed it through the matrix wrapper.
 
 ## Risks Or Blockers
 - No blockers remain.
