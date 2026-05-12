@@ -79,7 +79,10 @@ const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-checked-prop',
   'unsupported-name-prop',
   'unsupported-type-prop',
-  'unsupported-component'
+  'unsupported-component',
+  'unsupported-memo-component',
+  'unsupported-forwardRef-component',
+  'unsupported-lazy-component'
 ]);
 
 test('react-dom/client private facade symbols are non-enumerable descriptor-stable gates', () => {
@@ -719,9 +722,14 @@ test('public createRoot render rejects unsupported inputs before adapter root.re
   assert.equal(result.adapterRenderCalls, 1);
   assert.deepEqual(result.adapterRenderLabels, ['accepted-minimal-div']);
   assert.equal(result.eventCallbackCalls, 0);
+  assert.equal(result.forwardRefRefCurrent, null);
   assert.equal(result.refCallbackCalls, 0);
   assert.equal(result.formCallbackCalls, 0);
   assert.equal(result.objectRefCurrent, null);
+  assert.equal(result.unsupportedComponentCalls, 0);
+  assert.equal(result.unsupportedMemoComponentCalls, 0);
+  assert.equal(result.unsupportedForwardRefRenderCalls, 0);
+  assert.equal(result.unsupportedLazyLoaderCalls, 0);
   assert.deepEqual(
     result.freshErrors.map((error) => error.exportName),
     publicRenderCapabilityRejectionLabels.map(() => 'createRoot().render')
@@ -986,12 +994,10 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
       label: 'unsupported-type-prop',
       element: React.createElement('div', {type: 'button'}, 'blocked type prop')
     }),
-    () => ({
-      label: 'unsupported-component',
-      element: React.createElement(function UnsupportedComponent() {
-        return React.createElement('div', null, 'blocked component');
-      })
-    })
+    createUnsupportedComponentRejectionCase,
+    createUnsupportedMemoComponentRejectionCase,
+    createUnsupportedForwardRefComponentRejectionCase,
+    createUnsupportedLazyComponentRejectionCase
   ];
 
   assert.deepEqual(
@@ -999,6 +1005,75 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
     publicRenderCapabilityRejectionLabels
   );
   return factories;
+}
+
+function createUnsupportedComponentRejectionCase() {
+  let componentCalls = 0;
+  return {
+    label: 'unsupported-component',
+    element: React.createElement(function UnsupportedComponent() {
+      componentCalls++;
+      return React.createElement('div', null, 'blocked component');
+    }),
+    assertNoCapabilityEffects() {
+      assert.equal(componentCalls, 0);
+    }
+  };
+}
+
+function createUnsupportedMemoComponentRejectionCase() {
+  let componentCalls = 0;
+  const MemoComponent = React.memo(function UnsupportedMemoComponent() {
+    componentCalls++;
+    return React.createElement('div', null, 'blocked memo component');
+  });
+
+  return {
+    label: 'unsupported-memo-component',
+    element: React.createElement(MemoComponent),
+    assertNoCapabilityEffects() {
+      assert.equal(componentCalls, 0);
+    }
+  };
+}
+
+function createUnsupportedForwardRefComponentRejectionCase() {
+  let renderCalls = 0;
+  const ref = {current: null};
+  const ForwardRefComponent = React.forwardRef(
+    function UnsupportedForwardRefComponent(props, forwardedRef) {
+      renderCalls++;
+      if (forwardedRef !== null && typeof forwardedRef === 'object') {
+        forwardedRef.current = 'touched';
+      }
+      return React.createElement('div', null, 'blocked forwardRef component');
+    }
+  );
+
+  return {
+    label: 'unsupported-forwardRef-component',
+    element: React.createElement(ForwardRefComponent, {ref}),
+    assertNoCapabilityEffects() {
+      assert.equal(renderCalls, 0);
+      assert.equal(ref.current, null);
+    }
+  };
+}
+
+function createUnsupportedLazyComponentRejectionCase() {
+  let loaderCalls = 0;
+  const LazyComponent = React.lazy(function loadUnsupportedLazyComponent() {
+    loaderCalls++;
+    throw new Error('unsupported lazy component loader must not be called');
+  });
+
+  return {
+    label: 'unsupported-lazy-component',
+    element: React.createElement(LazyComponent),
+    assertNoCapabilityEffects() {
+      assert.equal(loaderCalls, 0);
+    }
+  };
 }
 
 function createEventPropRejectionCaseFactory(label, propName) {
@@ -1760,9 +1835,14 @@ let adapterCreateRootCalls = 0;
 let adapterRenderCalls = 0;
 let currentRenderLabel = null;
 let eventCallbackCalls = 0;
+let unsupportedComponentCalls = 0;
+let unsupportedForwardRefRenderCalls = 0;
+let unsupportedLazyLoaderCalls = 0;
+let unsupportedMemoComponentCalls = 0;
 let formCallbackCalls = 0;
 let refCallbackCalls = 0;
 const objectRef = {current: null};
+const forwardRefRef = {current: null};
 
 const rootBridge = Object.freeze({
   privateRootPublicFacadeAdapterSymbol: Symbol.for(
@@ -1824,13 +1904,18 @@ process.stdout.write(JSON.stringify({
   adapterRenderCalls,
   adapterRenderLabels,
   eventCallbackCalls,
+  forwardRefRefCurrent: forwardRefRef.current,
   formCallbackCalls,
   freshErrors,
   freshRejectedLabels: freshErrors.map((error) => error.label),
   objectRefCurrent: objectRef.current,
   postAcceptedErrors,
   postAcceptedRejectedLabels: postAcceptedErrors.map((error) => error.label),
-  refCallbackCalls
+  refCallbackCalls,
+  unsupportedComponentCalls,
+  unsupportedForwardRefRenderCalls,
+  unsupportedLazyLoaderCalls,
+  unsupportedMemoComponentCalls
 }));
 
 function renderExpectingRejection(root, rejectionCase, errors) {
@@ -2005,8 +2090,49 @@ function createCases() {
     {
       label: 'unsupported-component',
       element: React.createElement(function UnsupportedComponent() {
+        unsupportedComponentCalls++;
         return React.createElement('div', null, 'blocked component');
       })
+    },
+    {
+      label: 'unsupported-memo-component',
+      element: React.createElement(
+        React.memo(function UnsupportedMemoComponent() {
+          unsupportedMemoComponentCalls++;
+          return React.createElement('div', null, 'blocked memo component');
+        })
+      )
+    },
+    {
+      label: 'unsupported-forwardRef-component',
+      element: React.createElement(
+        React.forwardRef(function UnsupportedForwardRefComponent(
+          props,
+          ref
+        ) {
+          unsupportedForwardRefRenderCalls++;
+          if (ref !== null && typeof ref === 'object') {
+            ref.current = 'touched';
+          }
+          return React.createElement(
+            'div',
+            null,
+            'blocked forwardRef component'
+          );
+        }),
+        {ref: forwardRefRef}
+      )
+    },
+    {
+      label: 'unsupported-lazy-component',
+      element: React.createElement(
+        React.lazy(function loadUnsupportedLazyComponent() {
+          unsupportedLazyLoaderCalls++;
+          throw new Error(
+            'unsupported lazy component loader must not be called'
+          );
+        })
+      )
     }
   ];
 }

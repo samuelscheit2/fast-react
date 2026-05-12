@@ -706,6 +706,12 @@ function publicFacadeCapabilityRejectionRow({
     callbackInvocationCount: 0,
     refCallbackInvocationCount: 0,
     refObjectMutationCount: 0,
+    componentRenderInvocationCount: 0,
+    memoWrappedComponentInvocationCount: 0,
+    forwardRefRenderInvocationCount: 0,
+    forwardRefRefMutationCount: 0,
+    lazyLoaderInvocationCount: 0,
+    lazyLoaderErrorThrown: false,
     listenerMarkerWritten: false,
     resourceDomInsertion: false,
     formActionInvocationCount: 0,
@@ -935,6 +941,28 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       id: "public-render-unsupported-component",
       label: "unsupported-component",
       publicApi: "root.render(<UnsupportedComponent />)",
+      category: "browser-dom-expansion",
+      blockedSurface: "component"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-memo-component",
+      label: "unsupported-memo-component",
+      publicApi: "root.render(<React.memo(UnsupportedComponent) />)",
+      category: "browser-dom-expansion",
+      blockedSurface: "component"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-forwardref-component",
+      label: "unsupported-forwardRef-component",
+      publicApi:
+        "root.render(<React.forwardRef(UnsupportedComponent) ref={ref} />)",
+      category: "browser-dom-expansion",
+      blockedSurface: "component"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-lazy-component",
+      label: "unsupported-lazy-component",
+      publicApi: "root.render(<React.lazy(loadUnsupportedComponent) />)",
       category: "browser-dom-expansion",
       blockedSurface: "component"
     }),

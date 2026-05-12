@@ -5265,6 +5265,26 @@ test("React DOM public root facade records hostile render capability rejections"
       .map((row) => row.label),
     ["unsupported-callback-ref-prop", "unsupported-object-ref-prop"]
   );
+  const componentWrapperRows = rejectionRows.filter(
+    (row) => row.blockedSurface === "component"
+  );
+  assert.deepEqual(
+    componentWrapperRows.map((row) => row.label),
+    [
+      "unsupported-component",
+      "unsupported-memo-component",
+      "unsupported-forwardRef-component",
+      "unsupported-lazy-component"
+    ]
+  );
+  for (const row of componentWrapperRows) {
+    assert.equal(row.componentRenderInvocationCount, 0);
+    assert.equal(row.memoWrappedComponentInvocationCount, 0);
+    assert.equal(row.forwardRefRenderInvocationCount, 0);
+    assert.equal(row.forwardRefRefMutationCount, 0);
+    assert.equal(row.lazyLoaderInvocationCount, 0);
+    assert.equal(row.lazyLoaderErrorThrown, false);
+  }
   assert.ok(
     rejectionRows.some(
       (row) =>

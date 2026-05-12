@@ -1200,13 +1200,80 @@ function createPublicRenderCapabilityRejectionCases() {
       label: 'unsupported-type-prop',
       element: React.createElement('div', {type: 'button'}, 'blocked type prop')
     }),
-    () => ({
-      label: 'unsupported-component',
-      element: React.createElement(function UnsupportedComponent() {
-        return React.createElement('div', null, 'blocked component');
-      })
-    })
+    createUnsupportedComponentRejectionCase,
+    createUnsupportedMemoComponentRejectionCase,
+    createUnsupportedForwardRefComponentRejectionCase,
+    createUnsupportedLazyComponentRejectionCase
   ];
+}
+
+function createUnsupportedComponentRejectionCase() {
+  let componentCalls = 0;
+  return {
+    label: 'unsupported-component',
+    element: React.createElement(function UnsupportedComponent() {
+      componentCalls++;
+      return React.createElement('div', null, 'blocked component');
+    }),
+    assertNoCapabilityEffects() {
+      assert.equal(componentCalls, 0);
+    }
+  };
+}
+
+function createUnsupportedMemoComponentRejectionCase() {
+  let componentCalls = 0;
+  const MemoComponent = React.memo(function UnsupportedMemoComponent() {
+    componentCalls++;
+    return React.createElement('div', null, 'blocked memo component');
+  });
+
+  return {
+    label: 'unsupported-memo-component',
+    element: React.createElement(MemoComponent),
+    assertNoCapabilityEffects() {
+      assert.equal(componentCalls, 0);
+    }
+  };
+}
+
+function createUnsupportedForwardRefComponentRejectionCase() {
+  let renderCalls = 0;
+  const ref = {current: null};
+  const ForwardRefComponent = React.forwardRef(
+    function UnsupportedForwardRefComponent(props, forwardedRef) {
+      renderCalls++;
+      if (forwardedRef !== null && typeof forwardedRef === 'object') {
+        forwardedRef.current = 'touched';
+      }
+      return React.createElement('div', null, 'blocked forwardRef component');
+    }
+  );
+
+  return {
+    label: 'unsupported-forwardRef-component',
+    element: React.createElement(ForwardRefComponent, {ref}),
+    assertNoCapabilityEffects() {
+      assert.equal(renderCalls, 0);
+      assert.equal(ref.current, null);
+    }
+  };
+}
+
+function createUnsupportedLazyComponentRejectionCase() {
+  let loaderCalls = 0;
+  const LazyComponent = React.lazy(function loadUnsupportedLazyComponent() {
+    loaderCalls++;
+    throw new Error('unsupported lazy component loader must not be called');
+  });
+
+  return {
+    label: 'unsupported-lazy-component',
+    element: React.createElement(LazyComponent),
+    assertNoCapabilityEffects() {
+      assert.equal(loaderCalls, 0);
+    }
+  };
 }
 
 function createEventRejectionCase(label, propName) {
