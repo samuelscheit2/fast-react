@@ -29,6 +29,38 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1224 and 1225 Currentness Freeze/Queue Hardening
+
+- Worker 1224 closed the Worker 1220 Rust audit residual by tightening the
+  private/test-only same-transition queue handoff proof to exactly two update
+  rows, adding a direct three-row same-lane negative canary, and validating live
+  queue staleness before same-lane multi-update commit handoff.
+- Worker 1224 preserves the accepted two-update same-lane transition shape,
+  Worker 1221 entangled transition canaries, and Worker 1215's single-transition
+  currentness path. Broader N-row same-lane batching still requires separate
+  proof and hostile canaries.
+- Worker 1225 hardened the five private hook currentness validators so
+  helper-owned, top-level-frozen reports with mutable nested records or arrays
+  fail closed after source proof. The covered validators are `useRef`
+  currentness, `useRef` execution evidence, `useRef` renderer lifecycle, context
+  renderer readiness, and unsupported placeholder hook currentness.
+- Worker 1225 preserves source-proof ordering for forged objects and proxies and
+  does not claim broad hook compatibility, public `useRef` identity, public
+  context/provider rendering, unsupported-hook execution, Scheduler/root,
+  renderer, `act`, or package compatibility.
+- Accepted validation includes clean independent source and verification audits
+  for both workers. Root reruns passed Worker 1224's focused Rust
+  `root_updates`, `root_scheduler_transition`,
+  `root_scheduler_queue_lane_continuation`, and
+  `finished_work_queue_lane_commit_currentness` tests, `cargo check -p
+  fast-react-reconciler --all-features`, `cargo fmt --all --check`, and
+  `git diff --check`; plus Worker 1225's hook syntax checks, hook oracle and
+  guard tests, `@fast-react/react` check, package-surface guard, import smoke,
+  and `git diff --check`.
+- The accepted state is main `535a23fc` after Worker 1224 merge `3104515f` and
+  Worker 1225 merge `535a23fc`, plus worker/report commits `7b46f705`,
+  `9e8d349b`, and `1c293daa`.
+
 ### Workers 1220-1222 Root Facade, Scheduler, and Children Hardening Batch
 
 - Worker 1220 added narrow public fake-DOM recreate-after-unmount evidence for
@@ -60,12 +92,11 @@ sequencing belong in `MASTER_PLAN.md`.
   focused Rust scheduler/update/commit tests, `cargo check -p
   fast-react-reconciler --all-features`, `cargo fmt --all --check`, and
   `git diff --check`.
-- A non-blocking Rust audit residual remains: the lower-level test-only
-  same-lane handoff predicate accepts `update_records.len() > 1`, while the
-  accepted scheduler path remains exact-two scoped through
-  `[RootTransitionLaneSchedulerRequestRecord; 2]` and exact update-sequence
-  comparison. Tighten the lower-level predicate or add a direct three-row
-  negative canary before reusing it for broader same-lane batching evidence.
+- A non-blocking Rust audit residual was identified in this batch: the
+  lower-level test-only same-lane handoff predicate accepted
+  `update_records.len() > 1` while the accepted scheduler path was exact-two
+  scoped. Worker 1224 later closed that residual with exact-two validation and
+  direct three-row negative coverage.
 - The accepted state is main `e833c646` after Worker 1220 public recreate merge
   `cbfc7a5e`, Worker 1221 entangled transition merge `7d775144`, Worker 1221
   public id hardening merge `3153075e`, Worker 1222 Children hardening merge

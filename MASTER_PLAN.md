@@ -46,7 +46,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Latest accepted implementation/evidence baseline is
-main `e833c646` (`Merge worker 1220 transition multi update currentness`).
+main `535a23fc` (`Merge worker 1225 hook nested freeze currentness`).
 Accepted implementation, cleanup, planning, and docs-only history through that
 baseline is recorded in `MASTER_PROGRESS.md`; this plan lists only
 current/future work.
@@ -58,9 +58,9 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Accepted implementation/evidence facts through baseline main `e833c646` are
+- Accepted implementation/evidence facts through baseline main `535a23fc` are
   recorded in `MASTER_PROGRESS.md`.
-- Active, unaccepted workers: none from the accepted 1220-1222 merge batch.
+- Active, unaccepted workers: none from the accepted 1220-1225 merge batches.
   The queue is ready for the next scheduling decision.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
@@ -79,7 +79,7 @@ Current orchestration queue:
   extension.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `e833c646`,
+implementation/evidence baseline main `535a23fc`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -104,7 +104,7 @@ verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
 Accepted compatibility evidence through accepted implementation/evidence
-baseline main `e833c646` includes only
+baseline main `535a23fc` includes only
 the minimal public fake-DOM div/text `createRoot().render(...)` path above,
 Worker 1194's same-root repeat fake-DOM div/text update and rendered-root
 unmount cleanup, Worker 1200's smoke alignment with those expectations, and
@@ -146,6 +146,9 @@ entangled transition queue-lane continuation remain narrow evidence only.
 Worker 1222 adds only private React Children nested source-freeze hardening.
 Worker 1220's same-transition multi-update currentness remains private
 Rust/test-only and exact-two scoped through the scheduler continuation path.
+Worker 1224 closes the lower-level same-lane queue handoff residual by requiring
+exactly two rows and rejecting live queue staleness before commit. Worker 1225
+adds only private hook nested-freeze validation after source proof.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -165,7 +168,7 @@ canonical evidence requirements.
 ## Near-Term Sequencing
 
 1. Treat accepted compatibility evidence through accepted
-   implementation/evidence baseline main `e833c646` as
+   implementation/evidence baseline main `535a23fc` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, Worker 1176's narrow public fake-DOM
    host-output proof, Worker 1194's narrow public same-root repeat div/text
@@ -193,8 +196,9 @@ canonical evidence requirements.
    that private Children currentness line by rejecting helper-owned reports
    whose nested source/evidence authority is mutable. Worker 1208 proves
    only private hook currentness source-proof/freeze validation for the five
-   assigned hook validators, with broad hook, `useRef`, context, and
-   unsupported-hook compatibility still blocked. Worker 1207 proves only public
+   assigned hook validators. Worker 1225 extends that line by requiring frozen
+   nested records/arrays after source proof, with broad hook, `useRef`, context,
+   and unsupported-hook compatibility still blocked. Worker 1207 proves only public
    `React.act` blocked-currentness source-proof/freeze validation; its
    `reactDomClientRootPlaceholder: false` evidence follows from the accepted
    minimal `react-dom/client.createRoot` fake-DOM lifecycle, not from public
@@ -405,7 +409,9 @@ canonical evidence requirements.
   blockers, plus Worker 953's unsupported-hook report override/source-proof
   hardening, plus Worker 1208's private source-proof/freeze hardening for the
   `useRef` currentness, `useRef` execution, `useRef` renderer lifecycle,
-  context readiness, and unsupported placeholder currentness validators. Public
+  context readiness, and unsupported placeholder currentness validators, plus
+  Worker 1225's nested freeze hardening for those same private validators.
+  Public
   dispatcher routing, broad hook compatibility, `useRef` execution/ref
   identity, public context/provider rendering, unsupported hook behavior and
   execution, external-store subscription, callback invocation, ID generation,
@@ -425,8 +431,9 @@ canonical evidence requirements.
   continuation, and Worker 934's transition queue/lane continuation, plus
   Worker 948's finished-work commit queue-lane consumer, Worker 980's
   expired queue-lane consumer, Worker 1221's entangled transition queue-lane
-  continuation, and Worker 1220's same-transition multi-update currentness,
-  only when preserving scheduler identity, Worker 898 queue/lane proof,
+  continuation, Worker 1220's same-transition multi-update currentness, and
+  Worker 1224's exact-two/live-queue validation repair, only when preserving
+  scheduler identity, Worker 898 queue/lane proof,
   store-backed row lane metadata, sequence IDs, applied/skipped counts,
   resulting element, callback identity, expired/selected lane currentness, and
   root/current/finished-work identity.
