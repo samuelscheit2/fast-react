@@ -6,6 +6,10 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  SCHEDULER_NATIVE_ENTRY_CURRENTNESS_GATE_STATUS,
+  SCHEDULER_NATIVE_ENTRY_CURRENTNESS_SOURCE_VARIANT_IDS,
+  SCHEDULER_NATIVE_ENTRY_CURRENTNESS_VIOLATION_STATUS,
+  evaluateSchedulerNativeEntryCurrentnessGate,
   findFastReactSchedulerNativeEntryComparison,
   findFastReactSchedulerNativeEntryObservation,
   findSchedulerNativeEntryDirectCjsProbe,
@@ -122,6 +126,8 @@ const POST_TASK_EXPORT_KEYS = [
   "unstable_shouldYield",
   "unstable_wrapCallback"
 ];
+
+let cachedNativeEntryCurrentnessGate = null;
 
 const PRIVATE_MOCK_DIAGNOSTICS_KEY =
   "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__";
@@ -265,6 +271,179 @@ test("scheduler native entry oracle keeps compatibility claims false", () => {
       "matched-but-compatibility-not-claimed": 14
     }
   );
+});
+
+test("scheduler native entry currentness gate binds current local native observations without public compatibility claims", () => {
+  const gate = baselineNativeEntryCurrentnessGate();
+
+  assert.equal(gate.status, SCHEDULER_NATIVE_ENTRY_CURRENTNESS_GATE_STATUS);
+  assert.equal(gate.oracleArtifactPath, SCHEDULER_NATIVE_ENTRY_ORACLE_ARTIFACT_PATH);
+  assert.equal(gate.blockedPublicClaimsRecognized, true);
+  assert.equal(gate.currentnessRowsMatched, true);
+  assert.equal(gate.sourceRowsCurrent, true);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.deepEqual(gate.violations, []);
+  assert.equal(
+    gate.sourceVariantCurrentnessContext.role,
+    "private-scheduler-variant-currentness-context-only"
+  );
+  assert.equal(
+    gate.sourceVariantCurrentnessContext.acceptedAsPrivateContextOnly,
+    true
+  );
+  assert.equal(gate.sourceVariantCurrentnessContext.behaviorEvidenceUsed, false);
+  assert.equal(
+    gate.sourceVariantCurrentnessContext.nativeRuntimeExecutionAllowed,
+    false
+  );
+  assert.equal(
+    gate.sourceVariantCurrentnessContext.publicSchedulerTimingCompatibilityAllowed,
+    false
+  );
+  assert.equal(
+    gate.localObservationRows.length,
+    SCHEDULER_NATIVE_ENTRY_PROBE_MODES.length *
+      SCHEDULER_NATIVE_ENTRY_SCENARIO_IDS.length
+  );
+  assert.deepEqual(
+    gate.sourceRows.map((row) => row.variantId),
+    SCHEDULER_NATIVE_ENTRY_CURRENTNESS_SOURCE_VARIANT_IDS
+  );
+  assert.deepEqual(
+    new Set(gate.currentnessRows.map((row) => row.status)),
+    new Set(["current-local-native-entry-observation-matches-checked-oracle"])
+  );
+
+  assertNativeSourceRow(gate.sourceRowsByVariant["scheduler-native-wrapper"], {
+    packagePath: "scheduler/index.native.js",
+    sourceFile: "packages/scheduler/index.native.js",
+    physicalEntrypoint: "index.native.js",
+    directDeepCjsImport: false,
+    nodeEnv: null,
+    wrapperTargets: [
+      "cjs/scheduler.native.production.js",
+      "cjs/scheduler.native.development.js"
+    ]
+  });
+  assertNativeSourceRow(
+    gate.sourceRowsByVariant["scheduler-cjs-native-development"],
+    {
+      packagePath: "scheduler/cjs/scheduler.native.development.js",
+      sourceFile: "packages/scheduler/cjs/scheduler.native.development.js",
+      physicalEntrypoint: "cjs/scheduler.native.development.js",
+      directDeepCjsImport: true,
+      nodeEnv: "development",
+      wrapperTargets: []
+    }
+  );
+  assertNativeSourceRow(
+    gate.sourceRowsByVariant["scheduler-cjs-native-production"],
+    {
+      packagePath: "scheduler/cjs/scheduler.native.production.js",
+      sourceFile: "packages/scheduler/cjs/scheduler.native.production.js",
+      physicalEntrypoint: "cjs/scheduler.native.production.js",
+      directDeepCjsImport: true,
+      nodeEnv: "production",
+      wrapperTargets: []
+    }
+  );
+});
+
+test("scheduler native entry currentness rejects stale source currentness rows", () => {
+  const baseline = baselineNativeEntryCurrentnessGate();
+  const staleSourceRows = baseline.sourceRows.map((row) =>
+    row.variantId === "scheduler-cjs-native-development"
+      ? {
+          ...row,
+          sourceSha256: "stale-native-development-source"
+        }
+      : row
+  );
+
+  const gate = evaluateSchedulerNativeEntryCurrentnessGate({
+    localObservationRows: baseline.localObservationRows,
+    sourceRows: staleSourceRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_NATIVE_ENTRY_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.sourceRowsCurrent, false);
+  assert.equal(gate.currentnessRowsMatched, true);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.deepEqual(violationIds(gate), [
+    "scheduler-native-entry-currentness-stale-source-row"
+  ]);
+});
+
+test("scheduler native entry currentness rejects public timing, native runtime, and package claim smuggling", () => {
+  const baseline = baselineNativeEntryCurrentnessGate();
+  const claimedOracle = cloneJson(oracle);
+  claimedOracle.publicSchedulerTimingCompatibilityClaimed = true;
+  claimedOracle.nativeRuntimeExecutionClaimed = true;
+  claimedOracle.packages.fastReactScheduler.publicPackageCompatibilityClaimed =
+    true;
+
+  const gate = evaluateSchedulerNativeEntryCurrentnessGate({
+    oracle: claimedOracle,
+    localObservationRows: baseline.localObservationRows,
+    sourceRows: baseline.sourceRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_NATIVE_ENTRY_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.currentnessRowsMatched, true);
+  assert.equal(gate.sourceRowsCurrent, true);
+  assert.equal(gate.blockedPublicClaimsRecognized, false);
+  assert.equal(gate.compatibilityClaimed, true);
+  assert.deepEqual(violationIds(gate), [
+    "scheduler-native-entry-currentness-public-compatibility-claim-detected"
+  ]);
+  assert.deepEqual([...gate.publicCompatibilityClaimIds].sort(), [
+    "oracle.nativeRuntimeExecutionClaimed",
+    "oracle.packages.fastReactScheduler.publicPackageCompatibilityClaimed",
+    "oracle.publicSchedulerTimingCompatibilityClaimed"
+  ]);
+});
+
+test("scheduler native entry currentness rejects stale schema, missing local rows, mode mismatch, and native/default aliasing", () => {
+  const baseline = baselineNativeEntryCurrentnessGate();
+  const staleOracle = cloneJson(oracle);
+  staleOracle.schemaVersion = 0;
+  const localRows = baseline.localObservationRows
+    .filter((row) => row.rowId !== "node-production:direct-native-cjs-loading")
+    .map((row) =>
+      row.rowId === "node-development:native-entry-loading"
+        ? {
+            ...row,
+            nodeEnv: "production"
+          }
+        : row
+    );
+  const sourceRows = baseline.sourceRows.map((row) =>
+    row.variantId === "scheduler-native-wrapper"
+      ? {
+          ...row,
+          entrypoint: "scheduler",
+          packagePath: "scheduler",
+          sourceFile: "packages/scheduler/index.js"
+        }
+      : row
+  );
+
+  const gate = evaluateSchedulerNativeEntryCurrentnessGate({
+    oracle: staleOracle,
+    localObservationRows: localRows,
+    sourceRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_NATIVE_ENTRY_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.currentnessRowsMatched, false);
+  assert.equal(gate.sourceRowsCurrent, false);
+  assert.deepEqual(violationIds(gate), [
+    "scheduler-native-entry-currentness-stale-oracle-schema",
+    "scheduler-native-entry-currentness-stale-source-row",
+    "scheduler-native-entry-currentness-native-default-deep-cjs-alias",
+    "scheduler-native-entry-currentness-missing-local-observation-row",
+    "scheduler-native-entry-currentness-mode-node-env-mismatch"
+  ]);
 });
 
 test("scheduler native entry oracle covers every scenario in every probe mode", () => {
@@ -851,6 +1030,41 @@ test("print-scheduler-native-entry-oracle CLI emits the checked-in oracle", () =
 
   assert.equal(output, readCheckedSchedulerNativeEntryOracleText());
 });
+
+function baselineNativeEntryCurrentnessGate() {
+  if (cachedNativeEntryCurrentnessGate === null) {
+    cachedNativeEntryCurrentnessGate =
+      evaluateSchedulerNativeEntryCurrentnessGate();
+  }
+  return cachedNativeEntryCurrentnessGate;
+}
+
+function assertNativeSourceRow(row, expected) {
+  assert.equal(row.classification, "native");
+  assert.equal(row.rootNativeMockPostTaskClassification, "native");
+  assert.equal(row.variantFamily, "native");
+  assert.equal(row.packagePath, expected.packagePath);
+  assert.equal(row.sourceFile, expected.sourceFile);
+  assert.equal(row.physicalEntrypoint, expected.physicalEntrypoint);
+  assert.equal(row.directDeepCjsImport, expected.directDeepCjsImport);
+  assert.equal(row.nodeEnv, expected.nodeEnv);
+  assert.equal(row.compatibilityClaimed, false);
+  assert.deepEqual(row.wrapperTargets, expected.wrapperTargets);
+  assert.deepEqual(row.sourceDiagnosticIds, []);
+  assert.equal(
+    row.evidenceScope.variantEvidenceAcceptedForRootBehavior,
+    false
+  );
+  assert.equal(row.evidenceScope.packageCompatibilityClaimed, false);
+}
+
+function violationIds(gate) {
+  return gate.violations.map((violation) => violation.id);
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
 function observation(modeId, scenarioId) {
   return findSchedulerNativeEntryObservation(oracle, modeId, scenarioId);
