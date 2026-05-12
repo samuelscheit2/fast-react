@@ -643,6 +643,65 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     assertNoNativeLedgerExecution(claimRow, diagnosticCase.field);
   }
 
+  const fullCanonicalKnownFieldCases = [
+    {
+      field: 'packageExportCompatibility',
+      code: codes.packageExportClaim,
+      rejectedValue: false
+    },
+    {
+      field: 'proseEvidence',
+      code: codes.proseEvidence,
+      rejectedValue: true
+    },
+    {
+      field: 'errorMessageEvidence',
+      code: codes.proseEvidence,
+      rejectedValue: true
+    }
+  ];
+
+  for (const diagnosticCase of fullCanonicalKnownFieldCases) {
+    const result = validateSourceCurrentnessRows(
+      ledger.rows.map((row) =>
+        row.id === canonicalCommit.id
+          ? sourceCurrentnessRow(row, {
+              [diagnosticCase.field]: true
+            })
+          : row
+      )
+    );
+    const claimRow = result.rows.find(
+      (row) => row.id === canonicalCommit.id
+    );
+
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.field);
+    assert.equal(
+      result.rejectedEvidenceCount,
+      ledger.rows.length,
+      diagnosticCase.field
+    );
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.field
+    );
+    assert.equal(
+      result.rows.some((row) => row.status === ledger.acceptedStatus),
+      false,
+      diagnosticCase.field
+    );
+    assert.equal(claimRow.status, ledger.rejectedStatus, diagnosticCase.field);
+    assert.equal(claimRow.code, diagnosticCase.code, diagnosticCase.field);
+    assert.equal(
+      claimRow[diagnosticCase.field],
+      diagnosticCase.rejectedValue,
+      diagnosticCase.field
+    );
+    assertNoNativeLedgerExecution(result, diagnosticCase.field);
+    assertNoNativeLedgerExecution(claimRow, diagnosticCase.field);
+  }
+
   for (const diagnosticCase of [
     {
       id: 'root-work-loop-metadata-missing-canonical-row',

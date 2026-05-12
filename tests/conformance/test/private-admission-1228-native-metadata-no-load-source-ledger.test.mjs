@@ -66,6 +66,7 @@ test("private admission 1228 manifest pins current native metadata source/no-loa
       "publicNativeCompatibility",
       "publicRootExecution",
       "publicRootCompatibilitySurface",
+      "packageExportCompatibility",
       "packageExportCompatibilityClaimed",
       "packageExportsChanged"
     ],
@@ -209,7 +210,9 @@ test("private admission 1228 rejects caller, prose, test-title, and syntax-only 
       [sourceCurrentnessLedgerSurface]: {
         callerShapedEvidence: true,
         evidenceKind: "test-title",
+        proseEvidence: true,
         testTitleEvidence: true,
+        errorMessageEvidence: true,
         sourceSyntaxOnly: true
       }
     }
@@ -225,6 +228,14 @@ test("private admission 1228 rejects caller, prose, test-title, and syntax-only 
   assert.equal(
     gate.rowsBySurface[sourceCurrentnessLedgerSurface].sourceEvidenceRecognized,
     false
+  );
+  assert.equal(
+    gate.rowsBySurface[sourceCurrentnessLedgerSurface].proseEvidence,
+    true
+  );
+  assert.equal(
+    gate.rowsBySurface[sourceCurrentnessLedgerSurface].errorMessageEvidence,
+    true
   );
 });
 
@@ -258,6 +269,7 @@ test("private admission 1228 rejects native, worker, cleanup, renderer, package,
           publicNativeCompatibility: true,
           publicRootExecution: true,
           publicRootCompatibilitySurface: true,
+          packageExportCompatibility: true,
           packageCompatibilityClaimed: true,
           packageExportCompatibilityClaimed: true,
           packageExportsChanged: true,
@@ -319,6 +331,7 @@ test("private admission 1228 rejects native, worker, cleanup, renderer, package,
   ]);
   assert.deepEqual(gate.packageExportClaimIds, [
     `${noLoadMetadataGuardSurface}.packageCompatibilityClaimed`,
+    `${noLoadMetadataGuardSurface}.packageExportCompatibility`,
     `${noLoadMetadataGuardSurface}.packageExportCompatibilityClaimed`,
     `${noLoadMetadataGuardSurface}.packageExportsChanged`,
     `${noLoadMetadataGuardSurface}.nativePrivateSubpathsExported`
