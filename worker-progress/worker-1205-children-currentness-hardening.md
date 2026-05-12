@@ -73,4 +73,4 @@ The validator now rejects non-frozen currentness reports with `children-traversa
 
 ## Commit
 
-- Pending.
+- Implementation commit: `bcb3fb84c3eb98e21f66ce2eff80f06fdadbc1d8`.
