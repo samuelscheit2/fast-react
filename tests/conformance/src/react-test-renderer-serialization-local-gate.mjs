@@ -731,6 +731,66 @@ const publicJsReactTestRendererEntrypointSourcePaths = freezeArray([
   "packages/react-test-renderer/cjs/react-test-renderer.production.js"
 ]);
 
+const publicJsReactTestRendererExactPlaceholderPackageRoot =
+  "packages/react-test-renderer";
+
+const reactTestRendererCompatibilityTarget = "react-test-renderer@19.2.6";
+
+const reactTestRendererPlaceholderVersion =
+  "0.0.0-fast-react-test-renderer-placeholder";
+
+const reactTestRendererExpectedRendererExportNames = freezeArray([
+  "_Scheduler",
+  "act",
+  "create",
+  "unstable_batchedUpdates",
+  "version"
+]);
+
+const reactTestRendererPlaceholderClaimFieldNames = freezeArray([
+  "ReactTestInstance",
+  "TestInstance",
+  "browserDomCompatibilityClaimed",
+  "compatibilityClaim",
+  "compatibilityClaimed",
+  "createRouteAvailable",
+  "fastReactBehaviorCompatible",
+  "nativeAddonLoaded",
+  "nativeBridgeAvailable",
+  "nativeBridgeLoadingAvailable",
+  "nativeExecution",
+  "nativeExecutionAvailable",
+  "packageCompatibilityClaimed",
+  "publicCompatibilityClaimed",
+  "publicJsFacadeRoutingPresent",
+  "publicSerializationAvailable",
+  "publicTestInstanceWrappersPresent",
+  "reactTestRendererCompatibilityClaimed",
+  "rendererCompatibilityClaimed",
+  "rootCompatibilityClaimed",
+  "serializationAvailable",
+  "serializationCompatibilityClaimed",
+  "testInstanceCompatibilityClaimed"
+]);
+
+const reactTestRendererRendererEntrypointPlaceholderSpecs = freezeArray([
+  freezeRecord({
+    relativePath: "index.js",
+    entrypoint: "react-test-renderer",
+    actExport: "environment-blocked"
+  }),
+  freezeRecord({
+    relativePath: "cjs/react-test-renderer.development.js",
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.development",
+    actExport: "blocked-function"
+  }),
+  freezeRecord({
+    relativePath: "cjs/react-test-renderer.production.js",
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.production",
+    actExport: "undefined"
+  })
+]);
+
 const privateSerializationLifecycleSourceTokens = freezeArray([
   "rootLifecycleExecutionEvidences",
   "validatePrivateSerializationLifecycleExecutionEvidence",
@@ -937,8 +997,14 @@ export function inspectReactTestRendererSerializationLocalTargets({
       existsWorkspacePath(workspaceRoot, `${packageRoot}/package.json`)
     );
   const publicJsReactTestRendererFacadePlaceholder =
-    publicJsReactTestRendererPackageRoots.some((packageRoot) =>
-      isPlaceholderReactTestRendererPackage(workspaceRoot, packageRoot)
+    isPlaceholderReactTestRendererPackage(
+      workspaceRoot,
+      publicJsReactTestRendererExactPlaceholderPackageRoot
+    ) &&
+    publicJsReactTestRendererPackageRoots.every(
+      (packageRoot) =>
+        packageRoot === publicJsReactTestRendererExactPlaceholderPackageRoot ||
+        !existsWorkspacePath(workspaceRoot, `${packageRoot}/package.json`)
     );
   const publicJsReactTestRendererFacadeStatus =
     publicJsReactTestRendererFacadePresent
@@ -2539,28 +2605,744 @@ function expectedReactTestRendererSerializationLocalFastReactStatus(localChecks)
 }
 
 function isPlaceholderReactTestRendererPackage(workspaceRoot, packageRoot) {
-  if (!existsWorkspacePath(workspaceRoot, `${packageRoot}/package.json`)) {
+  if (packageRoot !== publicJsReactTestRendererExactPlaceholderPackageRoot) {
     return false;
   }
 
-  const packageJson = readWorkspaceFile(workspaceRoot, `${packageRoot}/package.json`);
-  const packageSource = readWorkspaceTree(workspaceRoot, packageRoot);
+  if (!isExactReactTestRendererPlaceholderPackageJson(workspaceRoot)) {
+    return false;
+  }
 
   return (
-    hasSourcePattern(
-      packageJson,
-      /"name"\s*:\s*"@fast-react\/react-test-renderer"/u
+    reactTestRendererRendererEntrypointPlaceholderSpecs.every((spec) =>
+      isExactReactTestRendererPlaceholderRendererEntrypoint(
+        workspaceRoot,
+        spec
+      )
     ) &&
-    hasSourcePattern(packageSource, /\b__FAST_REACT_PLACEHOLDER__\b/u) &&
-    hasSourcePattern(
-      packageSource,
-      /\bFastReactTestRendererUnimplementedError\b/u
-    ) &&
-    hasSourcePattern(
-      packageSource,
-      /\b0\.0\.0-fast-react-test-renderer-placeholder\b/u
-    )
+    isExactReactTestRendererPlaceholderShallowEntrypoint(workspaceRoot)
   );
+}
+
+function isExactReactTestRendererPlaceholderPackageJson(workspaceRoot) {
+  const packageJson = readWorkspaceFile(
+    workspaceRoot,
+    `${publicJsReactTestRendererExactPlaceholderPackageRoot}/package.json`
+  );
+  if (packageJson === "") {
+    return false;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(packageJson);
+  } catch {
+    return false;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return false;
+  }
+
+  return (
+    parsed.name === "@fast-react/react-test-renderer" &&
+    parsed.version === "0.0.0" &&
+    parsed.private === true &&
+    parsed.main === "index.js" &&
+    parsed.dependencies?.scheduler === "^0.27.0" &&
+    parsed.peerDependencies?.["@fast-react/react"] === "0.0.0" &&
+    parsed.engines?.node === ">=26.0.0" &&
+    !Object.hasOwn(parsed, "exports") &&
+    !Object.hasOwn(parsed, "module") &&
+    !Object.hasOwn(parsed, "browser") &&
+    !Object.hasOwn(parsed, "react-native") &&
+    !Object.hasOwn(parsed, "types") &&
+    !jsonRecordContainsClaimField(parsed)
+  );
+}
+
+function jsonRecordContainsClaimField(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => jsonRecordContainsClaimField(item));
+  }
+
+  return Object.entries(value).some(
+    ([key, nestedValue]) =>
+      reactTestRendererPlaceholderClaimFieldNames.includes(key) ||
+      jsonRecordContainsClaimField(nestedValue)
+  );
+}
+
+function isExactReactTestRendererPlaceholderRendererEntrypoint(
+  workspaceRoot,
+  spec
+) {
+  const relativePath =
+    `${publicJsReactTestRendererExactPlaceholderPackageRoot}/` +
+    spec.relativePath;
+  const source = readWorkspaceFile(workspaceRoot, relativePath);
+  if (source === "") {
+    return false;
+  }
+  const sourceHeader = source.slice(0, 20000);
+  const placeholderSurfaceIndex = findJsSourceOutsideCommentsAndStrings(
+    source,
+    "function definePlaceholderMetadata"
+  );
+  if (placeholderSurfaceIndex < 0) {
+    return false;
+  }
+  const sourceFooter = source.slice(placeholderSurfaceIndex);
+
+  return (
+    readJsConstStringLiteral(sourceHeader, "compatibilityTarget") ===
+      reactTestRendererCompatibilityTarget &&
+    readJsConstStringLiteral(sourceHeader, "entrypoint") === spec.entrypoint &&
+    readJsConstStringLiteral(sourceHeader, "placeholderVersion") ===
+      reactTestRendererPlaceholderVersion &&
+    jsPlaceholderMetadataFunctionPass(sourceFooter) &&
+    jsExactSourceStatementPass(
+      sourceFooter,
+      "definePlaceholderMetadata(module.exports);"
+    ) &&
+    jsExactSourceStatementPass(
+      sourceFooter,
+      "exports.version = placeholderVersion;"
+    ) &&
+    jsExactCommonJsNamedExportsPass(
+      source,
+      reactTestRendererExpectedRendererExportNames
+    ) &&
+    jsRendererPublicBlockerSurfacePass(sourceFooter, spec) &&
+    !jsContainsCommonJsAliasSmuggling(source)
+  );
+}
+
+function isExactReactTestRendererPlaceholderShallowEntrypoint(workspaceRoot) {
+  const source = readWorkspaceFile(
+    workspaceRoot,
+    `${publicJsReactTestRendererExactPlaceholderPackageRoot}/shallow.js`
+  );
+  if (source === "") {
+    return false;
+  }
+
+  return (
+    readJsConstStringLiteral(source, "compatibilityTarget") ===
+      reactTestRendererCompatibilityTarget &&
+    readJsConstStringLiteral(source, "entrypoint") ===
+      "react-test-renderer/shallow" &&
+    readJsConstStringLiteral(source, "shallowUnsupportedCode") ===
+      "FAST_REACT_TEST_RENDERER_SHALLOW_UNSUPPORTED" &&
+    jsDefinePropertiesDescriptorsPass({
+      source,
+      targetSource: "shallow",
+      descriptors: reactTestRendererPlaceholderMetadataDescriptors()
+    }) &&
+    jsFunctionDeclarationSourceCallPrefixesPass({
+      source,
+      functionName: "shallow",
+      calls: freezeArray([
+        freezeRecord({
+          callee: "createShallowUnsupportedError",
+          arguments: freezeArray(["'was called'"])
+        })
+      ])
+    }) &&
+    jsExactSourceStatementPass(source, "module.exports = shallow;") &&
+    readCommonJsNamedExportAssignmentNames(source).length === 0 &&
+    !jsContainsCommonJsAliasSmuggling(source, {
+      allowModuleExportsAssignment: "shallow"
+    })
+  );
+}
+
+function reactTestRendererPlaceholderMetadataDescriptors() {
+  return freezeArray([
+    freezeRecord({
+      property: "__FAST_REACT_PLACEHOLDER__",
+      assertions: freezeArray([
+        jsBooleanPropertyAssertion("enumerable", false),
+        jsBooleanPropertyAssertion("value", true)
+      ])
+    }),
+    freezeRecord({
+      property: "__FAST_REACT_ENTRYPOINT__",
+      assertions: freezeArray([
+        jsBooleanPropertyAssertion("enumerable", false),
+        jsSourcePropertyAssertion("value", "entrypoint")
+      ])
+    }),
+    freezeRecord({
+      property: "compatibilityTarget",
+      assertions: freezeArray([
+        jsBooleanPropertyAssertion("enumerable", false),
+        jsSourcePropertyAssertion("value", "compatibilityTarget")
+      ])
+    })
+  ]);
+}
+
+function jsPlaceholderMetadataFunctionPass(source) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName: "definePlaceholderMetadata",
+    afterDeclaration: "function createPlaceholderRenderer"
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  return jsDefinePropertiesDescriptorsPass({
+    source: declaration.body,
+    targetSource: "exportsObject",
+    descriptors: reactTestRendererPlaceholderMetadataDescriptors()
+  });
+}
+
+function jsRendererPublicBlockerSurfacePass(source, spec) {
+  const rendererCallsPass = jsFunctionDeclarationSourceCallPrefixesPass({
+    source,
+    functionName: "createPlaceholderRenderer",
+    calls: freezeArray([
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().toJSON'", "0"])
+      }),
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().toTree'", "0"])
+      }),
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().update'", "1"])
+      }),
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().unmount'", "0"])
+      }),
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().getInstance'", "0"])
+      }),
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().unstable_flushSync'", "1"])
+      }),
+      freezeRecord({
+        callee: "createUnsupportedError",
+        arguments: freezeArray(["'create().root'", "'was accessed'"])
+      })
+    ])
+  });
+
+  if (rendererCallsPass !== true) {
+    return false;
+  }
+
+  const unstableBatchedUpdatesBlocked =
+    jsCallExpressionWithArgumentPrefixPass({
+      source,
+      callee: "createUnsupportedFunction",
+      expectedArgumentsPrefix: freezeArray(["'unstable_batchedUpdates'", "2"])
+    });
+
+  if (
+    !unstableBatchedUpdatesBlocked ||
+    !jsExactSourceStatementPass(source, "exports._Scheduler = schedulerPlaceholder;") ||
+    !jsExactSourceStatementPass(source, "exports.create = createExport;") ||
+    !jsExactSourceStatementPass(source, "const createExport = defineFunctionShape(create, 'create', 2);")
+  ) {
+    return false;
+  }
+
+  if (spec.actExport === "undefined") {
+    return jsExactSourceStatementPass(source, "exports.act = undefined;");
+  }
+
+  const actBlocked = jsCallExpressionWithArgumentPrefixPass({
+    source,
+    callee: "createUnsupportedFunction",
+    expectedArgumentsPrefix: freezeArray(["'act'", "1"])
+  });
+
+  if (spec.actExport === "blocked-function") {
+    return (
+      actBlocked &&
+      jsExactSourceStatementPass(source, "exports.act = createUnsupportedFunction(")
+    );
+  }
+
+  return (
+    actBlocked &&
+    jsExactSourceStatementPass(source, "exports.act = isProduction")
+  );
+}
+
+function jsDefinePropertiesDescriptorsPass({
+  source,
+  targetSource,
+  descriptors
+}) {
+  let searchIndex = 0;
+
+  while (searchIndex < source.length) {
+    const calleeIndex = findJsSourceOutsideCommentsAndStrings(
+      source,
+      "Object.defineProperties",
+      searchIndex
+    );
+    if (calleeIndex < 0) {
+      return false;
+    }
+
+    const callOpenIndex = skipJsTrivia(
+      source,
+      calleeIndex + "Object.defineProperties".length,
+      source.length
+    );
+    if (source[callOpenIndex] !== "(") {
+      searchIndex = calleeIndex + "Object.defineProperties".length;
+      continue;
+    }
+
+    const callCloseIndex = findMatchingJsEnclosure(
+      source,
+      callOpenIndex,
+      "(",
+      ")"
+    );
+    if (callCloseIndex < 0) {
+      return false;
+    }
+
+    const args = extractTopLevelJsCallArguments(
+      source,
+      callOpenIndex,
+      callCloseIndex
+    );
+    if (args.length >= 2 && args[0] === targetSource) {
+      const descriptorObject = extractJsObjectLiteralProperties(args[1]);
+      if (
+        descriptorObject.ok === true &&
+        jsPropertyDescriptorAssertionsPass({
+          properties: descriptorObject.properties,
+          descriptors
+        })
+      ) {
+        return true;
+      }
+    }
+
+    searchIndex = callCloseIndex + 1;
+  }
+
+  return false;
+}
+
+function jsPropertyDescriptorAssertionsPass({ properties, descriptors }) {
+  return descriptors.every((descriptor) => {
+    const descriptorSource = properties.get(descriptor.property);
+    const descriptorProperties = extractJsObjectLiteralProperties(
+      descriptorSource
+    );
+    return (
+      descriptorProperties.ok === true &&
+      descriptor.assertions.every((assertion) =>
+        jsObjectPropertyAssertionPass({
+          properties: descriptorProperties.properties,
+          assertion
+        })
+      )
+    );
+  });
+}
+
+function jsObjectPropertyAssertionPass({ properties, assertion }) {
+  const actualSource = properties.get(assertion.property);
+  if (assertion.kind === "js-boolean-property") {
+    return actualSource === String(assertion.value);
+  }
+  if (assertion.kind === "js-string-property") {
+    return parseJsStringLiteralSource(actualSource) === assertion.value;
+  }
+  if (assertion.kind === "js-source-property") {
+    return actualSource === assertion.value;
+  }
+  return false;
+}
+
+function extractJsObjectLiteralProperties(source) {
+  if (typeof source !== "string") {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-source-not-string"
+    });
+  }
+
+  const openIndex = skipJsTrivia(source, 0, source.length);
+  if (source[openIndex] !== "{") {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-literal-not-found"
+    });
+  }
+
+  const closeIndex = findMatchingJsBrace(source, openIndex);
+  if (closeIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-literal-not-closed"
+    });
+  }
+
+  const endIndex = skipJsTrivia(source, closeIndex + 1, source.length);
+  if (endIndex !== source.length) {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-literal-has-trailing-source"
+    });
+  }
+
+  return extractTopLevelJsObjectProperties(source, openIndex, closeIndex);
+}
+
+function readJsConstStringLiteral(source, constName) {
+  const declarationIndex = findJsSourceOutsideCommentsAndStrings(
+    source,
+    `const ${constName}`
+  );
+  if (declarationIndex < 0) {
+    return null;
+  }
+
+  const afterNameIndex = declarationIndex + `const ${constName}`.length;
+  if (/[A-Za-z0-9_$]/u.test(source[afterNameIndex] ?? "")) {
+    return null;
+  }
+
+  const assignmentIndex = skipJsTrivia(
+    source,
+    afterNameIndex,
+    source.length
+  );
+  if (source[assignmentIndex] !== "=") {
+    return null;
+  }
+
+  const valueStart = skipJsTrivia(
+    source,
+    assignmentIndex + 1,
+    source.length
+  );
+  const valueEnd = skipQuotedJsLiteral(source, valueStart);
+  if (valueEnd === valueStart) {
+    return null;
+  }
+
+  const statementEnd = skipJsTrivia(source, valueEnd, source.length);
+  if (source[statementEnd] !== ";") {
+    return null;
+  }
+
+  return parseJsStringLiteralSource(source.slice(valueStart, valueEnd));
+}
+
+function jsExactSourceStatementPass(source, statement) {
+  return findJsSourceOutsideCommentsAndStrings(source, statement) >= 0;
+}
+
+function jsExactCommonJsNamedExportsPass(source, expectedNames) {
+  const actualNames = readCommonJsNamedExportAssignmentNames(source);
+  return (
+    actualNames.length === expectedNames.length &&
+    expectedNames.every((expectedName) => actualNames.includes(expectedName))
+  );
+}
+
+function readCommonJsNamedExportAssignmentNames(source) {
+  const names = [];
+  let searchIndex = 0;
+
+  while (searchIndex < source.length) {
+    const exportsIndex = findJsSourceOutsideCommentsAndStrings(
+      source,
+      "exports",
+      searchIndex
+    );
+    if (exportsIndex < 0) {
+      break;
+    }
+
+    if (!jsIdentifierAt(source, exportsIndex, "exports")) {
+      searchIndex = exportsIndex + "exports".length;
+      continue;
+    }
+
+    const propertyDotIndex = exportsIndex + "exports".length;
+    if (source[propertyDotIndex] !== ".") {
+      searchIndex = propertyDotIndex;
+      continue;
+    }
+
+    const propertyName = readJsIdentifier(
+      source,
+      propertyDotIndex + 1,
+      source.length
+    );
+    if (propertyName.ok !== true) {
+      searchIndex = propertyDotIndex + 1;
+      continue;
+    }
+
+    const assignmentIndex = skipJsTrivia(
+      source,
+      propertyName.end,
+      source.length
+    );
+    if (source[assignmentIndex] === "=") {
+      names.push(propertyName.name);
+    }
+
+    searchIndex = propertyName.end;
+  }
+
+  return freezeArray(names);
+}
+
+function readJsIdentifier(source, startIndex, endIndex) {
+  if (!/[A-Za-z_$]/u.test(source[startIndex] ?? "")) {
+    return freezeRecord({
+      ok: false,
+      name: "",
+      end: startIndex
+    });
+  }
+
+  let index = startIndex + 1;
+  while (index < endIndex && /[A-Za-z0-9_$]/u.test(source[index])) {
+    index += 1;
+  }
+
+  return freezeRecord({
+    ok: true,
+    name: source.slice(startIndex, index),
+    end: index
+  });
+}
+
+function jsFunctionDeclarationSourceCallPrefixesPass({
+  source,
+  functionName,
+  calls
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  return calls.every((call) =>
+    jsCallExpressionWithArgumentPrefixPass({
+      source: declaration.body,
+      callee: call.callee,
+      expectedArgumentsPrefix: call.arguments
+    })
+  );
+}
+
+function jsCallExpressionWithArgumentPrefixPass({
+  source,
+  callee,
+  expectedArgumentsPrefix
+}) {
+  let searchIndex = 0;
+
+  while (searchIndex < source.length) {
+    const calleeIndex = findJsSourceOutsideCommentsAndStrings(
+      source,
+      callee,
+      searchIndex
+    );
+    if (calleeIndex < 0) {
+      return false;
+    }
+
+    const beforeCallee = source[calleeIndex - 1] ?? "";
+    const afterCalleeIndex = calleeIndex + callee.length;
+    const afterCallee = source[afterCalleeIndex] ?? "";
+    if (
+      /[A-Za-z0-9_$]/u.test(beforeCallee) ||
+      /[A-Za-z0-9_$]/u.test(afterCallee)
+    ) {
+      searchIndex = afterCalleeIndex;
+      continue;
+    }
+
+    const callOpenIndex = skipJsTrivia(
+      source,
+      afterCalleeIndex,
+      source.length
+    );
+    if (source[callOpenIndex] !== "(") {
+      searchIndex = afterCalleeIndex;
+      continue;
+    }
+
+    const callCloseIndex = findMatchingJsEnclosure(
+      source,
+      callOpenIndex,
+      "(",
+      ")"
+    );
+    if (callCloseIndex < 0) {
+      return false;
+    }
+
+    const actualArguments = extractTopLevelJsCallArguments(
+      source,
+      callOpenIndex,
+      callCloseIndex
+    );
+    if (
+      actualArguments.length >= expectedArgumentsPrefix.length &&
+      expectedArgumentsPrefix.every(
+        (expectedArgument, index) =>
+          actualArguments[index] === expectedArgument
+      )
+    ) {
+      return true;
+    }
+
+    searchIndex = callCloseIndex + 1;
+  }
+
+  return false;
+}
+
+function jsContainsCommonJsAliasSmuggling(
+  source,
+  { allowModuleExportsAssignment = null } = {}
+) {
+  const commonJsNamedExports = readCommonJsNamedExportAssignmentNames(source);
+  if (
+    commonJsNamedExports.some((name) =>
+      reactTestRendererPlaceholderClaimFieldNames.includes(name)
+    )
+  ) {
+    return true;
+  }
+
+  if (findJsSourceOutsideCommentsAndStrings(source, "exports[") >= 0) {
+    return true;
+  }
+  if (findJsSourceOutsideCommentsAndStrings(source, "module.exports.") >= 0) {
+    return true;
+  }
+
+  if (
+    findJsSourceOutsideCommentsAndStrings(
+      source,
+      "Object.defineProperty(exports,"
+    ) >= 0 ||
+    findJsSourceOutsideCommentsAndStrings(
+      source,
+      "Object.defineProperties(exports,"
+    ) >= 0 ||
+    findJsSourceOutsideCommentsAndStrings(
+      source,
+      "Object.defineProperty(module.exports,"
+    ) >= 0 ||
+    findJsSourceOutsideCommentsAndStrings(
+      source,
+      "Object.defineProperties(module.exports,"
+    ) >= 0 ||
+    findJsSourceOutsideCommentsAndStrings(
+      source,
+      "Object.assign(exports,"
+    ) >= 0 ||
+    findJsSourceOutsideCommentsAndStrings(
+      source,
+      "Object.assign(module.exports,"
+    ) >= 0
+  ) {
+    return true;
+  }
+
+  const moduleExportsAssignment = readModuleExportsAssignmentSource(source);
+  if (moduleExportsAssignment === null) {
+    return false;
+  }
+
+  return moduleExportsAssignment !== allowModuleExportsAssignment;
+}
+
+function readModuleExportsAssignmentSource(source) {
+  let searchIndex = 0;
+
+  while (searchIndex < source.length) {
+    const moduleExportsIndex = findJsSourceOutsideCommentsAndStrings(
+      source,
+      "module.exports",
+      searchIndex
+    );
+    if (moduleExportsIndex < 0) {
+      return null;
+    }
+
+    const assignmentIndex = skipJsTrivia(
+      source,
+      moduleExportsIndex + "module.exports".length,
+      source.length
+    );
+    if (source[assignmentIndex] !== "=") {
+      searchIndex = moduleExportsIndex + "module.exports".length;
+      continue;
+    }
+
+    const valueStart = skipJsTrivia(
+      source,
+      assignmentIndex + 1,
+      source.length
+    );
+    const valueEnd = findJsStatementEnd(source, valueStart);
+    if (valueEnd < 0) {
+      return "";
+    }
+
+    return source.slice(valueStart, valueEnd).trim();
+  }
+
+  return null;
+}
+
+function findJsStatementEnd(source, startIndex) {
+  let index = startIndex;
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (source[index] === ";") {
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return -1;
 }
 
 function existsWorkspacePath(workspaceRoot, relativePath) {
