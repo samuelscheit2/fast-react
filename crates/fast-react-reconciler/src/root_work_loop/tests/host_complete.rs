@@ -819,6 +819,212 @@ fn root_work_loop_minimal_render_complete_placement_commit_appends_div_text_with
     );
 }
 
+#[test]
+fn root_work_loop_minimal_render_complete_placement_diagnostic_exports_private_bridge_metadata() {
+    let (mut store, root_id, mut host) = root_store();
+    let element = RootElementHandle::from_raw(7_571);
+    let element_type = ElementTypeHandle::from_raw(7_572);
+    let props = PropsHandle::from_raw(7_573);
+    let text_props = PropsHandle::from_raw(7_574);
+    let source = minimal_root_component_source(element, element_type, props, "text", text_props);
+    let public_error = crate::render_mutation_placeholder(&mut host).unwrap_err();
+    assert_eq!(
+        public_error,
+        ReconcilerError::unimplemented(MUTATION_RENDER_PLACEHOLDER_FEATURE)
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let current = store.root(root_id).unwrap().current();
+    update_container(&mut store, root_id, element, None).unwrap();
+    let mut token_ids = Vec::new();
+    let mut type_calls = 0;
+    let mut props_calls = 0;
+
+    let diagnostic = describe_minimal_host_root_render_complete_placement_for_private_bridge(
+        &mut store,
+        &mut host,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+        |token_id| {
+            token_ids.push(token_id);
+            FakeHostFiberToken(token_id.raw())
+        },
+        |actual_element, actual_element_type| {
+            type_calls += 1;
+            Ok::<Option<&'static str>, MinimalHandoffAdapterError>(
+                (actual_element == element && actual_element_type == element_type).then_some("div"),
+            )
+        },
+        |actual_element, actual_props| {
+            props_calls += 1;
+            Ok::<Option<()>, MinimalHandoffAdapterError>(
+                (actual_element == element && actual_props == props).then_some(()),
+            )
+        },
+    )
+    .unwrap();
+
+    assert_eq!(source.calls(), 1);
+    assert_eq!(type_calls, 1);
+    assert_eq!(props_calls, 1);
+    assert_eq!(token_ids.len(), 2);
+    assert!(token_ids.contains(&diagnostic.component_token()));
+    assert!(token_ids.contains(&diagnostic.text_token()));
+    assert_eq!(diagnostic.root(), root_id);
+    assert_eq!(diagnostic.previous_current(), current);
+    assert_eq!(
+        diagnostic.host_root_work_in_progress(),
+        diagnostic.finished_work()
+    );
+    assert_eq!(diagnostic.root_element(), element);
+    assert_eq!(diagnostic.component_element_type(), element_type);
+    assert_eq!(diagnostic.component_props(), props);
+    assert_eq!(diagnostic.text_props(), text_props);
+    assert_eq!(diagnostic.text_content(), "text");
+    assert_eq!(diagnostic.render_lanes(), Lanes::DEFAULT);
+    assert_ne!(diagnostic.render_lanes_bits(), 0);
+    assert_eq!(diagnostic.root_child_count(), 1);
+    assert_eq!(diagnostic.component_child_count(), 1);
+    assert_eq!(diagnostic.detached_instance_count(), 1);
+    assert_eq!(diagnostic.detached_text_count(), 1);
+    assert_eq!(diagnostic.host_node_count_after_complete_work(), 2);
+    assert_eq!(diagnostic.host_node_count_after_placement(), 0);
+    assert_ne!(diagnostic.component_state_node_raw(), 0);
+    assert_ne!(diagnostic.text_state_node_raw(), 0);
+    assert_eq!(
+        diagnostic.placement_mutation_kind(),
+        "append-placement-to-container"
+    );
+    assert!(diagnostic.prepared_for_commit());
+    assert!(diagnostic.appended_child_to_container());
+    assert!(diagnostic.reset_after_commit());
+    assert!(diagnostic.private_root_placement_only());
+    assert_eq!(
+        diagnostic.host_mutation_gate_status(),
+        "blocked-until-production-complete-commit-promotion"
+    );
+    assert!(diagnostic.host_mutation_gate_blockers_intact());
+    assert!(diagnostic.host_mutation_execution_blocked());
+    assert!(!diagnostic.production_host_mutation_apply_promoted());
+    assert!(diagnostic.render_complete_handoff_proven());
+    assert!(diagnostic.private_render_complete_placement_proven());
+    assert!(!diagnostic.public_dom_compatibility_claimed());
+    assert!(!diagnostic.public_root_rendering_claimed());
+    assert!(diagnostic.public_root_rendering_blocked());
+    assert!(diagnostic.public_compatibility_blocked());
+    assert!(!diagnostic.public_renderer_package_behavior_exposed());
+    assert!(!diagnostic.react_dom_compatibility_claimed());
+    assert!(!diagnostic.test_renderer_compatibility_claimed());
+
+    let committed_root = store.root(root_id).unwrap();
+    assert_eq!(committed_root.current(), diagnostic.finished_work());
+    assert_eq!(
+        store
+            .fiber_arena()
+            .get(diagnostic.component())
+            .unwrap()
+            .state_node()
+            .raw(),
+        diagnostic.component_state_node_raw()
+    );
+    assert_eq!(
+        store
+            .fiber_arena()
+            .get(diagnostic.text())
+            .unwrap()
+            .state_node()
+            .raw(),
+        diagnostic.text_state_node_raw()
+    );
+    assert_eq!(
+        host.operations(),
+        vec![
+            "root_host_context",
+            "child_host_context",
+            "should_set_text_content",
+            "create_text_instance",
+            "create_instance",
+            "append_initial_child",
+            "finalize_initial_children",
+            "prepare_for_commit",
+            "append_child_to_container",
+            "reset_after_commit",
+        ]
+    );
+
+    let public_error_after_private_commit =
+        crate::render_mutation_placeholder(&mut host).unwrap_err();
+    assert_eq!(
+        public_error_after_private_commit,
+        ReconcilerError::unimplemented(MUTATION_RENDER_PLACEHOLDER_FEATURE)
+    );
+}
+
+#[test]
+fn root_work_loop_minimal_render_complete_placement_diagnostic_fails_closed_on_adapter_error() {
+    let (mut store, root_id, mut host) = root_store();
+    let element = RootElementHandle::from_raw(7_581);
+    let element_type = ElementTypeHandle::from_raw(7_582);
+    let props = PropsHandle::from_raw(7_583);
+    let text_props = PropsHandle::from_raw(7_584);
+    let source = minimal_root_component_source(element, element_type, props, "text", text_props);
+    let current = store.root(root_id).unwrap().current();
+    update_container(&mut store, root_id, element, None).unwrap();
+    let mut token_calls = 0;
+    let mut type_calls = 0;
+    let mut props_calls = 0;
+
+    let error = describe_minimal_host_root_render_complete_placement_for_private_bridge(
+        &mut store,
+        &mut host,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+        |token_id| {
+            token_calls += 1;
+            FakeHostFiberToken(token_id.raw())
+        },
+        |_actual_element, _actual_element_type| {
+            type_calls += 1;
+            Err::<Option<&'static str>, MinimalHandoffAdapterError>(
+                MinimalHandoffAdapterError::RejectType,
+            )
+        },
+        |_actual_element, _actual_props| {
+            props_calls += 1;
+            Ok::<Option<()>, MinimalHandoffAdapterError>(Some(()))
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(source.calls(), 1);
+    assert_eq!(type_calls, 1);
+    assert_eq!(props_calls, 0);
+    assert_eq!(token_calls, 0);
+    assert!(matches!(
+        error,
+        MinimalHostRootRenderCompletePlacementDiagnosticError::CompletePlacement { .. }
+    ));
+    assert_eq!(error.message(), "test adapter rejected host type");
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert!(
+        store
+            .root(root_id)
+            .unwrap()
+            .scheduling()
+            .work_in_progress()
+            .is_some()
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let public_error_after_rejection = crate::render_mutation_placeholder(&mut host).unwrap_err();
+    assert_eq!(
+        public_error_after_rejection,
+        ReconcilerError::unimplemented(MUTATION_RENDER_PLACEHOLDER_FEATURE)
+    );
+}
+
 #[derive(Debug, Clone, Copy)]
 enum MinimalRenderPayloadDrift {
     ComponentElementType(ElementTypeHandle),
