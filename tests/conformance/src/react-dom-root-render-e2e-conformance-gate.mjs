@@ -456,6 +456,18 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       privateBridgeEvidence: "separate"
     }),
     Object.freeze({
+      id: "public-create-root-render-div-text",
+      publicApi:
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text"))',
+      scenarioId: "initial-host-render",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      controlledDomShim: true,
+      expectedTextContent: "text",
+      privateBridgeEvidence: "separate"
+    }),
+    Object.freeze({
       id: "public-create-root-render-update",
       publicApi:
         "react-dom/client.createRoot(container).render(updatedElement)",
@@ -2897,6 +2909,7 @@ export function inspectReactDomRootPublicFacadeBoundary({
     const reactDomClient = require(
       join(workspaceRoot, "packages/react-dom/client.js")
     );
+    const React = require(join(workspaceRoot, "packages/react/index.js"));
     const rootMarkers = require(
       join(workspaceRoot, "packages/react-dom/src/client/root-markers.js")
     );
@@ -2945,6 +2958,7 @@ export function inspectReactDomRootPublicFacadeBoundary({
     const publicRootLifecycle = inspectReactDomRootPublicFacadeLifecycle({
       domContainer,
       listenerRegistry,
+      React,
       reactDomClient,
       rootMarkers
     });
@@ -5225,13 +5239,19 @@ function validatePublicRootLifecycleBlocked({
       expectedLabel: "react-dom/client.createRoot(...).render(initial)"
     },
     {
-      key: "renderUpdate",
+      key: "renderDivText",
       expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1],
+      expectedLabel:
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text"))'
+    },
+    {
+      key: "renderUpdate",
+      expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2],
       expectedLabel: "react-dom/client.createRoot(...).render(update)"
     },
     {
       key: "unmount",
-      expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2],
+      expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[3],
       expectedLabel: "react-dom/client.createRoot(...).unmount()"
     }
   ];
@@ -5268,6 +5288,26 @@ function validatePublicRootLifecycleBlocked({
     }
 
     if (
+      expected.controlledDomShim === true &&
+      (operation.controlledDomShim !== true ||
+        operation.renderElementType !== "div" ||
+        operation.renderTextContent !== expected.expectedTextContent ||
+        !isPublicRenderControlledDomShimUntouched(
+          operation.controlledDomSnapshot
+        ))
+    ) {
+      failures.push({
+        gateStatus: "public-root-render-controlled-dom-shim-not-blocked",
+        id: expected.id,
+        controlledDomShim: operation.controlledDomShim ?? null,
+        controlledDomSnapshot: operation.controlledDomSnapshot ?? null,
+        renderElementType: operation.renderElementType ?? null,
+        renderTextContent: operation.renderTextContent ?? null
+      });
+      continue;
+    }
+
+    if (
       operation.label === expectedLabel &&
       operation.status === "throws" &&
       operation.thrown.code === "FAST_REACT_UNIMPLEMENTED" &&
@@ -5288,6 +5328,8 @@ function validatePublicRootLifecycleBlocked({
           operation.sideEffects
         ),
         mutationCount: getRootFacadeMutationCount(operation.sideEffects),
+        controlledDomShim: operation.controlledDomShim ?? false,
+        controlledDomSnapshot: operation.controlledDomSnapshot ?? null,
         privateBridgeEvidence: "separate",
         publicApi: expected.publicApi,
         scenarioId: expected.scenarioId
@@ -5301,6 +5343,18 @@ function validatePublicRootLifecycleBlocked({
       operation
     });
   }
+}
+
+function isPublicRenderControlledDomShimUntouched(snapshot) {
+  return (
+    snapshot &&
+    snapshot.containerChildCount === 0 &&
+    findFirstDifferencePath(snapshot.containerChildNodeNames, []) === null &&
+    findFirstDifferencePath(snapshot.containerMutationLog, []) === null &&
+    snapshot.containerTextContent === "" &&
+    snapshot.ownerDocumentChildCount === 0 &&
+    findFirstDifferencePath(snapshot.ownerDocumentMutationLog, []) === null
+  );
 }
 
 function validatePrivateRootBridgeBoundary({
@@ -5876,6 +5930,7 @@ function rejectClientRootCompatibilityClaimsWhileBlocked({
 function inspectReactDomRootPublicFacadeLifecycle({
   domContainer,
   listenerRegistry,
+  React,
   reactDomClient,
   rootMarkers
 }) {
@@ -5894,6 +5949,15 @@ function inspectReactDomRootPublicFacadeLifecycle({
           type: "span"
         });
       }
+    }),
+    renderDivText: attemptControlledPublicRootRenderDivTextOperation({
+      domContainer,
+      label:
+        'ReactDOMClient.createRoot(container).render(React.createElement("div", null, "text"))',
+      listenerRegistry,
+      React,
+      reactDomClient,
+      rootMarkers
     }),
     renderUpdate: attemptChainedPublicRootOperation({
       domContainer,
@@ -5970,6 +6034,66 @@ function attemptChainedPublicRootOperation({
     compatibilityClaimed: false,
     createRootAttempt,
     lifecycleOperationAttempted,
+    rootObjectCreated,
+    sideEffects: inspectRootFacadeSideEffects(
+      container,
+      ownerDocument,
+      rootMarkers,
+      listenerRegistry
+    )
+  };
+}
+
+function attemptControlledPublicRootRenderDivTextOperation({
+  domContainer,
+  label,
+  listenerRegistry,
+  React,
+  reactDomClient,
+  rootMarkers
+}) {
+  const { container, ownerDocument } = createPublicRenderControlledDomShim({
+    domContainer,
+    label
+  });
+  let createRootAttempt = null;
+  let lifecycleOperationAttempted = false;
+  let rootObjectCreated = false;
+
+  const result = attemptGateOperation(label, () => {
+    let root;
+    try {
+      root = reactDomClient.createRoot(container);
+      createRootAttempt = {
+        status: "ok",
+        value: describeLocalValue(root)
+      };
+      rootObjectCreated = root !== null && typeof root === "object";
+    } catch (error) {
+      createRootAttempt = {
+        status: "throws",
+        thrown: serializeGateError(error)
+      };
+      throw error;
+    }
+
+    lifecycleOperationAttempted = true;
+    return root.render(React.createElement("div", null, "text"));
+  });
+
+  return {
+    ...result,
+    blockedAt: createRootAttempt?.status === "throws" ? "createRoot" : null,
+    compatibilityClaimed: false,
+    controlledDomShim: true,
+    controlledDomSnapshot: summarizePublicRenderControlledDomShim({
+      container,
+      ownerDocument
+    }),
+    createRootAttempt,
+    lifecycleOperationAttempted,
+    renderElementType: "div",
+    renderTextContent: "text",
     rootObjectCreated,
     sideEffects: inspectRootFacadeSideEffects(
       container,
@@ -11432,6 +11556,32 @@ function createGateElement(nodeName, ownerDocument, domContainer) {
     nodeType: domContainer.ELEMENT_NODE,
     ownerDocument
   });
+}
+
+function createPublicRenderControlledDomShim({ domContainer, label }) {
+  const ownerDocument = new PrivateHostOutputDocument({
+    documentNodeType: domContainer.DOCUMENT_NODE,
+    elementNodeType: domContainer.ELEMENT_NODE,
+    label,
+    textNodeType: domContainer.TEXT_NODE
+  });
+  const container = ownerDocument.createElement("div");
+
+  return {
+    container,
+    ownerDocument
+  };
+}
+
+function summarizePublicRenderControlledDomShim({ container, ownerDocument }) {
+  return {
+    containerChildCount: container.childNodes.length,
+    containerChildNodeNames: summarizeChildNodeNames(container),
+    containerMutationLog: container.mutationLog.slice(),
+    containerTextContent: container.textContent,
+    ownerDocumentChildCount: ownerDocument.childNodes.length,
+    ownerDocumentMutationLog: ownerDocument.mutationLog.slice()
+  };
 }
 
 function createGateEventTarget(fields) {
