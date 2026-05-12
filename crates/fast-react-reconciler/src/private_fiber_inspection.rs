@@ -12,6 +12,8 @@ use fast_react_core::{
 };
 use fast_react_host_config::HostTypes;
 
+#[cfg(test)]
+use crate::sync_flush::SyncFlushMinimalHostPlacementCommitRecordForCanary;
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     HostRootStateStoreError, RootElementHandle,
@@ -1447,6 +1449,1210 @@ fn expect_reconciler_direct_current_row<H: HostTypes>(
         Ok(())
     } else {
         Err(ReconcilerDirectMultiChildCommittedFiberInspectionError::SourceMismatch { field })
+    }
+}
+
+#[cfg(test)]
+const SYNC_FLUSH_MINIMAL_HOST_PLACEMENT_FIBER_INSPECTION_COMPATIBILITY_BLOCKERS: &[&str] = &[
+    "public root rendering",
+    "public flushSync compatibility",
+    "React DOM compatibility",
+    "react-test-renderer public compatibility",
+    "native execution",
+    "broad renderer compatibility",
+    "act compatibility",
+    "Scheduler compatibility",
+    "refs/effects/hydration execution",
+    "package compatibility",
+];
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SyncFlushMinimalHostPlacementCommittedFiberSource {
+    root: FiberRootId,
+    root_token: StateNodeHandle,
+    previous_current: FiberId,
+    committed_current: FiberId,
+    rendered_finished_work: FiberId,
+    root_element: RootElementHandle,
+    render_lanes: Lanes,
+    commit_finished_lanes: Lanes,
+    commit_remaining_lanes: Lanes,
+    commit_pending_lanes: Lanes,
+    finished_work_after_commit: Option<FiberId>,
+    finished_lanes_after_commit: Lanes,
+    host_root_source_row: TestRendererCommittedFiberNodeInspection,
+    component_source_row: TestRendererCommittedFiberNodeInspection,
+    text_source_row: TestRendererCommittedFiberNodeInspection,
+    component: FiberId,
+    component_element_type: ElementTypeHandle,
+    component_props: PropsHandle,
+    component_state_node: StateNodeHandle,
+    component_lanes: Lanes,
+    component_child_lanes: Lanes,
+    text: FiberId,
+    text_props: PropsHandle,
+    text_state_node: StateNodeHandle,
+    text_lanes: Lanes,
+    source_current_topology_recorded: bool,
+    host_node_store_state_nodes_present: bool,
+    public_root_rendering_claimed: bool,
+    public_flush_sync_compatibility_claimed: bool,
+    react_dom_compatibility_claimed: bool,
+    test_renderer_public_compatibility_claimed: bool,
+    native_execution_compatibility_claimed: bool,
+    broad_renderer_compatibility_claimed: bool,
+    act_compatibility_claimed: bool,
+    scheduler_compatibility_claimed: bool,
+    refs_effects_hydration_execution_claimed: bool,
+    package_compatibility_claimed: bool,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "test-only sync-flush minimal placement fiber source exposes focused hostile tamper hooks"
+)]
+impl SyncFlushMinimalHostPlacementCommittedFiberSource {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn root_token(self) -> StateNodeHandle {
+        self.root_token
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_current(self) -> FiberId {
+        self.committed_current
+    }
+
+    #[must_use]
+    pub(crate) const fn rendered_finished_work(self) -> FiberId {
+        self.rendered_finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn root_element(self) -> RootElementHandle {
+        self.root_element
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_finished_lanes(self) -> Lanes {
+        self.commit_finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_remaining_lanes(self) -> Lanes {
+        self.commit_remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_pending_lanes(self) -> Lanes {
+        self.commit_pending_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_after_commit(self) -> Option<FiberId> {
+        self.finished_work_after_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes_after_commit(self) -> Lanes {
+        self.finished_lanes_after_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn host_root_source_row(self) -> TestRendererCommittedFiberNodeInspection {
+        self.host_root_source_row
+    }
+
+    #[must_use]
+    pub(crate) const fn component_source_row(self) -> TestRendererCommittedFiberNodeInspection {
+        self.component_source_row
+    }
+
+    #[must_use]
+    pub(crate) const fn text_source_row(self) -> TestRendererCommittedFiberNodeInspection {
+        self.text_source_row
+    }
+
+    #[must_use]
+    pub(crate) const fn component(self) -> FiberId {
+        self.component
+    }
+
+    #[must_use]
+    pub(crate) const fn component_element_type(self) -> ElementTypeHandle {
+        self.component_element_type
+    }
+
+    #[must_use]
+    pub(crate) const fn component_props(self) -> PropsHandle {
+        self.component_props
+    }
+
+    #[must_use]
+    pub(crate) const fn component_state_node(self) -> StateNodeHandle {
+        self.component_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn component_lanes(self) -> Lanes {
+        self.component_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn component_child_lanes(self) -> Lanes {
+        self.component_child_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn text(self) -> FiberId {
+        self.text
+    }
+
+    #[must_use]
+    pub(crate) const fn text_props(self) -> PropsHandle {
+        self.text_props
+    }
+
+    #[must_use]
+    pub(crate) const fn text_state_node(self) -> StateNodeHandle {
+        self.text_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn text_lanes(self) -> Lanes {
+        self.text_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn source_current_topology_recorded(self) -> bool {
+        self.source_current_topology_recorded
+    }
+
+    #[must_use]
+    pub(crate) const fn host_node_store_state_nodes_present(self) -> bool {
+        self.host_node_store_state_nodes_present
+    }
+
+    #[must_use]
+    pub(crate) fn public_compatibility_blockers(&self) -> &[&'static str] {
+        SYNC_FLUSH_MINIMAL_HOST_PLACEMENT_FIBER_INSPECTION_COMPATIBILITY_BLOCKERS
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(self) -> bool {
+        !self.public_root_rendering_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_blocked(self) -> bool {
+        !self.public_flush_sync_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_blocked(self) -> bool {
+        !self.react_dom_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_public_compatibility_blocked(self) -> bool {
+        !self.test_renderer_public_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn native_execution_blocked(self) -> bool {
+        !self.native_execution_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn broad_renderer_compatibility_blocked(self) -> bool {
+        !self.broad_renderer_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn act_compatibility_blocked(self) -> bool {
+        !self.act_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_compatibility_blocked(self) -> bool {
+        !self.scheduler_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn refs_effects_hydration_execution_blocked(self) -> bool {
+        !self.refs_effects_hydration_execution_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn package_compatibility_blocked(self) -> bool {
+        !self.package_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_claimed(self) -> bool {
+        self.public_root_rendering_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(self) -> bool {
+        self.public_flush_sync_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(self) -> bool {
+        self.react_dom_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_public_compatibility_claimed(self) -> bool {
+        self.test_renderer_public_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn native_execution_compatibility_claimed(self) -> bool {
+        self.native_execution_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn broad_renderer_compatibility_claimed(self) -> bool {
+        self.broad_renderer_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn act_compatibility_claimed(self) -> bool {
+        self.act_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_compatibility_claimed(self) -> bool {
+        self.scheduler_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn refs_effects_hydration_execution_claimed(self) -> bool {
+        self.refs_effects_hydration_execution_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn package_compatibility_claimed(self) -> bool {
+        self.package_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn compatibility_claimed(self) -> bool {
+        self.public_root_rendering_claimed
+            || self.public_flush_sync_compatibility_claimed
+            || self.react_dom_compatibility_claimed
+            || self.test_renderer_public_compatibility_claimed
+            || self.native_execution_compatibility_claimed
+            || self.broad_renderer_compatibility_claimed
+            || self.act_compatibility_claimed
+            || self.scheduler_compatibility_claimed
+            || self.refs_effects_hydration_execution_claimed
+            || self.package_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) fn with_root_and_token_for_canary(mut self, root: FiberRootId) -> Self {
+        self.root = root;
+        self.root_token = root.state_node_handle();
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_component_for_canary(mut self, component: FiberId) -> Self {
+        self.component = component;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_text_for_canary(mut self, text: FiberId) -> Self {
+        self.text = text;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_component_state_node_for_canary(
+        mut self,
+        state_node: StateNodeHandle,
+    ) -> Self {
+        self.component_state_node = state_node;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_text_state_node_for_canary(
+        mut self,
+        state_node: StateNodeHandle,
+    ) -> Self {
+        self.text_state_node = state_node;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_finished_work_after_commit_for_canary(
+        mut self,
+        finished_work: Option<FiberId>,
+    ) -> Self {
+        self.finished_work_after_commit = finished_work;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_finished_lanes_after_commit_for_canary(
+        mut self,
+        finished_lanes: Lanes,
+    ) -> Self {
+        self.finished_lanes_after_commit = finished_lanes;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_component_source_row_for_canary(
+        mut self,
+        row: TestRendererCommittedFiberNodeInspection,
+    ) -> Self {
+        self.component_source_row = row;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_react_dom_compatibility_claimed_for_canary(mut self) -> Self {
+        self.react_dom_compatibility_claimed = true;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_scheduler_compatibility_claimed_for_canary(mut self) -> Self {
+        self.scheduler_compatibility_claimed = true;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_refs_effects_hydration_claimed_for_canary(mut self) -> Self {
+        self.refs_effects_hydration_execution_claimed = true;
+        self
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SyncFlushMinimalHostPlacementCommittedFiberRows {
+    host_root: TestRendererCommittedFiberNodeInspection,
+    component: TestRendererCommittedFiberNodeInspection,
+    text: TestRendererCommittedFiberNodeInspection,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushMinimalHostPlacementCommittedFiberInspection {
+    source: SyncFlushMinimalHostPlacementCommittedFiberSource,
+    inspection: TestRendererCommittedFiberTreeInspection,
+    store_current: FiberId,
+    finished_work_after_commit: Option<FiberId>,
+    finished_lanes_after_commit: Lanes,
+    rows: SyncFlushMinimalHostPlacementCommittedFiberRows,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "test-only sync-flush minimal placement fiber proof is consumed by focused canaries"
+)]
+impl SyncFlushMinimalHostPlacementCommittedFiberInspection {
+    #[must_use]
+    pub(crate) const fn source(&self) -> SyncFlushMinimalHostPlacementCommittedFiberSource {
+        self.source
+    }
+
+    #[must_use]
+    pub(crate) const fn store_current(&self) -> FiberId {
+        self.store_current
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_after_commit(&self) -> Option<FiberId> {
+        self.finished_work_after_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes_after_commit(&self) -> Lanes {
+        self.finished_lanes_after_commit
+    }
+
+    #[must_use]
+    pub(crate) fn tree(&self) -> &TestRendererCommittedFiberTreeInspection {
+        &self.inspection
+    }
+
+    #[must_use]
+    pub(crate) fn shape_name(&self) -> &'static str {
+        self.inspection.shape_name()
+    }
+
+    #[must_use]
+    pub(crate) const fn host_root(&self) -> TestRendererCommittedFiberNodeInspection {
+        self.rows.host_root
+    }
+
+    #[must_use]
+    pub(crate) const fn host_component(&self) -> TestRendererCommittedFiberNodeInspection {
+        self.rows.component
+    }
+
+    #[must_use]
+    pub(crate) const fn host_text(&self) -> TestRendererCommittedFiberNodeInspection {
+        self.rows.text
+    }
+
+    #[must_use]
+    pub(crate) fn blockers(&self) -> &[&'static str] {
+        self.source.public_compatibility_blockers()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_public_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn native_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn broad_renderer_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn act_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn refs_effects_hydration_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn package_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_public_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn native_execution_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn broad_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn refs_effects_hydration_execution_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn package_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    pub(crate) fn validate_against_store<H: HostTypes>(
+        &self,
+        store: &FiberRootStore<H>,
+    ) -> Result<(), SyncFlushMinimalHostPlacementCommittedFiberInspectionError> {
+        let root = store
+            .root(self.source.root)
+            .map_err(TestRendererCommittedFiberInspectionError::from)?;
+        if root.current() != self.store_current {
+            return Err(
+                SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CurrentRootMismatch {
+                    expected: self.store_current,
+                    actual: root.current(),
+                },
+            );
+        }
+        if root.finished_work() != self.finished_work_after_commit {
+            return Err(
+                SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                    field: "finished_work_after_commit",
+                },
+            );
+        }
+        if root.finished_lanes() != self.finished_lanes_after_commit {
+            return Err(
+                SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                    field: "finished_lanes_after_commit",
+                },
+            );
+        }
+
+        let inspection =
+            inspect_sync_flush_minimal_host_placement_committed_fiber_tree(store, self.source)?;
+        if inspection.inspection != self.inspection {
+            return Err(
+                SyncFlushMinimalHostPlacementCommittedFiberInspectionError::StaleOrClonedInspectionRows,
+            );
+        }
+
+        validate_sync_flush_minimal_host_placement_committed_fiber_inspection(
+            store,
+            self.source,
+            &self.inspection,
+        )?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SyncFlushMinimalHostPlacementCommittedFiberInspectionError {
+    FiberInspection(TestRendererCommittedFiberInspectionError),
+    ExpectedShape { actual: &'static str },
+    CurrentRootMismatch { expected: FiberId, actual: FiberId },
+    SourceMismatch { field: &'static str },
+    MissingCommittedSource { field: &'static str },
+    CompatibilityClaim { surface: &'static str },
+    StaleOrClonedInspectionRows,
+}
+
+#[cfg(test)]
+impl Display for SyncFlushMinimalHostPlacementCommittedFiberInspectionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberInspection(error) => Display::fmt(error, formatter),
+            Self::ExpectedShape { actual } => write!(
+                formatter,
+                "expected sync-flush minimal HostRoot->HostComponent->HostText fiber shape, found {actual}"
+            ),
+            Self::CurrentRootMismatch { expected, actual } => write!(
+                formatter,
+                "source-bound sync-flush minimal placement inspection expected current root fiber {}, found {}",
+                expected.slot().get(),
+                actual.slot().get()
+            ),
+            Self::SourceMismatch { field } => write!(
+                formatter,
+                "source-bound sync-flush minimal placement inspection source mismatch at {field}"
+            ),
+            Self::MissingCommittedSource { field } => write!(
+                formatter,
+                "source-bound sync-flush minimal placement inspection missing committed source evidence at {field}"
+            ),
+            Self::CompatibilityClaim { surface } => write!(
+                formatter,
+                "source-bound sync-flush minimal placement inspection cannot claim {surface} compatibility"
+            ),
+            Self::StaleOrClonedInspectionRows => write!(
+                formatter,
+                "source-bound sync-flush minimal placement inspection rows are stale or caller-built"
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for SyncFlushMinimalHostPlacementCommittedFiberInspectionError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberInspection(error) => Some(error),
+            Self::ExpectedShape { .. }
+            | Self::CurrentRootMismatch { .. }
+            | Self::SourceMismatch { .. }
+            | Self::MissingCommittedSource { .. }
+            | Self::CompatibilityClaim { .. }
+            | Self::StaleOrClonedInspectionRows => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<TestRendererCommittedFiberInspectionError>
+    for SyncFlushMinimalHostPlacementCommittedFiberInspectionError
+{
+    fn from(error: TestRendererCommittedFiberInspectionError) -> Self {
+        Self::FiberInspection(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FiberTopologyError> for SyncFlushMinimalHostPlacementCommittedFiberInspectionError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberInspection(TestRendererCommittedFiberInspectionError::from(error))
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootStateStoreError> for SyncFlushMinimalHostPlacementCommittedFiberInspectionError {
+    fn from(error: HostRootStateStoreError) -> Self {
+        Self::FiberInspection(TestRendererCommittedFiberInspectionError::from(error))
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn record_sync_flush_minimal_host_placement_committed_fiber_source<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    record: &SyncFlushMinimalHostPlacementCommitRecordForCanary,
+) -> Result<
+    SyncFlushMinimalHostPlacementCommittedFiberSource,
+    SyncFlushMinimalHostPlacementCommittedFiberInspectionError,
+> {
+    let root_id = record.root();
+    let root = store
+        .root(root_id)
+        .map_err(TestRendererCommittedFiberInspectionError::from)?;
+    let sync_flush_record = record.sync_flush_record();
+    let render = sync_flush_record.render_phase();
+    let placement = record.placement();
+    let commit = placement.commit();
+    let placement_commit = placement.placement_commit();
+    let complete_handoff = placement.complete_handoff();
+    let complete_work = placement.complete_work();
+
+    if !record.accepted_sync_flush_minimal_host_placement_handoff() {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "sync_flush_minimal_host_placement_handoff",
+            },
+        );
+    }
+    if root.current() != commit.current() {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CurrentRootMismatch {
+                expected: commit.current(),
+                actual: root.current(),
+            },
+        );
+    }
+    if commit.current() != render.finished_work()
+        || commit.current() != record.finished_work()
+        || placement_commit.finished_work() != commit.current()
+        || complete_work.host_root_work_in_progress() != commit.current()
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "placement.finished_work",
+            },
+        );
+    }
+    if root.finished_work().is_some() || root.finished_lanes().is_non_empty() {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "root.finished_work_after_commit",
+            },
+        );
+    }
+    if placement_commit.root() != commit.root()
+        || placement_commit.previous_current() != commit.previous_current()
+        || placement_commit.component() != complete_work.component()
+        || placement_commit.text() != complete_work.text()
+        || placement_commit.component_state_node() != complete_work.component_state_node()
+        || placement_commit.text_state_node() != complete_work.text_state_node()
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "placement_commit",
+            },
+        );
+    }
+
+    let host_root_node = store.fiber_arena().get(commit.current())?;
+    expect_fiber_tag(host_root_node, FiberTag::HostRoot)?;
+    validate_host_root_state_node(root_id, host_root_node)?;
+    let resulting_element = store
+        .host_root_states()
+        .get(host_root_node.memoized_state())?
+        .element();
+    if resulting_element != complete_handoff.root_element() {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "root_element",
+            },
+        );
+    }
+    let root_children = expect_child_count(store, commit.current(), 1)?;
+    if root_children != [placement_commit.component()] {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "root_child_identity",
+            },
+        );
+    }
+
+    let component_with_text = inspect_host_component_with_text_children(
+        store,
+        placement_commit.component(),
+        &[placement_commit.text()],
+    )?;
+    let host_root_row = inspect_node(host_root_node);
+    let component_row = component_with_text.component;
+    let text_row = component_with_text.texts[0];
+
+    if component_row.element_type() != complete_handoff.render().root_child_element_type()
+        || component_row.pending_props() != complete_handoff.render().root_child_props()
+        || component_row.memoized_props() != complete_handoff.render().root_child_props()
+        || text_row.pending_props() != complete_handoff.render().text_child_props()
+        || text_row.memoized_props() != complete_handoff.render().text_child_props()
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "render_props",
+            },
+        );
+    }
+
+    let source = SyncFlushMinimalHostPlacementCommittedFiberSource {
+        root: root_id,
+        root_token: root_id.state_node_handle(),
+        previous_current: commit.previous_current(),
+        committed_current: commit.current(),
+        rendered_finished_work: render.finished_work(),
+        root_element: complete_handoff.root_element(),
+        render_lanes: record.render_lanes(),
+        commit_finished_lanes: commit.finished_lanes(),
+        commit_remaining_lanes: commit.remaining_lanes(),
+        commit_pending_lanes: commit.pending_lanes(),
+        finished_work_after_commit: root.finished_work(),
+        finished_lanes_after_commit: root.finished_lanes(),
+        host_root_source_row: host_root_row,
+        component_source_row: component_row,
+        text_source_row: text_row,
+        component: placement_commit.component(),
+        component_element_type: complete_handoff.render().root_child_element_type(),
+        component_props: complete_handoff.render().root_child_props(),
+        component_state_node: placement_commit.component_state_node(),
+        component_lanes: component_row.lanes(),
+        component_child_lanes: component_row.child_lanes(),
+        text: placement_commit.text(),
+        text_props: complete_handoff.render().text_child_props(),
+        text_state_node: placement_commit.text_state_node(),
+        text_lanes: text_row.lanes(),
+        source_current_topology_recorded: true,
+        host_node_store_state_nodes_present: host_root_row.state_node_present()
+            && component_row.state_node_present()
+            && text_row.state_node_present(),
+        public_root_rendering_claimed: false,
+        public_flush_sync_compatibility_claimed: false,
+        react_dom_compatibility_claimed: false,
+        test_renderer_public_compatibility_claimed: false,
+        native_execution_compatibility_claimed: false,
+        broad_renderer_compatibility_claimed: false,
+        act_compatibility_claimed: false,
+        scheduler_compatibility_claimed: false,
+        refs_effects_hydration_execution_claimed: false,
+        package_compatibility_claimed: false,
+    };
+    validate_sync_flush_minimal_host_placement_committed_fiber_source(source)?;
+    Ok(source)
+}
+
+#[cfg(test)]
+pub(crate) fn inspect_sync_flush_minimal_host_placement_committed_fiber_tree<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    source: SyncFlushMinimalHostPlacementCommittedFiberSource,
+) -> Result<
+    SyncFlushMinimalHostPlacementCommittedFiberInspection,
+    SyncFlushMinimalHostPlacementCommittedFiberInspectionError,
+> {
+    validate_sync_flush_minimal_host_placement_committed_fiber_source(source)?;
+    let root = store
+        .root(source.root)
+        .map_err(TestRendererCommittedFiberInspectionError::from)?;
+    let current = root.current();
+    if current != source.committed_current {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CurrentRootMismatch {
+                expected: source.committed_current,
+                actual: current,
+            },
+        );
+    }
+    if root.finished_work() != source.finished_work_after_commit {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "source.finished_work_after_commit",
+            },
+        );
+    }
+    if root.finished_lanes() != source.finished_lanes_after_commit {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "source.finished_lanes_after_commit",
+            },
+        );
+    }
+
+    let inspection = inspect_test_renderer_committed_fiber_tree(store, source.root)?;
+    let rows = validate_sync_flush_minimal_host_placement_committed_fiber_inspection(
+        store,
+        source,
+        &inspection,
+    )?;
+
+    Ok(SyncFlushMinimalHostPlacementCommittedFiberInspection {
+        source,
+        inspection,
+        store_current: root.current(),
+        finished_work_after_commit: root.finished_work(),
+        finished_lanes_after_commit: root.finished_lanes(),
+        rows,
+    })
+}
+
+#[cfg(test)]
+fn validate_sync_flush_minimal_host_placement_committed_fiber_source(
+    source: SyncFlushMinimalHostPlacementCommittedFiberSource,
+) -> Result<(), SyncFlushMinimalHostPlacementCommittedFiberInspectionError> {
+    if !source.source_current_topology_recorded {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::MissingCommittedSource {
+                field: "source_current_topology_recorded",
+            },
+        );
+    }
+    if !source.host_node_store_state_nodes_present {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::MissingCommittedSource {
+                field: "host_node_store_state_nodes_present",
+            },
+        );
+    }
+    if source.compatibility_claimed() {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CompatibilityClaim {
+                surface: claimed_sync_flush_minimal_host_placement_source_surface(source),
+            },
+        );
+    }
+    if source.root_token != source.root.state_node_handle() {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "source.root_token",
+            },
+        );
+    }
+    if source.committed_current != source.rendered_finished_work {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "source.rendered_finished_work",
+            },
+        );
+    }
+    if source.render_lanes.is_empty()
+        || source.render_lanes != source.commit_finished_lanes
+        || source.commit_remaining_lanes.is_non_empty()
+        || source.commit_pending_lanes.is_non_empty()
+        || source.finished_work_after_commit.is_some()
+        || source.finished_lanes_after_commit.is_non_empty()
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "source.commit_lanes",
+            },
+        );
+    }
+
+    validate_sync_flush_minimal_host_placement_committed_fiber_source_rows(source)
+}
+
+#[cfg(test)]
+fn claimed_sync_flush_minimal_host_placement_source_surface(
+    source: SyncFlushMinimalHostPlacementCommittedFiberSource,
+) -> &'static str {
+    if source.public_root_rendering_claimed {
+        "public root rendering"
+    } else if source.public_flush_sync_compatibility_claimed {
+        "public flushSync"
+    } else if source.react_dom_compatibility_claimed {
+        "React DOM"
+    } else if source.test_renderer_public_compatibility_claimed {
+        "react-test-renderer public"
+    } else if source.native_execution_compatibility_claimed {
+        "native execution"
+    } else if source.broad_renderer_compatibility_claimed {
+        "broad renderer"
+    } else if source.act_compatibility_claimed {
+        "act"
+    } else if source.scheduler_compatibility_claimed {
+        "Scheduler"
+    } else if source.refs_effects_hydration_execution_claimed {
+        "refs/effects/hydration execution"
+    } else {
+        "package"
+    }
+}
+
+#[cfg(test)]
+fn validate_sync_flush_minimal_host_placement_committed_fiber_source_rows(
+    source: SyncFlushMinimalHostPlacementCommittedFiberSource,
+) -> Result<(), SyncFlushMinimalHostPlacementCommittedFiberInspectionError> {
+    let host_root = source.host_root_source_row;
+    if host_root.fiber() != source.committed_current
+        || host_root.tag() != FiberTag::HostRoot
+        || host_root.parent().is_some()
+        || host_root.child() != Some(source.component)
+        || host_root.sibling().is_some()
+        || host_root.alternate() != Some(source.previous_current)
+        || host_root.state_node() != source.root_token
+        || !host_root.state_node_present()
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "source.host_root_row",
+            },
+        );
+    }
+
+    let component = source.component_source_row;
+    if component.fiber() != source.component
+        || component.tag() != FiberTag::HostComponent
+        || component.parent() != Some(source.committed_current)
+        || component.child() != Some(source.text)
+        || component.sibling().is_some()
+        || component.index() != 0
+        || component.alternate().is_some()
+        || component.element_type() != source.component_element_type
+        || component.pending_props() != source.component_props
+        || component.memoized_props() != source.component_props
+        || component.state_node() != source.component_state_node
+        || component.lanes() != source.component_lanes
+        || component.child_lanes() != source.component_child_lanes
+        || !component.state_node_present()
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "source.component_row",
+            },
+        );
+    }
+
+    let text = source.text_source_row;
+    if text.fiber() != source.text
+        || text.tag() != FiberTag::HostText
+        || text.parent() != Some(source.component)
+        || text.child().is_some()
+        || text.sibling().is_some()
+        || text.index() != 0
+        || text.alternate().is_some()
+        || text.pending_props() != source.text_props
+        || text.memoized_props() != source.text_props
+        || text.state_node() != source.text_state_node
+        || text.lanes() != source.text_lanes
+        || !text.state_node_present()
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "source.text_row",
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+fn validate_sync_flush_minimal_host_placement_committed_fiber_inspection<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    source: SyncFlushMinimalHostPlacementCommittedFiberSource,
+    inspection: &TestRendererCommittedFiberTreeInspection,
+) -> Result<
+    SyncFlushMinimalHostPlacementCommittedFiberRows,
+    SyncFlushMinimalHostPlacementCommittedFiberInspectionError,
+> {
+    let root = store
+        .root(source.root)
+        .map_err(TestRendererCommittedFiberInspectionError::from)?;
+    if root.current() != source.committed_current {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CurrentRootMismatch {
+                expected: source.committed_current,
+                actual: root.current(),
+            },
+        );
+    }
+    if root.finished_work() != source.finished_work_after_commit {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "source.finished_work_after_commit",
+            },
+        );
+    }
+    if root.finished_lanes() != source.finished_lanes_after_commit {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "source.finished_lanes_after_commit",
+            },
+        );
+    }
+    if inspection.shape_name() != "HostRoot->HostComponent->HostText" {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::ExpectedShape {
+                actual: inspection.shape_name(),
+            },
+        );
+    }
+    if inspection.root() != source.root
+        || inspection.current() != source.committed_current
+        || inspection.resulting_element() != source.root_element
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "inspection.root_current_element",
+            },
+        );
+    }
+    if inspection.nodes().len() != 3
+        || inspection.root_children().len() != 1
+        || inspection.host_children().len() != 1
+        || inspection.host_components().len() != 1
+        || inspection.host_texts().len() != 1
+        || inspection.has_function_component_wrapper()
+        || inspection.nested_host_component().is_some()
+        || inspection.is_direct_multi_child_host_component_shape()
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "inspection.child_sets",
+            },
+        );
+    }
+    if inspection.public_serialization_compatibility_claimed()
+        || inspection.test_renderer_public_compatibility_claimed()
+        || inspection.react_dom_compatibility_claimed()
+        || inspection.native_execution_compatibility_claimed()
+        || inspection.broad_renderer_compatibility_claimed()
+        || inspection.act_compatibility_claimed()
+        || inspection.scheduler_compatibility_claimed()
+        || inspection.package_compatibility_claimed()
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CompatibilityClaim {
+                surface: "inspection compatibility",
+            },
+        );
+    }
+
+    let host_root = inspection.host_root();
+    let component = inspection.host_component();
+    let text = inspection.host_text();
+
+    expect_sync_flush_minimal_host_placement_current_row(store, host_root, "host_root.row")?;
+    expect_sync_flush_minimal_host_placement_current_row(store, component, "component.row")?;
+    expect_sync_flush_minimal_host_placement_current_row(store, text, "text.row")?;
+
+    if host_root != source.host_root_source_row
+        || component != source.component_source_row
+        || text != source.text_source_row
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::StaleOrClonedInspectionRows,
+        );
+    }
+
+    let previous_current = store.fiber_arena().get(source.previous_current)?;
+    if previous_current.alternate() != Some(source.committed_current) {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "host_root.alternate_current",
+            },
+        );
+    }
+    let component_children = store.fiber_arena().child_ids(source.component)?;
+    if component_children != [source.text] {
+        return Err(
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+                field: "component.child_order",
+            },
+        );
+    }
+
+    Ok(SyncFlushMinimalHostPlacementCommittedFiberRows {
+        host_root,
+        component,
+        text,
+    })
+}
+
+#[cfg(test)]
+fn expect_sync_flush_minimal_host_placement_current_row<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    row: TestRendererCommittedFiberNodeInspection,
+    field: &'static str,
+) -> Result<(), SyncFlushMinimalHostPlacementCommittedFiberInspectionError> {
+    let current = inspect_node(store.fiber_arena().get(row.fiber())?);
+    if current == row {
+        Ok(())
+    } else {
+        Err(SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch { field })
     }
 }
 
