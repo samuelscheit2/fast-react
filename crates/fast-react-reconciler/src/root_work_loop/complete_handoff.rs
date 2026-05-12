@@ -1,9 +1,9 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{ElementTypeHandle, FiberId, Lanes, PropsHandle};
 #[cfg(test)]
-use fast_react_core::{FiberTag, FiberTopologyError};
+use fast_react_core::FiberTopologyError;
+use fast_react_core::{ElementTypeHandle, FiberId, FiberTag, Lanes, PropsHandle};
 use fast_react_host_config::{HostCreation, HostTypes};
 
 use crate::{
@@ -170,6 +170,31 @@ pub(crate) enum HostRootMinimalRenderCompleteHandoffError<E> {
         root: FiberRootId,
         host_root_work_in_progress: FiberId,
     },
+    LiveRootChildMismatch {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        expected: FiberId,
+        actual: Option<FiberId>,
+        actual_child_count: usize,
+    },
+    LiveTextChildMismatch {
+        root: FiberRootId,
+        component: FiberId,
+        expected: FiberId,
+        actual: Option<FiberId>,
+        actual_child_count: usize,
+    },
+    LiveFiberTagMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        expected: FiberTag,
+        actual: FiberTag,
+    },
+    LiveTextChildrenMismatch {
+        root: FiberRootId,
+        text: FiberId,
+        actual_child_count: usize,
+    },
     PublicCompatibilityClaimed {
         root: FiberRootId,
         element: RootElementHandle,
@@ -240,6 +265,60 @@ impl<E: Display> Display for HostRootMinimalRenderCompleteHandoffError<E> {
                 root.raw(),
                 host_root_work_in_progress.slot().get()
             ),
+            Self::LiveRootChildMismatch {
+                root,
+                host_root_work_in_progress,
+                expected,
+                actual,
+                actual_child_count,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} live child tree no longer matches minimal render record: expected component {}, found {:?} across {} root children",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                expected.slot().get(),
+                actual.map(|fiber| fiber.slot().get()),
+                actual_child_count
+            ),
+            Self::LiveTextChildMismatch {
+                root,
+                component,
+                expected,
+                actual,
+                actual_child_count,
+            } => write!(
+                formatter,
+                "root {} HostComponent {} live text child no longer matches minimal render record: expected text {}, found {:?} across {} component children",
+                root.raw(),
+                component.slot().get(),
+                expected.slot().get(),
+                actual.map(|fiber| fiber.slot().get()),
+                actual_child_count
+            ),
+            Self::LiveFiberTagMismatch {
+                root,
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} live minimal render fiber {} must be {:?}, found {:?}",
+                root.raw(),
+                fiber.slot().get(),
+                expected,
+                actual
+            ),
+            Self::LiveTextChildrenMismatch {
+                root,
+                text,
+                actual_child_count,
+            } => write!(
+                formatter,
+                "root {} live HostText {} must not have children before minimal complete handoff, found {}",
+                root.raw(),
+                text.slot().get(),
+                actual_child_count
+            ),
             Self::PublicCompatibilityClaimed { root, element } => write!(
                 formatter,
                 "root {} minimal render element {} claimed public compatibility before private complete-work handoff",
@@ -297,6 +376,10 @@ where
             | Self::RenderPhaseLanesMismatch { .. }
             | Self::RenderPhaseNotCompleted { .. }
             | Self::MinimalRenderRecordShapeMismatch { .. }
+            | Self::LiveRootChildMismatch { .. }
+            | Self::LiveTextChildMismatch { .. }
+            | Self::LiveFiberTagMismatch { .. }
+            | Self::LiveTextChildrenMismatch { .. }
             | Self::PublicCompatibilityClaimed { .. }
             | Self::UnadaptedHostComponentType { .. }
             | Self::UnadaptedHostComponentProps { .. } => None,
@@ -337,6 +420,7 @@ where
             },
         );
     }
+    validate_live_minimal_render_tree_matches_record(store, &render)?;
 
     let component_type = adapter
         .adapt_host_component_type(render.root_element(), render.root_child_element_type())
@@ -411,6 +495,86 @@ fn validate_minimal_render_for_complete_work_handoff<H: HostTypes, E>(
             HostRootMinimalRenderCompleteHandoffError::RenderPhaseNotCompleted {
                 root: root_id,
                 status: scheduling.render_exit_status(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+fn validate_live_minimal_render_tree_matches_record<H: HostTypes, E>(
+    store: &FiberRootStore<H>,
+    render: &HostRootMinimalElementRenderPhaseRecord,
+) -> Result<(), HostRootMinimalRenderCompleteHandoffError<E>> {
+    let root = render.root();
+    let arena = store.fiber_arena();
+    let root_children = arena
+        .child_ids(render.host_root_work_in_progress())
+        .map_err(MinimalHostCompleteWorkError::from)?;
+    if root_children.as_slice() != [render.root_child()] {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveRootChildMismatch {
+                root,
+                host_root_work_in_progress: render.host_root_work_in_progress(),
+                expected: render.root_child(),
+                actual: root_children.first().copied(),
+                actual_child_count: root_children.len(),
+            },
+        );
+    }
+
+    let component = arena
+        .get(render.root_child())
+        .map_err(MinimalHostCompleteWorkError::from)?;
+    if component.tag() != FiberTag::HostComponent {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveFiberTagMismatch {
+                root,
+                fiber: render.root_child(),
+                expected: FiberTag::HostComponent,
+                actual: component.tag(),
+            },
+        );
+    }
+
+    let component_children = arena
+        .child_ids(render.root_child())
+        .map_err(MinimalHostCompleteWorkError::from)?;
+    if component_children.as_slice() != [render.text_child()] {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveTextChildMismatch {
+                root,
+                component: render.root_child(),
+                expected: render.text_child(),
+                actual: component_children.first().copied(),
+                actual_child_count: component_children.len(),
+            },
+        );
+    }
+
+    let text = arena
+        .get(render.text_child())
+        .map_err(MinimalHostCompleteWorkError::from)?;
+    if text.tag() != FiberTag::HostText {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveFiberTagMismatch {
+                root,
+                fiber: render.text_child(),
+                expected: FiberTag::HostText,
+                actual: text.tag(),
+            },
+        );
+    }
+
+    let text_children = arena
+        .child_ids(render.text_child())
+        .map_err(MinimalHostCompleteWorkError::from)?;
+    if !text_children.is_empty() {
+        return Err(
+            HostRootMinimalRenderCompleteHandoffError::LiveTextChildrenMismatch {
+                root,
+                text: render.text_child(),
+                actual_child_count: text_children.len(),
             },
         );
     }

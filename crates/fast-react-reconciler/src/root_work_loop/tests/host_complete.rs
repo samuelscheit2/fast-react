@@ -6,7 +6,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::{
     HostFiberTokenId, RootElementResolutionError, RootElementSource, RootHostComponentElement,
     RootHostTextChild,
-    complete_work::{HostFiberTokenFactory, MinimalHostCompleteWorkError},
+    complete_work::HostFiberTokenFactory,
     host_nodes::HostNodeStore,
     test_support::{FakeHostChild, FakeHostFiberToken},
 };
@@ -823,6 +823,96 @@ fn root_work_loop_minimal_render_complete_handoff_rejects_stale_render_record_be
 }
 
 #[test]
+fn root_work_loop_minimal_render_complete_handoff_rejects_replaced_same_shape_wip_tree_before_adapter()
+ {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = MinimalRecordingHostTokenFactory;
+    let element = RootElementHandle::from_raw(7_651);
+    let element_type = ElementTypeHandle::from_raw(7_652);
+    let props = PropsHandle::from_raw(7_653);
+    let source = minimal_root_component_source(
+        element,
+        element_type,
+        props,
+        "stale same shape",
+        PropsHandle::from_raw(7_654),
+    );
+    update_container(&mut store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes_with_minimal_root_element(
+        &mut store,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+    )
+    .unwrap();
+    let work_in_progress = render.host_root_work_in_progress();
+    let original_component = render.root_child();
+    let original_text = render.text_child();
+    let replacement_component = store.fiber_arena_mut().create_fiber(
+        FiberTag::HostComponent,
+        None,
+        PropsHandle::from_raw(7_655),
+        FiberMode::NO,
+    );
+    let replacement_text = store.fiber_arena_mut().create_fiber(
+        FiberTag::HostText,
+        None,
+        PropsHandle::from_raw(7_656),
+        FiberMode::NO,
+    );
+    store
+        .fiber_arena_mut()
+        .set_children(work_in_progress, &[])
+        .unwrap();
+    store
+        .fiber_arena_mut()
+        .set_children(replacement_component, &[replacement_text])
+        .unwrap();
+    store
+        .fiber_arena_mut()
+        .set_children(work_in_progress, &[replacement_component])
+        .unwrap();
+    let mut adapter = MinimalRecordingHostAdapter::new(element, element_type, props, "section");
+
+    let error = handoff_minimal_root_element_render_to_complete_work(
+        &mut store,
+        &mut host,
+        &mut host_nodes,
+        &mut token_factory,
+        render,
+        &mut adapter,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        HostRootMinimalRenderCompleteHandoffError::LiveRootChildMismatch {
+            root: root_id,
+            host_root_work_in_progress: work_in_progress,
+            expected: original_component,
+            actual: Some(replacement_component),
+            actual_child_count: 1,
+        }
+    );
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert_minimal_render_complete_handoff_unpublished(
+        &store,
+        &host_nodes,
+        original_component,
+        original_text,
+    );
+    assert_minimal_render_complete_handoff_unpublished(
+        &store,
+        &host_nodes,
+        replacement_component,
+        replacement_text,
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
 fn root_work_loop_minimal_render_complete_handoff_rejects_missing_wip_shape_without_publication() {
     let (mut store, root_id, mut host) = root_store();
     let mut host_nodes = HostNodeStore::<RecordingHost>::new();
@@ -866,16 +956,16 @@ fn root_work_loop_minimal_render_complete_handoff_rejects_missing_wip_shape_with
 
     assert_eq!(
         error,
-        HostRootMinimalRenderCompleteHandoffError::MinimalCompleteWork(
-            MinimalHostCompleteWorkError::ChildCountMismatch {
-                parent: work_in_progress,
-                expected: 1,
-                actual: 0,
-            },
-        )
+        HostRootMinimalRenderCompleteHandoffError::LiveRootChildMismatch {
+            root: root_id,
+            host_root_work_in_progress: work_in_progress,
+            expected: component,
+            actual: None,
+            actual_child_count: 0,
+        }
     );
-    assert_eq!(adapter.type_calls(), 1);
-    assert_eq!(adapter.props_calls(), 1);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
     assert_minimal_render_complete_handoff_unpublished(&store, &host_nodes, component, text);
     assert_eq!(host.operations(), Vec::<&'static str>::new());
 }
@@ -929,15 +1019,16 @@ fn root_work_loop_minimal_render_complete_handoff_rejects_mismatched_wip_shape_w
 
     assert_eq!(
         error,
-        HostRootMinimalRenderCompleteHandoffError::MinimalCompleteWork(
-            MinimalHostCompleteWorkError::UnsupportedRootTextChild {
-                host_root: work_in_progress,
-                text,
-            },
-        )
+        HostRootMinimalRenderCompleteHandoffError::LiveRootChildMismatch {
+            root: root_id,
+            host_root_work_in_progress: work_in_progress,
+            expected: component,
+            actual: Some(text),
+            actual_child_count: 1,
+        }
     );
-    assert_eq!(adapter.type_calls(), 1);
-    assert_eq!(adapter.props_calls(), 1);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
     assert_minimal_render_complete_handoff_unpublished(&store, &host_nodes, component, text);
     assert_eq!(host.operations(), Vec::<&'static str>::new());
 }
