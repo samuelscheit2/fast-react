@@ -24,10 +24,9 @@ const legacyReactElementType = Symbol.for('react.element');
 const minimalPublicRootContainers = new WeakMap();
 
 const createRoot = defineFunctionShape(function createRoot(
-  container,
-  rootOptions
+  container
 ) {
-  assertCreateRootOptionsUnsupported(arguments, rootOptions);
+  assertCreateRootOptionsUnsupported(arguments);
   assertCreateRootContainerAvailable(container);
 
   const adapter = createPrivateRootPublicFacadeAdapter();
@@ -100,8 +99,8 @@ exports.version = placeholderVersion;
 
 definePlaceholderMetadata(module.exports, entrypoint);
 
-function assertCreateRootOptionsUnsupported(args, rootOptions) {
-  if (args.length > 1 && rootOptions !== undefined) {
+function assertCreateRootOptionsUnsupported(args) {
+  if (args.length > 1) {
     throw createUnsupportedError(
       entrypoint,
       'createRoot',

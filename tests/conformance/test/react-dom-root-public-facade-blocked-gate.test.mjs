@@ -663,6 +663,101 @@ test("React DOM public root facade inspection records current placeholder bounda
   assertMinimalPublicRootBoundary(publicBoundary);
 });
 
+test("React DOM public createRoot rejects explicit options and extra arguments", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const React = require(path.join(repoRoot, "packages/react/index.js"));
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  let callbackCalls = 0;
+  const blockedArgumentCases = [
+    {
+      args: [undefined],
+      label: "undefined-options"
+    },
+    {
+      args: [
+        {
+          onRecoverableError() {
+            callbackCalls++;
+          }
+        }
+      ],
+      label: "recoverable-error-options"
+    },
+    {
+      args: [undefined, "extra"],
+      label: "undefined-options-extra-argument"
+    }
+  ];
+
+  for (const blockedCase of blockedArgumentCases) {
+    const document = createPrivateGateDocument(
+      `public-create-root-${blockedCase.label}-blocked`,
+      domContainer
+    );
+    const container = createPrivateGateElement("DIV", document, domContainer);
+    let createRootResult;
+
+    assert.throws(
+      () => {
+        createRootResult = reactDomClient.createRoot(
+          container,
+          ...blockedCase.args
+        );
+      },
+      (error) => {
+        assert.equal(error.name, "FastReactDomUnimplementedError");
+        assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+        assert.equal(error.entrypoint, "react-dom/client");
+        assert.equal(error.exportName, "createRoot");
+        assert.match(
+          error.message,
+          /Root options, callbacks, hydration, scheduler hooks, and compatibility claims remain blocked\./
+        );
+        return true;
+      }
+    );
+    assert.equal(createRootResult, undefined);
+    assert.equal(
+      rootMarkers.inspectContainerRootMarker(container).propertyCount,
+      0
+    );
+    assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
+    assert.equal(listenerRegistry.hasListeningMarker(container), false);
+    assert.equal(listenerRegistry.hasListeningMarker(document), false);
+    assert.equal(container.__registrations.length, 0);
+    assert.equal(document.__registrations.length, 0);
+    assert.equal(container.__mutationLog.length, 0);
+    assert.equal(document.__mutationLog.length, 0);
+  }
+  assert.equal(callbackCalls, 0);
+
+  const document = createPrivateGateDocument(
+    "public-create-root-no-options-accepted",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const root = reactDomClient.createRoot(container);
+
+  assert.deepEqual(Object.keys(root), ["render", "unmount"]);
+  assert.equal(
+    root.render(React.createElement("div", null, "text")),
+    undefined
+  );
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild.nodeName, "DIV");
+  assert.equal(container.textContent, "text");
+});
+
 test("React DOM client private facade adapter is symbol-only and routes to private records", () => {
   const reactDomClient = require(
     path.join(repoRoot, "packages/react-dom/client.js")

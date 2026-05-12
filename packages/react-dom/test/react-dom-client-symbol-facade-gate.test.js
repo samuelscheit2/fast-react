@@ -144,39 +144,59 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     preflight: profilingPreflight
   });
 
-  const createRootOptionsDocument = createDocument(
-    'public-create-root-options-blocked'
-  );
-  const createRootOptionsContainer = createElement(
-    'DIV',
-    createRootOptionsDocument
-  );
-  let createRootOptionsResult;
   let callbackCalls = 0;
-
-  assert.throws(
-    () => {
-      createRootOptionsResult = reactDomClient.createRoot(
-        createRootOptionsContainer,
+  const createRootBlockedArgumentCases = [
+    {
+      args: [undefined],
+      label: 'undefined-options'
+    },
+    {
+      args: [
         {
           onRecoverableError() {
             callbackCalls++;
           }
         }
-      );
+      ],
+      label: 'recoverable-error-options'
     },
     {
-      code: 'FAST_REACT_UNIMPLEMENTED',
-      entrypoint: 'react-dom/client',
-      exportName: 'createRoot'
+      args: [undefined, 'extra'],
+      label: 'undefined-options-extra-argument'
     }
-  );
-  assert.equal(createRootOptionsResult, undefined);
+  ];
+
+  for (const blockedCase of createRootBlockedArgumentCases) {
+    const createRootOptionsDocument = createDocument(
+      `public-create-root-${blockedCase.label}-blocked`
+    );
+    const createRootOptionsContainer = createElement(
+      'DIV',
+      createRootOptionsDocument
+    );
+    let createRootOptionsResult;
+
+    assert.throws(
+      () => {
+        createRootOptionsResult = reactDomClient.createRoot(
+          createRootOptionsContainer,
+          ...blockedCase.args
+        );
+      },
+      {
+        code: 'FAST_REACT_UNIMPLEMENTED',
+        entrypoint: 'react-dom/client',
+        exportName: 'createRoot'
+      }
+    );
+    assert.equal(createRootOptionsResult, undefined);
+    assertContainerUntouched(
+      createRootOptionsContainer,
+      createRootOptionsDocument
+    );
+  }
+
   assert.equal(callbackCalls, 0);
-  assertContainerUntouched(
-    createRootOptionsContainer,
-    createRootOptionsDocument
-  );
 
   const createRootDocument = createDocument('public-create-root-minimal');
   const createRootContainer = createRootDocument.createElement('div');
