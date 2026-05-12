@@ -91,4 +91,9 @@
 
 ## Commit
 
-- Pending.
+- Substantive implementation commit:
+  `1bfe7e1133f3fab64d3ced1eb4fab8890e257978` (`Add same transition multi
+  update currentness canary`).
+- Final branch `HEAD` is reported in the worker handoff after the report hash
+  commit is created. A commit cannot contain its own final hash in this tracked
+  report.
