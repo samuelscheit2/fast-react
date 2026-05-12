@@ -248,7 +248,7 @@ test("public React.act gate stays blocked until act queue flushing, effects, and
     "public-renderer-roots-placeholder-blocked"
   );
   assert.equal(gate.localChecks.rendererRootsReady, false);
-  assert.equal(gate.localChecks.reactDomClientRootPlaceholder, true);
+  assert.equal(gate.localChecks.reactDomClientRootPlaceholder, false);
   assert.equal(gate.localChecks.testRendererRootPlaceholder, true);
 });
 
@@ -381,6 +381,29 @@ test("public React.act currentness gate stays fail-closed for rootless behavior"
       ...report
     }),
     "public-react-act-currentness-source-proof"
+  );
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    {
+      ...report
+    },
+    "public-react-act-currentness-source-proof"
+  );
+  const hostileForgedCurrentnessReport =
+    createHostilePublicReactActCurrentnessProxy();
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    hostileForgedCurrentnessReport.proxy,
+    "public-react-act-currentness-source-proof"
+  );
+  assert.equal(hostileForgedCurrentnessReport.getTrapCount(), 0);
+  const mutableReport =
+    createPublicReactActCurrentnessReportWithFreezeBypass(gate);
+  assert.equal(Object.isFrozen(mutableReport), false);
+  assertPublicReactActCurrentnessRejected(
+    gate,
+    mutableReport,
+    "public-react-act-currentness-not-frozen"
   );
   assertPublicReactActCurrentnessRejected(
     gate,
@@ -4295,6 +4318,46 @@ function replacePublicReactActCurrentnessScenario(report, index, overrides) {
         }
       : scenario
   );
+}
+
+function createHostilePublicReactActCurrentnessProxy() {
+  let trapCount = 0;
+  const throwTrap = (trapName) => {
+    trapCount += 1;
+    throw new Error(`forged proxy ${trapName} trap should not be reached`);
+  };
+
+  return {
+    proxy: new Proxy(
+      {},
+      {
+        get() {
+          throwTrap("get");
+        },
+        getOwnPropertyDescriptor() {
+          throwTrap("getOwnPropertyDescriptor");
+        },
+        isExtensible() {
+          throwTrap("isExtensible");
+        },
+        ownKeys() {
+          throwTrap("ownKeys");
+        }
+      }
+    ),
+    getTrapCount: () => trapCount
+  };
+}
+
+function createPublicReactActCurrentnessReportWithFreezeBypass(gate) {
+  const originalFreeze = Object.freeze;
+
+  Object.freeze = (value) => value;
+  try {
+    return gate.createPublicReactActBlockedCurrentnessReport();
+  } finally {
+    Object.freeze = originalFreeze;
+  }
 }
 
 function createExpiredActRootWorkMetadata(
