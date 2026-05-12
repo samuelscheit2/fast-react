@@ -99,5 +99,5 @@
 
 ## Commit
 
-- Final commit created after report finalization; the exact branch `HEAD` hash
-  is reported in the worker final response.
+- `fccf88fd328308e2a1c42bb2443b5c64d6797c48` `Refresh docs after fake DOM
+  observability`
