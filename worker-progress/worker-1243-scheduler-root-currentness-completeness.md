@@ -7,6 +7,7 @@
 - Tightened the scenario manifest check so checked-oracle/source scenario ids missing from the currentness gate, or unexpected currentness ids, fail closed.
 - Tightened public compatibility claim name detection to catch `Compatible` claim names such as `fastReactBehaviorCompatible`.
 - Follow-up audit repair: local observation rows now require an exact expected manifest, source rows now require an exact expected manifest and identity, and local row/evidence claim-like fields are rejected.
+- Second audit repair: local observation manifests now use exact `rowId` values, and source row identity now rejects extra fields such as injected public claim aliases or forged identity fields.
 
 ## Changed Files
 
@@ -29,6 +30,7 @@
 
 - Focused currentness test passed with 11 tests, including missing-row and stale-row cases for task shape, didTimeout, and priority context.
 - Follow-up focused currentness test passed with 15 tests, including unexpected local rows, omitted/forged source rows, and local row/evidence public claim fields.
+- Second follow-up focused currentness test passed with 17 tests, including forged local `rowId` and extra source-row field identity bypass cases.
 - Companion Scheduler/root/blocker/variant conformance suite passed with 111 tests.
 - Scheduler workspace check, package surface guard, smoke import checks, and diff whitespace check passed.
 - Negative evidence now rejects deep CJS, native, mock, postTask, and private variant evidence as root behavior evidence.
@@ -40,6 +42,7 @@
 - No nested agents were used.
 - While adding compatibility-claim tests, found and fixed case-sensitive claim detection that missed `fastReactBehaviorCompatible`.
 - Source audit found fail-open caller-injection paths for unexpected local rows, omitted source rows, and local row/evidence claim-like fields; all were repaired with focused hostile coverage.
+- Second source audit found row identity bypasses for forged local `rowId` values and extra source row fields; both were repaired with exact manifest/key validation.
 
 ## Risks Or Blockers
 

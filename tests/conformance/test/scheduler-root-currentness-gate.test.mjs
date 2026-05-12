@@ -441,6 +441,32 @@ test("Scheduler root currentness gate fails closed for unexpected current local 
   );
 });
 
+test("Scheduler root currentness gate fails closed when a local rowId is forged", () => {
+  const localObservationRows = cloneJson(baselineGate().localObservationRows);
+  rowById(
+    localObservationRows,
+    "default-node-development:scheduler-root-export-shape"
+  ).rowId = "unexpected-local-row-id";
+
+  const gate = evaluateWithBaselineRows({
+    localObservationRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-local-observation-manifest-mismatch"
+    ),
+    {
+      id: "scheduler-root-currentness-local-observation-manifest-mismatch",
+      missingRowIds: ["default-node-development:scheduler-root-export-shape"],
+      unexpectedRowIds: ["unexpected-local-row-id"],
+      duplicateRowIds: []
+    }
+  );
+});
+
 test("Scheduler root currentness gate fails closed for missing current local rows for the former coverage gaps", () => {
   const missingScenarioIds = [
     "scheduler-root-task-object-shape",
@@ -543,6 +569,35 @@ test("Scheduler root currentness gate fails closed for unexpected or forged sour
       "scheduler-root-currentness-source-row-missing-or-stale"
     ).rowIds,
     ["scheduler-root-production-cjs-source-context"]
+  );
+});
+
+test("Scheduler root currentness gate fails closed for extra source row fields", () => {
+  const sourceRows = cloneJson(baselineGate().sourceRows);
+  rowById(
+    sourceRows,
+    "scheduler-root-wrapper-source"
+  ).publicPackageCompatibilityClaimed = true;
+  rowById(
+    sourceRows,
+    "scheduler-root-development-cjs-source-context"
+  ).forgedIdentity = "scheduler-root-wrapper-source";
+
+  const gate = evaluateWithBaselineRows({
+    sourceRows
+  });
+
+  assert.equal(gate.status, SCHEDULER_ROOT_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.sourceRowsCurrent, false);
+  assert.deepEqual(
+    violationById(
+      gate,
+      "scheduler-root-currentness-source-row-identity-mismatch"
+    ).rowIds,
+    [
+      "scheduler-root-wrapper-source",
+      "scheduler-root-development-cjs-source-context"
+    ]
   );
 });
 

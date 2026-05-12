@@ -248,7 +248,7 @@ export function evaluateSchedulerRootCurrentnessGate({
     collectExpectedSchedulerRootCurrentnessRowKeys();
   const localObservationManifest = compareStringSets(
     expectedLocalObservationRowKeys,
-    effectiveLocalObservationRows.map((row) => rowKey(row))
+    effectiveLocalObservationRows.map((row) => row.rowId)
   );
   if (
     localObservationManifest.missing.length > 0 ||
@@ -681,12 +681,18 @@ function sourceRowMatchesDefinition(row, definition) {
     return false;
   }
 
+  const keyManifest = compareStringSets(
+    expectedSourceRowKeys(definition),
+    Object.keys(row)
+  );
   const modeMatches =
     definition.modeId === undefined
       ? row.modeId === undefined
       : row.modeId === definition.modeId;
 
   return (
+    keyManifest.missing.length === 0 &&
+    keyManifest.unexpected.length === 0 &&
     row.rowId === definition.rowId &&
     row.entrypoint === definition.entrypoint &&
     row.sourcePath === definition.sourcePath &&
@@ -704,6 +710,30 @@ function sourceRowMatchesDefinition(row, definition) {
     row.compatibilityClaimed === false &&
     row.status === "current-source-row-present"
   );
+}
+
+function expectedSourceRowKeys(definition) {
+  const keys = [
+    "rowId",
+    "entrypoint",
+    "sourcePath",
+    "sourceRole",
+    "behaviorEvidenceAllowed",
+    "requiredTokens",
+    "exists",
+    "missingTokens",
+    "directDeepCjsImport",
+    "variantBoundaryEvidence",
+    "privateAdmission886Evidence",
+    "compatibilityClaimed",
+    "status"
+  ];
+
+  if (definition.modeId !== undefined) {
+    keys.push("modeId");
+  }
+
+  return freezeArray(keys);
 }
 
 function tryFindSchedulerRootObservation(oracle, modeId, scenarioId) {
