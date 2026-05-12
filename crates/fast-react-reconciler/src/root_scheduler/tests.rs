@@ -365,7 +365,7 @@ fn transition_queue_lane_scheduler_handoff(
     (accepted, request, execution, queue_handoff)
 }
 
-fn same_transition_multi_update_queue_lane_scheduler_handoff(
+fn same_transition_exact_two_update_queue_lane_scheduler_handoff(
     store: &mut FiberRootStore<RecordingHost>,
     root_id: FiberRootId,
     lane: Lane,
@@ -390,11 +390,19 @@ fn same_transition_multi_update_queue_lane_scheduler_handoff(
             .unwrap();
     let requests = [first_request, second_request];
     let processed = process_root_schedule_in_microtask(store).unwrap();
-    assert_eq!(processed.records().len(), 1);
+    let scheduled_records = processed
+        .records()
+        .iter()
+        .filter(|record| record.root() == root_id)
+        .collect::<Vec<_>>();
+    assert_eq!(scheduled_records.len(), 1);
     assert_eq!(
-        processed.records()[0].outcome(),
+        scheduled_records[0].outcome(),
         RootTaskScheduleOutcome::Scheduled
     );
+    assert!(processed.records().iter().all(|record| {
+        record.root() == root_id || record.outcome() == RootTaskScheduleOutcome::NoWork
+    }));
     let callback = store
         .scheduler_bridge()
         .callback_requests()
@@ -424,6 +432,82 @@ fn same_transition_multi_update_queue_lane_scheduler_handoff(
     .unwrap();
 
     (first, second, requests, execution, queue_handoff)
+}
+
+fn same_transition_multi_update_queue_lane_scheduler_handoff(
+    store: &mut FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    lane: Lane,
+    first_element: RootElementHandle,
+    second_element: RootElementHandle,
+    third_element: RootElementHandle,
+) -> (
+    UpdateContainerResult,
+    UpdateContainerResult,
+    UpdateContainerResult,
+    [RootTransitionLaneSchedulerRequestRecord; 3],
+    RootSchedulerCallbackExecutionRecord,
+    HostRootUpdateQueueLaneHandoffRecordForCanary,
+) {
+    let first =
+        update_container_transition_for_canary(store, root_id, lane, first_element, None).unwrap();
+    let second =
+        update_container_transition_for_canary(store, root_id, lane, second_element, None).unwrap();
+    let third =
+        update_container_transition_for_canary(store, root_id, lane, third_element, None).unwrap();
+    let first_request =
+        record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(store, &first)
+            .unwrap();
+    let second_request =
+        record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(store, &second)
+            .unwrap();
+    let third_request =
+        record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(store, &third)
+            .unwrap();
+    let requests = [first_request, second_request, third_request];
+    let processed = process_root_schedule_in_microtask(store).unwrap();
+    let scheduled_records = processed
+        .records()
+        .iter()
+        .filter(|record| record.root() == root_id)
+        .collect::<Vec<_>>();
+    assert_eq!(scheduled_records.len(), 1);
+    assert_eq!(
+        scheduled_records[0].outcome(),
+        RootTaskScheduleOutcome::Scheduled
+    );
+    assert!(processed.records().iter().all(|record| {
+        record.root() == root_id || record.outcome() == RootTaskScheduleOutcome::NoWork
+    }));
+    let callback = store
+        .scheduler_bridge()
+        .callback_requests()
+        .iter()
+        .rev()
+        .copied()
+        .find(|callback| callback.root() == root_id)
+        .unwrap();
+    let execution = execute_scheduled_root_callback(store, callback).unwrap();
+    assert_eq!(
+        execution.status(),
+        RootSchedulerCallbackExecutionStatus::Rendered
+    );
+    assert_eq!(
+        execution.selected_lanes(),
+        third_request.selected_next_lanes()
+    );
+    let render = execution.render_phase().unwrap();
+    assert_eq!(render.applied_update_count(), 3);
+    assert_eq!(render.skipped_update_count(), 0);
+    let queue_handoff = host_root_update_queue_lane_handoff_for_canary(
+        store,
+        root_id,
+        &[first.clone(), second.clone(), third.clone()],
+        render,
+    )
+    .unwrap();
+
+    (first, second, third, requests, execution, queue_handoff)
 }
 
 fn entangled_transition_queue_lane_scheduler_handoff(
@@ -1151,14 +1235,14 @@ fn root_scheduler_transition_queue_lane_continuation_accepts_entangled_handoff()
 }
 
 #[test]
-fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_accepts_source_owned_handoff()
+fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_accepts_source_owned_exact_two_handoff()
  {
     let (mut store, root_id, host) = root_store();
     let current = store.root(root_id).unwrap().current();
-    let first_element = RootElementHandle::from_raw(12203);
-    let second_element = RootElementHandle::from_raw(12204);
+    let first_element = RootElementHandle::from_raw(12201);
+    let second_element = RootElementHandle::from_raw(12202);
     let (first, second, requests, execution, queue_handoff) =
-        same_transition_multi_update_queue_lane_scheduler_handoff(
+        same_transition_exact_two_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
@@ -1180,9 +1264,114 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_acce
         continuation.status(),
         RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::RenderedAndCommitted
     );
-    assert_eq!(continuation.requests(), &requests);
+    assert_eq!(
+        continuation.requests(),
+        RootTransitionSameLaneMultiUpdateRequestsForCanary::from(requests)
+    );
+    assert_eq!(continuation.request_count(), 2);
+    assert_eq!(continuation.request_records(), &requests);
     assert_eq!(continuation.first_request().update(), first.update());
     assert_eq!(continuation.second_request().update(), second.update());
+    assert_eq!(continuation.third_request(), None);
+    assert_eq!(continuation.root(), root_id);
+    assert_eq!(
+        continuation.selected_lanes(),
+        Lanes::from(Lane::TRANSITION_1)
+    );
+    assert_eq!(
+        continuation.update_sequence_ids(),
+        vec![first.update(), second.update()]
+    );
+    assert!(continuation.did_execute_same_lane_multi_update_queue_lane_scheduler_continuation());
+    assert!(continuation.accepted_transition_scheduler_evidence_for_canary());
+    assert!(continuation.accepted_root_scheduler_execution_evidence_for_canary());
+    assert!(continuation.accepted_queue_lane_handoff_evidence_for_canary());
+    assert!(
+        continuation.routed_through_same_lane_multi_update_transition_queue_lane_and_commit_evidence_for_canary()
+    );
+    assert!(continuation.currentness_source_token().is_some());
+    assert!(!continuation.public_root_compatibility_claimed());
+    assert!(!continuation.public_scheduler_timing_compatibility_claimed());
+    assert!(!continuation.public_transition_hooks_compatibility_claimed());
+    assert!(!continuation.public_act_compatibility_claimed());
+    assert!(!continuation.react_dom_compatibility_claimed());
+    assert!(!continuation.test_renderer_compatibility_claimed());
+    assert!(!continuation.native_execution_compatibility_claimed());
+    assert!(!continuation.package_compatibility_claimed());
+    assert!(!continuation.renderer_compatibility_claimed());
+    assert!(!continuation.executes_public_effects());
+
+    assert_eq!(continuation.queue_handoff(), Some(&queue_handoff));
+    let root_commit_handoff = continuation.root_commit_handoff_for_canary().unwrap();
+    assert!(root_commit_handoff.proves_private_root_finished_work_commit_metadata_handoff());
+    let commit = continuation.commit().unwrap();
+    assert_eq!(commit, root_commit_handoff.commit());
+    assert_eq!(commit.root(), root_id);
+    assert_eq!(commit.previous_current(), current);
+    assert_eq!(commit.current(), render.finished_work());
+    assert_eq!(commit.finished_work(), render.finished_work());
+    assert_eq!(commit.finished_lanes(), Lanes::from(Lane::TRANSITION_1));
+    assert_eq!(commit.remaining_lanes(), Lanes::NO);
+    assert_eq!(commit.pending_lanes(), Lanes::NO);
+    assert_eq!(render.resulting_element(), second_element);
+    assert_eq!(
+        store.root(root_id).unwrap().current(),
+        render.finished_work()
+    );
+    assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().pending_lanes(),
+        Lanes::NO
+    );
+    assert!(!store.root_scheduler().might_have_pending_sync_work());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_accepts_source_owned_exact_three_handoff()
+ {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let first_element = RootElementHandle::from_raw(12203);
+    let second_element = RootElementHandle::from_raw(12204);
+    let third_element = RootElementHandle::from_raw(12205);
+    let (first, second, third, requests, execution, queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            first_element,
+            second_element,
+            third_element,
+        );
+    let render = execution.render_phase().unwrap();
+
+    let continuation =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        continuation.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::RenderedAndCommitted
+    );
+    assert_eq!(
+        continuation.requests(),
+        RootTransitionSameLaneMultiUpdateRequestsForCanary::from(requests)
+    );
+    assert_eq!(continuation.request_count(), 3);
+    assert_eq!(continuation.request_records(), &requests);
+    assert_eq!(continuation.first_request().update(), first.update());
+    assert_eq!(continuation.second_request().update(), second.update());
+    assert_eq!(
+        continuation.third_request().unwrap().update(),
+        third.update()
+    );
     assert_eq!(continuation.root(), root_id);
     assert_eq!(continuation.callback_node(), execution.callback_node());
     assert_eq!(
@@ -1195,7 +1384,7 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_acce
     );
     assert_eq!(
         continuation.update_sequence_ids(),
-        vec![first.update(), second.update()]
+        vec![first.update(), second.update(), third.update()]
     );
     assert!(continuation.did_execute_same_lane_multi_update_queue_lane_scheduler_continuation());
     assert!(continuation.accepted_transition_scheduler_evidence_for_canary());
@@ -1232,6 +1421,7 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_acce
     assert_eq!(commit.finished_lanes(), Lanes::from(Lane::TRANSITION_1));
     assert_eq!(commit.remaining_lanes(), Lanes::NO);
     assert_eq!(commit.pending_lanes(), Lanes::NO);
+    assert_eq!(render.resulting_element(), third_element);
     assert_eq!(
         store.root(root_id).unwrap().current(),
         render.finished_work()
@@ -1251,13 +1441,14 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
  {
     let (mut store, root_id, host) = root_store();
     let current = store.root(root_id).unwrap().current();
-    let (_first, _second, requests, execution, queue_handoff) =
+    let (_first, _second, _third, requests, execution, queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
             RootElementHandle::from_raw(12220),
             RootElementHandle::from_raw(12221),
+            RootElementHandle::from_raw(12222),
         );
     let render = execution.render_phase().unwrap();
     let transition_lanes = Lanes::from(Lane::TRANSITION_1);
@@ -1279,7 +1470,7 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
         .update_queues_mut()
         .update_mut(stale_same_lane_update)
         .unwrap()
-        .set_payload(RootUpdatePayload::new(RootElementHandle::from_raw(12222)));
+        .set_payload(RootUpdatePayload::new(RootElementHandle::from_raw(12223)));
     store
         .update_queues_mut()
         .append_pending_update(queue_handoff.current_update_queue(), stale_same_lane_update)
@@ -1361,7 +1552,7 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
             Lane::TRANSITION_1,
             RootElementHandle::from_raw(12205),
         );
-    let single_claim =
+    let single_exact_two_claim =
         execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
             &mut store,
             [single_request, single_request],
@@ -1370,27 +1561,43 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
         )
         .unwrap();
     assert_eq!(
-        single_claim.first_request().update(),
+        single_exact_two_claim.first_request().update(),
         single_update.update()
     );
     assert_eq!(
-        single_claim.status(),
+        single_exact_two_claim.status(),
         RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByTransitionRequestMismatch
     );
-    assert!(single_claim.blocked_by_transition_request_mismatch());
-    assert!(single_claim.commit().is_none());
+    assert!(single_exact_two_claim.blocked_by_transition_request_mismatch());
+    assert!(single_exact_two_claim.commit().is_none());
+
+    let single_exact_three_claim =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            [single_request, single_request, single_request],
+            single_execution,
+            Some(&single_queue_handoff),
+        )
+        .unwrap();
+    assert_eq!(
+        single_exact_three_claim.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByTransitionRequestMismatch
+    );
+    assert!(single_exact_three_claim.blocked_by_transition_request_mismatch());
+    assert!(single_exact_three_claim.commit().is_none());
     assert_eq!(store.root(root_id).unwrap().current(), current);
     assert_eq!(host.operations(), Vec::<&'static str>::new());
 
     let (mut store, root_id, duplicate_host) = root_store();
     let current = store.root(root_id).unwrap().current();
-    let (first, second, requests, execution, queue_handoff) =
+    let (first, second, third, requests, execution, queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
             RootElementHandle::from_raw(12206),
             RootElementHandle::from_raw(12207),
+            RootElementHandle::from_raw(12208),
         );
     let mut duplicate = queue_handoff.clone();
     duplicate.update_records[1].update = first.update();
@@ -1412,8 +1619,8 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
             &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandoffNotSourceOwned {
                 root: root_id,
                 queue: queue_handoff.current_update_queue(),
-                expected_updates: vec![first.update(), second.update()],
-                actual_updates: vec![first.update(), first.update()],
+                expected_updates: vec![first.update(), second.update(), third.update()],
+                actual_updates: vec![first.update(), first.update(), third.update()],
                 records_in_sequence_order: true
             }
         )
@@ -1424,13 +1631,14 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
 
     let (mut store, root_id, missing_host) = root_store();
     let current = store.root(root_id).unwrap().current();
-    let (first, second, requests, execution, queue_handoff) =
+    let (first, second, third, requests, execution, queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
-            RootElementHandle::from_raw(12208),
             RootElementHandle::from_raw(12209),
+            RootElementHandle::from_raw(12210),
+            RootElementHandle::from_raw(12211),
         );
     let mut missing = queue_handoff.clone();
     missing.update_records.pop();
@@ -1452,8 +1660,8 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
             &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandoffNotSourceOwned {
                 root: root_id,
                 queue: queue_handoff.current_update_queue(),
-                expected_updates: vec![first.update(), second.update()],
-                actual_updates: vec![first.update()],
+                expected_updates: vec![first.update(), second.update(), third.update()],
+                actual_updates: vec![first.update(), second.update()],
                 records_in_sequence_order: true
             }
         )
@@ -1464,13 +1672,14 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
 
     let (mut store, root_id, order_host) = root_store();
     let current = store.root(root_id).unwrap().current();
-    let (first, second, requests, execution, queue_handoff) =
+    let (first, second, third, requests, execution, queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
-            RootElementHandle::from_raw(12210),
-            RootElementHandle::from_raw(12211),
+            RootElementHandle::from_raw(12212),
+            RootElementHandle::from_raw(12213),
+            RootElementHandle::from_raw(12214),
         );
     let mut reordered = queue_handoff.clone();
     reordered.update_records.swap(0, 1);
@@ -1492,8 +1701,8 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
             &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandoffNotSourceOwned {
                 root: root_id,
                 queue: queue_handoff.current_update_queue(),
-                expected_updates: vec![first.update(), second.update()],
-                actual_updates: vec![second.update(), first.update()],
+                expected_updates: vec![first.update(), second.update(), third.update()],
+                actual_updates: vec![second.update(), first.update(), third.update()],
                 records_in_sequence_order: false
             }
         )
@@ -1501,6 +1710,62 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
     assert!(order_rejection.commit().is_none());
     assert_eq!(store.root(root_id).unwrap().current(), current);
     assert_eq!(order_host.operations(), Vec::<&'static str>::new());
+
+    let (mut store, root_id, fourth_host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (first, second, third, requests, execution, queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(12215),
+            RootElementHandle::from_raw(12216),
+            RootElementHandle::from_raw(12217),
+        );
+    let fourth = store.update_queues_mut().create_update(Lane::TRANSITION_1);
+    store
+        .update_queues_mut()
+        .update_mut(fourth)
+        .unwrap()
+        .set_payload(RootUpdatePayload::new(RootElementHandle::from_raw(12218)));
+    let mut forged_fourth = queue_handoff.clone();
+    forged_fourth
+        .update_records
+        .push(HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+            sequence: 3,
+            update: fourth,
+            lane: Lane::TRANSITION_1,
+            source_lanes: Lanes::from(Lane::TRANSITION_1),
+            pending_lanes_after_enqueue: queue_handoff.pending_lanes_after_render(),
+            selected_next_lanes_after_enqueue: queue_handoff.selected_next_lanes_before_render(),
+        });
+    let fourth_rejection =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&forged_fourth),
+        )
+        .unwrap();
+    assert_eq!(
+        fourth_rejection.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+    );
+    assert_eq!(
+        fourth_rejection.queue_handoff_error(),
+        Some(
+            &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandoffNotSourceOwned {
+                root: root_id,
+                queue: queue_handoff.current_update_queue(),
+                expected_updates: vec![first.update(), second.update(), third.update()],
+                actual_updates: vec![first.update(), second.update(), third.update(), fourth],
+                records_in_sequence_order: true
+            }
+        )
+    );
+    assert!(fourth_rejection.commit().is_none());
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(fourth_host.operations(), Vec::<&'static str>::new());
 }
 
 #[test]
@@ -1508,13 +1773,14 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
  {
     let (mut store, root_id, host) = root_store();
     let current = store.root(root_id).unwrap().current();
-    let (_first, _second, requests, execution, queue_handoff) =
+    let (_first, _second, _third, requests, execution, queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
             RootElementHandle::from_raw(12212),
             RootElementHandle::from_raw(12213),
+            RootElementHandle::from_raw(12214),
         );
     let mut wrong_selected = queue_handoff.clone();
     wrong_selected.selected_next_lanes_before_render = Lanes::from(Lane::TRANSITION_2);
@@ -1546,13 +1812,14 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
 
     let (mut store, root_id, finished_host) = root_store();
     let current = store.root(root_id).unwrap().current();
-    let (_first, _second, requests, execution, queue_handoff) =
+    let (_first, _second, _third, requests, execution, queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
-            RootElementHandle::from_raw(12214),
             RootElementHandle::from_raw(12215),
+            RootElementHandle::from_raw(12216),
+            RootElementHandle::from_raw(12217),
         );
     let mut wrong_finished = queue_handoff.clone();
     wrong_finished.finished_lanes = Lanes::from(Lane::TRANSITION_2);
@@ -1584,13 +1851,14 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
 
     let (mut store, root_id, count_host) = root_store();
     let current = store.root(root_id).unwrap().current();
-    let (_first, _second, requests, execution, queue_handoff) =
+    let (_first, _second, _third, requests, execution, queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
-            RootElementHandle::from_raw(12216),
-            RootElementHandle::from_raw(12217),
+            RootElementHandle::from_raw(12218),
+            RootElementHandle::from_raw(12219),
+            RootElementHandle::from_raw(12220),
         );
     let mut wrong_count = queue_handoff.clone();
     wrong_count.applied_update_count = 1;
@@ -1611,7 +1879,7 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
         Some(
             &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::AppliedSkippedCountMismatch {
                 root: root_id,
-                expected_applied: 2,
+                expected_applied: 3,
                 actual_applied: 1,
                 expected_skipped: 0,
                 actual_skipped: 0
@@ -1622,14 +1890,56 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
     assert_eq!(store.root(root_id).unwrap().current(), current);
     assert_eq!(count_host.operations(), Vec::<&'static str>::new());
 
-    let (mut store, root_id, replay_host) = root_store();
-    let (_first, _second, requests, execution, queue_handoff) =
+    let (mut store, root_id, skipped_count_host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (_first, _second, _third, requests, execution, queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
-            RootElementHandle::from_raw(12218),
-            RootElementHandle::from_raw(12219),
+            RootElementHandle::from_raw(122201),
+            RootElementHandle::from_raw(122202),
+            RootElementHandle::from_raw(122203),
+        );
+    let mut wrong_skipped = queue_handoff.clone();
+    wrong_skipped.skipped_update_count = 1;
+    let wrong_skipped_rejection =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&wrong_skipped),
+        )
+        .unwrap();
+    assert_eq!(
+        wrong_skipped_rejection.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+    );
+    assert_eq!(
+        wrong_skipped_rejection.queue_handoff_error(),
+        Some(
+            &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::AppliedSkippedCountMismatch {
+                root: root_id,
+                expected_applied: 3,
+                actual_applied: 3,
+                expected_skipped: 0,
+                actual_skipped: 1
+            }
+        )
+    );
+    assert!(wrong_skipped_rejection.commit().is_none());
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(skipped_count_host.operations(), Vec::<&'static str>::new());
+
+    let (mut store, root_id, replay_host) = root_store();
+    let (_first, _second, _third, requests, execution, queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(12221),
+            RootElementHandle::from_raw(12222),
+            RootElementHandle::from_raw(12223),
         );
     let first = execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
         &mut store,
@@ -1655,6 +1965,303 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
     assert!(replay.commit().is_none());
     assert_eq!(store.root(root_id).unwrap().current(), committed_current);
     assert_eq!(replay_host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_rejects_wrong_lane_and_cross_root()
+ {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (_first, _second, _third, requests, execution, queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(122301),
+            RootElementHandle::from_raw(122302),
+            RootElementHandle::from_raw(122303),
+        );
+    let forged_update = queue_handoff.update_records()[1].update();
+    store
+        .update_queues_mut()
+        .update_mut(forged_update)
+        .unwrap()
+        .set_lane(Lanes::from(Lane::TRANSITION_2));
+
+    let wrong_lane =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        wrong_lane.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+    );
+    assert_eq!(
+        wrong_lane.queue_handoff_error(),
+        Some(
+            &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueLane(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::WrongLaneMetadata {
+                    root: root_id,
+                    queue: queue_handoff.current_update_queue(),
+                    update: forged_update,
+                    expected_lane: Lane::TRANSITION_1,
+                    actual_lanes: Lanes::from(Lane::TRANSITION_2)
+                }
+            )
+        )
+    );
+    assert!(wrong_lane.commit().is_none());
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let host = RecordingHost::default();
+    let mut store = FiberRootStore::<RecordingHost>::new();
+    let first_root = store
+        .create_client_root(FakeContainer::new(122304), RootOptions::new())
+        .unwrap();
+    let second_root = store
+        .create_client_root(FakeContainer::new(122305), RootOptions::new())
+        .unwrap();
+    let (_first, _second, _third, first_requests, first_execution, first_queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            first_root,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(122306),
+            RootElementHandle::from_raw(122307),
+            RootElementHandle::from_raw(122308),
+        );
+    let first_commit =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            first_requests,
+            first_execution,
+            Some(&first_queue_handoff),
+    )
+    .unwrap();
+    assert!(first_commit.did_execute_same_lane_multi_update_queue_lane_scheduler_continuation());
+    let drained = process_root_schedule_in_microtask(&mut store).unwrap();
+    assert!(drained.records().iter().all(|record| {
+        record.root() == first_root && record.outcome() == RootTaskScheduleOutcome::NoWork
+    }));
+
+    let second_current = store.root(second_root).unwrap().current();
+    let (_first, _second, _third, second_requests, second_execution, _second_queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            second_root,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(122309),
+            RootElementHandle::from_raw(122310),
+            RootElementHandle::from_raw(122311),
+        );
+    let cross_root =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            second_requests,
+            second_execution,
+            Some(&first_queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        cross_root.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByQueueLaneHandoffMismatch
+    );
+    assert_eq!(
+        cross_root.queue_handoff_error(),
+        Some(
+            &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueRootMismatch {
+                expected: second_root,
+                actual: first_root
+            }
+        )
+    );
+    assert!(cross_root.commit().is_none());
+    assert_eq!(store.root(second_root).unwrap().current(), second_current);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_rejects_stale_finished_work_and_skipped_lane_smuggling()
+ {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (_first, _second, _third, requests, execution, queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(122401),
+            RootElementHandle::from_raw(122402),
+            RootElementHandle::from_raw(122403),
+        );
+    let stale_render =
+        render_host_root_for_lanes(&mut store, root_id, Lanes::from(Lane::TRANSITION_1)).unwrap();
+    record_root_finished_work_for_scheduler_handoff_for_canary(&mut store, stale_render).unwrap();
+
+    let stale_finished_work =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        stale_finished_work.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch
+    );
+    assert!(stale_finished_work.blocked_by_finished_work_handoff_mismatch());
+    assert!(stale_finished_work.commit().is_none());
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(
+        store.root(root_id).unwrap().finished_work(),
+        Some(stale_render.finished_work())
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let (mut store, root_id, skipped_host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let first = update_container_transition_for_canary(
+        &mut store,
+        root_id,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(122404),
+        None,
+    )
+    .unwrap();
+    let second = update_container_transition_for_canary(
+        &mut store,
+        root_id,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(122405),
+        None,
+    )
+    .unwrap();
+    let third = update_container_transition_for_canary(
+        &mut store,
+        root_id,
+        Lane::TRANSITION_1,
+        RootElementHandle::from_raw(122406),
+        None,
+    )
+    .unwrap();
+    let requests = [
+        record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(
+            &mut store, &first,
+        )
+        .unwrap(),
+        record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(
+            &mut store, &second,
+        )
+        .unwrap(),
+        record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(
+            &mut store, &third,
+        )
+        .unwrap(),
+    ];
+    let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+    assert_eq!(processed.records().len(), 1);
+    let callback = store.scheduler_bridge().callback_requests()[0];
+    let validation =
+        validate_scheduled_host_root_callback(&store, root_id, callback.node()).unwrap();
+    let default_update = update_container(
+        &mut store,
+        root_id,
+        RootElementHandle::from_raw(122407),
+        None,
+    )
+    .unwrap();
+    let render =
+        render_host_root_for_lanes(&mut store, root_id, Lanes::from(Lane::TRANSITION_1)).unwrap();
+    let execution = RootSchedulerCallbackExecutionRecord {
+        callback,
+        validation,
+        selected_lanes: Lanes::from(Lane::TRANSITION_1),
+        status: RootSchedulerCallbackExecutionStatus::Rendered,
+        render_phase: Some(render),
+    };
+    let current_queue_base_updates = store
+        .update_queues()
+        .base_updates(render.current_update_queue())
+        .unwrap();
+    let forged = HostRootUpdateQueueLaneHandoffRecordForCanary {
+        root: root_id,
+        current: render.current(),
+        finished_work: render.finished_work(),
+        current_update_queue: render.current_update_queue(),
+        work_in_progress_update_queue: render.work_in_progress_update_queue(),
+        pending_lanes_before_render: render.render_lanes().merge(render.remaining_lanes()),
+        selected_next_lanes_before_render: render.render_lanes(),
+        finished_lanes: render.render_lanes(),
+        remaining_lanes: render.remaining_lanes(),
+        pending_lanes_after_render: store.root(root_id).unwrap().lanes().pending_lanes(),
+        update_records: vec![
+            HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                sequence: 0,
+                update: first.update(),
+                lane: first.lane(),
+                source_lanes: Lanes::from(Lane::TRANSITION_1),
+                pending_lanes_after_enqueue: first.pending_lanes_after_enqueue(),
+                selected_next_lanes_after_enqueue: first.selected_next_lanes(),
+            },
+            HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                sequence: 1,
+                update: second.update(),
+                lane: second.lane(),
+                source_lanes: Lanes::from(Lane::TRANSITION_1),
+                pending_lanes_after_enqueue: second.pending_lanes_after_enqueue(),
+                selected_next_lanes_after_enqueue: second.selected_next_lanes(),
+            },
+            HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                sequence: 2,
+                update: third.update(),
+                lane: third.lane(),
+                source_lanes: Lanes::from(Lane::TRANSITION_1),
+                pending_lanes_after_enqueue: third.pending_lanes_after_enqueue(),
+                selected_next_lanes_after_enqueue: third.selected_next_lanes(),
+            },
+            HostRootUpdateQueueLaneHandoffUpdateRecordForCanary {
+                sequence: 3,
+                update: default_update.update(),
+                lane: default_update.lane(),
+                source_lanes: Lanes::DEFAULT,
+                pending_lanes_after_enqueue: default_update.pending_lanes_after_enqueue(),
+                selected_next_lanes_after_enqueue: default_update.selected_next_lanes(),
+            },
+        ],
+        current_queue_base_updates,
+        applied_update_count: render.applied_update_count(),
+        skipped_update_count: render.skipped_update_count(),
+        resulting_element: render.resulting_element(),
+    };
+    let skipped =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&forged),
+        )
+        .unwrap();
+
+    assert_eq!(
+        skipped.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByLaneMismatch
+    );
+    assert!(skipped.blocked_by_lane_mismatch());
+    assert!(skipped.commit().is_none());
+    assert_eq!(render.applied_update_count(), 3);
+    assert_eq!(render.skipped_update_count(), 1);
+    assert_eq!(render.remaining_lanes(), Lanes::DEFAULT);
+    assert_eq!(store.root(root_id).unwrap().current(), current);
+    assert_eq!(skipped_host.operations(), Vec::<&'static str>::new());
 }
 
 #[test]
@@ -2394,18 +3001,103 @@ fn root_scheduler_transition_queue_lane_currentness_consumes_finished_work_sourc
 }
 
 #[test]
-fn root_scheduler_transition_same_lane_multi_update_currentness_consumes_source_owned_commit() {
+fn root_scheduler_transition_same_lane_multi_update_currentness_consumes_source_owned_exact_two_commit()
+ {
     let (mut store, root_id, host) = root_store();
     let current = store.root(root_id).unwrap().current();
     let first_element = RootElementHandle::from_raw(12223);
     let second_element = RootElementHandle::from_raw(12224);
     let (first, second, requests, execution, queue_handoff) =
+        same_transition_exact_two_update_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            first_element,
+            second_element,
+        );
+    let render = execution.render_phase().unwrap();
+    let prepared = prepare_test_renderer_host_output_canary_fibers(
+        &mut store,
+        render,
+        TestRendererHostOutputCanaryFixture::new(122230, 122231, 122232),
+    )
+    .unwrap();
+    let completed =
+        finish_test_renderer_host_output_canary_fibers(&mut store, prepared, 122233, 122234)
+            .unwrap();
+
+    let continuation =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+    assert!(continuation.currentness_source_token().is_some());
+    assert!(
+        continuation.routed_through_same_lane_multi_update_transition_queue_lane_and_commit_evidence_for_canary()
+    );
+
+    let currentness =
+        consume_transition_same_lane_multi_update_queue_lane_commit_currentness_for_canary(
+            &mut store,
+            &continuation,
+        )
+        .unwrap();
+    let finished = currentness.currentness();
+
+    assert!(currentness.source_owned_currentness_consumed());
+    assert!(
+        currentness
+            .ties_same_lane_multi_update_transition_queue_lane_commit_to_live_tree_state_for_canary(
+            )
+    );
+    assert_eq!(currentness.root(), root_id);
+    assert_eq!(currentness.transition_lane(), Lane::TRANSITION_1);
+    assert_eq!(finished.previous_current(), current);
+    assert_eq!(finished.finished_work(), render.finished_work());
+    assert_eq!(
+        finished.update_sequence_ids(),
+        &[first.update(), second.update()]
+    );
+    assert_eq!(finished.resulting_element(), second_element);
+    assert_eq!(finished.committed_element_after_consume(), second_element);
+    assert_eq!(finished.committed_root_children(), &[completed.component()]);
+    assert!(!currentness.public_root_compatibility_claimed());
+    assert!(!currentness.public_scheduler_timing_compatibility_claimed());
+    assert!(!currentness.public_transition_hooks_compatibility_claimed());
+    assert!(!currentness.public_act_compatibility_claimed());
+    assert!(!currentness.react_dom_compatibility_claimed());
+    assert!(!currentness.test_renderer_compatibility_claimed());
+    assert!(!currentness.native_execution_compatibility_claimed());
+    assert!(!currentness.package_compatibility_claimed());
+    assert!(!currentness.renderer_compatibility_claimed());
+    assert!(!currentness.executes_public_effects());
+    assert_eq!(
+        store.root(root_id).unwrap().current(),
+        render.finished_work()
+    );
+    assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_same_lane_multi_update_currentness_consumes_source_owned_exact_three_commit()
+ {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let first_element = RootElementHandle::from_raw(12225);
+    let second_element = RootElementHandle::from_raw(12226);
+    let third_element = RootElementHandle::from_raw(12227);
+    let (first, second, third, requests, execution, queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
             first_element,
             second_element,
+            third_element,
         );
     let render = execution.render_phase().unwrap();
     let prepared = prepare_test_renderer_host_output_canary_fibers(
@@ -2466,10 +3158,10 @@ fn root_scheduler_transition_same_lane_multi_update_currentness_consumes_source_
     assert_eq!(finished.remaining_lanes(), Lanes::NO);
     assert_eq!(
         finished.update_sequence_ids(),
-        &[first.update(), second.update()]
+        &[first.update(), second.update(), third.update()]
     );
-    assert_eq!(finished.resulting_element(), second_element);
-    assert_eq!(finished.committed_element_after_consume(), second_element);
+    assert_eq!(finished.resulting_element(), third_element);
+    assert_eq!(finished.committed_element_after_consume(), third_element);
     assert_eq!(finished.committed_root_children(), &[completed.component()]);
     assert!(finished.commit_mutation_record_count() > 0);
     assert_eq!(finished.commit_deletion_list_count(), 0);
@@ -2495,13 +3187,14 @@ fn root_scheduler_transition_same_lane_multi_update_currentness_consumes_source_
 fn root_scheduler_transition_same_lane_multi_update_currentness_rejects_clone_replay_metadata_and_stale_root()
  {
     let (mut store, root_id, host) = root_store();
-    let (_first, _second, requests, execution, queue_handoff) =
+    let (_first, _second, _third, requests, execution, queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
             RootElementHandle::from_raw(12225),
             RootElementHandle::from_raw(12226),
+            RootElementHandle::from_raw(12227),
         );
     let continuation =
         execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
@@ -2599,13 +3292,14 @@ fn root_scheduler_transition_same_lane_multi_update_currentness_rejects_clone_re
     );
 
     let (mut store, stale_root_id, stale_host) = root_store();
-    let (_first, _second, stale_requests, stale_execution, stale_queue_handoff) =
+    let (_first, _second, _third, stale_requests, stale_execution, stale_queue_handoff) =
         same_transition_multi_update_queue_lane_scheduler_handoff(
             &mut store,
             stale_root_id,
             Lane::TRANSITION_1,
             RootElementHandle::from_raw(12227),
             RootElementHandle::from_raw(12228),
+            RootElementHandle::from_raw(12229),
         );
     let stale_continuation =
         execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
@@ -2620,7 +3314,7 @@ fn root_scheduler_transition_same_lane_multi_update_currentness_rejects_clone_re
     update_container_sync(
         &mut store,
         stale_root_id,
-        RootElementHandle::from_raw(12229),
+        RootElementHandle::from_raw(12230),
         None,
     )
     .unwrap();

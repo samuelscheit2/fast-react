@@ -1429,7 +1429,7 @@ impl HostRootUpdateQueueLaneHandoffRecordForCanary {
             && self.work_loop_or_commit_consumer_required()
             && self.public_root_rendering_blocked()
             && lane.is_transition()
-            && self.update_records.len() == 2
+            && matches!(self.update_records.len(), 2 | 3)
             && self.selected_next_lanes_before_render == lane_lanes
             && self.finished_lanes == lane_lanes
             && self.remaining_lanes.is_empty()
@@ -3458,7 +3458,8 @@ mod tests {
     }
 
     #[test]
-    fn root_updates_same_transition_multi_update_handoff_rejects_extra_third_row() {
+    fn root_updates_same_transition_multi_update_handoff_accepts_exact_two_and_three_and_rejects_extra_fourth_row()
+     {
         let (mut store, root_id, _host) = root_store();
         let first = update_container_transition_for_canary(
             &mut store,
@@ -3476,11 +3477,57 @@ mod tests {
             None,
         )
         .unwrap();
-        let third = update_container_transition_for_canary(
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, second.selected_next_lanes()).unwrap();
+        let handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second.clone()],
+            render,
+        )
+        .unwrap();
+
+        assert_eq!(render.applied_update_count(), 2);
+        assert_eq!(render.skipped_update_count(), 0);
+        assert_eq!(handoff.update_records().len(), 2);
+        assert_eq!(
+            handoff.update_sequence_ids(),
+            vec![first.update(), second.update()]
+        );
+        assert_eq!(
+            handoff.current_queue_base_updates(),
+            &[first.update(), second.update()]
+        );
+        assert!(handoff.records_in_update_sequence_order());
+        assert_eq!(handoff.finished_lanes(), Lanes::from(Lane::TRANSITION_1));
+        assert_eq!(handoff.remaining_lanes(), Lanes::NO);
+        assert!(!handoff.proves_source_owned_lane_handoff());
+        assert!(
+            handoff.proves_same_transition_multi_update_lane_handoff_for_canary(Lane::TRANSITION_1)
+        );
+
+        let (mut store, root_id, _host) = root_store();
+        let first = update_container_transition_for_canary(
             &mut store,
             root_id,
             Lane::TRANSITION_1,
             RootElementHandle::from_raw(8978),
+            None,
+        )
+        .unwrap();
+        let second = update_container_transition_for_canary(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(8979),
+            None,
+        )
+        .unwrap();
+        let third = update_container_transition_for_canary(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(8980),
             None,
         )
         .unwrap();
@@ -3504,6 +3551,78 @@ mod tests {
         assert_eq!(
             handoff.current_queue_base_updates(),
             &[first.update(), second.update(), third.update()]
+        );
+        assert!(handoff.records_in_update_sequence_order());
+        assert_eq!(handoff.finished_lanes(), Lanes::from(Lane::TRANSITION_1));
+        assert_eq!(handoff.remaining_lanes(), Lanes::NO);
+        assert!(!handoff.proves_source_owned_lane_handoff());
+        assert!(
+            handoff.proves_same_transition_multi_update_lane_handoff_for_canary(Lane::TRANSITION_1)
+        );
+
+        let (mut store, root_id, _host) = root_store();
+        let first = update_container_transition_for_canary(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(8980),
+            None,
+        )
+        .unwrap();
+        let second = update_container_transition_for_canary(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(8981),
+            None,
+        )
+        .unwrap();
+        let third = update_container_transition_for_canary(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(8982),
+            None,
+        )
+        .unwrap();
+        let fourth = update_container_transition_for_canary(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(8983),
+            None,
+        )
+        .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, fourth.selected_next_lanes()).unwrap();
+        let handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second.clone(), third.clone(), fourth.clone()],
+            render,
+        )
+        .unwrap();
+
+        assert_eq!(render.applied_update_count(), 4);
+        assert_eq!(render.skipped_update_count(), 0);
+        assert_eq!(handoff.update_records().len(), 4);
+        assert_eq!(
+            handoff.update_sequence_ids(),
+            vec![
+                first.update(),
+                second.update(),
+                third.update(),
+                fourth.update()
+            ]
+        );
+        assert_eq!(
+            handoff.current_queue_base_updates(),
+            &[
+                first.update(),
+                second.update(),
+                third.update(),
+                fourth.update()
+            ]
         );
         assert!(handoff.records_in_update_sequence_order());
         assert_eq!(handoff.finished_lanes(), Lanes::from(Lane::TRANSITION_1));

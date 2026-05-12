@@ -2600,9 +2600,118 @@ pub(crate) enum RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForC
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootTransitionSameLaneMultiUpdateRequestsForCanary {
+    ExactTwo([RootTransitionLaneSchedulerRequestRecord; 2]),
+    ExactThree([RootTransitionLaneSchedulerRequestRecord; 3]),
+}
+
+#[cfg(test)]
+impl From<[RootTransitionLaneSchedulerRequestRecord; 2]>
+    for RootTransitionSameLaneMultiUpdateRequestsForCanary
+{
+    fn from(requests: [RootTransitionLaneSchedulerRequestRecord; 2]) -> Self {
+        Self::ExactTwo(requests)
+    }
+}
+
+#[cfg(test)]
+impl From<[RootTransitionLaneSchedulerRequestRecord; 3]>
+    for RootTransitionSameLaneMultiUpdateRequestsForCanary
+{
+    fn from(requests: [RootTransitionLaneSchedulerRequestRecord; 3]) -> Self {
+        Self::ExactThree(requests)
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "private same-transition multi-update canaries explicitly accept exact two or exact three requests"
+)]
+impl RootTransitionSameLaneMultiUpdateRequestsForCanary {
+    #[must_use]
+    pub(crate) const fn len(self) -> usize {
+        match self {
+            Self::ExactTwo(_) => 2,
+            Self::ExactThree(_) => 3,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn as_slice(&self) -> &[RootTransitionLaneSchedulerRequestRecord] {
+        match self {
+            Self::ExactTwo(requests) => requests,
+            Self::ExactThree(requests) => requests,
+        }
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, RootTransitionLaneSchedulerRequestRecord> {
+        self.as_slice().iter()
+    }
+
+    #[must_use]
+    pub(crate) const fn first(self) -> RootTransitionLaneSchedulerRequestRecord {
+        match self {
+            Self::ExactTwo([first, _]) | Self::ExactThree([first, _, _]) => first,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn second(self) -> RootTransitionLaneSchedulerRequestRecord {
+        match self {
+            Self::ExactTwo([_, second]) | Self::ExactThree([_, second, _]) => second,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn third(self) -> Option<RootTransitionLaneSchedulerRequestRecord> {
+        match self {
+            Self::ExactTwo(_) => None,
+            Self::ExactThree([_, _, third]) => Some(third),
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.first().root()
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.first().fiber()
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(self) -> UpdateQueueHandle {
+        self.first().queue()
+    }
+
+    #[must_use]
+    pub(crate) const fn lane(self) -> Lane {
+        self.first().lane()
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_next_lanes(self) -> Lanes {
+        self.first().selected_next_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn entangled_lanes(self) -> Lanes {
+        self.first().entangled_lanes()
+    }
+
+    #[must_use]
+    pub(crate) fn update_sequence_ids(&self) -> Vec<UpdateId> {
+        self.iter().map(|request| request.update()).collect()
+    }
+}
+
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RootTransitionSameLaneMultiUpdateQueueLaneContinuationMetadataForCanary {
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: RootTransitionSameLaneMultiUpdateRequestsForCanary,
     callback_execution: RootSchedulerCallbackExecutionRecord,
     current_callback_node: RootSchedulerCallbackHandle,
     current_event_transition_lane: Lane,
@@ -2620,7 +2729,7 @@ struct RootTransitionSameLaneMultiUpdateQueueLaneContinuationMetadataForCanary {
 #[cfg(test)]
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: RootTransitionSameLaneMultiUpdateRequestsForCanary,
     callback_execution: RootSchedulerCallbackExecutionRecord,
     current_callback_node: RootSchedulerCallbackHandle,
     current_event_transition_lane: Lane,
@@ -2668,28 +2777,43 @@ impl Clone for RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCa
 )]
 impl RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
     #[must_use]
-    pub(crate) const fn requests(&self) -> &[RootTransitionLaneSchedulerRequestRecord; 2] {
-        &self.requests
+    pub(crate) const fn requests(&self) -> RootTransitionSameLaneMultiUpdateRequestsForCanary {
+        self.requests
+    }
+
+    #[must_use]
+    pub(crate) fn request_records(&self) -> &[RootTransitionLaneSchedulerRequestRecord] {
+        self.requests.as_slice()
+    }
+
+    #[must_use]
+    pub(crate) const fn request_count(&self) -> usize {
+        self.requests.len()
     }
 
     #[must_use]
     pub(crate) const fn first_request(&self) -> RootTransitionLaneSchedulerRequestRecord {
-        self.requests[0]
+        self.requests.first()
     }
 
     #[must_use]
     pub(crate) const fn second_request(&self) -> RootTransitionLaneSchedulerRequestRecord {
-        self.requests[1]
+        self.requests.second()
+    }
+
+    #[must_use]
+    pub(crate) const fn third_request(&self) -> Option<RootTransitionLaneSchedulerRequestRecord> {
+        self.requests.third()
     }
 
     #[must_use]
     pub(crate) const fn root(&self) -> FiberRootId {
-        self.requests[0].root()
+        self.requests.root()
     }
 
     #[must_use]
     pub(crate) const fn transition_lane(&self) -> Lane {
-        self.requests[0].lane()
+        self.requests.lane()
     }
 
     #[must_use]
@@ -2784,10 +2908,7 @@ impl RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
 
     #[must_use]
     pub(crate) fn update_sequence_ids(&self) -> Vec<UpdateId> {
-        self.requests
-            .iter()
-            .map(|request| request.update())
-            .collect()
+        self.requests.update_sequence_ids()
     }
 
     #[must_use]
@@ -2941,7 +3062,7 @@ impl RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
                 .root_entangled_lanes_before_continuation
                 .contains_all(self.selected_lanes())
             && self.current_event_transition_lane == self.transition_lane()
-            && self.root_current_before_continuation == self.requests[0].fiber()
+            && self.root_current_before_continuation == self.requests.fiber()
             && self.callback_execution.status() == RootSchedulerCallbackExecutionStatus::Rendered
             && self.callback_execution.root() == self.root()
             && self.callback_execution.callback_node() == self.current_callback_node
@@ -2949,7 +3070,7 @@ impl RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
             && self.callback_execution.selected_lanes() == self.selected_lanes()
             && self.render_phase().is_some_and(|render| {
                 render.root() == self.root()
-                    && render.current() == self.requests[0].fiber()
+                    && render.current() == self.requests.fiber()
                     && render.render_lanes() == self.selected_lanes()
             })
     }
@@ -3046,31 +3167,36 @@ impl RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary {
 
 #[cfg(test)]
 fn transition_same_lane_multi_update_request_batch_shape_for_canary(
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: RootTransitionSameLaneMultiUpdateRequestsForCanary,
 ) -> bool {
-    let [first, second] = requests;
-    let lane = first.lane();
+    let first = requests.first();
+    let lane = requests.lane();
     let lane_lanes = lane.to_lanes();
 
     lane.is_transition()
-        && first.root() == second.root()
-        && first.fiber() == second.fiber()
-        && first.queue() == second.queue()
-        && first.update() != second.update()
-        && second.lane() == lane
+        && requests.iter().enumerate().all(|(index, request)| {
+            request.root() == first.root()
+                && request.fiber() == first.fiber()
+                && request.queue() == first.queue()
+                && request.lane() == lane
+                && request.selected_next_lanes() == lane_lanes
+                && request.entangled_lanes() == lane_lanes
+                && request.current_event_transition_lane_after() == lane
+                && requests
+                    .iter()
+                    .skip(index + 1)
+                    .all(|next| request.update() != next.update())
+        })
         && first.selected_next_lanes() == lane_lanes
-        && second.selected_next_lanes() == lane_lanes
         && first.entangled_lanes() == lane_lanes
-        && second.entangled_lanes() == lane_lanes
         && first.current_event_transition_lane_after() == lane
-        && second.current_event_transition_lane_after() == lane
 }
 
 #[cfg(test)]
 fn transition_same_lane_multi_update_queue_handoff_matches_render_for_canary(
     root_id: FiberRootId,
     render: HostRootRenderPhaseRecord,
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: RootTransitionSameLaneMultiUpdateRequestsForCanary,
     queue_handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
 ) -> Result<(), HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary> {
     if queue_handoff.root() != root_id {
@@ -3184,7 +3310,7 @@ fn transition_same_lane_multi_update_queue_handoff_matches_render_for_canary(
         return Err(HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueHandoffNotSourceOwned {
             root: root_id,
             queue: queue_handoff.current_update_queue(),
-            expected_updates: requests.iter().map(|request| request.update()).collect(),
+            expected_updates: requests.update_sequence_ids(),
             actual_updates: queue_handoff.update_sequence_ids(),
             records_in_sequence_order: queue_handoff.records_in_update_sequence_order(),
         });
@@ -3196,27 +3322,24 @@ fn transition_same_lane_multi_update_queue_handoff_matches_render_for_canary(
 #[cfg(test)]
 fn transition_same_lane_multi_update_queue_handoff_proves_source_owned_handoff_for_canary(
     queue_handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: RootTransitionSameLaneMultiUpdateRequestsForCanary,
 ) -> bool {
     if !transition_same_lane_multi_update_request_batch_shape_for_canary(requests) {
         return false;
     }
 
-    let expected_updates = requests
-        .iter()
-        .map(|request| request.update())
-        .collect::<Vec<_>>();
-    let lane = requests[0].lane();
+    let expected_updates = requests.update_sequence_ids();
+    let lane = requests.lane();
 
-    queue_handoff.root() == requests[0].root()
-        && queue_handoff.current() == requests[0].fiber()
-        && queue_handoff.current_update_queue() == requests[0].queue()
+    queue_handoff.root() == requests.root()
+        && queue_handoff.current() == requests.fiber()
+        && queue_handoff.current_update_queue() == requests.queue()
         && queue_handoff.update_sequence_ids() == expected_updates
         && queue_handoff.proves_same_transition_multi_update_lane_handoff_for_canary(lane)
         && queue_handoff
             .update_records()
             .iter()
-            .zip(requests)
+            .zip(requests.iter())
             .all(|(record, request)| {
                 record.update() == request.update()
                     && record.lane() == request.lane()
@@ -3861,40 +3984,40 @@ fn transition_same_lane_multi_update_queue_lane_continuation_source_metadata_mis
 
 #[cfg(test)]
 fn transition_same_lane_multi_update_callback_execution_is_stale_for_canary(
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: RootTransitionSameLaneMultiUpdateRequestsForCanary,
     callback_execution: RootSchedulerCallbackExecutionRecord,
     current_callback_node: RootSchedulerCallbackHandle,
 ) -> bool {
     let validation = callback_execution.validation();
     validation.is_stale()
-        || validation.root() != requests[0].root()
+        || validation.root() != requests.root()
         || validation.requested_callback_node() != callback_execution.callback_node()
         || validation.current_callback_node() != current_callback_node
-        || callback_execution.root() != requests[0].root()
+        || callback_execution.root() != requests.root()
         || callback_execution.callback_node() != current_callback_node
 }
 
 #[cfg(test)]
 fn transition_same_lane_multi_update_request_entanglement_is_current_for_canary(
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: RootTransitionSameLaneMultiUpdateRequestsForCanary,
     root_entangled_lanes: Lanes,
 ) -> bool {
     transition_same_lane_multi_update_request_batch_shape_for_canary(requests)
-        && root_entangled_lanes.contains_all(requests[0].entangled_lanes())
+        && root_entangled_lanes.contains_all(requests.entangled_lanes())
 }
 
 #[cfg(test)]
 fn transition_same_lane_multi_update_callback_render_lanes_match_request_for_canary(
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: RootTransitionSameLaneMultiUpdateRequestsForCanary,
     callback_execution: RootSchedulerCallbackExecutionRecord,
 ) -> bool {
     callback_execution.status() == RootSchedulerCallbackExecutionStatus::Rendered
-        && callback_execution.selected_lanes() == requests[0].selected_next_lanes()
+        && callback_execution.selected_lanes() == requests.selected_next_lanes()
         && callback_execution.render_phase().is_some_and(|render| {
-            render.root() == requests[0].root()
-                && render.current() == requests[0].fiber()
-                && render.render_lanes() == requests[0].selected_next_lanes()
-                && render.render_lanes() == requests[0].entangled_lanes()
+            render.root() == requests.root()
+                && render.current() == requests.fiber()
+                && render.render_lanes() == requests.selected_next_lanes()
+                && render.render_lanes() == requests.entangled_lanes()
                 && render.applied_update_count() == requests.len()
                 && render.skipped_update_count() == 0
         })
@@ -3909,7 +4032,7 @@ fn validate_transition_same_lane_multi_update_queue_handoff_for_commit_for_canar
     store: &FiberRootStore<H>,
     root_id: FiberRootId,
     render: HostRootRenderPhaseRecord,
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: RootTransitionSameLaneMultiUpdateRequestsForCanary,
     queue_handoff: Option<&HostRootUpdateQueueLaneHandoffRecordForCanary>,
 ) -> Result<(), HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary> {
     let Some(queue_handoff) = queue_handoff else {
@@ -3959,7 +4082,7 @@ fn validate_transition_same_lane_multi_update_queue_handoff_for_commit_for_canar
     reason = "private same-transition multi-update evidence mirrors the canary assertion shape"
 )]
 fn transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: RootTransitionSameLaneMultiUpdateRequestsForCanary,
     callback_execution: RootSchedulerCallbackExecutionRecord,
     current_callback_node: RootSchedulerCallbackHandle,
     current_event_transition_lane: Lane,
@@ -4017,15 +4140,17 @@ fn transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
 )]
 pub(crate) fn execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary<
     H: HostTypes,
+    R: Into<RootTransitionSameLaneMultiUpdateRequestsForCanary>,
 >(
     store: &mut FiberRootStore<H>,
-    requests: [RootTransitionLaneSchedulerRequestRecord; 2],
+    requests: R,
     callback_execution: RootSchedulerCallbackExecutionRecord,
     queue_handoff: Option<&HostRootUpdateQueueLaneHandoffRecordForCanary>,
 ) -> Result<
     RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
     RootSyncSchedulerContinuationExecutionError,
 > {
+    let requests = requests.into();
     let (
         current_callback_node,
         root_current_before_continuation,
@@ -4033,7 +4158,7 @@ pub(crate) fn execute_transition_same_lane_multi_update_scheduler_continuation_f
         root_entangled_lanes_before_continuation,
     ) = {
         let root = store
-            .root(requests[0].root())
+            .root(requests.root())
             .map_err(RootSchedulerError::from)?;
         (
             root.scheduling().callback_node(),
@@ -4088,7 +4213,7 @@ pub(crate) fn execute_transition_same_lane_multi_update_scheduler_continuation_f
         );
     }
 
-    if !root_pending_lanes_before_continuation.contains_all(requests[0].selected_next_lanes()) {
+    if !root_pending_lanes_before_continuation.contains_all(requests.selected_next_lanes()) {
         return Ok(
             transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
                 requests,
@@ -4108,8 +4233,8 @@ pub(crate) fn execute_transition_same_lane_multi_update_scheduler_continuation_f
         );
     }
 
-    if root_current_before_continuation != requests[0].fiber()
-        || current_event_transition_lane != requests[0].lane()
+    if root_current_before_continuation != requests.fiber()
+        || current_event_transition_lane != requests.lane()
     {
         return Ok(
             transition_same_lane_multi_update_queue_lane_continuation_record_for_canary(
@@ -4207,7 +4332,7 @@ pub(crate) fn execute_transition_same_lane_multi_update_scheduler_continuation_f
 
     let render_handoff = root_sync_flush_record_for_canary(
         0,
-        requests[0].root(),
+        requests.root(),
         callback_execution.selected_lanes(),
         render_phase,
     );
@@ -4236,7 +4361,7 @@ pub(crate) fn execute_transition_same_lane_multi_update_scheduler_continuation_f
     if let Err(error) =
         validate_transition_same_lane_multi_update_queue_handoff_for_commit_for_canary(
             store,
-            requests[0].root(),
+            requests.root(),
             render_phase,
             requests,
             queue_handoff,
@@ -4320,7 +4445,7 @@ pub(crate) fn execute_transition_same_lane_multi_update_scheduler_continuation_f
     let queue_handoff =
         queue_handoff.expect("same-transition queue handoff was validated before commit");
     let currentness_identity = RootFinishedWorkQueueLaneCommitCurrentnessIdentityForCanary {
-        root: requests[0].root(),
+        root: requests.root(),
         previous_current: commit.previous_current(),
         finished_work: commit.finished_work(),
         selected_lanes: callback_execution.selected_lanes(),
