@@ -56,10 +56,10 @@ use crate::unsupported_features::OFFSCREEN_UNSUPPORTED_FEATURE;
 use crate::unsupported_features::unsupported_reconciler_feature_for_fiber_tag;
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostFiberTokenId,
-    HostFiberTokenValidationError, HostRootRenderPhaseRecord, HostRootStateStoreError,
-    RootRenderExitStatus, RootSchedulingState, TestRendererHostOutputCanaryError,
-    TestRendererHostOutputCanaryPreparedFibers, TestRendererHostOutputCanaryUpdatedFibers,
-    UpdateQueueError,
+    HostFiberTokenValidationError, HostRootHydrationState, HostRootRenderPhaseRecord,
+    HostRootStateStoreError, RootKind, RootRenderExitStatus, RootSchedulingState,
+    TestRendererHostOutputCanaryError, TestRendererHostOutputCanaryPreparedFibers,
+    TestRendererHostOutputCanaryUpdatedFibers, UpdateQueueError,
 };
 #[cfg(test)]
 use crate::{RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle};
@@ -143,7 +143,6 @@ pub use record::{
     HostRootCommitOrderDiagnosticsForCanary, HostRootCommitOrderMetadataKindForCanary,
     HostRootCommitOrderPhaseForCanary, HostRootCommitOrderRecordForCanary, HostRootCommitRecord,
 };
-#[cfg(test)]
 use refs::{
     DOM_REF_CALLBACK_GATE_BLOCKERS, REF_CALLBACK_EXECUTION_HANDOFF_BLOCKERS,
     REF_CLEANUP_RETURN_EXECUTION_GATE_BLOCKERS,
@@ -170,6 +169,209 @@ use refs::{
     materialize_ref_callback_execution_handoff, materialize_ref_cleanup_return_execution_gate,
     materialize_ref_commit_metadata,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootCommitExecutionSurfaceBlocker {
+    RefAttachDetach,
+    LayoutEffectExecution,
+    PassiveEffectExecution,
+    Hydration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootCommitExecutionSurfaceBlockerRecord {
+    root: FiberRootId,
+    finished_work: FiberId,
+    root_kind: RootKind,
+    hydration_state: HostRootHydrationState,
+    blockers: Vec<HostRootCommitExecutionSurfaceBlocker>,
+    ref_commit_record_count: usize,
+    dom_ref_callback_gate_record_count: usize,
+    ref_callback_execution_handoff_record_count: usize,
+    ref_cleanup_return_execution_gate_record_count: usize,
+    refs_source_proven: bool,
+    layout_effect_record_count: usize,
+    layout_effect_callback_gate_record_count: usize,
+    layout_source_proven: bool,
+    pending_passive_record_count: usize,
+    committed_passive_fiber_count: usize,
+    deleted_subtree_passive_record_count: usize,
+    passive_source_proven: bool,
+    hydration_source_proven: bool,
+}
+
+#[allow(
+    dead_code,
+    reason = "execution-surface blocker details are exposed for focused private bridge diagnostics"
+)]
+impl HostRootCommitExecutionSurfaceBlockerRecord {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn root_kind(&self) -> RootKind {
+        self.root_kind
+    }
+
+    #[must_use]
+    pub(crate) const fn hydration_state(&self) -> HostRootHydrationState {
+        self.hydration_state
+    }
+
+    #[must_use]
+    pub(crate) fn blockers(&self) -> &[HostRootCommitExecutionSurfaceBlocker] {
+        &self.blockers
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_commit_record_count(&self) -> usize {
+        self.ref_commit_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn dom_ref_callback_gate_record_count(&self) -> usize {
+        self.dom_ref_callback_gate_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_callback_execution_handoff_record_count(&self) -> usize {
+        self.ref_callback_execution_handoff_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_cleanup_return_execution_gate_record_count(&self) -> usize {
+        self.ref_cleanup_return_execution_gate_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn layout_effect_record_count(&self) -> usize {
+        self.layout_effect_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn layout_effect_callback_gate_record_count(&self) -> usize {
+        self.layout_effect_callback_gate_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_record_count(&self) -> usize {
+        self.pending_passive_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_passive_fiber_count(&self) -> usize {
+        self.committed_passive_fiber_count
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_subtree_passive_record_count(&self) -> usize {
+        self.deleted_subtree_passive_record_count
+    }
+
+    #[must_use]
+    pub(crate) fn refs_execution_blocked(&self) -> bool {
+        self.has_blocker(HostRootCommitExecutionSurfaceBlocker::RefAttachDetach)
+            && self.refs_source_proven
+            && self.ref_commit_record_count == self.dom_ref_callback_gate_record_count
+            && self.dom_ref_callback_gate_record_count
+                == self.ref_callback_execution_handoff_record_count
+            && self.ref_callback_execution_handoff_record_count
+                == self.ref_cleanup_return_execution_gate_record_count
+    }
+
+    #[must_use]
+    pub(crate) fn layout_effect_execution_blocked(&self) -> bool {
+        self.has_blocker(HostRootCommitExecutionSurfaceBlocker::LayoutEffectExecution)
+            && self.layout_source_proven
+            && self.layout_effect_record_count == 0
+            && self.layout_effect_callback_gate_record_count == 0
+    }
+
+    #[must_use]
+    pub(crate) fn passive_effect_execution_blocked(&self) -> bool {
+        self.has_blocker(HostRootCommitExecutionSurfaceBlocker::PassiveEffectExecution)
+            && self.passive_source_proven
+            && self.pending_passive_record_count == 0
+            && self.committed_passive_fiber_count == 0
+            && self.deleted_subtree_passive_record_count == 0
+    }
+
+    #[must_use]
+    pub(crate) fn effects_execution_blocked(&self) -> bool {
+        self.layout_effect_execution_blocked() && self.passive_effect_execution_blocked()
+    }
+
+    #[must_use]
+    pub(crate) fn hydration_execution_blocked(&self) -> bool {
+        self.has_blocker(HostRootCommitExecutionSurfaceBlocker::Hydration)
+            && self.hydration_source_proven
+            && self.root_kind.is_client()
+            && !self.hydration_state.is_dehydrated()
+    }
+
+    #[must_use]
+    pub(crate) fn effects_refs_and_hydration_execution_surfaces_blocked(&self) -> bool {
+        self.effects_execution_blocked()
+            && self.refs_execution_blocked()
+            && self.hydration_execution_blocked()
+    }
+
+    fn has_blocker(&self, blocker: HostRootCommitExecutionSurfaceBlocker) -> bool {
+        self.blockers.contains(&blocker)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn without_blocker_for_test(
+        mut self,
+        blocker: HostRootCommitExecutionSurfaceBlocker,
+    ) -> Self {
+        self.blockers.retain(|candidate| *candidate != blocker);
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn with_refs_source_proven_for_test(
+        mut self,
+        refs_source_proven: bool,
+    ) -> Self {
+        self.refs_source_proven = refs_source_proven;
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn with_layout_source_proven_for_test(
+        mut self,
+        layout_source_proven: bool,
+    ) -> Self {
+        self.layout_source_proven = layout_source_proven;
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn with_passive_source_proven_for_test(
+        mut self,
+        passive_source_proven: bool,
+    ) -> Self {
+        self.passive_source_proven = passive_source_proven;
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn with_hydration_source_proven_for_test(
+        mut self,
+        hydration_source_proven: bool,
+    ) -> Self {
+        self.hydration_source_proven = hydration_source_proven;
+        self
+    }
+}
 
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -532,37 +734,41 @@ impl HostRootFinishedWorkCommitExecutionRequestForCanary {
 
     #[must_use]
     pub(crate) const fn host_mutation_execution_blocked(self) -> bool {
-        true
+        self.has_blocker(HostRootFinishedWorkCommitExecutionBlockerForCanary::HostMutationExecution)
     }
 
     #[must_use]
     pub(crate) const fn public_root_rendering_blocked(self) -> bool {
-        true
+        self.has_blocker(HostRootFinishedWorkCommitExecutionBlockerForCanary::PublicRootRendering)
     }
 
     #[must_use]
     pub(crate) const fn ref_attach_detach_blocked(self) -> bool {
-        true
+        self.has_blocker(HostRootFinishedWorkCommitExecutionBlockerForCanary::RefAttachDetach)
     }
 
     #[must_use]
     pub(crate) const fn layout_effect_execution_blocked(self) -> bool {
-        true
+        self.has_blocker(HostRootFinishedWorkCommitExecutionBlockerForCanary::LayoutEffectExecution)
     }
 
     #[must_use]
     pub(crate) const fn passive_effect_execution_blocked(self) -> bool {
-        true
+        self.has_blocker(
+            HostRootFinishedWorkCommitExecutionBlockerForCanary::PassiveEffectExecution,
+        )
     }
 
     #[must_use]
     pub(crate) const fn hydration_blocked(self) -> bool {
-        true
+        self.has_blocker(HostRootFinishedWorkCommitExecutionBlockerForCanary::Hydration)
     }
 
     #[must_use]
     pub(crate) const fn compatibility_claim_blocked(self) -> bool {
-        true
+        self.has_blocker(
+            HostRootFinishedWorkCommitExecutionBlockerForCanary::PublicCompatibilityClaim,
+        )
     }
 
     #[must_use]
@@ -571,6 +777,32 @@ impl HostRootFinishedWorkCommitExecutionRequestForCanary {
             && self.layout_effect_execution_blocked()
             && self.passive_effect_execution_blocked()
             && self.hydration_blocked()
+    }
+
+    const fn has_blocker(
+        self,
+        blocker: HostRootFinishedWorkCommitExecutionBlockerForCanary,
+    ) -> bool {
+        let blocker = Self::blocker_tag(blocker);
+        Self::blocker_tag(self.blockers[0]) == blocker
+            || Self::blocker_tag(self.blockers[1]) == blocker
+            || Self::blocker_tag(self.blockers[2]) == blocker
+            || Self::blocker_tag(self.blockers[3]) == blocker
+            || Self::blocker_tag(self.blockers[4]) == blocker
+            || Self::blocker_tag(self.blockers[5]) == blocker
+            || Self::blocker_tag(self.blockers[6]) == blocker
+    }
+
+    const fn blocker_tag(blocker: HostRootFinishedWorkCommitExecutionBlockerForCanary) -> u8 {
+        match blocker {
+            HostRootFinishedWorkCommitExecutionBlockerForCanary::HostMutationExecution => 0,
+            HostRootFinishedWorkCommitExecutionBlockerForCanary::PublicRootRendering => 1,
+            HostRootFinishedWorkCommitExecutionBlockerForCanary::RefAttachDetach => 2,
+            HostRootFinishedWorkCommitExecutionBlockerForCanary::LayoutEffectExecution => 3,
+            HostRootFinishedWorkCommitExecutionBlockerForCanary::PassiveEffectExecution => 4,
+            HostRootFinishedWorkCommitExecutionBlockerForCanary::Hydration => 5,
+            HostRootFinishedWorkCommitExecutionBlockerForCanary::PublicCompatibilityClaim => 6,
+        }
     }
 }
 
@@ -2712,6 +2944,53 @@ impl HostRootCommitRecord {
         )
     }
 
+    #[allow(
+        dead_code,
+        reason = "execution-surface blocker record details are consumed by focused private bridge tests"
+    )]
+    #[must_use]
+    pub(crate) fn execution_surface_blockers(&self) -> HostRootCommitExecutionSurfaceBlockerRecord {
+        materialize_host_root_commit_execution_surface_blockers(
+            self.root,
+            self.current,
+            self.root_kind,
+            self.hydration_state,
+            self.pending_passive_handoff,
+            &self.function_component_committed_passive_effects,
+            &self.function_component_deleted_subtree_passive_effects,
+            &self.function_component_layout_effects,
+            &self.function_component_layout_effect_callback_invocation_gate,
+            &self.function_component_effect_list_commit_phase_order,
+            &self.ref_commit_metadata,
+            &self.dom_ref_callback_commit_gate,
+            &self.ref_callback_execution_handoff,
+            &self.ref_cleanup_return_execution_gate,
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn effects_execution_blocked(&self) -> bool {
+        self.execution_surface_blockers()
+            .effects_execution_blocked()
+    }
+
+    #[must_use]
+    pub(crate) fn refs_execution_blocked(&self) -> bool {
+        self.execution_surface_blockers().refs_execution_blocked()
+    }
+
+    #[must_use]
+    pub(crate) fn hydration_execution_blocked(&self) -> bool {
+        self.execution_surface_blockers()
+            .hydration_execution_blocked()
+    }
+
+    #[must_use]
+    pub(crate) fn effects_refs_and_hydration_execution_surfaces_blocked(&self) -> bool {
+        self.execution_surface_blockers()
+            .effects_refs_and_hydration_execution_surfaces_blocked()
+    }
+
     #[doc(hidden)]
     #[must_use]
     pub fn test_only_host_parent_placement_apply_count_for_canary(&self) -> usize {
@@ -2995,6 +3274,9 @@ pub fn commit_finished_host_root<H: HostTypes>(
     let finished_lanes = render.render_lanes();
     let remaining_lanes = render.remaining_lanes();
     let work_in_progress_update_queue = render.work_in_progress_update_queue();
+    let root_kind = store.root(root_id)?.kind();
+    let finished_work_hydration_state =
+        host_root_hydration_state_for_finished_work(store, finished_work)?;
     let mutation_log =
         collect_host_root_mutation_phase_log(store, root_id, finished_work, finished_lanes)?;
     let deletion_lists = collect_deletion_list_metadata(store, finished_work)?;
@@ -3051,6 +3333,15 @@ pub fn commit_finished_host_root<H: HostTypes>(
         materialize_ref_callback_execution_handoff(store, &dom_ref_callback_commit_gate)?;
     let ref_cleanup_return_execution_gate =
         materialize_ref_cleanup_return_execution_gate(store, &ref_callback_execution_handoff)?;
+    let function_component_committed_passive_effects =
+        FunctionComponentCommittedPassiveEffectsSnapshot::default();
+    let function_component_deleted_subtree_passive_effects =
+        FunctionComponentDeletedSubtreePassiveEffectsSnapshot::default();
+    let function_component_layout_effects = FunctionComponentLayoutEffectsSnapshot::default();
+    let function_component_layout_effect_callback_invocation_gate =
+        FunctionComponentLayoutEffectCallbackInvocationGateSnapshot::default();
+    let function_component_effect_list_commit_phase_order =
+        FunctionComponentEffectListCommitPhaseOrderSnapshot::default();
 
     Ok(HostRootCommitRecord {
         root: root_id,
@@ -3059,20 +3350,18 @@ pub fn commit_finished_host_root<H: HostTypes>(
         finished_lanes,
         remaining_lanes,
         pending_lanes,
+        root_kind,
+        hydration_state: finished_work_hydration_state,
         mutation_log,
         mutation_apply_log,
         root_update_callbacks,
         root_update_callback_invocation_gate,
         pending_passive_handoff,
-        function_component_committed_passive_effects:
-            FunctionComponentCommittedPassiveEffectsSnapshot::default(),
-        function_component_deleted_subtree_passive_effects:
-            FunctionComponentDeletedSubtreePassiveEffectsSnapshot::default(),
-        function_component_layout_effects: FunctionComponentLayoutEffectsSnapshot::default(),
-        function_component_layout_effect_callback_invocation_gate:
-            FunctionComponentLayoutEffectCallbackInvocationGateSnapshot::default(),
-        function_component_effect_list_commit_phase_order:
-            FunctionComponentEffectListCommitPhaseOrderSnapshot::default(),
+        function_component_committed_passive_effects,
+        function_component_deleted_subtree_passive_effects,
+        function_component_layout_effects,
+        function_component_layout_effect_callback_invocation_gate,
+        function_component_effect_list_commit_phase_order,
         deletion_lists,
         deletion_subtree_traversal_gate,
         host_node_deletion_cleanup_log,
@@ -3373,6 +3662,178 @@ fn validate_context_provider_update_ancestor_child_lanes_for_canary(
             actual_child_lanes,
         },
     )
+}
+
+fn host_root_hydration_state_for_finished_work<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    finished_work: FiberId,
+) -> Result<HostRootHydrationState, RootCommitError> {
+    let memoized_state = store.fiber_arena().get(finished_work)?.memoized_state();
+    Ok(store.host_root_states().get(memoized_state)?.hydration())
+}
+
+fn materialize_host_root_commit_execution_surface_blockers(
+    root: FiberRootId,
+    finished_work: FiberId,
+    root_kind: RootKind,
+    hydration_state: HostRootHydrationState,
+    pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
+    function_component_committed_passive_effects: &FunctionComponentCommittedPassiveEffectsSnapshot,
+    function_component_deleted_subtree_passive_effects:
+        &FunctionComponentDeletedSubtreePassiveEffectsSnapshot,
+    function_component_layout_effects: &FunctionComponentLayoutEffectsSnapshot,
+    function_component_layout_effect_callback_invocation_gate:
+        &FunctionComponentLayoutEffectCallbackInvocationGateSnapshot,
+    function_component_effect_list_commit_phase_order:
+        &FunctionComponentEffectListCommitPhaseOrderSnapshot,
+    ref_commit_metadata: &HostRootRefCommitSnapshot,
+    dom_ref_callback_commit_gate: &HostRootDomRefCallbackCommitGateSnapshot,
+    ref_callback_execution_handoff: &HostRootRefCallbackExecutionHandoffSnapshot,
+    ref_cleanup_return_execution_gate: &HostRootRefCleanupReturnExecutionGateSnapshot,
+) -> HostRootCommitExecutionSurfaceBlockerRecord {
+    let mut blockers = Vec::new();
+    let refs_source_proven = ref_execution_source_proven(
+        ref_commit_metadata,
+        dom_ref_callback_commit_gate,
+        ref_callback_execution_handoff,
+        ref_cleanup_return_execution_gate,
+    );
+    let layout_source_proven = layout_effect_execution_source_proven(
+        function_component_layout_effects,
+        function_component_layout_effect_callback_invocation_gate,
+        function_component_effect_list_commit_phase_order,
+    );
+    let passive_source_proven = passive_effect_execution_source_proven(
+        function_component_committed_passive_effects,
+        function_component_deleted_subtree_passive_effects,
+        function_component_effect_list_commit_phase_order,
+    );
+    let hydration_source_proven = hydration_execution_source_proven(root_kind, hydration_state);
+
+    if refs_source_proven {
+        blockers.push(HostRootCommitExecutionSurfaceBlocker::RefAttachDetach);
+    }
+    if layout_source_proven {
+        blockers.push(HostRootCommitExecutionSurfaceBlocker::LayoutEffectExecution);
+    }
+    if passive_source_proven {
+        blockers.push(HostRootCommitExecutionSurfaceBlocker::PassiveEffectExecution);
+    }
+    if hydration_source_proven {
+        blockers.push(HostRootCommitExecutionSurfaceBlocker::Hydration);
+    }
+
+    HostRootCommitExecutionSurfaceBlockerRecord {
+        root,
+        finished_work,
+        root_kind,
+        hydration_state,
+        blockers,
+        ref_commit_record_count: ref_commit_metadata.len(),
+        dom_ref_callback_gate_record_count: dom_ref_callback_commit_gate.len(),
+        ref_callback_execution_handoff_record_count: ref_callback_execution_handoff.len(),
+        ref_cleanup_return_execution_gate_record_count: ref_cleanup_return_execution_gate.len(),
+        refs_source_proven,
+        layout_effect_record_count: function_component_layout_effects.len(),
+        layout_effect_callback_gate_record_count:
+            function_component_layout_effect_callback_invocation_gate.len(),
+        layout_source_proven,
+        pending_passive_record_count: pending_passive_handoff
+            .map(PendingPassiveCommitHandoff::pending_record_count)
+            .unwrap_or_default(),
+        committed_passive_fiber_count: function_component_committed_passive_effects.fiber_count(),
+        deleted_subtree_passive_record_count: function_component_deleted_subtree_passive_effects
+            .len(),
+        passive_source_proven,
+        hydration_source_proven,
+    }
+}
+
+fn ref_execution_source_proven(
+    ref_commit_metadata: &HostRootRefCommitSnapshot,
+    dom_ref_callback_commit_gate: &HostRootDomRefCallbackCommitGateSnapshot,
+    ref_callback_execution_handoff: &HostRootRefCallbackExecutionHandoffSnapshot,
+    ref_cleanup_return_execution_gate: &HostRootRefCleanupReturnExecutionGateSnapshot,
+) -> bool {
+    ref_commit_metadata.len() == dom_ref_callback_commit_gate.len()
+        && dom_ref_callback_commit_gate.len() == ref_callback_execution_handoff.len()
+        && ref_callback_execution_handoff.len() == ref_cleanup_return_execution_gate.len()
+        && dom_ref_callback_commit_gate.records().iter().all(|record| {
+            record.status() == HostRootDomRefCallbackCommitGateStatus::Blocked
+                && record.blockers() == &DOM_REF_CALLBACK_GATE_BLOCKERS
+        })
+        && ref_callback_execution_handoff
+            .records()
+            .iter()
+            .all(|record| {
+                record.status()
+                    == HostRootRefCallbackExecutionHandoffStatus::PrivateExecutionHandoff
+                    && record.blockers() == &REF_CALLBACK_EXECUTION_HANDOFF_BLOCKERS
+            })
+        && ref_cleanup_return_execution_gate
+            .records()
+            .iter()
+            .all(|record| {
+                record.status()
+                    == HostRootRefCleanupReturnExecutionGateStatus::TestOnlyExecutionGate
+                    && record.blockers() == &REF_CLEANUP_RETURN_EXECUTION_GATE_BLOCKERS
+            })
+        && !dom_ref_callback_commit_gate.callback_refs_invoked()
+        && !dom_ref_callback_commit_gate.object_refs_mutated()
+        && !dom_ref_callback_commit_gate.layout_effects_run()
+        && !dom_ref_callback_commit_gate.public_instances_exposed()
+        && !ref_callback_execution_handoff.callback_refs_invoked()
+        && !ref_callback_execution_handoff.object_refs_mutated()
+        && !ref_cleanup_return_execution_gate.callback_refs_invoked()
+        && !ref_cleanup_return_execution_gate.cleanup_return_callbacks_invoked()
+        && !ref_cleanup_return_execution_gate.object_refs_mutated()
+}
+
+fn layout_effect_execution_source_proven(
+    function_component_layout_effects: &FunctionComponentLayoutEffectsSnapshot,
+    function_component_layout_effect_callback_invocation_gate:
+        &FunctionComponentLayoutEffectCallbackInvocationGateSnapshot,
+    function_component_effect_list_commit_phase_order:
+        &FunctionComponentEffectListCommitPhaseOrderSnapshot,
+) -> bool {
+    !function_component_layout_effects.layout_callbacks_invoked()
+        && !function_component_layout_effects.dom_mutation_side_effects_performed()
+        && !function_component_layout_effects.refs_attached_or_detached()
+        && function_component_layout_effect_callback_invocation_gate.status()
+            == FunctionComponentLayoutEffectCallbackInvocationGateStatus::TestControlOnly
+        && function_component_layout_effect_callback_invocation_gate.blockers()
+            == &FUNCTION_COMPONENT_LAYOUT_EFFECT_CALLBACK_INVOCATION_GATE_BLOCKERS
+        && !function_component_layout_effect_callback_invocation_gate
+            .did_invoke_test_layout_callback()
+        && !function_component_layout_effect_callback_invocation_gate
+            .passive_phase_callbacks_invoked()
+        && !function_component_layout_effect_callback_invocation_gate.root_error_callbacks_invoked()
+        && !function_component_layout_effect_callback_invocation_gate.scheduler_queues_touched()
+        && !function_component_effect_list_commit_phase_order.layout_callbacks_invoked()
+        && !function_component_effect_list_commit_phase_order.passive_callbacks_invoked()
+        && !function_component_effect_list_commit_phase_order.public_act_execution_enabled()
+        && !function_component_effect_list_commit_phase_order.public_effect_compatibility_claimed()
+}
+
+fn passive_effect_execution_source_proven(
+    function_component_committed_passive_effects: &FunctionComponentCommittedPassiveEffectsSnapshot,
+    function_component_deleted_subtree_passive_effects:
+        &FunctionComponentDeletedSubtreePassiveEffectsSnapshot,
+    function_component_effect_list_commit_phase_order:
+        &FunctionComponentEffectListCommitPhaseOrderSnapshot,
+) -> bool {
+    function_component_committed_passive_effects.is_empty()
+        && function_component_deleted_subtree_passive_effects.is_empty()
+        && !function_component_effect_list_commit_phase_order.passive_callbacks_invoked()
+        && !function_component_effect_list_commit_phase_order.public_act_execution_enabled()
+        && !function_component_effect_list_commit_phase_order.public_effect_compatibility_claimed()
+}
+
+fn hydration_execution_source_proven(
+    root_kind: RootKind,
+    hydration_state: HostRootHydrationState,
+) -> bool {
+    root_kind.is_client() && !hydration_state.is_dehydrated()
 }
 
 #[cfg(test)]

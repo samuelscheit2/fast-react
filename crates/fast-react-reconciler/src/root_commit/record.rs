@@ -12,10 +12,10 @@ use crate::root_config::{
     RootErrorOptionCallbackRecord,
 };
 use crate::{
-    FiberRootId, FiberRootStore, HostRootRenderPhaseRecord, RootCallbackPriority,
-    RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle, RootSchedulerCallbackHandle,
-    RootUpdateCallbackHandle, RootUpdateCallbackRecord, RootUpdateCallbackSnapshot,
-    RootUpdateCallbackVisibility, UpdateId,
+    FiberRootId, FiberRootStore, HostRootHydrationState, HostRootRenderPhaseRecord,
+    RootCallbackPriority, RootErrorCallbackHandle, RootKind, RootRecoverableErrorCallbackHandle,
+    RootSchedulerCallbackHandle, RootUpdateCallbackHandle, RootUpdateCallbackRecord,
+    RootUpdateCallbackSnapshot, RootUpdateCallbackVisibility, UpdateId,
 };
 
 use super::{
@@ -767,6 +767,8 @@ pub struct HostRootCommitRecord {
     pub(super) finished_lanes: Lanes,
     pub(super) remaining_lanes: Lanes,
     pub(super) pending_lanes: Lanes,
+    pub(super) root_kind: RootKind,
+    pub(super) hydration_state: HostRootHydrationState,
     pub(super) mutation_log: HostRootMutationPhaseLog,
     pub(super) mutation_apply_log: HostRootMutationApplyLog,
     pub(super) root_update_callbacks: RootUpdateCallbackSnapshot,

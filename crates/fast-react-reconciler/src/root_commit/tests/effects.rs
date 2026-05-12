@@ -166,6 +166,7 @@ fn root_commit_queues_function_component_passive_metadata_into_handoff_without_e
     let commit = commit_finished_host_root(&mut store, render).unwrap();
     let handoff = commit.pending_passive_handoff().unwrap();
     let pending_after_commit = store.root(root_id).unwrap().scheduling().pending_passive();
+    let execution_surfaces = commit.execution_surface_blockers();
 
     assert_eq!(handoff.root(), root_id);
     assert_eq!(handoff.finished_work(), render.finished_work());
@@ -173,6 +174,11 @@ fn root_commit_queues_function_component_passive_metadata_into_handoff_without_e
     assert_eq!(handoff.pending_unmount_count(), 1);
     assert_eq!(handoff.pending_mount_count(), 1);
     assert_eq!(handoff.pending_record_count(), 2);
+    assert_eq!(execution_surfaces.pending_passive_record_count(), 2);
+    assert!(!execution_surfaces.passive_effect_execution_blocked());
+    assert!(!execution_surfaces.effects_execution_blocked());
+    assert!(!commit.effects_execution_blocked());
+    assert!(!commit.effects_refs_and_hydration_execution_surfaces_blocked());
     assert_eq!(
         pending_after_commit.finished_work(),
         Some(render.finished_work())
@@ -384,15 +390,23 @@ fn root_commit_committed_passive_execution_gate_runs_callbacks_under_test_contro
     .unwrap();
     let queued_effect = queued.records()[0];
     let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+    assert!(!commit.effects_execution_blocked());
     let committed = commit
         .record_function_component_committed_passive_effects_for_canary(std::slice::from_ref(
             &queued,
         ))
-        .unwrap();
+        .unwrap()
+        .clone();
+    let execution_surfaces = commit.execution_surface_blockers();
     assert_eq!(committed.fiber_count(), 1);
     assert_eq!(committed.fibers()[0].fiber(), finished_function);
     assert_eq!(committed.queued_unmount_count(), 1);
     assert_eq!(committed.queued_mount_count(), 1);
+    assert_eq!(execution_surfaces.pending_passive_record_count(), 2);
+    assert_eq!(execution_surfaces.committed_passive_fiber_count(), 1);
+    assert!(!execution_surfaces.passive_effect_execution_blocked());
+    assert!(!execution_surfaces.effects_execution_blocked());
+    assert!(!commit.effects_execution_blocked());
 
     let callback_request_count = store.scheduler_bridge().callback_requests().len();
     let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
@@ -586,10 +600,12 @@ fn root_commit_records_layout_effect_handoff_in_react_order_without_callbacks() 
 
     let mut commit = commit_finished_host_root(&mut store, render).unwrap();
     assert!(commit.function_component_layout_effects().is_empty());
+    assert!(commit.effects_execution_blocked());
     let snapshot = commit
         .record_function_component_layout_effects_for_canary(&store, &mut hook_store)
         .unwrap()
         .clone();
+    let execution_surfaces = commit.execution_surface_blockers();
 
     assert_eq!(snapshot.len(), 3);
     assert_eq!(snapshot.destroy_count(), 0);
@@ -600,6 +616,10 @@ fn root_commit_records_layout_effect_handoff_in_react_order_without_callbacks() 
     assert!(!snapshot.refs_attached_or_detached());
     assert!(!snapshot.public_effect_compatibility_claimed());
     assert_eq!(commit.function_component_layout_effects(), &snapshot);
+    assert_eq!(execution_surfaces.layout_effect_record_count(), 3);
+    assert!(!execution_surfaces.layout_effect_execution_blocked());
+    assert!(!execution_surfaces.effects_execution_blocked());
+    assert!(!commit.effects_execution_blocked());
     let records = snapshot.records();
     assert_eq!(records[0].commit_order(), 0);
     assert_eq!(records[0].destroy_order(), None);

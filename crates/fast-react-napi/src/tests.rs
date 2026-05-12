@@ -89,7 +89,10 @@ use crate::root_bridge_requests::{
     validate_native_root_bridge_worker_thread_cleanup_hook_preflight_rows,
 };
 use crate::root_work_loop_metadata::{
-    RootWorkLoopFinishedWorkMetadataError, root_work_loop_finished_work_metadata_for_canary,
+    RootWorkLoopFinishedWorkDiagnosticEvidence, RootWorkLoopFinishedWorkMetadataError,
+    root_work_loop_finished_work_metadata_for_canary,
+    root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary,
+    root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary,
 };
 use crate::test_renderer_root_execution_bridge::{
     TestRendererNativeRootExecutionBridge, TestRendererNativeRootExecutionBridgeError,
@@ -175,6 +178,13 @@ fn assert_cleanup_generation_currentness_rejection(
     assert_eq!(canary.accepted_cleanup_handoff_count(), 0);
     assert!(canary.rows().is_empty());
     assert_cleanup_generation_currentness_canary_inert(&canary);
+}
+
+fn private_root_work_loop_diagnostic_evidence() -> RootWorkLoopFinishedWorkDiagnosticEvidence {
+    RootWorkLoopFinishedWorkDiagnosticEvidence::from_private_reconciler_diagnostic(
+        &native_root_work_loop_minimal_placement_diagnostic_for_private_bridge(),
+        "div",
+    )
 }
 
 #[test]
@@ -353,6 +363,30 @@ fn native_private_root_work_loop_finished_work_metadata_shape_matches_canary() {
 }
 
 #[test]
+fn native_private_root_work_loop_finished_work_metadata_from_diagnostic_matches_canary() {
+    let canary = root_work_loop_finished_work_metadata_for_canary(
+        "native-root-work-loop-root:1",
+        "ConcurrentRoot",
+        "native-root-work-loop-update:1",
+        "div",
+        "text",
+        "append-placement-to-container",
+    )
+    .unwrap();
+    let diagnostic_backed =
+        root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+        )
+        .unwrap();
+
+    assert_eq!(diagnostic_backed, canary);
+}
+
+#[test]
 fn native_private_root_work_loop_finished_work_metadata_preserves_caller_ids() {
     let metadata = root_work_loop_finished_work_metadata_for_canary(
         "private-root-work-loop-root:99",
@@ -373,6 +407,110 @@ fn native_private_root_work_loop_finished_work_metadata_preserves_caller_ids() {
         metadata.facade().render_update_id(),
         "private-root-work-loop-update:42"
     );
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_from_diagnostic_preserves_caller_ids() {
+    let metadata =
+        root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary(
+            "private-root-work-loop-root:99",
+            "LegacyRoot",
+            "private-root-work-loop-update:42",
+            "div",
+            "text",
+        )
+        .unwrap();
+
+    assert_eq!(
+        metadata.facade().root_id(),
+        "private-root-work-loop-root:99"
+    );
+    assert_eq!(metadata.facade().root_tag(), "LegacyRoot");
+    assert_eq!(
+        metadata.facade().render_update_id(),
+        "private-root-work-loop-update:42"
+    );
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_uses_diagnostic_evidence() {
+    let diagnostic = native_root_work_loop_minimal_placement_diagnostic_for_private_bridge();
+    let evidence = RootWorkLoopFinishedWorkDiagnosticEvidence::from_private_reconciler_diagnostic(
+        &diagnostic,
+        "div",
+    );
+    let metadata = root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+        "native-root-work-loop-root:diagnostic",
+        "ConcurrentRoot",
+        "native-root-work-loop-update:diagnostic",
+        "div",
+        "text",
+        &evidence,
+    )
+    .unwrap();
+
+    assert_eq!(
+        metadata.placement().apply_kind(),
+        diagnostic.placement_mutation_kind()
+    );
+    assert_eq!(metadata.facade().host_type(), "div");
+    assert_eq!(metadata.facade().host_output_shape(), "host-component");
+    assert_eq!(metadata.facade().text_content(), diagnostic.text_content());
+    assert_eq!(
+        metadata.complete_work().root_child_tag(),
+        diagnostic.root_child_tag_name()
+    );
+    assert_eq!(
+        metadata.complete_work().completed_child_tag(),
+        diagnostic.completed_child_tag_name()
+    );
+    assert_eq!(
+        metadata.complete_work().host_text_child_tag(),
+        diagnostic.host_text_child_tag_name()
+    );
+    assert_eq!(
+        metadata.complete_work().child_tags(),
+        diagnostic.child_tag_names()
+    );
+    assert_eq!(metadata.placement().tag(), diagnostic.root_child_tag_name());
+    assert_eq!(
+        metadata.facade().host_component_count(),
+        u32::try_from(diagnostic.root_child_count()).unwrap()
+    );
+    assert_eq!(
+        metadata.facade().host_text_count(),
+        u32::try_from(diagnostic.component_child_count()).unwrap()
+    );
+    assert_eq!(
+        metadata.commit().mutation_execution_blocked(),
+        diagnostic.host_mutation_execution_blocked()
+    );
+    assert_eq!(
+        metadata.commit().public_root_rendering_blocked(),
+        diagnostic.public_root_rendering_blocked()
+    );
+    assert_eq!(
+        metadata.commit().effects_refs_and_hydration_blocked(),
+        diagnostic.effects_refs_and_hydration_blocked()
+    );
+    assert!(diagnostic.minimal_host_root_component_text_path_proven());
+    assert!(diagnostic.render_complete_handoff_proven());
+    assert!(diagnostic.private_render_complete_placement_proven());
+    assert!(diagnostic.host_mutation_gate_blockers_intact());
+    assert!(diagnostic.host_mutation_execution_blocked());
+    assert!(!diagnostic.production_host_mutation_apply_promoted());
+    assert!(!diagnostic.public_dom_compatibility_claimed());
+    assert!(!diagnostic.public_root_rendering_claimed());
+    assert!(diagnostic.public_root_rendering_blocked());
+    assert!(diagnostic.public_compatibility_blocked());
+    assert!(diagnostic.effects_execution_blocked());
+    assert!(diagnostic.refs_execution_blocked());
+    assert!(diagnostic.hydration_execution_blocked());
+    assert!(diagnostic.effects_refs_and_hydration_execution_surfaces_blocked());
+    assert!(diagnostic.effects_refs_and_hydration_blocked());
+    assert!(!diagnostic.public_renderer_package_behavior_exposed());
+    assert!(!diagnostic.react_dom_compatibility_claimed());
+    assert!(!diagnostic.test_renderer_compatibility_claimed());
 }
 
 #[test]
@@ -422,6 +560,70 @@ fn native_private_root_work_loop_finished_work_metadata_rejects_unsupported_cana
 }
 
 #[test]
+fn native_private_root_work_loop_finished_work_metadata_from_diagnostic_rejects_unsupported_inputs()
+{
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "span",
+            "text",
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedHostType {
+            actual: "span".to_string()
+        }
+    );
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "copy",
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedTextContent {
+            actual: "copy".to_string()
+        }
+    );
+
+    for (root_id, root_tag, render_update_id, field) in [
+        (
+            "",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "root_id",
+        ),
+        (
+            "native-root-work-loop-root:1",
+            "",
+            "native-root-work-loop-update:1",
+            "root_tag",
+        ),
+        (
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "",
+            "render_update_id",
+        ),
+    ] {
+        assert_eq!(
+            root_work_loop_finished_work_metadata_from_private_reconciler_diagnostic_for_canary(
+                root_id,
+                root_tag,
+                render_update_id,
+                "div",
+                "text",
+            )
+            .unwrap_err(),
+            RootWorkLoopFinishedWorkMetadataError::EmptyCallerId { field }
+        );
+    }
+}
+
+#[test]
 fn native_private_root_work_loop_finished_work_metadata_rejects_empty_caller_ids() {
     for (root_id, root_tag, render_update_id, field) in [
         (
@@ -456,6 +658,274 @@ fn native_private_root_work_loop_finished_work_metadata_rejects_empty_caller_ids
             RootWorkLoopFinishedWorkMetadataError::EmptyCallerId { field }
         );
     }
+}
+
+#[test]
+fn native_private_root_work_loop_finished_work_metadata_rejects_hostile_diagnostic_evidence() {
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_placement_mutation_kind_for_test("insert-placement-in-container-before");
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedPlacementApplyKind {
+            actual: "insert-placement-in-container-before".to_string()
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence().with_text_content_for_test("copy");
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+            field: "text_content",
+            expected: "text",
+            actual: "copy".to_string()
+        }
+    );
+
+    let evidence =
+        private_root_work_loop_diagnostic_evidence().with_host_output_shape_for_test("host-text");
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+            field: "host_output_shape",
+            expected: "host-component",
+            actual: "host-text".to_string()
+        }
+    );
+
+    let evidence =
+        private_root_work_loop_diagnostic_evidence().with_root_child_tag_for_test("HostText");
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+            field: "root_child_tag",
+            expected: "HostComponent",
+            actual: "HostText".to_string()
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_child_tags_for_test(["HostText", "HostComponent"]);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+            field: "child_tags",
+            expected: "HostComponent,HostText",
+            actual: "HostText,HostComponent".to_string()
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_minimal_host_root_component_text_path_proven_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "minimal_host_root_component_text_path_proven"
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence().with_root_child_count_for_test(2);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+            field: "root_child_count",
+            expected: "1",
+            actual: "2".to_string()
+        }
+    );
+
+    let evidence =
+        private_root_work_loop_diagnostic_evidence().with_component_child_count_for_test(0);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnsupportedDiagnosticValue {
+            field: "component_child_count",
+            expected: "1",
+            actual: "0".to_string()
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_host_mutation_execution_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "host_mutation_execution_blocked"
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_effects_refs_and_hydration_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "effects_refs_and_hydration_blocked"
+        }
+    );
+
+    let evidence =
+        private_root_work_loop_diagnostic_evidence().with_effects_execution_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "effects_execution_blocked"
+        }
+    );
+
+    let evidence =
+        private_root_work_loop_diagnostic_evidence().with_refs_execution_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "refs_execution_blocked"
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_hydration_execution_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "hydration_execution_blocked"
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_effects_refs_and_hydration_execution_surfaces_blocked_for_test(false);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::UnprovenDiagnostic {
+            field: "effects_refs_and_hydration_execution_surfaces_blocked"
+        }
+    );
+
+    let evidence = private_root_work_loop_diagnostic_evidence()
+        .with_public_dom_compatibility_claimed_for_test(true);
+    assert_eq!(
+        root_work_loop_finished_work_metadata_from_diagnostic_evidence_for_canary(
+            "native-root-work-loop-root:1",
+            "ConcurrentRoot",
+            "native-root-work-loop-update:1",
+            "div",
+            "text",
+            &evidence,
+        )
+        .unwrap_err(),
+        RootWorkLoopFinishedWorkMetadataError::DiagnosticPublicCompatibilityClaim {
+            field: "public_dom_compatibility_claimed"
+        }
+    );
 }
 
 #[test]
