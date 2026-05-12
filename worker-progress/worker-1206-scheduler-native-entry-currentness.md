@@ -101,4 +101,5 @@ Notes:
 
 ## Commit Hash
 
-- `4aae30a7` (`Add scheduler native entry currentness gate`).
+- Implementation commit: `7e2e349a` (`Add scheduler native entry currentness gate`).
+- Report repair commit: `4143674c` (`Record worker 1206 report hash`).
