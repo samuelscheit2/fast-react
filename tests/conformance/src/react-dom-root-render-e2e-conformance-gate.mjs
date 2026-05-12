@@ -2292,7 +2292,7 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     privateCrossRootSchedulingGate: {
       id: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_GATE_ID,
       localEntrypoint:
-        "packages/react-dom/src/client/root-bridge.js + packages/react-dom/src/shared/flush-sync-guard.js + crates/fast-react-reconciler/src/sync_flush.rs private diagnostics",
+        "packages/react-dom/src/client/root-bridge.js + packages/react-dom/src/shared/flush-sync-guard.js + crates/fast-react-reconciler/src/sync_flush.rs + crates/fast-react-reconciler/src/sync_flush/tests/root_commit_continuation.rs private diagnostics",
       admittedPrivateCrossRootSchedulingScenarioIds:
         REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ADMISSIONS.filter(
           (admission) =>
@@ -11128,9 +11128,13 @@ function inspectPortalReconcilerFailClosedDiagnostics({ workspaceRoot }) {
       workspaceRoot,
       "crates/fast-react-reconciler/src/begin_work.rs"
     );
-    const rootWorkLoopSource = readWorkspaceFile(
+    const rootWorkLoopPreflightSource = readWorkspaceFile(
       workspaceRoot,
-      "crates/fast-react-reconciler/src/root_work_loop.rs"
+      "crates/fast-react-reconciler/src/root_work_loop/preflight.rs"
+    );
+    const rootWorkLoopSuspenseTestsSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/root_work_loop/tests/suspense.rs"
     );
 
     return {
@@ -11146,15 +11150,17 @@ function inspectPortalReconcilerFailClosedDiagnostics({ workspaceRoot }) {
         /UnsupportedPortalBeginWorkRecord/u.test(beginWorkSource),
       rootPreflightErrorVariantPresent:
         /HostRootChildBeginWorkPreflightError[\s\S]*UnsupportedPortal/u.test(
-          rootWorkLoopSource
+          rootWorkLoopPreflightSource
         ),
       rootPreflightNoDelegationTestPresent:
         /root_work_loop_preflight_fails_closed_for_portal_child_without_delegating_or_mounting/u.test(
-          rootWorkLoopSource
+          rootWorkLoopSuspenseTestsSource
         ),
       rootPreflightPortalTagGuardPresent:
-        /child_tag == FiberTag::Portal/u.test(rootWorkLoopSource) &&
-        /unsupported_portal_begin_work_record/u.test(rootWorkLoopSource)
+        /child_tag == FiberTag::Portal/u.test(rootWorkLoopPreflightSource) &&
+        /unsupported_portal_begin_work_record/u.test(
+          rootWorkLoopPreflightSource
+        )
     };
   } catch (error) {
     return {
@@ -11169,6 +11175,10 @@ function inspectSyncFlushCrossRootReconcilerDiagnostics({ workspaceRoot }) {
       workspaceRoot,
       "crates/fast-react-reconciler/src/sync_flush.rs"
     );
+    const syncFlushRootCommitContinuationTestsSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/sync_flush/tests/root_commit_continuation.rs"
+    );
 
     return {
       loadError: null,
@@ -11181,7 +11191,7 @@ function inspectSyncFlushCrossRootReconcilerDiagnostics({ workspaceRoot }) {
         /SyncFlushCrossRootRenderDiagnosticsForCanary/u.test(syncFlushSource),
       crossRootDiagnosticTestPresent:
         /sync_flush_cross_root_render_diagnostics_prove_scheduled_private_flush/u.test(
-          syncFlushSource
+          syncFlushRootCommitContinuationTestsSource
         ),
       scheduledRootTraversalPresent:
         /first_scheduled_root/u.test(syncFlushSource) &&
@@ -11207,6 +11217,22 @@ function inspectRootWorkLoopCommitHandoffSourceDiagnostics({ workspaceRoot }) {
       workspaceRoot,
       "crates/fast-react-reconciler/src/root_commit.rs"
     );
+    const rootWorkLoopCompleteHandoffSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/root_work_loop/complete_handoff.rs"
+    );
+    const rootWorkLoopHostCompleteTestsSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/root_work_loop/tests/host_complete.rs"
+    );
+    const rootWorkLoopCommitHandoffTestsSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/root_work_loop/tests/commit_handoff.rs"
+    );
+    const rootCommitUpdatesTestsSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/root_commit/tests/updates.rs"
+    );
 
     return {
       loadError: null,
@@ -11227,11 +11253,11 @@ function inspectRootWorkLoopCommitHandoffSourceDiagnostics({ workspaceRoot }) {
           ),
         hostComponentCommitDiagnosticTestPresent:
           /root_work_loop_complete_work_handoff_commits_host_component_tree_with_diagnostics/u.test(
-            rootWorkLoopSource
+            rootWorkLoopHostCompleteTestsSource
           ),
         hostTextCommitDiagnosticTestPresent:
           /root_work_loop_complete_work_commit_handoff_records_root_text_diagnostic/u.test(
-            rootWorkLoopSource
+            rootWorkLoopCommitHandoffTestsSource
           ),
         hostOperationsUnchangedByCommitCheckPresent:
           /host_operations_unchanged_by_commit/u.test(rootWorkLoopSource),
@@ -11241,7 +11267,7 @@ function inspectRootWorkLoopCommitHandoffSourceDiagnostics({ workspaceRoot }) {
           ),
         publicRenderBlockedMethodPresent:
           /const fn public_render_blocked\(&self\) -> bool\s*\{\s*true\s*\}/u.test(
-            rootWorkLoopSource
+            rootWorkLoopCompleteHandoffSource
           ),
         mutationExecutionBlockedAssertionPresent:
           /mutation_execution_blocked\(\)/u.test(rootWorkLoopSource),
@@ -11286,19 +11312,19 @@ function inspectRootWorkLoopCommitHandoffSourceDiagnostics({ workspaceRoot }) {
           /effects_refs_and_hydration_blocked/u.test(rootCommitSource),
         identityLanesRootTokenOrderTestPresent:
           /root_commit_finished_work_handoff_records_identity_lanes_root_token_and_order/u.test(
-            rootCommitSource
+            rootCommitUpdatesTestsSource
           ),
         missingRecordRejectionTestPresent:
           /root_commit_finished_work_handoff_rejects_missing_record_before_switching_current/u.test(
-            rootCommitSource
+            rootCommitUpdatesTestsSource
           ),
         foreignRecordRejectionTestPresent:
           /root_commit_finished_work_handoff_rejects_foreign_record_before_switching_current/u.test(
-            rootCommitSource
+            rootCommitUpdatesTestsSource
           ),
         staleRecordRejectionTestPresent:
           /root_commit_finished_work_handoff_rejects_stale_record_(?:after_current_switch|before_switching_current)/u.test(
-            rootCommitSource
+            rootCommitUpdatesTestsSource
           ),
         lanesMismatchErrorVariantPresent:
           /FinishedWorkRecordLanesMismatch/u.test(rootCommitSource),
@@ -11334,6 +11360,10 @@ function inspectActPassiveSourceDiagnostics({ workspaceRoot }) {
       workspaceRoot,
       "crates/fast-react-reconciler/src/root_scheduler.rs"
     );
+    const rootSchedulerTestsSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/root_scheduler/tests.rs"
+    );
 
     return {
       loadError: null,
@@ -11368,9 +11398,12 @@ function inspectActPassiveSourceDiagnostics({ workspaceRoot }) {
       passiveErrorCaptureRecordPresent:
         /PassiveEffectRootErrorCaptureRecord/u.test(passiveEffectsSource),
       passiveSchedulerFlushGatePresent:
-        /passive_effect_scheduler_flush_gate/u.test(rootSchedulerSource) &&
-        /root_scheduler_passive_effect_scheduler_flush_gate_records_request_without_consuming/u.test(
+        /PassiveEffectSchedulerFlushGateRecord/u.test(rootSchedulerSource) &&
+        /schedule_passive_effects_flush_after_commit_for_canary/u.test(
           rootSchedulerSource
+        ) &&
+        /root_scheduler_passive_effect_scheduler_flush_gate_records_request_without_consuming/u.test(
+          rootSchedulerTestsSource
         )
     };
   } catch (error) {

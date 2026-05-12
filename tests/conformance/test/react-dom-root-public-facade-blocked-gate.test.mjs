@@ -1566,6 +1566,7 @@ test("React DOM client private hydrateRoot event replay preflight validates bloc
       "hydrate-root-lifecycle-request-boundary-required",
       "hydrate-root-target-claiming-preflight-required",
       "hydrate-root-replay-target-dispatch-execution-metadata",
+      "hydrate-root-replay-blocker-currentness",
       "hydrate-root-event-replay-state-unchanged"
     ]
   );

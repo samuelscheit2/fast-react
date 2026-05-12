@@ -1,6 +1,6 @@
 # Private Root Output Gate
 
-Last reviewed: 2026-05-10.
+Last reviewed: 2026-05-12.
 
 This note tracks the currently accepted private React DOM root-output pipeline.
 It is a diagnostic pipeline only. It does not admit public
@@ -31,8 +31,8 @@ The root-render E2E gate currently reports:
 - Public blocked scenario-mode rows: 20
 - Private bridge request rows compared: 18
 - Private bridge request rows blocked: 2
-- Private host-output diagnostic rows admitted: 16
-- Private host-output diagnostic rows blocked: 4
+- Private host-output diagnostic rows admitted: 18
+- Private host-output diagnostic rows blocked: 2
 - Portal root-render prerequisite rows accepted: 4
 - Portal root-render rows blocked: 5
 
@@ -40,10 +40,10 @@ The public facade blocked gate currently reports:
 
 - Accepted client-root oracle scenario-mode rows checked: 44
 - Accepted root-render oracle scenario-mode rows checked: 20
-- Blocked public facade rows: 12
+- Blocked public facade rows: 21
 - Blocked private bridge rows: 8
-- Root-render private host-output diagnostic rows admitted: 16
-- Root-render private host-output diagnostic rows blocked: 4
+- Root-render private host-output diagnostic rows admitted: 18
+- Root-render private host-output diagnostic rows blocked: 2
 - Root-render portal rows blocked: 5
 
 ## Private Bridge Rows
@@ -82,18 +82,20 @@ host-output diagnostics for these scenarios, in both default Node probe modes:
 - `root-unmount`
 - `double-unmount`
 - `render-after-unmount`
+- `flush-sync-cross-root-render`
 
 These rows are admitted only as private fake-DOM diagnostics. Accepted evidence
 includes explicit createRoot marker/listener apply and revert records,
 HostComponent/HostText fake-DOM creation, property and text update handoffs,
 latest-props publication, root-child replacement/clearing, component-tree
 metadata detach, unmount cleanup, double-unmount no-op behavior, and the stale
-render-after-unmount guard.
+render-after-unmount guard. The `flush-sync-cross-root-render` rows additionally
+consume private flushSync guard evidence plus split reconciler source/test
+diagnostics from `sync_flush.rs` and
+`sync_flush/tests/root_commit_continuation.rs`.
 
 The private host-output layer still blocks:
 
-- `flush-sync-cross-root-render`, pending private cross-root flush/scheduling
-  evidence in this gate.
 - `development-warning-boundaries`, pending private warning-boundary evidence in
   this gate.
 
