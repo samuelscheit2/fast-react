@@ -38,6 +38,7 @@ use crate::root_config::RootErrorOptionCallbackPhase;
 use crate::root_scheduler::{
     RootSyncSchedulerContinuationExecutionStatus, SchedulerBridgeActContinuationExecutionStatus,
     SchedulerBridgeActQueueRequestExecutionStatus, root_sync_flush_record_for_canary,
+    root_sync_flush_record_with_status_for_canary,
 };
 use crate::root_updates::{
     host_root_queued_callback_order_snapshot_for_canary, update_container_transition_for_canary,

@@ -242,6 +242,7 @@ mod render_phase;
 )]
 pub(crate) use render_phase::{
     HostRootMinimalElementRenderPhaseError, HostRootMinimalElementRenderPhaseRecord,
+    materialize_minimal_root_element_from_render_phase,
     render_host_root_for_lanes_with_minimal_root_element,
 };
 #[cfg(test)]

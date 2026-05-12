@@ -77,7 +77,7 @@ pub(crate) use self::continuations::{
     RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary,
     consume_expired_default_sync_queue_lane_commit_currentness_for_canary,
     consume_finished_work_queue_lane_commit_currentness_for_canary,
-    root_sync_flush_record_for_canary,
+    root_sync_flush_record_for_canary, root_sync_flush_record_with_status_for_canary,
 };
 #[allow(
     unused_imports,

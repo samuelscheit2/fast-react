@@ -72,6 +72,8 @@ pub enum RootSyncFlushExitStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RootSyncFlushRecordStatus {
     RenderedAwaitingCommit,
+    #[cfg(test)]
+    StaleForCanary,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -122,6 +124,27 @@ pub(crate) const fn root_sync_flush_record_for_canary(
         root,
         lanes,
         status: RootSyncFlushRecordStatus::RenderedAwaitingCommit,
+        render_phase,
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "crate-private forged sync-flush status helper is consumed through root_scheduler re-export by focused canaries"
+)]
+pub(crate) const fn root_sync_flush_record_with_status_for_canary(
+    order: usize,
+    root: FiberRootId,
+    lanes: Lanes,
+    status: RootSyncFlushRecordStatus,
+    render_phase: HostRootRenderPhaseRecord,
+) -> RootSyncFlushRecord {
+    RootSyncFlushRecord {
+        order,
+        root,
+        lanes,
+        status,
         render_phase,
     }
 }

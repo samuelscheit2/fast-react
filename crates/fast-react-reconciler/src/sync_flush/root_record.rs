@@ -1,10 +1,18 @@
 use fast_react_core::{FiberId, Lanes, StateNodeHandle};
 use fast_react_host_config::HostTypes;
+#[cfg(test)]
+use fast_react_host_config::{HostCommit, HostCreation, MutationHost};
 
+#[cfg(test)]
+use crate::RootElementSource;
 #[cfg(test)]
 use crate::RootSchedulerCallbackHandle;
 #[cfg(not(test))]
 use crate::commit_finished_host_root;
+#[cfg(test)]
+use crate::complete_work::HostFiberTokenFactory;
+#[cfg(test)]
+use crate::host_nodes::HostNodeStore;
 use crate::root_callbacks::{
     RootUpdateCallbackInvocationExecutionGateSnapshot, RootUpdateCallbackInvocationTestControl,
 };
@@ -30,6 +38,13 @@ use crate::root_scheduler::{
 use crate::root_scheduler::{
     RootSyncSchedulerContinuationExecutionError, RootSyncSchedulerContinuationExecutionRecord,
     execute_sync_scheduler_continuation_for_render_handoff,
+};
+#[cfg(test)]
+use crate::root_work_loop::{
+    HostRootMinimalElementRenderPhaseError, HostRootMinimalRenderCompletePlacementCommitError,
+    HostRootMinimalRenderCompletePlacementCommitRecord,
+    commit_minimal_root_element_render_complete_handoff_to_host_placement,
+    materialize_minimal_root_element_from_render_phase,
 };
 use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
@@ -448,6 +463,167 @@ impl SyncFlushActRootExecutionPathRecordForCanary {
     }
 }
 
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushMinimalHostPlacementCommitRecordForCanary {
+    sync_flush_record: RootSyncFlushRecord,
+    finished_work_handoff_identity: SyncFlushFinishedWorkHandoffIdentityForCanary,
+    placement: HostRootMinimalRenderCompletePlacementCommitRecord,
+    might_have_pending_sync_work_after_commit: bool,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush minimal host placement canary is inspected by focused tests"
+)]
+impl SyncFlushMinimalHostPlacementCommitRecordForCanary {
+    #[must_use]
+    pub(crate) const fn sync_flush_record(&self) -> RootSyncFlushRecord {
+        self.sync_flush_record
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_handoff_identity(
+        &self,
+    ) -> SyncFlushFinishedWorkHandoffIdentityForCanary {
+        self.finished_work_handoff_identity
+    }
+
+    #[must_use]
+    pub(crate) const fn placement(&self) -> &HostRootMinimalRenderCompletePlacementCommitRecord {
+        &self.placement
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.sync_flush_record.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn order(&self) -> usize {
+        self.sync_flush_record.order()
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(&self) -> Lanes {
+        self.sync_flush_record.lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.sync_flush_record.render_phase().finished_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn might_have_pending_sync_work_after_commit(&self) -> bool {
+        self.might_have_pending_sync_work_after_commit
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_sync_flush_minimal_host_placement_handoff(&self) -> bool {
+        let render = self.sync_flush_record.render_phase();
+        self.sync_flush_record.status() == RootSyncFlushRecordStatus::RenderedAwaitingCommit
+            && self
+                .finished_work_handoff_identity
+                .accepted_current_finished_work_record_shape()
+            && self.sync_flush_record.root() == render.root()
+            && self.sync_flush_record.lanes() == render.render_lanes()
+            && self.placement.commit().root() == render.root()
+            && self.placement.commit().previous_current() == render.current()
+            && self.placement.commit().current() == render.finished_work()
+            && self.placement.commit().finished_work() == render.finished_work()
+            && self.placement.commit().finished_lanes() == render.render_lanes()
+            && self.placement.commit().remaining_lanes() == render.remaining_lanes()
+            && self
+                .placement
+                .proves_private_minimal_render_complete_placement_commit()
+            && !self.might_have_pending_sync_work_after_commit
+            && self.public_root_rendering_blocked()
+            && self.public_compatibility_blocked()
+            && !self.public_flush_sync_compatibility_claimed()
+            && !self.react_dom_compatibility_claimed()
+            && !self.test_renderer_compatibility_claimed()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) fn effects_execution_blocked(&self) -> bool {
+        self.placement.effects_execution_blocked()
+    }
+
+    #[must_use]
+    pub(crate) fn refs_execution_blocked(&self) -> bool {
+        self.placement.refs_execution_blocked()
+    }
+
+    #[must_use]
+    pub(crate) fn hydration_execution_blocked(&self) -> bool {
+        self.placement.hydration_execution_blocked()
+    }
+
+    #[must_use]
+    pub(crate) fn effects_refs_and_hydration_execution_surfaces_blocked(&self) -> bool {
+        self.placement
+            .effects_refs_and_hydration_execution_surfaces_blocked()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SyncFlushMinimalHostPlacementCommitErrorForCanary<E> {
+    NonSyncLanes {
+        root: FiberRootId,
+        order: usize,
+        lanes: Lanes,
+    },
+    RenderLaneMismatch {
+        root: FiberRootId,
+        order: usize,
+        selected_lanes: Lanes,
+        render_lanes: Lanes,
+    },
+    StaleFinishedWorkHandoff {
+        root: FiberRootId,
+        order: usize,
+        selected_lanes: Lanes,
+        identity: SyncFlushFinishedWorkHandoffIdentityForCanary,
+    },
+    Render(HostRootMinimalElementRenderPhaseError),
+    CompletePlacement(HostRootMinimalRenderCompletePlacementCommitError<E>),
+    SyncFlush(SyncFlushError),
+    RootScheduler(RootSchedulerError),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncFlushRootRecord {
     pub(super) order: usize,
@@ -663,6 +839,86 @@ impl SyncFlushRootRecord {
         Ok((committed, diagnostics))
     }
 
+    #[cfg(test)]
+    #[allow(
+        dead_code,
+        reason = "crate-private sync-flush minimal host placement bridge is exercised by focused canaries"
+    )]
+    pub(crate) fn commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary<
+        H,
+        S,
+        A,
+        T,
+    >(
+        store: &mut FiberRootStore<H>,
+        host: &mut H,
+        host_nodes: &mut HostNodeStore<H>,
+        token_factory: &mut T,
+        record: RootSyncFlushRecord,
+        source: &S,
+        adapter: &mut A,
+    ) -> Result<
+        SyncFlushMinimalHostPlacementCommitRecordForCanary,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary<A::Error>,
+    >
+    where
+        H: HostCreation + HostCommit + MutationHost,
+        S: RootElementSource + ?Sized,
+        A: crate::root_work_loop::HostRootMinimalRenderCompleteHandoffAdapter<H>,
+        T: HostFiberTokenFactory<H>,
+    {
+        commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            store,
+            host,
+            host_nodes,
+            token_factory,
+            record,
+            source,
+            adapter,
+            false,
+        )
+    }
+
+    #[cfg(test)]
+    #[allow(
+        dead_code,
+        reason = "crate-private sync-flush compatibility-claim blocker canary is exercised by focused tests"
+    )]
+    pub(crate) fn commit_rendered_sync_flush_record_to_minimal_host_placement_with_public_compatibility_claim_for_canary<
+        H,
+        S,
+        A,
+        T,
+    >(
+        store: &mut FiberRootStore<H>,
+        host: &mut H,
+        host_nodes: &mut HostNodeStore<H>,
+        token_factory: &mut T,
+        record: RootSyncFlushRecord,
+        source: &S,
+        adapter: &mut A,
+    ) -> Result<
+        SyncFlushMinimalHostPlacementCommitRecordForCanary,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary<A::Error>,
+    >
+    where
+        H: HostCreation + HostCommit + MutationHost,
+        S: RootElementSource + ?Sized,
+        A: crate::root_work_loop::HostRootMinimalRenderCompleteHandoffAdapter<H>,
+        T: HostFiberTokenFactory<H>,
+    {
+        commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            store,
+            host,
+            host_nodes,
+            token_factory,
+            record,
+            source,
+            adapter,
+            true,
+        )
+    }
+
     #[allow(
         dead_code,
         reason = "crate-private sync-flush commit recovery diagnostic reserved for private error workers"
@@ -833,6 +1089,100 @@ impl SyncFlushRootRecord {
             && diagnostics.host_root_placement_apply_count() > 0
             && diagnostics.root_current_after_commit() == self.commit.current()
     }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private canary helper mirrors the minimal render/complete/placement handoff shape"
+)]
+fn commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary<H, S, A, T>(
+    store: &mut FiberRootStore<H>,
+    host: &mut H,
+    host_nodes: &mut HostNodeStore<H>,
+    token_factory: &mut T,
+    record: RootSyncFlushRecord,
+    source: &S,
+    adapter: &mut A,
+    claim_public_compatibility_for_canary: bool,
+) -> Result<
+    SyncFlushMinimalHostPlacementCommitRecordForCanary,
+    SyncFlushMinimalHostPlacementCommitErrorForCanary<A::Error>,
+>
+where
+    H: HostCreation + HostCommit + MutationHost,
+    S: RootElementSource + ?Sized,
+    A: crate::root_work_loop::HostRootMinimalRenderCompleteHandoffAdapter<H>,
+    T: HostFiberTokenFactory<H>,
+{
+    let root = record.root();
+    let order = record.order();
+    let selected_lanes = record.lanes();
+    let render = record.render_phase();
+
+    if selected_lanes != render.render_lanes() {
+        return Err(
+            SyncFlushMinimalHostPlacementCommitErrorForCanary::RenderLaneMismatch {
+                root,
+                order,
+                selected_lanes,
+                render_lanes: render.render_lanes(),
+            },
+        );
+    }
+
+    if !selected_lanes_are_sync_flush_lanes(selected_lanes) {
+        return Err(
+            SyncFlushMinimalHostPlacementCommitErrorForCanary::NonSyncLanes {
+                root,
+                order,
+                lanes: selected_lanes,
+            },
+        );
+    }
+
+    let identity = sync_flush_finished_work_handoff_identity_for_canary(store, record)
+        .map_err(SyncFlushMinimalHostPlacementCommitErrorForCanary::SyncFlush)?;
+    if record.status() != RootSyncFlushRecordStatus::RenderedAwaitingCommit
+        || !identity.accepted_current_finished_work_record_shape()
+    {
+        return Err(
+            SyncFlushMinimalHostPlacementCommitErrorForCanary::StaleFinishedWorkHandoff {
+                root,
+                order,
+                selected_lanes,
+                identity,
+            },
+        );
+    }
+
+    let mut minimal_render =
+        materialize_minimal_root_element_from_render_phase(store, render, source)
+            .map_err(SyncFlushMinimalHostPlacementCommitErrorForCanary::Render)?;
+    if claim_public_compatibility_for_canary {
+        minimal_render = minimal_render.with_public_compatibility_claimed_for_canary();
+    }
+
+    let placement = commit_minimal_root_element_render_complete_handoff_to_host_placement(
+        store,
+        host,
+        host_nodes,
+        token_factory,
+        minimal_render,
+        adapter,
+    )
+    .map_err(SyncFlushMinimalHostPlacementCommitErrorForCanary::CompletePlacement)?;
+    recompute_might_have_pending_sync_work(store)
+        .map_err(SyncFlushMinimalHostPlacementCommitErrorForCanary::RootScheduler)?;
+
+    Ok(SyncFlushMinimalHostPlacementCommitRecordForCanary {
+        sync_flush_record: record,
+        finished_work_handoff_identity: identity,
+        placement,
+        might_have_pending_sync_work_after_commit: store
+            .root_scheduler()
+            .might_have_pending_sync_work(),
+    })
 }
 
 #[cfg(test)]

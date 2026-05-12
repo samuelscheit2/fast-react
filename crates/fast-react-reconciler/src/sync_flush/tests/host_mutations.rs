@@ -1,4 +1,926 @@
 use super::*;
+use std::cell::Cell;
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+
+use crate::complete_work::HostFiberTokenFactory;
+use crate::host_nodes::HostNodeStore;
+use crate::root_work_loop::{
+    HostRootMinimalElementRenderPhaseError, HostRootMinimalRenderCompleteHandoffAdapter,
+    HostRootMinimalRenderCompleteHandoffError, HostRootMinimalRenderCompletePlacementCommitError,
+};
+use crate::test_support::FakeHostFiberToken;
+use crate::{
+    FiberRootId, FiberRootStore, HostFiberTokenId, RootElementResolutionError, RootElementSource,
+    RootHostComponentElement, RootHostTextChild, RootSyncFlushRecord, render_host_root_for_lanes,
+};
+use fast_react_core::ElementTypeHandle;
+
+#[derive(Debug)]
+struct SyncFlushMinimalRootElementSource {
+    expected: RootElementHandle,
+    component: Option<RootHostComponentElement>,
+    unsupported_reason: Option<&'static str>,
+    calls: Cell<usize>,
+}
+
+impl SyncFlushMinimalRootElementSource {
+    fn component(expected: RootElementHandle, component: RootHostComponentElement) -> Self {
+        Self {
+            expected,
+            component: Some(component),
+            unsupported_reason: None,
+            calls: Cell::new(0),
+        }
+    }
+
+    fn unsupported(expected: RootElementHandle, reason: &'static str) -> Self {
+        Self {
+            expected,
+            component: None,
+            unsupported_reason: Some(reason),
+            calls: Cell::new(0),
+        }
+    }
+
+    fn calls(&self) -> usize {
+        self.calls.get()
+    }
+}
+
+impl RootElementSource for SyncFlushMinimalRootElementSource {
+    fn resolve_root_host_component(
+        &self,
+        element: RootElementHandle,
+    ) -> Result<Option<RootHostComponentElement>, RootElementResolutionError> {
+        self.calls.set(self.calls.get() + 1);
+
+        if let Some(reason) = self.unsupported_reason {
+            return Err(RootElementResolutionError::UnsupportedRootElement { element, reason });
+        }
+
+        Ok((element == self.expected)
+            .then(|| self.component.clone())
+            .flatten())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SyncFlushMinimalAdapterError {
+    RejectType,
+}
+
+impl Display for SyncFlushMinimalAdapterError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RejectType => formatter.write_str("sync flush minimal adapter rejected type"),
+        }
+    }
+}
+
+impl Error for SyncFlushMinimalAdapterError {}
+
+#[derive(Debug)]
+struct SyncFlushMinimalHostAdapter {
+    element: RootElementHandle,
+    element_type: ElementTypeHandle,
+    props: PropsHandle,
+    ty: &'static str,
+    reject_type: bool,
+    type_calls: Cell<usize>,
+    props_calls: Cell<usize>,
+}
+
+impl SyncFlushMinimalHostAdapter {
+    fn new(
+        element: RootElementHandle,
+        element_type: ElementTypeHandle,
+        props: PropsHandle,
+        ty: &'static str,
+    ) -> Self {
+        Self {
+            element,
+            element_type,
+            props,
+            ty,
+            reject_type: false,
+            type_calls: Cell::new(0),
+            props_calls: Cell::new(0),
+        }
+    }
+
+    fn rejecting_type(mut self) -> Self {
+        self.reject_type = true;
+        self
+    }
+
+    fn type_calls(&self) -> usize {
+        self.type_calls.get()
+    }
+
+    fn props_calls(&self) -> usize {
+        self.props_calls.get()
+    }
+}
+
+impl HostRootMinimalRenderCompleteHandoffAdapter<RecordingHost> for SyncFlushMinimalHostAdapter {
+    type Error = SyncFlushMinimalAdapterError;
+
+    fn adapt_host_component_type(
+        &mut self,
+        element: RootElementHandle,
+        element_type: ElementTypeHandle,
+    ) -> Result<Option<&'static str>, Self::Error> {
+        self.type_calls.set(self.type_calls.get() + 1);
+        if self.reject_type {
+            return Err(SyncFlushMinimalAdapterError::RejectType);
+        }
+
+        Ok((element == self.element && element_type == self.element_type).then_some(self.ty))
+    }
+
+    fn adapt_host_component_props(
+        &mut self,
+        element: RootElementHandle,
+        props: PropsHandle,
+    ) -> Result<Option<()>, Self::Error> {
+        self.props_calls.set(self.props_calls.get() + 1);
+
+        Ok((element == self.element && props == self.props).then_some(()))
+    }
+}
+
+#[derive(Debug, Default)]
+struct SyncFlushMinimalHostTokenFactory;
+
+impl HostFiberTokenFactory<RecordingHost> for SyncFlushMinimalHostTokenFactory {
+    fn create_host_fiber_token(&mut self, token_id: HostFiberTokenId) -> FakeHostFiberToken {
+        FakeHostFiberToken(token_id.raw())
+    }
+}
+
+fn sync_flush_minimal_source(
+    element: RootElementHandle,
+    element_type: ElementTypeHandle,
+    props: PropsHandle,
+    text: &'static str,
+    text_props: PropsHandle,
+) -> SyncFlushMinimalRootElementSource {
+    let component = RootHostComponentElement::new(element, element_type, props)
+        .unwrap()
+        .with_text_child(RootHostTextChild::new(text, text_props).unwrap());
+    SyncFlushMinimalRootElementSource::component(element, component)
+}
+
+fn render_sync_flush_minimal_record(
+    store: &mut FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    element: RootElementHandle,
+) -> RootSyncFlushRecord {
+    let update = update_container_sync(store, root_id, element, None).unwrap();
+    ensure_root_is_scheduled(store, update.schedule()).unwrap();
+    let rendered = flush_sync_work_on_all_roots(store, &ExecutionContextState::new()).unwrap();
+    assert_eq!(rendered.records().len(), 1);
+    rendered.records()[0]
+}
+
+fn render_default_minimal_record(
+    store: &mut FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    element: RootElementHandle,
+) -> RootSyncFlushRecord {
+    update_container(store, root_id, element, None).unwrap();
+    let render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
+    root_sync_flush_record_for_canary(0, root_id, Lanes::DEFAULT, render)
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_consumes_rendered_record_and_appends_host_pair_canary() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let element = RootElementHandle::from_raw(8_901);
+    let element_type = ElementTypeHandle::from_raw(8_902);
+    let props = PropsHandle::from_raw(8_903);
+    let text_props = PropsHandle::from_raw(8_904);
+    let source = sync_flush_minimal_source(
+        element,
+        element_type,
+        props,
+        "sync flush minimal placement",
+        text_props,
+    );
+    let previous_current = store.root(root_id).unwrap().current();
+    let public_error = crate::render_mutation_placeholder(&mut host).unwrap_err();
+    assert_eq!(
+        public_error,
+        crate::ReconcilerError::unimplemented(crate::MUTATION_RENDER_PLACEHOLDER_FEATURE)
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    let render_phase = rendered_record.render_phase();
+    assert_eq!(rendered_record.root(), root_id);
+    assert_eq!(rendered_record.lanes(), Lanes::SYNC);
+    assert_eq!(render_phase.render_lanes(), Lanes::SYNC);
+    assert_eq!(render_phase.current(), previous_current);
+    assert_eq!(
+        store.root(root_id).unwrap().finished_work(),
+        Some(render_phase.finished_work())
+    );
+    assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::SYNC);
+    assert_eq!(
+        store.root(root_id).unwrap().scheduling().work_in_progress(),
+        Some(render_phase.finished_work())
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let mut adapter = SyncFlushMinimalHostAdapter::new(element, element_type, props, "section");
+    let record =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap();
+
+    assert_eq!(source.calls(), 1);
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 1);
+    assert_eq!(record.root(), root_id);
+    assert_eq!(record.order(), rendered_record.order());
+    assert_eq!(record.render_lanes(), Lanes::SYNC);
+    assert_eq!(record.finished_work(), render_phase.finished_work());
+    assert!(record.accepted_sync_flush_minimal_host_placement_handoff());
+    assert!(
+        record
+            .finished_work_handoff_identity()
+            .accepted_current_finished_work_record_shape()
+    );
+    assert!(!record.might_have_pending_sync_work_after_commit());
+    assert!(record.public_root_rendering_blocked());
+    assert!(!record.public_root_rendering_claimed());
+    assert!(record.public_compatibility_blocked());
+    assert!(!record.public_flush_sync_compatibility_claimed());
+    assert!(!record.react_dom_compatibility_claimed());
+    assert!(!record.test_renderer_compatibility_claimed());
+    assert!(record.refs_execution_blocked());
+    assert!(record.effects_execution_blocked());
+    assert!(record.hydration_execution_blocked());
+    assert!(record.effects_refs_and_hydration_execution_surfaces_blocked());
+
+    let placement = record.placement();
+    assert!(placement.proves_private_minimal_render_complete_placement_commit());
+    assert_eq!(placement.host_node_count_after_complete_work(), 2);
+    assert_eq!(placement.host_node_count_after_placement(), 0);
+    assert_eq!(placement.commit().previous_current(), previous_current);
+    assert_eq!(placement.commit().current(), render_phase.finished_work());
+    assert_eq!(placement.commit().finished_lanes(), Lanes::SYNC);
+    assert_eq!(placement.commit().pending_lanes(), Lanes::NO);
+    assert_eq!(placement.commit().mutation_log().len(), 1);
+    assert_eq!(placement.commit().mutation_apply_log().len(), 1);
+    assert_eq!(
+        placement.placement_commit().mutation_kind(),
+        HostRootMutationApplyRecordKind::AppendPlacementToContainer
+    );
+    assert!(placement.placement_commit().appended_child_to_container());
+    assert!(
+        !placement
+            .placement_commit()
+            .public_renderer_package_behavior_exposed()
+    );
+    assert!(
+        !placement
+            .placement_commit()
+            .react_dom_compatibility_claimed()
+    );
+    assert!(
+        !placement
+            .placement_commit()
+            .test_renderer_compatibility_claimed()
+    );
+    assert!(
+        placement
+            .commit()
+            .host_component_text_mutation_execution_gate()
+            .host_mutation_execution_blocked()
+    );
+    assert!(
+        placement
+            .commit()
+            .host_component_text_mutation_execution_gate()
+            .blockers_intact()
+    );
+    assert!(
+        !placement
+            .commit()
+            .host_component_text_mutation_execution_gate()
+            .public_dom_compatibility_claimed()
+    );
+    assert!(host_nodes.is_empty());
+    assert_eq!(
+        host.operations(),
+        vec![
+            "root_host_context",
+            "child_host_context",
+            "should_set_text_content",
+            "create_text_instance",
+            "create_instance",
+            "append_initial_child",
+            "finalize_initial_children",
+            "prepare_for_commit",
+            "append_child_to_container",
+            "reset_after_commit",
+        ]
+    );
+
+    let root = store.root(root_id).unwrap();
+    assert_eq!(root.current(), render_phase.finished_work());
+    assert_eq!(root.finished_work(), None);
+    assert_eq!(root.finished_lanes(), Lanes::NO);
+    assert_eq!(root.scheduling().work_in_progress(), None);
+    assert!(
+        !root
+            .lanes()
+            .pending_lanes()
+            .contains_any(rendered_record.lanes())
+    );
+
+    let operations_after_commit = host.operations();
+    let replay_error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+    assert!(matches!(
+        replay_error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::StaleFinishedWorkHandoff {
+            root,
+            order,
+            selected_lanes,
+            ..
+        } if root == root_id
+            && order == rendered_record.order()
+            && selected_lanes == Lanes::SYNC
+    ));
+    assert_eq!(source.calls(), 1);
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 1);
+    assert_eq!(host.operations(), operations_after_commit);
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_rejects_stale_finished_work_and_lane_evidence_canary() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let element = RootElementHandle::from_raw(8_921);
+    let element_type = ElementTypeHandle::from_raw(8_922);
+    let props = PropsHandle::from_raw(8_923);
+    let text_props = PropsHandle::from_raw(8_924);
+    let source = sync_flush_minimal_source(element, element_type, props, "stale", text_props);
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    let mut adapter = SyncFlushMinimalHostAdapter::new(element, element_type, props, "section");
+
+    store.root_mut(root_id).unwrap().clear_finished_work();
+    let stale_finished_work_error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        stale_finished_work_error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::StaleFinishedWorkHandoff {
+            root,
+            order,
+            selected_lanes,
+            ..
+        } if root == root_id
+            && order == rendered_record.order()
+            && selected_lanes == Lanes::SYNC
+    ));
+    assert_eq!(source.calls(), 0);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert!(host_nodes.is_empty());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let source = sync_flush_minimal_source(element, element_type, props, "stale wip", text_props);
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    store
+        .root_mut(root_id)
+        .unwrap()
+        .scheduling_mut()
+        .clear_render_phase_work();
+    let mut adapter = SyncFlushMinimalHostAdapter::new(element, element_type, props, "section");
+
+    let stale_wip_error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        stale_wip_error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::StaleFinishedWorkHandoff { .. }
+    ));
+    assert_eq!(source.calls(), 0);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert!(host_nodes.is_empty());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let source =
+        sync_flush_minimal_source(element, element_type, props, "lane mismatch", text_props);
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    let forged = root_sync_flush_record_for_canary(
+        rendered_record.order(),
+        root_id,
+        Lanes::SYNC_HYDRATION,
+        rendered_record.render_phase(),
+    );
+    let mut adapter = SyncFlushMinimalHostAdapter::new(element, element_type, props, "section");
+
+    let lane_error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            forged,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        lane_error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::RenderLaneMismatch {
+            root,
+            order,
+            selected_lanes,
+            render_lanes,
+        } if root == root_id
+            && order == rendered_record.order()
+            && selected_lanes == Lanes::SYNC_HYDRATION
+            && render_lanes == Lanes::SYNC
+    ));
+    assert_eq!(source.calls(), 0);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert!(host_nodes.is_empty());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_resolver_and_adapter_fail_closed_without_publishing_canary() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let element = RootElementHandle::from_raw(8_941);
+    let element_type = ElementTypeHandle::from_raw(8_942);
+    let props = PropsHandle::from_raw(8_943);
+    let text_props = PropsHandle::from_raw(8_944);
+    let source = SyncFlushMinimalRootElementSource::unsupported(element, "unsupported test shape");
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    let mut adapter = SyncFlushMinimalHostAdapter::new(element, element_type, props, "section");
+
+    let unsupported_error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        unsupported_error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::Render(
+            HostRootMinimalElementRenderPhaseError::RootElementResolution(
+                RootElementResolutionError::UnsupportedRootElement { element: rejected, reason }
+            )
+        ) if rejected == element && reason == "unsupported test shape"
+    ));
+    assert_eq!(source.calls(), 1);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert!(host_nodes.is_empty());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let component = RootHostComponentElement::new(element, element_type, props).unwrap();
+    let source = SyncFlushMinimalRootElementSource::component(element, component);
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    let mut adapter = SyncFlushMinimalHostAdapter::new(element, element_type, props, "section");
+
+    let missing_text_error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        missing_text_error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::Render(
+            HostRootMinimalElementRenderPhaseError::ExpectedSingleHostTextChild {
+                root,
+                element: rejected,
+            }
+        ) if root == root_id && rejected == element
+    ));
+    assert_eq!(source.calls(), 1);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert!(host_nodes.is_empty());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let source = sync_flush_minimal_source(element, element_type, props, "adapter", text_props);
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    let mut adapter =
+        SyncFlushMinimalHostAdapter::new(element, element_type, props, "section").rejecting_type();
+
+    let adapter_error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+
+    assert_eq!(source.calls(), 1);
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 0);
+    assert!(matches!(
+        adapter_error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::CompletePlacement(
+            HostRootMinimalRenderCompletePlacementCommitError::CompleteHandoff(
+                HostRootMinimalRenderCompleteHandoffError::Adapter(
+                    SyncFlushMinimalAdapterError::RejectType
+                )
+            )
+        )
+    ));
+    assert!(host_nodes.is_empty());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_rejects_public_compatibility_claim_before_host_publication_canary()
+ {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let element = RootElementHandle::from_raw(8_961);
+    let element_type = ElementTypeHandle::from_raw(8_962);
+    let props = PropsHandle::from_raw(8_963);
+    let source = sync_flush_minimal_source(
+        element,
+        element_type,
+        props,
+        "public compatibility must stay blocked",
+        PropsHandle::from_raw(8_964),
+    );
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    let mut adapter = SyncFlushMinimalHostAdapter::new(element, element_type, props, "section");
+
+    let error = SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_with_public_compatibility_claim_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::CompletePlacement(
+            HostRootMinimalRenderCompletePlacementCommitError::CompleteHandoff(
+                HostRootMinimalRenderCompleteHandoffError::PublicCompatibilityClaimed {
+                    root,
+                    element: rejected,
+                }
+            )
+        ) if root == root_id && rejected == element
+    ));
+    assert_eq!(source.calls(), 1);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert!(host_nodes.is_empty());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+    let root = store.root(root_id).unwrap();
+    assert_eq!(root.current(), rendered_record.render_phase().current());
+    assert_eq!(
+        root.finished_work(),
+        Some(rendered_record.render_phase().finished_work())
+    );
+    assert_eq!(
+        root.scheduling().work_in_progress(),
+        Some(rendered_record.render_phase().finished_work())
+    );
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_rejects_stale_status_before_source_adapter_or_host_canary() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let element = RootElementHandle::from_raw(8_971);
+    let element_type = ElementTypeHandle::from_raw(8_972);
+    let props = PropsHandle::from_raw(8_973);
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    let stale_record = root_sync_flush_record_with_status_for_canary(
+        rendered_record.order(),
+        rendered_record.root(),
+        rendered_record.lanes(),
+        RootSyncFlushRecordStatus::StaleForCanary,
+        rendered_record.render_phase(),
+    );
+    let source = SyncFlushMinimalRootElementSource::unsupported(
+        element,
+        "stale status must fail before source resolution",
+    );
+    let mut adapter =
+        SyncFlushMinimalHostAdapter::new(element, element_type, props, "section").rejecting_type();
+
+    let error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            stale_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::StaleFinishedWorkHandoff {
+            root,
+            order,
+            selected_lanes,
+            identity,
+        } if root == root_id
+            && order == rendered_record.order()
+            && selected_lanes == Lanes::SYNC
+            && identity.accepted_current_finished_work_record_shape()
+    ));
+    assert_eq!(source.calls(), 0);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert!(host_nodes.is_empty());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_rejects_non_sync_lanes_before_source_adapter_or_host_canary() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let element = RootElementHandle::from_raw(8_981);
+    let element_type = ElementTypeHandle::from_raw(8_982);
+    let props = PropsHandle::from_raw(8_983);
+    let rendered_record = render_default_minimal_record(&mut store, root_id, element);
+    let source = SyncFlushMinimalRootElementSource::unsupported(
+        element,
+        "non-sync lanes must fail before source resolution",
+    );
+    let mut adapter =
+        SyncFlushMinimalHostAdapter::new(element, element_type, props, "section").rejecting_type();
+
+    let error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::NonSyncLanes {
+            root: root_id,
+            order: 0,
+            lanes: Lanes::DEFAULT,
+        }
+    );
+    assert_eq!(source.calls(), 0);
+    assert_eq!(adapter.type_calls(), 0);
+    assert_eq!(adapter.props_calls(), 0);
+    assert!(host_nodes.is_empty());
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_rejects_existing_current_child_before_source_adapter_or_host_canary()
+ {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let element = RootElementHandle::from_raw(8_991);
+    let element_type = ElementTypeHandle::from_raw(8_992);
+    let props = PropsHandle::from_raw(8_993);
+    let source = sync_flush_minimal_source(
+        element,
+        element_type,
+        props,
+        "first minimal placement",
+        PropsHandle::from_raw(8_994),
+    );
+    let mut adapter = SyncFlushMinimalHostAdapter::new(element, element_type, props, "section");
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    let committed =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap();
+    assert!(committed.accepted_sync_flush_minimal_host_placement_handoff());
+    let committed_current = store.root(root_id).unwrap().current();
+    let existing_child = store
+        .fiber_arena()
+        .get(committed_current)
+        .unwrap()
+        .child()
+        .unwrap();
+    let host_operations_after_first_commit = host.operations();
+
+    let next_element = RootElementHandle::from_raw(8_995);
+    let next_type = ElementTypeHandle::from_raw(8_996);
+    let next_props = PropsHandle::from_raw(8_997);
+    let next_record = render_sync_flush_minimal_record(&mut store, root_id, next_element);
+    let next_source = SyncFlushMinimalRootElementSource::unsupported(
+        next_element,
+        "existing current child must fail before source resolution",
+    );
+    let mut next_adapter =
+        SyncFlushMinimalHostAdapter::new(next_element, next_type, next_props, "section")
+            .rejecting_type();
+
+    let error =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            next_record,
+            &next_source,
+            &mut next_adapter,
+        )
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        SyncFlushMinimalHostPlacementCommitErrorForCanary::Render(
+            HostRootMinimalElementRenderPhaseError::ExistingCurrentChild {
+                root: root_id,
+                current: committed_current,
+                child: existing_child,
+            },
+        )
+    );
+    assert_eq!(next_source.calls(), 0);
+    assert_eq!(next_adapter.type_calls(), 0);
+    assert_eq!(next_adapter.props_calls(), 0);
+    assert_eq!(host.operations(), host_operations_after_first_commit);
+    assert!(host_nodes.is_empty());
+    assert_eq!(store.root(root_id).unwrap().current(), committed_current);
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_flags_pending_sync_work_after_commit_canary() {
+    let (mut store, first_root, mut host) = root_store();
+    let second_root = store
+        .create_client_root(FakeContainer::new(2), RootOptions::new())
+        .unwrap();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let first_element = RootElementHandle::from_raw(8_998);
+    let second_element = RootElementHandle::from_raw(8_999);
+    schedule_sync_update(&mut store, first_root, first_element);
+    schedule_sync_update(&mut store, second_root, second_element);
+    let rendered = flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+    assert_eq!(rendered.records().len(), 2);
+    let rendered_record = rendered.records()[0];
+    let held_pending_root = if rendered_record.root() == first_root {
+        second_root
+    } else {
+        first_root
+    };
+    let element = rendered_record.render_phase().resulting_element();
+    let element_type = ElementTypeHandle::from_raw(9_000);
+    let props = PropsHandle::from_raw(9_001);
+    let source = sync_flush_minimal_source(
+        element,
+        element_type,
+        props,
+        "pending sync remains after one root commit",
+        PropsHandle::from_raw(9_002),
+    );
+    let mut adapter = SyncFlushMinimalHostAdapter::new(element, element_type, props, "section");
+
+    let committed =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap();
+
+    assert!(committed.might_have_pending_sync_work_after_commit());
+    assert!(!committed.accepted_sync_flush_minimal_host_placement_handoff());
+    assert!(store.root_scheduler().might_have_pending_sync_work());
+    assert!(
+        store
+            .root(held_pending_root)
+            .unwrap()
+            .lanes()
+            .pending_lanes()
+            .contains_lane(Lane::SYNC)
+    );
+    assert_eq!(source.calls(), 1);
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 1);
+    assert!(host_nodes.is_empty());
+}
+
+#[test]
+fn sync_flush_private_host_mutation_minimal_placement_matrix_executes_canaries() {
+    sync_flush_minimal_host_placement_consumes_rendered_record_and_appends_host_pair_canary();
+    sync_flush_minimal_host_placement_rejects_stale_finished_work_and_lane_evidence_canary();
+    sync_flush_minimal_host_placement_resolver_and_adapter_fail_closed_without_publishing_canary();
+    sync_flush_minimal_host_placement_rejects_public_compatibility_claim_before_host_publication_canary();
+    sync_flush_minimal_host_placement_rejects_stale_status_before_source_adapter_or_host_canary();
+    sync_flush_minimal_host_placement_rejects_non_sync_lanes_before_source_adapter_or_host_canary();
+    sync_flush_minimal_host_placement_rejects_existing_current_child_before_source_adapter_or_host_canary();
+    sync_flush_minimal_host_placement_flags_pending_sync_work_after_commit_canary();
+}
 
 #[test]
 fn sync_flush_handoff_commits_already_renderable_host_output_canary_with_diagnostics() {
