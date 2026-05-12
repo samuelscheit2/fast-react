@@ -773,8 +773,7 @@ function createNativeEntryBehaviorEvidence(scenarioId) {
     directNativeCjsImport,
     nativeEntryWrapperEvidence: !directNativeCjsImport,
     directNativeCjsEvidence: directNativeCjsImport,
-    defaultEntrypointRelationshipObserved:
-      scenarioId === "native-default-relationship",
+    defaultEntrypointRelationshipObserved: false,
     defaultEntrypointCompatibilityClaimed: false,
     rootEntryEvidenceClaimed: false,
     rootExecutionClaimed: false,
@@ -926,15 +925,20 @@ function nativeSourceBoundaryMatches(actual, expected) {
 
 function isNativeEntryBehaviorEvidence(evidence, scenarioId) {
   const directNativeCjsImport = scenarioId === "direct-native-cjs-loading";
+  const expectedEntrypoint = directNativeCjsImport
+    ? "scheduler/cjs/scheduler.native.*.js"
+    : "scheduler/index.native.js";
   return (
     evidence?.behaviorEvidenceKind ===
       "current-local-scheduler-native-entry-probe" &&
+    evidence?.entrypoint === expectedEntrypoint &&
     evidence?.scenarioId === scenarioId &&
     evidence?.packageName === "scheduler" &&
     evidence?.packageSourcePath === "packages/scheduler" &&
     evidence?.directNativeCjsImport === directNativeCjsImport &&
     evidence?.nativeEntryWrapperEvidence === !directNativeCjsImport &&
     evidence?.directNativeCjsEvidence === directNativeCjsImport &&
+    evidence?.defaultEntrypointRelationshipObserved === false &&
     evidence?.defaultEntrypointCompatibilityClaimed === false &&
     evidence?.rootEntryEvidenceClaimed === false &&
     evidence?.rootExecutionClaimed === false &&
