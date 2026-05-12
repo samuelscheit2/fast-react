@@ -23,6 +23,11 @@ import {
   REACT_TEST_RENDERER_SERIALIZATION_SCENARIO_IDS
 } from "./react-test-renderer-serialization-scenarios.mjs";
 import {
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS,
+  REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
+} from "./react-test-renderer-serialization-targets.mjs";
+import {
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS,
   REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTIC_REQUIREMENTS,
   REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS,
@@ -6135,6 +6140,256 @@ test("react-test-renderer serialization gate rejects premature public compatibil
   );
 });
 
+for (const { container, field } of [
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS.map(
+    (field) => ({ container: "conformanceClaims", field })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS.map(
+    (field) => ({ container: "conformanceClaims", field })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS.map(
+    (field) => ({ container: "evidenceClaims", field })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS.map(
+    (field) => ({ container: "evidenceClaims", field })
+  )
+]) {
+  test(`react-test-renderer serialization gate rejects ${container}.${field}`, () => {
+    const claimOracle = JSON.parse(JSON.stringify(oracle));
+    claimOracle[container][field] = true;
+
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle: claimOracle
+    });
+
+    assert.equal(gate.status, "blocked-with-violations");
+    assert.equal(gate.privateDiagnosticsReady, true);
+    assert.equal(gate.publicCompatibilityReady, false);
+    assert.equal(gate.publicCompatibilityClaimed, true);
+    assert.deepEqual(
+      gate.violations.map((violation) => violation.id),
+      ["compatibility-claimed-before-public-serialization-support"]
+    );
+    assert.deepEqual(gate.violations[0].blockers, [
+      "public-to-json-api",
+      "public-to-tree-api",
+      "public-test-instance-wrappers",
+      "public-js-react-test-renderer-routing"
+    ]);
+  });
+}
+
+test("react-test-renderer serialization gate rejects stale absent oracle status for the placeholder package", () => {
+  const staleOracle = JSON.parse(JSON.stringify(oracle));
+  staleOracle.localFastReactStatus.status = "not-present-in-workspace";
+
+  const gate = evaluateReactTestRendererSerializationLocalGate({
+    oracle: staleOracle
+  });
+
+  assert.equal(gate.status, "blocked-with-violations");
+  assert.equal(gate.requiredLocalTargetsReady, true);
+  assert.equal(gate.publicCompatibilityReady, false);
+  assert.deepEqual(
+    gate.violations.map((violation) => violation.id),
+    [
+      "local-fast-react-status-source-mismatch",
+      "local-fast-react-status-oracle-stale"
+    ]
+  );
+  assert.equal(gate.violations[1].expectedStatus, "placeholder-present");
+  assert.equal(gate.violations[1].actualStatus, "not-present-in-workspace");
+  assert.deepEqual(gate.publicCompatibilityBlockers, [
+    "public-to-json-api",
+    "public-to-tree-api",
+    "public-test-instance-wrappers",
+    "public-js-react-test-renderer-routing"
+  ]);
+});
+
+test("react-test-renderer serialization gate rejects placeholder oracle status after placeholder markers are removed", () => {
+  const placeholderMarkerFiles = [
+    ...serializationGateEntrypointSourceFiles,
+    "packages/react-test-renderer/shallow.js"
+  ];
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: placeholderMarkerFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate(text) {
+        assert.equal(
+          text.includes("__FAST_REACT_PLACEHOLDER__"),
+          true,
+          `${evidencePath} contains the placeholder marker`
+        );
+        return text
+          .split("__FAST_REACT_PLACEHOLDER__")
+          .join("__FAST_REACT_LOCAL_STATUS_PROBE__");
+      }
+    }))
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(gate.status, "blocked-with-violations");
+    assert.equal(gate.localChecks.publicJsReactTestRendererFacadePresent, true);
+    assert.equal(
+      gate.localChecks.publicJsReactTestRendererFacadePlaceholder,
+      false
+    );
+    assert.equal(
+      gate.localChecks.publicJsReactTestRendererFacadeStatus,
+      "present"
+    );
+    assert.equal(gate.requiredLocalTargetsReady, false);
+    assert.equal(gate.publicCompatibilityReady, false);
+    assert.deepEqual(
+      gate.violations.map((violation) => violation.id),
+      [
+        "local-fast-react-status-oracle-stale",
+        "local-fast-react-status-source-stale"
+      ]
+    );
+    assert.equal(gate.violations[0].expectedStatus, "present-in-workspace");
+    assert.equal(gate.violations[0].actualStatus, "placeholder-present");
+    assert.deepEqual(gate.publicCompatibilityBlockers, [
+      "public-to-json-api",
+      "public-to-tree-api",
+      "public-test-instance-wrappers",
+      "public-js-react-test-renderer-routing"
+    ]);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization gate rejects local Fast React comparison or compatibility status claims", () => {
+  const claimedOracle = JSON.parse(JSON.stringify(oracle));
+  claimedOracle.localFastReactStatus.comparedToReactTestRenderer = true;
+  claimedOracle.localFastReactStatus.fastReactComparedToReactTestRenderer = true;
+  claimedOracle.localFastReactStatus.behaviorCompatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.compatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.packageCompatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.publicCompatibilityClaimed = true;
+
+  const gate = evaluateReactTestRendererSerializationLocalGate({
+    oracle: claimedOracle
+  });
+  const violationIds = gate.violations.map((violation) => violation.id);
+  const comparisonClaimFields = gate.violations
+    .filter(
+      (violation) =>
+        violation.id ===
+        "local-fast-react-status-claims-fast-react-comparison"
+    )
+    .map((violation) => violation.field);
+  const compatibilityClaimFields = gate.violations
+    .filter(
+      (violation) =>
+        violation.id === "local-fast-react-status-claims-compatibility"
+    )
+    .map((violation) => violation.field);
+
+  assert.equal(gate.status, "blocked-with-violations");
+  assert.equal(gate.publicCompatibilityReady, false);
+  assert.equal(
+    violationIds.includes(
+      "local-fast-react-status-claims-fast-react-comparison"
+    ),
+    true
+  );
+  assert.deepEqual(comparisonClaimFields, [
+    "comparedToReactTestRenderer",
+    "fastReactComparedToReactTestRenderer"
+  ]);
+  assert.equal(
+    violationIds.includes("local-fast-react-status-claims-compatibility"),
+    true
+  );
+  assert.deepEqual(compatibilityClaimFields, [
+    "behaviorCompatibilityClaimed",
+    "compatibilityClaimed",
+    "packageCompatibilityClaimed",
+    "publicCompatibilityClaimed"
+  ]);
+  assert.equal(
+    violationIds.includes(
+      "compatibility-claimed-before-public-serialization-support"
+    ),
+    true
+  );
+});
+
+test("react-test-renderer serialization local status and admission records are immutable blocker sources", () => {
+  assert.equal(
+    Object.isFrozen(REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS),
+    true
+  );
+  assert.equal(
+    Object.isFrozen(
+      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS
+    ),
+    true
+  );
+  assert.equal(
+    Object.isFrozen(REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS),
+    true
+  );
+  assert.equal(
+    Object.isFrozen(
+      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS[0]
+    ),
+    true
+  );
+  assert.equal(
+    Object.isFrozen(
+      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS[0]
+    ),
+    true
+  );
+  assert.equal(
+    Object.isFrozen(
+      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS[0]
+        .unblockRequires
+    ),
+    true
+  );
+  assert.throws(
+    () => {
+      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS.status =
+        "present-in-workspace";
+    },
+    TypeError
+  );
+  assert.throws(
+    () => {
+      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS[0].id =
+        "spoofed-public-blocker";
+    },
+    TypeError
+  );
+  assert.throws(
+    () => {
+      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS[0]
+        .admittedForFastReactComparison = true;
+    },
+    TypeError
+  );
+
+  const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });
+  assert.deepEqual(gate.publicCompatibilityBlockers, [
+    "public-to-json-api",
+    "public-to-tree-api",
+    "public-test-instance-wrappers",
+    "public-js-react-test-renderer-routing"
+  ]);
+  assert.deepEqual(gate.admittedScenarios, []);
+  assert.deepEqual(gate.violations, []);
+});
+
 function createSerializationGateWorkspaceWithMutatedFile({
   evidencePath,
   mutate
@@ -8541,11 +8796,12 @@ test("react-test-renderer serialization React oracle generation remains React-on
     fullDualRunOracleExists: false,
     compatibilityClaimed: false
   });
-  assert.equal(oracle.localFastReactStatus.status, "not-present-in-workspace");
+  assert.equal(oracle.localFastReactStatus.status, "placeholder-present");
   assert.equal(
     oracle.localFastReactStatus.behaviorCompatibilityClaimed,
     false
   );
+  assert.equal(oracle.localFastReactStatus.compatibilityClaimed, false);
   assert.equal(
     oracle.localFastReactStatus.comparedToReactTestRenderer,
     false

@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent,
   findReactTestRendererSerializationObservation,
   readCheckedReactTestRendererSerializationOracle,
   readCheckedReactTestRendererSerializationOracleText
@@ -12,6 +13,8 @@ import {
   evaluateReactTestRendererSerializationLocalGate
 } from "../src/react-test-renderer-serialization-local-gate.mjs";
 import {
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS,
   REACT_TEST_RENDERER_SERIALIZATION_ORACLE_ARTIFACT_PATH,
   REACT_TEST_RENDERER_SERIALIZATION_PROBE_MODES,
@@ -85,6 +88,9 @@ test("react-test-renderer serialization oracle keeps local Fast React status exp
     oracle.localFastReactStatus,
     REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
   );
+  assert.doesNotThrow(() =>
+    assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(oracle)
+  );
   assert.equal(
     oracle.intentionalGaps.some(
       (gap) => gap.id === "no-fast-react-test-renderer-comparison"
@@ -92,6 +98,101 @@ test("react-test-renderer serialization oracle keeps local Fast React status exp
     true
   );
 });
+
+test("react-test-renderer serialization oracle rejects stale or unsafe local Fast React status", () => {
+  const staleOracle = JSON.parse(JSON.stringify(oracle));
+  staleOracle.localFastReactStatus.status = "not-present-in-workspace";
+  assert.throws(
+    () =>
+      assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
+        staleOracle
+      ),
+    /local-fast-react-status-source-mismatch/u
+  );
+
+  const claimedOracle = JSON.parse(JSON.stringify(oracle));
+  claimedOracle.localFastReactStatus.comparedToReactTestRenderer = true;
+  claimedOracle.localFastReactStatus.fastReactComparedToReactTestRenderer = true;
+  claimedOracle.localFastReactStatus.behaviorCompatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.compatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.packageCompatibilityClaimed = true;
+  claimedOracle.localFastReactStatus.publicCompatibilityClaimed = true;
+  assert.throws(
+    () =>
+      assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
+        claimedOracle
+      ),
+    /local-fast-react-status-claims-fast-react-comparison/u
+  );
+
+  const comparisonClaimedOracle = JSON.parse(JSON.stringify(oracle));
+  comparisonClaimedOracle.localFastReactStatus.fastReactComparedToReactTestRenderer =
+    true;
+  assert.throws(
+    () =>
+      assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
+        comparisonClaimedOracle
+      ),
+    /local-fast-react-status-claims-fast-react-comparison/u
+  );
+
+  const compatibilityClaimedOracle = JSON.parse(JSON.stringify(oracle));
+  compatibilityClaimedOracle.localFastReactStatus.packageCompatibilityClaimed =
+    true;
+  compatibilityClaimedOracle.localFastReactStatus.publicCompatibilityClaimed =
+    true;
+  assert.throws(
+    () =>
+      assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
+        compatibilityClaimedOracle
+      ),
+    /local-fast-react-status-claims-compatibility/u
+  );
+});
+
+for (const { container, field, violationId } of [
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS.map(
+    (field) => ({
+      container: "conformanceClaims",
+      field,
+      violationId: "oracle-conformance-claims-fast-react-comparison"
+    })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS.map(
+    (field) => ({
+      container: "conformanceClaims",
+      field,
+      violationId: "oracle-conformance-claims-compatibility"
+    })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS.map(
+    (field) => ({
+      container: "evidenceClaims",
+      field,
+      violationId: "oracle-evidence-claims-fast-react-comparison"
+    })
+  ),
+  ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS.map(
+    (field) => ({
+      container: "evidenceClaims",
+      field,
+      violationId: "oracle-evidence-claims-compatibility"
+    })
+  )
+]) {
+  test(`react-test-renderer serialization oracle rejects ${container}.${field}`, () => {
+    const claimedOracle = JSON.parse(JSON.stringify(oracle));
+    claimedOracle[container][field] = true;
+
+    assert.throws(
+      () =>
+        assertReactTestRendererSerializationOracleLocalFastReactStatusCurrent(
+          claimedOracle
+        ),
+      new RegExp(violationId, "u")
+    );
+  });
+}
 
 test("react-test-renderer serialization oracle remains public-compatibility blocked after private diagnostics are ready", () => {
   const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });

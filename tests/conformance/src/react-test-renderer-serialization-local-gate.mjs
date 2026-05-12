@@ -9,6 +9,8 @@ import {
   REACT_TEST_RENDERER_SERIALIZATION_SCENARIO_IDS
 } from "./react-test-renderer-serialization-scenarios.mjs";
 import {
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+  REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
 } from "./react-test-renderer-serialization-targets.mjs";
 
@@ -20,190 +22,199 @@ export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS =
 export const REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTICS_BLOCKED_STATUS =
   "blocked-until-private-serialization-diagnostics";
 
-export const REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTIC_REQUIREMENTS = [
-  {
-    id: "rust-test-renderer-root-facade",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "Public serialization needs a Rust TestRendererRoot that owns reconciler root state instead of direct host snapshots."
-  },
-  {
-    id: "committed-test-renderer-host-output",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "toJSON output must be read after reconciler commit produces test-renderer host output."
-  },
-  {
-    id: "committed-fiber-inspection-api",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "toTree and TestInstance queries need a read-only current-fiber view, not raw mutation host handles."
-  },
-  {
-    id: "private-json-diagnostics",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The Rust test-renderer canary must expose deterministic private JSON diagnostics before any public serializer is considered."
-  }
-];
+export const REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTIC_REQUIREMENTS =
+  freezeArray([
+    freezeRecord({
+      id: "rust-test-renderer-root-facade",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "Public serialization needs a Rust TestRendererRoot that owns reconciler root state instead of direct host snapshots."
+    }),
+    freezeRecord({
+      id: "committed-test-renderer-host-output",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "toJSON output must be read after reconciler commit produces test-renderer host output."
+    }),
+    freezeRecord({
+      id: "committed-fiber-inspection-api",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "toTree and TestInstance queries need a read-only current-fiber view, not raw mutation host handles."
+    }),
+    freezeRecord({
+      id: "private-json-diagnostics",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The Rust test-renderer canary must expose deterministic private JSON diagnostics before any public serializer is considered."
+    })
+  ]);
 
-export const REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS = [
-  {
-    id: "js-tojson-private-serialization-facade-gate",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The JS react-test-renderer facade must record a private toJSON gate without exposing a public serializer."
-  },
-  {
-    id: "js-tojson-accepted-rust-private-json-diagnostics",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toJSON gate must point at the accepted Rust private JSON diagnostic report, API, and canary tests."
-  },
-  {
-    id: "js-tojson-serializes-accepted-host-output-diagnostics",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toJSON facade must serialize the accepted minimal committed host-output diagnostic shape without exposing public toJSON."
-  },
-  {
-    id: "js-tojson-broader-host-shape-diagnostics",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toJSON facade must cover multiple host children, text siblings, prop elision, and empty roots while public toJSON stays blocked."
-  },
-  {
-    id: "js-tojson-exposes-private-diagnostic-result",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toJSON facade must expose an evidence-backed diagnostic result record without turning the public toJSON method on."
-  },
-  {
-    id: "js-tojson-update-unmount-host-output-rows",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toJSON facade must expose explicit update and unmount host-output rows with dependency metadata while public serialization stays blocked."
-  },
-  {
-    id: "js-tojson-update-prop-and-text-diagnostics",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toJSON facade must retain an accepted HostComponent prop plus text update payload while public serialization stays blocked."
-  },
-  {
-    id: "js-tojson-finished-work-identity-gate",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toJSON facade must validate serialization evidence against the committed HostRoot finished_work identity and lane handoff."
-  },
-  {
-    id: "js-tojson-public-serialization-blocked",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toJSON gate must keep public serialization, native bridge execution, and compatibility claims false."
-  }
-];
+export const REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS =
+  freezeArray([
+    freezeRecord({
+      id: "js-tojson-private-serialization-facade-gate",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The JS react-test-renderer facade must record a private toJSON gate without exposing a public serializer."
+    }),
+    freezeRecord({
+      id: "js-tojson-accepted-rust-private-json-diagnostics",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toJSON gate must point at the accepted Rust private JSON diagnostic report, API, and canary tests."
+    }),
+    freezeRecord({
+      id: "js-tojson-serializes-accepted-host-output-diagnostics",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toJSON facade must serialize the accepted minimal committed host-output diagnostic shape without exposing public toJSON."
+    }),
+    freezeRecord({
+      id: "js-tojson-broader-host-shape-diagnostics",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toJSON facade must cover multiple host children, text siblings, prop elision, and empty roots while public toJSON stays blocked."
+    }),
+    freezeRecord({
+      id: "js-tojson-exposes-private-diagnostic-result",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toJSON facade must expose an evidence-backed diagnostic result record without turning the public toJSON method on."
+    }),
+    freezeRecord({
+      id: "js-tojson-update-unmount-host-output-rows",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toJSON facade must expose explicit update and unmount host-output rows with dependency metadata while public serialization stays blocked."
+    }),
+    freezeRecord({
+      id: "js-tojson-update-prop-and-text-diagnostics",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toJSON facade must retain an accepted HostComponent prop plus text update payload while public serialization stays blocked."
+    }),
+    freezeRecord({
+      id: "js-tojson-finished-work-identity-gate",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toJSON facade must validate serialization evidence against the committed HostRoot finished_work identity and lane handoff."
+    }),
+    freezeRecord({
+      id: "js-tojson-public-serialization-blocked",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toJSON gate must keep public serialization, native bridge execution, and compatibility claims false."
+    })
+  ]);
 
-export const REACT_TEST_RENDERER_TOTREE_PRIVATE_METADATA_REQUIREMENTS = [
-  {
-    id: "js-totree-private-host-output-metadata-gate",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The JS react-test-renderer facade must record private toTree metadata without exposing public toTree output."
-  },
-  {
-    id: "js-totree-private-facade-gate",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The JS react-test-renderer facade must expose a hidden private toTree facade without making create().toTree public."
-  },
-  {
-    id: "js-totree-consumes-accepted-rust-private-tree-metadata",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toTree facade must consume the accepted Rust private tree metadata report, not only JS-local shape metadata."
-  },
-  {
-    id: "js-totree-recognizes-accepted-minimal-host-output-shape",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toTree metadata must be tied to the accepted HostRoot -> HostComponent -> HostText canary shape."
-  },
-  {
-    id: "js-totree-private-composite-function-metadata",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toTree metadata must record the FunctionComponent tree wrapper above the accepted committed host output without exposing public toTree."
-  },
-  {
-    id: "js-totree-private-multi-child-metadata",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toTree metadata must record minimal multi-child host output and composite-above-multi-child shapes without exposing public toTree."
-  },
-  {
-    id: "js-totree-private-committed-fiber-shape-diagnostics",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toTree metadata must be backed by committed-fiber inspection shape diagnostics for multi-child and FunctionComponent wrapper shapes."
-  },
-  {
-    id: "js-totree-finished-work-identity-gate",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toTree facade must validate metadata against the committed HostRoot finished_work identity and lane handoff."
-  },
-  {
-    id: "js-totree-public-tree-blocked",
-    requiredBeforePrivateDiagnostics: true,
-    reason:
-      "The private toTree metadata must keep public toTree, native bridge execution, and compatibility claims false."
-  }
-];
+export const REACT_TEST_RENDERER_TOTREE_PRIVATE_METADATA_REQUIREMENTS =
+  freezeArray([
+    freezeRecord({
+      id: "js-totree-private-host-output-metadata-gate",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The JS react-test-renderer facade must record private toTree metadata without exposing public toTree output."
+    }),
+    freezeRecord({
+      id: "js-totree-private-facade-gate",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The JS react-test-renderer facade must expose a hidden private toTree facade without making create().toTree public."
+    }),
+    freezeRecord({
+      id: "js-totree-consumes-accepted-rust-private-tree-metadata",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toTree facade must consume the accepted Rust private tree metadata report, not only JS-local shape metadata."
+    }),
+    freezeRecord({
+      id: "js-totree-recognizes-accepted-minimal-host-output-shape",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toTree metadata must be tied to the accepted HostRoot -> HostComponent -> HostText canary shape."
+    }),
+    freezeRecord({
+      id: "js-totree-private-composite-function-metadata",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toTree metadata must record the FunctionComponent tree wrapper above the accepted committed host output without exposing public toTree."
+    }),
+    freezeRecord({
+      id: "js-totree-private-multi-child-metadata",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toTree metadata must record minimal multi-child host output and composite-above-multi-child shapes without exposing public toTree."
+    }),
+    freezeRecord({
+      id: "js-totree-private-committed-fiber-shape-diagnostics",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toTree metadata must be backed by committed-fiber inspection shape diagnostics for multi-child and FunctionComponent wrapper shapes."
+    }),
+    freezeRecord({
+      id: "js-totree-finished-work-identity-gate",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toTree facade must validate metadata against the committed HostRoot finished_work identity and lane handoff."
+    }),
+    freezeRecord({
+      id: "js-totree-public-tree-blocked",
+      requiredBeforePrivateDiagnostics: true,
+      reason:
+        "The private toTree metadata must keep public toTree, native bridge execution, and compatibility claims false."
+    })
+  ]);
 
 export const REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS =
   "blocked-public-react-test-renderer-serialization-compatibility";
 
-export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS = [
-  {
-    id: "public-to-json-api",
-    requiredBeforeCompatibilityClaim: true,
-    reason:
-      "Public compatibility needs create().toJSON to route to Fast React serialization instead of the placeholder thrower."
-  },
-  {
-    id: "public-to-tree-api",
-    requiredBeforeCompatibilityClaim: true,
-    reason:
-      "Public compatibility needs create().toTree to expose React-shaped tree output instead of the placeholder thrower."
-  },
-  {
-    id: "public-test-instance-wrappers",
-    requiredBeforeCompatibilityClaim: true,
-    reason:
-      "Public compatibility needs ReactTestInstance root and query wrappers, not private fiber diagnostics."
-  },
-  {
-    id: "public-js-react-test-renderer-routing",
-    requiredBeforeCompatibilityClaim: true,
-    reason:
-      "A dual-run compatibility claim needs the public JS facade to route create, update, unmount, and serialization through the Rust test renderer."
-  }
-];
+export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS =
+  freezeArray([
+    freezeRecord({
+      id: "public-to-json-api",
+      requiredBeforeCompatibilityClaim: true,
+      reason:
+        "Public compatibility needs create().toJSON to route to Fast React serialization instead of the placeholder thrower."
+    }),
+    freezeRecord({
+      id: "public-to-tree-api",
+      requiredBeforeCompatibilityClaim: true,
+      reason:
+        "Public compatibility needs create().toTree to expose React-shaped tree output instead of the placeholder thrower."
+    }),
+    freezeRecord({
+      id: "public-test-instance-wrappers",
+      requiredBeforeCompatibilityClaim: true,
+      reason:
+        "Public compatibility needs ReactTestInstance root and query wrappers, not private fiber diagnostics."
+    }),
+    freezeRecord({
+      id: "public-js-react-test-renderer-routing",
+      requiredBeforeCompatibilityClaim: true,
+      reason:
+        "A dual-run compatibility claim needs the public JS facade to route create, update, unmount, and serialization through the Rust test renderer."
+    })
+  ]);
 
 export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS =
-  REACT_TEST_RENDERER_SERIALIZATION_SCENARIO_IDS.map((scenarioId) => ({
-    scenarioId,
-    readyForPrivateDiagnostics: true,
-    publicComparisonBlocked: true,
-    admittedForFastReactComparison: false,
-    compatibilityClaimed: false,
-    status: REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS,
-    unblockRequires:
-      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS.map(
-        (requirement) => requirement.id
-      )
-  }));
+  freezeArray(
+    REACT_TEST_RENDERER_SERIALIZATION_SCENARIO_IDS.map((scenarioId) =>
+      freezeRecord({
+        scenarioId,
+        readyForPrivateDiagnostics: true,
+        publicComparisonBlocked: true,
+        admittedForFastReactComparison: false,
+        compatibilityClaimed: false,
+        status: REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS,
+        unblockRequires: freezeArray(
+          REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS.map(
+            (requirement) => requirement.id
+          )
+        )
+      })
+    )
+  );
 
 export const REACT_TEST_RENDERER_ERROR_SURFACE_LOCAL_GATE_STATUS =
   "ready-for-private-error-diagnostics-public-error-compatibility-blocked";
@@ -465,11 +476,14 @@ export function evaluateReactTestRendererSerializationLocalGate({
         scenario.compatibilityClaimed
     );
   const publicCompatibilityClaimed = Boolean(
-    oracle.conformanceClaims?.compatibilityClaimed ||
-      oracle.conformanceClaims?.fastReactBehaviorCompatible ||
-      oracle.localFastReactStatus?.behaviorCompatibilityClaimed ||
-      REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
-        .behaviorCompatibilityClaimed
+    hasReactTestRendererSerializationFastReactClaim(oracle.conformanceClaims) ||
+      hasReactTestRendererSerializationFastReactClaim(oracle.evidenceClaims) ||
+      hasReactTestRendererSerializationFastReactClaim(
+        oracle.localFastReactStatus
+      ) ||
+      hasReactTestRendererSerializationFastReactClaim(
+        REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
+      )
   );
   const publicCompatibilityBlockers =
     REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS.filter(
@@ -490,6 +504,13 @@ export function evaluateReactTestRendererSerializationLocalGate({
       }
     ).map((requirement) => requirement.id);
   const violations = [];
+  const localFastReactStatusViolations =
+    validateReactTestRendererSerializationLocalFastReactStatus({
+      localChecks,
+      oracleStatus: oracle.localFastReactStatus,
+      sourceStatus: REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
+    });
+  violations.push(...localFastReactStatusViolations);
 
   if (publicCompatibilityClaimed && !publicCompatibilityReady) {
     violations.push({
@@ -506,19 +527,6 @@ export function evaluateReactTestRendererSerializationLocalGate({
       reason:
         "Scenario admission must remain explicit and blocked until public serialization and TestInstance surfaces are ready.",
       scenarioIds: admittedScenarios.map((scenario) => scenario.scenarioId)
-    });
-  }
-
-  if (
-    localChecks.publicJsReactTestRendererFacadePresent &&
-    !localChecks.publicJsReactTestRendererFacadePlaceholder &&
-    REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS.status ===
-      "not-present-in-workspace"
-  ) {
-    violations.push({
-      id: "local-fast-react-status-stale",
-      reason:
-        "The local target status still says the JS react-test-renderer facade is absent, but a package facade is present."
     });
   }
 
@@ -539,6 +547,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     publicCompatibilityReady,
     publicCompatibilityClaimed,
     publicCompatibilityBlockers,
+    localFastReactStatusViolations,
     localChecks,
     admittedScenarios,
     violations
@@ -2367,6 +2376,166 @@ function isErrorSurfacePrivateDiagnosticRowReady(rowId, localChecks) {
     );
   }
   return false;
+}
+
+function validateReactTestRendererSerializationLocalFastReactStatus({
+  localChecks,
+  oracleStatus,
+  sourceStatus
+}) {
+  const expectedStatus =
+    expectedReactTestRendererSerializationLocalFastReactStatus(localChecks);
+  const violations = [];
+
+  if (!oracleStatus || typeof oracleStatus !== "object") {
+    violations.push(
+      freezeRecord({
+        id: "local-fast-react-status-oracle-missing",
+        reason:
+          "The serialization oracle must record the local Fast React test-renderer status."
+      })
+    );
+  } else {
+    appendLocalFastReactStatusSourceMismatchViolations({
+      actualStatus: oracleStatus,
+      expectedStatus: sourceStatus,
+      sourceName: "oracle.localFastReactStatus",
+      violations
+    });
+    appendLocalFastReactStatusClaimViolations({
+      status: oracleStatus,
+      sourceName: "oracle.localFastReactStatus",
+      violations
+    });
+    if (oracleStatus.status !== expectedStatus) {
+      violations.push(
+        freezeRecord({
+          id: "local-fast-react-status-oracle-stale",
+          reason:
+            "The serialization oracle local status must match the current workspace react-test-renderer package state.",
+          expectedStatus,
+          actualStatus: oracleStatus.status,
+          localPackageStatus: localChecks.publicJsReactTestRendererFacadeStatus
+        })
+      );
+    }
+  }
+
+  appendLocalFastReactStatusClaimViolations({
+    status: sourceStatus,
+    sourceName: "source.localFastReactStatus",
+    violations
+  });
+  if (sourceStatus.status !== expectedStatus) {
+    violations.push(
+      freezeRecord({
+        id: "local-fast-react-status-source-stale",
+        reason:
+          "The source-owned local Fast React status must match the current workspace react-test-renderer package state.",
+        expectedStatus,
+        actualStatus: sourceStatus.status,
+        localPackageStatus: localChecks.publicJsReactTestRendererFacadeStatus
+      })
+    );
+  }
+
+  return freezeArray(violations);
+}
+
+function appendLocalFastReactStatusSourceMismatchViolations({
+  actualStatus,
+  expectedStatus,
+  sourceName,
+  violations
+}) {
+  for (const key of Object.keys(expectedStatus)) {
+    if (actualStatus[key] !== expectedStatus[key]) {
+      violations.push(
+        freezeRecord({
+          id: "local-fast-react-status-source-mismatch",
+          source: sourceName,
+          field: key,
+          expected: expectedStatus[key],
+          actual: actualStatus[key]
+        })
+      );
+    }
+  }
+}
+
+function appendLocalFastReactStatusClaimViolations({
+  status,
+  sourceName,
+  violations
+}) {
+  if (!status || typeof status !== "object") {
+    return;
+  }
+
+  appendLocalFastReactStatusClaimFieldViolations({
+    status,
+    sourceName,
+    fields: REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+    id: "local-fast-react-status-claims-fast-react-comparison",
+    reason:
+      "The React-only serialization oracle must not claim a Fast React react-test-renderer comparison.",
+    violations
+  });
+  appendLocalFastReactStatusClaimFieldViolations({
+    status,
+    sourceName,
+    fields:
+      REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS,
+    id: "local-fast-react-status-claims-compatibility",
+    reason:
+      "The React-only serialization oracle must not claim Fast React react-test-renderer compatibility.",
+    violations
+  });
+}
+
+function appendLocalFastReactStatusClaimFieldViolations({
+  status,
+  sourceName,
+  fields,
+  id,
+  reason,
+  violations
+}) {
+  for (const field of fields) {
+    if (Object.hasOwn(status, field) && status[field] !== false) {
+      violations.push(
+        freezeRecord({
+          id,
+          source: sourceName,
+          field,
+          reason
+        })
+      );
+    }
+  }
+}
+
+function hasReactTestRendererSerializationFastReactClaim(record) {
+  if (!record || typeof record !== "object") {
+    return false;
+  }
+
+  return [
+    ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS,
+    ...REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS
+  ].some((field) => Object.hasOwn(record, field) && record[field] !== false);
+}
+
+function expectedReactTestRendererSerializationLocalFastReactStatus(localChecks) {
+  if (
+    localChecks.publicJsReactTestRendererFacadeStatus === "placeholder-present"
+  ) {
+    return "placeholder-present";
+  }
+  if (localChecks.publicJsReactTestRendererFacadeStatus === "present") {
+    return "present-in-workspace";
+  }
+  return "not-present-in-workspace";
 }
 
 function isPlaceholderReactTestRendererPackage(workspaceRoot, packageRoot) {

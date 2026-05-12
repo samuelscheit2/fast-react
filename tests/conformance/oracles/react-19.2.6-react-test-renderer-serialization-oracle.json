@@ -82,10 +82,11 @@
   ],
   "localFastReactStatus": {
     "packageName": "@fast-react/react-test-renderer",
-    "status": "not-present-in-workspace",
+    "status": "placeholder-present",
     "comparedToReactTestRenderer": false,
     "behaviorCompatibilityClaimed": false,
-    "reason": "The current workspace has Rust fast-react-test-renderer host crates but no local JS react-test-renderer compatibility package to execute in this conformance oracle."
+    "compatibilityClaimed": false,
+    "reason": "The current workspace has a local JS react-test-renderer placeholder package for private diagnostics, but no public Fast React test-renderer compatibility package to execute in this conformance oracle."
   },
   "probeModes": [
     {

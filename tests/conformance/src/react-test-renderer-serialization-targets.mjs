@@ -47,14 +47,32 @@ export const REACT_TEST_RENDERER_SERIALIZATION_SUPPORTING_TARGETS = [
   }
 ];
 
-export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS = {
-  packageName: "@fast-react/react-test-renderer",
-  status: "not-present-in-workspace",
-  comparedToReactTestRenderer: false,
-  behaviorCompatibilityClaimed: false,
-  reason:
-    "The current workspace has Rust fast-react-test-renderer host crates but no local JS react-test-renderer compatibility package to execute in this conformance oracle."
-};
+export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS =
+  freezeRecord({
+    packageName: "@fast-react/react-test-renderer",
+    status: "placeholder-present",
+    comparedToReactTestRenderer: false,
+    behaviorCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    reason:
+      "The current workspace has a local JS react-test-renderer placeholder package for private diagnostics, but no public Fast React test-renderer compatibility package to execute in this conformance oracle."
+  });
+
+export const REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPARISON_CLAIM_FIELDS =
+  freezeArray([
+    "comparedToReactTestRenderer",
+    "fastReactComparedToReactTestRenderer",
+    "fullDualRunOracleExists"
+  ]);
+
+export const REACT_TEST_RENDERER_SERIALIZATION_FAST_REACT_COMPATIBILITY_CLAIM_FIELDS =
+  freezeArray([
+    "behaviorCompatibilityClaimed",
+    "fastReactBehaviorCompatible",
+    "compatibilityClaimed",
+    "packageCompatibilityClaimed",
+    "publicCompatibilityClaimed"
+  ]);
 
 export const REACT_TEST_RENDERER_SERIALIZATION_PACKAGES = [
   REACT_TEST_RENDERER_SERIALIZATION_TARGET,
@@ -89,3 +107,11 @@ export const REACT_TEST_RENDERER_SERIALIZATION_SOURCE_DOCUMENTS = [
   "worker-progress/worker-017-runtime-inventory-generation.md",
   "worker-progress/worker-073-test-renderer-update-model-plan.md"
 ];
+
+function freezeRecord(value) {
+  return Object.freeze(value);
+}
+
+function freezeArray(value) {
+  return Object.freeze([...value]);
+}
