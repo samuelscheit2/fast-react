@@ -40,4 +40,4 @@
 
 ## Commit
 
-- Pending.
+- Docs refresh commit: `8b8fb840` (`Refresh docs after source proof batch`).
