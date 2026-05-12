@@ -954,6 +954,104 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
     reportWithMutableBehavior,
     "children-traversal-currentness-behavior-probes"
   );
+  for (const trapName of [
+    "isExtensible",
+    "ownKeys",
+    "getOwnPropertyDescriptor",
+    "get"
+  ]) {
+    assertCurrentnessRejected(
+      createChildrenCurrentnessReportWithFreezeReplacement(
+        isChildrenTraversalCurrentnessReportRecord,
+        (value, originalFreeze) =>
+          createThrowingProxyReplacement(
+            originalFreeze(value),
+            trapName,
+            `final report ${trapName} trap should not be reached`
+          )
+      ),
+      "children-traversal-currentness-source-proof"
+    );
+    assertCurrentnessRejected(
+      createChildrenCurrentnessReportWithFreezeReplacement(
+        isChildrenTraversalBehaviorCurrentnessRecord,
+        (value, originalFreeze) =>
+          createThrowingProxyReplacement(
+            originalFreeze(value),
+            trapName,
+            `behavior currentness ${trapName} trap should not be reached`
+          )
+      ),
+      "children-traversal-currentness-behavior-probes"
+    );
+  }
+  assertCurrentnessRejected(
+    createChildrenCurrentnessReportWithFreezeReplacement(
+      isChildrenTraversalCurrentnessReportRecord,
+      (value, originalFreeze) => originalFreeze({ ...value })
+    ),
+    "children-traversal-currentness-source-proof"
+  );
+  assertCurrentnessRejected(
+    createChildrenCurrentnessReportWithFreezeReplacement(
+      isChildrenTraversalBehaviorCurrentnessRecord,
+      (value, originalFreeze) => originalFreeze({ ...value })
+    ),
+    "children-traversal-currentness-behavior-probes"
+  );
+  const staleSourceReportHiddenByFreeze =
+    createChildrenCurrentnessReportWithFreezeReplacement(
+      isChildrenTraversalSourceReportRecord,
+      () =>
+        childrenHelper.privateChildrenTraversalCurrentnessMetadata.sourceReport,
+      {
+        sourceReport: {
+          reactSourceCommit: "stale"
+        }
+      }
+    );
+  assertCurrentnessRejected(
+    staleSourceReportHiddenByFreeze,
+    "children-traversal-currentness-source-report"
+  );
+  const staleSourceReportReturnedByLaterValidFreeze =
+    createChildrenCurrentnessReportWithFreezeReplacement(
+      isChildrenTraversalCurrentnessReportRecord,
+      () => staleSourceReportHiddenByFreeze
+    );
+  assert.equal(
+    staleSourceReportReturnedByLaterValidFreeze,
+    staleSourceReportHiddenByFreeze
+  );
+  assertCurrentnessRejected(
+    staleSourceReportReturnedByLaterValidFreeze,
+    "children-traversal-currentness-source-report"
+  );
+  const publicAliasHiddenByFreeze =
+    createChildrenCurrentnessReportWithFreezeReplacement(
+      isChildrenTraversalCurrentnessReportRecord,
+      (value, originalFreeze) => {
+        delete value.publicChildrenTraversalCompatibilityClaimed;
+        return originalFreeze(value);
+      },
+      {
+        publicChildrenTraversalCompatibilityClaimed: true
+      }
+    );
+  assertCurrentnessRejected(
+    publicAliasHiddenByFreeze,
+    "children-traversal-currentness-report-shape"
+  );
+  const publicAliasReturnedByLaterValidFreeze =
+    createChildrenCurrentnessReportWithFreezeReplacement(
+      isChildrenTraversalCurrentnessReportRecord,
+      () => publicAliasHiddenByFreeze
+    );
+  assert.equal(publicAliasReturnedByLaterValidFreeze, publicAliasHiddenByFreeze);
+  assertCurrentnessRejected(
+    publicAliasReturnedByLaterValidFreeze,
+    "children-traversal-currentness-report-shape"
+  );
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
       sourceReport: {
@@ -1538,6 +1636,54 @@ function createChildrenCurrentnessReportWithFreezeBypass(shouldBypassFreeze) {
   } finally {
     Object.freeze = originalFreeze;
   }
+}
+
+function createChildrenCurrentnessReportWithFreezeReplacement(
+  shouldReplaceFreeze,
+  createReplacement,
+  overrides = undefined
+) {
+  const originalFreeze = Object.freeze;
+  Object.freeze = (value) => {
+    if (shouldReplaceFreeze(value)) {
+      return createReplacement(value, originalFreeze);
+    }
+
+    return originalFreeze(value);
+  };
+
+  try {
+    return childrenHelper.createChildrenTraversalCurrentnessReport(overrides);
+  } finally {
+    Object.freeze = originalFreeze;
+  }
+}
+
+function createThrowingProxyReplacement(value, trapName, message) {
+  return new Proxy(value, {
+    [trapName]() {
+      throw new Error(message);
+    }
+  });
+}
+
+function isChildrenTraversalCurrentnessReportRecord(value) {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    Object.hasOwn(value, "kind") &&
+    value.kind === "fast-react.private.children_helper_traversal_currentness" &&
+    Object.hasOwn(value, "behaviorCurrentness")
+  );
+}
+
+function isChildrenTraversalSourceReportRecord(value) {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    Object.hasOwn(value, "kind") &&
+    value.kind === "fast-react.private.children_helper_traversal_source_report"
+  );
 }
 
 function isChildrenTraversalBehaviorCurrentnessRecord(value) {
