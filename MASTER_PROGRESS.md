@@ -29,6 +29,35 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1111 and 1110 Private Root Render Native Bridge Evidence
+
+- Worker 1111 added a crate-private diagnostic helper that composes the minimal
+  HostRoot -> HostComponent -> HostText root render through complete-work
+  handoff, HostRoot current switching, and minimal HostRoot placement commit.
+  Follow-up hardening rejects same-fiber HostComponent element-type drift,
+  HostComponent props drift, and HostText props drift before adapter or host
+  calls. The helper remains private to `fast-react-reconciler`.
+- Worker 1110 added a private `Symbol.for`-backed native placeholder factory
+  for the `<div>text</div>` Rust work-loop finished-work metadata canary. The
+  helper is not exposed through enumerable CJS keys or named ESM exports, and
+  the React DOM private root bridge shell now consumes it while preserving
+  public root rendering rejection checks.
+- Accepted validation evidence for this batch includes
+  `cargo test -p fast-react-reconciler --lib` with 924 tests passed,
+  reconciler `cargo check` and all-features check variants,
+  `cargo fmt --all --check`, `git diff --check`, root-render and public-facade
+  conformance scripts, native CJS/ESM/package-surface/import smoke checks, and
+  the React DOM private root bridge shell with 76 tests passed. The native
+  no-load guard still fails on the inherited worker-873 Rust source-identifier
+  ledger assertion.
+- The accepted state for this batch is main `1066e3e7` after merge commits
+  `f6cc5868` and `1066e3e7`, plus worker/fix commits `bd6b595a`, `ab9ab507`,
+  and `f777de15`. Public React DOM root rendering, public update/unmount
+  behavior, public DOM mutation, listener/ref behavior, Scheduler/act timing,
+  public facade admission, native no-load guard currentness, package
+  compatibility, and broad renderer compatibility remain blocked unless
+  separately proven.
+
 ### Worker 1107 Docs Refresh and Workers 1090/1095-1097 Root Render Private Handoffs
 
 - Worker 1107 refreshed master docs for current main `14b121ce`
