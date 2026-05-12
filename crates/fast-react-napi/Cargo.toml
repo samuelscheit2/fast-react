@@ -10,6 +10,7 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+fast-react-core.workspace = true
 fast-react-reconciler.workspace = true
 fast-react-test-renderer = { path = "../fast-react-test-renderer" }
 serde_json = "1.0"

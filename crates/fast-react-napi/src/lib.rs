@@ -7,6 +7,8 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
+use fast_react_core::{ElementTypeHandle, Lanes, PropsHandle};
+
 mod handle_table;
 
 #[allow(dead_code)]
@@ -1042,6 +1044,87 @@ fn native_boundary_kind_for_root_bridge_request_error(
             ..
         } => NativeBoundaryErrorKind::RootBridgeValidationFailed,
     }
+}
+
+struct NativeRootMinimalPlacementElementSource {
+    element: fast_react_reconciler::RootElementHandle,
+    element_type: ElementTypeHandle,
+    props: PropsHandle,
+    text_props: PropsHandle,
+}
+
+impl NativeRootMinimalPlacementElementSource {
+    const TEXT: &'static str = "text";
+
+    #[must_use]
+    const fn new() -> Self {
+        Self {
+            element: fast_react_reconciler::RootElementHandle::from_raw(1_129),
+            element_type: ElementTypeHandle::from_raw(1_130),
+            props: PropsHandle::from_raw(1_131),
+            text_props: PropsHandle::from_raw(1_132),
+        }
+    }
+}
+
+impl fast_react_reconciler::RootElementSource for NativeRootMinimalPlacementElementSource {
+    fn resolve_root_host_component(
+        &self,
+        element: fast_react_reconciler::RootElementHandle,
+    ) -> Result<
+        Option<fast_react_reconciler::RootHostComponentElement>,
+        fast_react_reconciler::RootElementResolutionError,
+    > {
+        if element != self.element {
+            return Ok(None);
+        }
+
+        let text_child =
+            fast_react_reconciler::RootHostTextChild::new(Self::TEXT, self.text_props)?;
+        let component = fast_react_reconciler::RootHostComponentElement::new(
+            element,
+            self.element_type,
+            self.props,
+        )?
+        .with_text_child(text_child);
+
+        Ok(Some(component))
+    }
+}
+
+#[allow(dead_code)]
+pub(crate) fn native_root_work_loop_minimal_placement_diagnostic_for_private_bridge()
+-> fast_react_reconciler::MinimalHostRootRenderCompletePlacementDiagnostic {
+    use fast_react_reconciler::{
+        FiberRootStore, RootOptions,
+        describe_minimal_host_root_render_complete_placement_for_private_bridge, update_container,
+    };
+    use fast_react_test_renderer::{TestElementType, TestProps, TestRenderer};
+
+    let source = NativeRootMinimalPlacementElementSource::new();
+    let mut host = TestRenderer::new();
+    let container = host.create_container();
+    let mut store = FiberRootStore::<TestRenderer>::new();
+    let root_id = store
+        .create_client_root(container, RootOptions::new())
+        .expect("test renderer client root creation should succeed");
+
+    update_container(&mut store, root_id, source.element, None)
+        .expect("test renderer diagnostic root update should schedule");
+
+    describe_minimal_host_root_render_complete_placement_for_private_bridge(
+        &mut store,
+        &mut host,
+        root_id,
+        Lanes::DEFAULT,
+        &source,
+        |id| id.raw(),
+        |_element, _element_type| {
+            Ok::<Option<TestElementType>, &'static str>(Some(TestElementType::new("div")))
+        },
+        |_element, _props| Ok::<Option<TestProps>, &'static str>(Some(TestProps::new())),
+    )
+    .expect("test renderer should produce minimal placement diagnostic")
 }
 
 #[cfg(test)]

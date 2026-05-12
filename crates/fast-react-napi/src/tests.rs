@@ -6412,6 +6412,33 @@ fn test_renderer_native_root_execution_bridge_preserves_fail_closed_lifecycle_ou
 }
 
 #[test]
+fn native_root_work_loop_minimal_placement_diagnostic_consumes_private_reconciler_bridge() {
+    let diagnostic = native_root_work_loop_minimal_placement_diagnostic_for_private_bridge();
+
+    assert_eq!(diagnostic.text_content(), "text");
+    assert_eq!(
+        diagnostic.placement_mutation_kind(),
+        "append-placement-to-container"
+    );
+    assert!(diagnostic.host_mutation_gate_blockers_intact());
+    assert!(diagnostic.host_mutation_execution_blocked());
+    assert!(!diagnostic.production_host_mutation_apply_promoted());
+    assert!(diagnostic.public_root_rendering_blocked());
+    assert!(diagnostic.public_compatibility_blocked());
+    assert!(!diagnostic.public_dom_compatibility_claimed());
+    assert!(!diagnostic.public_root_rendering_claimed());
+    assert!(!diagnostic.public_renderer_package_behavior_exposed());
+    assert!(!diagnostic.react_dom_compatibility_claimed());
+    assert!(!diagnostic.test_renderer_compatibility_claimed());
+
+    let native_boundary = native_export_placeholder("native.root.render").unwrap_err();
+    assert_eq!(
+        native_boundary.kind(),
+        NativeBoundaryErrorKind::NativeExportsNotBuilt
+    );
+}
+
+#[test]
 fn native_root_bridge_sequence_validator_rejects_value_handles_invalidated_after_recording() {
     let mut table = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(281));
     let element_handle = table.insert_value(PlaceholderValueRecord::new(9501));
