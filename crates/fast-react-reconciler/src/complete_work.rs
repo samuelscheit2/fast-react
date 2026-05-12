@@ -1,25 +1,33 @@
-//! Private test-only complete/unwind helpers.
+//! Private complete/unwind helpers.
 //!
-//! These helpers model only the Provider stack restoration point and narrow
-//! HostRoot child-set completion points needed by root-loop canaries. They do
-//! not implement general complete-work traversal, public arrays, keyed
-//! children, portals, Suspense, commit, renderer output, or public container
-//! compatibility.
+//! The production-compiled surface remains crate-private and deliberately
+//! minimal. It currently supports only the detached host creation path needed
+//! for an already reconciled HostRoot -> HostComponent -> HostText tree. The
+//! wider canary helpers are still test-only and model only the Provider stack
+//! restoration point and narrow HostRoot child-set completion points needed by
+//! root-loop tests. This module does not implement general complete-work
+//! traversal, public arrays, keyed children, portals, Suspense, commit,
+//! renderer output, or public container compatibility.
 
-#![cfg(test)]
 #![allow(dead_code)]
 
+#[cfg(test)]
 use std::collections::HashSet;
+#[cfg(test)]
 use std::error::Error;
+#[cfg(test)]
 use std::fmt::{self, Display, Formatter};
 
+#[cfg(test)]
 use fast_react_core::{
     ContextHandle, ContextStackError, ContextStackSnapshot, ContextValueHandle, DeletionListId,
     FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle,
     StateNodeHandle, bubble_properties,
 };
 
+#[cfg(test)]
 use crate::FiberRootId;
+#[cfg(test)]
 use crate::begin_work::{
     ContextProviderUseContextOpenScopeBeginWorkRecord, UnsupportedOffscreenChildShapeKind,
     UnsupportedOffscreenChildShapeRecord, UnsupportedOffscreenVisibility,
@@ -27,21 +35,41 @@ use crate::begin_work::{
     UnsupportedOffscreenVisibilityTransitionKind, UnsupportedOffscreenVisibilityTransitionRecord,
     unsupported_offscreen_visibility_transition_record,
 };
+#[cfg(test)]
 use crate::function_component::FunctionComponentContextRenderStore;
+#[cfg(test)]
 use crate::unsupported_features::OFFSCREEN_UNSUPPORTED_FEATURE;
 
+#[cfg(test)]
 mod append_all_children;
+#[cfg(test)]
 mod context_provider;
+#[cfg(test)]
 mod host_component_update;
+#[cfg(test)]
 mod host_root_child_set;
+#[cfg(test)]
 mod managed_child;
+mod minimal_host;
+#[cfg(test)]
 mod offscreen_visibility;
 
+#[cfg(test)]
 pub(crate) use append_all_children::*;
+#[cfg(test)]
 pub(crate) use context_provider::*;
+#[cfg(test)]
 pub(crate) use host_component_update::*;
+#[cfg(test)]
 pub(crate) use host_root_child_set::*;
+#[cfg(test)]
 pub(crate) use managed_child::*;
+#[allow(
+    unused_imports,
+    reason = "crate-private minimal complete-work entry points are production-compiled before the render loop consumes them"
+)]
+pub(crate) use minimal_host::*;
+#[cfg(test)]
 pub(crate) use offscreen_visibility::*;
 
 #[cfg(test)]
