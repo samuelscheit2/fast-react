@@ -31,7 +31,7 @@ const createRoot = defineFunctionShape(function createRoot(
 
   const adapter = createPrivateRootPublicFacadeAdapter();
   const privateRoot = adapter.createRoot(container);
-  let rendered = false;
+  let hostOutputMounted = false;
   let unmounted = false;
   minimalPublicRootContainers.set(container, true);
 
@@ -41,15 +41,23 @@ const createRoot = defineFunctionShape(function createRoot(
       enumerable: true,
       value(element) {
         assertRenderArgumentsSupported(arguments);
-        assertMinimalHostTextElement(element);
         if (unmounted) {
           throwUnsupportedRootRender(
             'Rendering after public root.unmount remains blocked for the minimal host-output facade.'
           );
         }
+        if (element === null) {
+          if (hostOutputMounted) {
+            adapter.clearHostOutput(privateRoot);
+            hostOutputMounted = false;
+          }
+          return undefined;
+        }
+
+        assertMinimalHostTextElement(element);
 
         privateRoot.render(element);
-        rendered = true;
+        hostOutputMounted = true;
         return undefined;
       }
     },
@@ -58,19 +66,12 @@ const createRoot = defineFunctionShape(function createRoot(
       value() {
         assertUnmountArgumentsSupported(arguments);
         if (unmounted) {
-          throwUnsupportedRootUnmount(
-            'Repeated public root.unmount calls remain blocked.'
-          );
-        }
-        if (!rendered) {
-          throwUnsupportedRootUnmount(
-            'Public root.unmount currently requires one accepted minimal div text render to clean up.'
-          );
+          return undefined;
         }
 
         privateRoot.unmount();
         minimalPublicRootContainers.delete(container);
-        rendered = false;
+        hostOutputMounted = false;
         unmounted = true;
         return undefined;
       }

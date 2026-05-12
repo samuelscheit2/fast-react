@@ -164,6 +164,64 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
     publicContainer.innerHTML,
     '<div>id removed &amp; &lt; &gt;</div>'
   );
+  const clearedHostNode = publicContainer.firstChild;
+  const clearReturn = root.render(null);
+  assert.equal(clearReturn, undefined);
+  assert.equal(publicContainer.childNodes.length, 0);
+  assert.equal(publicContainer.children.length, 0);
+  assert.equal(publicContainer.firstElementChild, null);
+  assert.equal(publicContainer.firstChild, null);
+  assert.equal(publicContainer.textContent, '');
+  assert.equal(publicContainer.innerHTML, '');
+  assert.equal(componentTree.getLatestPropsFromNode(clearedHostNode), null);
+  assert.deepEqual(
+    publicContainer.__mutationLog.map((entry) => [
+      entry.type,
+      entry.child?.nodeName
+    ]),
+    [
+      ['appendChild', 'DIV'],
+      ['removeChild', 'DIV']
+    ]
+  );
+  assert.equal(root.render(null), undefined);
+  assert.deepEqual(
+    publicContainer.__mutationLog.map((entry) => [
+      entry.type,
+      entry.child?.nodeName
+    ]),
+    [
+      ['appendChild', 'DIV'],
+      ['removeChild', 'DIV']
+    ]
+  );
+  const rerenderElement = React.createElement(
+    'div',
+    {id: publicId},
+    'hello & < >'
+  );
+  assert.equal(root.render(rerenderElement), undefined);
+  assert.equal(publicContainer.childNodes.length, 1);
+  assert.equal(publicContainer.children.length, 1);
+  assert.equal(publicContainer.firstElementChild, publicContainer.firstChild);
+  assert.notEqual(publicContainer.firstChild, clearedHostNode);
+  assert.equal(publicContainer.firstChild.nodeName, 'DIV');
+  assert.equal(publicContainer.firstChild.tagName, 'DIV');
+  assert.equal(publicContainer.firstChild.getAttribute('id'), publicId);
+  assert.deepEqual(attributeEntries(publicContainer.firstChild), [
+    ['id', publicId]
+  ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(publicContainer.firstChild),
+    rerenderElement.props
+  );
+  assert.equal(publicContainer.firstChild.textContent, 'hello & < >');
+  assert.equal(publicContainer.firstChild.innerHTML, 'hello &amp; &lt; &gt;');
+  assert.equal(publicContainer.textContent, 'hello & < >');
+  assert.equal(
+    publicContainer.innerHTML,
+    '<div id="app&amp;&lt;&gt;&quot;">hello &amp; &lt; &gt;</div>'
+  );
   const unmountReturn = root.unmount();
   assert.equal(unmountReturn, undefined);
   assert.equal(publicContainer.childNodes.length, 0);
@@ -182,10 +240,7 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
   assert.equal(staleRenderError.code, 'FAST_REACT_UNIMPLEMENTED');
   assert.equal(staleRenderError.entrypoint, 'react-dom/client');
   assert.equal(staleRenderError.exportName, 'createRoot().render');
-  const secondUnmountError = captureThrown(() => root.unmount());
-  assert.equal(secondUnmountError.code, 'FAST_REACT_UNIMPLEMENTED');
-  assert.equal(secondUnmountError.entrypoint, 'react-dom/client');
-  assert.equal(secondUnmountError.exportName, 'createRoot().unmount');
+  assert.equal(root.unmount(), undefined);
   assert.equal(publicContainer.childNodes.length, 0);
   assert.equal(publicContainer.children.length, 0);
   assert.equal(publicContainer.firstElementChild, null);
@@ -220,6 +275,8 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
     [
       ['appendChild', 'DIV'],
       ['removeChild', 'DIV'],
+      ['appendChild', 'DIV'],
+      ['removeChild', 'DIV'],
       ['appendChild', 'DIV']
     ]
   );
@@ -238,12 +295,82 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
       ['appendChild', 'DIV'],
       ['removeChild', 'DIV'],
       ['appendChild', 'DIV'],
+      ['removeChild', 'DIV'],
+      ['appendChild', 'DIV'],
       ['removeChild', 'DIV']
     ]
   );
   assert.equal(publicContainer.__registrations.length, 0);
   assert.equal(publicDocument.__registrations.length, 0);
   assert.equal(rootMarkers.isContainerMarkedAsRoot(publicContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(publicContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(publicDocument), false);
+}
+
+{
+  const publicDocument = createDocument('public-null-before-render');
+  const publicContainer = publicDocument.createElement('div');
+  publicDocument.__mutationLog.length = 0;
+  const root = reactDomClient.createRoot(publicContainer);
+
+  assert.equal(root.render(null), undefined);
+  assert.equal(root.render(null), undefined);
+  assert.equal(publicContainer.childNodes.length, 0);
+  assert.equal(publicContainer.children.length, 0);
+  assert.equal(publicContainer.firstElementChild, null);
+  assert.equal(publicContainer.textContent, '');
+  assert.equal(publicContainer.innerHTML, '');
+  assert.equal(publicContainer.__mutationLog.length, 0);
+  assert.equal(publicDocument.__mutationLog.length, 0);
+  assert.equal(publicContainer.__registrations.length, 0);
+  assert.equal(publicDocument.__registrations.length, 0);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(publicContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(publicContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(publicDocument), false);
+  assert.equal(root.unmount(), undefined);
+  assert.equal(root.unmount(), undefined);
+  assert.equal(publicContainer.__mutationLog.length, 0);
+  assert.equal(publicDocument.__mutationLog.length, 0);
+  assert.equal(reactDomClient.createRoot(publicContainer).unmount(), undefined);
+}
+
+{
+  const publicDocument = createDocument('public-null-then-unmount');
+  const publicContainer = publicDocument.createElement('div');
+  publicDocument.__mutationLog.length = 0;
+  const root = reactDomClient.createRoot(publicContainer);
+  const element = React.createElement('div', {id: 'x'}, 'text');
+
+  assert.equal(root.render(element), undefined);
+  const hostNode = publicContainer.firstChild;
+  assert.equal(root.render(null), undefined);
+  assert.equal(componentTree.getLatestPropsFromNode(hostNode), null);
+  assert.deepEqual(
+    publicContainer.__mutationLog.map((entry) => [
+      entry.type,
+      entry.child?.nodeName
+    ]),
+    [
+      ['appendChild', 'DIV'],
+      ['removeChild', 'DIV']
+    ]
+  );
+  assert.equal(root.unmount(), undefined);
+  assert.equal(root.unmount(), undefined);
+  assert.deepEqual(
+    publicContainer.__mutationLog.map((entry) => [
+      entry.type,
+      entry.child?.nodeName
+    ]),
+    [
+      ['appendChild', 'DIV'],
+      ['removeChild', 'DIV']
+    ]
+  );
+  assert.equal(publicContainer.childNodes.length, 0);
+  assert.equal(publicContainer.firstElementChild, null);
+  assert.equal(publicContainer.textContent, '');
+  assert.equal(publicContainer.innerHTML, '');
   assert.equal(listenerRegistry.hasListeningMarker(publicContainer), false);
   assert.equal(listenerRegistry.hasListeningMarker(publicDocument), false);
 }

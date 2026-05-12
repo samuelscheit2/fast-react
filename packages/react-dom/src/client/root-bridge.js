@@ -3761,6 +3761,12 @@ function createPrivateRootPublicFacadeAdapter(options) {
         options
       );
     },
+    clearHostOutput(root) {
+      return clearPrivateRootPublicFacadeHostOutputWithAdapter(
+        adapterState,
+        root
+      );
+    },
     unmountHostOutput(root, element, options) {
       return unmountPrivateRootPublicFacadeHostOutputWithAdapter(
         adapterState,
@@ -9415,6 +9421,43 @@ function updatePrivateRootPublicFacadeNestedHostOutputWithAdapter(
     nextElement,
     options
   );
+}
+
+function clearPrivateRootPublicFacadeHostOutputWithAdapter(
+  adapterState,
+  root
+) {
+  const payload = assertPrivateRootPublicFacadeRootForAdapter(
+    root,
+    adapterState
+  );
+  return clearPrivateRootPublicFacadeActiveHostOutputFromPayload(payload);
+}
+
+function clearPrivateRootPublicFacadeActiveHostOutputFromPayload(payload) {
+  const handleState = getPrivateRootHandleState(payload.rootHandle);
+  if (handleState.lifecycleStatus === ROOT_LIFECYCLE_UNMOUNTED) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Cannot clear private public-facade host output after the private facade root was unmounted.'
+    );
+  }
+
+  const activeHostOutput =
+    getActivePrivateRootPublicFacadeHostOutputRender(payload);
+  if (activeHostOutput === null) {
+    return null;
+  }
+
+  const cleanupRecord = payload.bridge.cleanupInitialRenderHostOutput(
+    activeHostOutput.renderPayload.hostOutputHandoff
+  );
+  if (
+    handleState.createRenderAdmissionRecord ===
+    activeHostOutput.renderPayload.admissionRecord
+  ) {
+    handleState.createRenderAdmissionRecord = null;
+  }
+  return cleanupRecord;
 }
 
 function updatePrivateRootPublicFacadeHostOutputFromPayload(
