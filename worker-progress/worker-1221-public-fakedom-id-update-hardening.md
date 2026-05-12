@@ -2,12 +2,15 @@
 
 ## Summary
 
-Hardened the narrow public fake-DOM `createRoot().render(<div id>text</div>)`
-facade evidence around hostile id/text serialization and same-root id updates.
-The lifecycle gate now records raw `getAttribute("id")`, raw component-tree
-stored latest-props id/children, and stored-props identity separately from
-escaped `innerHTML`/serialized container output for initial render, id/text
-update, id removal update, and rendered-root unmount cleanup.
+Repaired the branch onto current `main` (`7d775144`) and resolved the public
+fake-DOM lifecycle merge by preserving both accepted evidence streams:
+
+- Worker 1220 recreate-after-unmount evidence, including stale old-root
+  fail-closed attempts, distinct fresh root, fresh render/unmount snapshots,
+  and the accepted repeat-render snapshot with the original id.
+- Worker 1221 id/text update and id-removal hardening, including raw
+  `getAttribute("id")` checks, escaped serialized `innerHTML`, component-tree
+  latest-props children/id checks, and latest-props object identity.
 
 Compatibility remains explicitly blocked (`compatibilityClaimed: false`). The
 change does not broaden browser DOM/root compatibility claims, hydration,
@@ -21,34 +24,60 @@ options.
 - `tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`
 - `tests/smoke/react-dom-private-root-bridge-shell.mjs`
 - `packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js`
+- `worker-progress/worker-1221-public-fakedom-id-update-hardening.md`
+
+Accepted main merge-parent content also brought in:
+
+- `MASTER_PLAN.md`
+- `crates/fast-react-reconciler/src/root_scheduler.rs`
+- `crates/fast-react-reconciler/src/root_scheduler/tests.rs`
+- `worker-progress/worker-1220-public-root-recreate-after-unmount.md`
+- `worker-progress/worker-1221-entangled-transition-queue-lane-continuation.md`
 
 ## Commands Run
 
-- `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs` - pass, 42/42
+- `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs` - pass, 43/43
 - `npm --prefix tests/conformance run root-public-facade:conformance` - pass
 - `node tests/smoke/react-dom-private-root-bridge-shell.mjs` - pass
 - `node --test packages/react-dom/test/react-dom-client-symbol-facade-gate.test.js` - pass, 4/4
 - `git diff --check` - pass
+- `git diff --cached --check` - pass before the repair merge commit
 
 ## Evidence Gathered
 
+- Lifecycle order is now `renderInitial`, `renderDivText`, `renderUpdate`,
+  `renderIdRemoval`, `unmount`, and `recreateAfterUnmount`; the recreate row
+  is validated against `lifecycleRowSource[5]`.
 - Initial render records raw id as `app&<>"` through both `getAttribute("id")`
   and stored latest props, while serialized output remains
   `app&amp;&lt;&gt;&quot;`.
-- Same-root update reuses the host node and records raw id as `next&<>"` in
-  `getAttribute("id")` and stored latest props, while `innerHTML` serializes the
-  updated id and text.
+- Same-root id/text update reuses the host node and records raw id as
+  `next&<>"` in `getAttribute("id")` and stored latest props, while `innerHTML`
+  serializes the updated id and text.
 - Id removal update reuses the same host node, records no raw id attribute or
   stored id prop, and serializes `<div>id removed &amp; &lt; &gt;</div>`.
-- False-green cases now reject escaped raw ids, stale updated ids, missing raw
-  id fields, stale stored props ids, dropped stored-props identity, retained ids
-  after removal, listener side effects, and compatibility claims.
+- Recreate-after-unmount keeps the accepted repeat-render snapshot with the
+  original id, then verifies stale old-root render/unmount attempts fail
+  closed, a fresh root is distinct, fresh render/unmount complete, and the final
+  mutation log includes append/remove/append/remove.
+- False-green cases reject escaped raw ids, stale updated ids, missing raw id
+  fields, stale stored props ids, dropped stored-props identity, retained ids
+  after removal, old-root reuse, old render/unmount success after unmount,
+  missing fresh render attr evidence, hostile fresh-render HTML escaping,
+  incomplete fresh unmount mutation logs, listener/root marker leaks, stale
+  lifecycle labels, and compatibility claims.
 
 ## Audit / Review Notes
 
 - No nested agents were used.
-- The implementation stayed in fake-DOM/public-facade conformance and package
-  smoke tests; no production source changes were needed.
+- The read-only scout guidance was applied: the conflicted files were staged
+  after combining accepted lifecycle rows, the recreate row uses index `[5]`,
+  `componentTree` is passed through recreate snapshots, and
+  `MINIMAL_PUBLIC_DIV_TEXT_REPEAT_RENDER_SNAPSHOT` remains the recreate
+  same-root update expectation.
+- Manual edits stayed within the assigned public fake-DOM files and this
+  report. Non-scope files present in the repair merge are accepted main content
+  from the merge parent and were not refactored or dropped.
 
 ## Non-Claims
 
@@ -61,10 +90,9 @@ options.
 
 ## Risks / Overlap
 
-- Adjacent public fake-DOM conformance files may overlap with another public
-  React DOM fake-DOM worker. The changes are self-contained to id update/raw
-  serialization evidence and should merge cleanly if similar lifecycle rows are
-  preserved.
+- Remaining audit risk is merge-review only: the merge commit intentionally
+  contains accepted current-main files outside this worker's manual write scope.
+  Those files were preserved as merge-parent content.
 - The gate now depends on component-tree latest-props identity in the public
   fake-DOM inspection path; this is intentional evidence hardening for the
   existing fake-DOM facade only.
@@ -79,5 +107,6 @@ options.
 
 ## Commit Info
 
-- Implementation commit: `8618da92847fb9527434485631c865d724a08b07`
-- Report commit: records the implementation hash above.
+- Original implementation commit: `8618da92847fb9527434485631c865d724a08b07`
+- Original report commit: `28c474dbdf98bf05b442ffcca3e8ff6af89f4031`
+- Repair merge commit: `fec9b390733a8681772afb6192afdb2996dd450b`
