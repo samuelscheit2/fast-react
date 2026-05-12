@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
+import * as nativeNamespace from '../index.mjs';
 import nativeDefault, {
   FastReactNativeBindingUnavailableError,
   bindingStatus,
@@ -20,6 +21,9 @@ import nativeDefault, {
 
 const require = createRequire(import.meta.url);
 const cjsBinding = require('../index.cjs');
+const nativeRootWorkLoopFinishedWorkMetadataFactorySymbol = Symbol.for(
+  'fast.react_native.private_root_work_loop_finished_work_metadata_factory'
+);
 
 assert.equal(nativeDefault, cjsBinding);
 assert.equal(
@@ -45,6 +49,66 @@ assert.equal(platformArtifactPolicy, cjsBinding.platformArtifactPolicy);
 assert.equal(platformPackages, cjsBinding.platformPackages);
 assert.equal(supportedNativeTargets, cjsBinding.supportedNativeTargets);
 assert.equal(unavailableErrorCode, cjsBinding.unavailableErrorCode);
+assert.equal(
+  Object.hasOwn(
+    nativeNamespace,
+    'createNativeRootWorkLoopFinishedWorkMetadataForCanary'
+  ),
+  false
+);
+assert.equal(
+  nativeDefault[nativeRootWorkLoopFinishedWorkMetadataFactorySymbol],
+  cjsBinding[nativeRootWorkLoopFinishedWorkMetadataFactorySymbol]
+);
+
+const nativeRootWorkLoopFinishedWorkMetadata =
+  nativeDefault[nativeRootWorkLoopFinishedWorkMetadataFactorySymbol]({
+    hostType: 'div',
+    renderUpdateId: 'esm-root-work-loop-update:1',
+    rootId: 'esm-root-work-loop-root:1',
+    rootTag: 'ConcurrentRoot',
+    textContent: 'text'
+  });
+assert.equal(Object.isFrozen(nativeRootWorkLoopFinishedWorkMetadata), true);
+assert.equal(
+  Object.isFrozen(nativeRootWorkLoopFinishedWorkMetadata.facade),
+  true
+);
+assert.deepEqual(nativeRootWorkLoopFinishedWorkMetadata.facade, {
+  rootId: 'esm-root-work-loop-root:1',
+  rootTag: 'ConcurrentRoot',
+  renderUpdateId: 'esm-root-work-loop-update:1',
+  hostType: 'div',
+  hostOutputShape: 'host-component',
+  hostComponentCount: 1,
+  hostTextCount: 1,
+  textContent: 'text'
+});
+assert.deepEqual(
+  nativeRootWorkLoopFinishedWorkMetadata.completeWork.childTags,
+  ['HostComponent', 'HostText']
+);
+assert.throws(
+  () =>
+    nativeDefault[nativeRootWorkLoopFinishedWorkMetadataFactorySymbol]({
+      hostType: 'section',
+      renderUpdateId: 'esm-root-work-loop-update:1',
+      rootId: 'esm-root-work-loop-root:1',
+      rootTag: 'ConcurrentRoot',
+      textContent: 'text'
+    }),
+  {
+    name: 'FastReactNativeRootWorkLoopFinishedWorkMetadataFactoryError',
+    code:
+      'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_INVALID_OPTIONS',
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    compatibilityClaimed: false
+  }
+);
 
 const plan = getNativeBindingLoadPlan({
   platform: 'win32',

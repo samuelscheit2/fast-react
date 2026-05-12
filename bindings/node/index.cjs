@@ -12,6 +12,101 @@ const platformArtifactPolicy =
 const optionalPackagePrefix = '@fast-react/native-';
 const nativeRootBridgeRequestShapeGateStatus =
   'admitted-native-root-bridge-js-request-shape';
+const nativeRootWorkLoopFinishedWorkMetadataFactorySymbol = Symbol.for(
+  'fast.react_native.private_root_work_loop_finished_work_metadata_factory'
+);
+const nativeRootWorkLoopFinishedWorkMetadataFactoryErrorCode =
+  'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_INVALID_OPTIONS';
+const nativeRootWorkLoopFinishedWorkMetadataFactoryCapabilityClaimErrorCode =
+  'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_CAPABILITY_CLAIM';
+const nativeRootWorkLoopFinishedWorkMetadataSource =
+  'fast-react-reconciler.root-work-loop.finished-work-handoff';
+const nativeRootWorkLoopFinishedWorkMetadataStatus =
+  'accepted-private-root-work-loop-finished-work-handoff-metadata';
+const nativeRootWorkLoopFinishedWorkMetadataRevision =
+  'root-work-loop-finished-work-handoff-2026-05-10';
+const nativeRootWorkLoopFinishedWorkMetadataFactoryOptionFields =
+  Object.freeze([
+    'hostType',
+    'renderUpdateId',
+    'rootId',
+    'rootTag',
+    'textContent'
+  ]);
+const nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields =
+  Object.freeze([
+    'browserDomMutation',
+    'browserDomMutationClaimed',
+    'browser_dom_mutation',
+    'browser_dom_mutation_claimed',
+    'compatibilityClaimed',
+    'compatibility_claimed',
+    'domMutation',
+    'domMutationClaimed',
+    'dom_mutation',
+    'dom_mutation_claimed',
+    'eventDispatch',
+    'eventDispatchClaimed',
+    'event_dispatch',
+    'event_dispatch_claimed',
+    'fakeDomMutation',
+    'fakeDomMutationClaimed',
+    'fake_dom_mutation',
+    'fake_dom_mutation_claimed',
+    'hydration',
+    'hydrationClaimed',
+    'hydration_claimed',
+    'listenerInstallation',
+    'listenerInstallationClaimed',
+    'listener_installation',
+    'listener_installation_claimed',
+    'markerWrites',
+    'markerWritesClaimed',
+    'marker_writes',
+    'marker_writes_claimed',
+    'nativeExecution',
+    'nativeExecutionClaimed',
+    'native_execution',
+    'native_execution_claimed',
+    'publicCompatibilityClaimed',
+    'publicCreateRootCompatibilityClaimed',
+    'publicDomMutationCompatibilityClaimed',
+    'publicEventCompatibilityClaimed',
+    'publicHydrateRootCompatibilityClaimed',
+    'publicHydrationCompatibilityClaimed',
+    'publicNativeCompatibility',
+    'publicRootCompatibilitySurface',
+    'publicRootExecution',
+    'publicRootRenderCompatibilityClaimed',
+    'publicRootUnmountCompatibilityClaimed',
+    'publicRootUpdateCompatibilityClaimed',
+    'publicTestRendererCompatibilityClaimed',
+    'public_compatibility_claimed',
+    'public_create_root_compatibility_claimed',
+    'public_dom_mutation_compatibility_claimed',
+    'public_event_compatibility_claimed',
+    'public_hydrate_root_compatibility_claimed',
+    'public_hydration_compatibility_claimed',
+    'public_native_compatibility',
+    'public_root_compatibility_surface',
+    'public_root_execution',
+    'public_root_render_compatibility_claimed',
+    'public_root_unmount_compatibility_claimed',
+    'public_root_update_compatibility_claimed',
+    'public_test_renderer_compatibility_claimed',
+    'reconcilerExecution',
+    'reconcilerExecutionClaimed',
+    'reconciler_execution',
+    'reconciler_execution_claimed',
+    'refEffects',
+    'refEffectsClaimed',
+    'ref_effects',
+    'ref_effects_claimed',
+    'rootScheduled',
+    'rootScheduledClaimed',
+    'root_scheduled',
+    'root_scheduled_claimed'
+  ]);
 const nativeRootBridgeHandleAdmissionPreflightStatus =
   'preflighted-native-root-bridge-real-handle-admission';
 const nativeRootBridgeRustHandleTableAdmissionSmokeStatus =
@@ -5669,6 +5764,192 @@ function assertPositiveSafeInteger(value, field) {
   );
 }
 
+const createNativeRootWorkLoopFinishedWorkMetadataForCanary = Object.freeze(
+  function createNativeRootWorkLoopFinishedWorkMetadataForCanary(options) {
+    assertNativeRootWorkLoopFinishedWorkMetadataCanaryOptions(options);
+
+    const childTags = Object.freeze(['HostComponent', 'HostText']);
+    return Object.freeze({
+      source: nativeRootWorkLoopFinishedWorkMetadataSource,
+      status: nativeRootWorkLoopFinishedWorkMetadataStatus,
+      metadataRevision: nativeRootWorkLoopFinishedWorkMetadataRevision,
+      facade: Object.freeze({
+        rootId: options.rootId,
+        rootTag: options.rootTag,
+        renderUpdateId: options.renderUpdateId,
+        hostType: 'div',
+        hostOutputShape: 'host-component',
+        hostComponentCount: 1,
+        hostTextCount: 1,
+        textContent: 'text'
+      }),
+      completeWork: Object.freeze({
+        rootChildTag: 'HostComponent',
+        completedChildTag: 'HostComponent',
+        hostTextChildTag: 'HostText',
+        childTags
+      }),
+      pending: Object.freeze({
+        recordsFinishedWork: true,
+        pendingWorkMatchesFinishedWork: true,
+        renderLanes: 'Default',
+        finishedLanes: 'Default',
+        remainingLanes: 'NoLanes'
+      }),
+      commit: Object.freeze({
+        commitOrderAfterPendingRecord: true,
+        consumedFinishedWorkRecord: true,
+        finishedWorkAfterCommit: null,
+        finishedLanesAfterCommit: 'NoLanes',
+        renderPhaseWorkAfterCommit: null,
+        mutationExecutionBlocked: true,
+        publicRootRenderingBlocked: true,
+        effectsRefsAndHydrationBlocked: true
+      }),
+      placement: Object.freeze({
+        tag: 'HostComponent',
+        applyKind: 'append-placement-to-container',
+        siblingStatus: 'append'
+      })
+    });
+  }
+);
+
+function assertNativeRootWorkLoopFinishedWorkMetadataCanaryOptions(options) {
+  if (!isNativeRootWorkLoopMetadataObjectLike(options)) {
+    throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
+      'Native root work-loop finished-work metadata factory requires an options object.',
+      nativeRootWorkLoopFinishedWorkMetadataFactoryErrorCode
+    );
+  }
+
+  assertNativeRootWorkLoopFinishedWorkMetadataHasNoCapabilityClaims(options);
+
+  for (const field of Object.getOwnPropertyNames(options)) {
+    if (
+      !nativeRootWorkLoopFinishedWorkMetadataFactoryOptionFields.includes(
+        field
+      )
+    ) {
+      throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
+        `Native root work-loop finished-work metadata factory does not accept option ${field}.`,
+        nativeRootWorkLoopFinishedWorkMetadataFactoryErrorCode,
+        { field }
+      );
+    }
+  }
+
+  assertNativeRootWorkLoopFinishedWorkMetadataStringOption(
+    options.rootId,
+    'rootId'
+  );
+  assertNativeRootWorkLoopFinishedWorkMetadataStringOption(
+    options.rootTag,
+    'rootTag'
+  );
+  assertNativeRootWorkLoopFinishedWorkMetadataStringOption(
+    options.renderUpdateId,
+    'renderUpdateId'
+  );
+
+  if (options.hostType !== 'div') {
+    throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
+      'Native root work-loop finished-work metadata canary only supports hostType "div".',
+      nativeRootWorkLoopFinishedWorkMetadataFactoryErrorCode,
+      { field: 'hostType', value: options.hostType }
+    );
+  }
+
+  if (options.textContent !== 'text') {
+    throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
+      'Native root work-loop finished-work metadata canary only supports textContent "text".',
+      nativeRootWorkLoopFinishedWorkMetadataFactoryErrorCode,
+      { field: 'textContent', value: options.textContent }
+    );
+  }
+}
+
+function assertNativeRootWorkLoopFinishedWorkMetadataStringOption(
+  value,
+  field
+) {
+  if (typeof value === 'string' && value !== '') {
+    return;
+  }
+
+  throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
+    `Native root work-loop finished-work metadata factory requires ${field}.`,
+    nativeRootWorkLoopFinishedWorkMetadataFactoryErrorCode,
+    { field, value }
+  );
+}
+
+function assertNativeRootWorkLoopFinishedWorkMetadataHasNoCapabilityClaims(
+  value
+) {
+  const seen = new WeakSet();
+
+  function visit(candidate) {
+    if (
+      !isNativeRootWorkLoopMetadataObjectLike(candidate) ||
+      seen.has(candidate)
+    ) {
+      return;
+    }
+    seen.add(candidate);
+
+    for (const key of Object.getOwnPropertyNames(candidate)) {
+      const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
+      if (!descriptor) {
+        continue;
+      }
+      if (
+        nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields.includes(
+          key
+        ) &&
+        (!Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
+          Boolean(descriptor.value))
+      ) {
+        throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
+          'Native root work-loop finished-work metadata factory cannot accept public, native, DOM, hydration, event, ref, marker, listener, scheduler, Rust, or compatibility capability claims.',
+          nativeRootWorkLoopFinishedWorkMetadataFactoryCapabilityClaimErrorCode,
+          { field: key }
+        );
+      }
+      if (Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+        visit(descriptor.value);
+      }
+    }
+  }
+
+  visit(value);
+}
+
+function isNativeRootWorkLoopMetadataObjectLike(value) {
+  return (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function')
+  );
+}
+
+function throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
+  message,
+  code,
+  details = {}
+) {
+  const error = new Error(message);
+  error.name = 'FastReactNativeRootWorkLoopFinishedWorkMetadataFactoryError';
+  error.code = code;
+  error.details = Object.freeze({ ...details });
+  error.nativeAddonLoaded = false;
+  error.nativeExecution = false;
+  error.rendererExecution = false;
+  error.reconcilerExecution = false;
+  error.publicNativeCompatibility = false;
+  error.compatibilityClaimed = false;
+  throw error;
+}
+
 function throwNativeRootBridgeRequestShapeError(message, code, details = {}) {
   const error = new Error(message);
   error.name = 'FastReactNativeRequestShapeError';
@@ -5837,3 +6118,14 @@ module.exports = {
   supportedNodeEngineRange,
   unavailableErrorCode
 };
+
+Object.defineProperty(
+  module.exports,
+  nativeRootWorkLoopFinishedWorkMetadataFactorySymbol,
+  {
+    value: createNativeRootWorkLoopFinishedWorkMetadataForCanary,
+    enumerable: false,
+    configurable: false,
+    writable: false
+  }
+);

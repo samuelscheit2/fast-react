@@ -91,6 +91,11 @@ const expectedPlatformPackages = Object.fromEntries(
     target.optionalPackageName
   ])
 );
+const nativeRootWorkLoopFinishedWorkMetadataFactorySymbol = Symbol.for(
+  'fast.react_native.private_root_work_loop_finished_work_metadata_factory'
+);
+const nativeRootWorkLoopFinishedWorkMetadataFactory =
+  native[nativeRootWorkLoopFinishedWorkMetadataFactorySymbol];
 
 const expectedNativeRootBridgeEnvironmentTeardownFields = [
   'requestedEnvironmentId',
@@ -119,6 +124,10 @@ const expectedNativeRootBridgeCrossEnvironmentTeardownRowFields = [
   'reconcilerExecution',
   'reactBehaviorError'
 ];
+
+assertNativeRootWorkLoopFinishedWorkMetadataFactory(
+  nativeRootWorkLoopFinishedWorkMetadataFactory
+);
 const expectedNativeRootBridgeCrossEnvironmentTeardownRows = [
   {
     id: 'first-root-active-after-mismatched-teardown',
@@ -4180,6 +4189,155 @@ function assertNativeRootBridgeBatchLifecycleConsumer(consumer) {
   assert.equal(consumer.napiCleanupHookExecution, false);
   assert.equal(consumer.publicNativeCompatibility, false);
   assert.equal(consumer.reactBehaviorError, false);
+}
+
+function assertNativeRootWorkLoopFinishedWorkMetadataFactory(factory) {
+  const descriptor = Object.getOwnPropertyDescriptor(
+    native,
+    nativeRootWorkLoopFinishedWorkMetadataFactorySymbol
+  );
+  assert.equal(descriptor.value, factory);
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(typeof factory, 'function');
+  assert.equal(
+    factory.name,
+    'createNativeRootWorkLoopFinishedWorkMetadataForCanary'
+  );
+  assert.equal(Object.isFrozen(factory), true);
+  assert.equal(
+    Object.keys(native).includes(
+      'createNativeRootWorkLoopFinishedWorkMetadataForCanary'
+    ),
+    false
+  );
+
+  const validOptions = Object.freeze({
+    hostType: 'div',
+    renderUpdateId: 'native-root-work-loop-update:1',
+    rootId: 'native-root-work-loop-root:1',
+    rootTag: 'ConcurrentRoot',
+    textContent: 'text'
+  });
+  const metadata = factory(validOptions);
+
+  assert.equal(Object.isFrozen(metadata), true);
+  assert.equal(Object.isFrozen(metadata.facade), true);
+  assert.equal(Object.isFrozen(metadata.completeWork), true);
+  assert.equal(Object.isFrozen(metadata.completeWork.childTags), true);
+  assert.equal(Object.isFrozen(metadata.pending), true);
+  assert.equal(Object.isFrozen(metadata.commit), true);
+  assert.equal(Object.isFrozen(metadata.placement), true);
+  assert.deepEqual(metadata, {
+    source: rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE,
+    status: rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
+    metadataRevision:
+      rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION,
+    facade: {
+      rootId: 'native-root-work-loop-root:1',
+      rootTag: 'ConcurrentRoot',
+      renderUpdateId: 'native-root-work-loop-update:1',
+      hostType: 'div',
+      hostOutputShape: 'host-component',
+      hostComponentCount: 1,
+      hostTextCount: 1,
+      textContent: 'text'
+    },
+    completeWork: {
+      rootChildTag: 'HostComponent',
+      completedChildTag: 'HostComponent',
+      hostTextChildTag: 'HostText',
+      childTags: ['HostComponent', 'HostText']
+    },
+    pending: {
+      recordsFinishedWork: true,
+      pendingWorkMatchesFinishedWork: true,
+      renderLanes: 'Default',
+      finishedLanes: 'Default',
+      remainingLanes: 'NoLanes'
+    },
+    commit: {
+      commitOrderAfterPendingRecord: true,
+      consumedFinishedWorkRecord: true,
+      finishedWorkAfterCommit: null,
+      finishedLanesAfterCommit: 'NoLanes',
+      renderPhaseWorkAfterCommit: null,
+      mutationExecutionBlocked: true,
+      publicRootRenderingBlocked: true,
+      effectsRefsAndHydrationBlocked: true
+    },
+    placement: {
+      tag: 'HostComponent',
+      applyKind: 'append-placement-to-container',
+      siblingStatus: 'append'
+    }
+  });
+
+  const invalidCode =
+    'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_INVALID_OPTIONS';
+  const claimCode =
+    'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_CAPABILITY_CLAIM';
+  const accessorClaimOptions = { ...validOptions };
+  Object.defineProperty(accessorClaimOptions, 'compatibilityClaimed', {
+    get() {
+      return false;
+    },
+    enumerable: true
+  });
+
+  for (const [label, input, expectedCode] of [
+    ['missing options', undefined, invalidCode],
+    ['empty root id', { ...validOptions, rootId: '' }, invalidCode],
+    ['wrong root tag type', { ...validOptions, rootTag: 0 }, invalidCode],
+    [
+      'empty render update id',
+      { ...validOptions, renderUpdateId: '' },
+      invalidCode
+    ],
+    ['wrong host type', { ...validOptions, hostType: 'span' }, invalidCode],
+    [
+      'wrong text content',
+      { ...validOptions, textContent: 'Text' },
+      invalidCode
+    ],
+    [
+      'unknown option',
+      { ...validOptions, renderPhase: 'complete' },
+      invalidCode
+    ],
+    [
+      'top-level public claim',
+      { ...validOptions, publicRootExecution: true },
+      claimCode
+    ],
+    [
+      'nested native claim',
+      { ...validOptions, facade: { nativeExecution: true } },
+      claimCode
+    ],
+    ['accessor compatibility claim', accessorClaimOptions, claimCode]
+  ]) {
+    assert.throws(
+      () => factory(input),
+      (error) => {
+        assert.equal(
+          error.name,
+          'FastReactNativeRootWorkLoopFinishedWorkMetadataFactoryError',
+          label
+        );
+        assert.equal(error.code, expectedCode, label);
+        assert.equal(error.nativeAddonLoaded, false, label);
+        assert.equal(error.nativeExecution, false, label);
+        assert.equal(error.rendererExecution, false, label);
+        assert.equal(error.reconcilerExecution, false, label);
+        assert.equal(error.publicNativeCompatibility, false, label);
+        assert.equal(error.compatibilityClaimed, false, label);
+        return true;
+      },
+      label
+    );
+  }
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {

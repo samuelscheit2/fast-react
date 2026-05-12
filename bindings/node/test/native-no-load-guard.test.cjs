@@ -8,6 +8,9 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const forbiddenLoads = [];
+const nativeRootWorkLoopFinishedWorkMetadataFactorySymbol = Symbol.for(
+  'fast.react_native.private_root_work_loop_finished_work_metadata_factory'
+);
 const originalLoad = Module._load;
 const originalNodeExtension = Module._extensions['.node'];
 let moduleLoadHooks = null;
@@ -256,6 +259,87 @@ function assertBlockedNativeRootBridgeClaim(native, blockedClaim) {
       `native no-load guard must reject ${blockedClaim} on ${label}`
     );
   }
+}
+
+function assertNativeRootWorkLoopFinishedWorkMetadataFactoryNoLoad(native) {
+  const descriptor = Object.getOwnPropertyDescriptor(
+    native,
+    nativeRootWorkLoopFinishedWorkMetadataFactorySymbol
+  );
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(typeof descriptor.value, 'function');
+
+  const metadata = descriptor.value({
+    hostType: 'div',
+    renderUpdateId: 'no-load-root-work-loop-update:1',
+    rootId: 'no-load-root-work-loop-root:1',
+    rootTag: 'ConcurrentRoot',
+    textContent: 'text'
+  });
+
+  assert.equal(Object.isFrozen(metadata), true);
+  assert.equal(Object.isFrozen(metadata.facade), true);
+  assert.equal(Object.isFrozen(metadata.completeWork), true);
+  assert.equal(Object.isFrozen(metadata.completeWork.childTags), true);
+  assert.equal(Object.isFrozen(metadata.pending), true);
+  assert.equal(Object.isFrozen(metadata.commit), true);
+  assert.equal(Object.isFrozen(metadata.placement), true);
+  assert.equal(
+    metadata.source,
+    'fast-react-reconciler.root-work-loop.finished-work-handoff'
+  );
+  assert.equal(
+    metadata.status,
+    'accepted-private-root-work-loop-finished-work-handoff-metadata'
+  );
+  assert.equal(
+    metadata.metadataRevision,
+    'root-work-loop-finished-work-handoff-2026-05-10'
+  );
+  assert.deepEqual(metadata.facade, {
+    rootId: 'no-load-root-work-loop-root:1',
+    rootTag: 'ConcurrentRoot',
+    renderUpdateId: 'no-load-root-work-loop-update:1',
+    hostType: 'div',
+    hostOutputShape: 'host-component',
+    hostComponentCount: 1,
+    hostTextCount: 1,
+    textContent: 'text'
+  });
+  assert.deepEqual(metadata.completeWork.childTags, [
+    'HostComponent',
+    'HostText'
+  ]);
+  assert.equal(
+    Object.keys(native).includes(
+      'createNativeRootWorkLoopFinishedWorkMetadataForCanary'
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      descriptor.value({
+        hostType: 'div',
+        nativeExecution: true,
+        renderUpdateId: 'no-load-root-work-loop-update:1',
+        rootId: 'no-load-root-work-loop-root:1',
+        rootTag: 'ConcurrentRoot',
+        textContent: 'text'
+      }),
+    {
+      name: 'FastReactNativeRootWorkLoopFinishedWorkMetadataFactoryError',
+      code:
+        'FAST_REACT_NAPI_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_FACTORY_CAPABILITY_CLAIM',
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rendererExecution: false,
+      reconcilerExecution: false,
+      publicNativeCompatibility: false,
+      compatibilityClaimed: false
+    }
+  );
 }
 
 function assertNoNativeCleanupHookExecution(record, label) {
@@ -1091,6 +1175,7 @@ async function main() {
     assert.equal(nativePackageJson.name, '@fast-react/native');
     assert.equal(nativePackageJsonModule.default.name, '@fast-react/native');
     assert.equal(native.nativeBindingManifest.status, 'placeholder');
+    assertNativeRootWorkLoopFinishedWorkMetadataFactoryNoLoad(native);
     const actualRootBridgeEvidence =
       native.nativeBindingManifest.nativeRootBridgeValidationEvidence;
 
