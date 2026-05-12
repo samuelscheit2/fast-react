@@ -5971,6 +5971,7 @@ fn deletion_ref_passive_cleanup_execution_orders_nested_host_refs_before_passive
     assert_eq!(host.operations(), Vec::<&'static str>::new());
 }
 
+#[test]
 fn passive_effects_deleted_subtree_destroy_executor_rejects_non_deleted_unmounts() {
     let (mut store, root_id, host) = root_store();
     let previous_current = store.root(root_id).unwrap().current();

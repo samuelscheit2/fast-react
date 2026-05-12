@@ -17,6 +17,9 @@ hook effect destroy handles before invoking the private destroy executor.
 - Added canary tests for update unmounts, returned create destroy persistence,
   executor error handling after clear, unchanged/wrong-record preservation, replay
   rejection, and deleted-subtree passive destroy cleanup.
+- Repaired source-audit gap by marking
+  `passive_effects_deleted_subtree_destroy_executor_rejects_non_deleted_unmounts`
+  as a Rust test so the non-deleted unmount rejection hostile case executes.
 
 ## Verification
 
@@ -31,6 +34,19 @@ hook effect destroy handles before invoking the private destroy executor.
 
 All commands passed. The focused destroy-clear filter and hygiene checks were
 rerun after formatting and adding this progress report.
+
+## Audit Repair Verification
+
+All audit repair commands passed after adding the missing `#[test]`
+annotation. The non-deleted unmount rejection filter now runs one test.
+
+- `cargo test -p fast-react-reconciler --all-features passive_effects_deleted_subtree_destroy_executor_rejects_non_deleted_unmounts`
+- `cargo test -p fast-react-reconciler --all-features passive_effects_destroy_clear_before_invoke`
+- `cargo test -p fast-react-reconciler --all-features passive_effects_deleted_subtree_destroy_executor_consumes_private_order_metadata`
+- `cargo test -p fast-react-reconciler --all-features passive`
+- `cargo check -p fast-react-reconciler --all-features`
+- `cargo fmt --all --check`
+- `git diff --check`
 
 ## Risks
 
