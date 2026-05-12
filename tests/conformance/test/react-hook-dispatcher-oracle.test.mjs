@@ -3424,6 +3424,127 @@ test("private hook currentness validators keep helper-owned mutable reports not-
   );
 });
 
+test("private hook currentness validators reject top-level frozen reports with mutable nested fields", () => {
+  const useRefPublicShape = withObjectFreezeSelectivelyBypassed(
+    () => hookDispatcher.createUseRefHookCurrentnessReport(),
+    (value) =>
+      Array.isArray(value) &&
+      value[0]?.reactDispatcherMethod === "dispatcher.useRef"
+  );
+  assertNestedFreezeBypass(useRefPublicShape, (report) => [
+    report.publicShapeBlockers
+  ]);
+  assertUseRefCurrentnessRejected(
+    useRefPublicShape.report,
+    "useRef-hook-currentness-public-shape"
+  );
+
+  const useRefBlockerCurrentness = withObjectFreezeSelectivelyBypassed(
+    () => hookDispatcher.createUseRefHookCurrentnessReport(),
+    (value) => value?.status === expectedUseRefBlockerCurrentness.status
+  );
+  assertNestedFreezeBypass(useRefBlockerCurrentness, (report) => [
+    report.blockerCurrentness
+  ]);
+  assertUseRefCurrentnessRejected(
+    useRefBlockerCurrentness.report,
+    "useRef-hook-currentness-blocker-currentness"
+  );
+
+  const useRefExecutionSource = withObjectFreezeSelectivelyBypassed(
+    () => hookDispatcher.createUseRefHookExecutionEvidence(),
+    (value) => value?.kind === expectedUseRefExecutionSourceReport.kind
+  );
+  assertNestedFreezeBypass(useRefExecutionSource, (report) => [
+    report.sourceReport
+  ]);
+  assertUseRefExecutionEvidenceRejected(
+    useRefExecutionSource.report,
+    "useRef-hook-execution-source-report"
+  );
+
+  const useRefExecutionRefObject = withObjectFreezeSelectivelyBypassed(
+    () => hookDispatcher.createUseRefHookExecutionEvidence(),
+    (value) =>
+      value?.current === "fast-react-private-useRef-mount-initial" &&
+      Object.keys(value).length === 1
+  );
+  assertNestedFreezeBypass(useRefExecutionRefObject, (report) => [
+    report.refIdentityRecord.mountRefObject
+  ]);
+  assertUseRefExecutionEvidenceRejected(
+    useRefExecutionRefObject.report,
+    "useRef-hook-execution-caller-ref-object"
+  );
+
+  const useRefRendererLifecycleSource = withObjectFreezeSelectivelyBypassed(
+    () => hookDispatcher.createUseRefHookRendererLifecycleBlockerReport(),
+    (value) =>
+      value?.kind === expectedUseRefRendererLifecycleSourceReport.kind
+  );
+  assertNestedFreezeBypass(useRefRendererLifecycleSource, (report) => [
+    report.sourceReport
+  ]);
+  assertUseRefRendererLifecycleRejected(
+    useRefRendererLifecycleSource.report,
+    "useRef-hook-renderer-lifecycle-source-report"
+  );
+
+  const contextReadinessSource = withObjectFreezeSelectivelyBypassed(
+    () => hookDispatcher.createContextHookRendererReadinessReport(),
+    (value) => value?.kind === expectedContextRendererReadinessSourceReport.kind
+  );
+  assertNestedFreezeBypass(contextReadinessSource, (report) => [
+    report.sourceReport
+  ]);
+  assertContextRendererReadinessRejected(
+    contextReadinessSource.report,
+    "context-hook-renderer-readiness-source-report"
+  );
+
+  const unsupportedCallbackReport = withObjectFreezeSelectivelyBypassed(
+    () => hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport(),
+    (value) =>
+      value?.useActionStateActionInvocationBlocked === true &&
+      value?.invokesEffectEventCallback === false
+  );
+  assertNestedFreezeBypass(unsupportedCallbackReport, (report) => [
+    report.callbackInvocationReport
+  ]);
+  assertUnsupportedCurrentnessRejected(
+    unsupportedCallbackReport.report,
+    "unsupported-placeholder-hook-currentness-callback-invocation-claim"
+  );
+
+  const unsupportedExternalStoreReport = withObjectFreezeSelectivelyBypassed(
+    () => hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport(),
+    (value) =>
+      value?.subscribeInvocationBlocked === true &&
+      value?.invokesGetServerSnapshot === false
+  );
+  assertNestedFreezeBypass(unsupportedExternalStoreReport, (report) => [
+    report.externalStoreInvocationReport
+  ]);
+  assertUnsupportedCurrentnessRejected(
+    unsupportedExternalStoreReport.report,
+    "unsupported-placeholder-hook-currentness-external-store-claim"
+  );
+
+  const unsupportedIdGenerationReport = withObjectFreezeSelectivelyBypassed(
+    () => hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport(),
+    (value) =>
+      value?.treeIdAllocationBlocked === true &&
+      value?.claimsHydrationIdPrefix === false
+  );
+  assertNestedFreezeBypass(unsupportedIdGenerationReport, (report) => [
+    report.idGenerationReport
+  ]);
+  assertUnsupportedCurrentnessRejected(
+    unsupportedIdGenerationReport.report,
+    "unsupported-placeholder-hook-currentness-id-generation-claim"
+  );
+});
+
 test("unsupported public placeholder hooks do not call dispatcher methods or user callbacks across root surfaces", () => {
   const calls = [];
   const sideEffects = [];
@@ -3927,6 +4048,38 @@ function withObjectFreezeBypassed(callback) {
     return callback();
   } finally {
     Object.freeze = originalFreeze;
+  }
+}
+
+function withObjectFreezeSelectivelyBypassed(callback, shouldBypass) {
+  const originalFreeze = Object.freeze;
+  const bypassed = [];
+  Object.freeze = (value) => {
+    if (shouldBypass(value)) {
+      bypassed.push(value);
+      return value;
+    }
+
+    return originalFreeze(value);
+  };
+
+  try {
+    return {
+      report: callback(),
+      bypassed
+    };
+  } finally {
+    Object.freeze = originalFreeze;
+  }
+}
+
+function assertNestedFreezeBypass({ report, bypassed }, getNestedValues) {
+  assert.equal(Object.isFrozen(report), true);
+  assert.notEqual(bypassed.length, 0);
+
+  for (const nestedValue of getNestedValues(report)) {
+    assert.equal(Object.isFrozen(nestedValue), false);
+    assert.equal(bypassed.includes(nestedValue), true);
   }
 }
 
