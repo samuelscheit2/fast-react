@@ -2,15 +2,21 @@
 
 ## Summary
 
-- Completed the private no-load/source-currentness ledger for the symbol-only
-  root work-loop finished-work metadata factory.
-- Added conformance coverage for current native placeholder metadata source
-  identifiers, crate-private Rust metadata shape, no-load guard source evidence,
-  private ESM/CJS visibility, and package-private exports.
-- The accepted product-side ledger verifies source-owned Rust identifiers and JS factory shape, and the conformance gate re-evaluates implementation files directly instead of accepting worker prose.
-- Repaired audit feedback so source-currentness rows fail closed on omitted
-  native/runtime, public root, package export, cleanup hook, worker creation,
-  and native private subpath claim fields.
+- Repaired the source audit blocker found after `715cd49e`: the product-side
+  source-currentness validator no longer accepts full canonical row sets when
+  extra omitted claim fields are `true`.
+- The validator now rejects the exact omitted fields
+  `workerThreadLoadAttempted`, `childProcessLoadAttempted`,
+  `httpLoadAttempted`, `httpsLoadAttempted`,
+  `publicRuntimeExecutionClaimed`, `nativeLoadAttempted`,
+  `cleanupHookExecutionClaimed`, and `packageExportsChanged`, plus the
+  related modeled `runtimeExecutionClaimed` alias.
+- Direct native tests now prove a complete canonical row set with each exact
+  omitted field set to `true` is rejected before accepted-row freezing can drop
+  the extra field.
+- Conformance now includes the exact omitted names in the 1228 blocked-claim
+  list, source/evidence tokens, claim classification, and hostile negative
+  expectations.
 
 ## Changed Files
 
@@ -22,40 +28,25 @@
 
 ## Evidence Gathered
 
-- Product-side native test reads
-  `crates/fast-react-napi/src/root_work_loop_metadata.rs` and checks each
-  accepted ledger row against real Rust source identifiers.
-- The hidden source-currentness ledger stays attached to the private metadata
-  factory function through a non-global symbol and non-enumerable validator.
-- The conformance ledger checks direct tokens in `bindings/node/index.cjs`,
-  `crates/fast-react-napi/src/root_work_loop_metadata.rs`,
-  `crates/fast-react-napi/src/lib.rs`, `bindings/node/index.mjs`,
-  `bindings/node/package.json`, and the native no-load/admission tests.
-- Hostile coverage rejects stale or missing identifiers, fake JS-only rows,
-  caller/prose/test-title/error-message evidence, source-syntax-only evidence,
-  public/native/package claims, worker/child-process/http/https claims, cleanup
-  hook claims, renderer/reconciler claims, and canonical-set drift.
-- Additional hostile source-currentness rows reject
-  `nativeAddonLoadAttempted`, `workerThreadCreationAttempted`,
-  `napiCleanupHookExecution`, `cleanupHookPublicExecutionClaimed`,
-  `publicRootExecution`, `publicRootCompatibilitySurface`,
-  `packageExportCompatibilityClaimed`, and `nativePrivateSubpathsExported`
-  before canonical-set acceptance.
-- The no-load source evidence preserves blocked `.node`, optional native
-  package, `worker_threads`, `child_process`, `http`, `https`, cleanup hook,
-  renderer/reconciler, package export, and public native compatibility surfaces.
+- Product-side validation checks the omitted public/runtime, native-load,
+  worker/child/network-load, cleanup-hook, and package-export claim names before
+  canonical source row acceptance.
+- Hostile direct native coverage feeds the validator a full canonical row set
+  and flips one omitted claim field at a time; every case reports zero accepted
+  rows, a rejected canonical set, and the expected rejection code.
+- The conformance manifest now treats the exact omitted names as blocked claims
+  and verifies they are categorized into native runtime, worker/child/network,
+  cleanup-hook, and package-export claim buckets.
+- The previous report statement of no blockers was stale; this report records
+  the audit blocker and the repair evidence.
 
 ## Commands Run
 
-- `git rebase main` - passed; branch now includes current `main` with worker
-  1227 fixture bridge repair.
-- `git status --short --branch` - passed; showed only the repair files modified
-  before this commit.
-- `node --version && npm --version` - passed: Node 26.1.0, npm 11.13.0.
-- `node --check bindings/node/index.cjs && node --check bindings/node/test/native-no-load-guard.test.cjs && node --check bindings/node/test/native-private-root-work-loop-metadata-factory.test.cjs && node --check tests/conformance/src/private-admission-1228-native-metadata-no-load-source-ledger.mjs && node --check tests/conformance/test/private-admission-1228-native-metadata-no-load-source-ledger.test.mjs` - passed.
+- `git worktree add -b worker/1228-native-metadata-no-load-source-ledger /Users/user/Developer/Developer/fast-react-worktrees/worker-1228-native-metadata-no-load-source-ledger 715cd49e` - passed after the merged 1228 worktree/branch had been pruned.
+- `git -C /Users/user/Developer/Developer/fast-react-worktrees/worker-1228-native-metadata-no-load-source-ledger commit --allow-empty -m "Repair native metadata source ledger exact claim blockers"` - passed; later amended with the real repair.
+- `node --check bindings/node/index.cjs && node --check bindings/node/test/native-private-root-work-loop-metadata-factory.test.cjs && node --check tests/conformance/src/private-admission-1228-native-metadata-no-load-source-ledger.mjs && node --check tests/conformance/test/private-admission-1228-native-metadata-no-load-source-ledger.test.mjs` - passed.
+- `node bindings/node/test/native-private-root-work-loop-metadata-factory.test.cjs` - passed.
 - `node --test tests/conformance/test/private-admission-1228-native-metadata-no-load-source-ledger.test.mjs` - passed, 6 tests.
-- `npm test --workspace @fast-react/conformance` - failed in pre-existing unrelated gates outside this worker's files, including context-object, DOM HostText, private-admission 821/825/850, and resource-hints prerequisite checks; the new 1228 conformance test passed in the same run.
-- `node bindings/node/test/native-no-load-guard.test.cjs` - passed.
 - `npm --prefix bindings/node run check` - passed; npm emitted the existing `minimum-release-age` warning.
 - `node tests/smoke/package-surface-guard.mjs` - passed.
 - `node tests/smoke/import-entrypoints.mjs` - passed.
@@ -65,23 +56,25 @@
 ## Audit, Review, Or Nested-Agent Findings
 
 - No nested agents were used.
-- Orchestrator status check noted the product-side native ledger was already in
-  the worktree; I kept the runtime diff intact and added conformance/report
-  coverage around it.
-- While inspecting that product-side coverage, I added direct hostile cases for
-  test-title and error-message evidence before the product-side commit landed in
-  `HEAD`.
-- Audit repair found the source-currentness claim validator categorized only a
-  subset of the 1228 blocked public/package/runtime fields. The product
-  validator and conformance gate now cover the omitted fields directly.
+- Source audit found a High blocker in `715cd49e`: full canonical row sets with
+  omitted true claim fields could be accepted, then accepted-row freezing
+  erased those extra fields.
+- The audit also found that direct and conformance tests missed the exact names
+  `workerThreadLoadAttempted`, `childProcessLoadAttempted`,
+  `httpLoadAttempted`, `httpsLoadAttempted`,
+  `publicRuntimeExecutionClaimed`, `nativeLoadAttempted`,
+  `cleanupHookExecutionClaimed`, and `packageExportsChanged`.
+- During this repair, the assigned branch/worktree had already been merged and
+  pruned. I recreated the requested worktree at `715cd49e`, then kept all
+  source edits inside that assigned checkout.
 
 ## Risks Or Blockers
 
-- No blockers found.
-- Residual risk is limited to static/private source evidence: this deliberately
-  does not load native artifacts or claim public React/native compatibility.
+- No remaining blockers found after the required verification set.
+- Residual risk is limited to the intended static source-currentness model:
+  these checks still do not load native artifacts or claim public native,
+  package, worker, network, renderer, cleanup-hook, or React behavior execution.
 
 ## Recommended Next Tasks
 
-- Merge after the orchestrator confirms the product-side ledger commit and this
-  conformance/report commit are both in the intended order.
+- Re-run the orchestrator source audit against this repair commit before merge.

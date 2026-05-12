@@ -563,6 +563,86 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     assertNoNativeLedgerExecution(row, diagnosticCase.row.id);
   }
 
+  const fullCanonicalClaimCases = [
+    {
+      field: 'runtimeExecutionClaimed',
+      code: codes.publicNativeExecutionClaim
+    },
+    {
+      field: 'workerThreadLoadAttempted',
+      code: codes.workerOrNetworkExecutionClaim
+    },
+    {
+      field: 'childProcessLoadAttempted',
+      code: codes.workerOrNetworkExecutionClaim
+    },
+    {
+      field: 'httpLoadAttempted',
+      code: codes.workerOrNetworkExecutionClaim
+    },
+    {
+      field: 'httpsLoadAttempted',
+      code: codes.workerOrNetworkExecutionClaim
+    },
+    {
+      field: 'publicRuntimeExecutionClaimed',
+      code: codes.publicNativeExecutionClaim
+    },
+    {
+      field: 'nativeLoadAttempted',
+      code: codes.nativeAddonLoadClaim
+    },
+    {
+      field: 'cleanupHookExecutionClaimed',
+      code: codes.nativeAddonLoadClaim
+    },
+    {
+      field: 'packageExportsChanged',
+      code: codes.packageExportClaim
+    }
+  ];
+
+  for (const diagnosticCase of fullCanonicalClaimCases) {
+    const result = validateSourceCurrentnessRows(
+      ledger.rows.map((row) =>
+        row.id === canonicalCommit.id
+          ? sourceCurrentnessRow(row, {
+              [diagnosticCase.field]: true
+            })
+          : row
+      )
+    );
+    const claimRow = result.rows.find(
+      (row) => row.id === canonicalCommit.id
+    );
+
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.field);
+    assert.equal(
+      result.rejectedEvidenceCount,
+      ledger.rows.length,
+      diagnosticCase.field
+    );
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.field
+    );
+    assert.equal(
+      result.rows.some((row) => row.status === ledger.acceptedStatus),
+      false,
+      diagnosticCase.field
+    );
+    assert.equal(claimRow.status, ledger.rejectedStatus, diagnosticCase.field);
+    assert.equal(claimRow.code, diagnosticCase.code, diagnosticCase.field);
+    assert.equal(
+      Object.hasOwn(claimRow, diagnosticCase.field),
+      false,
+      diagnosticCase.field
+    );
+    assertNoNativeLedgerExecution(result, diagnosticCase.field);
+    assertNoNativeLedgerExecution(claimRow, diagnosticCase.field);
+  }
+
   for (const diagnosticCase of [
     {
       id: 'root-work-loop-metadata-missing-canonical-row',

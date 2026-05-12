@@ -102,8 +102,10 @@ const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCaseIds =
   ]);
 const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPublicClaimFields =
   Object.freeze([
+    'runtimeExecutionClaimed',
     'nativeExecution',
     'publicNativeExecution',
+    'publicRuntimeExecutionClaimed',
     'publicNativeCompatibility',
     'publicRootExecution',
     'publicRootCompatibilitySurface',
@@ -119,7 +121,8 @@ const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPackageClaimFields 
     'nativePackageExportClaimed',
     'nativePrivateSubpathsExported',
     'nativePackageCompatibilityClaimed',
-    'packageExportsOpened'
+    'packageExportsOpened',
+    'packageExportsChanged'
   ]);
 const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCompatibilityClaimFields =
   Object.freeze([
@@ -7343,9 +7346,11 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   }
 
   if (
+    row.nativeLoadAttempted === true ||
     row.nativeAddonLoaded === true ||
     row.nativeAddonLoadAttempted === true ||
     row.napiCleanupHookExecution === true ||
+    row.cleanupHookExecutionClaimed === true ||
     row.cleanupHookPublicExecutionClaimed === true
   ) {
     return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
@@ -7373,9 +7378,13 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   if (
     row.nodeWorkerThreadsExecution === true ||
     row.workerThreadCreationAttempted === true ||
+    row.workerThreadLoadAttempted === true ||
     row.childProcessExecution === true ||
+    row.childProcessLoadAttempted === true ||
     row.httpExecution === true ||
+    row.httpLoadAttempted === true ||
     row.httpsExecution === true ||
+    row.httpsLoadAttempted === true ||
     row.networkExecution === true
   ) {
     return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes

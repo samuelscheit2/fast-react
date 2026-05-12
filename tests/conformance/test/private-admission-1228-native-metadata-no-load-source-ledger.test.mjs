@@ -44,21 +44,30 @@ test("private admission 1228 manifest pins current native metadata source/no-loa
   assert.equal(new Set(PRIVATE_ADMISSION_1228_SURFACES).size, 3);
   assertSubset(
     [
+      "runtimeExecutionClaimed",
+      "publicRuntimeExecutionClaimed",
+      "nativeLoadAttempted",
       "nativeAddonLoaded",
       "nativeAddonLoadAttempted",
       "nodeWorkerThreadsExecution",
       "workerThreadCreationAttempted",
+      "workerThreadLoadAttempted",
       "childProcessExecution",
+      "childProcessLoadAttempted",
       "httpExecution",
+      "httpLoadAttempted",
       "httpsExecution",
+      "httpsLoadAttempted",
       "napiCleanupHookExecution",
+      "cleanupHookExecutionClaimed",
       "cleanupHookPublicExecutionClaimed",
       "rendererExecution",
       "reconcilerExecution",
       "publicNativeCompatibility",
       "publicRootExecution",
       "publicRootCompatibilitySurface",
-      "packageExportCompatibilityClaimed"
+      "packageExportCompatibilityClaimed",
+      "packageExportsChanged"
     ],
     PRIVATE_ADMISSION_1228_BLOCKED_CLAIMS
   );
@@ -225,16 +234,24 @@ test("private admission 1228 rejects native, worker, cleanup, renderer, package,
     rowOverrides: {
       [noLoadMetadataGuardSurface]: {
         publicBlockers: {
+          runtimeExecutionClaimed: true,
+          publicRuntimeExecutionClaimed: true,
+          nativeLoadAttempted: true,
           nativeAddonLoaded: true,
           nativeAddonLoadAttempted: true,
           nativeExecution: true,
           publicNativeExecution: true,
           nodeWorkerThreadsExecution: true,
           workerThreadCreationAttempted: true,
+          workerThreadLoadAttempted: true,
           childProcessExecution: true,
+          childProcessLoadAttempted: true,
           httpExecution: true,
+          httpLoadAttempted: true,
           httpsExecution: true,
+          httpsLoadAttempted: true,
           napiCleanupHookExecution: true,
+          cleanupHookExecutionClaimed: true,
           cleanupHookPublicExecutionClaimed: true,
           rendererExecution: true,
           reconcilerExecution: true,
@@ -243,6 +260,7 @@ test("private admission 1228 rejects native, worker, cleanup, renderer, package,
           publicRootCompatibilitySurface: true,
           packageCompatibilityClaimed: true,
           packageExportCompatibilityClaimed: true,
+          packageExportsChanged: true,
           nativePrivateSubpathsExported: true,
           compatibilityClaimed: true
         }
@@ -265,6 +283,9 @@ test("private admission 1228 rejects native, worker, cleanup, renderer, package,
     "native-metadata-no-load-required-row-not-recognized"
   ]);
   assert.deepEqual(gate.nativeRuntimeClaimIds, [
+    `${noLoadMetadataGuardSurface}.runtimeExecutionClaimed`,
+    `${noLoadMetadataGuardSurface}.publicRuntimeExecutionClaimed`,
+    `${noLoadMetadataGuardSurface}.nativeLoadAttempted`,
     `${noLoadMetadataGuardSurface}.nativeAddonLoaded`,
     `${noLoadMetadataGuardSurface}.nativeAddonLoadAttempted`,
     `${noLoadMetadataGuardSurface}.nativeExecution`,
@@ -273,12 +294,17 @@ test("private admission 1228 rejects native, worker, cleanup, renderer, package,
   assert.deepEqual(gate.workerChildNetworkClaimIds, [
     `${noLoadMetadataGuardSurface}.nodeWorkerThreadsExecution`,
     `${noLoadMetadataGuardSurface}.workerThreadCreationAttempted`,
+    `${noLoadMetadataGuardSurface}.workerThreadLoadAttempted`,
     `${noLoadMetadataGuardSurface}.childProcessExecution`,
+    `${noLoadMetadataGuardSurface}.childProcessLoadAttempted`,
     `${noLoadMetadataGuardSurface}.httpExecution`,
-    `${noLoadMetadataGuardSurface}.httpsExecution`
+    `${noLoadMetadataGuardSurface}.httpLoadAttempted`,
+    `${noLoadMetadataGuardSurface}.httpsExecution`,
+    `${noLoadMetadataGuardSurface}.httpsLoadAttempted`
   ]);
   assert.deepEqual(gate.cleanupHookClaimIds, [
     `${noLoadMetadataGuardSurface}.napiCleanupHookExecution`,
+    `${noLoadMetadataGuardSurface}.cleanupHookExecutionClaimed`,
     `${noLoadMetadataGuardSurface}.cleanupHookPublicExecutionClaimed`
   ]);
   assert.deepEqual(gate.rendererReconcilerClaimIds, [
@@ -294,6 +320,7 @@ test("private admission 1228 rejects native, worker, cleanup, renderer, package,
   assert.deepEqual(gate.packageExportClaimIds, [
     `${noLoadMetadataGuardSurface}.packageCompatibilityClaimed`,
     `${noLoadMetadataGuardSurface}.packageExportCompatibilityClaimed`,
+    `${noLoadMetadataGuardSurface}.packageExportsChanged`,
     `${noLoadMetadataGuardSurface}.nativePrivateSubpathsExported`
   ]);
 });
