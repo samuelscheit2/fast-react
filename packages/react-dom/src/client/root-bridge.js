@@ -578,6 +578,82 @@ const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS =
   'accepted-private-root-work-loop-finished-work-handoff-metadata';
 const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION =
   'root-work-loop-finished-work-handoff-2026-05-10';
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_BLOCKED_CAPABILITY_CLAIM_FIELDS =
+  freezeArray([
+    'browserDomMutation',
+    'browserDomMutationClaimed',
+    'browser_dom_mutation',
+    'browser_dom_mutation_claimed',
+    'compatibilityClaimed',
+    'compatibility_claimed',
+    'domMutation',
+    'domMutationClaimed',
+    'dom_mutation',
+    'dom_mutation_claimed',
+    'eventDispatch',
+    'eventDispatchClaimed',
+    'event_dispatch',
+    'event_dispatch_claimed',
+    'fakeDomMutation',
+    'fakeDomMutationClaimed',
+    'fake_dom_mutation',
+    'fake_dom_mutation_claimed',
+    'hydration',
+    'hydrationClaimed',
+    'hydration_claimed',
+    'listenerInstallation',
+    'listenerInstallationClaimed',
+    'listener_installation',
+    'listener_installation_claimed',
+    'markerWrites',
+    'markerWritesClaimed',
+    'marker_writes',
+    'marker_writes_claimed',
+    'nativeExecution',
+    'nativeExecutionClaimed',
+    'native_execution',
+    'native_execution_claimed',
+    'publicCompatibilityClaimed',
+    'publicCreateRootCompatibilityClaimed',
+    'publicDomMutationCompatibilityClaimed',
+    'publicEventCompatibilityClaimed',
+    'publicHydrateRootCompatibilityClaimed',
+    'publicHydrationCompatibilityClaimed',
+    'public_compatibility_claimed',
+    'public_create_root_compatibility_claimed',
+    'public_dom_mutation_compatibility_claimed',
+    'public_event_compatibility_claimed',
+    'public_hydrate_root_compatibility_claimed',
+    'public_hydration_compatibility_claimed',
+    'public_root_compatibility_surface',
+    'public_root_execution',
+    'public_root_render_compatibility_claimed',
+    'public_root_unmount_compatibility_claimed',
+    'public_root_update_compatibility_claimed',
+    'public_test_renderer_compatibility_claimed',
+    'publicRootCompatibilitySurface',
+    'publicRootExecution',
+    'publicRootRenderCompatibilityClaimed',
+    'publicRootUnmountCompatibilityClaimed',
+    'publicRootUpdateCompatibilityClaimed',
+    'publicTestRendererCompatibilityClaimed',
+    'reconcilerExecution',
+    'reconcilerExecutionClaimed',
+    'reconciler_execution',
+    'reconciler_execution_claimed',
+    'refEffects',
+    'refEffectsClaimed',
+    'ref_effects',
+    'ref_effects_claimed',
+    'rootScheduled',
+    'rootScheduledClaimed',
+    'root_scheduled',
+    'root_scheduled_claimed',
+    'rustExecution',
+    'rustExecutionClaimed',
+    'rust_execution',
+    'rust_execution_claimed'
+  ]);
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -26816,6 +26892,17 @@ function getPublicFacadeRootWorkLoopFinishedWorkMetadataOption(options) {
       value: options.rootWorkLoopFinishedWorkHandoffMetadata
     };
   }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rustRootWorkLoopFinishedWorkMetadata'
+    )
+  ) {
+    return {
+      found: true,
+      value: options.rustRootWorkLoopFinishedWorkMetadata
+    };
+  }
   return {
     found: false,
     value: undefined
@@ -27147,6 +27234,7 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
       'Public-facade host-output render requires accepted root work-loop finished-work metadata.'
     );
   }
+  assertRootWorkLoopFinishedWorkMetadataHasNoCapabilityClaims(metadata);
 
   const source = getFirstRootWorkLoopMetadataValue(metadata, [
     ['source'],
@@ -27526,6 +27614,43 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
     source,
     status
   };
+}
+
+function assertRootWorkLoopFinishedWorkMetadataHasNoCapabilityClaims(metadata) {
+  const seen = new WeakSet();
+
+  function visit(value) {
+    if (!isObjectOrFunction(value) || seen.has(value)) {
+      return;
+    }
+    seen.add(value);
+    for (const key of Object.getOwnPropertyNames(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor) {
+        continue;
+      }
+      if (
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_BLOCKED_CAPABILITY_CLAIM_FIELDS.includes(
+          key
+        ) &&
+        (!Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
+          isRootWorkLoopFinishedWorkMetadataClaimingValue(descriptor.value))
+      ) {
+        throwInvalidRootPublicFacadeHostOutputRender(
+          'Root work-loop finished-work metadata cannot claim public, native, DOM, hydration, event, ref, marker, listener, scheduler, Rust, or compatibility capabilities.'
+        );
+      }
+      if (Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+        visit(descriptor.value);
+      }
+    }
+  }
+
+  visit(metadata);
+}
+
+function isRootWorkLoopFinishedWorkMetadataClaimingValue(value) {
+  return Boolean(value);
 }
 
 function normalizePrivateRootRenderHostOutputRootWorkLoopMetadata(

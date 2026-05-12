@@ -735,6 +735,19 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADM
       evidenceKind: "root-commit-finished-work-record-consumption",
       reason:
         "Worker 534 accepted a private root-commit finished-work record with root token, lane, order, consumption, and fail-closed rejection diagnostics while host mutation and public root compatibility stay blocked."
+    }),
+    Object.freeze({
+      metadataId:
+        "worker-1095-js-rust-root-work-loop-metadata-private-native-handoff",
+      workerId: "1095",
+      category: "root-work-loop-js-admission",
+      scenarioId: "initial-host-render",
+      admission: "private-root-work-loop-commit-handoff-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ACCEPTED_STATUS,
+      evidenceKind: "js-rust-root-work-loop-metadata-private-native-handoff",
+      reason:
+        "Worker 1095 accepted JS/package-side Rust-shaped root work-loop finished-work metadata for <div>text</div> through the private facade render/native handoff while public root compatibility stays blocked."
     })
   ]);
 
@@ -8141,6 +8154,14 @@ function inspectRootWorkLoopCommitHandoffSourceDiagnostics({ workspaceRoot }) {
       workspaceRoot,
       "crates/fast-react-reconciler/src/root_commit/tests/updates.rs"
     );
+    const rootBridgeSource = readWorkspaceFile(
+      workspaceRoot,
+      "packages/react-dom/src/client/root-bridge.js"
+    );
+    const privateRootFacadeRenderUpdateTestsSource = readWorkspaceFile(
+      workspaceRoot,
+      "packages/react-dom/test/react-dom-private-root-bridge-shell/facade-render-update.js"
+    );
 
     return {
       loadError: null,
@@ -8239,6 +8260,49 @@ function inspectRootWorkLoopCommitHandoffSourceDiagnostics({ workspaceRoot }) {
         commitDelegatesToFinishedHostRoot:
           /let commit = commit_finished_host_root\(store, render\)\?/u.test(
             rootCommitSource
+          ),
+        publicRootCompatibilityClaimed: false
+      },
+      "worker-1095-js-rust-root-work-loop-metadata-private-native-handoff": {
+        rustMetadataOptionAccepted:
+          /rustRootWorkLoopFinishedWorkMetadata/u.test(rootBridgeSource),
+        privateFacadeNativeHandoffTestPresent:
+          /private react-dom\/client facade render native handoff consumes Rust root work-loop metadata for div text/u.test(
+            privateRootFacadeRenderUpdateTestsSource
+          ),
+        divTextHostOutputAsserted:
+          /hostNode\.nodeName,\s*'DIV'/u.test(
+            privateRootFacadeRenderUpdateTestsSource
+          ) &&
+          /textNode\.nodeValue,\s*'text'/u.test(
+            privateRootFacadeRenderUpdateTestsSource
+          ),
+        rustMetadataPassedToPrivateAdapter:
+          /adapter\.renderNativeHandoff\([\s\S]*rustRootWorkLoopFinishedWorkMetadata:\s*metadata/u.test(
+            privateRootFacadeRenderUpdateTestsSource
+          ),
+        metadataAcceptedAndConsumed:
+          /rootWorkLoopRecord\.metadataProvided,\s*true/u.test(
+            privateRootFacadeRenderUpdateTestsSource
+          ) &&
+          /handoff\.rootWorkLoopFinishedWorkConsumed,\s*true/u.test(
+            privateRootFacadeRenderUpdateTestsSource
+          ),
+        publicCompatibilityBlockedAssertionsPresent:
+          /handoff\.publicRootExecution,\s*false/u.test(
+            privateRootFacadeRenderUpdateTestsSource
+          ) &&
+          /handoff\.publicRootCompatibilitySurface,\s*false/u.test(
+            privateRootFacadeRenderUpdateTestsSource
+          ) &&
+          /handoff\.nativeExecution,\s*false/u.test(
+            privateRootFacadeRenderUpdateTestsSource
+          ) &&
+          /handoff\.reconcilerExecution,\s*false/u.test(
+            privateRootFacadeRenderUpdateTestsSource
+          ) &&
+          /handoff\.compatibilityClaimed,\s*false/u.test(
+            privateRootFacadeRenderUpdateTestsSource
           ),
         publicRootCompatibilityClaimed: false
       }
@@ -9792,6 +9856,16 @@ function expectedPrivateRootWorkLoopCommitHandoffEvidence(metadataId) {
         commitDelegatesToFinishedHostRoot: true,
         publicRootCompatibilityClaimed: false
       };
+    case "worker-1095-js-rust-root-work-loop-metadata-private-native-handoff":
+      return {
+        rustMetadataOptionAccepted: true,
+        privateFacadeNativeHandoffTestPresent: true,
+        divTextHostOutputAsserted: true,
+        rustMetadataPassedToPrivateAdapter: true,
+        metadataAcceptedAndConsumed: true,
+        publicCompatibilityBlockedAssertionsPresent: true,
+        publicRootCompatibilityClaimed: false
+      };
     default:
       return null;
   }
@@ -9863,6 +9937,20 @@ function comparablePrivateRootWorkLoopCommitHandoffEvidence(
           evidence.lanesMismatchErrorVariantPresent,
         commitDelegatesToFinishedHostRoot:
           evidence.commitDelegatesToFinishedHostRoot,
+        publicRootCompatibilityClaimed:
+          evidence.publicRootCompatibilityClaimed
+      };
+    case "worker-1095-js-rust-root-work-loop-metadata-private-native-handoff":
+      return {
+        rustMetadataOptionAccepted: evidence.rustMetadataOptionAccepted,
+        privateFacadeNativeHandoffTestPresent:
+          evidence.privateFacadeNativeHandoffTestPresent,
+        divTextHostOutputAsserted: evidence.divTextHostOutputAsserted,
+        rustMetadataPassedToPrivateAdapter:
+          evidence.rustMetadataPassedToPrivateAdapter,
+        metadataAcceptedAndConsumed: evidence.metadataAcceptedAndConsumed,
+        publicCompatibilityBlockedAssertionsPresent:
+          evidence.publicCompatibilityBlockedAssertionsPresent,
         publicRootCompatibilityClaimed:
           evidence.publicRootCompatibilityClaimed
       };
