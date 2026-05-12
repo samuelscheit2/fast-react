@@ -14,6 +14,11 @@
 - Added focused positive and negative canaries for repeated update sequence
   rows, lane/count mismatches, stale callback replay, source-owned commit
   currentness, and non-claims for public compatibility surfaces.
+- Repaired the branch onto current `main` at
+  `7d77514434fcfc2f4517cbbea741f9a11a2e3b03` with merge repair commit
+  `33f096ecf5960610b4d0497591d1594595f01cb8`, preserving Worker 1221's
+  entangled transition queue-lane canaries beside this branch's same-lane
+  multi-update canaries.
 
 ## Changed Files
 
@@ -40,13 +45,24 @@
 - The same-transition queue proof remains separate from the generic Worker 1215
   queue proof, so existing single-transition/distinct-lane behavior is not
   widened for public or generic private consumers.
+- Merge repair preserved Worker 1221's distinct-transition entangled helper and
+  three tests:
+  `root_scheduler_transition_entangled_queue_lane_continuation_accepts_two_transition_lanes`,
+  `root_scheduler_transition_entangled_queue_lane_continuation_rejects_missing_entanglement_and_one_selected_lane`,
+  and
+  `root_scheduler_transition_entangled_queue_lane_continuation_rejects_duplicate_update_rows`.
+  The same-lane duplicate-row rejection still expects ordered duplicate rows,
+  while the entangled duplicate-row rejection still expects reordered/duplicate
+  aggregate evidence to fail source ownership.
 
 ## Commands Run
 
 - `cargo fmt --all`
-  - Applied formatting.
+  - Applied formatting during merge repair.
+- `git diff --check`
+  - Passed.
 - `cargo test -p fast-react-reconciler --all-features root_scheduler_transition`
-  - Passed: 23 tests.
+  - Passed: 26 tests.
 - `cargo test -p fast-react-reconciler --all-features root_scheduler_queue_lane_continuation`
   - Passed: 13 tests.
 - `cargo test -p fast-react-reconciler --all-features finished_work_queue_lane_commit_currentness`
@@ -58,8 +74,6 @@
 - `cargo check -p fast-react-reconciler --all-features`
   - Passed.
 - `cargo fmt --all --check`
-  - Passed.
-- `git diff --check`
   - Passed.
 
 ## Compatibility Non-Claims
@@ -74,6 +88,9 @@
 ## Risks Or Blockers
 
 - No blockers found.
+- Accepted current-main files outside this worker's manual write scope were
+  carried by the merge commit as merge-parent content and were not manually
+  refactored during conflict repair.
 - The same-lane multi-update path is intentionally narrow and fixed to the
   two-update canary shape used by these tests. Broader batching should add a
   separate audited proof rather than widening this one opportunistically.
@@ -94,6 +111,9 @@
 - Substantive implementation commit:
   `1bfe7e1133f3fab64d3ced1eb4fab8890e257978` (`Add same transition multi
   update currentness canary`).
+- Merge repair commit:
+  `33f096ecf5960610b4d0497591d1594595f01cb8` (`Merge branch 'main' into
+  worker/1220-transition-multi-update-currentness`).
 - Final branch `HEAD` is reported in the worker handoff after the report hash
   commit is created. A commit cannot contain its own final hash in this tracked
   report.
