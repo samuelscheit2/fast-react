@@ -50,17 +50,30 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
 {
   const publicDocument = createDocument('public');
   const publicContainer = publicDocument.createElement('div');
+  const publicId = 'app&<>"';
   publicDocument.__mutationLog.length = 0;
   const root = reactDomClient.createRoot(publicContainer);
   const renderReturn = root.render(
-    React.createElement('div', {id: 'app'}, 'hello')
+    React.createElement('div', {id: publicId}, 'hello & < >')
   );
 
   assert.equal(renderReturn, undefined);
   assert.equal(publicContainer.childNodes.length, 1);
+  assert.equal(publicContainer.children.length, 1);
+  assert.equal(publicContainer.firstElementChild, publicContainer.firstChild);
   assert.equal(publicContainer.firstChild.nodeName, 'DIV');
-  assert.equal(publicContainer.firstChild.getAttribute('id'), 'app');
-  assert.equal(publicContainer.textContent, 'hello');
+  assert.equal(publicContainer.firstChild.tagName, 'DIV');
+  assert.equal(publicContainer.firstChild.getAttribute('id'), publicId);
+  assert.deepEqual(attributeEntries(publicContainer.firstChild), [
+    ['id', publicId]
+  ]);
+  assert.equal(publicContainer.firstChild.textContent, 'hello & < >');
+  assert.equal(publicContainer.firstChild.innerHTML, 'hello &amp; &lt; &gt;');
+  assert.equal(publicContainer.textContent, 'hello & < >');
+  assert.equal(
+    publicContainer.innerHTML,
+    '<div id="app&amp;&lt;&gt;&quot;">hello &amp; &lt; &gt;</div>'
+  );
   assert.equal(publicContainer.__registrations.length, 0);
   assert.equal(publicDocument.__registrations.length, 0);
   assert.equal(rootMarkers.isContainerMarkedAsRoot(publicContainer), false);
@@ -68,17 +81,31 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
   assert.equal(listenerRegistry.hasListeningMarker(publicDocument), false);
   const initialHostNode = publicContainer.firstChild;
   const updateReturn = root.render(
-    React.createElement('div', {id: 'app'}, 'again')
+    React.createElement('div', {id: publicId}, 'again & < >')
   );
   assert.equal(updateReturn, undefined);
   assert.equal(publicContainer.childNodes.length, 1);
+  assert.equal(publicContainer.children.length, 1);
+  assert.equal(publicContainer.firstElementChild, initialHostNode);
   assert.equal(publicContainer.firstChild, initialHostNode);
-  assert.equal(publicContainer.firstChild.getAttribute('id'), 'app');
-  assert.equal(publicContainer.textContent, 'again');
+  assert.equal(publicContainer.firstChild.getAttribute('id'), publicId);
+  assert.deepEqual(attributeEntries(publicContainer.firstChild), [
+    ['id', publicId]
+  ]);
+  assert.equal(publicContainer.firstChild.textContent, 'again & < >');
+  assert.equal(publicContainer.firstChild.innerHTML, 'again &amp; &lt; &gt;');
+  assert.equal(publicContainer.textContent, 'again & < >');
+  assert.equal(
+    publicContainer.innerHTML,
+    '<div id="app&amp;&lt;&gt;&quot;">again &amp; &lt; &gt;</div>'
+  );
   const unmountReturn = root.unmount();
   assert.equal(unmountReturn, undefined);
   assert.equal(publicContainer.childNodes.length, 0);
+  assert.equal(publicContainer.children.length, 0);
+  assert.equal(publicContainer.firstElementChild, null);
   assert.equal(publicContainer.textContent, '');
+  assert.equal(publicContainer.innerHTML, '');
   assert.equal(publicContainer.__registrations.length, 0);
   assert.equal(publicDocument.__registrations.length, 0);
   assert.equal(rootMarkers.isContainerMarkedAsRoot(publicContainer), false);
@@ -95,6 +122,9 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
   assert.equal(secondUnmountError.entrypoint, 'react-dom/client');
   assert.equal(secondUnmountError.exportName, 'createRoot().unmount');
   assert.equal(publicContainer.childNodes.length, 0);
+  assert.equal(publicContainer.children.length, 0);
+  assert.equal(publicContainer.firstElementChild, null);
+  assert.equal(publicContainer.innerHTML, '');
 }
 
 const first = createBridgeScenario('first');
@@ -924,6 +954,30 @@ function createEventTarget(fields) {
       return childNodes.length === 0 ? null : childNodes[0];
     }
   });
+  Object.defineProperty(target, 'children', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return childNodes.filter((child) => child.nodeType === ELEMENT_NODE);
+    }
+  });
+  Object.defineProperty(target, 'firstElementChild', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return this.children.length === 0 ? null : this.children[0];
+    }
+  });
+  Object.defineProperty(target, 'innerHTML', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      if (childNodes.length > 0) {
+        return childNodes.map(serializeNode).join('');
+      }
+      return escapeText(this.textContent);
+    }
+  });
   Object.defineProperty(target, 'lastChild', {
     configurable: true,
     enumerable: true,
@@ -979,6 +1033,38 @@ function createEventTarget(fields) {
     }
   });
   return target;
+}
+
+function serializeNode(node) {
+  if (node.nodeType === TEXT_NODE) {
+    return escapeText(node.textContent);
+  }
+  if (node.nodeType === ELEMENT_NODE) {
+    const tagName = String(node.nodeName).toLowerCase();
+    return `<${tagName}${serializeAttributes(node)}>${node.innerHTML}</${tagName}>`;
+  }
+  return '';
+}
+
+function serializeAttributes(node) {
+  if (!(node.__attributes instanceof Map) || node.__attributes.size === 0) {
+    return '';
+  }
+  return [...node.__attributes.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, value]) => ` ${name}="${escapeAttributeValue(value)}"`)
+    .join('');
+}
+
+function escapeText(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+}
+
+function escapeAttributeValue(value) {
+  return escapeText(value).replaceAll('"', '&quot;');
 }
 
 function createStyleDeclaration() {

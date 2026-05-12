@@ -24,7 +24,8 @@ const listenerRegistry = require(path.join(
 ));
 const {
   DOCUMENT_NODE,
-  ELEMENT_NODE
+  ELEMENT_NODE,
+  TEXT_NODE
 } = require(path.join(packageRoot, 'src/client/dom-container.js'));
 
 const privateFacadeSymbols = Object.freeze([
@@ -201,20 +202,42 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   const createRootDocument = createDocument('public-create-root-minimal');
   const createRootContainer = createRootDocument.createElement('div');
   const createRootResult = reactDomClient.createRoot(createRootContainer);
+  const escapedPublicId = 'app&<>"';
 
   assert.deepEqual(Object.keys(createRootResult), ['render', 'unmount']);
   assert.equal(createRootResult.render.length, 1);
   assert.equal(createRootResult.unmount.length, 0);
   assert.equal(
     createRootResult.render(
-      React.createElement('div', {id: 'app'}, 'hello')
+      React.createElement('div', {id: escapedPublicId}, 'hello & < >')
     ),
     undefined
   );
   assert.equal(createRootContainer.childNodes.length, 1);
+  assert.equal(createRootContainer.children.length, 1);
+  assert.equal(
+    createRootContainer.firstElementChild,
+    createRootContainer.firstChild
+  );
   assert.equal(createRootContainer.firstChild.nodeName, 'DIV');
-  assert.equal(createRootContainer.firstChild.getAttribute('id'), 'app');
-  assert.equal(createRootContainer.textContent, 'hello');
+  assert.equal(createRootContainer.firstChild.tagName, 'DIV');
+  assert.equal(
+    createRootContainer.firstChild.getAttribute('id'),
+    escapedPublicId
+  );
+  assert.deepEqual([...createRootContainer.firstChild.attributes.entries()], [
+    ['id', escapedPublicId]
+  ]);
+  assert.equal(createRootContainer.firstChild.textContent, 'hello & < >');
+  assert.equal(
+    createRootContainer.firstChild.innerHTML,
+    'hello &amp; &lt; &gt;'
+  );
+  assert.equal(createRootContainer.textContent, 'hello & < >');
+  assert.equal(
+    createRootContainer.innerHTML,
+    '<div id="app&amp;&lt;&gt;&quot;">hello &amp; &lt; &gt;</div>'
+  );
   const initialHostNode = createRootContainer.firstChild;
   assert.throws(
     () => {
@@ -231,35 +254,43 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
   );
   assert.equal(
     createRootResult.render(
-      React.createElement('div', {id: 'app'}, 'again')
+      React.createElement('div', {id: escapedPublicId}, 'again & < >')
     ),
     undefined
   );
   assert.equal(createRootContainer.childNodes.length, 1);
+  assert.equal(createRootContainer.children.length, 1);
+  assert.equal(createRootContainer.firstElementChild, initialHostNode);
   assert.equal(createRootContainer.firstChild, initialHostNode);
-  assert.equal(createRootContainer.firstChild.getAttribute('id'), 'app');
-  assert.equal(createRootContainer.textContent, 'again');
-  assert.throws(
-    () => {
-      const unsupportedPropsDocument = createDocument(
-        'public-create-root-unsupported-props'
-      );
-      const unsupportedPropsRoot = reactDomClient.createRoot(
-        unsupportedPropsDocument.createElement('div')
-      );
-      unsupportedPropsRoot.render(
-        React.createElement('div', {className: 'blocked'}, 'blocked')
-      );
-    },
-    {
-      code: 'FAST_REACT_UNIMPLEMENTED',
-      entrypoint: 'react-dom/client',
-      exportName: 'createRoot().render'
-    }
+  assert.equal(createRootContainer.firstChild.tagName, 'DIV');
+  assert.equal(
+    createRootContainer.firstChild.getAttribute('id'),
+    escapedPublicId
+  );
+  assert.deepEqual([...createRootContainer.firstChild.attributes.entries()], [
+    ['id', escapedPublicId]
+  ]);
+  assert.equal(createRootContainer.firstChild.textContent, 'again & < >');
+  assert.equal(
+    createRootContainer.firstChild.innerHTML,
+    'again &amp; &lt; &gt;'
+  );
+  assert.equal(createRootContainer.textContent, 'again & < >');
+  assert.equal(
+    createRootContainer.innerHTML,
+    '<div id="app&amp;&lt;&gt;&quot;">again &amp; &lt; &gt;</div>'
+  );
+  assertPublicRenderFailureDoesNotLeak(
+    React.createElement('div', {className: 'blocked'}, 'blocked'),
+    'unsupported-className-prop'
   );
   assertPublicRenderFailureDoesNotLeak(
     React.createElement('span', null, 'blocked type'),
     'unsupported-type'
+  );
+  assertPublicRenderFailureDoesNotLeak(
+    React.createElement('div', {id: {}}, 'blocked id'),
+    'unsupported-id-object'
   );
   assertPublicRenderFailureDoesNotLeak(
     [
@@ -321,7 +352,10 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
 
   assert.equal(createRootResult.unmount(), undefined);
   assert.equal(createRootContainer.childNodes.length, 0);
+  assert.equal(createRootContainer.children.length, 0);
+  assert.equal(createRootContainer.firstElementChild, null);
   assert.equal(createRootContainer.textContent, '');
+  assert.equal(createRootContainer.innerHTML, '');
   assert.throws(
     () => {
       createRootResult.render(React.createElement('div', null, 'stale'));
@@ -343,6 +377,9 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     }
   );
   assert.equal(createRootContainer.childNodes.length, 0);
+  assert.equal(createRootContainer.children.length, 0);
+  assert.equal(createRootContainer.firstElementChild, null);
+  assert.equal(createRootContainer.innerHTML, '');
 
   const recreatedRoot = reactDomClient.createRoot(createRootContainer);
   assert.equal(
@@ -350,9 +387,15 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     undefined
   );
   assert.equal(createRootContainer.childNodes.length, 1);
+  assert.equal(createRootContainer.children.length, 1);
+  assert.equal(createRootContainer.firstElementChild, createRootContainer.firstChild);
   assert.equal(createRootContainer.textContent, '42');
+  assert.equal(createRootContainer.innerHTML, '<div>42</div>');
   assert.equal(recreatedRoot.unmount(), undefined);
   assert.equal(createRootContainer.childNodes.length, 0);
+  assert.equal(createRootContainer.children.length, 0);
+  assert.equal(createRootContainer.firstElementChild, null);
+  assert.equal(createRootContainer.innerHTML, '');
 
   const hydrateRootDocument = createDocument('public-hydrate-root-placeholder');
   const hydrateRootContainer = createElement('DIV', hydrateRootDocument);
@@ -674,6 +717,11 @@ function assertPrivateRootPublicFacadePayloadCounts({
 }
 
 function assertContainerUntouched(container, document) {
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(container.children.length, 0);
+  assert.equal(container.firstElementChild, null);
+  assert.equal(container.innerHTML, '');
+  assert.equal(container.textContent, '');
   assert.equal(
     rootMarkers.inspectContainerRootMarker(container).propertyCount,
     0
@@ -704,6 +752,10 @@ function assertPublicRenderFailureDoesNotLeak(element, label) {
     }
   );
   assert.equal(container.childNodes.length, 0);
+  assert.equal(container.children.length, 0);
+  assert.equal(container.firstElementChild, null);
+  assert.equal(container.innerHTML, '');
+  assert.equal(container.textContent, '');
   assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
   assert.equal(listenerRegistry.hasListeningMarker(container), false);
   assert.equal(listenerRegistry.hasListeningMarker(document), false);
@@ -859,11 +911,42 @@ function createEventTarget(fields) {
   };
   let textContent = '';
   Object.defineProperties(target, {
+    children: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes.filter(isFakeDomElementNode);
+      }
+    },
     firstChild: {
       configurable: true,
       enumerable: true,
       get() {
         return this.childNodes[0] || null;
+      }
+    },
+    firstElementChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.children[0] || null;
+      }
+    },
+    innerHTML: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (this.childNodes.length > 0) {
+          return this.childNodes.map(serializeFakeDomNode).join('');
+        }
+        return escapeFakeDomText(this.textContent);
+      }
+    },
+    tagName: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.nodeType === ELEMENT_NODE ? this.nodeName : undefined;
       }
     },
     textContent: {
@@ -885,6 +968,45 @@ function createEventTarget(fields) {
     }
   });
   return target;
+}
+
+function isFakeDomElementNode(node) {
+  return node?.nodeType === ELEMENT_NODE;
+}
+
+function serializeFakeDomNode(node) {
+  if (node?.nodeType === TEXT_NODE) {
+    return escapeFakeDomText(node.textContent);
+  }
+  if (isFakeDomElementNode(node)) {
+    const tagName = String(node.nodeName).toLowerCase();
+    return `<${tagName}${serializeFakeDomAttributes(node)}>${node.innerHTML}</${tagName}>`;
+  }
+  return '';
+}
+
+function serializeFakeDomAttributes(node) {
+  if (!(node.attributes instanceof Map) || node.attributes.size === 0) {
+    return '';
+  }
+  return [...node.attributes.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(
+      ([name, value]) =>
+        ` ${name}="${escapeFakeDomAttributeValue(String(value))}"`
+    )
+    .join('');
+}
+
+function escapeFakeDomText(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+}
+
+function escapeFakeDomAttributeValue(value) {
+  return escapeFakeDomText(value).replaceAll('"', '&quot;');
 }
 
 function detachChildFromParent(child) {
