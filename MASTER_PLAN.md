@@ -46,7 +46,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Latest accepted implementation/evidence baseline is
-main `f7be6d87` (`Merge worker 1215 transition queue lane currentness`).
+main `e833c646` (`Merge worker 1220 transition multi update currentness`).
 Accepted implementation, cleanup, planning, and docs-only history through that
 baseline is recorded in `MASTER_PROGRESS.md`; this plan lists only
 current/future work.
@@ -58,21 +58,10 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Accepted implementation/evidence facts through baseline main `f7be6d87` are
+- Accepted implementation/evidence facts through baseline main `e833c646` are
   recorded in `MASTER_PROGRESS.md`.
-- Active, unaccepted workers:
-  - Worker 1220: private same-transition multi-update queue-lane
-    continuation/currentness; branch/worktree
-    `worker/1220-transition-multi-update-currentness`,
-    `/Users/user/Developer/Developer/fast-react-worktrees/worker-1220-transition-multi-update-currentness`;
-    merge readiness pending worker report, focused Rust verification, and
-    independent audit.
-  - Worker 1221: public fake-DOM div/id update hardening for the already
-    accepted narrow `createRoot().render(<div id>text</div>)` lifecycle;
-    branch/worktree `worker/1221-public-fakedom-id-update-hardening`,
-    `/Users/user/Developer/Developer/fast-react-worktrees/worker-1221-public-fakedom-id-update-hardening`;
-    merge readiness pending worker report, focused JS/conformance verification,
-    and independent audit.
+- Active, unaccepted workers: none from the accepted 1220-1222 merge batch.
+  The queue is ready for the next scheduling decision.
 - Next root-render sequencing after the accepted private NAPI metadata JSON
   adapter/roundtrip, private HTML-like host commit canary, and native React DOM
   render handoff admission, plus the minimal public
@@ -90,7 +79,7 @@ Current orchestration queue:
   extension.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `f7be6d87`,
+implementation/evidence baseline main `e833c646`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 29,521 lines
@@ -115,7 +104,7 @@ verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
 Accepted compatibility evidence through accepted implementation/evidence
-baseline main `f7be6d87` includes only
+baseline main `e833c646` includes only
 the minimal public fake-DOM div/text `createRoot().render(...)` path above,
 Worker 1194's same-root repeat fake-DOM div/text update and rendered-root
 unmount cleanup, Worker 1200's smoke alignment with those expectations, and
@@ -151,6 +140,12 @@ only private Rust/test-host transition queue-lane commit currentness evidence
 for the accepted root-scheduler transition continuation path by adapting the
 transition continuation into Worker 948's finished-work queue-lane currentness
 consumer, preserving source-token ownership and one-shot consumption.
+Worker 1220's public root recreate-after-unmount evidence, Worker 1221's
+public fake-DOM id/text update and id-removal hardening, and Worker 1221's
+entangled transition queue-lane continuation remain narrow evidence only.
+Worker 1222 adds only private React Children nested source-freeze hardening.
+Worker 1220's same-transition multi-update currentness remains private
+Rust/test-only and exact-two scoped through the scheduler continuation path.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -170,7 +165,7 @@ canonical evidence requirements.
 ## Near-Term Sequencing
 
 1. Treat accepted compatibility evidence through accepted
-   implementation/evidence baseline main `f7be6d87` as
+   implementation/evidence baseline main `e833c646` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, Worker 1176's narrow public fake-DOM
    host-output proof, Worker 1194's narrow public same-root repeat div/text
@@ -194,7 +189,9 @@ canonical evidence requirements.
    snapshot-field/side-effect false-green checks, and independent lifecycle
    label evidence for that same public fake-DOM lifecycle. Worker 1205 proves
    only private React Children traversal currentness immutability/source-proof
-   hardening with public compatibility flags still false. Worker 1208 proves
+   hardening with public compatibility flags still false. Worker 1222 extends
+   that private Children currentness line by rejecting helper-owned reports
+   whose nested source/evidence authority is mutable. Worker 1208 proves
    only private hook currentness source-proof/freeze validation for the five
    assigned hook validators, with broad hook, `useRef`, context, and
    unsupported-hook compatibility still blocked. Worker 1207 proves only public
@@ -391,8 +388,9 @@ canonical evidence requirements.
 - React Children helper work can consume accepted Worker 950's private
   source-owned traversal currentness report, Worker 972's lazy traversal oracle,
   Worker 976's lazy renderer blockers, and Worker 995's portal/ref/owner
-  blockers, plus Worker 1205's frozen/source-proof currentness hardening, only
-  as fail-closed evidence. Full traversal parity, public package
+  blockers, plus Worker 1205's frozen/source-proof currentness hardening and
+  Worker 1222's nested source-freeze hardening, only as fail-closed evidence.
+  Full traversal parity, public package
   compatibility, renderer/root/portal execution, owner/ref integration, and
   package-wide React behavior remain blocked until separately oracle-backed.
 - React hook facade work can consume accepted Worker 916 transition blocker
@@ -425,11 +423,13 @@ canonical evidence requirements.
   queue/lane continuation gate, Worker 907's
   callback/currentness negative canaries, Worker 906's expired default+sync
   continuation, and Worker 934's transition queue/lane continuation, plus
-  Worker 948's finished-work commit queue-lane consumer and Worker 980's
-  expired queue-lane consumer, only when preserving scheduler identity, Worker
-  898 queue/lane proof, store-backed row lane metadata, sequence IDs,
-  applied/skipped counts, resulting element, callback identity,
-  expired/selected lane currentness, and root/current/finished-work identity.
+  Worker 948's finished-work commit queue-lane consumer, Worker 980's
+  expired queue-lane consumer, Worker 1221's entangled transition queue-lane
+  continuation, and Worker 1220's same-transition multi-update currentness,
+  only when preserving scheduler identity, Worker 898 queue/lane proof,
+  store-backed row lane metadata, sequence IDs, applied/skipped counts,
+  resulting element, callback identity, expired/selected lane currentness, and
+  root/current/finished-work identity.
   Public Scheduler timing, public root/act/package/native behavior,
   postTask/mock compatibility, and package compatibility remain blocked.
 - Conformance harness follow-ups can consume accepted Worker 955's discovery
@@ -458,7 +458,9 @@ canonical evidence requirements.
   and Worker 1200's aligned smoke repair, plus Worker 1202's observable
   fake-DOM `children`, `firstElementChild`, `innerHTML`, `tagName`, and
   escaped serialization evidence, plus Worker 1204's hostile escaped public
-  facade conformance/false-green hardening, for that lifecycle only. Broader
+  facade conformance/false-green hardening, plus Worker 1220's
+  recreate-after-unmount evidence and Worker 1221's id/text update and
+  id-removal hardening, for that lifecycle only. Broader
   public root rendering remains blocked outside that accepted fake-DOM div/text
   lifecycle slice until later workers prove additional render/update/unmount
   shapes, browser DOM mutation, listener/root marker behavior, lifecycle

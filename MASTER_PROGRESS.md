@@ -29,6 +29,51 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1220-1222 Root Facade, Scheduler, and Children Hardening Batch
+
+- Worker 1220 added narrow public fake-DOM recreate-after-unmount evidence for
+  `react-dom/client.createRoot(...).render(...)` after rendered-root unmount,
+  preserving stale old-root fail-closed behavior, fresh-root cleanup, root marker
+  and listener cleanup, and `compatibilityClaimed: false`.
+- Worker 1221 added private Rust/test-only evidence for two same-root transition
+  updates on distinct transition lanes to continue through the entangled
+  queue-lane scheduler path without public Scheduler/root/package claims.
+- Worker 1221 also hardened the public fake-DOM id/text update slice by checking
+  raw `getAttribute("id")`, serialized `innerHTML`, component-tree latest props,
+  stored-props identity, id removal, host-node reuse, root/listener leak
+  blockers, and hostile false-green cases while keeping broad public React DOM
+  compatibility blocked.
+- Worker 1222 hardened private React Children traversal currentness validation
+  so helper-owned reports with mutable nested source/evidence authority fail
+  closed after source proof, while forged caller objects and proxies still fail
+  source proof first.
+- Worker 1220 added private Rust/test-only same-transition two-update
+  queue-lane continuation/currentness evidence. It preserves Worker 1215's
+  single-transition currentness path, uses source-owned one-shot currentness
+  tokens, and rejects cloned, caller-shaped, replayed, stale-root, wrong-lane,
+  wrong-count, and mismatched queue handoff evidence.
+- Accepted validation includes independent source and verification audits for
+  the public fake-DOM id hardening, Children nested source-freeze hardening, and
+  Rust same-transition multi-update currentness repair. Root reruns passed the
+  focused public facade conformance/smoke/package tests, Children currentness and
+  oracle tests, `@fast-react/react` and package-surface checks, import smoke,
+  focused Rust scheduler/update/commit tests, `cargo check -p
+  fast-react-reconciler --all-features`, `cargo fmt --all --check`, and
+  `git diff --check`.
+- A non-blocking Rust audit residual remains: the lower-level test-only
+  same-lane handoff predicate accepts `update_records.len() > 1`, while the
+  accepted scheduler path remains exact-two scoped through
+  `[RootTransitionLaneSchedulerRequestRecord; 2]` and exact update-sequence
+  comparison. Tighten the lower-level predicate or add a direct three-row
+  negative canary before reusing it for broader same-lane batching evidence.
+- The accepted state is main `e833c646` after Worker 1220 public recreate merge
+  `cbfc7a5e`, Worker 1221 entangled transition merge `7d775144`, Worker 1221
+  public id hardening merge `3153075e`, Worker 1222 Children hardening merge
+  `cc8a7903`, and Worker 1220 same-transition multi-update merge `e833c646`,
+  plus worker/report commits `f339e386`, `6eb2441f`, `e103e99c`, `7fceef19`,
+  `deaffbcc`, `8618da92`, `84e3f8c6`, `78250dbb`, `b80d5c47`, `1bfe7e11`, and
+  `10f3b785`.
+
 ### Worker 1215 Transition Queue-Lane Currentness
 
 - Worker 1215 added a private/test-only transition queue-lane commit currentness
