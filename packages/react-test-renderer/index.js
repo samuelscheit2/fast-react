@@ -6699,6 +6699,19 @@ function normalizeAcceptedRustRootCreateRouteAdmissionDiagnostic(diagnostic) {
       'Expected a Rust create-route admission metadata object.'
     );
   }
+  const rootCreatePreflight = readDiagnosticField(diagnostic, [
+    'rootCreatePreflight',
+    'root_create_preflight',
+    'preflight'
+  ]);
+  if (rootCreatePreflight === null || typeof rootCreatePreflight !== 'object') {
+    throwInvalidRootRequest(
+      'Rust create-route admission requires root-create preflight evidence.'
+    );
+  }
+  assertPrivateNativeBridgeSourceDoesNotClaimCompatibility(
+    rootCreatePreflight
+  );
 
   return freezeRecord({
     id: readDiagnosticField(diagnostic, ['id', 'recordId', 'record_id']),
@@ -6761,11 +6774,9 @@ function normalizeAcceptedRustRootCreateRouteAdmissionDiagnostic(diagnostic) {
         'accepted_input_shape'
       ])
     }),
-    rootCreatePreflight: readDiagnosticField(diagnostic, [
-      'rootCreatePreflight',
-      'root_create_preflight',
-      'preflight'
-    ]),
+    rootCreatePreflight: normalizeAcceptedRustRootCreatePreflightDiagnostic(
+      rootCreatePreflight
+    ),
     workLoopFinishedWorkPreflight: normalizeRootCreateWorkLoopFinishedWorkPreflight(
       readDiagnosticField(diagnostic, [
         'workLoopFinishedWorkPreflight',
@@ -6856,16 +6867,14 @@ function assertAcceptedRustRootCreateRouteAdmissionMatchesRequest(
     );
   }
 
-  assertAcceptedRustRootCreatePreflightMatchesRequest(admission.rootCreatePreflight, {
-    diagnosticName: privateRootCreatePreflightDiagnosticName,
-    status: privateRootCreatePreflightStatus,
-    operation: 'create',
-    createInputShape: admission.rootCreatePreflight.createInputShape,
-    rootOptionsMetadata: admission.rootCreatePreflight.rootOptionsMetadata,
-    canaryApiIdentity: admission.rootCreatePreflight.canaryApiIdentity,
-    workLoopFinishedWorkPreflight:
-      diagnostic.workLoopFinishedWorkPreflight
-  });
+  assertAcceptedRustRootCreatePreflightMatchesRequest(
+    admission.rootCreatePreflight,
+    diagnostic.rootCreatePreflight
+  );
+  assertRootCreatePreflightWorkLoopEvidenceMatchesAdmission(
+    diagnostic.rootCreatePreflight.workLoopFinishedWorkPreflight,
+    diagnostic.workLoopFinishedWorkPreflight
+  );
 
   const evidence = diagnostic.rootCreateExecutionEvidence;
   if (evidence === null || typeof evidence !== 'object') {
@@ -6898,6 +6907,44 @@ function assertAcceptedRustRootCreateRouteAdmissionMatchesRequest(
   ) {
     throwInvalidRootRequest(
       'Rust create-route admission consumption flags are not accepted.'
+    );
+  }
+}
+
+function assertRootCreatePreflightWorkLoopEvidenceMatchesAdmission(
+  rootCreatePreflight,
+  admissionWorkLoopPreflight
+) {
+  if (
+    rootCreatePreflight === null ||
+    typeof rootCreatePreflight !== 'object' ||
+    admissionWorkLoopPreflight === null ||
+    typeof admissionWorkLoopPreflight !== 'object' ||
+    rootCreatePreflight.id !== admissionWorkLoopPreflight.id ||
+    rootCreatePreflight.status !== admissionWorkLoopPreflight.status ||
+    rootCreatePreflight.rootRequestId !==
+      admissionWorkLoopPreflight.rootRequestId ||
+    rootCreatePreflight.rootRequestSequence !==
+      admissionWorkLoopPreflight.rootRequestSequence ||
+    rootCreatePreflight.rootId !== admissionWorkLoopPreflight.rootId ||
+    rootCreatePreflight.rootSequence !==
+      admissionWorkLoopPreflight.rootSequence ||
+    rootCreatePreflight.rootApi !== admissionWorkLoopPreflight.rootApi ||
+    normalizeRustUpdateKind(rootCreatePreflight.updateKind) !==
+      normalizeRustUpdateKind(admissionWorkLoopPreflight.updateKind) ||
+    normalizeRustUpdateOutcome(rootCreatePreflight.updateOutcome) !==
+      normalizeRustUpdateOutcome(admissionWorkLoopPreflight.updateOutcome) ||
+    !createRouteFiberHandlesEqual(
+      rootCreatePreflight.finishedWork,
+      admissionWorkLoopPreflight.finishedWork
+    ) ||
+    rootCreatePreflight.renderLanesBits !==
+      admissionWorkLoopPreflight.renderLanesBits ||
+    rootCreatePreflight.remainingLanesBits !==
+      admissionWorkLoopPreflight.remainingLanesBits
+  ) {
+    throwInvalidRootRequest(
+      'Rust create-route admission root-create preflight evidence is missing or stale.'
     );
   }
 }
@@ -8211,16 +8258,71 @@ const privateNativeBridgeCompatibilityClaimFields = freezeArray([
 ]);
 
 const privateNativeBridgeAdjacentCompatibilityClaimFields = freezeArray([
+  freezeArray(['publicCompatibilityClaimed', 'public_compatibility_claimed']),
   freezeArray(['publicToJSONAvailable', 'public_to_json_available']),
   freezeArray(['publicToTreeAvailable', 'public_to_tree_available']),
   freezeArray(['publicTreeAvailable', 'public_tree_available']),
+  freezeArray(['publicTreeObject', 'public_tree_object']),
+  freezeArray(['publicTreeObjectAvailable', 'public_tree_object_available']),
   freezeArray(['publicActAvailable', 'public_act_available']),
+  freezeArray(['publicActBehaviorAvailable', 'public_act_behavior_available']),
+  freezeArray([
+    'publicActCompatibilityClaimed',
+    'public_act_compatibility_claimed'
+  ]),
+  freezeArray(['publicActExecution', 'public_act_execution']),
+  freezeArray([
+    'publicReactActCompatibilityClaimed',
+    'public_react_act_compatibility_claimed'
+  ]),
   freezeArray(['publicSchedulerAvailable', 'public_scheduler_available']),
+  freezeArray([
+    'publicSchedulerTimingCompatibilityClaimed',
+    'public_scheduler_timing_compatibility_claimed'
+  ]),
+  freezeArray([
+    'publicSchedulerFlushExecutionAvailable',
+    'public_scheduler_flush_execution_available'
+  ]),
+  freezeArray([
+    'publicSchedulerTaskExecution',
+    'public_scheduler_task_execution'
+  ]),
+  freezeArray([
+    'publicRootSyncFlushRouteAvailable',
+    'public_root_sync_flush_route_available'
+  ]),
+  freezeArray([
+    'publicPassiveEffectFlushExecutionAvailable',
+    'public_passive_effect_flush_execution_available'
+  ]),
+  freezeArray(['publicRootAccessAvailable', 'public_root_access_available']),
+  freezeArray(['publicAccessAvailable', 'public_access_available']),
+  freezeArray(['publicObject', 'public_object']),
+  freezeArray(['publicQueryMethodsAvailable', 'public_query_methods_available']),
+  freezeArray(['publicQueryMethodAvailable', 'public_query_method_available']),
   freezeArray([
     'ReactTestInstanceAvailable',
     'reactTestInstanceAvailable',
     'react_test_instance_available'
   ]),
+  freezeArray([
+    'publicTestInstanceObjectAvailable',
+    'public_test_instance_object_available'
+  ]),
+  freezeArray([
+    'publicRefOrEffectCompatibilityClaimed',
+    'public_ref_or_effect_compatibility_claimed'
+  ]),
+  freezeArray([
+    'publicHostTeardownCompatibilityClaimed',
+    'public_host_teardown_compatibility_claimed'
+  ]),
+  freezeArray([
+    'publicUnmountCompatibilityClaimed',
+    'public_unmount_compatibility_claimed'
+  ]),
+  freezeArray(['publicEffectExecution', 'public_effect_execution']),
   freezeArray(['rootCompatibilityClaimed', 'root_compatibility_claimed']),
   freezeArray([
     'packageCompatibilityAvailable',
@@ -8229,7 +8331,22 @@ const privateNativeBridgeAdjacentCompatibilityClaimFields = freezeArray([
   freezeArray(['nativeCompatibilityClaimed', 'native_compatibility_claimed']),
   freezeArray(['packageSerializationAvailable', 'package_serialization_available']),
   freezeArray(['nativeBridgeLoadingAvailable', 'native_bridge_loading_available']),
-  freezeArray(['nativeExecutionAvailable', 'native_execution_available'])
+  freezeArray(['nativeExecutionAvailable', 'native_execution_available']),
+  freezeArray([
+    'rendererRootsCompatibilityClaimed',
+    'renderer_roots_compatibility_claimed'
+  ]),
+  freezeArray([
+    'schedulerFlushCompatibilityClaimed',
+    'scheduler_flush_compatibility_claimed'
+  ]),
+  freezeArray(['actFlushingClaimed', 'act_flushing_claimed']),
+  freezeArray(['queuedWorkExecution', 'queued_work_execution']),
+  freezeArray([
+    'schedulerDrivenPassiveExecution',
+    'scheduler_driven_passive_execution'
+  ]),
+  freezeArray(['passiveEffectExecution', 'passive_effect_execution'])
 ]);
 
 const privateNativeBridgeCompatibilityClaimProbeFields = freezeArray([

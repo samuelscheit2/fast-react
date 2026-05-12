@@ -2881,6 +2881,35 @@ test("react-test-renderer package root hidden create bridge returns private root
     false,
     "package-root create bridge rejects public serialization claims"
   );
+  const missingRootCreatePreflightAdmission =
+    createRustCreateRouteAdmissionDiagnosticSource(admission);
+  delete missingRootCreatePreflightAdmission.rootCreatePreflight;
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreateRouteAdmission(
+      createRequest,
+      missingRootCreatePreflightAdmission
+    ),
+    false,
+    "package-root create bridge rejects admission without rootCreatePreflight"
+  );
+  const staleRootCreatePreflightAdmission =
+    createRustCreateRouteAdmissionDiagnosticSource(admission);
+  staleRootCreatePreflightAdmission.rootCreatePreflight = {
+    ...staleRootCreatePreflightAdmission.rootCreatePreflight,
+    workLoopFinishedWorkPreflight: {
+      ...staleRootCreatePreflightAdmission.rootCreatePreflight
+        .workLoopFinishedWorkPreflight,
+      renderLanesBits: 2
+    }
+  };
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreateRouteAdmission(
+      createRequest,
+      staleRootCreatePreflightAdmission
+    ),
+    false,
+    "package-root create bridge rejects stale rootCreatePreflight evidence"
+  );
   const missingEmbeddedAdmissionHandoff = { ...handoff };
   delete missingEmbeddedAdmissionHandoff.createRouteAdmission;
   assert.equal(
@@ -2891,6 +2920,21 @@ test("react-test-renderer package root hidden create bridge returns private root
     ),
     false,
     "package-root create bridge rejects handoff without embedded admission"
+  );
+  const missingPreflightAdmissionHandoff = {
+    ...handoff,
+    createRouteAdmission: { ...handoff.createRouteAdmission }
+  };
+  delete missingPreflightAdmissionHandoff.createRouteAdmission
+    .rootCreatePreflight;
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      missingPreflightAdmissionHandoff
+    ),
+    false,
+    "package-root create bridge rejects handoff admission without rootCreatePreflight"
   );
   assert.equal(
     bridge.canCreatePrivateRootFromHostOutputHandoff(
@@ -2942,6 +2986,43 @@ test("react-test-renderer package root hidden create bridge returns private root
     ),
     false,
     "package-root create bridge rejects proxy-hidden package compatibility aliases"
+  );
+  for (const alias of [
+    "publicSchedulerTimingCompatibilityClaimed",
+    "public_scheduler_timing_compatibility_claimed",
+    "publicQueryMethodsAvailable",
+    "public_query_methods_available",
+    "publicTestInstanceObjectAvailable",
+    "public_test_instance_object_available",
+    "publicRootAccessAvailable",
+    "public_root_access_available",
+    "publicActBehaviorAvailable",
+    "public_act_behavior_available",
+    "rendererRootsCompatibilityClaimed",
+    "renderer_roots_compatibility_claimed",
+    "publicSchedulerFlushExecutionAvailable",
+    "public_scheduler_flush_execution_available",
+    "publicReactActCompatibilityClaimed",
+    "public_react_act_compatibility_claimed"
+  ]) {
+    assert.equal(
+      bridge.canCreatePrivateRootFromHostOutputHandoff(
+        createRequest,
+        admissionConsumption,
+        withProxyInTrapTrueProperty(handoff, alias)
+      ),
+      false,
+      `package-root create bridge rejects proxy-hidden ${alias}`
+    );
+  }
+  assert.equal(
+    bridge.canCreatePrivateRootFromHostOutputHandoff(
+      createRequest,
+      admissionConsumption,
+      withHiddenTrueProperty(handoff, "publicQueryMethodsAvailable")
+    ),
+    false,
+    "package-root create bridge rejects hidden public query aliases"
   );
   assert.equal(
     bridge.canCreatePrivateRootFromHostOutputHandoff(
@@ -11186,7 +11267,12 @@ function createRustCreateRouteAdmissionDiagnosticSource(admission) {
     publicSurface: "create()",
     jsFacadeMetadataSource: "FastReactTestRendererPrivateRootRequestRecord",
     rustAdmissionMetadata: admission.rustAdmissionMetadata,
-    rootCreatePreflight: admission.rootCreatePreflight,
+    rootCreatePreflight:
+      admission.rootCreatePreflight === null
+        ? null
+        : createRustRootCreatePreflightDiagnosticSource(
+            admission.rootCreatePreflight
+          ),
     workLoopFinishedWorkPreflight:
       createRustRootCreateWorkLoopFinishedWorkPreflightSource(
         admission.workLoopFinishedWorkPreflight

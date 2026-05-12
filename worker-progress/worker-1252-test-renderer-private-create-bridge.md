@@ -13,6 +13,10 @@
   evidence, and rejects stale request/lane metadata plus public/native/package,
   serialization, TestInstance, hidden/proxy, source-smuggled, and
   JS-produced-host-output claims.
+- Repair follow-up closed the source-audit gaps by requiring the Rust
+  create-route admission diagnostic's own `rootCreatePreflight` evidence and
+  directly probing known hidden/proxy public root, query, TestInstance, act,
+  Scheduler, native, and package compatibility aliases.
 - Public `create()`, `.root`, `toJSON`, `toTree`, `ReactTestInstance`, query
   methods, `act`, Scheduler behavior, native addon loading/execution, JS/CJS
   package compatibility, and broad renderer compatibility remain blocked.
@@ -53,13 +57,21 @@
   metadata, mismatched handoff preflight lanes, public serialization aliases,
   hidden/proxy compatibility aliases, source-smuggled TestInstance claims, and
   host-output produced-from-JS aliases.
+- Repair coverage rejects omitted and stale `rootCreatePreflight` in the Rust
+  create-route admission diagnostic, plus proxy-hidden root/query/TestInstance,
+  act, and Scheduler compatibility aliases that do not appear in `ownKeys`.
 - Existing update/unmount private route behavior, lifecycle evidence
   consumption, serialization/TestInstance/act blockers, package-surface guard,
   and import smoke remain green.
 
 ## Audit/Review Or Nested-Agent Findings
 
-- No nested agents were spawned in this final repair pass.
+- No nested agents were spawned in the final repair or audit follow-up passes.
+- Independent source audit found two blockers before merge: proxy-hidden
+  aliases such as `publicSchedulerTimingCompatibilityClaimed` could bypass the
+  create bridge, and missing Rust admission `rootCreatePreflight` evidence was
+  accepted because validation synthesized JS-owned preflight evidence. Both
+  blockers are now repaired with focused hostile coverage.
 - The accepted Worker 539/573/610 reports shaped the required source-owned
   create preflight, work-loop finished-work, and create-route admission
   metadata checks.
