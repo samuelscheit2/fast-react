@@ -2656,21 +2656,36 @@ test('private react-dom/client facade rejects Rust root work-loop metadata capab
   };
   const claimCases = [
     'publicRootExecution',
+    'public_root_execution',
     'nativeExecution',
+    'native_execution',
     'reconcilerExecution',
+    'reconciler_execution',
     'domMutation',
+    'dom_mutation',
     'browserDomMutation',
+    'browser_dom_mutation',
     'markerWrites',
+    'marker_writes',
     'listenerInstallation',
+    'listener_installation',
     'hydration',
     'eventDispatch',
+    'event_dispatch',
     'refEffects',
+    'ref_effects',
     'rootScheduled',
+    'root_scheduled',
     'compatibilityClaimed',
+    'compatibility_claimed',
     'publicRootCompatibilitySurface',
+    'public_root_compatibility_surface',
     'publicRootRenderCompatibilityClaimed',
+    'public_root_render_compatibility_claimed',
     'publicDomMutationCompatibilityClaimed',
-    'publicTestRendererCompatibilityClaimed'
+    'public_dom_mutation_compatibility_claimed',
+    'publicTestRendererCompatibilityClaimed',
+    'public_test_renderer_compatibility_claimed'
   ];
 
   for (const claimField of claimCases) {
