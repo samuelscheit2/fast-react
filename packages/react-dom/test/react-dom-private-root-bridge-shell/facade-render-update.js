@@ -2633,6 +2633,88 @@ test('private react-dom/client facade render native handoff consumes Rust root w
   assert.equal(container.childNodes.length, 0);
 });
 
+test('private react-dom/client facade rejects Rust root work-loop metadata capability claims', () => {
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    initialHostOutputIdPrefix: 'facade-rust-claim-initial',
+    nativeEnvironmentId: 1095,
+    nativeHandoffIdPrefix: 'facade-rust-claim-native',
+    publicFacadeHostOutputRenderIdPrefix: 'facade-rust-claim-render',
+    requestIdPrefix: 'facade-rust-claim-request',
+    rootIdPrefix: 'facade-rust-claim-root',
+    rootRenderNativeHandoffIdPrefix: 'facade-rust-claim-handoff',
+    updateIdPrefix: 'facade-rust-claim-update'
+  });
+  const element = {
+    props: {
+      children: 'text'
+    },
+    type: 'div'
+  };
+  const claimCases = [
+    'publicRootExecution',
+    'nativeExecution',
+    'reconcilerExecution',
+    'domMutation',
+    'browserDomMutation',
+    'markerWrites',
+    'listenerInstallation',
+    'hydration',
+    'eventDispatch',
+    'refEffects',
+    'rootScheduled',
+    'compatibilityClaimed',
+    'publicRootCompatibilitySurface',
+    'publicRootRenderCompatibilityClaimed',
+    'publicDomMutationCompatibilityClaimed',
+    'publicTestRendererCompatibilityClaimed'
+  ];
+
+  for (const claimField of claimCases) {
+    const document = createDocument(
+      `private-client-facade-rust-claim-${claimField}`
+    );
+    const container = createElement('DIV', document);
+    const root = adapter.createRoot(container);
+    const create = adapter.getRootCreateRecord(root);
+    const metadata = createRootWorkLoopFinishedWorkMetadata({
+      hostType: 'div',
+      renderUpdateId: 'facade-rust-claim-update:1',
+      rootId: create.rootId,
+      rootTag: create.rootTag,
+      textContent: 'text'
+    });
+    metadata[claimField] = true;
+
+    assert.throws(
+      () =>
+        adapter.renderNativeHandoff(root, element, {
+          rustRootWorkLoopFinishedWorkMetadata: metadata
+        }),
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER',
+        message: /cannot claim public, native, DOM/
+      },
+      claimField
+    );
+    assertBridgeDidNotTouchContainer(container, document);
+    assert.deepEqual(adapter.getRootRequestRecords(root), [create]);
+    assert.deepEqual(adapter.getRootHostOutputRenderDiagnostics(root), []);
+    assert.deepEqual(adapter.getRootRenderNativeHandoffRecords(root), []);
+    assert.equal(
+      rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(metadata),
+      null
+    );
+    assert.equal(
+      rootBridge.getPrivateRootRenderNativeHandoffPayload(metadata),
+      null
+    );
+  }
+});
+
 test('private react-dom/client facade host-output update diagnostic routes root.render through fake DOM', () => {
   const document = createDocument('private-client-facade-host-output-update');
   const container = createElement('DIV', document);

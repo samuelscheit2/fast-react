@@ -578,6 +578,46 @@ const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS =
   'accepted-private-root-work-loop-finished-work-handoff-metadata';
 const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION =
   'root-work-loop-finished-work-handoff-2026-05-10';
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_BLOCKED_CAPABILITY_CLAIM_FIELDS =
+  freezeArray([
+    'browserDomMutation',
+    'browserDomMutationClaimed',
+    'compatibilityClaimed',
+    'domMutation',
+    'domMutationClaimed',
+    'eventDispatch',
+    'eventDispatchClaimed',
+    'fakeDomMutation',
+    'fakeDomMutationClaimed',
+    'hydration',
+    'hydrationClaimed',
+    'listenerInstallation',
+    'listenerInstallationClaimed',
+    'markerWrites',
+    'markerWritesClaimed',
+    'nativeExecution',
+    'nativeExecutionClaimed',
+    'publicCompatibilityClaimed',
+    'publicCreateRootCompatibilityClaimed',
+    'publicDomMutationCompatibilityClaimed',
+    'publicEventCompatibilityClaimed',
+    'publicHydrateRootCompatibilityClaimed',
+    'publicHydrationCompatibilityClaimed',
+    'publicRootCompatibilitySurface',
+    'publicRootExecution',
+    'publicRootRenderCompatibilityClaimed',
+    'publicRootUnmountCompatibilityClaimed',
+    'publicRootUpdateCompatibilityClaimed',
+    'publicTestRendererCompatibilityClaimed',
+    'reconcilerExecution',
+    'reconcilerExecutionClaimed',
+    'refEffects',
+    'refEffectsClaimed',
+    'rootScheduled',
+    'rootScheduledClaimed',
+    'rustExecution',
+    'rustExecutionClaimed'
+  ]);
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -27158,6 +27198,7 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
       'Public-facade host-output render requires accepted root work-loop finished-work metadata.'
     );
   }
+  assertRootWorkLoopFinishedWorkMetadataHasNoCapabilityClaims(metadata);
 
   const source = getFirstRootWorkLoopMetadataValue(metadata, [
     ['source'],
@@ -27537,6 +27578,43 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
     source,
     status
   };
+}
+
+function assertRootWorkLoopFinishedWorkMetadataHasNoCapabilityClaims(metadata) {
+  const seen = new WeakSet();
+
+  function visit(value) {
+    if (!isObjectOrFunction(value) || seen.has(value)) {
+      return;
+    }
+    seen.add(value);
+    for (const key of Object.getOwnPropertyNames(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor) {
+        continue;
+      }
+      if (
+        ROOT_WORK_LOOP_FINISHED_WORK_METADATA_BLOCKED_CAPABILITY_CLAIM_FIELDS.includes(
+          key
+        ) &&
+        (!Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
+          isRootWorkLoopFinishedWorkMetadataClaimingValue(descriptor.value))
+      ) {
+        throwInvalidRootPublicFacadeHostOutputRender(
+          'Root work-loop finished-work metadata cannot claim public, native, DOM, hydration, event, ref, marker, listener, scheduler, Rust, or compatibility capabilities.'
+        );
+      }
+      if (Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+        visit(descriptor.value);
+      }
+    }
+  }
+
+  visit(metadata);
+}
+
+function isRootWorkLoopFinishedWorkMetadataClaimingValue(value) {
+  return Boolean(value);
 }
 
 function normalizePrivateRootRenderHostOutputRootWorkLoopMetadata(
