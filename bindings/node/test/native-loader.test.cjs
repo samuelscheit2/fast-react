@@ -1470,7 +1470,7 @@ assert.equal(packageJson.engines.node, native.supportedNodeEngineRange);
 assert.equal(packageJson.scripts.build, 'cargo build -p fast-react-napi');
 assert.equal(
   packageJson.scripts.check,
-  'node ./test/native-loader.test.cjs && node ./test/native-no-load-guard.test.cjs && node ./test/native-loader-esm.test.mjs'
+  'node ./test/native-private-root-work-loop-metadata-factory.test.cjs && node ./test/native-loader.test.cjs && node ./test/native-no-load-guard.test.cjs && node ./test/native-loader-esm.test.mjs'
 );
 for (const lifecycleScript of ['preinstall', 'install', 'postinstall', 'prepare']) {
   assert.equal(
