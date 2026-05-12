@@ -556,6 +556,7 @@
         "src/events/react-dom-event-listener.js",
         "src/events/root-listeners.js",
         "src/resource-form-gates.js",
+        "src/resource-form-internals-contracts.js",
         "src/resource-form-internals-gate.js",
         "src/shared/create-portal.js",
         "src/shared/flush-sync-guard.js",
