@@ -29,6 +29,33 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1019 Docs Refresh and Workers 1016-1017 Root Commit Cleanup Splits
+
+- Worker 1019 refreshed master docs after accepted Workers 1016 and 1017. This
+  is a docs-only refresh and makes no runtime or public compatibility claim.
+- Worker 1017 split `root_commit` deletion metadata, cleanup logs, traversal
+  gates, host-detachment planning, and deletion collection/materialization
+  helpers into `root_commit/deletions.rs` while preserving existing
+  `crate::root_commit::...` paths. A follow-up repair kept intentional
+  deletion re-exports warning-free.
+- Worker 1016 split function-component commit effect metadata, passive/layout
+  handoffs, HostRoot effect accessors, and effect helper implementations into
+  `root_commit/effects.rs` while preserving crate-root re-export paths. The
+  merge resolved overlap with Worker 1017 and later removed a stale import
+  warning.
+- Accepted verification included focused deletion/root-commit checks for
+  Worker 1017; focused effects, deletion, and root-commit checks for Worker
+  1016; post-overlap `cargo test -p fast-react-reconciler root_commit --lib`;
+  `cargo test -p fast-react-test-renderer --lib`; and final warning-free
+  `cargo test -p fast-react-reconciler` with 886 unit tests plus 1 doctest.
+  Cargo formatting and diff checks also passed.
+- The accepted state for this cleanup batch is main `284949c1` after merge
+  commits `5a450ddf` and `6d36d599`, plus the final stale-import warning
+  repair. These changes improve file organization only. Public React DOM
+  roots, test-renderer/native behavior, hooks, Scheduler timing, hydration,
+  events, resources/forms, package compatibility, and broad renderer
+  compatibility remain blocked unless separately proven.
+
 ### Worker 1018 Docs Refresh and Workers 1010-1015 Cleanup Split Batch
 
 - Worker 1018 refreshed master docs after the accepted cleanup split batch.
