@@ -676,6 +676,272 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
     })
   ]);
 
+function publicFacadeCapabilityRejectionRow({
+  blockedSurface,
+  category,
+  id,
+  label,
+  postAcceptedRenderRejected = true,
+  publicApi
+}) {
+  return Object.freeze({
+    id,
+    label,
+    publicApi,
+    category,
+    blockedSurface,
+    admission: "blocked",
+    expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+    compatibilityClaimed: false,
+    freshRootRejected: true,
+    postAcceptedRenderRejected,
+    rejectedBeforePrivateBridgeRender: true,
+    rejectedBeforeNativeExecution: true,
+    rejectedBeforeListenerMarker: true,
+    previousFakeDomNodePreserved: postAcceptedRenderRejected,
+    previousInnerHTMLPreserved: postAcceptedRenderRejected,
+    previousGetAttributeIdPreserved: postAcceptedRenderRejected,
+    previousLatestPropsPreserved: postAcceptedRenderRejected,
+    previousMutationLogPreserved: postAcceptedRenderRejected,
+    callbackInvocationCount: 0,
+    refCallbackInvocationCount: 0,
+    refObjectMutationCount: 0,
+    listenerMarkerWritten: false,
+    resourceDomInsertion: false,
+    formActionInvocationCount: 0,
+    controlledInputRestore: false,
+    hydrateRootCallbackInvocationCount: 0,
+    reason:
+      "Unsupported public facade input is rejected by the narrow createRoot().render/hydrateRoot guard before private bridge, native, listener, ref, resource, form, or controlled-input behavior can run."
+  });
+}
+
+export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
+  Object.freeze([
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-onclick-prop",
+      label: "unsupported-onClick-prop",
+      publicApi: "root.render(<div onClick={fn}>text</div>)",
+      category: "event-listener-prop",
+      blockedSurface: "event"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-onclickcapture-prop",
+      label: "unsupported-onClickCapture-prop",
+      publicApi: "root.render(<div onClickCapture={fn}>text</div>)",
+      category: "event-listener-prop",
+      blockedSurface: "event"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-onsubmit-prop",
+      label: "unsupported-onSubmit-prop",
+      publicApi: "root.render(<div onSubmit={fn}>text</div>)",
+      category: "event-listener-prop",
+      blockedSurface: "event"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-onchange-prop",
+      label: "unsupported-onChange-prop",
+      publicApi: "root.render(<div onChange={fn}>text</div>)",
+      category: "event-listener-prop",
+      blockedSurface: "event"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-callback-ref-prop",
+      label: "unsupported-callback-ref-prop",
+      publicApi: "root.render(<div ref={fn}>text</div>)",
+      category: "ref-prop",
+      blockedSurface: "ref"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-object-ref-prop",
+      label: "unsupported-object-ref-prop",
+      publicApi: "root.render(<div ref={objectRef}>text</div>)",
+      category: "ref-prop",
+      blockedSurface: "ref"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-classname-prop",
+      label: "unsupported-className-prop",
+      publicApi: "root.render(<div className=\"blocked\">text</div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "browser-dom"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-style-prop",
+      label: "unsupported-style-prop",
+      publicApi: "root.render(<div style={{color: 'red'}}>text</div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "browser-dom"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-dangerouslysetinnerhtml-prop",
+      label: "unsupported-dangerouslySetInnerHTML-prop",
+      publicApi: "root.render(<div dangerouslySetInnerHTML={...} />)",
+      category: "browser-dom-expansion",
+      blockedSurface: "browser-dom"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-keyed-div",
+      label: "unsupported-keyed-div",
+      publicApi: "root.render(<div key=\"blocked\">text</div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "keyed-element"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-span-type",
+      label: "unsupported-span-type",
+      publicApi: "root.render(<span>text</span>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "host-type"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-child",
+      label: "unsupported-nested-child",
+      publicApi: "root.render(<div><span>text</span></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "nested-child"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-fragment",
+      label: "unsupported-fragment",
+      publicApi: "root.render(<><div>text</div></>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "fragment"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-array",
+      label: "unsupported-array",
+      publicApi: "root.render([<div key=\"array\">text</div>])",
+      category: "browser-dom-expansion",
+      blockedSurface: "array-child"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-suppresshydrationwarning-prop",
+      label: "unsupported-suppressHydrationWarning-prop",
+      publicApi:
+        "root.render(<div suppressHydrationWarning={true}>text</div>)",
+      category: "hydration-adjacent",
+      blockedSurface: "hydration"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-id-object",
+      label: "unsupported-id-object",
+      publicApi: "root.render(<div id={{}}>text</div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "attribute-coercion"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-link-resource-type",
+      label: "unsupported-link-resource-type",
+      publicApi: "root.render(<link rel=\"stylesheet\" href=\"/blocked.css\" />)",
+      category: "resource-form-controlled",
+      blockedSurface: "resource"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-script-resource-type",
+      label: "unsupported-script-resource-type",
+      publicApi: "root.render(<script src=\"/blocked.js\" />)",
+      category: "resource-form-controlled",
+      blockedSurface: "resource"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-style-resource-type",
+      label: "unsupported-style-resource-type",
+      publicApi: "root.render(<style>.blocked{}</style>)",
+      category: "resource-form-controlled",
+      blockedSurface: "resource"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-form-type",
+      label: "unsupported-form-type",
+      publicApi: "root.render(<form action={fn}>text</form>)",
+      category: "resource-form-controlled",
+      blockedSurface: "form"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-input-type",
+      label: "unsupported-input-type",
+      publicApi:
+        "root.render(<input type=\"checkbox\" name=\"blocked\" value=\"blocked\" defaultValue=\"fallback\" checked />)",
+      category: "resource-form-controlled",
+      blockedSurface: "controlled-input"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-button-type",
+      label: "unsupported-button-type",
+      publicApi: "root.render(<button formAction={fn}>text</button>)",
+      category: "resource-form-controlled",
+      blockedSurface: "form"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-textarea-type",
+      label: "unsupported-textarea-type",
+      publicApi:
+        "root.render(<textarea name=\"blocked\" value=\"blocked\" defaultValue=\"fallback\" />)",
+      category: "resource-form-controlled",
+      blockedSurface: "controlled-input"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-action-prop",
+      label: "unsupported-action-prop",
+      publicApi: "root.render(<div action={fn}>text</div>)",
+      category: "resource-form-controlled",
+      blockedSurface: "form"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-formaction-prop",
+      label: "unsupported-formAction-prop",
+      publicApi: "root.render(<div formAction={fn}>text</div>)",
+      category: "resource-form-controlled",
+      blockedSurface: "form"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-value-prop",
+      label: "unsupported-value-prop",
+      publicApi: "root.render(<div value=\"blocked\">text</div>)",
+      category: "resource-form-controlled",
+      blockedSurface: "controlled-input"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-defaultvalue-prop",
+      label: "unsupported-defaultValue-prop",
+      publicApi: "root.render(<div defaultValue=\"blocked\">text</div>)",
+      category: "resource-form-controlled",
+      blockedSurface: "controlled-input"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-checked-prop",
+      label: "unsupported-checked-prop",
+      publicApi: "root.render(<div checked={true}>text</div>)",
+      category: "resource-form-controlled",
+      blockedSurface: "controlled-input"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-name-prop",
+      label: "unsupported-name-prop",
+      publicApi: "root.render(<div name=\"blocked\">text</div>)",
+      category: "resource-form-controlled",
+      blockedSurface: "controlled-input"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-type-prop",
+      label: "unsupported-type-prop",
+      publicApi: "root.render(<div type=\"button\">text</div>)",
+      category: "resource-form-controlled",
+      blockedSurface: "controlled-input"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-hydrateroot-options-callbacks-rejected",
+      label: "unsupported-hydrateRoot-options-callbacks",
+      publicApi:
+        "react-dom/client.hydrateRoot(container, children, { onRecoverableError, onCaughtError, onUncaughtError, identifierPrefix, formState })",
+      category: "hydration-adjacent",
+      blockedSurface: "hydrateRoot-options",
+      postAcceptedRenderRejected: false
+    })
+  ]);
+
 export const REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS = Object.freeze(
   REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.map((scenarioId) =>
     Object.freeze({
@@ -729,6 +995,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       compatibilityClaimed: false
     }),
     ...REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
+    ...REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS,
     Object.freeze({
       id: "public-portal-root-render",
       publicApi: "ReactDOM.createPortal(...) through public root.render",
@@ -843,6 +1110,8 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_GATE = Object.freeze({
   localTargetPackageName: REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_TARGET.packageName,
   scenarioAdmissions: REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS,
   blockedBoundaryRows: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS,
+  capabilityRejectionRows:
+    REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS,
   privatePromotionRejectionRows503533:
     REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS,
   unsupportedBehavior: Object.freeze({
@@ -2756,6 +3025,13 @@ function validatePublicFacadeBoundary({
     blockedPublicFacadeRows,
     failures
   });
+  for (const row of REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS) {
+    blockedPublicFacadeRows.push({
+      ...row,
+      gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false
+    });
+  }
 
   blockedPublicFacadeRows.push({
     id: "public-portal-root-render",
