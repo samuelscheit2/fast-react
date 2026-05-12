@@ -45,14 +45,19 @@ test("private admission 1228 manifest pins current native metadata source/no-loa
   assertSubset(
     [
       "nativeAddonLoaded",
+      "nativeAddonLoadAttempted",
       "nodeWorkerThreadsExecution",
+      "workerThreadCreationAttempted",
       "childProcessExecution",
       "httpExecution",
       "httpsExecution",
       "napiCleanupHookExecution",
+      "cleanupHookPublicExecutionClaimed",
       "rendererExecution",
       "reconcilerExecution",
       "publicNativeCompatibility",
+      "publicRootExecution",
+      "publicRootCompatibilitySurface",
       "packageExportCompatibilityClaimed"
     ],
     PRIVATE_ADMISSION_1228_BLOCKED_CLAIMS
@@ -221,15 +226,22 @@ test("private admission 1228 rejects native, worker, cleanup, renderer, package,
       [noLoadMetadataGuardSurface]: {
         publicBlockers: {
           nativeAddonLoaded: true,
+          nativeAddonLoadAttempted: true,
           nativeExecution: true,
+          publicNativeExecution: true,
           nodeWorkerThreadsExecution: true,
+          workerThreadCreationAttempted: true,
           childProcessExecution: true,
           httpExecution: true,
           httpsExecution: true,
           napiCleanupHookExecution: true,
+          cleanupHookPublicExecutionClaimed: true,
           rendererExecution: true,
           reconcilerExecution: true,
           publicNativeCompatibility: true,
+          publicRootExecution: true,
+          publicRootCompatibilitySurface: true,
+          packageCompatibilityClaimed: true,
           packageExportCompatibilityClaimed: true,
           nativePrivateSubpathsExported: true,
           compatibilityClaimed: true
@@ -254,13 +266,35 @@ test("private admission 1228 rejects native, worker, cleanup, renderer, package,
   ]);
   assert.deepEqual(gate.nativeRuntimeClaimIds, [
     `${noLoadMetadataGuardSurface}.nativeAddonLoaded`,
-    `${noLoadMetadataGuardSurface}.nativeExecution`
+    `${noLoadMetadataGuardSurface}.nativeAddonLoadAttempted`,
+    `${noLoadMetadataGuardSurface}.nativeExecution`,
+    `${noLoadMetadataGuardSurface}.publicNativeExecution`
   ]);
   assert.deepEqual(gate.workerChildNetworkClaimIds, [
     `${noLoadMetadataGuardSurface}.nodeWorkerThreadsExecution`,
+    `${noLoadMetadataGuardSurface}.workerThreadCreationAttempted`,
     `${noLoadMetadataGuardSurface}.childProcessExecution`,
     `${noLoadMetadataGuardSurface}.httpExecution`,
     `${noLoadMetadataGuardSurface}.httpsExecution`
+  ]);
+  assert.deepEqual(gate.cleanupHookClaimIds, [
+    `${noLoadMetadataGuardSurface}.napiCleanupHookExecution`,
+    `${noLoadMetadataGuardSurface}.cleanupHookPublicExecutionClaimed`
+  ]);
+  assert.deepEqual(gate.rendererReconcilerClaimIds, [
+    `${noLoadMetadataGuardSurface}.rendererExecution`,
+    `${noLoadMetadataGuardSurface}.reconcilerExecution`
+  ]);
+  assert.deepEqual(gate.publicNativeCompatibilityClaimIds, [
+    `${noLoadMetadataGuardSurface}.publicNativeCompatibility`,
+    `${noLoadMetadataGuardSurface}.publicRootExecution`,
+    `${noLoadMetadataGuardSurface}.publicRootCompatibilitySurface`,
+    `${noLoadMetadataGuardSurface}.compatibilityClaimed`
+  ]);
+  assert.deepEqual(gate.packageExportClaimIds, [
+    `${noLoadMetadataGuardSurface}.packageCompatibilityClaimed`,
+    `${noLoadMetadataGuardSurface}.packageExportCompatibilityClaimed`,
+    `${noLoadMetadataGuardSurface}.nativePrivateSubpathsExported`
   ]);
 });
 

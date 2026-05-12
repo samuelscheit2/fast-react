@@ -421,9 +421,37 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     },
     {
       row: sourceCurrentnessRow(canonicalCommit, {
+        id: 'root-work-loop-metadata-public-root-execution-claim',
+        publicRootExecution: true
+      }),
+      code: codes.publicNativeExecutionClaim
+    },
+    {
+      row: sourceCurrentnessRow(canonicalCommit, {
+        id: 'root-work-loop-metadata-public-root-compatibility-surface-claim',
+        publicRootCompatibilitySurface: true
+      }),
+      code: codes.publicNativeExecutionClaim
+    },
+    {
+      row: sourceCurrentnessRow(canonicalCommit, {
         id: 'root-work-loop-metadata-package-export-claim',
         packageExportCompatibility: true,
         packageExportClaimed: true
+      }),
+      code: codes.packageExportClaim
+    },
+    {
+      row: sourceCurrentnessRow(canonicalCommit, {
+        id: 'root-work-loop-metadata-package-export-compatibility-claimed',
+        packageExportCompatibilityClaimed: true
+      }),
+      code: codes.packageExportClaim
+    },
+    {
+      row: sourceCurrentnessRow(canonicalCommit, {
+        id: 'root-work-loop-metadata-native-private-subpaths-exported',
+        nativePrivateSubpathsExported: true
       }),
       code: codes.packageExportClaim
     },
@@ -436,11 +464,33 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     },
     {
       row: sourceCurrentnessRow(canonicalCommit, {
+        id: 'root-work-loop-metadata-native-addon-load-attempted',
+        nativeAddonLoadAttempted: true
+      }),
+      code: codes.nativeAddonLoadClaim
+    },
+    {
+      row: sourceCurrentnessRow(canonicalCommit, {
+        id: 'root-work-loop-metadata-cleanup-hook-execution-claim',
+        napiCleanupHookExecution: true
+      }),
+      code: codes.nativeAddonLoadClaim
+    },
+    {
+      row: sourceCurrentnessRow(canonicalCommit, {
+        id: 'root-work-loop-metadata-cleanup-hook-public-claim',
+        cleanupHookPublicExecutionClaimed: true
+      }),
+      code: codes.nativeAddonLoadClaim
+    },
+    {
+      row: sourceCurrentnessRow(canonicalCommit, {
         id: 'root-work-loop-metadata-worker-network-claim',
         childProcessExecution: true,
         httpExecution: true,
         httpsExecution: true,
-        nodeWorkerThreadsExecution: true
+        nodeWorkerThreadsExecution: true,
+        workerThreadCreationAttempted: true
       }),
       code: codes.workerOrNetworkExecutionClaim
     },

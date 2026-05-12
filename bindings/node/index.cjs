@@ -105,15 +105,19 @@ const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPublicClaimFields =
     'nativeExecution',
     'publicNativeExecution',
     'publicNativeCompatibility',
+    'publicRootExecution',
+    'publicRootCompatibilitySurface',
     'publicRootRendering',
     'publicRootRenderingClaimed'
   ]);
 const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPackageClaimFields =
   Object.freeze([
     'packageExportCompatibility',
+    'packageExportCompatibilityClaimed',
     'packageCompatibilityClaimed',
     'packageExportClaimed',
     'nativePackageExportClaimed',
+    'nativePrivateSubpathsExported',
     'nativePackageCompatibilityClaimed',
     'packageExportsOpened'
   ]);
@@ -7338,7 +7342,12 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
     return null;
   }
 
-  if (row.nativeAddonLoaded === true) {
+  if (
+    row.nativeAddonLoaded === true ||
+    row.nativeAddonLoadAttempted === true ||
+    row.napiCleanupHookExecution === true ||
+    row.cleanupHookPublicExecutionClaimed === true
+  ) {
     return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
       .nativeAddonLoadClaim;
   }
@@ -7363,6 +7372,7 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
 
   if (
     row.nodeWorkerThreadsExecution === true ||
+    row.workerThreadCreationAttempted === true ||
     row.childProcessExecution === true ||
     row.httpExecution === true ||
     row.httpsExecution === true ||
