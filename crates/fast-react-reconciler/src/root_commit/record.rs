@@ -12,10 +12,10 @@ use crate::root_config::{
     RootErrorOptionCallbackRecord,
 };
 use crate::{
-    FiberRootId, FiberRootStore, HostRootRenderPhaseRecord, RootCallbackPriority,
-    RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle, RootSchedulerCallbackHandle,
-    RootUpdateCallbackHandle, RootUpdateCallbackRecord, RootUpdateCallbackSnapshot,
-    RootUpdateCallbackVisibility, UpdateId,
+    FiberRootId, FiberRootStore, HostRootHydrationState, HostRootRenderPhaseRecord,
+    RootCallbackPriority, RootErrorCallbackHandle, RootKind, RootRecoverableErrorCallbackHandle,
+    RootSchedulerCallbackHandle, RootUpdateCallbackHandle, RootUpdateCallbackRecord,
+    RootUpdateCallbackSnapshot, RootUpdateCallbackVisibility, UpdateId,
 };
 
 use super::{
@@ -24,9 +24,9 @@ use super::{
     FunctionComponentEffectListCommitPhaseOrderSnapshot,
     FunctionComponentLayoutEffectCallbackInvocationGateSnapshot,
     FunctionComponentLayoutEffectCommitPhase, FunctionComponentLayoutEffectsSnapshot,
-    HostRootCommitExecutionSurfaceBlockerRecord, HostRootDeletionCleanupLog,
-    HostRootDeletionListRecord, HostRootDeletionSubtreeTraversalGateSnapshot,
-    HostRootDomRefCallbackCommitGateSnapshot, HostRootMutationApplyLog, HostRootMutationPhaseLog,
+    HostRootDeletionCleanupLog, HostRootDeletionListRecord,
+    HostRootDeletionSubtreeTraversalGateSnapshot, HostRootDomRefCallbackCommitGateSnapshot,
+    HostRootMutationApplyLog, HostRootMutationPhaseLog,
     HostRootRefCallbackExecutionHandoffSnapshot, HostRootRefCleanupReturnExecutionGateSnapshot,
     HostRootRefCommitAction, HostRootRefCommitSnapshot, PendingPassiveCommitHandoff,
     RootCommitError, host_root_fiber_tag_name,
@@ -767,6 +767,8 @@ pub struct HostRootCommitRecord {
     pub(super) finished_lanes: Lanes,
     pub(super) remaining_lanes: Lanes,
     pub(super) pending_lanes: Lanes,
+    pub(super) root_kind: RootKind,
+    pub(super) hydration_state: HostRootHydrationState,
     pub(super) mutation_log: HostRootMutationPhaseLog,
     pub(super) mutation_apply_log: HostRootMutationApplyLog,
     pub(super) root_update_callbacks: RootUpdateCallbackSnapshot,
@@ -784,7 +786,6 @@ pub struct HostRootCommitRecord {
     pub(super) deletion_lists: Vec<HostRootDeletionListRecord>,
     pub(super) deletion_subtree_traversal_gate: HostRootDeletionSubtreeTraversalGateSnapshot,
     pub(super) host_node_deletion_cleanup_log: HostRootDeletionCleanupLog,
-    pub(super) execution_surface_blockers: HostRootCommitExecutionSurfaceBlockerRecord,
     pub(super) ref_commit_metadata: HostRootRefCommitSnapshot,
     pub(super) dom_ref_callback_commit_gate: HostRootDomRefCallbackCommitGateSnapshot,
     pub(super) ref_callback_execution_handoff: HostRootRefCallbackExecutionHandoffSnapshot,

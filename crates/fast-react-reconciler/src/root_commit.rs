@@ -290,6 +290,7 @@ impl HostRootCommitExecutionSurfaceBlockerRecord {
     pub(crate) fn layout_effect_execution_blocked(&self) -> bool {
         self.has_blocker(HostRootCommitExecutionSurfaceBlocker::LayoutEffectExecution)
             && self.layout_source_proven
+            && self.layout_effect_record_count == 0
             && self.layout_effect_callback_gate_record_count == 0
     }
 
@@ -297,6 +298,7 @@ impl HostRootCommitExecutionSurfaceBlockerRecord {
     pub(crate) fn passive_effect_execution_blocked(&self) -> bool {
         self.has_blocker(HostRootCommitExecutionSurfaceBlocker::PassiveEffectExecution)
             && self.passive_source_proven
+            && self.pending_passive_record_count == 0
             && self.committed_passive_fiber_count == 0
             && self.deleted_subtree_passive_record_count == 0
     }
@@ -2947,31 +2949,45 @@ impl HostRootCommitRecord {
         reason = "execution-surface blocker record details are consumed by focused private bridge tests"
     )]
     #[must_use]
-    pub(crate) const fn execution_surface_blockers(
-        &self,
-    ) -> &HostRootCommitExecutionSurfaceBlockerRecord {
-        &self.execution_surface_blockers
+    pub(crate) fn execution_surface_blockers(&self) -> HostRootCommitExecutionSurfaceBlockerRecord {
+        materialize_host_root_commit_execution_surface_blockers(
+            self.root,
+            self.current,
+            self.root_kind,
+            self.hydration_state,
+            self.pending_passive_handoff,
+            &self.function_component_committed_passive_effects,
+            &self.function_component_deleted_subtree_passive_effects,
+            &self.function_component_layout_effects,
+            &self.function_component_layout_effect_callback_invocation_gate,
+            &self.function_component_effect_list_commit_phase_order,
+            &self.ref_commit_metadata,
+            &self.dom_ref_callback_commit_gate,
+            &self.ref_callback_execution_handoff,
+            &self.ref_cleanup_return_execution_gate,
+        )
     }
 
     #[must_use]
     pub(crate) fn effects_execution_blocked(&self) -> bool {
-        self.execution_surface_blockers.effects_execution_blocked()
+        self.execution_surface_blockers()
+            .effects_execution_blocked()
     }
 
     #[must_use]
     pub(crate) fn refs_execution_blocked(&self) -> bool {
-        self.execution_surface_blockers.refs_execution_blocked()
+        self.execution_surface_blockers().refs_execution_blocked()
     }
 
     #[must_use]
     pub(crate) fn hydration_execution_blocked(&self) -> bool {
-        self.execution_surface_blockers
+        self.execution_surface_blockers()
             .hydration_execution_blocked()
     }
 
     #[must_use]
     pub(crate) fn effects_refs_and_hydration_execution_surfaces_blocked(&self) -> bool {
-        self.execution_surface_blockers
+        self.execution_surface_blockers()
             .effects_refs_and_hydration_execution_surfaces_blocked()
     }
 
@@ -3326,22 +3342,6 @@ pub fn commit_finished_host_root<H: HostTypes>(
         FunctionComponentLayoutEffectCallbackInvocationGateSnapshot::default();
     let function_component_effect_list_commit_phase_order =
         FunctionComponentEffectListCommitPhaseOrderSnapshot::default();
-    let execution_surface_blockers = materialize_host_root_commit_execution_surface_blockers(
-        root_id,
-        finished_work,
-        root_kind,
-        finished_work_hydration_state,
-        pending_passive_handoff,
-        &function_component_committed_passive_effects,
-        &function_component_deleted_subtree_passive_effects,
-        &function_component_layout_effects,
-        &function_component_layout_effect_callback_invocation_gate,
-        &function_component_effect_list_commit_phase_order,
-        &ref_commit_metadata,
-        &dom_ref_callback_commit_gate,
-        &ref_callback_execution_handoff,
-        &ref_cleanup_return_execution_gate,
-    );
 
     Ok(HostRootCommitRecord {
         root: root_id,
@@ -3350,6 +3350,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
         finished_lanes,
         remaining_lanes,
         pending_lanes,
+        root_kind,
+        hydration_state: finished_work_hydration_state,
         mutation_log,
         mutation_apply_log,
         root_update_callbacks,
@@ -3363,7 +3365,6 @@ pub fn commit_finished_host_root<H: HostTypes>(
         deletion_lists,
         deletion_subtree_traversal_gate,
         host_node_deletion_cleanup_log,
-        execution_surface_blockers,
         ref_commit_metadata,
         dom_ref_callback_commit_gate,
         ref_callback_execution_handoff,
