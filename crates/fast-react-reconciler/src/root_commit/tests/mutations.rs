@@ -83,6 +83,107 @@ fn root_commit_records_host_root_child_placement_metadata_without_host_mutation(
     );
     assert_eq!(host.operations(), Vec::<&'static str>::new());
 }
+
+#[test]
+fn root_commit_host_component_text_mutation_execution_gate_blocks_production_host_execution() {
+    let (mut store, root_id, host) = root_store();
+    update_container(&mut store, root_id, RootElementHandle::from_raw(46), None).unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+    attach_host_root_children(
+        &mut store,
+        render.finished_work(),
+        &[
+            (
+                FiberTag::HostComponent,
+                FiberFlags::PLACEMENT,
+                StateNodeHandle::from_raw(702),
+                PropsHandle::from_raw(703),
+                PropsHandle::from_raw(703),
+            ),
+            (
+                FiberTag::HostText,
+                FiberFlags::PLACEMENT,
+                StateNodeHandle::from_raw(704),
+                PropsHandle::from_raw(705),
+                PropsHandle::from_raw(705),
+            ),
+        ],
+    );
+
+    let commit = commit_finished_host_root(&mut store, render).unwrap();
+    let gate = commit.host_component_text_mutation_execution_gate();
+
+    assert_eq!(gate.root(), root_id);
+    assert_eq!(gate.finished_work(), render.finished_work());
+    assert_eq!(gate.mutation_apply_record_count(), 2);
+    assert_eq!(gate.host_component_record_count(), 1);
+    assert_eq!(gate.host_text_record_count(), 1);
+    assert_eq!(gate.placement_record_count(), 2);
+    assert_eq!(gate.update_record_count(), 0);
+    assert_eq!(gate.deletion_record_count(), 0);
+    assert_eq!(gate.blocked_record_count(), 2);
+    assert_eq!(
+        gate.status(),
+        HostRootHostMutationExecutionGateStatus::BlockedUntilProductionCompleteCommitPromotion
+    );
+    assert_eq!(
+        gate.status_name(),
+        "blocked-until-production-complete-commit-promotion"
+    );
+    assert_eq!(gate.blockers(), &HOST_ROOT_HOST_MUTATION_EXECUTION_BLOCKERS);
+    assert!(gate.host_mutation_execution_blocked());
+    assert!(gate.requires_production_complete_work_promotion());
+    assert!(gate.requires_production_host_mutation_apply());
+    assert!(!gate.production_complete_work_promoted());
+    assert!(!gate.production_host_mutation_apply_promoted());
+    assert!(!gate.public_dom_compatibility_claimed());
+    assert!(!gate.test_renderer_compatibility_claimed());
+    assert!(gate.blockers_intact());
+    assert_eq!(
+        store.root(root_id).unwrap().current(),
+        render.finished_work()
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_commit_host_component_text_mutation_execution_gate_allows_empty_noop_commit() {
+    let (mut store, root_id, host) = root_store();
+    update_container(&mut store, root_id, RootElementHandle::from_raw(47), None).unwrap();
+    let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+    let commit = commit_finished_host_root(&mut store, render).unwrap();
+    let gate = commit.host_component_text_mutation_execution_gate();
+
+    assert_eq!(gate.root(), root_id);
+    assert_eq!(gate.finished_work(), render.finished_work());
+    assert_eq!(gate.mutation_apply_record_count(), 0);
+    assert_eq!(gate.host_component_record_count(), 0);
+    assert_eq!(gate.host_text_record_count(), 0);
+    assert_eq!(gate.placement_record_count(), 0);
+    assert_eq!(gate.update_record_count(), 0);
+    assert_eq!(gate.deletion_record_count(), 0);
+    assert_eq!(gate.blocked_record_count(), 0);
+    assert_eq!(
+        gate.status(),
+        HostRootHostMutationExecutionGateStatus::NoHostMutations
+    );
+    assert_eq!(gate.status_name(), "no-host-mutations");
+    assert!(!gate.host_mutation_execution_blocked());
+    assert!(!gate.requires_production_complete_work_promotion());
+    assert!(!gate.requires_production_host_mutation_apply());
+    assert!(!gate.production_complete_work_promoted());
+    assert!(!gate.production_host_mutation_apply_promoted());
+    assert!(!gate.public_dom_compatibility_claimed());
+    assert!(!gate.test_renderer_compatibility_claimed());
+    assert!(gate.blockers_intact());
+    assert_eq!(
+        store.root(root_id).unwrap().current(),
+        render.finished_work()
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
 #[test]
 fn root_commit_records_function_component_single_host_child_placement_as_container_append() {
     let (mut store, root_id, host) = root_store();
