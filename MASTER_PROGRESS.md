@@ -29,6 +29,24 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1289 React DOM Root Object Prototype Blocker
+
+- Worker 1289 hardened the public `createRoot` returned root object against
+  inherited `Object.prototype` public/native/package/compatibility aliases by
+  constructing the facade root with a null prototype while keeping only own
+  `render` and `unmount` methods.
+- Hostile coverage includes non-enumerable inherited root compatibility aliases,
+  a getter-backed public event compatibility alias without getter invocation,
+  and snake/dash aliases. Minimal root shape, frozen descriptors, method
+  lengths, symbol behavior, and narrow fake-DOM lifecycle remain preserved.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed the React DOM client symbol facade gate (6/6), public facade blocked
+  gate (47/47), root public facade conformance with zero failures, root render
+  E2E conformance with zero failures, React DOM workspace check (238/238),
+  package-surface guard, import smoke, and `git diff --check`.
+- The accepted state is main `d0477bc3` after Worker 1289 merge `d0477bc3`,
+  worker commit `cb226155`, and this orchestration-state update.
+
 ### Worker 1288 Hook Dispatcher Singleton Metadata
 
 - Worker 1288 hardened private state, callback, memo, and effect hook dispatcher

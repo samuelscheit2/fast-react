@@ -61,7 +61,7 @@ the pre-audit Worker 1215 full-hash typo.
 Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
-  1269, 1270, 1271, 1272, 1277 through 1280, 1286, and 1288
+  1269, 1270, 1271, 1272, 1277 through 1280, 1286, 1288, and 1289
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
@@ -76,14 +76,13 @@ Current orchestration queue:
 - Worker 1287 is repair-active for native cleanup-hook exact evidence-set
   counting after source audit found the Rust/N-API cleanup path still accepted
   only root/value evidence.
-- Worker 1289 is auditing for React DOM root object prototype blockers.
 - Worker 1290 is active for react-test-renderer create-routing source-proof
   hardening.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `d08b0b08`,
+implementation/evidence baseline main `d0477bc3`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 30,464 lines

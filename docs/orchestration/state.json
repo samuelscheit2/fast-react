@@ -378,7 +378,7 @@
 		{
 			"id": 1289,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "React DOM root object prototype blocker",
 			"agent": "worker_1289_react_dom_root_object_prototype_blocker",
 			"branch": "worker/1289-react-dom-root-object-prototype-blocker",
