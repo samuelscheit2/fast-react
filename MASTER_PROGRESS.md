@@ -29,6 +29,33 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1253 and 1257 Acceptance Batch
+
+- Worker 1253 aligned direct `React.Children` key coercion with React 19.2.6
+  default-hint behavior by using `'' + key` for object keys instead of
+  `String(key)`. Oracle coverage now includes portal-shaped object keys,
+  callback-returned fake valid elements, same-key mapped element paths without
+  extra mapped-key coercion, and symbol-key throw/warning behavior across
+  development and production modes while package compatibility remains
+  unclaimed.
+- Worker 1253 extended the private Children traversal currentness evidence with
+  source-owned object-key default-coercion rows and hostile stale/fake/source
+  smuggling coverage. DOM, test-renderer, Rust, package exports, and public
+  Children package compatibility were not broadened.
+- Worker 1257 hardened the conformance discovery harness so covered wrapper
+  tests follow relative static re-export edges as well as imports. The scanner
+  now covers `export * from "./gate.mjs"` and named `export ... from` edges
+  while preserving comment/string/template false-positive rejection,
+  non-relative edge rejection, sidecar/fixture filtering, and cycle safety.
+- Accepted validation includes independent source and verification audits for
+  both workers. Root reruns passed Children oracle generation idempotence,
+  Children oracle tests (14/14), Children currentness tests (6/6), conformance
+  discovery tests (17/17), `npm run check --workspace @fast-react/react`,
+  package-surface guard, import smoke, and `git diff --check`.
+- The accepted state is main `4787fc06` after Worker 1257 merge `1cbe026f`,
+  Worker 1253 merge `4787fc06`, worker commits `491933b4` and `ed7d1932`, and
+  orchestration-state commit `0b907ac7`.
+
 ### Workers 1246, 1247, 1250, 1251, and 1252 Acceptance Batch
 
 - Worker 1246 hardened the react-test-renderer serialization local gate so the

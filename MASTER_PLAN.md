@@ -48,8 +48,8 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted implementation head before this
-docs pass is main `cd641e3f` (`Repair integrated test renderer create preflight
-fixture`). Accepted implementation, cleanup, planning, and docs-only history
+docs pass is main `4787fc06` (`Merge worker 1253 React Children key
+coercion`). Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
@@ -60,15 +60,19 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- No worker tasks are currently recorded in `docs/orchestration/state.json`.
-- Workers 1246, 1247, 1250, 1251, and 1252 have been reviewed, repaired where
-  needed, merged, and recorded as accepted history.
-- Next workers should be seeded from the candidate lanes below or from a fresh
-  scout pass, with `docs/orchestration/state.json` updated when tasks become
-  live.
+- Workers 1253 and 1257 have been reviewed, merged, and recorded as accepted
+  history.
+- Worker 1254 is under repair after source audit found extra-property smuggling
+  in the private `startTransition` currentness validator.
+- Workers 1258, 1259, 1260, 1261, and 1262 are active in separate worktrees for
+  Scheduler same-lane rejection canaries, native prototype-row rejection,
+  queued minimal HostRoot cleanup currentness, React DOM inherited-prop
+  fail-closed guards, and test-renderer cross-entrypoint currentness.
+- Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
+  findings seeded Workers 1258 and 1259.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `cd641e3f`,
+implementation/evidence baseline main `4787fc06`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 30,464 lines
@@ -92,7 +96,7 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `cd641e3f` remains narrow.
+Accepted compatibility evidence through current main `4787fc06` remains narrow.
 The only public React DOM root behavior
 accepted so far is the fake-DOM div/text `createRoot().render(...)` lifecycle:
 initial render, same-root div/text/id update, id removal, `render(null)` cleanup,
@@ -122,15 +126,16 @@ placeholder package, exact placeholder package-root/JS/CJS/shallow currentness,
 private package-root create bridge admission guards requiring source-owned
 root-create preflight evidence, private/test-only sync-flush placement
 committed-fiber inspection, and private queued minimal HostRoot update evidence
-with update-then-cleanup fail-closed coverage while public test-renderer
-behavior remains blocked.
+with update-then-cleanup fail-closed coverage, direct React Children object-key
+default-hint coercion parity, and conformance discovery static re-export
+coverage while public test-renderer behavior remains blocked.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
 renderer/root/Scheduler execution, `react-dom/test-utils.act`, `flushSync`,
 Scheduler timing,
 test-renderer public behavior, resources/forms, public input/change or
-controlled-input behavior, serialization, React Children traversal parity,
+controlled-input behavior, serialization, broad React Children traversal parity,
 unsupported hook behavior, broad hook/useRef/context compatibility, public
 `react-dom/test-utils.act` callback/thenable behavior, public `flushSync`
 callback/thenable/root/Scheduler behavior, package compatibility, and broad
@@ -142,7 +147,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `cd641e3f` as
+1. Treat accepted compatibility evidence through current main `4787fc06` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, and the narrow fake-DOM public div/text
    plus nested fake-DOM lifecycle evidence described above, including
@@ -151,8 +156,9 @@ canonical evidence requirements.
    metadata and admission ledgers, React DOM private denylist parity, React
    Children freeze/proxy currentness hardening, exact-two/exact-three private
    same-transition currentness, sync-flush placement and committed-fiber
-   inspection, queued minimal HostRoot private update evidence, passive destroy
-   evidence, scheduler root currentness completeness, scheduler local
+   inspection, queued minimal HostRoot private update evidence, direct Children
+   object-key default coercion parity, conformance discovery re-export coverage,
+   passive destroy evidence, scheduler root currentness completeness, scheduler local
    row/evidence source validation, test-renderer placeholder currentness, and
    test-renderer private create/serialization gates are blockers and currentness
    evidence only; they do not open broader public root, native, browser DOM,
