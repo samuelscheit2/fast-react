@@ -521,6 +521,25 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
       code: codes.publicNativeExecutionClaim
     },
     {
+      id: 'root-work-loop-metadata-prototype-normalized-public-claim-alias',
+      row: sourceCurrentnessPrototypeClaimRow(canonicalCommit, {
+        public_native_execution: true
+      }),
+      code: codes.publicNativeExecutionClaim
+    },
+    {
+      id: 'root-work-loop-metadata-own-normalized-public-claim-alias',
+      row: sourceCurrentnessExtraPropertyRow(
+        canonicalCommit,
+        'public_native_execution',
+        {
+          value: true,
+          enumerable: true
+        }
+      ),
+      code: codes.publicNativeExecutionClaim
+    },
+    {
       id: 'root-work-loop-metadata-prototype-package-claim-alias',
       row: sourceCurrentnessPrototypeClaimRow(canonicalCommit, {
         packageExportsChanged: true
@@ -528,10 +547,36 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
       code: codes.packageExportClaim
     },
     {
+      id: 'root-work-loop-metadata-non-enumerable-normalized-package-accessor-claim',
+      row: sourceCurrentnessExtraPropertyRow(
+        canonicalCommit,
+        'package-exports-changed',
+        {
+          get() {
+            throw new Error('package export claim getter must not run');
+          },
+          enumerable: false
+        }
+      ),
+      code: codes.packageExportClaim
+    },
+    {
       id: 'root-work-loop-metadata-accessor-native-addon-claim',
       row: sourceCurrentnessAccessorClaimRow(
         canonicalCommit,
         'nativeAddonLoadAttempted'
+      ),
+      code: codes.nativeAddonLoadClaim
+    },
+    {
+      id: 'root-work-loop-metadata-symbol-native-addon-load-claim',
+      row: sourceCurrentnessExtraPropertyRow(
+        canonicalCommit,
+        Symbol.for('nativeAddonLoadAttempted'),
+        {
+          value: true,
+          enumerable: true
+        }
       ),
       code: codes.nativeAddonLoadClaim
     }
@@ -588,6 +633,18 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
         }
       ),
       extraSymbol: Symbol.for('packageExportsChanged')
+    },
+    {
+      id: 'root-work-loop-metadata-normalized-package-export-null',
+      row: sourceCurrentnessExtraPropertyRow(
+        canonicalCommit,
+        'package-exports-changed',
+        {
+          value: null,
+          enumerable: true
+        }
+      ),
+      extraKey: 'package-exports-changed'
     }
   ];
 
@@ -940,6 +997,74 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     );
     assertNoNativeLedgerExecution(result, diagnosticCase.field);
     assertNoNativeLedgerExecution(claimRow, diagnosticCase.field);
+  }
+
+  const fullCanonicalAliasClaimCases = [
+    {
+      id: 'public_native_execution',
+      rowFor: (row) =>
+        sourceCurrentnessExtraPropertyRow(row, 'public_native_execution', {
+          value: true,
+          enumerable: true
+        }),
+      code: codes.publicNativeExecutionClaim
+    },
+    {
+      id: 'Symbol.for(nativeAddonLoadAttempted)',
+      rowFor: (row) =>
+        sourceCurrentnessExtraPropertyRow(
+          row,
+          Symbol.for('nativeAddonLoadAttempted'),
+          {
+            value: true,
+            enumerable: true
+          }
+        ),
+      code: codes.nativeAddonLoadClaim
+    },
+    {
+      id: 'package-exports-changed',
+      rowFor: (row) =>
+        sourceCurrentnessExtraPropertyRow(row, 'package-exports-changed', {
+          get() {
+            throw new Error('package export claim getter must not run');
+          },
+          enumerable: false
+        }),
+      code: codes.packageExportClaim
+    }
+  ];
+
+  for (const diagnosticCase of fullCanonicalAliasClaimCases) {
+    const result = validateSourceCurrentnessRows(
+      ledger.rows.map((row) =>
+        row.id === canonicalCommit.id ? diagnosticCase.rowFor(row) : row
+      )
+    );
+    const claimRow = result.rows.find(
+      (row) => row.id === canonicalCommit.id
+    );
+
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(
+      result.rejectedEvidenceCount,
+      ledger.rows.length,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.rows.some((row) => row.status === ledger.acceptedStatus),
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(claimRow.status, ledger.rejectedStatus, diagnosticCase.id);
+    assert.equal(claimRow.code, diagnosticCase.code, diagnosticCase.id);
+    assertNoNativeLedgerExecution(result, diagnosticCase.id);
+    assertNoNativeLedgerExecution(claimRow, diagnosticCase.id);
   }
 
   const fullCanonicalKnownFieldCases = [
