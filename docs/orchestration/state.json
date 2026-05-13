@@ -342,29 +342,38 @@
 		{
 			"id": 1286,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Same-lane transition nested handoff metadata drift canaries",
 			"agent": "worker_1286_scheduler_nested_handoff_drift",
 			"branch": "worker/1286-scheduler-nested-handoff-drift",
-			"audits": []
+			"audits": [
+				"audit_1286_source_contract",
+				"audit_1286_verification"
+			]
 		},
 		{
 			"id": 1287,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Native cleanup-hook preflight exact evidence-set counting",
 			"agent": "worker_1287_native_cleanup_hook_exact_set",
 			"branch": "worker/1287-native-cleanup-hook-exact-set",
-			"audits": []
+			"audits": [
+				"audit_1287_source_contract",
+				"audit_1287_verification"
+			]
 		},
 		{
 			"id": 1288,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Hook dispatcher singleton metadata hardening",
 			"agent": "worker_1288_hook_dispatcher_singleton_metadata",
 			"branch": "worker/1288-hook-dispatcher-singleton-metadata",
-			"audits": []
+			"audits": [
+				"audit_1288_source_contract",
+				"audit_1288_verification"
+			]
 		},
 		{
 			"id": 1289,
