@@ -647,6 +647,68 @@ fn root_work_loop_queued_minimal_host_root_rejects_missing_previous_root_child_b
 }
 
 #[test]
+fn root_work_loop_queued_minimal_host_root_rejects_live_extra_root_child_before_enqueue() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut source = TestHostTree::new();
+    let element = source.insert_host_element_with_text("section", "extra live child");
+    let mounted = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        element,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        None,
+        QUEUED_MINIMAL_SOURCE_ORDER + 145,
+        QUEUED_MINIMAL_COMMIT_ORDER + 145,
+    )
+    .unwrap();
+    let current = store.root(root_id).unwrap().current();
+    let current_child = mounted.host_work().root_child().unwrap();
+    let previous = mounted.into_host_work();
+    let extra_child = create_unattached_host_component_fiber(&mut store, 145);
+    store
+        .fiber_arena_mut()
+        .set_children(current, &[current_child, extra_child])
+        .unwrap();
+    let snapshot = queued_minimal_host_root_snapshot(&store, &host, root_id);
+    assert_eq!(snapshot.current_child, Some(current_child));
+    assert_eq!(snapshot.current_children, vec![current_child, extra_child]);
+    assert_eq!(snapshot.finished_work, None);
+    assert_eq!(snapshot.finished_lanes, Lanes::NO);
+    assert_eq!(snapshot.pending_lanes, Lanes::NO);
+    assert_eq!(snapshot.render_phase_work, None);
+    assert_eq!(snapshot.element, element);
+
+    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        RootElementHandle::NONE,
+        QueuedMinimalHostRootUpdatePriority::Sync,
+        Lanes::SYNC,
+        &source,
+        Some(previous),
+        QUEUED_MINIMAL_SOURCE_ORDER + 146,
+        QUEUED_MINIMAL_COMMIT_ORDER + 146,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        QueuedMinimalHostRootCommitError::PreviousHostWorkRootChildMismatch {
+            root: root_id,
+            expected_root_child: Some(current_child),
+            actual_root_child: Some(current_child),
+            expected_root_children: vec![current_child, extra_child],
+            actual_root_children: vec![current_child],
+        }
+    );
+    assert_queued_minimal_host_root_snapshot(&store, &host, root_id, snapshot);
+}
+
+#[test]
 fn root_work_loop_queued_minimal_host_root_rejects_extra_completed_child_before_enqueue() {
     let (mut store, root_id, mut host) = root_store();
     let mut source = TestHostTree::new();
@@ -840,6 +902,7 @@ fn root_work_loop_queued_minimal_host_root_rejects_replayed_finished_work_handof
 struct QueuedMinimalHostRootSnapshot {
     current: FiberId,
     current_child: Option<FiberId>,
+    current_children: Vec<FiberId>,
     fiber_count: usize,
     finished_work: Option<FiberId>,
     finished_lanes: Lanes,
@@ -859,6 +922,7 @@ fn queued_minimal_host_root_snapshot(
     QueuedMinimalHostRootSnapshot {
         current,
         current_child: store.fiber_arena().get(current).unwrap().child(),
+        current_children: store.fiber_arena().child_ids(current).unwrap(),
         fiber_count: store.fiber_arena().len(),
         finished_work: root.finished_work(),
         finished_lanes: root.finished_lanes(),
