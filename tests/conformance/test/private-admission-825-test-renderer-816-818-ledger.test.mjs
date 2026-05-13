@@ -41,6 +41,8 @@ const bridgeLedgerSource =
   "tests/conformance/src/private-admission-733-736-bridge-ledger.mjs";
 const testRendererConstantsRustSource =
   "crates/fast-react-test-renderer/src/diagnostics/constants.rs";
+const testRendererHostNodeCleanupRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/host_node_cleanup.rs";
 const sourceTokenPolicy =
   "source-owned-identifiers-statuses-functions-fields-and-constants";
 
@@ -431,6 +433,87 @@ test("private admission 825 ledger rejects Worker 818 JS evidence tokens left on
   });
 });
 
+test("private admission 825 ledger rejects Worker 818 JS evidence tokens left only in template interpolation comments", () => {
+  const token = "bridge-rust-source-identifier-missing";
+  const sourceLine = `    "${token}",`;
+  const templateLine =
+    "      .map(([claimId]) => `${row.workerId}.${claimId}`)";
+
+  assertCommentOnlyTokenRejected({
+    edits: [
+      {
+        evidencePath: bridgeLedgerSource,
+        find: sourceLine,
+        replace: `    "bridge-rust-source-identifier-stale",`
+      },
+      {
+        evidencePath: bridgeLedgerSource,
+        find: templateLine,
+        replace: `      .map(([claimId]) => \`\${row.workerId /* ${token} */}.\${claimId}\`)`
+      }
+    ],
+    workerId: worker818,
+    evidenceId: "worker-818-bridge-row-contract-and-evaluator",
+    token
+  });
+
+  assertCommentOnlyTokenRejected({
+    edits: [
+      {
+        evidencePath: bridgeLedgerSource,
+        find: sourceLine,
+        replace: `    "bridge-rust-source-identifier-stale",`
+      },
+      {
+        evidencePath: bridgeLedgerSource,
+        find: templateLine,
+        replace: `      .map(([claimId]) => \`\${row.workerId // ${token}\n}.\${claimId}\`)`
+      }
+    ],
+    workerId: worker818,
+    evidenceId: "worker-818-bridge-row-contract-and-evaluator",
+    token
+  });
+});
+
+test("private admission 825 ledger rejects delegated 733-736 Rust evidence tokens left only in comments", () => {
+  const token = "cleanup_handoff_id: &'static str";
+  const workspace = createWorkspaceWithMutatedEvidenceFile({
+    evidencePath: testRendererHostNodeCleanupRustSource,
+    find: `${token},`,
+    replace: `cleanup_route_handoff_id: &'static str, // ${token}`
+  });
+
+  try {
+    const ledger = evaluatePrivateAdmission825TestRenderer816818Ledger({
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      ledger.status,
+      PRIVATE_ADMISSION_825_LEDGER_VIOLATION_STATUS
+    );
+    assert.equal(ledger.privateAdmissionRecognized, false);
+    assert.equal(ledger.bridgeLedgerContextRecognized, false);
+    assert.notEqual(
+      ledger.bridgeLedger.status,
+      PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_STATUS
+    );
+    assertViolationIds(ledger, [
+      "private-admission-825-bridge-ledger-not-recognized"
+    ]);
+    const bridgeViolation = ledger.violations.find(
+      (violation) =>
+        violation.id === "private-admission-825-bridge-ledger-not-recognized"
+    );
+    assert.deepEqual(bridgeViolation.rows[0].bridgeViolationIds, [
+      "bridge-rust-source-identifier-missing"
+    ]);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
 test("private admission 825 ledger rejects public, native, package, root, act, scheduler, broad multichild, and compatibility claims", () => {
   const ledger = evaluatePrivateAdmission825TestRenderer816818Ledger({
     compatibilityClaimed: true,
@@ -589,6 +672,7 @@ function assertEvidenceRecognized(ledger, workerId, evidenceId, expected) {
 
 function assertCommentOnlyTokenRejected({
   evidencePath,
+  edits,
   find,
   replace,
   workerId,
@@ -597,6 +681,7 @@ function assertCommentOnlyTokenRejected({
 }) {
   const workspace = createWorkspaceWithMutatedEvidenceFile({
     evidencePath,
+    edits,
     find,
     replace
   });
@@ -674,8 +759,21 @@ function rowContract(row) {
   };
 }
 
-function createWorkspaceWithMutatedEvidenceFile({ evidencePath, find, replace }) {
+function createWorkspaceWithMutatedEvidenceFile({
+  evidencePath,
+  edits,
+  find,
+  replace
+}) {
   const root = mkdtempSync(join(tmpdir(), "private-admission-825-"));
+  const mutations =
+    edits ?? [
+      {
+        evidencePath,
+        find,
+        replace
+      }
+    ];
   const evidencePaths = new Set([
     ...PRIVATE_ADMISSION_825_ROWS.flatMap((row) =>
       row.evidence.map((evidenceRow) => evidenceRow.path)
@@ -696,8 +794,10 @@ function createWorkspaceWithMutatedEvidenceFile({ evidencePath, find, replace })
     const targetPath = join(root, path);
     mkdirSync(dirname(targetPath), { recursive: true });
     let text = readFileSync(sourcePath, "utf8");
-    if (path === evidencePath) {
-      text = replaceFirst(text, find, replace);
+    for (const mutation of mutations) {
+      if (path === mutation.evidencePath) {
+        text = replaceFirst(text, mutation.find, mutation.replace);
+      }
     }
     writeFileSync(targetPath, text);
   }

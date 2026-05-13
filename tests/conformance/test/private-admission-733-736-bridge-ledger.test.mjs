@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import {
-  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -10,6 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   PRIVATE_ADMISSION_733_736_BRIDGE_BLOCKED_ADMISSION_CLAIMS,
@@ -34,7 +34,10 @@ import {
 const worker733 = "worker-733-test-renderer-unmount-finished-work-identity";
 const worker736 = "worker-736-nested-tojson-source-report-identity";
 const expectedWorkers = [worker733, worker736];
+const workspaceRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const testRendererRustSource = "crates/fast-react-test-renderer/src/lib.rs";
+const testRendererHostNodeCleanupRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/host_node_cleanup.rs";
 const rustIdentifierTokenPolicy =
   "rust-source-identifiers-statuses-function-and-field-names";
 
@@ -257,7 +260,7 @@ test("private admission 733-736 bridge ledger rejects row contract tampering", (
 
 test("private admission 733-736 bridge ledger rejects corrupted Worker 733 cleanup handoff metadata", () => {
   const workspace = createWorkspaceWithMutatedEvidenceFile({
-    evidencePath: testRendererRustSource,
+    evidencePath: testRendererHostNodeCleanupRustSource,
     find: "cleanup_handoff_id: &'static str,",
     replace: "cleanup_route_handoff_id: &'static str,"
   });
@@ -286,6 +289,43 @@ test("private admission 733-736 bridge ledger rejects corrupted Worker 733 clean
       true
     );
     assertViolationIds(ledger, ["bridge-rust-source-identifier-missing"]);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("private admission 733-736 bridge ledger rejects Rust evidence tokens left only in comments", () => {
+  const token = "cleanup_handoff_id: &'static str";
+  const workspace = createWorkspaceWithMutatedEvidenceFile({
+    evidencePath: testRendererHostNodeCleanupRustSource,
+    find: `${token},`,
+    replace: `cleanup_route_handoff_id: &'static str, // ${token}`
+  });
+
+  try {
+    const ledger = evaluatePrivateAdmission733736BridgeLedger({
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      ledger.status,
+      PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_VIOLATION_STATUS
+    );
+    assert.equal(ledger.privateBridgePrerequisitesRecognized, false);
+    assert.equal(ledger.rustEvidenceRecognized, false);
+    assertEvidenceRecognized(
+      ledger,
+      worker733,
+      "worker-733-unmount-native-admission-struct",
+      false
+    );
+    assertViolationIds(ledger, ["bridge-rust-source-identifier-missing"]);
+    assertMissingBridgeEvidenceToken(
+      ledger,
+      worker733,
+      "worker-733-unmount-native-admission-struct",
+      token
+    );
   } finally {
     workspace.cleanup();
   }
@@ -453,9 +493,20 @@ function assertEvidenceRecognized(ledger, workerId, evidenceId, expected) {
   assert.equal(evidenceRow.recognized, expected, evidenceId);
 }
 
+function assertMissingBridgeEvidenceToken(ledger, workerId, evidenceId, token) {
+  const violation = ledger.violations.find(
+    (row) => row.id === "bridge-rust-source-identifier-missing"
+  );
+  assert.notEqual(violation, undefined);
+  const evidenceViolation = violation.rows.find(
+    (row) => row.workerId === workerId && row.evidenceId === evidenceId
+  );
+  assert.notEqual(evidenceViolation, undefined, evidenceId);
+  assert.equal(evidenceViolation.missingTokens.includes(token), true, token);
+}
+
 function createWorkspaceWithMutatedEvidenceFile({ evidencePath, find, replace }) {
   const root = mkdtempSync(join(tmpdir(), "private-admission-733-736-bridge-"));
-  const workspaceRoot = findWorkspaceRoot();
   const evidencePaths = new Set(
     PRIVATE_ADMISSION_733_736_BRIDGE_ROWS.flatMap((row) => row.evidence).map(
       (evidenceRow) => evidenceRow.path
@@ -479,19 +530,6 @@ function createWorkspaceWithMutatedEvidenceFile({ evidencePath, find, replace })
       rmSync(root, { recursive: true, force: true });
     }
   };
-}
-
-function findWorkspaceRoot() {
-  let current = process.cwd();
-  while (true) {
-    if (existsSync(join(current, "WORKER_BRIEF.md"))) {
-      return current;
-    }
-
-    const parent = dirname(current);
-    assert.notEqual(parent, current, "workspace root not found");
-    current = parent;
-  }
 }
 
 function replaceFirst(text, find, replace) {

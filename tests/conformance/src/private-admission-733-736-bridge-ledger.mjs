@@ -13,6 +13,18 @@ const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
 );
 
 const testRendererRustSource = "crates/fast-react-test-renderer/src/lib.rs";
+const testRendererConstantsRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/constants.rs";
+const testRendererFixturesRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/fixtures.rs";
+const testRendererHostNodeCleanupRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/host_node_cleanup.rs";
+const testRendererJsonDiagnosticsRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/json.rs";
+const testRendererSerializationExecutionRustSource =
+  "crates/fast-react-test-renderer/src/root_impl/serialization_execution.rs";
+const testRendererUpdateRouteRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/update_route.rs";
 const reconcilerInspectionRustSource =
   "crates/fast-react-reconciler/src/private_fiber_inspection.rs";
 const rustIdentifierTokenPolicy =
@@ -162,7 +174,7 @@ const rowData733736 = freezeArray([
     evidenceRows: [
       evidenceData({
         evidenceId: "worker-733-unmount-native-admission-struct",
-        path: testRendererRustSource,
+        path: testRendererHostNodeCleanupRustSource,
         sliceStart: "pub struct TestRendererUnmountNativeBridgeAdmission",
         sliceEnd: "pub struct TestRendererUnmountNativeBridgeCleanupHandoff",
         tokens: [
@@ -187,7 +199,7 @@ const rowData733736 = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-733-unmount-native-status-constants",
-        path: testRendererRustSource,
+        path: testRendererConstantsRustSource,
         sliceStart: "pub const TEST_RENDERER_SERIALIZATION_CANARY_GATE_NAME",
         sliceEnd: "pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME",
         tokens: [
@@ -207,7 +219,7 @@ const rowData733736 = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-733-unmount-native-record-validators",
-        path: testRendererRustSource,
+        path: testRendererSerializationExecutionRustSource,
         sliceStart:
           "fn validate_private_to_json_unmount_native_execution_record_for_canary",
         sliceEnd: "fn private_to_tree_native_execution_record_error<T>",
@@ -226,7 +238,7 @@ const rowData733736 = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-733-unmount-handoff-matches-identity",
-        path: testRendererRustSource,
+        path: testRendererSerializationExecutionRustSource,
         sliceStart:
           "fn validate_private_unmount_native_execution_matches_handoff_for_canary",
         sliceEnd: "fn validate_private_to_json_create_native_execution_record_for_canary",
@@ -248,7 +260,7 @@ const rowData733736 = freezeArray([
         path: testRendererRustSource,
         sliceStart:
           "fn describe_private_unmount_serialization_finished_work_identity_gate_for_canary",
-        sliceEnd: "fn private_test_instance_native_query_execution_evidence_from_reports",
+        sliceEnd: "const fn instance_state_node_raw",
         tokens: [
           "fn describe_private_unmount_serialization_finished_work_identity_gate_for_canary",
           "self.validate_private_unmount_native_bridge_handoff_for_canary(scheduled_update, handoff)?;",
@@ -276,7 +288,7 @@ const rowData733736 = freezeArray([
     evidenceRows: [
       evidenceData({
         evidenceId: "worker-736-update-route-admission-record",
-        path: testRendererRustSource,
+        path: testRendererUpdateRouteRustSource,
         sliceStart: "pub struct TestRendererPrivateUpdateRouteAdmissionRecord",
         sliceEnd: "pub struct TestRendererPrivateUpdateRouteDiagnostics",
         tokens: [
@@ -298,9 +310,9 @@ const rowData733736 = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-736-nested-report-struct",
-        path: testRendererRustSource,
+        path: testRendererJsonDiagnosticsRustSource,
         sliceStart: "pub struct TestRendererPrivateJsonSerializationReport",
-        sliceEnd: "pub enum TestRendererPrivateTreeNodeType",
+        sliceEnd: null,
         tokens: [
           "pub struct TestRendererPrivateJsonSerializationReport",
           "gate: TestRendererSerializationGateReport",
@@ -317,9 +329,9 @@ const rowData733736 = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-736-nested-current-fibers-variant",
-        path: testRendererRustSource,
+        path: testRendererFixturesRustSource,
         sliceStart: "enum TestRendererPrivateJsonCurrentFibersForCanary",
-        sliceEnd: "pub enum TestRendererHostNodeCleanupTarget",
+        sliceEnd: null,
         tokens: [
           "enum TestRendererPrivateJsonCurrentFibersForCanary",
           "Nested {",
@@ -982,14 +994,20 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
           sliceEnd: evidenceRow.sliceEnd
         })
       : fileText;
+  const commentFreeSourceText =
+    sourceText.ok === true
+      ? stripPrivateAdmissionSourceComments(sourceText.value, evidenceRow.path)
+      : "";
   const missingTokens =
     sourceText.ok === true
-      ? evidenceRow.tokens.filter((token) => !sourceText.value.includes(token))
+      ? evidenceRow.tokens.filter(
+          (token) => !commentFreeSourceText.includes(token)
+        )
       : evidenceRow.tokens;
   const forbiddenTokensPresent =
     sourceText.ok === true
       ? evidenceRow.forbiddenTokens.filter((token) =>
-          sourceText.value.includes(token)
+          commentFreeSourceText.includes(token)
         )
       : [];
 
@@ -1031,6 +1049,237 @@ function extractEvidenceSourceSlice({ text, sliceStart, sliceEnd }) {
   }
 
   return freezeRecord({ ok: true, value: text.slice(startIndex, endIndex) });
+}
+
+export function stripPrivateAdmissionSourceComments(text, path) {
+  const rustSource = path.endsWith(".rs");
+  const javascriptSource = /\.(?:cjs|js|mjs)$/.test(path);
+  const output = [];
+  let index = 0;
+
+  while (index < text.length) {
+    const rawStringEnd = rustSource
+      ? findRustRawStringEnd(text, index)
+      : -1;
+    if (rawStringEnd >= 0) {
+      output.push(text.slice(index, rawStringEnd));
+      index = rawStringEnd;
+      continue;
+    }
+
+    const character = text[index];
+    const nextCharacter = text[index + 1];
+
+    if (character === `"` && rustSource) {
+      const stringEnd = findQuotedStringEnd(text, index, character);
+      output.push(text.slice(index, stringEnd));
+      index = stringEnd;
+      continue;
+    }
+
+    if (javascriptSource && (character === `"` || character === "'")) {
+      const stringEnd = findQuotedStringEnd(text, index, character);
+      output.push(text.slice(index, stringEnd));
+      index = stringEnd;
+      continue;
+    }
+
+    if (javascriptSource && character === "`") {
+      index = copyTemplateLiteralWithoutCommentedInterpolations(
+        text,
+        index,
+        output
+      );
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "/") {
+      index = skipLineComment(text, index, output);
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "*") {
+      index = skipBlockComment(text, index, output, rustSource);
+      continue;
+    }
+
+    output.push(character);
+    index += 1;
+  }
+
+  return output.join("");
+}
+
+function copyTemplateLiteralWithoutCommentedInterpolations(
+  text,
+  index,
+  output
+) {
+  output.push("`");
+  let cursor = index + 1;
+
+  while (cursor < text.length) {
+    const character = text[cursor];
+    const nextCharacter = text[cursor + 1];
+
+    if (character === "\\") {
+      output.push(text.slice(cursor, cursor + 2));
+      cursor += 2;
+      continue;
+    }
+
+    if (character === "`") {
+      output.push(character);
+      return cursor + 1;
+    }
+
+    if (character === "$" && nextCharacter === "{") {
+      output.push("${");
+      cursor = copyTemplateInterpolationWithoutComments(
+        text,
+        cursor + 2,
+        output
+      );
+      continue;
+    }
+
+    output.push(character);
+    cursor += 1;
+  }
+
+  return text.length;
+}
+
+function copyTemplateInterpolationWithoutComments(text, index, output) {
+  let cursor = index;
+  let braceDepth = 1;
+
+  while (cursor < text.length && braceDepth > 0) {
+    const character = text[cursor];
+    const nextCharacter = text[cursor + 1];
+
+    if (character === `"` || character === "'") {
+      const stringEnd = findQuotedStringEnd(text, cursor, character);
+      output.push(text.slice(cursor, stringEnd));
+      cursor = stringEnd;
+      continue;
+    }
+
+    if (character === "`") {
+      cursor = copyTemplateLiteralWithoutCommentedInterpolations(
+        text,
+        cursor,
+        output
+      );
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "/") {
+      cursor = skipLineComment(text, cursor, output);
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "*") {
+      cursor = skipBlockComment(text, cursor, output, false);
+      continue;
+    }
+
+    if (character === "{") {
+      braceDepth += 1;
+      output.push(character);
+      cursor += 1;
+      continue;
+    }
+
+    if (character === "}") {
+      braceDepth -= 1;
+      output.push(character);
+      cursor += 1;
+      if (braceDepth === 0) {
+        return cursor;
+      }
+      continue;
+    }
+
+    output.push(character);
+    cursor += 1;
+  }
+
+  return cursor;
+}
+
+function findRustRawStringEnd(text, index) {
+  let rawPrefixIndex = index;
+  if (text[index] === "b" && text[index + 1] === "r") {
+    rawPrefixIndex += 1;
+  }
+  if (text[rawPrefixIndex] !== "r") {
+    return -1;
+  }
+
+  let cursor = rawPrefixIndex + 1;
+  while (text[cursor] === "#") {
+    cursor += 1;
+  }
+  if (text[cursor] !== `"`) {
+    return -1;
+  }
+
+  const terminator = `"` + "#".repeat(cursor - rawPrefixIndex - 1);
+  const endIndex = text.indexOf(terminator, cursor + 1);
+  return endIndex < 0 ? text.length : endIndex + terminator.length;
+}
+
+function findQuotedStringEnd(text, index, quote) {
+  let cursor = index + 1;
+  while (cursor < text.length) {
+    if (text[cursor] === "\\") {
+      cursor += 2;
+      continue;
+    }
+    cursor += 1;
+    if (text[cursor - 1] === quote) {
+      return cursor;
+    }
+  }
+  return text.length;
+}
+
+function skipLineComment(text, index, output) {
+  output.push(" ");
+  let cursor = index + 2;
+  while (cursor < text.length && text[cursor] !== "\n") {
+    cursor += 1;
+  }
+  if (cursor < text.length) {
+    output.push(text[cursor]);
+    cursor += 1;
+  }
+  return cursor;
+}
+
+function skipBlockComment(text, index, output, nested) {
+  output.push(" ");
+  let cursor = index + 2;
+  let depth = 1;
+  while (cursor < text.length && depth > 0) {
+    if (nested && text[cursor] === "/" && text[cursor + 1] === "*") {
+      depth += 1;
+      cursor += 2;
+      continue;
+    }
+    if (text[cursor] === "*" && text[cursor + 1] === "/") {
+      depth -= 1;
+      cursor += 2;
+      continue;
+    }
+    if (text[cursor] === "\n") {
+      output.push("\n");
+    }
+    cursor += 1;
+  }
+  output.push(" ");
+  return cursor;
 }
 
 function readWorkspaceFile({ fileCache, path, workspaceRoot }) {
