@@ -257,7 +257,8 @@ export const REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROWS = [
     id: "react-test-renderer-test-instance-private-fiber-diagnostic",
     area: "TestInstance",
     publicSurface: "create().root/find*/findBy*",
-    privatePrerequisite: "accepted committed-fiber inspection diagnostics"
+    privatePrerequisite:
+      "accepted CJS TestInstance query bridge preflight diagnostics"
   },
   {
     id: "react-test-renderer-act-scheduler-private-diagnostic",
@@ -731,6 +732,11 @@ const publicJsReactTestRendererEntrypointSourcePaths = freezeArray([
   "packages/react-test-renderer/cjs/react-test-renderer.production.js"
 ]);
 
+const publicJsReactTestRendererCjsEntrypointSourcePaths = freezeArray([
+  "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+  "packages/react-test-renderer/cjs/react-test-renderer.production.js"
+]);
+
 const publicJsReactTestRendererExactPlaceholderPackageRoot =
   "packages/react-test-renderer";
 
@@ -934,6 +940,136 @@ const createRoutingGateCreateFunctionSourceCalls = freezeArray([
   })
 ]);
 
+const privateTestInstanceQueryBridgePreflightGateSourceAssertions = freezeArray([
+  jsQuotedStringPropertyAssertion(
+    "id",
+    "react-test-renderer-private-test-instance-query-bridge-preflight-gate"
+  ),
+  jsSourcePropertyAssertion(
+    "diagnosticName",
+    "privateTestInstanceQueryBridgePreflightDiagnosticName"
+  ),
+  jsSourcePropertyAssertion(
+    "status",
+    "privateTestInstanceQueryBridgePreflightStatus"
+  ),
+  jsQuotedStringPropertyAssertion(
+    "publicSurface",
+    "create().root/ReactTestInstance.find*"
+  ),
+  jsQuotedStringPropertyAssertion(
+    "acceptedWorker",
+    "worker-515-test-renderer-live-query-bridge-preflight"
+  ),
+  jsQuotedStringPropertyAssertion("acceptedRustCrate", "fast-react-test-renderer"),
+  jsSourcePropertyAssertion(
+    "acceptedRustDiagnosticName",
+    "privateTestInstanceQueryBridgePreflightDiagnosticName"
+  ),
+  jsQuotedStringArrayPropertyIncludesAssertion("acceptedRustApis", [
+    "TestRendererRoot::describe_private_test_instance_query_bridge_preflight_for_canary",
+    "TestRendererRoot::describe_private_test_instance_query_bridge_preflight_after_update_for_canary",
+    "TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics"
+  ]),
+  jsQuotedStringArrayPropertyIncludesAssertion("acceptedRustTests", [
+    "root_private_test_instance_query_bridge_preflight_ties_find_all_and_find_by_records",
+    "root_private_test_instance_query_bridge_preflight_follows_update_records"
+  ]),
+  jsQuotedStringPropertyAssertion(
+    "bridgeSource",
+    "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery"
+  ),
+  jsSourcePropertyAssertion(
+    "wrapperRecordSymbol",
+    "privateTestInstanceWrapperRecordSymbol.description"
+  ),
+  jsSourcePropertyAssertion(
+    "sourceFindAllDiagnosticName",
+    "privateTestInstanceFindAllPredicateDiagnostics.diagnosticName"
+  ),
+  jsSourcePropertyAssertion(
+    "sourceFindByDiagnosticName",
+    "privateTestInstanceFindByQueryDiagnostics.diagnosticName"
+  ),
+  jsBooleanPropertyAssertion("consumesAcceptedRustFindAllDiagnostics", true),
+  jsBooleanPropertyAssertion("consumesAcceptedRustFindByDiagnostics", true),
+  jsBooleanPropertyAssertion("recordOnlyDiagnosticConsumption", true),
+  jsBooleanPropertyAssertion("publicRootAvailable", false),
+  jsBooleanPropertyAssertion("publicQueryMethodsAvailable", false),
+  jsBooleanPropertyAssertion("publicTestInstanceObjectAvailable", false),
+  jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+  jsBooleanPropertyAssertion("nativeExecution", false),
+  jsBooleanPropertyAssertion("rustExecutionFromJs", false),
+  jsBooleanPropertyAssertion("compatibilityClaimed", false)
+]);
+
+const privateTestInstanceQueryBridgePreflightRecordSourceAssertions =
+  freezeArray([
+    jsQuotedStringPropertyAssertion(
+      "id",
+      "react-test-renderer-private-test-instance-query-bridge-preflight"
+    ),
+    jsQuotedStringPropertyAssertion(
+      "kind",
+      "FastReactTestRendererPrivateTestInstanceQueryBridgePreflight"
+    ),
+    jsSourcePropertyAssertion(
+      "diagnosticName",
+      "privateTestInstanceQueryBridgePreflightDiagnosticName"
+    ),
+    jsSourcePropertyAssertion(
+      "status",
+      "privateTestInstanceQueryBridgePreflightStatus"
+    ),
+    jsSourcePropertyAssertion("gate", "privateTestInstanceQueryBridgePreflightGate"),
+    jsBooleanPropertyAssertion("privateRootLifecycleEvidenceAccepted", true),
+    jsQuotedStringPropertyAssertion(
+      "bridgeSource",
+      "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery"
+    ),
+    jsSourcePropertyAssertion(
+      "wrapperRecordSymbol",
+      "privateTestInstanceWrapperRecordSymbol.description"
+    ),
+    jsSourcePropertyAssertion(
+      "sourceFindAllDiagnosticName",
+      "normalizedFindAll.diagnosticName"
+    ),
+    jsSourcePropertyAssertion(
+      "sourceFindByDiagnosticName",
+      "normalizedFindBy.diagnosticName"
+    ),
+    jsBooleanPropertyAssertion("consumesAcceptedRustFindAllDiagnostics", true),
+    jsBooleanPropertyAssertion("consumesAcceptedRustFindByDiagnostics", true),
+    jsBooleanPropertyAssertion(
+      "consumesPrivateRootLifecycleExecutionEvidence",
+      true
+    ),
+    jsBooleanPropertyAssertion("recordOnlyDiagnosticConsumption", true),
+    jsBooleanPropertyAssertion("publicRootAvailable", false),
+    jsBooleanPropertyAssertion("publicQueryMethodsAvailable", false),
+    jsBooleanPropertyAssertion("publicTestInstanceObjectAvailable", false),
+    jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+    jsBooleanPropertyAssertion("nativeExecution", false),
+    jsBooleanPropertyAssertion("rustExecutionFromJs", false),
+    jsBooleanPropertyAssertion("compatibilityClaimed", false)
+  ]);
+
+const privateTestInstanceWrapperQueryBridgePreflightSourceAssertions =
+  freezeArray([
+    jsSourcePropertyAssertion("queryBridgePreflight", "queryBridgePreflight"),
+    jsSourcePropertyAssertion(
+      "acceptedRustFindAllDiagnostics",
+      "queryBridgePreflight.acceptedRustFindAllDiagnostics"
+    ),
+    jsSourcePropertyAssertion(
+      "acceptedRustFindByDiagnostics",
+      "queryBridgePreflight.acceptedRustFindByDiagnostics"
+    )
+  ]);
+
+const cjsTestInstanceQueryBridgePreflightSourceEvidenceCache = new Map();
+
 export function inspectReactTestRendererSerializationLocalTargets({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT
 } = {}) {
@@ -959,6 +1095,10 @@ export function inspectReactTestRendererSerializationLocalTargets({
     ).join("\n");
   const publicJsReactTestRendererEntrypointSources =
     publicJsReactTestRendererEntrypointSourcePaths.map((path) =>
+      readWorkspaceFile(workspaceRoot, path)
+    );
+  const publicJsReactTestRendererCjsEntrypointSources =
+    publicJsReactTestRendererCjsEntrypointSourcePaths.map((path) =>
       readWorkspaceFile(workspaceRoot, path)
     );
   const privateToJSONFinishedWorkIdentitySourceEvidencePresent =
@@ -2110,52 +2250,15 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bfindByPredicateExecution\s*:\s*false\b/u
     );
-  const privateTestInstanceQueryBridgePreflightPresent =
-    privateTestInstanceFindByQueryDiagnosticsPresent &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bprivateTestInstanceQueryBridgePreflightGate\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /fast-react-test-renderer\.testinstance\.query-bridge-preflight/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bFastReactTestRendererPrivateTestInstanceQueryBridgePreflight\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bTestRendererRoot::describe_private_test_instance_query_bridge_preflight_for_canary\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bworker-515-test-renderer-live-query-bridge-preflight\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bconsumeAcceptedRustTestInstanceQueryDiagnosticsForRequest\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bgetTestInstanceQueryBridgePreflightForRootRequest\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bconsumesAcceptedRustFindAllDiagnostics\s*:\s*true\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bconsumesAcceptedRustFindByDiagnostics\s*:\s*true\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\brecordOnlyDiagnosticConsumption\s*:\s*true\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\brustExecutionFromJs\s*:\s*false\b/u
+  const privateCjsTestInstanceQueryBridgePreflightPresent =
+    publicJsReactTestRendererFacadePresent &&
+    publicJsReactTestRendererCjsEntrypointSources.length ===
+      publicJsReactTestRendererCjsEntrypointSourcePaths.length &&
+    publicJsReactTestRendererCjsEntrypointSources.every((source) =>
+      cjsTestInstanceQueryBridgePreflightSourceEvidencePresent(source)
     );
+  const privateTestInstanceQueryBridgePreflightPresent =
+    privateCjsTestInstanceQueryBridgePreflightPresent;
   const publicJsFacadeRoutingPresent =
     publicJsReactTestRendererFacadePresent &&
     !publicJsReactTestRendererFacadePlaceholder &&
@@ -2219,6 +2322,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateTestInstanceBridgeQueryDiagnosticsPresent,
     privateTestInstanceFindAllQueryDiagnosticsPresent,
     privateTestInstanceFindByQueryDiagnosticsPresent,
+    privateCjsTestInstanceQueryBridgePreflightPresent,
     privateTestInstanceQueryBridgePreflightPresent,
     publicToJSONAvailable,
     publicToTreeAvailable,
@@ -3899,12 +4003,154 @@ function jsStringPropertyAssertion(property, value) {
   });
 }
 
+function jsQuotedStringPropertyAssertion(property, value) {
+  return freezeRecord({
+    kind: "js-quoted-string-property",
+    property,
+    value
+  });
+}
+
 function jsSourcePropertyAssertion(property, value) {
   return freezeRecord({
     kind: "js-source-property",
     property,
     value
   });
+}
+
+function jsQuotedStringArrayPropertyIncludesAssertion(property, values) {
+  return freezeRecord({
+    kind: "js-quoted-string-array-property-includes",
+    property,
+    values: freezeArray(values)
+  });
+}
+
+function cjsTestInstanceQueryBridgePreflightSourceEvidencePresent(source) {
+  if (cjsTestInstanceQueryBridgePreflightSourceEvidenceCache.has(source)) {
+    return cjsTestInstanceQueryBridgePreflightSourceEvidenceCache.get(source);
+  }
+
+  const present =
+    cjsTestInstanceQueryBridgePreflightSourceEvidencePresentUncached(source);
+  cjsTestInstanceQueryBridgePreflightSourceEvidenceCache.set(source, present);
+  return present;
+}
+
+function cjsTestInstanceQueryBridgePreflightSourceEvidencePresentUncached(
+  source
+) {
+  return (
+    jsFunctionDeclarationReturnedFreezeRecordMethodReturnedCallsPass({
+      source,
+      functionName: "createTestRendererRootRequestBridge",
+      methodCalls: freezeArray([
+        freezeRecord({
+          methodName: "getTestInstanceQueryBridgePreflight",
+          callee: "getTestInstanceQueryBridgePreflightForRootRequest",
+          arguments: freezeArray(["record"])
+        }),
+        freezeRecord({
+          methodName: "getRootTestInstanceQueryBridgePreflight",
+          callee: "getTestInstanceQueryBridgePreflightForRootRequest",
+          arguments: freezeArray(["request"])
+        }),
+        freezeRecord({
+          methodName: "getRendererTestInstanceQueryBridgePreflight",
+          callee: "getTestInstanceQueryBridgePreflightForRootRequest",
+          arguments: freezeArray(["request"])
+        })
+      ])
+    }) &&
+    jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
+      source,
+      functionName: "createTestRendererRootRequestBridge",
+      methodCalls: freezeArray([
+        freezeRecord({
+          methodName: "canConsumeAcceptedRustTestInstanceQueryDiagnostics",
+          callee: "consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest",
+          arguments: freezeArray(["record", "diagnostics"])
+        }),
+        freezeRecord({
+          methodName: "consumeAcceptedRustTestInstanceQueryDiagnostics",
+          callee: "consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest",
+          arguments: freezeArray(["record", "diagnostics"])
+        })
+      ])
+    }) &&
+    jsFunctionDeclarationSourceCallsPass({
+      source,
+      functionName: "getTestInstanceQueryDiagnosticsForRootRequest",
+      calls: freezeArray([
+        freezeRecord({
+          callee: "createPrivateTestInstanceWrapperRecordForRootRequest",
+          arguments: freezeArray(["record", "lifecycleEvidence"])
+        })
+      ])
+    }) &&
+    jsFunctionDeclarationConstInitializerCallPass({
+      source,
+      functionName: "createPrivateTestInstanceWrapperRecordForRootRequest",
+      name: "queryBridgePreflight",
+      callee: "createPrivateTestInstanceQueryBridgePreflightRecord",
+      arguments: freezeArray([
+        "rootRequest",
+        "undefined",
+        "acceptedLifecycleEvidence"
+      ])
+    }) &&
+    jsFunctionDeclarationReturnedFreezeRecordAssertionsPass({
+      source,
+      functionName: "createPrivateTestInstanceWrapperRecordForRootRequest",
+      assertions:
+        privateTestInstanceWrapperQueryBridgePreflightSourceAssertions
+    }) &&
+    jsConstQuotedStringDeclarationPass({
+      source,
+      name: "privateTestInstanceQueryBridgePreflightDiagnosticName",
+      value: "fast-react-test-renderer.testinstance.query-bridge-preflight"
+    }) &&
+    jsConstQuotedStringDeclarationPass({
+      source,
+      name: "privateTestInstanceQueryBridgePreflightStatus",
+      value:
+        "private-test-instance-query-bridge-preflight-ready-public-test-instance-blocked"
+    }) &&
+    jsObjectSourceAssertionsPass({
+      source,
+      declaration:
+        "const privateTestInstanceQueryBridgePreflightGate = Object.freeze",
+      assertions: privateTestInstanceQueryBridgePreflightGateSourceAssertions
+    }) &&
+    jsFunctionDeclarationConstInitializerBeforeTopLevelReturnExpressionPass({
+      source,
+      functionName: "getTestInstanceQueryBridgePreflightForRootRequest",
+      name: "diagnostics",
+      callee: "getTestInstanceQueryDiagnosticsForRootRequest",
+      arguments: freezeArray(["record"]),
+      expression: "diagnostics.queryBridgePreflight ?? diagnostics"
+    }) &&
+    jsFunctionDeclarationSourceCallsPass({
+      source,
+      functionName: "consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest",
+      calls: freezeArray([
+        freezeRecord({
+          callee: "assertAcceptedTestInstanceLifecycleEvidenceForRootRequest",
+          arguments: freezeArray(["record"])
+        }),
+        freezeRecord({
+          callee: "createPrivateTestInstanceQueryBridgePreflightRecord",
+          arguments: freezeArray(["record", "diagnostics", "lifecycleEvidence"])
+        })
+      ])
+    }) &&
+    jsFunctionDeclarationReturnedFreezeRecordAssertionsPass({
+      source,
+      functionName: "createPrivateTestInstanceQueryBridgePreflightRecord",
+      assertions: privateTestInstanceQueryBridgePreflightRecordSourceAssertions
+    })
+  );
 }
 
 function jsObjectSourceAssertionsPass({ source, declaration, assertions }) {
@@ -3916,16 +4162,91 @@ function jsObjectSourceAssertionsPass({ source, declaration, assertions }) {
     return false;
   }
 
+  if (
+    jsObjectSpreadsCanOverrideAssertedProperties({
+      extracted,
+      assertions
+    })
+  ) {
+    return false;
+  }
+
+  return jsObjectPropertyAssertionsPass(extracted.properties, assertions);
+}
+
+function jsObjectSpreadsCanOverrideAssertedProperties({
+  extracted,
+  assertions
+}) {
+  if (
+    extracted.spreadStartIndexes.length === 0 &&
+    extracted.unsupportedKeyStartIndexes.length === 0
+  ) {
+    return false;
+  }
+
+  return assertions.some((assertion) => {
+    const propertyStartIndex = extracted.propertyStartIndexes.get(
+      assertion.property
+    );
+    if (propertyStartIndex === undefined) {
+      return false;
+    }
+
+    return (
+      extracted.spreadStartIndexes.some(
+        (spreadStartIndex) => spreadStartIndex > propertyStartIndex
+      ) ||
+      extracted.unsupportedKeyStartIndexes.some(
+        (unsupportedKeyStartIndex) =>
+          unsupportedKeyStartIndex > propertyStartIndex
+      )
+    );
+  });
+}
+
+function jsObjectPropertyCanBeOverriddenAfterStartIndex({
+  extracted,
+  property,
+  propertyStartIndex
+}) {
+  const occurrenceStartIndexes =
+    extracted.propertyOccurrenceStartIndexes.get(property) ?? freezeArray([]);
+  return (
+    occurrenceStartIndexes.some(
+      (occurrenceStartIndex) => occurrenceStartIndex > propertyStartIndex
+    ) ||
+    extracted.spreadStartIndexes.some(
+      (spreadStartIndex) => spreadStartIndex > propertyStartIndex
+    ) ||
+    extracted.unsupportedKeyStartIndexes.some(
+      (unsupportedKeyStartIndex) =>
+        unsupportedKeyStartIndex > propertyStartIndex
+    )
+  );
+}
+
+function jsObjectPropertyAssertionsPass(properties, assertions) {
   return assertions.every((assertion) => {
-    const actualSource = extracted.properties.get(assertion.property);
+    const actualSource = properties.get(assertion.property);
     if (assertion.kind === "js-boolean-property") {
       return actualSource === String(assertion.value);
     }
     if (assertion.kind === "js-string-property") {
       return parseJsStringLiteralSource(actualSource) === assertion.value;
     }
+    if (assertion.kind === "js-quoted-string-property") {
+      return parseJsQuotedStringLiteralSource(actualSource) === assertion.value;
+    }
     if (assertion.kind === "js-source-property") {
       return actualSource === assertion.value;
+    }
+    if (assertion.kind === "js-quoted-string-array-property-includes") {
+      const actualValues = parseJsQuotedStringArrayExpressionSource(actualSource);
+      return (
+        actualValues !== null &&
+        assertion.values.every((value) => actualValues.includes(value))
+      );
     }
     return false;
   });
@@ -3950,10 +4271,179 @@ function parseJsStringLiteralSource(source) {
       if (index >= source.length - 1) {
         return null;
       }
+      if (source[index] === "u") {
+        const escaped = readJsUnicodeEscapeSequence(source, index);
+        if (escaped === null || escaped.end >= source.length) {
+          return null;
+        }
+        value += escaped.value;
+        index = escaped.end - 1;
+        continue;
+      }
+      if (source[index] === "x") {
+        const escaped = readJsHexEscapeSequence(source, index);
+        if (escaped === null || escaped.end >= source.length) {
+          return null;
+        }
+        value += escaped.value;
+        index = escaped.end - 1;
+        continue;
+      }
+      if (source[index] === "\r" || source[index] === "\n") {
+        if (source[index] === "\r" && source[index + 1] === "\n") {
+          index += 1;
+        }
+        continue;
+      }
+      if (source[index] === "b") {
+        value += "\b";
+        continue;
+      }
+      if (source[index] === "f") {
+        value += "\f";
+        continue;
+      }
+      if (source[index] === "n") {
+        value += "\n";
+        continue;
+      }
+      if (source[index] === "r") {
+        value += "\r";
+        continue;
+      }
+      if (source[index] === "t") {
+        value += "\t";
+        continue;
+      }
+      if (source[index] === "v") {
+        value += "\x0b";
+        continue;
+      }
+      if (
+        source[index] === "0" &&
+        !/[0-9]/u.test(source[index + 1] ?? "")
+      ) {
+        value += "\0";
+        continue;
+      }
     }
     value += source[index];
   }
   return value;
+}
+
+function readJsUnicodeEscapeSequence(source, index) {
+  if (source[index] !== "u") {
+    return null;
+  }
+
+  if (source[index + 1] === "{") {
+    const closeIndex = source.indexOf("}", index + 2);
+    if (closeIndex < 0) {
+      return null;
+    }
+    const hexSource = source.slice(index + 2, closeIndex);
+    if (!/^[0-9A-Fa-f]{1,6}$/u.test(hexSource)) {
+      return null;
+    }
+    const codePoint = Number.parseInt(hexSource, 16);
+    if (!Number.isSafeInteger(codePoint) || codePoint > 0x10ffff) {
+      return null;
+    }
+    return freezeRecord({
+      value: String.fromCodePoint(codePoint),
+      end: closeIndex + 1
+    });
+  }
+
+  const hexSource = source.slice(index + 1, index + 5);
+  if (!/^[0-9A-Fa-f]{4}$/u.test(hexSource)) {
+    return null;
+  }
+  return freezeRecord({
+    value: String.fromCharCode(Number.parseInt(hexSource, 16)),
+    end: index + 5
+  });
+}
+
+function readJsHexEscapeSequence(source, index) {
+  if (source[index] !== "x") {
+    return null;
+  }
+
+  const hexSource = source.slice(index + 1, index + 3);
+  if (!/^[0-9A-Fa-f]{2}$/u.test(hexSource)) {
+    return null;
+  }
+  return freezeRecord({
+    value: String.fromCharCode(Number.parseInt(hexSource, 16)),
+    end: index + 3
+  });
+}
+
+function parseJsQuotedStringLiteralSource(source) {
+  if (typeof source !== "string" || source[0] === "`") {
+    return null;
+  }
+  return parseJsStringLiteralSource(source);
+}
+
+function parseJsQuotedStringArrayExpressionSource(source) {
+  if (typeof source !== "string") {
+    return null;
+  }
+
+  const calleeIndex = skipJsTrivia(source, 0, source.length);
+  if (!source.startsWith("Object.freeze", calleeIndex)) {
+    return null;
+  }
+  const callOpenIndex = skipJsTrivia(
+    source,
+    calleeIndex + "Object.freeze".length,
+    source.length
+  );
+  if (source[callOpenIndex] !== "(") {
+    return null;
+  }
+  const callCloseIndex = findMatchingJsEnclosure(
+    source,
+    callOpenIndex,
+    "(",
+    ")"
+  );
+  if (callCloseIndex < 0) {
+    return null;
+  }
+  const openIndex = skipJsTrivia(source, callOpenIndex + 1, callCloseIndex);
+  if (source[openIndex] !== "[") {
+    return null;
+  }
+  const closeIndex = findMatchingJsEnclosure(source, openIndex, "[", "]");
+  if (closeIndex < 0 || closeIndex > callCloseIndex) {
+    return null;
+  }
+
+  const elements = extractTopLevelJsCallArguments(source, openIndex, closeIndex);
+  const values = [];
+  for (const element of elements) {
+    const value = parseJsQuotedStringLiteralSource(element);
+    if (value === null) {
+      return null;
+    }
+    values.push(value);
+  }
+  return freezeArray(values);
+}
+
+function jsConstQuotedStringDeclarationPass({ source, name, value }) {
+  const declaration = extractJsConstDeclarationInitializerSource({
+    source,
+    name
+  });
+  return (
+    declaration.ok === true &&
+    parseJsQuotedStringLiteralSource(declaration.initializer) === value
+  );
 }
 
 function jsSourceTokensOutsideCommentsAndStringsPass(source, tokens) {
@@ -4007,6 +4497,92 @@ function jsFunctionDeclarationSourceCallsPass({
   );
 }
 
+function jsFunctionDeclarationConstInitializerCallPass({
+  source,
+  functionName,
+  name,
+  callee,
+  arguments: expectedArguments
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  const initializer = extractTopLevelJsConstDeclarationInitializerSource({
+    source: declaration.body,
+    name
+  });
+  return (
+    initializer.ok === true &&
+    jsExactCallExpressionWithArgumentsPass({
+      source: initializer.initializer,
+      callee,
+      expectedArguments
+    })
+  );
+}
+
+function jsFunctionDeclarationTopLevelReturnExpressionPass({
+  source,
+  functionName,
+  expression
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  return jsTopLevelReturnExpressionPass(declaration.body, expression);
+}
+
+function jsFunctionDeclarationConstInitializerBeforeTopLevelReturnExpressionPass({
+  source,
+  functionName,
+  name,
+  callee,
+  arguments: expectedArguments,
+  expression
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  const returnExpressions = readTopLevelJsReturnExpressions(declaration.body);
+  if (
+    returnExpressions === null ||
+    returnExpressions.length !== 1 ||
+    normalizeJsExpressionSource(returnExpressions[0].expression) !==
+      normalizeJsExpressionSource(expression)
+  ) {
+    return false;
+  }
+
+  const initializer = extractTopLevelJsConstDeclarationInitializerSource({
+    source: declaration.body,
+    name,
+    beforeIndex: returnExpressions[0].returnIndex
+  });
+  return (
+    initializer.ok === true &&
+    jsExactCallExpressionWithArgumentsPass({
+      source: initializer.initializer,
+      callee,
+      expectedArguments
+    })
+  );
+}
+
 function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
   source,
   functionName,
@@ -4026,6 +4602,14 @@ function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
   if (returnedObject.ok !== true) {
     return false;
   }
+  const extracted = extractTopLevelJsObjectProperties(
+    declaration.body,
+    returnedObject.openIndex,
+    returnedObject.closeIndex
+  );
+  if (extracted.ok !== true) {
+    return false;
+  }
 
   return methodCalls.every((methodCall) => {
     const method = extractTopLevelJsObjectMethodBody({
@@ -4037,6 +4621,15 @@ function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
     if (method.ok !== true) {
       return false;
     }
+    if (
+      jsObjectPropertyCanBeOverriddenAfterStartIndex({
+        extracted,
+        property: methodCall.methodName,
+        propertyStartIndex: method.propertyStartIndex
+      })
+    ) {
+      return false;
+    }
 
     return jsCallExpressionWithArgumentsPass({
       source: method.body,
@@ -4044,6 +4637,104 @@ function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
       expectedArguments: methodCall.arguments
     });
   });
+}
+
+function jsFunctionDeclarationReturnedFreezeRecordMethodReturnedCallsPass({
+  source,
+  functionName,
+  methodCalls
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  const returnedObject = extractTopLevelReturnedFreezeRecordObject(
+    declaration.body
+  );
+  if (returnedObject.ok !== true) {
+    return false;
+  }
+  const extracted = extractTopLevelJsObjectProperties(
+    declaration.body,
+    returnedObject.openIndex,
+    returnedObject.closeIndex
+  );
+  if (extracted.ok !== true) {
+    return false;
+  }
+
+  return methodCalls.every((methodCall) => {
+    const method = extractTopLevelJsObjectMethodBody({
+      source: declaration.body,
+      openIndex: returnedObject.openIndex,
+      closeIndex: returnedObject.closeIndex,
+      methodName: methodCall.methodName
+    });
+    if (method.ok !== true) {
+      return false;
+    }
+    if (
+      jsObjectPropertyCanBeOverriddenAfterStartIndex({
+        extracted,
+        property: methodCall.methodName,
+        propertyStartIndex: method.propertyStartIndex
+      })
+    ) {
+      return false;
+    }
+
+    return jsTopLevelReturnCallExpressionWithArgumentsPass({
+      source: method.body,
+      params: method.params,
+      callee: methodCall.callee,
+      expectedArguments: methodCall.arguments
+    });
+  });
+}
+
+function jsFunctionDeclarationReturnedFreezeRecordAssertionsPass({
+  source,
+  functionName,
+  assertions
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  const returnedObject = extractTopLevelReturnedFreezeRecordObject(
+    declaration.body
+  );
+  if (returnedObject.ok !== true) {
+    return false;
+  }
+
+  const extracted = extractTopLevelJsObjectProperties(
+    declaration.body,
+    returnedObject.openIndex,
+    returnedObject.closeIndex
+  );
+  if (extracted.ok !== true) {
+    return false;
+  }
+
+  if (
+    jsObjectSpreadsCanOverrideAssertedProperties({
+      extracted,
+      assertions
+    })
+  ) {
+    return false;
+  }
+
+  return jsObjectPropertyAssertionsPass(extracted.properties, assertions);
 }
 
 function extractTopLevelReturnedFreezeRecordObject(source) {
@@ -4059,6 +4750,17 @@ function extractTopLevelReturnedFreezeRecordObject(source) {
       continue;
     }
 
+    if (jsIdentifierAt(source, index, "return")) {
+      if (braceDepth !== 0 || bracketDepth !== 0 || parenDepth !== 0) {
+        return freezeRecord({
+          ok: false,
+          openIndex: -1,
+          closeIndex: -1,
+          error: "nested-return-before-top-level-freeze-record"
+        });
+      }
+    }
+
     if (
       braceDepth === 0 &&
       bracketDepth === 0 &&
@@ -4071,8 +4773,12 @@ function extractTopLevelReturnedFreezeRecordObject(source) {
         source.length
       );
       if (!jsIdentifierAt(source, calleeIndex, "freezeRecord")) {
-        index += "return".length;
-        continue;
+        return freezeRecord({
+          ok: false,
+          openIndex: -1,
+          closeIndex: -1,
+          error: "first-top-level-return-not-freeze-record"
+        });
       }
 
       const callOpenIndex = skipJsTrivia(
@@ -4266,9 +4972,173 @@ function extractJsFunctionDeclarationBody({
   return freezeRecord({
     ok: true,
     body: source.slice(bodyOpenIndex + 1, bodyCloseIndex),
+    params: freezeArray(
+      extractTopLevelJsCallArguments(source, paramsOpenIndex, paramsCloseIndex)
+    ),
     bodyOpenIndex,
     bodyCloseIndex,
     error: null
+  });
+}
+
+function extractJsConstDeclarationInitializerSource({ source, name }) {
+  let searchIndex = 0;
+  const declarationPrefix = "const ";
+
+  while (searchIndex < source.length) {
+    const declarationIndex = findJsSourceOutsideCommentsAndStrings(
+      source,
+      declarationPrefix,
+      searchIndex
+    );
+    if (declarationIndex < 0) {
+      return freezeRecord({
+        ok: false,
+        initializer: "",
+        error: "const-declaration-not-found"
+      });
+    }
+
+    const nameIndex = skipJsTrivia(
+      source,
+      declarationIndex + declarationPrefix.length,
+      source.length
+    );
+    if (!jsIdentifierAt(source, nameIndex, name)) {
+      searchIndex = declarationIndex + declarationPrefix.length;
+      continue;
+    }
+
+    const afterNameIndex = nameIndex + name.length;
+    const equalsIndex = skipJsTrivia(source, afterNameIndex, source.length);
+    if (source[equalsIndex] !== "=") {
+      searchIndex = afterNameIndex;
+      continue;
+    }
+
+    const initializerStart = skipJsTrivia(
+      source,
+      equalsIndex + 1,
+      source.length
+    );
+    const statementEnd = findJsStatementEnd(source, initializerStart);
+    if (statementEnd < 0) {
+      return freezeRecord({
+        ok: false,
+        initializer: "",
+        error: "const-declaration-not-terminated"
+      });
+    }
+
+    return freezeRecord({
+      ok: true,
+      initializer: source.slice(initializerStart, statementEnd).trim(),
+      error: null
+    });
+  }
+
+  return freezeRecord({
+    ok: false,
+    initializer: "",
+    error: "const-declaration-not-found"
+  });
+}
+
+function extractTopLevelJsConstDeclarationInitializerSource({
+  source,
+  name,
+  beforeIndex = source.length
+}) {
+  let index = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  const declarationPrefix = "const ";
+
+  while (index < source.length && index < beforeIndex) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (
+      braceDepth === 0 &&
+      bracketDepth === 0 &&
+      parenDepth === 0 &&
+      index < beforeIndex &&
+      source.startsWith(declarationPrefix, index)
+    ) {
+      const nameIndex = skipJsTrivia(
+        source,
+        index + declarationPrefix.length,
+        source.length
+      );
+      if (!jsIdentifierAt(source, nameIndex, name)) {
+        index += declarationPrefix.length;
+        continue;
+      }
+
+      const afterNameIndex = nameIndex + name.length;
+      const equalsIndex = skipJsTrivia(
+        source,
+        afterNameIndex,
+        source.length
+      );
+      if (source[equalsIndex] !== "=") {
+        index = afterNameIndex;
+        continue;
+      }
+
+      const initializerStart = skipJsTrivia(
+        source,
+        equalsIndex + 1,
+        source.length
+      );
+      const statementEnd = findJsStatementEnd(source, initializerStart);
+      if (statementEnd < 0 || statementEnd >= beforeIndex) {
+        return freezeRecord({
+          ok: false,
+          initializer: "",
+          declarationIndex: -1,
+          statementEnd: -1,
+          error: "const-declaration-not-terminated"
+        });
+      }
+
+      return freezeRecord({
+        ok: true,
+        initializer: source.slice(initializerStart, statementEnd).trim(),
+        declarationIndex: index,
+        statementEnd,
+        error: null
+      });
+    }
+
+    const character = source[index];
+    if (character === "{" && bracketDepth === 0 && parenDepth === 0) {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[" && braceDepth === 0 && parenDepth === 0) {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (character === "(" && braceDepth === 0 && bracketDepth === 0) {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    }
+
+    index += 1;
+  }
+
+  return freezeRecord({
+    ok: false,
+    initializer: "",
+    declarationIndex: -1,
+    statementEnd: -1,
+    error: "top-level-const-declaration-not-found"
   });
 }
 
@@ -4311,6 +5181,10 @@ function extractJsObjectFreezePropertiesForDeclaration({
 
 function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
   const properties = new Map();
+  const propertyStartIndexes = new Map();
+  const propertyOccurrenceStartIndexes = new Map();
+  const spreadStartIndexes = [];
+  const unsupportedKeyStartIndexes = [];
   let index = openIndex + 1;
 
   while (index < closeIndex) {
@@ -4322,8 +5196,21 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
       break;
     }
 
+    if (source.startsWith("...", index)) {
+      spreadStartIndexes.push(index);
+      const nextIndex = findNextTopLevelPropertySeparator(
+        source,
+        index + "...".length,
+        closeIndex
+      );
+      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+      continue;
+    }
+
+    const propertyStartIndex = index;
     const propertyKey = readJsObjectPropertyKey(source, index, closeIndex);
     if (propertyKey.ok !== true) {
+      unsupportedKeyStartIndexes.push(index);
       const nextIndex = findNextTopLevelPropertySeparator(
         source,
         index,
@@ -4334,12 +5221,93 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
     }
 
     index = skipJsTrivia(source, propertyKey.end, closeIndex);
+    if (source[index] === "(") {
+      const paramsCloseIndex = findMatchingJsEnclosure(
+        source,
+        index,
+        "(",
+        ")"
+      );
+      if (paramsCloseIndex < 0 || paramsCloseIndex > closeIndex) {
+        unsupportedKeyStartIndexes.push(propertyStartIndex);
+        return freezeRecord({
+          ok: true,
+          properties,
+          propertyStartIndexes,
+          propertyOccurrenceStartIndexes:
+            freezeJsObjectPropertyOccurrenceStartIndexes(
+              propertyOccurrenceStartIndexes
+            ),
+          spreadStartIndexes: freezeArray(spreadStartIndexes),
+          unsupportedKeyStartIndexes: freezeArray(unsupportedKeyStartIndexes),
+          error: null
+        });
+      }
+
+      const bodyOpenIndex = skipJsTrivia(
+        source,
+        paramsCloseIndex + 1,
+        closeIndex
+      );
+      if (source[bodyOpenIndex] !== "{") {
+        unsupportedKeyStartIndexes.push(propertyStartIndex);
+        const nextIndex = findNextTopLevelPropertySeparator(
+          source,
+          paramsCloseIndex + 1,
+          closeIndex
+        );
+        index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+        continue;
+      }
+
+      const bodyCloseIndex = findMatchingJsBrace(source, bodyOpenIndex);
+      if (bodyCloseIndex < 0 || bodyCloseIndex > closeIndex) {
+        unsupportedKeyStartIndexes.push(propertyStartIndex);
+        return freezeRecord({
+          ok: true,
+          properties,
+          propertyStartIndexes,
+          propertyOccurrenceStartIndexes:
+            freezeJsObjectPropertyOccurrenceStartIndexes(
+              propertyOccurrenceStartIndexes
+            ),
+          spreadStartIndexes: freezeArray(spreadStartIndexes),
+          unsupportedKeyStartIndexes: freezeArray(unsupportedKeyStartIndexes),
+          error: null
+        });
+      }
+
+      properties.set(
+        propertyKey.key,
+        source.slice(propertyStartIndex, bodyCloseIndex + 1).trim()
+      );
+      propertyStartIndexes.set(propertyKey.key, propertyStartIndex);
+      recordJsObjectPropertyOccurrenceStartIndex(
+        propertyOccurrenceStartIndexes,
+        propertyKey.key,
+        propertyStartIndex
+      );
+      index = bodyCloseIndex + 1;
+      continue;
+    }
+
     if (source[index] !== ":") {
       const nextIndex = findNextTopLevelPropertySeparator(
         source,
         index,
         closeIndex
       );
+      if (source.slice(index, nextIndex).trim() === "") {
+        properties.set(propertyKey.key, propertyKey.key);
+        propertyStartIndexes.set(propertyKey.key, propertyStartIndex);
+        recordJsObjectPropertyOccurrenceStartIndex(
+          propertyOccurrenceStartIndexes,
+          propertyKey.key,
+          propertyStartIndex
+        );
+      } else {
+        unsupportedKeyStartIndexes.push(propertyStartIndex);
+      }
       index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
       continue;
     }
@@ -4351,14 +5319,47 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
       closeIndex
     );
     properties.set(propertyKey.key, source.slice(valueStart, valueEnd).trim());
+    propertyStartIndexes.set(propertyKey.key, propertyStartIndex);
+    recordJsObjectPropertyOccurrenceStartIndex(
+      propertyOccurrenceStartIndexes,
+      propertyKey.key,
+      propertyStartIndex
+    );
     index = valueEnd < closeIndex ? valueEnd + 1 : closeIndex;
   }
 
   return freezeRecord({
     ok: true,
     properties,
+    propertyStartIndexes,
+    propertyOccurrenceStartIndexes:
+      freezeJsObjectPropertyOccurrenceStartIndexes(
+        propertyOccurrenceStartIndexes
+      ),
+    spreadStartIndexes: freezeArray(spreadStartIndexes),
+    unsupportedKeyStartIndexes: freezeArray(unsupportedKeyStartIndexes),
     error: null
   });
+}
+
+function recordJsObjectPropertyOccurrenceStartIndex(
+  propertyOccurrenceStartIndexes,
+  property,
+  propertyStartIndex
+) {
+  const startIndexes = propertyOccurrenceStartIndexes.get(property) ?? [];
+  startIndexes.push(propertyStartIndex);
+  propertyOccurrenceStartIndexes.set(property, startIndexes);
+}
+
+function freezeJsObjectPropertyOccurrenceStartIndexes(
+  propertyOccurrenceStartIndexes
+) {
+  const frozen = new Map();
+  for (const [property, startIndexes] of propertyOccurrenceStartIndexes) {
+    frozen.set(property, freezeArray(startIndexes));
+  }
+  return frozen;
 }
 
 function findJsSourceOutsideCommentsAndStrings(source, needle, fromIndex = 0) {
@@ -4438,6 +5439,7 @@ function extractTopLevelJsObjectMethodBody({
   methodName
 }) {
   let index = openIndex + 1;
+  let matchedMethod = null;
 
   while (index < closeIndex) {
     index = skipJsTrivia(source, index, closeIndex);
@@ -4448,8 +5450,38 @@ function extractTopLevelJsObjectMethodBody({
       break;
     }
 
+    if (source.startsWith("...", index)) {
+      if (matchedMethod !== null) {
+        return freezeRecord({
+          ok: false,
+          body: "",
+          bodyOpenIndex: -1,
+          bodyCloseIndex: -1,
+          error: "object-method-overridden-by-spread"
+        });
+      }
+
+      const nextIndex = findNextTopLevelPropertySeparator(
+        source,
+        index + "...".length,
+        closeIndex
+      );
+      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+      continue;
+    }
+
     const propertyKey = readJsObjectPropertyKey(source, index, closeIndex);
     if (propertyKey.ok !== true) {
+      if (matchedMethod !== null) {
+        return freezeRecord({
+          ok: false,
+          body: "",
+          bodyOpenIndex: -1,
+          bodyCloseIndex: -1,
+          error: "object-method-overridden-by-unsupported-key"
+        });
+      }
+
       const nextIndex = findNextTopLevelPropertySeparator(
         source,
         index,
@@ -4504,9 +5536,27 @@ function extractTopLevelJsObjectMethodBody({
       }
 
       if (propertyKey.key === methodName) {
-        return freezeRecord({
+        if (matchedMethod !== null) {
+          return freezeRecord({
+            ok: false,
+            body: "",
+            bodyOpenIndex: -1,
+            bodyCloseIndex: -1,
+            error: "object-method-overridden-by-duplicate-method"
+          });
+        }
+
+        matchedMethod = freezeRecord({
           ok: true,
           body: source.slice(bodyOpenIndex + 1, bodyCloseIndex),
+          params: freezeArray(
+            extractTopLevelJsCallArguments(
+              source,
+              afterKeyIndex,
+              paramsCloseIndex
+            )
+          ),
+          propertyStartIndex: index,
           bodyOpenIndex,
           bodyCloseIndex,
           error: null
@@ -4517,12 +5567,26 @@ function extractTopLevelJsObjectMethodBody({
       continue;
     }
 
+    if (propertyKey.key === methodName && matchedMethod !== null) {
+      return freezeRecord({
+        ok: false,
+        body: "",
+        bodyOpenIndex: -1,
+        bodyCloseIndex: -1,
+        error: "object-method-overridden-by-property"
+      });
+    }
+
     const nextIndex = findNextTopLevelPropertySeparator(
       source,
       afterKeyIndex,
       closeIndex
     );
     index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+  }
+
+  if (matchedMethod !== null) {
+    return matchedMethod;
   }
 
   return freezeRecord({
@@ -4532,6 +5596,980 @@ function extractTopLevelJsObjectMethodBody({
     bodyCloseIndex: -1,
     error: "top-level-object-method-not-found"
   });
+}
+
+function jsTopLevelReturnExpressionPass(source, expectedExpression) {
+  const returnExpressions = readTopLevelJsReturnExpressions(source);
+  return (
+    returnExpressions !== null &&
+    returnExpressions.length === 1 &&
+    normalizeJsExpressionSource(returnExpressions[0].expression) ===
+      normalizeJsExpressionSource(expectedExpression)
+  );
+}
+
+function jsTopLevelReturnCallExpressionWithArgumentsPass({
+  source,
+  params = freezeArray([]),
+  callee,
+  expectedArguments
+}) {
+  const returnExpressions = readTopLevelJsReturnExpressions(source, {
+    allowGuardedNestedNullReturns: true,
+    params
+  });
+  return (
+    returnExpressions !== null &&
+    returnExpressions.length === 1 &&
+    jsExpressionReturnsCallExpressionWithArgumentsPass({
+      source: returnExpressions[0].expression,
+      contextSource: source,
+      params,
+      beforeIndex: returnExpressions[0].returnIndex,
+      callee,
+      expectedArguments
+    })
+  );
+}
+
+function readTopLevelJsReturnExpressions(source, options = freezeRecord({})) {
+  const returnExpressions = [];
+  let index = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  const braceStack = [];
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (
+      bracketDepth === 0 &&
+      parenDepth === 0 &&
+      jsIdentifierAt(source, index, "return")
+    ) {
+      const expressionStart = skipJsTrivia(
+        source,
+        index + "return".length,
+        source.length
+      );
+      const statementEnd = findJsStatementEnd(source, expressionStart);
+      if (statementEnd < 0) {
+        return null;
+      }
+      const expression = source.slice(expressionStart, statementEnd).trim();
+      if (braceDepth !== 0) {
+        if (
+          !jsNestedReturnAllowed({
+            source,
+            expression,
+            returnIndex: index,
+            braceStack,
+            options
+          })
+        ) {
+          return null;
+        }
+        index = statementEnd + 1;
+        continue;
+      }
+      returnExpressions.push(
+        freezeRecord({
+          expression,
+          returnIndex: index
+        })
+      );
+      index = statementEnd + 1;
+      continue;
+    }
+
+    const character = source[index];
+    if (character === "{" && bracketDepth === 0 && parenDepth === 0) {
+      braceDepth += 1;
+      braceStack.push(readJsControlBlockHeader(source, index));
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+      braceStack.pop();
+    } else if (character === "[" && braceDepth === 0 && parenDepth === 0) {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (character === "(" && braceDepth === 0 && bracketDepth === 0) {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    }
+
+    index += 1;
+  }
+
+  return freezeArray(returnExpressions);
+}
+
+function readJsControlBlockHeader(source, blockOpenIndex) {
+  const closeParenIndex = skipJsWhitespaceBackward(
+    source,
+    blockOpenIndex - 1
+  );
+  if (source[closeParenIndex] !== ")") {
+    return freezeRecord({
+      kind: "block",
+      test: ""
+    });
+  }
+
+  const openParenIndex = findMatchingJsOpeningEnclosure(
+    source,
+    closeParenIndex,
+    "(",
+    ")"
+  );
+  if (openParenIndex < 0) {
+    return freezeRecord({
+      kind: "block",
+      test: ""
+    });
+  }
+
+  const keyword = readPreviousJsIdentifier(source, openParenIndex);
+  if (keyword.value !== "if") {
+    return freezeRecord({
+      kind: "block",
+      test: ""
+    });
+  }
+
+  return freezeRecord({
+    kind: "if",
+    test: source.slice(openParenIndex + 1, closeParenIndex).trim()
+  });
+}
+
+function jsNestedReturnAllowed({
+  source,
+  expression,
+  returnIndex,
+  braceStack,
+  options
+}) {
+  if (
+    options.allowGuardedNestedNullReturns !== true ||
+    !isJsNullLiteralExpression(expression)
+  ) {
+    return false;
+  }
+
+  const block = braceStack[braceStack.length - 1];
+  if (block === undefined || block.kind !== "if") {
+    return false;
+  }
+
+  const guard = parseJsNullishEqualityGuardExpression(block.test);
+  return (
+    guard !== null &&
+    jsExpressionHasLiveBindingProof({
+      source,
+      expression: guard.operand,
+      params: options.params ?? freezeArray([]),
+      beforeIndex: returnIndex
+    })
+  );
+}
+
+function jsCallArgumentsHaveLiveBindingProof({
+  source,
+  expectedArguments,
+  params,
+  beforeIndex
+}) {
+  return expectedArguments.every((expectedArgument) =>
+    jsExpressionHasLiveBindingProof({
+      source,
+      expression: expectedArgument,
+      params,
+      beforeIndex
+    })
+  );
+}
+
+function jsExpressionHasLiveBindingProof({
+  source,
+  expression,
+  params,
+  beforeIndex
+}) {
+  const identifier = normalizeJsExpressionSource(expression);
+  if (!isSimpleJsIdentifierExpression(identifier)) {
+    return false;
+  }
+
+  if (params.includes(identifier)) {
+    return !jsIdentifierHasAssignmentBeforeIndex({
+      source,
+      identifier,
+      beforeIndex,
+      treatDeclarationsAsAssignments: true
+    });
+  }
+
+  const declaration = extractTopLevelJsConstDeclarationInitializerSource({
+    source,
+    name: identifier,
+    beforeIndex
+  });
+  return (
+    declaration.ok === true &&
+    !jsIdentifierHasAssignmentBeforeIndex({
+      source,
+      identifier,
+      beforeIndex,
+      ignoredDeclarationIndex: declaration.declarationIndex,
+      treatDeclarationsAsAssignments: true
+    }) &&
+    jsConstInitializerHasLiveBindingProof({
+      source,
+      initializer: declaration.initializer,
+      params,
+      beforeIndex: declaration.declarationIndex
+    })
+  );
+}
+
+function jsConstInitializerHasLiveBindingProof({
+  source,
+  initializer,
+  params,
+  beforeIndex
+}) {
+  const expression = stripOuterJsExpressionParentheses(initializer);
+  if (isJsNullishLiteralExpression(expression)) {
+    return false;
+  }
+
+  const call = parseJsSimpleCallExpression(expression);
+  if (call === null || call.arguments.length !== 1) {
+    return false;
+  }
+
+  if (
+    call.callee !== "getCurrentRootRequestForHandle" &&
+    call.callee !== "rendererRootHandles.get"
+  ) {
+    return false;
+  }
+
+  return jsExpressionHasLiveBindingProof({
+    source,
+    expression: call.arguments[0],
+    params,
+    beforeIndex
+  });
+}
+
+function jsIdentifierHasAssignmentBeforeIndex({
+  source,
+  identifier,
+  beforeIndex,
+  ignoredDeclarationIndex = -1,
+  treatDeclarationsAsAssignments = false
+}) {
+  if (
+    treatDeclarationsAsAssignments &&
+    jsIdentifierHasBindingDeclarationBeforeIndex({
+      source,
+      identifier,
+      beforeIndex,
+      ignoredDeclarationIndex
+    })
+  ) {
+    return true;
+  }
+
+  if (
+    jsIdentifierAppearsInDestructuringAssignmentBeforeIndex({
+      source,
+      identifier,
+      beforeIndex
+    })
+  ) {
+    return true;
+  }
+
+  let index = 0;
+
+  while (index < beforeIndex) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (!jsIdentifierAt(source, index, identifier)) {
+      index += 1;
+      continue;
+    }
+
+    const previousToken = findPreviousJsSignificantToken(source, index);
+    const afterIdentifierIndex = skipJsTrivia(
+      source,
+      index + identifier.length,
+      beforeIndex
+    );
+    if (
+      previousToken !== null &&
+      previousToken.type === "word" &&
+      ["class", "const", "let", "var", "function"].includes(
+        previousToken.value
+      )
+    ) {
+      if (
+        treatDeclarationsAsAssignments &&
+        previousToken.start !== ignoredDeclarationIndex
+      ) {
+        return true;
+      }
+      index = afterIdentifierIndex + 1;
+      continue;
+    }
+
+    if (
+      readJsAssignmentOperatorAt(source, afterIdentifierIndex).ok === true ||
+      source.startsWith("++", afterIdentifierIndex) ||
+      source.startsWith("--", afterIdentifierIndex) ||
+      jsPrefixUpdateOperatorBefore(source, index)
+    ) {
+      return true;
+    }
+
+    index += identifier.length;
+  }
+
+  return false;
+}
+
+function jsIdentifierAppearsInDestructuringAssignmentBeforeIndex({
+  source,
+  identifier,
+  beforeIndex
+}) {
+  let index = 0;
+
+  while (index < beforeIndex) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const assignmentOperator = readJsAssignmentOperatorAt(source, index);
+    if (assignmentOperator.ok !== true) {
+      index += 1;
+      continue;
+    }
+
+    const pattern = readJsDestructuringAssignmentPatternBeforeOperator(
+      source,
+      index
+    );
+    if (
+      pattern !== null &&
+      jsDestructuringAssignmentPatternContainsIdentifier(pattern, identifier)
+    ) {
+      return true;
+    }
+
+    index = assignmentOperator.end;
+  }
+
+  return false;
+}
+
+function readJsDestructuringAssignmentPatternBeforeOperator(
+  source,
+  operatorIndex
+) {
+  const patternEnd = skipJsWhitespaceBackward(source, operatorIndex - 1);
+  const closeCharacter = source[patternEnd];
+  const openCharacter =
+    closeCharacter === "}" ? "{" : closeCharacter === "]" ? "[" : "";
+  if (openCharacter === "") {
+    return null;
+  }
+
+  const patternOpenIndex = findMatchingJsOpeningEnclosure(
+    source,
+    patternEnd,
+    openCharacter,
+    closeCharacter
+  );
+  if (patternOpenIndex < 0) {
+    return null;
+  }
+
+  return source.slice(patternOpenIndex, patternEnd + 1);
+}
+
+function jsDestructuringAssignmentPatternContainsIdentifier(
+  source,
+  identifier
+) {
+  const bindings = new Set();
+  collectJsIdentifiersInSource(source, bindings);
+  return bindings.has(identifier);
+}
+
+function jsIdentifierHasBindingDeclarationBeforeIndex({
+  source,
+  identifier,
+  beforeIndex,
+  ignoredDeclarationIndex
+}) {
+  let index = 0;
+
+  while (index < beforeIndex) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const declaration = readJsBindingDeclarationAt({
+      source,
+      index,
+      endIndex: beforeIndex
+    });
+    if (declaration.ok === true) {
+      if (
+        declaration.start !== ignoredDeclarationIndex &&
+        declaration.bindings.includes(identifier)
+      ) {
+        return true;
+      }
+      index = Math.max(index + 1, declaration.nameSearchEnd);
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return false;
+}
+
+function readJsBindingDeclarationAt({ source, index, endIndex }) {
+  const variableDeclaration = readJsVariableBindingDeclarationAt({
+    source,
+    index,
+    endIndex
+  });
+  if (variableDeclaration.ok === true) {
+    return variableDeclaration;
+  }
+
+  const functionDeclaration = readJsFunctionBindingDeclarationAt({
+    source,
+    index,
+    endIndex
+  });
+  if (functionDeclaration.ok === true) {
+    return functionDeclaration;
+  }
+
+  return readJsClassBindingDeclarationAt({ source, index, endIndex });
+}
+
+function readJsVariableBindingDeclarationAt({ source, index, endIndex }) {
+  const keyword = ["const", "let", "var"].find((candidate) =>
+    jsIdentifierAt(source, index, candidate)
+  );
+  if (keyword === undefined) {
+    return freezeRecord({
+      ok: false,
+      start: index,
+      bindings: freezeArray([]),
+      nameSearchEnd: index
+    });
+  }
+
+  const declaratorsStart = skipJsTrivia(
+    source,
+    index + keyword.length,
+    endIndex
+  );
+  const statementEnd = findJsStatementEnd(source, declaratorsStart);
+  const declarationEnd =
+    statementEnd < 0 || statementEnd > endIndex ? endIndex : statementEnd;
+  const bindings = new Set();
+  let cursor = declaratorsStart;
+
+  while (cursor < declarationEnd) {
+    const declaratorStart = skipJsTrivia(source, cursor, declarationEnd);
+    if (declaratorStart >= declarationEnd) {
+      break;
+    }
+
+    const declaratorEnd = findNextTopLevelPropertySeparator(
+      source,
+      declaratorStart,
+      declarationEnd
+    );
+    collectJsVariableDeclaratorBindingIdentifiers(
+      source.slice(declaratorStart, declaratorEnd),
+      bindings
+    );
+    cursor = declaratorEnd < declarationEnd ? declaratorEnd + 1 : declarationEnd;
+  }
+
+  return freezeRecord({
+    ok: true,
+    start: index,
+    bindings: freezeArray(bindings),
+    nameSearchEnd: declaratorsStart
+  });
+}
+
+function collectJsVariableDeclaratorBindingIdentifiers(source, bindings) {
+  const startIndex = skipJsTrivia(source, 0, source.length);
+  const character = source[startIndex];
+  if (character === "{" || character === "[") {
+    const closeCharacter = character === "{" ? "}" : "]";
+    const patternEnd = findMatchingJsEnclosure(
+      source,
+      startIndex,
+      character,
+      closeCharacter
+    );
+    if (patternEnd >= 0) {
+      collectJsIdentifiersInSource(
+        source.slice(startIndex, patternEnd + 1),
+        bindings
+      );
+    }
+    return;
+  }
+
+  const identifier = readJsIdentifier(source, startIndex, source.length);
+  if (identifier.ok === true) {
+    bindings.add(identifier.name);
+  }
+}
+
+function readJsFunctionBindingDeclarationAt({ source, index, endIndex }) {
+  const startIndex = index;
+  let cursor = index;
+
+  if (jsIdentifierAt(source, cursor, "async")) {
+    cursor = skipJsTrivia(source, cursor + "async".length, endIndex);
+    if (!jsIdentifierAt(source, cursor, "function")) {
+      return freezeRecord({
+        ok: false,
+        start: startIndex,
+        bindings: freezeArray([]),
+        nameSearchEnd: index
+      });
+    }
+  } else if (!jsIdentifierAt(source, cursor, "function")) {
+    return freezeRecord({
+      ok: false,
+      start: startIndex,
+      bindings: freezeArray([]),
+      nameSearchEnd: index
+    });
+  }
+
+  cursor = skipJsTrivia(source, cursor + "function".length, endIndex);
+  if (source[cursor] === "*") {
+    cursor = skipJsTrivia(source, cursor + 1, endIndex);
+  }
+
+  const identifier = readJsIdentifier(source, cursor, endIndex);
+  if (identifier.ok !== true) {
+    return freezeRecord({
+      ok: false,
+      start: startIndex,
+      bindings: freezeArray([]),
+      nameSearchEnd: cursor
+    });
+  }
+
+  return freezeRecord({
+    ok: true,
+    start: startIndex,
+    bindings: freezeArray([identifier.name]),
+    nameSearchEnd: identifier.end
+  });
+}
+
+function readJsClassBindingDeclarationAt({ source, index, endIndex }) {
+  if (!jsIdentifierAt(source, index, "class")) {
+    return freezeRecord({
+      ok: false,
+      start: index,
+      bindings: freezeArray([]),
+      nameSearchEnd: index
+    });
+  }
+
+  const nameStart = skipJsTrivia(source, index + "class".length, endIndex);
+  const identifier = readJsIdentifier(source, nameStart, endIndex);
+  if (identifier.ok !== true) {
+    return freezeRecord({
+      ok: false,
+      start: index,
+      bindings: freezeArray([]),
+      nameSearchEnd: nameStart
+    });
+  }
+
+  return freezeRecord({
+    ok: true,
+    start: index,
+    bindings: freezeArray([identifier.name]),
+    nameSearchEnd: identifier.end
+  });
+}
+
+function collectJsIdentifiersInSource(source, bindings) {
+  let index = 0;
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const identifier = readJsIdentifier(source, index, source.length);
+    if (identifier.ok === true) {
+      bindings.add(identifier.name);
+      index = identifier.end;
+      continue;
+    }
+
+    index += 1;
+  }
+}
+
+function parseJsSimpleCallExpression(source) {
+  const expression = stripOuterJsExpressionParentheses(source);
+  const callOpenIndex = findTopLevelJsCallOpenIndex(expression);
+  if (callOpenIndex < 0) {
+    return null;
+  }
+
+  const callee = expression.slice(0, callOpenIndex).trim();
+  if (!isSimpleJsMemberExpression(callee)) {
+    return null;
+  }
+
+  const callCloseIndex = findMatchingJsEnclosure(
+    expression,
+    callOpenIndex,
+    "(",
+    ")"
+  );
+  if (callCloseIndex < 0) {
+    return null;
+  }
+
+  const trailingIndex = skipJsTrivia(
+    expression,
+    callCloseIndex + 1,
+    expression.length
+  );
+  if (trailingIndex !== expression.length) {
+    return null;
+  }
+
+  return freezeRecord({
+    callee,
+    arguments: freezeArray(
+      extractTopLevelJsCallArguments(expression, callOpenIndex, callCloseIndex)
+    )
+  });
+}
+
+function findTopLevelJsCallOpenIndex(source) {
+  let index = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const character = source[index];
+    if (character === "{" && bracketDepth === 0) {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[" && braceDepth === 0) {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (
+      character === "(" &&
+      braceDepth === 0 &&
+      bracketDepth === 0
+    ) {
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return -1;
+}
+
+function jsExpressionReturnsCallExpressionWithArgumentsPass({
+  source,
+  contextSource = "",
+  params = freezeArray([]),
+  beforeIndex = 0,
+  callee,
+  expectedArguments
+}) {
+  const expression = stripOuterJsExpressionParentheses(source);
+  if (
+    jsExactCallExpressionWithArgumentsPass({
+      source: expression,
+      callee,
+      expectedArguments
+    })
+  ) {
+    return jsCallArgumentsHaveLiveBindingProof({
+      source: contextSource,
+      expectedArguments,
+      params,
+      beforeIndex
+    });
+  }
+
+  const conditional = splitTopLevelJsConditionalExpression(expression);
+  if (conditional === null) {
+    return false;
+  }
+
+  const nullishGuard = parseJsNullishEqualityGuardExpression(
+    conditional.test
+  );
+  if (
+    nullishGuard === null ||
+    expectedArguments.length !== 1 ||
+    normalizeJsExpressionSource(nullishGuard.operand) !==
+      normalizeJsExpressionSource(expectedArguments[0]) ||
+    !jsExpressionHasLiveBindingProof({
+      source: contextSource,
+      expression: expectedArguments[0],
+      params,
+      beforeIndex
+    })
+  ) {
+    return false;
+  }
+
+  if (nullishGuard.operator === "===") {
+    return (
+      isJsNullLiteralExpression(conditional.consequent) &&
+      jsExactCallExpressionWithArgumentsPass({
+        source: conditional.alternate,
+        callee,
+        expectedArguments
+      })
+    );
+  }
+
+  return (
+    isJsNullLiteralExpression(conditional.alternate) &&
+    jsExactCallExpressionWithArgumentsPass({
+      source: conditional.consequent,
+      callee,
+      expectedArguments
+    })
+  );
+}
+
+function parseJsNullishEqualityGuardExpression(source) {
+  const expression = normalizeJsExpressionSource(source);
+  const direct = expression.match(/^(.+?)\s*(===|!==)\s*(null|undefined)$/u);
+  if (
+    direct !== null &&
+    isSimpleJsMemberExpression(direct[1].trim())
+  ) {
+    return freezeRecord({
+      operand: direct[1].trim(),
+      operator: direct[2]
+    });
+  }
+
+  const reversed = expression.match(/^(null|undefined)\s*(===|!==)\s*(.+)$/u);
+  if (
+    reversed !== null &&
+    isSimpleJsMemberExpression(reversed[3].trim())
+  ) {
+    return freezeRecord({
+      operand: reversed[3].trim(),
+      operator: reversed[2]
+    });
+  }
+
+  return null;
+}
+
+function isSimpleJsMemberExpression(source) {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/u.test(
+    source
+  );
+}
+
+function isSimpleJsIdentifierExpression(source) {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(source);
+}
+
+function isJsNullLiteralExpression(source) {
+  return normalizeJsExpressionSource(source) === "null";
+}
+
+function isJsNullishLiteralExpression(source) {
+  const expression = normalizeJsExpressionSource(source);
+  return expression === "null" || expression === "undefined";
+}
+
+function jsExactCallExpressionWithArgumentsPass({
+  source,
+  callee,
+  expectedArguments
+}) {
+  const expression = stripOuterJsExpressionParentheses(source);
+  const calleeIndex = skipJsTrivia(expression, 0, expression.length);
+  if (!jsIdentifierAt(expression, calleeIndex, callee)) {
+    return false;
+  }
+
+  const callOpenIndex = skipJsTrivia(
+    expression,
+    calleeIndex + callee.length,
+    expression.length
+  );
+  if (expression[callOpenIndex] !== "(") {
+    return false;
+  }
+
+  const callCloseIndex = findMatchingJsEnclosure(
+    expression,
+    callOpenIndex,
+    "(",
+    ")"
+  );
+  if (callCloseIndex < 0) {
+    return false;
+  }
+
+  const trailingIndex = skipJsTrivia(
+    expression,
+    callCloseIndex + 1,
+    expression.length
+  );
+  if (trailingIndex !== expression.length) {
+    return false;
+  }
+
+  const actualArguments = extractTopLevelJsCallArguments(
+    expression,
+    callOpenIndex,
+    callCloseIndex
+  );
+  return (
+    actualArguments.length === expectedArguments.length &&
+    actualArguments.every(
+      (actualArgument, index) => actualArgument === expectedArguments[index]
+    )
+  );
+}
+
+function splitTopLevelJsConditionalExpression(source) {
+  const expression = stripOuterJsExpressionParentheses(source);
+  let questionIndex = -1;
+  let nestedConditionalDepth = 0;
+  let index = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+
+  while (index < expression.length) {
+    const nextIndex = skipJsCommentStringOrRegex(expression, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const character = expression[index];
+    if (braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
+      if (character === "?") {
+        if (questionIndex < 0) {
+          questionIndex = index;
+        } else {
+          nestedConditionalDepth += 1;
+        }
+        index += 1;
+        continue;
+      }
+      if (character === ":" && questionIndex >= 0) {
+        if (nestedConditionalDepth === 0) {
+          return freezeRecord({
+            test: expression.slice(0, questionIndex).trim(),
+            consequent: expression.slice(questionIndex + 1, index).trim(),
+            alternate: expression.slice(index + 1).trim()
+          });
+        }
+        nestedConditionalDepth -= 1;
+        index += 1;
+        continue;
+      }
+    }
+
+    if (character === "{" && bracketDepth === 0 && parenDepth === 0) {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[" && braceDepth === 0 && parenDepth === 0) {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (character === "(" && braceDepth === 0 && bracketDepth === 0) {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    }
+
+    index += 1;
+  }
+
+  return null;
+}
+
+function stripOuterJsExpressionParentheses(source) {
+  let expression = source.trim();
+
+  while (expression[0] === "(") {
+    const closeIndex = findMatchingJsEnclosure(expression, 0, "(", ")");
+    if (closeIndex !== expression.length - 1) {
+      break;
+    }
+    expression = expression.slice(1, -1).trim();
+  }
+
+  return expression;
+}
+
+function normalizeJsExpressionSource(source) {
+  return stripOuterJsExpressionParentheses(source).replace(/\s+/gu, " ");
 }
 
 function jsCallExpressionWithArgumentsPass({
@@ -4774,14 +6812,18 @@ function findPreviousJsSignificantToken(source, index) {
       }
       previousToken = freezeRecord({
         type: "word",
-        value: source.slice(start, cursor)
+        value: source.slice(start, cursor),
+        start,
+        end: cursor
       });
       continue;
     }
 
     previousToken = freezeRecord({
       type: "punctuator",
-      value: character
+      value: character,
+      start: cursor,
+      end: cursor + 1
     });
     cursor += 1;
   }
@@ -4802,8 +6844,149 @@ function jsIdentifierAt(source, index, identifier) {
   );
 }
 
+function readPreviousJsIdentifier(source, endIndex) {
+  let index = skipJsWhitespaceBackward(source, endIndex - 1);
+  const end = index + 1;
+  while (index >= 0 && /[A-Za-z0-9_$]/u.test(source[index])) {
+    index -= 1;
+  }
+  const start = index + 1;
+  if (start >= end || !/[A-Za-z_$]/u.test(source[start])) {
+    return freezeRecord({
+      value: "",
+      start: -1,
+      end: -1
+    });
+  }
+
+  return freezeRecord({
+    value: source.slice(start, end),
+    start,
+    end
+  });
+}
+
+function skipJsWhitespaceBackward(source, startIndex) {
+  let index = startIndex;
+  while (index >= 0 && /\s/u.test(source[index])) {
+    index -= 1;
+  }
+  return index;
+}
+
+function findMatchingJsOpeningEnclosure(
+  source,
+  closeIndex,
+  openCharacter,
+  closeCharacter
+) {
+  let index = 0;
+
+  while (index < closeIndex) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (source[index] === openCharacter) {
+      const matchingCloseIndex = findMatchingJsEnclosure(
+        source,
+        index,
+        openCharacter,
+        closeCharacter
+      );
+      if (matchingCloseIndex === closeIndex) {
+        return index;
+      }
+      if (matchingCloseIndex > index) {
+        index = matchingCloseIndex + 1;
+        continue;
+      }
+    }
+
+    index += 1;
+  }
+
+  return -1;
+}
+
+function jsPrefixUpdateOperatorBefore(source, index) {
+  const beforeIndex = skipJsWhitespaceBackward(source, index - 1);
+  return (
+    source.slice(beforeIndex - 1, beforeIndex + 1) === "++" ||
+    source.slice(beforeIndex - 1, beforeIndex + 1) === "--"
+  );
+}
+
 function readJsObjectPropertyKey(source, startIndex, endIndex) {
   const character = source[startIndex];
+  if (character === "'" || character === '"') {
+    const literalEnd = skipQuotedJsLiteral(source, startIndex);
+    if (literalEnd > endIndex) {
+      return freezeRecord({
+        ok: false,
+        key: null,
+        end: startIndex,
+        error: "quoted-property-key-not-closed"
+      });
+    }
+
+    const key = parseJsQuotedStringLiteralSource(
+      source.slice(startIndex, literalEnd)
+    );
+    if (key === null) {
+      return freezeRecord({
+        ok: false,
+        key: null,
+        end: literalEnd,
+        error: "quoted-property-key-not-supported"
+      });
+    }
+
+    return freezeRecord({
+      ok: true,
+      key,
+      end: literalEnd,
+      error: null
+    });
+  }
+
+  if (character === "[") {
+    const computedEnd = findMatchingJsEnclosure(
+      source,
+      startIndex,
+      "[",
+      "]"
+    );
+    if (computedEnd < 0 || computedEnd > endIndex) {
+      return freezeRecord({
+        ok: false,
+        key: null,
+        end: startIndex,
+        error: "computed-property-key-not-closed"
+      });
+    }
+
+    const expression = source.slice(startIndex + 1, computedEnd).trim();
+    const key = parseJsQuotedStringLiteralSource(expression);
+    if (key === null) {
+      return freezeRecord({
+        ok: false,
+        key: null,
+        end: computedEnd + 1,
+        error: "computed-property-key-not-supported"
+      });
+    }
+
+    return freezeRecord({
+      ok: true,
+      key,
+      end: computedEnd + 1,
+      error: null
+    });
+  }
+
   if (!/[A-Za-z_$]/u.test(character)) {
     return freezeRecord({
       ok: false,
