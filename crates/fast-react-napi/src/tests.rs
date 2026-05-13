@@ -6348,6 +6348,154 @@ fn cleanup_hook_preflight_callable_rejects_duplicate_or_missing_canonical_roles(
 }
 
 #[test]
+fn cleanup_hook_preflight_callable_requires_exact_rejected_evidence_rows() {
+    fn assert_exact_set_rejected(
+        preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+        id: &'static str,
+        expected_rejected_count: usize,
+        expected_stale_or_forged_count: usize,
+    ) {
+        assert_eq!(preflight.accepted_cleanup_evidence_count(), 0, "{id}");
+        assert_eq!(
+            preflight.rejected_cleanup_evidence_count(),
+            expected_rejected_count,
+            "{id}"
+        );
+        assert_eq!(
+            preflight.stale_or_forged_cleanup_evidence_rejection_count(),
+            expected_stale_or_forged_count,
+            "{id}"
+        );
+        assert!(!preflight.canonical_executable_evidence_accepted(), "{id}");
+        assert!(!preflight.node_worker_threads_execution(), "{id}");
+        assert!(!preflight.napi_cleanup_hook_execution(), "{id}");
+        assert!(!preflight.native_addon_loaded(), "{id}");
+        assert!(!preflight.native_execution(), "{id}");
+        assert!(!preflight.renderer_execution(), "{id}");
+        assert!(!preflight.reconciler_execution(), "{id}");
+        assert!(!preflight.public_native_compatibility(), "{id}");
+        assert!(!preflight.react_behavior_error(), "{id}");
+
+        let canonical_set_mismatch_count = preflight
+            .rows()
+            .iter()
+            .filter(|row| {
+                row.code()
+                    == Some(
+                        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_CANONICAL_SET_MISMATCH_CODE,
+                    )
+            })
+            .count();
+        assert_eq!(canonical_set_mismatch_count, 2, "{id}");
+    }
+
+    let canonical = native_root_bridge_worker_thread_cleanup_hook_preflight();
+    let root =
+        NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(canonical.rows()[0]);
+    let value =
+        NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(canonical.rows()[1]);
+    let stale =
+        NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(canonical.rows()[2]);
+    let forged =
+        NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(canonical.rows()[3]);
+
+    let caller_shaped_stale_wrong_worker = NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+        "cleanup-hook-stale-worker-transport-evidence-rejected",
+        "cleanup-hook-evidence-preflight-rejection",
+        "stale-worker-transport-cleanup-hook",
+        "private-cleanup-hook-fn:stale-worker-teardown",
+        "private-cleanup-hook-arg:worker-524-root-slot-1",
+        2,
+        1,
+        NATIVE_ROOT_BRIDGE_TRANSPORT_WORKER_THREAD_TEARDOWN_GATE_STATUS,
+        525,
+        BridgeEnvironmentId::from_raw(524),
+        "worker-root-stale-after-thread-teardown",
+        BridgeHandleKind::Root,
+        Some("FAST_REACT_NAPI_STALE_HANDLE"),
+        Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+    );
+    let caller_shaped_forged_wrong_source_row =
+        NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+            "cleanup-hook-forged-peer-active-evidence-rejected",
+            "cleanup-hook-evidence-preflight-rejection",
+            "forged-peer-active-cleanup-hook",
+            "private-cleanup-hook-fn:forged-peer-active",
+            "private-cleanup-hook-arg:worker-1764-peer-root",
+            1,
+            2,
+            NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS,
+            764,
+            BridgeEnvironmentId::from_raw(764),
+            "peer-value-active-executable-preflight",
+            BridgeHandleKind::Value,
+            None,
+            None,
+        );
+
+    for (id, evidence_rows, expected_rejected_count, expected_stale_or_forged_count) in [
+        (
+            "cleanup-hook-callable-missing-stale-rejection",
+            vec![root, value, forged],
+            3,
+            1,
+        ),
+        (
+            "cleanup-hook-callable-missing-forged-rejection",
+            vec![root, value, stale],
+            3,
+            1,
+        ),
+        (
+            "cleanup-hook-callable-duplicate-stale-rejection",
+            vec![root, value, stale, stale, forged],
+            5,
+            3,
+        ),
+        (
+            "cleanup-hook-callable-duplicate-forged-rejection",
+            vec![root, value, stale, forged, forged],
+            5,
+            3,
+        ),
+        (
+            "cleanup-hook-callable-extra-forged-rejection",
+            vec![
+                root,
+                value,
+                stale,
+                forged,
+                forged.with_id_for_test("cleanup-hook-extra-forged-peer-active-evidence-rejected"),
+            ],
+            5,
+            3,
+        ),
+        (
+            "cleanup-hook-callable-reused-stale-id-wrong-source",
+            vec![root, value, caller_shaped_stale_wrong_worker, forged],
+            4,
+            2,
+        ),
+        (
+            "cleanup-hook-callable-reused-forged-id-wrong-source",
+            vec![root, value, stale, caller_shaped_forged_wrong_source_row],
+            4,
+            2,
+        ),
+    ] {
+        let callable =
+            validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows(evidence_rows);
+
+        assert_exact_set_rejected(
+            &callable,
+            id,
+            expected_rejected_count,
+            expected_stale_or_forged_count,
+        );
+    }
+}
+
+#[test]
 fn native_root_bridge_worker_thread_cleanup_hook_preflight_rejects_stale_and_forged_evidence() {
     fn row<'a>(
         rows: &'a [crate::root_bridge_requests::NativeRootBridgeWorkerThreadCleanupHookPreflightRow],
