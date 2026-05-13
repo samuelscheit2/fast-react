@@ -10,14 +10,15 @@ export const REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME =
 
 export const REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS = [
   {
-    id: "react-test-renderer-render-error-root-option-private-diagnostic",
-    phase: "Render",
-    area: "render error root option metadata",
+    id: "react-test-renderer-update-error-root-option-private-diagnostic",
+    phase: "Update",
+    area: "update error root option metadata",
     rootErrorChannel: "onUncaughtError",
     privatePrerequisite:
-      "TestRendererRoot render error diagnostics read RootOptions error handles",
+      "TestRendererRoot update error diagnostics read RootOptions error handles",
     publicErrorBoundaryBehaviorAvailable: false,
     publicRootErrorCallbacksInvoked: false,
+    nativeExecution: false,
     compatibilityClaimed: false
   },
   {
@@ -29,6 +30,7 @@ export const REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS = [
       "TestRendererRoot commit error diagnostics read RootOptions error handles",
     publicErrorBoundaryBehaviorAvailable: false,
     publicRootErrorCallbacksInvoked: false,
+    nativeExecution: false,
     compatibilityClaimed: false
   }
 ];
