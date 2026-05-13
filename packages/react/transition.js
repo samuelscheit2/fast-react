@@ -245,6 +245,20 @@ const startTransitionRootlessCurrentnessReportFieldNames = freezeArray([
   'packageCompatibility',
   'compatibilityClaimed'
 ]);
+const startTransitionRootlessCurrentnessInheritedOptionAliasNames = freezeArray([
+  ...startTransitionRootlessCurrentnessReportOptionNames,
+  ...startTransitionRootlessCurrentnessReportFieldNames,
+  ...startTransitionRootlessCurrentnessFieldNames,
+  ...startTransitionRootlessSurfaceCurrentnessFieldNames,
+  'publicTransitionCompatibilityClaimed',
+  'publicRootCompatibilityClaimed',
+  'schedulerCompatibilityClaimed',
+  'schedulerPackageCompatibilityClaimed',
+  'packageCompatibilityClaimed',
+  'transitionCompatibilityClaimed',
+  'rootCompatibilityClaimed',
+  'sourceCompatibilityClaimed'
+]);
 
 function reportGlobalError(error) {
   if (typeof reportError === 'function') {
@@ -289,19 +303,22 @@ function isTransitionBatchActive() {
 
 function noop() {}
 
+function createStartTransitionRootlessCurrentnessReportOptionsResult(
+  sourceOwnedOptions
+) {
+  return {
+    options: Object.create(null),
+    sourceOwnedOptions
+  };
+}
+
 function sanitizeStartTransitionRootlessCurrentnessReportOptions(overrides) {
   if (overrides == null) {
-    return {
-      options: {},
-      sourceOwnedOptions: true
-    };
+    return createStartTransitionRootlessCurrentnessReportOptionsResult(true);
   }
 
   if (!isObjectLike(overrides) || typeof overrides === 'function') {
-    return {
-      options: {},
-      sourceOwnedOptions: false
-    };
+    return createStartTransitionRootlessCurrentnessReportOptionsResult(false);
   }
 
   let prototype;
@@ -311,31 +328,26 @@ function sanitizeStartTransitionRootlessCurrentnessReportOptions(overrides) {
     prototype = Object.getPrototypeOf(overrides);
     ownKeys = Reflect.ownKeys(overrides);
   } catch {
-    return {
-      options: {},
-      sourceOwnedOptions: false
-    };
+    return createStartTransitionRootlessCurrentnessReportOptionsResult(false);
+  }
+
+  if (hasInheritedStartTransitionRootlessCurrentnessOptionAlias(overrides)) {
+    return createStartTransitionRootlessCurrentnessReportOptionsResult(false);
   }
 
   if (prototype !== Object.prototype && prototype !== null) {
-    return {
-      options: {},
-      sourceOwnedOptions: false
-    };
+    return createStartTransitionRootlessCurrentnessReportOptionsResult(false);
   }
 
   const ownStringKeys = new Set();
-  const options = {};
+  const options = Object.create(null);
 
   for (const key of ownKeys) {
     if (
       typeof key !== 'string' ||
       !startTransitionRootlessCurrentnessReportOptionNames.includes(key)
     ) {
-      return {
-        options: {},
-        sourceOwnedOptions: false
-      };
+      return createStartTransitionRootlessCurrentnessReportOptionsResult(false);
     }
 
     let descriptor;
@@ -343,20 +355,14 @@ function sanitizeStartTransitionRootlessCurrentnessReportOptions(overrides) {
     try {
       descriptor = Object.getOwnPropertyDescriptor(overrides, key);
     } catch {
-      return {
-        options: {},
-        sourceOwnedOptions: false
-      };
+      return createStartTransitionRootlessCurrentnessReportOptionsResult(false);
     }
 
     if (
       descriptor == null ||
       !Object.prototype.hasOwnProperty.call(descriptor, 'value')
     ) {
-      return {
-        options: {},
-        sourceOwnedOptions: false
-      };
+      return createStartTransitionRootlessCurrentnessReportOptionsResult(false);
     }
 
     ownStringKeys.add(key);
@@ -366,23 +372,67 @@ function sanitizeStartTransitionRootlessCurrentnessReportOptions(overrides) {
   try {
     for (const key in overrides) {
       if (!ownStringKeys.has(key)) {
-        return {
-          options: {},
-          sourceOwnedOptions: false
-        };
+        return createStartTransitionRootlessCurrentnessReportOptionsResult(false);
       }
     }
   } catch {
-    return {
-      options: {},
-      sourceOwnedOptions: false
-    };
+    return createStartTransitionRootlessCurrentnessReportOptionsResult(false);
   }
 
   return {
     options,
     sourceOwnedOptions: true
   };
+}
+
+function hasInheritedStartTransitionRootlessCurrentnessOptionAlias(value) {
+  let prototype;
+
+  try {
+    prototype = Object.getPrototypeOf(value);
+  } catch {
+    return true;
+  }
+
+  while (prototype !== null) {
+    for (const key of startTransitionRootlessCurrentnessInheritedOptionAliasNames) {
+      const ownDescriptorStatus = getOwnPropertyDescriptorStatus(value, key);
+      if (ownDescriptorStatus === 'throws') {
+        return true;
+      }
+
+      if (ownDescriptorStatus === 'present') {
+        continue;
+      }
+
+      const prototypeDescriptorStatus =
+        getOwnPropertyDescriptorStatus(prototype, key);
+      if (
+        prototypeDescriptorStatus === 'throws' ||
+        prototypeDescriptorStatus === 'present'
+      ) {
+        return true;
+      }
+    }
+
+    try {
+      prototype = Object.getPrototypeOf(prototype);
+    } catch {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getOwnPropertyDescriptorStatus(value, key) {
+  try {
+    return Object.getOwnPropertyDescriptor(value, key) === undefined
+      ? 'absent'
+      : 'present';
+  } catch {
+    return 'throws';
+  }
 }
 
 function createStartTransitionRootlessCurrentnessReport(overrides = {}) {
@@ -760,15 +810,23 @@ function freezeStartTransitionRootlessSurfaceCurrentnessRow(row) {
   const surfaceRow = {};
 
   for (const fieldName of startTransitionRootlessSurfaceCurrentnessFieldNames) {
+    let value;
     if (
       startTransitionRootlessSurfaceCurrentnessArrayFieldNames.includes(
         fieldName
       )
     ) {
-      surfaceRow[fieldName] = freezeArray(row[fieldName] ?? []);
+      value = freezeArray(row[fieldName] ?? []);
     } else {
-      surfaceRow[fieldName] = row[fieldName];
+      value = row[fieldName];
     }
+
+    Object.defineProperty(surfaceRow, fieldName, {
+      configurable: true,
+      enumerable: true,
+      value,
+      writable: true
+    });
   }
 
   return freezeRecord(surfaceRow);
