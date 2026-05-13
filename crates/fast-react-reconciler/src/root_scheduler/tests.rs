@@ -687,6 +687,59 @@ fn clone_same_transition_multi_update_continuation_preserving_currentness_source
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SameLaneMultiUpdateRejectionRootSnapshotForCanary {
+    current: FiberId,
+    callback_node: RootSchedulerCallbackHandle,
+    pending_lanes: Lanes,
+    entangled_lanes: Lanes,
+    finished_work: Option<FiberId>,
+    finished_lanes: Lanes,
+    current_event_transition_lane: Lane,
+    pending_currentness_sources: usize,
+    consumed_currentness_sources: usize,
+}
+
+fn same_lane_multi_update_rejection_root_snapshot_for_canary(
+    store: &FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+) -> SameLaneMultiUpdateRejectionRootSnapshotForCanary {
+    let root = store.root(root_id).unwrap();
+    SameLaneMultiUpdateRejectionRootSnapshotForCanary {
+        current: root.current(),
+        callback_node: root.scheduling().callback_node(),
+        pending_lanes: root.lanes().pending_lanes(),
+        entangled_lanes: root.lanes().entangled_lanes(),
+        finished_work: root.finished_work(),
+        finished_lanes: root.finished_lanes(),
+        current_event_transition_lane: store.root_scheduler().current_event_transition_lane(),
+        pending_currentness_sources: store
+            .root_scheduler()
+            .pending_finished_work_queue_lane_commit_currentness_source_count(),
+        consumed_currentness_sources: store
+            .root_scheduler()
+            .consumed_finished_work_queue_lane_commit_currentness_source_count(),
+    }
+}
+
+fn assert_same_lane_multi_update_early_rejection_preserves_root_for_canary(
+    store: &FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    before: SameLaneMultiUpdateRejectionRootSnapshotForCanary,
+    rejection: &RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
+    host: &RecordingHost,
+) {
+    assert_eq!(
+        same_lane_multi_update_rejection_root_snapshot_for_canary(store, root_id),
+        before
+    );
+    assert!(rejection.queue_handoff_error().is_none());
+    assert!(rejection.root_commit_handoff_for_canary().is_none());
+    assert!(rejection.commit().is_none());
+    assert_eq!(rejection.currentness_source_token(), None);
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
 fn attach_function_component_child(
     store: &mut FiberRootStore<RecordingHost>,
     root_id: FiberRootId,
@@ -1538,6 +1591,221 @@ fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_reje
         vec![stale_same_lane_update]
     );
     assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
+fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_rejects_cleared_pending_transition()
+ {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (_first, _second, _third, requests, execution, queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(122501),
+            RootElementHandle::from_raw(122502),
+            RootElementHandle::from_raw(122503),
+        );
+    let transition_lanes = Lanes::from(Lane::TRANSITION_1);
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().pending_lanes(),
+        transition_lanes
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().entangled_lanes(),
+        transition_lanes
+    );
+    assert_eq!(
+        store.root_scheduler().current_event_transition_lane(),
+        Lane::TRANSITION_1
+    );
+
+    store
+        .root_mut(root_id)
+        .unwrap()
+        .lanes_mut()
+        .mark_finished(RootFinishedLanes::new(transition_lanes, Lanes::NO));
+    let before = same_lane_multi_update_rejection_root_snapshot_for_canary(&store, root_id);
+
+    assert_eq!(before.current, current);
+    assert_eq!(before.callback_node, execution.callback_node());
+    assert_eq!(before.pending_lanes, Lanes::NO);
+    assert_eq!(before.entangled_lanes, Lanes::NO);
+    assert_eq!(before.finished_work, None);
+    assert_eq!(before.finished_lanes, Lanes::NO);
+    assert_eq!(before.current_event_transition_lane, Lane::TRANSITION_1);
+
+    let rejection =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        rejection.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::NoTransitionWork
+    );
+    assert!(rejection.no_transition_work());
+    assert_eq!(rejection.root_current_before_continuation(), current);
+    assert_eq!(
+        rejection.root_pending_lanes_before_continuation(),
+        Lanes::NO
+    );
+    assert_eq!(
+        rejection.root_entangled_lanes_before_continuation(),
+        Lanes::NO
+    );
+    assert_eq!(
+        rejection.current_event_transition_lane(),
+        Lane::TRANSITION_1
+    );
+    assert_eq!(rejection.queue_handoff(), Some(&queue_handoff));
+    assert_same_lane_multi_update_early_rejection_preserves_root_for_canary(
+        &store, root_id, before, &rejection, &host,
+    );
+}
+
+#[test]
+fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_rejects_stale_event_transition_lane()
+ {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (_first, _second, _third, requests, execution, queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(122504),
+            RootElementHandle::from_raw(122505),
+            RootElementHandle::from_raw(122506),
+        );
+    let transition_lanes = Lanes::from(Lane::TRANSITION_1);
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().pending_lanes(),
+        transition_lanes
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().entangled_lanes(),
+        transition_lanes
+    );
+
+    store
+        .root_scheduler_mut()
+        .set_current_event_transition_lane(Lane::NO);
+    let before = same_lane_multi_update_rejection_root_snapshot_for_canary(&store, root_id);
+
+    assert_eq!(before.current, current);
+    assert_eq!(before.callback_node, execution.callback_node());
+    assert_eq!(before.pending_lanes, transition_lanes);
+    assert_eq!(before.entangled_lanes, transition_lanes);
+    assert_eq!(before.finished_work, None);
+    assert_eq!(before.finished_lanes, Lanes::NO);
+    assert_eq!(before.current_event_transition_lane, Lane::NO);
+
+    let rejection =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        rejection.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::StaleTransitionDiagnostics
+    );
+    assert!(rejection.stale_transition_diagnostics());
+    assert_eq!(rejection.root_current_before_continuation(), current);
+    assert_eq!(
+        rejection.root_pending_lanes_before_continuation(),
+        transition_lanes
+    );
+    assert_eq!(
+        rejection.root_entangled_lanes_before_continuation(),
+        transition_lanes
+    );
+    assert_eq!(rejection.current_event_transition_lane(), Lane::NO);
+    assert_eq!(rejection.queue_handoff(), Some(&queue_handoff));
+    assert_same_lane_multi_update_early_rejection_preserves_root_for_canary(
+        &store, root_id, before, &rejection, &host,
+    );
+}
+
+#[test]
+fn root_scheduler_transition_same_lane_multi_update_queue_lane_continuation_rejects_repending_without_entanglement()
+ {
+    let (mut store, root_id, host) = root_store();
+    let current = store.root(root_id).unwrap().current();
+    let (_first, _second, _third, requests, execution, queue_handoff) =
+        same_transition_multi_update_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(122507),
+            RootElementHandle::from_raw(122508),
+            RootElementHandle::from_raw(122509),
+        );
+    let transition_lanes = Lanes::from(Lane::TRANSITION_1);
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().pending_lanes(),
+        transition_lanes
+    );
+    assert_eq!(
+        store.root(root_id).unwrap().lanes().entangled_lanes(),
+        transition_lanes
+    );
+
+    {
+        let lanes = store.root_mut(root_id).unwrap().lanes_mut();
+        lanes.mark_finished(RootFinishedLanes::new(transition_lanes, Lanes::NO));
+        lanes.mark_updated(Lane::TRANSITION_1);
+    }
+    let before = same_lane_multi_update_rejection_root_snapshot_for_canary(&store, root_id);
+
+    assert_eq!(before.current, current);
+    assert_eq!(before.callback_node, execution.callback_node());
+    assert_eq!(before.pending_lanes, transition_lanes);
+    assert_eq!(before.entangled_lanes, Lanes::NO);
+    assert_eq!(before.finished_work, None);
+    assert_eq!(before.finished_lanes, Lanes::NO);
+    assert_eq!(before.current_event_transition_lane, Lane::TRANSITION_1);
+
+    let rejection =
+        execute_transition_same_lane_multi_update_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            requests,
+            execution,
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+    assert_eq!(
+        rejection.status(),
+        RootTransitionSameLaneMultiUpdateQueueLaneContinuationStatusForCanary::BlockedByTransitionEntanglementMismatch
+    );
+    assert!(rejection.blocked_by_transition_entanglement());
+    assert_eq!(rejection.root_current_before_continuation(), current);
+    assert_eq!(
+        rejection.root_pending_lanes_before_continuation(),
+        transition_lanes
+    );
+    assert_eq!(
+        rejection.root_entangled_lanes_before_continuation(),
+        Lanes::NO
+    );
+    assert_eq!(
+        rejection.current_event_transition_lane(),
+        Lane::TRANSITION_1
+    );
+    assert_eq!(rejection.queue_handoff(), Some(&queue_handoff));
+    assert_same_lane_multi_update_early_rejection_preserves_root_for_canary(
+        &store, root_id, before, &rejection, &host,
+    );
 }
 
 #[test]
