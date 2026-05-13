@@ -68,6 +68,9 @@ Current orchestration queue:
 - Scouts 1273 and 1276 reported concrete next-lane candidates.
 - Scout 1275 reported a concrete native/no-load next-lane candidate.
 - Scout 1274 reported a concrete React hooks/core facade next-lane candidate.
+- Scouts 1281, 1282, 1283, 1284, and 1285 are active for Rust scheduler/root,
+  React DOM, react-test-renderer, native/no-load, and React core/hooks
+  next-lane candidates.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

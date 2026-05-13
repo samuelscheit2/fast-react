@@ -303,6 +303,41 @@
 				"audit_1280_source_contract",
 				"audit_1280_verification"
 			]
+		},
+		{
+			"id": 1281,
+			"type": "scout",
+			"status": "active",
+			"title": "Rust scheduler/root next-lane scout",
+			"agent": "scout_1281_rust_scheduler_next"
+		},
+		{
+			"id": 1282,
+			"type": "scout",
+			"status": "active",
+			"title": "React DOM facade/root next-lane scout",
+			"agent": "scout_1282_react_dom_next"
+		},
+		{
+			"id": 1283,
+			"type": "scout",
+			"status": "active",
+			"title": "react-test-renderer blocker next-lane scout",
+			"agent": "scout_1283_test_renderer_next"
+		},
+		{
+			"id": 1284,
+			"type": "scout",
+			"status": "active",
+			"title": "Native/no-load next-lane scout",
+			"agent": "scout_1284_native_next"
+		},
+		{
+			"id": 1285,
+			"type": "scout",
+			"status": "active",
+			"title": "React core/hooks next-lane scout",
+			"agent": "scout_1285_react_core_next"
 		}
 	]
 }
