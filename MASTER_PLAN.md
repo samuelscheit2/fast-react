@@ -48,7 +48,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted implementation head before this
-docs pass is main `31e3c2a0` (`Merge worker 1260 queued cleanup currentness`).
+docs pass is main `d38bb298` (`Merge worker 1263 deleted subtree teardown drift`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -60,29 +60,24 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Workers 1253, 1254, 1257, 1258, 1259, 1260, and 1262 have been reviewed,
-  repaired where needed, merged, and recorded as accepted history.
-- Worker 1261 is under repair for inherited non-enumerable React DOM
-  compatibility-claim aliases.
-- Worker 1263 is active for private FunctionComponent deleted-subtree teardown
-  drift canaries in Rust.
-- Worker 1264 is active for native root work-loop metadata exact-key
-  hardening.
+- Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, and 1264
+  have been reviewed, repaired where needed, merged, and recorded as accepted
+  history.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `31e3c2a0`,
+implementation/evidence baseline main `d38bb298`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 30,464 lines
-- `tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`: 18,639 lines
-- `packages/react-test-renderer/index.js`: 17,231 lines
+- `tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`: 18,954 lines
+- `packages/react-test-renderer/index.js`: 17,251 lines
 - `packages/react-dom/src/resource-form-internals-gate.js`: 14,641 lines
 - `packages/react-dom/src/client/controlled-restore-queue.js`: 10,949 lines
 - `tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs`: 10,282 lines
 - `packages/react-dom/src/events/plugin-event-system.js`: 9,533 lines
-- `crates/fast-react-reconciler/src/root_scheduler/tests.rs`: 9,283 lines
+- `crates/fast-react-reconciler/src/root_scheduler/tests.rs`: 9,551 lines
 - `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: 9,241 lines
 - `crates/fast-react-reconciler/src/root_scheduler.rs`: 8,545 lines
 
@@ -96,7 +91,7 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `31e3c2a0` remains narrow.
+Accepted compatibility evidence through current main `d38bb298` remains narrow.
 The only public React DOM root behavior
 accepted so far is the fake-DOM div/text `createRoot().render(...)` lifecycle:
 initial render, same-root div/text/id update, id removal, `render(null)` cleanup,
@@ -133,7 +128,13 @@ exact report/array key validation, test-only Scheduler same-lane early rejection
 canaries, native no-load/source-currentness prototype-row rejection, and
 test-renderer private cross-entrypoint bridge currentness while public
 test-renderer behavior remains blocked. Queued minimal HostRoot cleanup also now
-validates detached-host ownership before publication.
+validates detached-host ownership before publication. React DOM public facade
+host-prop validation now rejects inherited root-bridge capability and claim
+aliases, including non-enumerable Object.prototype pollution and proxy
+prototype traps, before private rendering. Native root work-loop metadata
+source-currentness rows require exact own keys. Private FunctionComponent
+deleted-subtree teardown rejects live topology drift before ref cleanup,
+passive destroy, host detach, or host operations.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,

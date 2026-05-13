@@ -29,6 +29,39 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1261, 1263, and 1264 Acceptance Batch
+
+- Worker 1261 hardened the React DOM public `createRoot().render` host-prop
+  facade against inherited public/compatibility aliases. The accepted repair
+  reads element and prop fields through own data descriptors, rejects proxy
+  element/prop/prototype paths before trap execution, walks prototypes with
+  exact descriptor checks, and rejects root-bridge capability and claim fields
+  such as `listenerInstallationClaimed`, `markerWritesClaimed`,
+  `reconcilerExecutionClaimed`, and `refEffectsClaimed`, including
+  non-enumerable inherited and Object.prototype pollution cases.
+- Worker 1263 added private Rust deleted-subtree teardown drift canaries for
+  FunctionComponent deletion. Source-owned teardown requests now have hostile
+  tests proving newer committed current, reattached HostRoot child, and host
+  child sibling drift reject with no ref cleanup, passive destroy, host detach,
+  or extra host operations.
+- Worker 1264 hardened native root work-loop metadata source-currentness rows
+  so accepted rows require exact own data keys, while preserving raw
+  `status`/`code` omission handling. Extra enumerable string keys,
+  non-enumerable keys, and own symbols now reject as caller-built evidence
+  without native load/execution or package compatibility claims.
+- Accepted validation includes clean repair/source/verification audits. Root
+  reruns passed React DOM public-facade package test (5/5), public facade
+  conformance (47/47), root-public-facade script with 96 blocked rows and zero
+  failures, React DOM workspace check (237/237), native metadata and no-load
+  tests, native workspace check, FunctionComponent deleted-subtree teardown
+  (5/5), `root_work_loop` (154/154), package-surface guard, import smoke,
+  `cargo check -p fast-react-reconciler --all-features`,
+  `cargo fmt --all --check`, and `git diff --check`.
+- The accepted state is main `d38bb298` after Worker 1261 merge `6c30041a`,
+  Worker 1264 merge `c5b029d9`, Worker 1263 merge `d38bb298`, worker commits
+  `642b2c29`, `595db56b`, and `36dbf674`, and orchestration-state commits
+  through `09fc6236`.
+
 ### Worker 1260 Queued Minimal HostRoot Cleanup Currentness
 
 - Worker 1260 added private queued minimal HostRoot cleanup currentness
