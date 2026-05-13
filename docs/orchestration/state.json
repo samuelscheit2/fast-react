@@ -5,7 +5,7 @@
 		{
 			"id": 1253,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "React Children object key coercion",
 			"agent": "worker_1253_react_children_key_coercion",
 			"branch": "worker/1253-react-children-key-coercion",
@@ -17,7 +17,7 @@
 		{
 			"id": 1254,
 			"type": "worker",
-			"status": "auditing",
+			"status": "repair-active",
 			"title": "startTransition rootless currentness",
 			"agent": "worker_1254_start_transition_currentness",
 			"branch": "worker/1254-start-transition-currentness",
@@ -43,7 +43,7 @@
 		{
 			"id": 1257,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Conformance discovery static re-export coverage",
 			"agent": "worker_1257_conformance_reexport_discovery",
 			"branch": "worker/1257-conformance-reexport-discovery",
@@ -54,38 +54,43 @@
 		},
 		{
 			"id": 1258,
-			"type": "scout",
+			"type": "worker",
 			"status": "active",
-			"title": "Scheduler variant/root-scheduler replacement scout",
-			"agent": "scout_1258_scheduler_next"
+			"title": "Root-scheduler same-lane transition early rejection canaries",
+			"agent": "worker_1258_scheduler_same_lane_rejection",
+			"branch": "worker/1258-scheduler-same-lane-rejection"
 		},
 		{
 			"id": 1259,
-			"type": "scout",
+			"type": "worker",
 			"status": "active",
-			"title": "Native lifecycle/no-load replacement scout",
-			"agent": "scout_1259_native_next"
+			"title": "Native no-load ledgers reject prototype-only rows",
+			"agent": "worker_1259_native_prototype_rows",
+			"branch": "worker/1259-native-prototype-rows"
 		},
 		{
 			"id": 1260,
-			"type": "scout",
+			"type": "worker",
 			"status": "active",
-			"title": "Rust root/sync-flush next lane scout",
-			"agent": "scout_1260_rust_root_next"
+			"title": "Queued minimal HostRoot cleanup currentness gate",
+			"agent": "worker_1260_queued_cleanup_currentness",
+			"branch": "worker/1260-queued-cleanup-currentness"
 		},
 		{
 			"id": 1261,
-			"type": "scout",
+			"type": "worker",
 			"status": "active",
-			"title": "React DOM facade/native handoff next lane scout",
-			"agent": "scout_1261_react_dom_next"
+			"title": "React DOM public facade inherited-prop fail-closed guard",
+			"agent": "worker_1261_react_dom_inherited_props",
+			"branch": "worker/1261-react-dom-inherited-props"
 		},
 		{
 			"id": 1262,
-			"type": "scout",
+			"type": "worker",
 			"status": "active",
-			"title": "Test-renderer private bridge next lane scout",
-			"agent": "scout_1262_test_renderer_next"
+			"title": "react-test-renderer private root bridge cross-entrypoint currentness",
+			"agent": "worker_1262_test_renderer_cross_entrypoint",
+			"branch": "worker/1262-test-renderer-cross-entrypoint"
 		}
 	]
 }
