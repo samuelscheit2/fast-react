@@ -577,11 +577,14 @@
 		{
 			"id": 1309,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Native generation source ownership map",
 			"agent": "worker_1309_native_generation_source_ownership",
 			"branch": "worker/1309-native-generation-source-ownership",
-			"audits": []
+			"audits": [
+				"audit_1309_source_contract",
+				"audit_1309_verification"
+			]
 		},
 		{
 			"id": 1310,
