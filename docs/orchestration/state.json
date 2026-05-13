@@ -177,7 +177,7 @@
 		{
 			"id": 1269,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Queued minimal HostRoot source preflight inertness",
 			"agent": "worker_1269_queued_minimal_source_preflight",
 			"branch": "worker/1269-queued-minimal-source-preflight",
@@ -189,7 +189,7 @@
 		{
 			"id": 1270,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Native generation-admission ledger exact-key hardening",
 			"agent": "worker_1270_native_generation_exact_keys",
 			"branch": "worker/1270-native-generation-exact-keys",
@@ -201,20 +201,26 @@
 		{
 			"id": 1271,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "React DOM public root element-prototype capability blocker",
 			"agent": "worker_1271_react_dom_element_prototype_blocker",
 			"branch": "worker/1271-react-dom-element-prototype-blocker",
-			"audits": []
+			"audits": [
+				"audit_1271_source_contract",
+				"audit_1271_verification"
+			]
 		},
 		{
 			"id": 1272,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "test-renderer private-admission source-token comment proofing",
 			"agent": "worker_1272_test_renderer_ledger_comment_tokens",
 			"branch": "worker/1272-test-renderer-ledger-comment-tokens",
-			"audits": []
+			"audits": [
+				"audit_1272_source_contract",
+				"audit_1272_verification"
+			]
 		}
 	]
 }

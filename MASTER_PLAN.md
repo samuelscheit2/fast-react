@@ -48,7 +48,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted implementation head before this
-docs pass is main `d38bb298` (`Merge worker 1263 deleted subtree teardown drift`).
+docs pass is main `8f2a190b` (`Merge worker 1270 native generation exact keys`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -60,23 +60,20 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, and 1264
+- Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
+  1269, and 1270
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
-- Worker 1269 is active for queued minimal HostRoot invalid source preflight
-  inertness canaries.
-- Worker 1270 is active for native generation-admission ledger exact-key
-  hardening.
-- Worker 1271 is active for React DOM public root element-prototype capability
-  blockers.
-- Worker 1272 is active for test-renderer private-admission source-token
+- Worker 1271 is under audit for React DOM public root element-prototype
+  capability blockers.
+- Worker 1272 is under audit for test-renderer private-admission source-token
   comment proofing.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `d38bb298`,
+implementation/evidence baseline main `8f2a190b`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 30,464 lines
@@ -100,7 +97,7 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `d38bb298` remains narrow.
+Accepted compatibility evidence through current main `8f2a190b` remains narrow.
 The only public React DOM root behavior
 accepted so far is the fake-DOM div/text `createRoot().render(...)` lifecycle:
 initial render, same-root div/text/id update, id removal, `render(null)` cleanup,
@@ -143,7 +140,11 @@ aliases, including non-enumerable Object.prototype pollution and proxy
 prototype traps, before private rendering. Native root work-loop metadata
 source-currentness rows require exact own keys. Private FunctionComponent
 deleted-subtree teardown rejects live topology drift before ref cleanup,
-passive destroy, host detach, or host operations.
+passive destroy, host detach, or host operations. Queued minimal HostRoot
+source preflight rejects missing root-element handles and root text sources
+before enqueue, render, commit, current switch, finished-work metadata, pending
+lanes, render-phase work, or host mutation. Native generation-admission ledger
+rows require exact own data keys.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -162,7 +163,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `d38bb298` as
+1. Treat accepted compatibility evidence through current main `8f2a190b` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, and the narrow fake-DOM public div/text
    plus nested fake-DOM lifecycle evidence described above, including
@@ -178,11 +179,12 @@ canonical evidence requirements.
    test-renderer cross-entrypoint bridge currentness, passive destroy evidence,
    queued minimal cleanup detached-host ownership validation, scheduler root
    currentness completeness, scheduler local
-   row/evidence source validation, test-renderer placeholder currentness, and
-   test-renderer private create/serialization gates are blockers and currentness
-   evidence only; they do not open broader public root, native, browser DOM,
-   component rendering, Children traversal, package, Scheduler, effects,
-   test-renderer, or renderer compatibility.
+   row/evidence source validation, test-renderer placeholder currentness,
+   test-renderer private create/serialization gates, queued minimal source
+   preflight inertness, and native generation exact-key admission are blockers
+   and currentness evidence only; they do not open broader public root, native,
+   browser DOM, component rendering, Children traversal, package, Scheduler,
+   effects, test-renderer, or renderer compatibility.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct

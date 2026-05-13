@@ -29,6 +29,28 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1269 and 1270 Acceptance Batch
+
+- Worker 1269 added private Rust queued minimal HostRoot source-preflight
+  canaries. Invalid `TestHostTree` input now rejects missing root-element
+  handles and root text sources before enqueue, render, commit, current switch,
+  finished-work metadata, pending lanes, render-phase work, or host mutation.
+- Worker 1270 hardened native generation-admission ledger rows so accepted
+  evidence requires exact own data keys, while preserving optional raw
+  `status`/`code` input handling. Extra enumerable string keys,
+  non-enumerable keys, and own symbols now reject as caller-built evidence,
+  strip hostile keys from rejected rows, and keep native, worker, and package
+  execution flags false.
+- Accepted validation includes clean source and verification audits for both
+  workers. Root reruns passed queued minimal host (14/14),
+  `cargo check -p fast-react-reconciler --all-features`,
+  `cargo fmt --all --check`, native no-load guard, native private root
+  work-loop metadata factory, native workspace check, package-surface guard,
+  import smoke, and `git diff --check`.
+- The accepted state is main `8f2a190b` after Worker 1269 merge `4afb3e59`,
+  Worker 1270 merge `8f2a190b`, worker commits `c207b9d4` and `aaf0cba1`,
+  and this orchestration-state update.
+
 ### Workers 1261, 1263, and 1264 Acceptance Batch
 
 - Worker 1261 hardened the React DOM public `createRoot().render` host-prop
