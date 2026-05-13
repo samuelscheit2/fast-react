@@ -48,7 +48,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted implementation head before this
-docs pass is main `1dbe4bef` (`Merge worker 1280 transition hook dispatcher metadata`).
+docs pass is main `316985ef` (`Merge worker 1300 test renderer query bridge source proof`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -62,7 +62,7 @@ Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
   1269, 1270, 1271, 1272, 1277 through 1280, 1286 through 1290,
-  1296 through 1299, and 1306 through 1310
+  1296 through 1300, and 1306 through 1310
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
@@ -75,13 +75,9 @@ Current orchestration queue:
 - Scout 1283 reported a concrete react-test-renderer next-lane candidate.
 - Scout 1285 reported a concrete React core/hooks next-lane candidate.
 - Scouts 1291 through 1295 reported concrete next-lane candidates.
-- Worker 1300 eighth repair is under audit for react-test-renderer TestInstance
-  query-bridge local-gate source proofing after source audit found detached CJS
-  stub false greens, broken return wiring, first-return/top-level binding gaps,
-  control-flow, spread override, nested-return, guard-binding, duplicate-key,
-  helper-order, `var` redeclaration, method duplicate-key, `\u0042` escaped-key,
-  `\x42` escaped-key, destructuring redeclaration, and generator redeclaration
-  gaps, followed by returned bridge-method override and destructuring-assignment
+- Worker 1300's react-test-renderer TestInstance query-bridge source proof has
+  been repaired, merged, and recorded as accepted history after the eighth
+  repair closed returned bridge-method override and destructuring-assignment
   gaps.
 - Scout 1301 reported a Rust root/scheduler source-metadata currentness lane;
   Worker 1306 has been reviewed, merged, and recorded as accepted history.

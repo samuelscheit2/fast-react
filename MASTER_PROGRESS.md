@@ -29,6 +29,31 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1300 react-test-renderer TestInstance Query Bridge Source Proof
+
+- Worker 1300 hardened the react-test-renderer serialization local gate's
+  private TestInstance query-bridge source proof so accepted query helpers must
+  come from the live bridge wiring instead of detached or caller-shaped stubs.
+- The accepted repair sequence closed source-proof gaps for detached CJS stub
+  false greens, broken return wiring, first-return and top-level binding
+  checks, control-flow and spread override cases, nested returns, guard binding
+  drift, duplicate and escaped keys, `var` and destructuring redeclarations,
+  generator redeclarations, returned bridge-method overrides, and
+  destructuring-assigned live bindings.
+- The accepted change is private serialization/conformance evidence only. It
+  does not open public `.root`, public TestInstance query APIs, `act`,
+  Scheduler, native execution, package compatibility, or broad renderer
+  compatibility.
+- Accepted validation includes manual post-repair source inspection after the
+  final audit agents returned no report, worker-worktree checks passing the
+  targeted destructuring/returned-bridge cases (5/5), the serialization local
+  gate (92/92), the create-routing gate (46/46), and `git diff --check`.
+  Root merge verification passed cached and unstaged whitespace checks, the
+  targeted source-proof cases (5/5), the create-routing gate (46/46), and the
+  serialization local gate (94/94).
+- The accepted merge is main `316985ef` after Worker 1300 repair commit
+  `2b1ba347`.
+
 ### Worker 1309 Native Generation Source Ownership Map
 
 - Worker 1309 hardened the native no-load
