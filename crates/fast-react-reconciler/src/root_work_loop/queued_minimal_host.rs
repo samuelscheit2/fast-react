@@ -255,6 +255,29 @@ pub(crate) enum QueuedMinimalHostRootCommitError {
         expected: FiberRootId,
         actual: FiberRootId,
     },
+    PreviousHostWorkCurrentMismatch {
+        root: FiberRootId,
+        expected_current: FiberId,
+        actual_work_in_progress: FiberId,
+    },
+    MissingCurrentHostRootChildForCleanup {
+        root: FiberRootId,
+        current: FiberId,
+    },
+    PreviousHostWorkRootChildMismatch {
+        root: FiberRootId,
+        expected_root_child: Option<FiberId>,
+        actual_root_child: Option<FiberId>,
+        expected_root_children: Vec<FiberId>,
+        actual_root_children: Vec<FiberId>,
+    },
+    PreviousHostWorkCompletedChildMismatch {
+        root: FiberRootId,
+        expected_completed_child: Option<FiberId>,
+        actual_completed_child: Option<FiberId>,
+        expected_completed_children: Vec<FiberId>,
+        actual_completed_children: Vec<FiberId>,
+    },
     MissingPreviousHostWorkForCleanup {
         root: FiberRootId,
     },
@@ -303,6 +326,53 @@ impl Display for QueuedMinimalHostRootCommitError {
                 "queued minimal HostRoot commit expected previous host work for root {}, found root {}",
                 expected.raw(),
                 actual.raw()
+            ),
+            Self::PreviousHostWorkCurrentMismatch {
+                root,
+                expected_current,
+                actual_work_in_progress,
+            } => write!(
+                formatter,
+                "queued minimal HostRoot cleanup for root {} expected previous host work-in-progress {:?} to match live current {:?}",
+                root.raw(),
+                actual_work_in_progress,
+                expected_current
+            ),
+            Self::MissingCurrentHostRootChildForCleanup { root, current } => write!(
+                formatter,
+                "queued minimal HostRoot cleanup for root {} expected live current {:?} to have a child",
+                root.raw(),
+                current
+            ),
+            Self::PreviousHostWorkRootChildMismatch {
+                root,
+                expected_root_child,
+                actual_root_child,
+                expected_root_children,
+                actual_root_children,
+            } => write!(
+                formatter,
+                "queued minimal HostRoot cleanup for root {} expected previous root child {:?}/{:?}, found {:?}/{:?}",
+                root.raw(),
+                expected_root_child,
+                expected_root_children,
+                actual_root_child,
+                actual_root_children
+            ),
+            Self::PreviousHostWorkCompletedChildMismatch {
+                root,
+                expected_completed_child,
+                actual_completed_child,
+                expected_completed_children,
+                actual_completed_children,
+            } => write!(
+                formatter,
+                "queued minimal HostRoot cleanup for root {} expected previous completed child {:?}/{:?}, found {:?}/{:?}",
+                root.raw(),
+                expected_completed_child,
+                expected_completed_children,
+                actual_completed_child,
+                actual_completed_children
             ),
             Self::MissingPreviousHostWorkForCleanup { root } => write!(
                 formatter,
@@ -377,6 +447,10 @@ impl Error for QueuedMinimalHostRootCommitError {
             Self::UpdateQueueCommit(error) => Some(error),
             Self::FinishedWorkCommit(error) => Some(error),
             Self::PreviousHostWorkRootMismatch { .. }
+            | Self::PreviousHostWorkCurrentMismatch { .. }
+            | Self::MissingCurrentHostRootChildForCleanup { .. }
+            | Self::PreviousHostWorkRootChildMismatch { .. }
+            | Self::PreviousHostWorkCompletedChildMismatch { .. }
             | Self::MissingPreviousHostWorkForCleanup { .. }
             | Self::UpdatedPreviousHostWorkCleanupUnsupported { .. }
             | Self::MissingRootElement { .. }
@@ -708,6 +782,40 @@ fn validate_cleanup_previous_host_work_is_mount_owned(
     root: FiberRootId,
     previous: &HostWorkResult,
 ) -> Result<(), QueuedMinimalHostRootCommitError> {
+    let current = store.root(root).map_err(HostWorkError::from)?.current();
+    if previous.work_in_progress() != current {
+        return Err(
+            QueuedMinimalHostRootCommitError::PreviousHostWorkCurrentMismatch {
+                root,
+                expected_current: current,
+                actual_work_in_progress: previous.work_in_progress(),
+            },
+        );
+    }
+
+    let current_children = current_host_root_children(store, current)?;
+    let current_child = current_children.first().copied();
+    if current_child.is_none() {
+        return Err(
+            QueuedMinimalHostRootCommitError::MissingCurrentHostRootChildForCleanup {
+                root,
+                current,
+            },
+        );
+    }
+
+    if previous.root_child() != current_child || previous.root_children() != current_children {
+        return Err(
+            QueuedMinimalHostRootCommitError::PreviousHostWorkRootChildMismatch {
+                root,
+                expected_root_child: current_child,
+                actual_root_child: previous.root_child(),
+                expected_root_children: current_children,
+                actual_root_children: previous.root_children().to_vec(),
+            },
+        );
+    }
+
     for &fiber in previous.completed_children() {
         let node = store
             .fiber_arena()
@@ -725,7 +833,44 @@ fn validate_cleanup_previous_host_work_is_mount_owned(
         }
     }
 
+    if previous.completed_child() != current_child
+        || previous.completed_children() != current_children.as_slice()
+    {
+        return Err(
+            QueuedMinimalHostRootCommitError::PreviousHostWorkCompletedChildMismatch {
+                root,
+                expected_completed_child: current_child,
+                actual_completed_child: previous.completed_child(),
+                expected_completed_children: current_children,
+                actual_completed_children: previous.completed_children().to_vec(),
+            },
+        );
+    }
+
     Ok(())
+}
+
+fn current_host_root_children(
+    store: &FiberRootStore<RecordingHost>,
+    current: FiberId,
+) -> Result<Vec<FiberId>, QueuedMinimalHostRootCommitError> {
+    let mut children = Vec::new();
+    let mut next = store
+        .fiber_arena()
+        .get(current)
+        .map_err(HostWorkError::from)?
+        .child();
+
+    while let Some(child) = next {
+        children.push(child);
+        next = store
+            .fiber_arena()
+            .get(child)
+            .map_err(HostWorkError::from)?
+            .sibling();
+    }
+
+    Ok(children)
 }
 
 fn validate_minimal_host_component_with_text_source(

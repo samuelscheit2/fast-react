@@ -181,6 +181,65 @@ fn root_work_loop_queued_minimal_host_root_null_cleanup_consumes_sync_root_updat
 }
 
 #[test]
+fn root_work_loop_queued_minimal_host_root_rejects_cleanup_when_live_current_child_is_missing() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut source = TestHostTree::new();
+    let initial = source.insert_host_element_with_text("article", "queued cleanup");
+    let mounted = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        initial,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        None,
+        QUEUED_MINIMAL_SOURCE_ORDER + 35,
+        QUEUED_MINIMAL_COMMIT_ORDER + 35,
+    )
+    .unwrap();
+    let cleaned = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        RootElementHandle::NONE,
+        QueuedMinimalHostRootUpdatePriority::Sync,
+        Lanes::SYNC,
+        &source,
+        Some(mounted.into_host_work()),
+        QUEUED_MINIMAL_SOURCE_ORDER + 36,
+        QUEUED_MINIMAL_COMMIT_ORDER + 36,
+    )
+    .unwrap();
+    let current = store.root(root_id).unwrap().current();
+    let snapshot = queued_minimal_host_root_snapshot(&store, &host, root_id);
+    assert_eq!(snapshot.current_child, None);
+
+    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        RootElementHandle::NONE,
+        QueuedMinimalHostRootUpdatePriority::Sync,
+        Lanes::SYNC,
+        &source,
+        Some(cleaned.into_host_work()),
+        QUEUED_MINIMAL_SOURCE_ORDER + 37,
+        QUEUED_MINIMAL_COMMIT_ORDER + 37,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        QueuedMinimalHostRootCommitError::MissingCurrentHostRootChildForCleanup {
+            root: root_id,
+            current,
+        }
+    );
+    assert_queued_minimal_host_root_snapshot(&store, &host, root_id, snapshot);
+}
+
+#[test]
 fn root_work_loop_queued_minimal_host_root_rejects_update_then_cleanup_before_publication() {
     let (mut store, root_id, mut host) = root_store();
     let mut source = TestHostTree::new();
@@ -343,6 +402,232 @@ fn root_work_loop_queued_minimal_host_root_rejects_wrong_root_previous_host_work
 }
 
 #[test]
+fn root_work_loop_queued_minimal_host_root_rejects_stale_previous_host_work_current_before_enqueue()
+{
+    let (mut store, root_id, mut host) = root_store();
+    let mut source = TestHostTree::new();
+    let element = source.insert_host_element_with_text("section", "currentness");
+    let stale_work_in_progress = store.root(root_id).unwrap().current();
+    let mounted = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        element,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        None,
+        QUEUED_MINIMAL_SOURCE_ORDER + 120,
+        QUEUED_MINIMAL_COMMIT_ORDER + 120,
+    )
+    .unwrap();
+    let current = store.root(root_id).unwrap().current();
+    let current_child = mounted.host_work().root_child().unwrap();
+    let previous = HostWorkResult::from_detached_hosts_for_canary(
+        root_id,
+        stale_work_in_progress,
+        vec![current_child],
+        vec![current_child],
+        DetachedHostRecords::new_for_canary(),
+    );
+    let snapshot = queued_minimal_host_root_snapshot(&store, &host, root_id);
+
+    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        RootElementHandle::NONE,
+        QueuedMinimalHostRootUpdatePriority::Sync,
+        Lanes::SYNC,
+        &source,
+        Some(previous),
+        QUEUED_MINIMAL_SOURCE_ORDER + 121,
+        QUEUED_MINIMAL_COMMIT_ORDER + 121,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        QueuedMinimalHostRootCommitError::PreviousHostWorkCurrentMismatch {
+            root: root_id,
+            expected_current: current,
+            actual_work_in_progress: stale_work_in_progress,
+        }
+    );
+    assert_queued_minimal_host_root_snapshot(&store, &host, root_id, snapshot);
+}
+
+#[test]
+fn root_work_loop_queued_minimal_host_root_rejects_stale_previous_root_child_before_enqueue() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut source = TestHostTree::new();
+    let element = source.insert_host_element_with_text("section", "root child");
+    let mounted = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        element,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        None,
+        QUEUED_MINIMAL_SOURCE_ORDER + 130,
+        QUEUED_MINIMAL_COMMIT_ORDER + 130,
+    )
+    .unwrap();
+    let current = store.root(root_id).unwrap().current();
+    let current_child = mounted.host_work().root_child().unwrap();
+    let stale_child = create_unattached_host_component_fiber(&mut store, 130);
+    let previous = HostWorkResult::from_detached_hosts_for_canary(
+        root_id,
+        current,
+        vec![stale_child],
+        vec![stale_child],
+        DetachedHostRecords::new_for_canary(),
+    );
+    let snapshot = queued_minimal_host_root_snapshot(&store, &host, root_id);
+
+    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        RootElementHandle::NONE,
+        QueuedMinimalHostRootUpdatePriority::Sync,
+        Lanes::SYNC,
+        &source,
+        Some(previous),
+        QUEUED_MINIMAL_SOURCE_ORDER + 131,
+        QUEUED_MINIMAL_COMMIT_ORDER + 131,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        QueuedMinimalHostRootCommitError::PreviousHostWorkRootChildMismatch {
+            root: root_id,
+            expected_root_child: Some(current_child),
+            actual_root_child: Some(stale_child),
+            expected_root_children: vec![current_child],
+            actual_root_children: vec![stale_child],
+        }
+    );
+    assert_queued_minimal_host_root_snapshot(&store, &host, root_id, snapshot);
+}
+
+#[test]
+fn root_work_loop_queued_minimal_host_root_rejects_missing_previous_root_child_before_enqueue() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut source = TestHostTree::new();
+    let element = source.insert_host_element_with_text("section", "missing child");
+    let mounted = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        element,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        None,
+        QUEUED_MINIMAL_SOURCE_ORDER + 140,
+        QUEUED_MINIMAL_COMMIT_ORDER + 140,
+    )
+    .unwrap();
+    let current = store.root(root_id).unwrap().current();
+    let current_child = mounted.host_work().root_child().unwrap();
+    let previous = HostWorkResult::from_detached_hosts_for_canary(
+        root_id,
+        current,
+        Vec::new(),
+        Vec::new(),
+        DetachedHostRecords::new_for_canary(),
+    );
+    let snapshot = queued_minimal_host_root_snapshot(&store, &host, root_id);
+
+    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        RootElementHandle::NONE,
+        QueuedMinimalHostRootUpdatePriority::Sync,
+        Lanes::SYNC,
+        &source,
+        Some(previous),
+        QUEUED_MINIMAL_SOURCE_ORDER + 141,
+        QUEUED_MINIMAL_COMMIT_ORDER + 141,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        QueuedMinimalHostRootCommitError::PreviousHostWorkRootChildMismatch {
+            root: root_id,
+            expected_root_child: Some(current_child),
+            actual_root_child: None,
+            expected_root_children: vec![current_child],
+            actual_root_children: Vec::new(),
+        }
+    );
+    assert_queued_minimal_host_root_snapshot(&store, &host, root_id, snapshot);
+}
+
+#[test]
+fn root_work_loop_queued_minimal_host_root_rejects_extra_completed_child_before_enqueue() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut source = TestHostTree::new();
+    let element = source.insert_host_element_with_text("section", "extra completed");
+    let mounted = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        element,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        None,
+        QUEUED_MINIMAL_SOURCE_ORDER + 150,
+        QUEUED_MINIMAL_COMMIT_ORDER + 150,
+    )
+    .unwrap();
+    let current = store.root(root_id).unwrap().current();
+    let current_child = mounted.host_work().root_child().unwrap();
+    let extra_child = create_unattached_host_component_fiber(&mut store, 150);
+    let previous = HostWorkResult::from_detached_hosts_for_canary(
+        root_id,
+        current,
+        vec![current_child],
+        vec![current_child, extra_child],
+        DetachedHostRecords::new_for_canary(),
+    );
+    let snapshot = queued_minimal_host_root_snapshot(&store, &host, root_id);
+
+    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        RootElementHandle::NONE,
+        QueuedMinimalHostRootUpdatePriority::Sync,
+        Lanes::SYNC,
+        &source,
+        Some(previous),
+        QUEUED_MINIMAL_SOURCE_ORDER + 151,
+        QUEUED_MINIMAL_COMMIT_ORDER + 151,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        QueuedMinimalHostRootCommitError::PreviousHostWorkCompletedChildMismatch {
+            root: root_id,
+            expected_completed_child: Some(current_child),
+            actual_completed_child: Some(current_child),
+            expected_completed_children: vec![current_child],
+            actual_completed_children: vec![current_child, extra_child],
+        }
+    );
+    assert_queued_minimal_host_root_snapshot(&store, &host, root_id, snapshot);
+}
+
+#[test]
 fn root_work_loop_queued_minimal_host_root_rejects_stale_render_lane_before_complete_or_commit() {
     let (mut store, root_id, mut host) = root_store();
     let mut source = TestHostTree::new();
@@ -420,4 +705,59 @@ fn root_work_loop_queued_minimal_host_root_rejects_replayed_finished_work_handof
         } if root == root_id && finished_work == render.finished_work()
     ));
     assert_eq!(current_host_root_element(&store, root_id), element);
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct QueuedMinimalHostRootSnapshot {
+    current: FiberId,
+    current_child: Option<FiberId>,
+    finished_work: Option<FiberId>,
+    finished_lanes: Lanes,
+    pending_lanes: Lanes,
+    render_phase_work: Option<FiberId>,
+    operations: Vec<&'static str>,
+    element: RootElementHandle,
+}
+
+fn queued_minimal_host_root_snapshot(
+    store: &FiberRootStore<RecordingHost>,
+    host: &RecordingHost,
+    root_id: FiberRootId,
+) -> QueuedMinimalHostRootSnapshot {
+    let root = store.root(root_id).unwrap();
+    let current = root.current();
+    QueuedMinimalHostRootSnapshot {
+        current,
+        current_child: store.fiber_arena().get(current).unwrap().child(),
+        finished_work: root.finished_work(),
+        finished_lanes: root.finished_lanes(),
+        pending_lanes: root.lanes().pending_lanes(),
+        render_phase_work: root.scheduling().work_in_progress(),
+        operations: host.operations(),
+        element: current_host_root_element(store, root_id),
+    }
+}
+
+fn assert_queued_minimal_host_root_snapshot(
+    store: &FiberRootStore<RecordingHost>,
+    host: &RecordingHost,
+    root_id: FiberRootId,
+    expected: QueuedMinimalHostRootSnapshot,
+) {
+    assert_eq!(
+        queued_minimal_host_root_snapshot(store, host, root_id),
+        expected
+    );
+}
+
+fn create_unattached_host_component_fiber(
+    store: &mut FiberRootStore<RecordingHost>,
+    raw_props: u64,
+) -> FiberId {
+    store.fiber_arena_mut().create_fiber(
+        FiberTag::HostComponent,
+        None,
+        PropsHandle::from_raw(raw_props),
+        FiberMode::NO,
+    )
 }
