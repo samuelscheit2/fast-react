@@ -366,7 +366,7 @@
 		{
 			"id": 1288,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Hook dispatcher singleton metadata hardening",
 			"agent": "worker_1288_hook_dispatcher_singleton_metadata",
 			"branch": "worker/1288-hook-dispatcher-singleton-metadata",

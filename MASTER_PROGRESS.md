@@ -29,6 +29,22 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1288 Hook Dispatcher Singleton Metadata
+
+- Worker 1288 hardened private state, callback, memo, and effect hook dispatcher
+  metadata validators so they require source-owned singleton identity before
+  field inspection. Shallow clones, extra-claim clones, prototype-backed
+  objects, accessor-backed forged fields, proxy-wrapped metadata, and cloned
+  metadata mark attempts now fail closed.
+- The accepted change is private source-ownership evidence only. It does not
+  claim public hook behavior, dispatcher routing, Scheduler, root, package, or
+  broad hook compatibility.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed the hook dispatcher guard and oracle together (65/65), React workspace
+  check, package-surface guard, import smoke, and `git diff --check`.
+- The accepted state is main `d08b0b08` after Worker 1288 merge `d08b0b08`,
+  worker commit `a7b01d43`, and this orchestration-state update.
+
 ### Worker 1286 Scheduler Nested Handoff Drift Canaries
 
 - Worker 1286 added private Rust same-lane transition currentness canaries for
