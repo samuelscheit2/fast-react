@@ -5,6 +5,12 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::complete_work::HostFiberTokenFactory;
 use crate::host_nodes::HostNodeStore;
+use crate::private_fiber_inspection::{
+    SyncFlushMinimalHostPlacementCommittedFiberInspectionError,
+    SyncFlushMinimalHostPlacementCompatibilityClaimForCanary,
+    inspect_sync_flush_minimal_host_placement_committed_fiber_tree,
+    record_sync_flush_minimal_host_placement_committed_fiber_source,
+};
 use crate::root_work_loop::{
     HostRootMinimalElementRenderPhaseError, HostRootMinimalRenderCompleteHandoffAdapter,
     HostRootMinimalRenderCompleteHandoffError, HostRootMinimalRenderCompletePlacementCommitError,
@@ -194,6 +200,62 @@ fn render_default_minimal_record(
     root_sync_flush_record_for_canary(0, root_id, Lanes::DEFAULT, render)
 }
 
+struct SyncFlushMinimalPlacementFiberInspectionFixture {
+    store: FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    record: SyncFlushMinimalHostPlacementCommitRecordForCanary,
+    element: RootElementHandle,
+    element_type: ElementTypeHandle,
+    props: PropsHandle,
+    text_props: PropsHandle,
+    previous_current: FiberId,
+}
+
+fn commit_sync_flush_minimal_placement_for_fiber_inspection(
+    base: u64,
+    text: &'static str,
+) -> SyncFlushMinimalPlacementFiberInspectionFixture {
+    let (mut store, root_id, mut host) = root_store();
+    let mut host_nodes = HostNodeStore::<RecordingHost>::new();
+    let mut token_factory = SyncFlushMinimalHostTokenFactory;
+    let element = RootElementHandle::from_raw(base);
+    let element_type = ElementTypeHandle::from_raw(base + 1);
+    let props = PropsHandle::from_raw(base + 2);
+    let text_props = PropsHandle::from_raw(base + 3);
+    let source = sync_flush_minimal_source(element, element_type, props, text, text_props);
+    let previous_current = store.root(root_id).unwrap().current();
+    let rendered_record = render_sync_flush_minimal_record(&mut store, root_id, element);
+    let mut adapter = SyncFlushMinimalHostAdapter::new(element, element_type, props, "section");
+    let record =
+        SyncFlushRootRecord::commit_rendered_sync_flush_record_to_minimal_host_placement_for_canary(
+            &mut store,
+            &mut host,
+            &mut host_nodes,
+            &mut token_factory,
+            rendered_record,
+            &source,
+            &mut adapter,
+        )
+        .unwrap();
+
+    assert_eq!(source.calls(), 1);
+    assert_eq!(adapter.type_calls(), 1);
+    assert_eq!(adapter.props_calls(), 1);
+    assert!(host_nodes.is_empty());
+    assert!(record.accepted_sync_flush_minimal_host_placement_handoff());
+
+    SyncFlushMinimalPlacementFiberInspectionFixture {
+        store,
+        root_id,
+        record,
+        element,
+        element_type,
+        props,
+        text_props,
+        previous_current,
+    }
+}
+
 #[test]
 fn sync_flush_minimal_host_placement_consumes_rendered_record_and_appends_host_pair_canary() {
     let (mut store, root_id, mut host) = root_store();
@@ -377,6 +439,428 @@ fn sync_flush_minimal_host_placement_consumes_rendered_record_and_appends_host_p
     assert_eq!(adapter.type_calls(), 1);
     assert_eq!(adapter.props_calls(), 1);
     assert_eq!(host.operations(), operations_after_commit);
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_fiber_inspection_proves_committed_shape_canary() {
+    let fixture = commit_sync_flush_minimal_placement_for_fiber_inspection(
+        9_101,
+        "sync flush committed fiber inspection",
+    );
+    let rendered_record = fixture.record.sync_flush_record();
+    let render_phase = rendered_record.render_phase();
+    let placement = fixture.record.placement();
+    let placement_commit = placement.placement_commit();
+
+    let source = record_sync_flush_minimal_host_placement_committed_fiber_source(
+        &fixture.store,
+        &fixture.record,
+    )
+    .unwrap();
+    let proof =
+        inspect_sync_flush_minimal_host_placement_committed_fiber_tree(&fixture.store, source)
+            .unwrap();
+
+    assert_eq!(source.root(), fixture.root_id);
+    assert_eq!(source.root_token(), fixture.root_id.state_node_handle());
+    assert_eq!(source.previous_current(), fixture.previous_current);
+    assert_eq!(source.committed_current(), placement.commit().current());
+    assert_eq!(
+        source.rendered_finished_work(),
+        render_phase.finished_work()
+    );
+    assert_eq!(source.committed_current(), render_phase.finished_work());
+    assert_eq!(
+        fixture.store.root(fixture.root_id).unwrap().current(),
+        placement.commit().current()
+    );
+    assert_eq!(
+        fixture.store.root(fixture.root_id).unwrap().finished_work(),
+        None
+    );
+    assert_eq!(
+        fixture
+            .store
+            .root(fixture.root_id)
+            .unwrap()
+            .finished_lanes(),
+        Lanes::NO
+    );
+    assert_eq!(source.finished_work_after_commit(), None);
+    assert_eq!(source.finished_lanes_after_commit(), Lanes::NO);
+
+    assert_eq!(proof.shape_name(), "HostRoot->HostComponent->HostText");
+    assert_eq!(
+        proof.tree().fiber_tag_order(),
+        vec![
+            FiberTag::HostRoot,
+            FiberTag::HostComponent,
+            FiberTag::HostText
+        ]
+    );
+    assert_eq!(proof.store_current(), placement.commit().current());
+    assert_eq!(proof.finished_work_after_commit(), None);
+    assert_eq!(proof.finished_lanes_after_commit(), Lanes::NO);
+    assert_eq!(proof.host_root().fiber(), placement.commit().current());
+    assert_eq!(
+        proof.host_root().alternate(),
+        Some(fixture.previous_current)
+    );
+    assert_eq!(
+        fixture
+            .store
+            .fiber_arena()
+            .get(fixture.previous_current)
+            .unwrap()
+            .alternate(),
+        Some(placement.commit().current())
+    );
+    assert_eq!(proof.host_component().fiber(), placement_commit.component());
+    assert_eq!(
+        proof.host_component().state_node(),
+        placement_commit.component_state_node()
+    );
+    assert_eq!(proof.host_component().element_type(), fixture.element_type);
+    assert_eq!(proof.host_component().pending_props(), fixture.props);
+    assert_eq!(proof.host_component().memoized_props(), fixture.props);
+    assert_eq!(proof.host_component().lanes(), source.component_lanes());
+    assert_eq!(proof.host_text().fiber(), placement_commit.text());
+    assert_eq!(
+        proof.host_text().state_node(),
+        placement_commit.text_state_node()
+    );
+    assert_eq!(proof.host_text().pending_props(), fixture.text_props);
+    assert_eq!(proof.host_text().memoized_props(), fixture.text_props);
+    assert_eq!(proof.host_text().lanes(), source.text_lanes());
+    assert_eq!(source.root_element(), fixture.element);
+    assert_eq!(source.component(), placement_commit.component());
+    assert_eq!(source.component_element_type(), fixture.element_type);
+    assert_eq!(source.component_props(), fixture.props);
+    assert_eq!(
+        source.component_state_node(),
+        placement_commit.component_state_node()
+    );
+    assert_eq!(source.component_lanes(), proof.host_component().lanes());
+    assert_eq!(source.text(), placement_commit.text());
+    assert_eq!(source.text_props(), fixture.text_props);
+    assert_eq!(source.text_state_node(), placement_commit.text_state_node());
+    assert_eq!(source.text_lanes(), proof.host_text().lanes());
+    assert_eq!(source.render_lanes(), Lanes::SYNC);
+    assert_eq!(source.commit_finished_lanes(), Lanes::SYNC);
+    assert_eq!(source.commit_remaining_lanes(), Lanes::NO);
+    assert_eq!(source.commit_pending_lanes(), Lanes::NO);
+    assert!(source.source_current_topology_recorded());
+    assert!(source.host_node_store_state_nodes_present());
+    assert_eq!(source.host_root_source_row(), proof.host_root());
+    assert_eq!(source.component_source_row(), proof.host_component());
+    assert_eq!(source.text_source_row(), proof.host_text());
+    assert!(proof.validate_against_store(&fixture.store).is_ok());
+
+    assert_eq!(
+        proof.blockers(),
+        &[
+            "public root rendering",
+            "public flushSync compatibility",
+            "React DOM compatibility",
+            "react-test-renderer public compatibility",
+            "native execution",
+            "broad renderer compatibility",
+            "act compatibility",
+            "Scheduler compatibility",
+            "refs/effects/hydration execution",
+            "package compatibility",
+        ]
+    );
+    assert_eq!(source.public_compatibility_blockers(), proof.blockers());
+    assert!(source.public_root_rendering_blocked());
+    assert!(source.public_flush_sync_compatibility_blocked());
+    assert!(source.react_dom_compatibility_blocked());
+    assert!(source.test_renderer_public_compatibility_blocked());
+    assert!(source.native_execution_blocked());
+    assert!(source.broad_renderer_compatibility_blocked());
+    assert!(source.act_compatibility_blocked());
+    assert!(source.scheduler_compatibility_blocked());
+    assert!(source.refs_effects_hydration_execution_blocked());
+    assert!(source.package_compatibility_blocked());
+    assert!(!source.public_root_rendering_claimed());
+    assert!(!source.public_flush_sync_compatibility_claimed());
+    assert!(!source.react_dom_compatibility_claimed());
+    assert!(!source.test_renderer_public_compatibility_claimed());
+    assert!(!source.native_execution_compatibility_claimed());
+    assert!(!source.broad_renderer_compatibility_claimed());
+    assert!(!source.act_compatibility_claimed());
+    assert!(!source.scheduler_compatibility_claimed());
+    assert!(!source.refs_effects_hydration_execution_claimed());
+    assert!(!source.package_compatibility_claimed());
+    assert!(!source.compatibility_claimed());
+    assert!(proof.public_root_rendering_blocked());
+    assert!(proof.public_flush_sync_compatibility_blocked());
+    assert!(proof.react_dom_compatibility_blocked());
+    assert!(proof.test_renderer_public_compatibility_blocked());
+    assert!(proof.native_execution_blocked());
+    assert!(proof.broad_renderer_compatibility_blocked());
+    assert!(proof.act_compatibility_blocked());
+    assert!(proof.scheduler_compatibility_blocked());
+    assert!(proof.refs_effects_hydration_execution_blocked());
+    assert!(proof.package_compatibility_blocked());
+    assert!(!proof.public_root_rendering_claimed());
+    assert!(!proof.public_flush_sync_compatibility_claimed());
+    assert!(!proof.react_dom_compatibility_claimed());
+    assert!(!proof.test_renderer_public_compatibility_claimed());
+    assert!(!proof.native_execution_compatibility_claimed());
+    assert!(!proof.broad_renderer_compatibility_claimed());
+    assert!(!proof.act_compatibility_claimed());
+    assert!(!proof.scheduler_compatibility_claimed());
+    assert!(!proof.refs_effects_hydration_execution_claimed());
+    assert!(!proof.package_compatibility_claimed());
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_fiber_inspection_rejects_stale_current_canary() {
+    let mut fixture = commit_sync_flush_minimal_placement_for_fiber_inspection(9_121, "stale rows");
+    let source = record_sync_flush_minimal_host_placement_committed_fiber_source(
+        &fixture.store,
+        &fixture.record,
+    )
+    .unwrap();
+    let proof =
+        inspect_sync_flush_minimal_host_placement_committed_fiber_tree(&fixture.store, source)
+            .unwrap();
+    let cloned_row_error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
+        &fixture.store,
+        source.with_component_source_row_for_canary(source.host_root_source_row()),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        cloned_row_error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch { .. }
+    ));
+
+    update_container(
+        &mut fixture.store,
+        fixture.root_id,
+        RootElementHandle::from_raw(9_125),
+        None,
+    )
+    .unwrap();
+    let stale_render =
+        render_host_root_for_lanes(&mut fixture.store, fixture.root_id, Lanes::DEFAULT).unwrap();
+    let stale_commit = commit_finished_host_root(&mut fixture.store, stale_render).unwrap();
+    assert_ne!(stale_commit.current(), source.committed_current());
+
+    let validation_error = proof.validate_against_store(&fixture.store).unwrap_err();
+    assert!(matches!(
+        validation_error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CurrentRootMismatch {
+            expected,
+            actual,
+        } if expected == source.committed_current()
+            && actual == stale_commit.current()
+    ));
+    let inspection_error =
+        inspect_sync_flush_minimal_host_placement_committed_fiber_tree(&fixture.store, source)
+            .unwrap_err();
+    assert!(matches!(
+        inspection_error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CurrentRootMismatch {
+            expected,
+            actual,
+        } if expected == source.committed_current()
+            && actual == stale_commit.current()
+    ));
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_fiber_inspection_rejects_tampered_ids_canary() {
+    let fixture = commit_sync_flush_minimal_placement_for_fiber_inspection(9_141, "tampered ids");
+    let source = record_sync_flush_minimal_host_placement_committed_fiber_source(
+        &fixture.store,
+        &fixture.record,
+    )
+    .unwrap();
+
+    let component_error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
+        &fixture.store,
+        source.with_component_for_canary(source.text()),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        component_error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch { .. }
+    ));
+
+    let text_error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
+        &fixture.store,
+        source.with_text_for_canary(source.component()),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        text_error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch { .. }
+    ));
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_fiber_inspection_rejects_tampered_state_nodes_canary() {
+    let fixture =
+        commit_sync_flush_minimal_placement_for_fiber_inspection(9_161, "tampered state nodes");
+    let source = record_sync_flush_minimal_host_placement_committed_fiber_source(
+        &fixture.store,
+        &fixture.record,
+    )
+    .unwrap();
+
+    let component_error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
+        &fixture.store,
+        source.with_component_state_node_for_canary(source.text_state_node()),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        component_error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch { .. }
+    ));
+
+    let text_error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
+        &fixture.store,
+        source.with_text_state_node_for_canary(source.component_state_node()),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        text_error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch { .. }
+    ));
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_fiber_inspection_rejects_cross_root_source_canary() {
+    let mut fixture = commit_sync_flush_minimal_placement_for_fiber_inspection(9_181, "cross root");
+    let other_root = fixture
+        .store
+        .create_client_root(FakeContainer::new(44), RootOptions::new())
+        .unwrap();
+    let source = record_sync_flush_minimal_host_placement_committed_fiber_source(
+        &fixture.store,
+        &fixture.record,
+    )
+    .unwrap();
+
+    let error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
+        &fixture.store,
+        source.with_root_and_token_for_canary(other_root),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch { .. }
+    ));
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_fiber_inspection_rejects_stale_finished_metadata_canary() {
+    let mut fixture =
+        commit_sync_flush_minimal_placement_for_fiber_inspection(9_201, "stale finished metadata");
+    let source = record_sync_flush_minimal_host_placement_committed_fiber_source(
+        &fixture.store,
+        &fixture.record,
+    )
+    .unwrap();
+    let proof =
+        inspect_sync_flush_minimal_host_placement_committed_fiber_tree(&fixture.store, source)
+            .unwrap();
+
+    fixture
+        .store
+        .root_mut(fixture.root_id)
+        .unwrap()
+        .record_finished_work_for_canary(source.committed_current(), Lanes::SYNC);
+    let validation_error = proof.validate_against_store(&fixture.store).unwrap_err();
+    assert!(matches!(
+        validation_error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+            field: "finished_work_after_commit",
+        }
+    ));
+    let inspection_error =
+        inspect_sync_flush_minimal_host_placement_committed_fiber_tree(&fixture.store, source)
+            .unwrap_err();
+    assert!(matches!(
+        inspection_error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+            field: "source.finished_work_after_commit",
+        }
+    ));
+
+    let fixture = commit_sync_flush_minimal_placement_for_fiber_inspection(
+        9_221,
+        "stale source finished metadata",
+    );
+    let source = record_sync_flush_minimal_host_placement_committed_fiber_source(
+        &fixture.store,
+        &fixture.record,
+    )
+    .unwrap();
+    let stale_source = source
+        .with_finished_work_after_commit_for_canary(Some(source.committed_current()))
+        .with_finished_lanes_after_commit_for_canary(Lanes::SYNC);
+    let stale_source_error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
+        &fixture.store,
+        stale_source,
+    )
+    .unwrap_err();
+    assert!(matches!(
+        stale_source_error,
+        SyncFlushMinimalHostPlacementCommittedFiberInspectionError::SourceMismatch {
+            field: "source.commit_lanes",
+        }
+    ));
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_fiber_inspection_rejects_public_compat_claims_canary() {
+    let fixture =
+        commit_sync_flush_minimal_placement_for_fiber_inspection(9_241, "compat blockers");
+    let source = record_sync_flush_minimal_host_placement_committed_fiber_source(
+        &fixture.store,
+        &fixture.record,
+    )
+    .unwrap();
+
+    let claims = [
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::PublicRootRendering,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::PublicFlushSync,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::ReactDom,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::TestRendererPublic,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::NativeExecution,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::BroadRenderer,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::Act,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::Scheduler,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::RefsEffectsHydration,
+        SyncFlushMinimalHostPlacementCompatibilityClaimForCanary::Package,
+    ];
+    for claim in claims {
+        let error = inspect_sync_flush_minimal_host_placement_committed_fiber_tree(
+            &fixture.store,
+            source.with_compatibility_claim_for_canary(claim),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            SyncFlushMinimalHostPlacementCommittedFiberInspectionError::CompatibilityClaim {
+                surface,
+            } if surface == claim.surface()
+        ));
+    }
+}
+
+#[test]
+fn sync_flush_minimal_host_placement_private_fiber_inspection_committed_fiber_inspection() {
+    sync_flush_minimal_host_placement_fiber_inspection_proves_committed_shape_canary();
+    sync_flush_minimal_host_placement_fiber_inspection_rejects_stale_current_canary();
+    sync_flush_minimal_host_placement_fiber_inspection_rejects_tampered_ids_canary();
+    sync_flush_minimal_host_placement_fiber_inspection_rejects_tampered_state_nodes_canary();
+    sync_flush_minimal_host_placement_fiber_inspection_rejects_cross_root_source_canary();
+    sync_flush_minimal_host_placement_fiber_inspection_rejects_stale_finished_metadata_canary();
+    sync_flush_minimal_host_placement_fiber_inspection_rejects_public_compat_claims_canary();
 }
 
 #[test]
@@ -982,6 +1466,7 @@ fn sync_flush_minimal_host_placement_flags_pending_sync_work_after_commit_canary
 #[test]
 fn sync_flush_private_host_mutation_minimal_placement_matrix_executes_canaries() {
     sync_flush_minimal_host_placement_consumes_rendered_record_and_appends_host_pair_canary();
+    sync_flush_minimal_host_placement_private_fiber_inspection_committed_fiber_inspection();
     sync_flush_minimal_host_placement_rejects_stale_finished_work_and_lane_evidence_canary();
     sync_flush_minimal_host_placement_resolver_and_adapter_fail_closed_without_publishing_canary();
     sync_flush_minimal_host_placement_rejects_public_compatibility_claim_before_host_publication_canary();
