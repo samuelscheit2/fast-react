@@ -801,6 +801,7 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRowFields =
     'sourceFiles',
     'evidenceKind',
     'sourceIdentifiers',
+    'sourceIdentifierEvidenceByFile',
     'status',
     'code',
     'sourceOwnedEvidence',
@@ -868,7 +869,18 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows =
         'source_owned_json_row',
         'rust_state_machine_execution',
         'source_guard'
-      ]
+      ],
+      sourceIdentifierEvidenceByFile: {
+        [nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportSourceFile]:
+          [
+            'NativeRootBridgeJsonBatchLifecycleExecutorRow',
+            'source_owned_json_row',
+            'rust_state_machine_execution',
+            'source_guard'
+          ],
+        [nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleAlgorithmsSourceFile]:
+          ['NativeRootBridgeJsonBatchLifecycleExecutorRow::applied']
+      }
     }),
     freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow({
       id: 'worker-873-json-batch-lifecycle-generation-allocation',
@@ -885,7 +897,20 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows =
         'allocate_native_root_bridge_json_batch_lifecycle_executor_generation',
         'validate_executor_value_handle_not_reused',
         'FAST_REACT_NAPI_ROOT_REQUEST_VALUE_HANDLE_REUSE'
-      ]
+      ],
+      sourceIdentifierEvidenceByFile: {
+        [nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleAlgorithmsSourceFile]:
+          [
+            'allocate_native_root_bridge_json_batch_lifecycle_executor_generation',
+            'validate_executor_value_handle_not_reused'
+          ],
+        [nativeRootBridgeJsonBatchLifecycleGenerationAdmissionModuleSourceFile]:
+          [
+            'NEXT_NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_GENERATION'
+          ],
+        [nativeRootBridgeJsonBatchLifecycleGenerationAdmissionErrorsSourceFile]:
+          ['FAST_REACT_NAPI_ROOT_REQUEST_VALUE_HANDLE_REUSE']
+      }
     }),
     freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow({
       id: 'worker-873-json-batch-lifecycle-source-row-validator',
@@ -914,7 +939,22 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRows =
         'validate_and_consume_native_root_bridge_json_batch_lifecycle_executor',
         'json_batch_lifecycle_executor_replay_guard_consumed',
         'json_batch_lifecycle_executor_source_rows_validated'
-      ]
+      ],
+      sourceIdentifierEvidenceByFile: {
+        [nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportParserSourceFile]:
+          [
+            'validate_and_consume_native_root_bridge_json_batch_lifecycle_executor'
+          ],
+        [nativeRootBridgeJsonBatchLifecycleGenerationAdmissionModuleSourceFile]:
+          [
+            'CONSUMED_NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_GENERATIONS'
+          ],
+        [nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleSourceFile]:
+          [
+            'json_batch_lifecycle_executor_replay_guard_consumed',
+            'json_batch_lifecycle_executor_source_rows_validated'
+          ]
+      }
     })
   ]);
 const nativeRootBridgeJsonTransportBatchResponseSequenceGateStatus =
@@ -3629,12 +3669,20 @@ function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow
   role,
   sourceFile = nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFile,
   sourceFiles = [sourceFile],
-  sourceIdentifiers
+  sourceIdentifiers,
+  sourceIdentifierEvidenceByFile
 }) {
   const normalizedSourceFiles =
     freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFiles(
       sourceFile,
       sourceFiles
+    );
+  const normalizedSourceIdentifierEvidenceByFile =
+    freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIdentifierEvidenceByFile(
+      sourceIdentifierEvidenceByFile ?? {
+        [normalizedSourceFiles[0]]: sourceIdentifiers
+      },
+      normalizedSourceFiles
     );
 
   return Object.freeze({
@@ -3645,6 +3693,8 @@ function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow
     evidenceKind:
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceKind,
     sourceIdentifiers: Object.freeze([...sourceIdentifiers]),
+    sourceIdentifierEvidenceByFile:
+      normalizedSourceIdentifierEvidenceByFile,
     sourceOwnedEvidence: true,
     blockedPrivateEvidence: true,
     publicAdmission: false,
@@ -3681,6 +3731,26 @@ function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFiles(
   }
 
   return Object.freeze(normalizedSourceFiles);
+}
+
+function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIdentifierEvidenceByFile(
+  evidenceByFile,
+  sourceFiles
+) {
+  const normalizedEvidenceByFile = {};
+  const evidence = isObjectLike(evidenceByFile) ? evidenceByFile : {};
+  const sourceFileKeys = Array.isArray(sourceFiles)
+    ? sourceFiles
+    : Object.keys(evidence);
+
+  for (const sourceFile of sourceFileKeys) {
+    const identifiers = arrayFromMaybe(
+      getOwnDataPropertyValue(evidence, sourceFile, [])
+    );
+    normalizedEvidenceByFile[sourceFile] = Object.freeze([...identifiers]);
+  }
+
+  return Object.freeze(normalizedEvidenceByFile);
 }
 
 function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionLedger(
@@ -3862,6 +3932,20 @@ function validateNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRow(
     );
   }
 
+  if (
+    !hasExactNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIdentifierEvidenceByFile(
+      row.sourceIdentifierEvidenceByFile,
+      row.sourceFiles,
+      row.sourceIdentifiers
+    )
+  ) {
+    return freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedRow(
+      row,
+      nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectionCodes
+        .callerBuilt
+    );
+  }
+
   const canonicalRow =
     getNativeRootBridgeJsonBatchLifecycleGenerationAdmissionCanonicalRow(row);
   if (canonicalRow === null) {
@@ -3886,7 +3970,11 @@ function validateNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRow(
     !arrayEquals(row.sourceFiles, canonicalRow.sourceFiles) ||
     row.evidenceKind !== canonicalRow.evidenceKind ||
     row.code != null ||
-    !arrayEquals(row.sourceIdentifiers, canonicalRow.sourceIdentifiers)
+    !arrayEquals(row.sourceIdentifiers, canonicalRow.sourceIdentifiers) ||
+    !nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIdentifierEvidenceByFileEquals(
+      row.sourceIdentifierEvidenceByFile,
+      canonicalRow.sourceIdentifierEvidenceByFile
+    )
   ) {
     return freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedRow(
       row,
@@ -3986,6 +4074,11 @@ function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionAcceptedRow(
     sourceFiles: Object.freeze([...row.sourceFiles]),
     evidenceKind: row.evidenceKind,
     sourceIdentifiers: Object.freeze([...row.sourceIdentifiers]),
+    sourceIdentifierEvidenceByFile:
+      freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIdentifierEvidenceByFile(
+        row.sourceIdentifierEvidenceByFile,
+        row.sourceFiles
+      ),
     status:
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionAcceptedStatus,
     code: null,
@@ -4025,6 +4118,11 @@ function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedRow(
     sourceIdentifiers: Object.freeze([
       ...arrayFromMaybe(getOwnDataPropertyValue(row, 'sourceIdentifiers', []))
     ]),
+    sourceIdentifierEvidenceByFile:
+      freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIdentifierEvidenceByFile(
+        getOwnDataPropertyValue(row, 'sourceIdentifierEvidenceByFile', {}),
+        arrayFromMaybe(getOwnDataPropertyValue(row, 'sourceFiles', []))
+      ),
     status:
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedStatus,
     code,
@@ -4163,6 +4261,129 @@ function arrayEquals(actual, expected) {
   }
 
   return actualArray.every((value, index) => value === expected[index]);
+}
+
+function stringMultisetEquals(actual, expected) {
+  const actualArray = arrayFromMaybe(actual);
+  const expectedArray = arrayFromMaybe(expected);
+  if (actualArray.length !== expectedArray.length) {
+    return false;
+  }
+
+  const remaining = [...expectedArray];
+  for (const value of actualArray) {
+    if (typeof value !== 'string') {
+      return false;
+    }
+
+    const index = remaining.indexOf(value);
+    if (index === -1) {
+      return false;
+    }
+
+    remaining.splice(index, 1);
+  }
+
+  return remaining.length === 0;
+}
+
+function hasExactStringArrayOwnDataProperties(array) {
+  if (!Array.isArray(array) || Object.getOwnPropertySymbols(array).length !== 0) {
+    return false;
+  }
+
+  const expectedPropertyNames = [];
+  for (let index = 0; index < array.length; index += 1) {
+    expectedPropertyNames.push(String(index));
+  }
+  expectedPropertyNames.push('length');
+
+  if (!arrayEquals(Object.getOwnPropertyNames(array), expectedPropertyNames)) {
+    return false;
+  }
+
+  for (let index = 0; index < array.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(array, String(index));
+    if (
+      descriptor === undefined ||
+      !hasOwn(descriptor, 'value') ||
+      descriptor.enumerable !== true ||
+      typeof descriptor.value !== 'string'
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasExactNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIdentifierEvidenceByFile(
+  evidenceByFile,
+  sourceFiles,
+  sourceIdentifiers
+) {
+  if (
+    !isObjectLike(evidenceByFile) ||
+    Array.isArray(evidenceByFile) ||
+    Object.getOwnPropertySymbols(evidenceByFile).length !== 0
+  ) {
+    return false;
+  }
+
+  const expectedSourceFiles = arrayFromMaybe(sourceFiles);
+  if (
+    !arrayEquals(
+      Object.getOwnPropertyNames(evidenceByFile),
+      expectedSourceFiles
+    )
+  ) {
+    return false;
+  }
+
+  const evidenceIdentifiers = [];
+  for (const sourceFile of expectedSourceFiles) {
+    const descriptor = Object.getOwnPropertyDescriptor(
+      evidenceByFile,
+      sourceFile
+    );
+
+    if (
+      descriptor === undefined ||
+      !hasOwn(descriptor, 'value') ||
+      descriptor.enumerable !== true ||
+      !hasExactStringArrayOwnDataProperties(descriptor.value)
+    ) {
+      return false;
+    }
+
+    evidenceIdentifiers.push(...descriptor.value);
+  }
+
+  return stringMultisetEquals(evidenceIdentifiers, sourceIdentifiers);
+}
+
+function nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIdentifierEvidenceByFileEquals(
+  actual,
+  expected
+) {
+  if (
+    !isObjectLike(expected) ||
+    !hasExactNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIdentifierEvidenceByFile(
+      actual,
+      Object.keys(expected),
+      Object.values(expected).flat()
+    )
+  ) {
+    return false;
+  }
+
+  for (const sourceFile of Object.keys(expected)) {
+    if (!arrayEquals(actual[sourceFile], expected[sourceFile])) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function isObjectLike(value) {
