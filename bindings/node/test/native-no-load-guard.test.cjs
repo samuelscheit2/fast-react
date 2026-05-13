@@ -1254,6 +1254,8 @@ function assertPrivateCleanupHookPreflightCallable(native) {
   );
 
   const canonicalValue = cleanupHookPreflight.rows[1];
+  const canonicalStale = cleanupHookPreflight.rows[2];
+  const canonicalForged = cleanupHookPreflight.rows[3];
   const forgedCode = 'FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE';
   const canonicalSetMismatchCode =
     'FAST_REACT_NAPI_CLEANUP_HOOK_CANONICAL_SET_MISMATCH';
@@ -1526,6 +1528,10 @@ function assertPrivateCleanupHookPreflightCallable(native) {
     {
       id: 'cleanup-hook-callable-missing-root-rejected',
       rows: [canonicalValue]
+    },
+    {
+      id: 'cleanup-hook-callable-missing-rejected-evidence-rejected',
+      rows: [canonicalRoot, canonicalValue]
     }
   ]) {
     const result = validateCleanupHookEvidenceRows(diagnosticCase.rows);
@@ -1555,6 +1561,114 @@ function assertPrivateCleanupHookPreflightCallable(native) {
       assertNoNativeCleanupHookExecution(row, diagnosticCase.id);
     }
   }
+
+  const extraForgedCleanupHookRow = cleanupHookRow(canonicalRoot, {
+    id: 'cleanup-hook-callable-extra-forged-row-rejected',
+    sourceRowId: 'peer-root-active-executable-preflight',
+    sourceErrorCode: null,
+    sourceBoundaryErrorCode: null
+  });
+  const callerShapedStaleRejectedRow = cleanupHookRow(canonicalStale, {
+    sourcePreflightStatus: canonicalRoot.sourcePreflightStatus,
+    sourceWorkerThreadId: canonicalRoot.sourceWorkerThreadId,
+    sourceEnvironmentId: canonicalRoot.sourceEnvironmentId,
+    sourceRowId: canonicalRoot.sourceRowId
+  });
+
+  for (const diagnosticCase of [
+    {
+      id: 'cleanup-hook-callable-extra-forged-row-rejected',
+      rows: [canonicalRoot, canonicalValue, extraForgedCleanupHookRow],
+      expectedRejectedCount: 3
+    },
+    {
+      id: 'cleanup-hook-callable-one-known-rejection-rejected',
+      rows: [canonicalRoot, canonicalValue, canonicalStale],
+      expectedRejectedCount: 3
+    },
+    {
+      id: 'cleanup-hook-callable-duplicate-stale-rejection-rejected',
+      rows: [
+        canonicalRoot,
+        canonicalValue,
+        canonicalStale,
+        canonicalForged,
+        canonicalStale
+      ],
+      expectedRejectedCount: 5
+    },
+    {
+      id: 'cleanup-hook-callable-duplicate-forged-rejection-rejected',
+      rows: [
+        canonicalRoot,
+        canonicalValue,
+        canonicalStale,
+        canonicalForged,
+        canonicalForged
+      ],
+      expectedRejectedCount: 5
+    },
+    {
+      id: 'cleanup-hook-callable-spoofed-rejected-source-rejected',
+      rows: [
+        canonicalRoot,
+        canonicalValue,
+        callerShapedStaleRejectedRow,
+        canonicalForged
+      ],
+      expectedRejectedCount: 4
+    }
+  ]) {
+    const result = validateCleanupHookEvidenceRows(diagnosticCase.rows);
+
+    assert.equal(result.acceptedCleanupEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(
+      result.rejectedCleanupEvidenceCount,
+      diagnosticCase.expectedRejectedCount,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.canonicalExecutableEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.rows.some((row) => row.status === 'accepted'),
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.rows.filter((row) => row.code === canonicalSetMismatchCode)
+        .length,
+      2,
+      diagnosticCase.id
+    );
+    assertNoNativeCleanupHookExecution(result, diagnosticCase.id);
+
+    for (const row of result.rows) {
+      assert.equal(row.status, 'rejected', diagnosticCase.id);
+      assert.equal(row.canonicalExecutableEvidence, false, diagnosticCase.id);
+      assertNoNativeCleanupHookExecution(row, diagnosticCase.id);
+    }
+  }
+
+  const spoofedRejectedResult = validateCleanupHookEvidenceRows([
+    canonicalRoot,
+    canonicalValue,
+    callerShapedStaleRejectedRow,
+    canonicalForged
+  ]);
+  const spoofedRejectedRow = spoofedRejectedResult.rows.find(
+    (row) => row.id === canonicalStale.id
+  );
+  assert.equal(
+    spoofedRejectedRow.sourceWorkerThreadId,
+    canonicalRoot.sourceWorkerThreadId
+  );
+  assert.notEqual(
+    spoofedRejectedRow.sourceWorkerThreadId,
+    canonicalStale.sourceWorkerThreadId
+  );
 }
 
 function assertNativeRootBridgeBatchLifecycleConsumerNoLoad(native) {

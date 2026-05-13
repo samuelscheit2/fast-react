@@ -1,3 +1,14 @@
+    const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_STALE_REJECTED_EVIDENCE_ROW_ID: &str =
+        "cleanup-hook-stale-worker-transport-evidence-rejected";
+    const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_REJECTED_EVIDENCE_ROW_ID: &str =
+        "cleanup-hook-forged-peer-active-evidence-rejected";
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum NativeRootBridgeWorkerThreadCleanupHookExpectedRejection {
+        StaleWorkerTransport,
+        ForgedPeerActive,
+    }
+
     const fn bridge_handle_kind_code(kind: BridgeHandleKind) -> &'static str {
         match kind {
             BridgeHandleKind::Root => "root",
@@ -97,22 +108,43 @@
     fn cleanup_hook_has_exact_canonical_evidence_set(
         rows: &[NativeRootBridgeWorkerThreadCleanupHookPreflightRow],
     ) -> bool {
+        if rows.len() != 4 {
+            return false;
+        }
+
         let mut root_count = 0;
         let mut value_count = 0;
+        let mut stale_rejection_count = 0;
+        let mut forged_rejection_count = 0;
 
         for row in rows {
             match cleanup_hook_accepted_canonical_role(*row) {
                 Some(NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root) => {
                     root_count += 1;
+                    continue;
                 }
                 Some(NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value) => {
                     value_count += 1;
+                    continue;
                 }
                 None => {}
             }
+
+            match cleanup_hook_expected_rejected_canonical_evidence(*row) {
+                Some(NativeRootBridgeWorkerThreadCleanupHookExpectedRejection::StaleWorkerTransport) => {
+                    stale_rejection_count += 1;
+                }
+                Some(NativeRootBridgeWorkerThreadCleanupHookExpectedRejection::ForgedPeerActive) => {
+                    forged_rejection_count += 1;
+                }
+                None => return false,
+            }
         }
 
-        root_count == 1 && value_count == 1
+        root_count == 1
+            && value_count == 1
+            && stale_rejection_count == 1
+            && forged_rejection_count == 1
     }
 
     fn cleanup_hook_accepted_canonical_role(
@@ -128,9 +160,186 @@
             cleanup_hook_canonical_role_for_source(row.source_row_id(), row.source_handle_kind())?;
 
         (row.id() == cleanup_hook_expected_evidence_row_id(role)
-            && row.source_provenance_token()
-                == Some(cleanup_hook_source_provenance_token_for_role(role)))
+            && row.operation() == "cleanup-hook-order-preflight"
+            && row.code().is_none()
+            && row.observed_execution_order() == Some(row.expected_execution_order())
+            && cleanup_hook_expected_identity_for_role(role).matches_row(row)
+            && cleanup_hook_accepted_source_fields_match_expected_role(row, role)
+            && cleanup_hook_row_keeps_private_non_execution_guards(row)
+            && !row.stale_or_forged_cleanup_evidence_rejected())
         .then_some(role)
+    }
+
+    fn cleanup_hook_expected_rejected_canonical_evidence(
+        row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+    ) -> Option<NativeRootBridgeWorkerThreadCleanupHookExpectedRejection> {
+        if row.status() != NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Rejected
+            || row.canonical_executable_evidence()
+            || row.observed_execution_order().is_some()
+            || !row.stale_or_forged_cleanup_evidence_rejected()
+            || !cleanup_hook_row_keeps_private_non_execution_guards(row)
+        {
+            return None;
+        }
+
+        if cleanup_hook_matches_expected_stale_transport_rejection(row) {
+            Some(NativeRootBridgeWorkerThreadCleanupHookExpectedRejection::StaleWorkerTransport)
+        } else if cleanup_hook_matches_expected_forged_peer_active_rejection(row) {
+            Some(NativeRootBridgeWorkerThreadCleanupHookExpectedRejection::ForgedPeerActive)
+        } else {
+            None
+        }
+    }
+
+    fn cleanup_hook_matches_expected_stale_transport_rejection(
+        row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+    ) -> bool {
+        row.id() == NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_STALE_REJECTED_EVIDENCE_ROW_ID
+            && row.operation() == "cleanup-hook-evidence-preflight-rejection"
+            && row.cleanup_hook_id() == "stale-worker-transport-cleanup-hook"
+            && row.cleanup_hook_function_identity_token()
+                == "private-cleanup-hook-fn:stale-worker-teardown"
+            && row.cleanup_hook_argument_identity_token()
+                == "private-cleanup-hook-arg:worker-524-root-slot-1"
+            && row.registration_order() == 2
+            && row.expected_execution_order() == 1
+            && row.code() == Some(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_STALE_EVIDENCE_CODE)
+            && row.source_preflight_status()
+                == super::NATIVE_ROOT_BRIDGE_TRANSPORT_WORKER_THREAD_TEARDOWN_GATE_STATUS
+            && row.source_worker_thread_id() == 524
+            && row.source_environment_id() == BridgeEnvironmentId::from_raw(524)
+            && row.source_row_id() == "worker-root-stale-after-thread-teardown"
+            && row.source_provenance_token().is_none()
+            && row.source_handle_kind() == BridgeHandleKind::Root
+            && cleanup_hook_row_has_no_source_identity(row)
+            && row.source_error_code() == Some("FAST_REACT_NAPI_STALE_HANDLE")
+            && row.source_boundary_error_code()
+                == Some(super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code())
+    }
+
+    fn cleanup_hook_matches_expected_forged_peer_active_rejection(
+        row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+    ) -> bool {
+        row.id() == NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_REJECTED_EVIDENCE_ROW_ID
+            && row.operation() == "cleanup-hook-evidence-preflight-rejection"
+            && row.cleanup_hook_id() == "forged-peer-active-cleanup-hook"
+            && row.cleanup_hook_function_identity_token()
+                == "private-cleanup-hook-fn:forged-peer-active"
+            && row.cleanup_hook_argument_identity_token()
+                == "private-cleanup-hook-arg:worker-1764-peer-root"
+            && row.registration_order() == 1
+            && row.expected_execution_order() == 2
+            && row.code()
+                == Some(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE)
+            && row.source_preflight_status()
+                == NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS
+            && row.source_worker_thread_id() == 764
+            && row.source_environment_id() == BridgeEnvironmentId::from_raw(764)
+            && row.source_row_id() == "peer-root-active-executable-preflight"
+            && row.source_provenance_token().is_none()
+            && row.source_handle_kind() == BridgeHandleKind::Root
+            && cleanup_hook_row_has_no_source_identity(row)
+            && row.source_error_code().is_none()
+            && row.source_boundary_error_code().is_none()
+    }
+
+    fn cleanup_hook_accepted_source_fields_match_expected_role(
+        row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+        role: NativeRootBridgeWorkerThreadCleanupHookCanonicalRole,
+    ) -> bool {
+        match role {
+            NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root => {
+                row.source_preflight_status()
+                    == NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS
+                    && row.source_worker_thread_id() == 764
+                    && row.source_environment_id() == BridgeEnvironmentId::from_raw(764)
+                    && row.source_provenance_token()
+                        == Some(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_PROVENANCE_TOKEN)
+                    && row.source_handle_environment_id()
+                        == Some(BridgeEnvironmentId::from_raw(764))
+                    && row.source_handle_slot() == Some(1)
+                    && row.source_handle_generation() == Some(1)
+                    && row.source_current_generation() == Some(2)
+                    && row.source_record_id().is_none()
+                    && row.source_root_id() == Some(1)
+                    && row.source_error_code() == Some("FAST_REACT_NAPI_STALE_HANDLE")
+                    && row.source_boundary_error_code()
+                        == Some(super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code())
+            }
+            NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value => {
+                row.source_preflight_status()
+                    == NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS
+                    && row.source_worker_thread_id() == 764
+                    && row.source_environment_id() == BridgeEnvironmentId::from_raw(764)
+                    && row.source_provenance_token()
+                        == Some(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_PROVENANCE_TOKEN)
+                    && row.source_handle_environment_id()
+                        == Some(BridgeEnvironmentId::from_raw(764))
+                    && row.source_handle_slot() == Some(3)
+                    && row.source_handle_generation() == Some(1)
+                    && row.source_current_generation() == Some(2)
+                    && row.source_record_id().is_none()
+                    && row.source_root_id() == Some(1)
+                    && row.source_error_code() == Some("FAST_REACT_NAPI_STALE_HANDLE")
+                    && row.source_boundary_error_code()
+                        == Some(super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code())
+            }
+        }
+    }
+
+    fn cleanup_hook_row_has_no_source_identity(
+        row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+    ) -> bool {
+        row.source_handle_environment_id().is_none()
+            && row.source_handle_slot().is_none()
+            && row.source_handle_generation().is_none()
+            && row.source_current_generation().is_none()
+            && row.source_record_id().is_none()
+            && row.source_root_id().is_none()
+    }
+
+    fn cleanup_hook_row_keeps_private_non_execution_guards(
+        row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+    ) -> bool {
+        row.cleanup_hook_order_private()
+            && row.cleanup_hook_identity_private()
+            && !row.node_worker_threads_execution()
+            && !row.napi_cleanup_hook_execution()
+            && !row.native_addon_loaded()
+            && !row.native_execution()
+            && !row.renderer_execution()
+            && !row.reconciler_execution()
+            && !row.public_native_compatibility()
+            && !row.react_behavior_error()
+    }
+
+    const fn cleanup_hook_expected_identity_for_role(
+        role: NativeRootBridgeWorkerThreadCleanupHookCanonicalRole,
+    ) -> NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity {
+        match role {
+            NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root => {
+                NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity::root()
+            }
+            NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value => {
+                NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity::value()
+            }
+        }
+    }
+
+    impl NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity {
+        fn matches_row(self, row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow) -> bool {
+            row.cleanup_hook_id() == self.cleanup_hook_id
+                && row.cleanup_hook_function_identity_token()
+                    == self.cleanup_hook_function_identity_token
+                && row.cleanup_hook_argument_identity_token()
+                    == self.cleanup_hook_argument_identity_token
+                && row.registration_order() == self.registration_order
+                && row.expected_execution_order() == self.expected_execution_order
+                && cleanup_hook_canonical_role_for_source(
+                    row.source_row_id(),
+                    row.source_handle_kind(),
+                ) == Some(self.role)
+        }
     }
 
     const fn cleanup_hook_expected_evidence_row_id(
@@ -485,7 +694,7 @@
                 value_stale_row,
             ),
             NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
-                "cleanup-hook-stale-worker-transport-evidence-rejected",
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_STALE_REJECTED_EVIDENCE_ROW_ID,
                 "cleanup-hook-evidence-preflight-rejection",
                 "stale-worker-transport-cleanup-hook",
                 "private-cleanup-hook-fn:stale-worker-teardown",
@@ -501,7 +710,7 @@
                 Some(super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code()),
             ),
             NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
-                "cleanup-hook-forged-peer-active-evidence-rejected",
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_REJECTED_EVIDENCE_ROW_ID,
                 "cleanup-hook-evidence-preflight-rejection",
                 "forged-peer-active-cleanup-hook",
                 "private-cleanup-hook-fn:forged-peer-active",
