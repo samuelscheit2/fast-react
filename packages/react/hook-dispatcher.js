@@ -4364,6 +4364,10 @@ function getPrivateTransitionHookDispatcherMetadata(dispatcher) {
 }
 
 function isPrivateStateHookDispatcherMetadata(metadata) {
+  if (metadata !== privateStateHookDispatcherMetadata) {
+    return false;
+  }
+
   if (
     !isObjectLike(metadata) ||
     metadata.capability !== privateStateHookDispatcherMetadata.capability ||
@@ -4392,6 +4396,10 @@ function isPrivateStateHookDispatcherMetadata(metadata) {
 }
 
 function isPrivateCallbackHookDispatcherMetadata(metadata) {
+  if (metadata !== privateCallbackHookDispatcherMetadata) {
+    return false;
+  }
+
   if (
     !isObjectLike(metadata) ||
     metadata.capability !== privateCallbackHookDispatcherMetadata.capability ||
@@ -4421,6 +4429,10 @@ function isPrivateCallbackHookDispatcherMetadata(metadata) {
 }
 
 function isPrivateMemoHookDispatcherMetadata(metadata) {
+  if (metadata !== privateMemoHookDispatcherMetadata) {
+    return false;
+  }
+
   if (
     !isObjectLike(metadata) ||
     metadata.capability !== privateMemoHookDispatcherMetadata.capability ||
@@ -4566,6 +4578,10 @@ function isPrivateContextHookDispatcherMetadata(metadata) {
 }
 
 function isPrivateEffectHookDispatcherMetadata(metadata) {
+  if (metadata !== privateEffectHookDispatcherMetadata) {
+    return false;
+  }
+
   if (
     !isObjectLike(metadata) ||
     metadata.capability !== privateEffectHookDispatcherMetadata.capability ||

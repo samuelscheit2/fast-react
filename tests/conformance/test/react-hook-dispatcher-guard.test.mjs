@@ -1509,6 +1509,152 @@ test("private state-hook dispatcher marker rejects eager dispatch metadata drift
   assert.equal(hookDispatcher.isPrivateStateHookDispatcher(dispatcher), false);
 });
 
+test("private state/callback/memo/effect dispatcher metadata requires source-owned singleton identity", () => {
+  const cases = [
+    {
+      label: "state",
+      hookName: "useState",
+      metadata: hookDispatcher.privateStateHookDispatcherMetadata,
+      isMetadata: hookDispatcher.isPrivateStateHookDispatcherMetadata,
+      mark: hookDispatcher.markPrivateStateHookDispatcher,
+      isDispatcher: hookDispatcher.isPrivateStateHookDispatcher,
+      assertReject: assertStateHookDispatcherUnavailable,
+      createDispatcher() {
+        return {
+          useReducer() {
+            throw new Error("unreachable reducer dispatch");
+          },
+          useState() {
+            throw new Error("unreachable state dispatch");
+          }
+        };
+      }
+    },
+    {
+      label: "callback",
+      hookName: "useCallback",
+      metadata: hookDispatcher.privateCallbackHookDispatcherMetadata,
+      isMetadata: hookDispatcher.isPrivateCallbackHookDispatcherMetadata,
+      mark: hookDispatcher.markPrivateCallbackHookDispatcher,
+      isDispatcher: hookDispatcher.isPrivateCallbackHookDispatcher,
+      assertReject: assertInvalidHookCall,
+      createDispatcher() {
+        return {
+          useCallback() {
+            throw new Error("unreachable callback dispatch");
+          }
+        };
+      }
+    },
+    {
+      label: "memo",
+      hookName: "useMemo",
+      metadata: hookDispatcher.privateMemoHookDispatcherMetadata,
+      isMetadata: hookDispatcher.isPrivateMemoHookDispatcherMetadata,
+      mark: hookDispatcher.markPrivateMemoHookDispatcher,
+      isDispatcher: hookDispatcher.isPrivateMemoHookDispatcher,
+      assertReject: assertInvalidHookCall,
+      createDispatcher() {
+        return {
+          useMemo() {
+            throw new Error("unreachable memo dispatch");
+          }
+        };
+      }
+    },
+    {
+      label: "effect",
+      hookName: "useEffect",
+      metadata: hookDispatcher.privateEffectHookDispatcherMetadata,
+      isMetadata: hookDispatcher.isPrivateEffectHookDispatcherMetadata,
+      mark: hookDispatcher.markPrivateEffectHookDispatcher,
+      isDispatcher: hookDispatcher.isPrivateEffectHookDispatcher,
+      assertReject: assertInvalidHookCall,
+      createDispatcher() {
+        return Object.fromEntries(
+          effectDefaultHooks.map(([hookName]) => [
+            hookName,
+            function () {
+              throw new Error(`unreachable ${hookName} dispatch`);
+            }
+          ])
+        );
+      }
+    }
+  ];
+
+  for (const {
+    label,
+    hookName,
+    metadata,
+    isMetadata,
+    mark,
+    isDispatcher,
+    assertReject,
+    createDispatcher
+  } of cases) {
+    const clonedMetadata = { ...metadata };
+    const extraClaimMetadata = {
+      ...metadata,
+      packageCompatibilityClaimed: true,
+      publicCompatibilityClaimed: true,
+      rootCompatibilityClaimed: true
+    };
+    const prototypeBackedMetadata = Object.create(metadata);
+    let accessorReads = 0;
+    const accessorBackedMetadata = Object.defineProperties(
+      {},
+      Object.fromEntries(
+        Object.keys(metadata).map((key) => [
+          key,
+          {
+            enumerable: true,
+            get() {
+              accessorReads += 1;
+              throw new Error(`${label} metadata accessor inspected`);
+            }
+          }
+        ])
+      )
+    );
+    let proxyTrapCalls = 0;
+    const trap = () => {
+      proxyTrapCalls += 1;
+      throw new Error(`${label} metadata proxy inspected`);
+    };
+    const proxyMetadata = new Proxy(metadata, {
+      get: trap,
+      getOwnPropertyDescriptor: trap,
+      getPrototypeOf: trap,
+      ownKeys: trap
+    });
+
+    assert.equal(isMetadata(clonedMetadata), false, `${label}: shallow clone`);
+    assert.equal(
+      isMetadata(extraClaimMetadata),
+      false,
+      `${label}: extra compatibility claims`
+    );
+    assert.equal(
+      isMetadata(prototypeBackedMetadata),
+      false,
+      `${label}: prototype-backed metadata`
+    );
+    assert.equal(
+      isMetadata(accessorBackedMetadata),
+      false,
+      `${label}: accessor-backed metadata`
+    );
+    assert.equal(accessorReads, 0, `${label}: accessor metadata inspected`);
+    assert.equal(isMetadata(proxyMetadata), false, `${label}: proxy metadata`);
+    assert.equal(proxyTrapCalls, 0, `${label}: proxy metadata inspected`);
+
+    const dispatcher = createDispatcher();
+    assertReject(() => mark(dispatcher, clonedMetadata), hookName);
+    assert.equal(isDispatcher(dispatcher), false, `${label}: dispatcher marked`);
+  }
+});
+
 test("useContext fails closed without a marked private context dispatcher", () => {
   const context = { $$typeof: Symbol.for("react.context") };
 
