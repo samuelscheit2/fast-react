@@ -7103,6 +7103,49 @@ function createRustCreateNativeBridgeHostOutputHandoffSource(
 }
 
 function createPackageRootCreateRouteAdmissionSource(request) {
+  const workLoopFinishedWorkPreflight = {
+    id: "react-test-renderer-root-create-work-loop-finished-work-private-diagnostic",
+    status:
+      "private-root-create-work-loop-finished-work-preflight-public-root-blocked",
+    operation: "create",
+    rootRequestId: request.requestId,
+    rootRequestSequence: request.requestSequence,
+    rootId: request.rootId,
+    rootSequence: request.rootSequence,
+    rootApi: "TestRendererRoot::create",
+    updateKind: "Create",
+    updateOutcome: "Scheduled",
+    ready: true,
+    acceptedInputShape: "HostComponentWithTextChild",
+    supportedChildren: true,
+    rootOptionsMetadataAvailable: true,
+    previousCurrent: createRustRootCreatePreviousCurrentHandle(),
+    finishedWork: createRustRootCreateFinishedWorkHandle(),
+    renderLanesEmpty: false,
+    renderLanesBits: 1,
+    remainingLanesEmpty: true,
+    remainingLanesBits: 0,
+    finishedWorkMatchesRenderPhase: true,
+    recordsAcceptedFinishedWorkMetadata: true,
+    consumesAcceptedRustWorkLoopFinishedWorkPreflightMetadata: true,
+    workLoopFinishedWorkMetadata: {
+      metadataId:
+        "fast-react-test-renderer-root-work-loop-finished-work-preflight-metadata",
+      metadataStatus:
+        "accepted-root-work-loop-finished-work-preflight-metadata",
+      acceptedWorker: "worker-534-root-work-loop-finished-work-commit-handoff",
+      acceptedRustModule: "fast-react-reconciler::root_work_loop",
+      renderPhaseApi:
+        "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff",
+      renderPhaseRecord: "HostRootRenderPhaseRecord",
+      finishedWorkRecord: "HostRootRenderPhaseRecord::finished_work",
+      pendingFinishedWorkRecord:
+        "HostRootFinishedWorkPendingCommitRecordForCanary",
+      commitHandoffRecord: "HostRootFinishedWorkCommitHandoffRecordForCanary",
+      acceptedInputShape: "HostComponentWithTextChild"
+    }
+  };
+
   return {
     rustAdmissionMetadata: {
       metadataId: "fast-react-test-renderer-create-route-admission-metadata",
@@ -7129,28 +7172,13 @@ function createPackageRootCreateRouteAdmissionSource(request) {
       canaryApiIdentity: {
         rootApi: "TestRendererRoot::create",
         metadataId: "fast-react-test-renderer-root-create-canary-metadata"
-      }
+      },
+      workLoopFinishedWorkPreflight:
+        createRustRootCreateWorkLoopFinishedWorkPreflightSource(
+          workLoopFinishedWorkPreflight
+        )
     },
-    workLoopFinishedWorkPreflight: {
-      id: "react-test-renderer-root-create-work-loop-finished-work-private-diagnostic",
-      status:
-        "private-root-create-work-loop-finished-work-preflight-public-root-blocked",
-      operation: "create",
-      rootRequestId: request.requestId,
-      rootRequestSequence: request.requestSequence,
-      rootId: request.rootId,
-      rootSequence: request.rootSequence,
-      rootApi: "TestRendererRoot::create",
-      updateKind: "Create",
-      updateOutcome: "Scheduled",
-      previousCurrent: createRustRootCreatePreviousCurrentHandle(),
-      finishedWork: createRustRootCreateFinishedWorkHandle(),
-      renderLanesEmpty: false,
-      renderLanesBits: 1,
-      remainingLanesEmpty: true,
-      remainingLanesBits: 0,
-      finishedWorkMatchesRenderPhase: true
-    },
+    workLoopFinishedWorkPreflight,
     rootCreateExecutionEvidence: {
       operation: "create",
       requestId: request.requestId,
@@ -7167,6 +7195,21 @@ function createPackageRootCreateRouteAdmissionSource(request) {
   };
 }
 
+function createRustRootCreatePreflightDiagnosticSource(preflight) {
+  return {
+    diagnosticName: "fast-react-test-renderer.root-create.private-preflight",
+    status: "private-root-create-preflight-ready-public-root-blocked",
+    operation: "create",
+    createInputShape: preflight.createInputShape,
+    rootOptionsMetadata: preflight.rootOptionsMetadata,
+    canaryApiIdentity: preflight.canaryApiIdentity,
+    workLoopFinishedWorkPreflight:
+      createRustRootCreateWorkLoopFinishedWorkPreflightSource(
+        preflight.workLoopFinishedWorkPreflight
+      )
+  };
+}
+
 function createRustCreateRouteAdmissionDiagnosticSource(admission) {
   return {
     id: privateCreateRouteAdmissionRecordId,
@@ -7176,7 +7219,12 @@ function createRustCreateRouteAdmissionDiagnosticSource(admission) {
     publicSurface: "create()",
     jsFacadeMetadataSource: "FastReactTestRendererPrivateRootRequestRecord",
     rustAdmissionMetadata: admission.rustAdmissionMetadata,
-    rootCreatePreflight: admission.rootCreatePreflight,
+    rootCreatePreflight:
+      admission.rootCreatePreflight === null
+        ? null
+        : createRustRootCreatePreflightDiagnosticSource(
+            admission.rootCreatePreflight
+          ),
     workLoopFinishedWorkPreflight:
       createRustRootCreateWorkLoopFinishedWorkPreflightSource(
         admission.workLoopFinishedWorkPreflight
