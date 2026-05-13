@@ -751,6 +751,27 @@
 				"audit_1326_source_contract",
 				"audit_1326_verification"
 			]
+		},
+		{
+			"id": 1327,
+			"type": "worker",
+			"status": "accepted",
+			"title": "React DOM public facade lifecycle source ledger",
+			"agent": "worker_1327_react_dom_public_facade_lifecycle_source_ledger",
+			"branch": "worker/1327-react-dom-public-facade-lifecycle-source-ledger",
+			"audits": [
+				"audit_1327_source_contract",
+				"audit_1327_verification",
+				"audit_1327_repair_source",
+				"audit_1327_repair_verification"
+			]
+		},
+		{
+			"id": 1328,
+			"type": "scout",
+			"status": "reported",
+			"title": "Rust scheduler act-queue consumed-request replay blocker scout",
+			"agent": "scout_1328_rust_root_next"
 		}
 	]
 }

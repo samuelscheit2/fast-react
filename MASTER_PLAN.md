@@ -47,11 +47,11 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current root head is main `0ebb5c53`
-(`Merge worker 1326 test renderer root handle WeakMap ledger`) before this
+Top-level cap: 30 workers. Current root head is main `d2f30e86`
+(`Merge worker 1327 React DOM lifecycle source ledger`) before this
 docs pass.
-Current accepted implementation head is main `0ebb5c53`
-(`Merge worker 1326 test renderer root handle WeakMap ledger`).
+Current accepted implementation head is main `d2f30e86`
+(`Merge worker 1327 React DOM lifecycle source ledger`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -65,7 +65,8 @@ Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
   1269, 1270, 1271, 1272, 1277 through 1280, 1286 through 1290,
-  1296 through 1300, 1306 through 1310, 1318 through 1320, 1325, and 1326
+  1296 through 1300, 1306 through 1310, 1318 through 1320, and 1325 through
+  1327
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
@@ -117,6 +118,13 @@ Current orchestration queue:
 - Worker 1326 has been reviewed, merged, and recorded as accepted history for
   the react-test-renderer root-handle WeakMap source-ledger candidate from
   Scout 1323.
+- Worker 1327 has been repaired, reviewed, merged, and recorded as accepted
+  history for the React DOM public facade lifecycle source-ledger candidate
+  from Scout 1322. The accepted repair keeps validator identity checks tied to
+  the canonical root bridge rather than caller-supplied ledger data.
+- Scout 1328 reported a Rust scheduler act-queue consumed-request replay
+  blocker. Worker 1330 is active in a separate worktree for that lane and is
+  not accepted input until reviewed, verified, and merged.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

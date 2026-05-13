@@ -29,6 +29,33 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1327 React DOM Public Facade Lifecycle Source Ledger
+
+- Worker 1327 added a conformance-only source ledger tying accepted public
+  fake-DOM root facade lifecycle rows to source-owned private lifecycle
+  boundary and container snapshot records.
+- The accepted repair closed a false-green path where the validator trusted a
+  caller-supplied `lifecycleSourceLedger.rootBridge`. The gate now loads the
+  canonical `root-bridge.js` by workspace root, uses its WeakMap-backed
+  boundary/snapshot identity checks, omits `rootBridge` from returned ledger
+  data, and rejects forged ledgers with cloned records plus fake bridge
+  methods.
+- Hostile coverage includes missing ledger evidence, cloned boundary records,
+  foreign/stale lifecycle records, fake bridge injection, compatibility
+  promotion, public/native/browser DOM claims, listener-count drift, and
+  mutation-count drift.
+- The accepted change is tests/conformance-only evidence. It does not alter
+  public `createRoot` runtime behavior or open browser DOM, component, refs,
+  events, hydration, listener, Scheduler, native, package, or broad public root
+  compatibility.
+- Accepted validation includes the initial blocking source audit, clean repair
+  source and verification audits, and root post-merge reruns of the public
+  facade blocked gate (48/48), root-render E2E conformance gate (12/12),
+  React DOM client symbol facade gate (7/7), private root bridge smoke, and
+  `git diff --check`.
+- The accepted merge is main `d2f30e86` after Worker 1327 repair commit
+  `90dfb910` and original worker commit `464c3d08`.
+
 ### Worker 1326 react-test-renderer Root-Handle WeakMap Ledger
 
 - Worker 1326 added a private conformance source-proof ledger for
