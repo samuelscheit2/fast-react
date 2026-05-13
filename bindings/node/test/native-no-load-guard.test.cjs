@@ -1100,6 +1100,38 @@ function cleanupHookRow(row, overrides = {}) {
   return Object.freeze({ ...row, ...overrides });
 }
 
+function cleanupHookPrototypeClaimRow(row, prototypeClaims) {
+  return Object.freeze(
+    Object.assign(Object.create(Object.freeze(prototypeClaims)), row)
+  );
+}
+
+function cleanupHookAccessorFieldRow(row, field) {
+  let accessCount = 0;
+  const nextRow = { ...row };
+  Object.defineProperty(nextRow, field, {
+    get() {
+      accessCount += 1;
+      return row[field];
+    },
+    enumerable: true
+  });
+
+  return {
+    row: Object.freeze(nextRow),
+    getAccessCount() {
+      return accessCount;
+    }
+  };
+}
+
+function cleanupHookExtraPropertyRow(row, key, descriptor) {
+  const nextRow = { ...row };
+  Object.defineProperty(nextRow, key, descriptor);
+
+  return Object.freeze(nextRow);
+}
+
 function assertPrivateCleanupHookPreflightCallable(native) {
   const cleanupHookPreflight =
     native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight;
@@ -1222,6 +1254,227 @@ function assertPrivateCleanupHookPreflightCallable(native) {
   );
 
   const canonicalValue = cleanupHookPreflight.rows[1];
+  const forgedCode = 'FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE';
+  const canonicalSetMismatchCode =
+    'FAST_REACT_NAPI_CLEANUP_HOOK_CANONICAL_SET_MISMATCH';
+
+  const inheritedCanonicalRowsResult = validateCleanupHookEvidenceRows([
+    Object.create(canonicalRoot),
+    canonicalValue
+  ]);
+  assert.equal(inheritedCanonicalRowsResult.acceptedCleanupEvidenceCount, 0);
+  assert.equal(inheritedCanonicalRowsResult.rejectedCleanupEvidenceCount, 2);
+  assert.equal(
+    inheritedCanonicalRowsResult.canonicalExecutableEvidenceAccepted,
+    false
+  );
+  assertNoNativeCleanupHookExecution(
+    inheritedCanonicalRowsResult,
+    'cleanup-hook inherited canonical rows'
+  );
+  assert.equal(inheritedCanonicalRowsResult.rows[0].status, 'rejected');
+  assert.equal(inheritedCanonicalRowsResult.rows[0].code, forgedCode);
+  assert.equal(inheritedCanonicalRowsResult.rows[0].id, null);
+  assert.equal(inheritedCanonicalRowsResult.rows[0].sourceRowId, null);
+  assert.equal(
+    inheritedCanonicalRowsResult.rows[1].code,
+    canonicalSetMismatchCode
+  );
+  for (const row of inheritedCanonicalRowsResult.rows) {
+    assertNoNativeCleanupHookExecution(
+      row,
+      'cleanup-hook inherited canonical row'
+    );
+  }
+
+  const cleanupHookAccessorCase = cleanupHookAccessorFieldRow(
+    canonicalRoot,
+    'cleanupHookId'
+  );
+  const accessorResult = validateCleanupHookEvidenceRows([
+    cleanupHookAccessorCase.row,
+    canonicalValue
+  ]);
+  assert.equal(accessorResult.acceptedCleanupEvidenceCount, 0);
+  assert.equal(accessorResult.rejectedCleanupEvidenceCount, 2);
+  assert.equal(accessorResult.canonicalExecutableEvidenceAccepted, false);
+  assert.equal(cleanupHookAccessorCase.getAccessCount(), 0);
+  assert.equal(accessorResult.rows[0].status, 'rejected');
+  assert.equal(accessorResult.rows[0].code, forgedCode);
+  assert.equal(accessorResult.rows[0].cleanupHookId, null);
+  assert.equal(accessorResult.rows[1].code, canonicalSetMismatchCode);
+  assertNoNativeCleanupHookExecution(
+    accessorResult,
+    'cleanup-hook accessor required field'
+  );
+  for (const row of accessorResult.rows) {
+    assertNoNativeCleanupHookExecution(
+      row,
+      'cleanup-hook accessor required field row'
+    );
+  }
+
+  const extraOwnKeyCases = [
+    {
+      id: 'cleanup-hook-extra-worker-progress-path',
+      row: cleanupHookRow(canonicalValue, {
+        workerProgressEvidencePath:
+          'worker-progress/native-cleanup-hook-preflight.md'
+      }),
+      extraKey: 'workerProgressEvidencePath'
+    },
+    {
+      id: 'cleanup-hook-non-enumerable-source-alias',
+      row: cleanupHookExtraPropertyRow(
+        canonicalValue,
+        'sourceEvidenceAlias',
+        {
+          value: 'caller-supplied-cleanup-hook-source',
+          enumerable: false
+        }
+      ),
+      extraKey: 'sourceEvidenceAlias'
+    },
+    {
+      id: 'cleanup-hook-symbol-package-export-false',
+      row: cleanupHookExtraPropertyRow(
+        canonicalValue,
+        Symbol.for('packageExportsChanged'),
+        {
+          value: false,
+          enumerable: true
+        }
+      ),
+      extraSymbol: Symbol.for('packageExportsChanged')
+    }
+  ];
+
+  for (const diagnosticCase of extraOwnKeyCases) {
+    const result = validateCleanupHookEvidenceRows([
+      canonicalRoot,
+      diagnosticCase.row
+    ]);
+    const extraRow = result.rows.find(
+      (row) => row.sourceRowId === canonicalValue.sourceRowId
+    );
+
+    assert.ok(Object.isFrozen(result), diagnosticCase.id);
+    assert.ok(Object.isFrozen(result.rows), diagnosticCase.id);
+    assert.equal(result.acceptedCleanupEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(result.rejectedCleanupEvidenceCount, 2, diagnosticCase.id);
+    assert.equal(
+      result.canonicalExecutableEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.rows.some((row) => row.status === 'accepted'),
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(extraRow.status, 'rejected', diagnosticCase.id);
+    assert.equal(extraRow.code, forgedCode, diagnosticCase.id);
+
+    for (const row of result.rows) {
+      assert.ok(Object.isFrozen(row), diagnosticCase.id);
+      if (diagnosticCase.extraKey !== undefined) {
+        assert.equal(
+          Object.hasOwn(row, diagnosticCase.extraKey),
+          false,
+          diagnosticCase.id
+        );
+      }
+      assert.equal(
+        Object.getOwnPropertySymbols(row).length,
+        0,
+        diagnosticCase.id
+      );
+      assertNoNativeCleanupHookExecution(row, diagnosticCase.id);
+    }
+    assertNoNativeCleanupHookExecution(result, diagnosticCase.id);
+  }
+
+  for (const diagnosticCase of [
+    {
+      id: 'cleanup-hook-forged-accepted-row-id',
+      row: cleanupHookRow(canonicalRoot, {
+        id: 'cleanup-hook-caller-forged-accepted-root-label'
+      }),
+      assertedField: 'id',
+      assertedValue: 'cleanup-hook-caller-forged-accepted-root-label'
+    },
+    {
+      id: 'cleanup-hook-forged-accepted-row-operation',
+      row: cleanupHookRow(canonicalRoot, {
+        operation: 'caller-forged-cleanup-hook-accepted-operation'
+      }),
+      assertedField: 'operation',
+      assertedValue: 'caller-forged-cleanup-hook-accepted-operation'
+    }
+  ]) {
+    const result = validateCleanupHookEvidenceRows([
+      diagnosticCase.row,
+      canonicalValue
+    ]);
+    const forgedRow = result.rows.find(
+      (row) =>
+        row[diagnosticCase.assertedField] ===
+        diagnosticCase.assertedValue
+    );
+
+    assert.equal(result.acceptedCleanupEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(result.rejectedCleanupEvidenceCount, 2, diagnosticCase.id);
+    assert.equal(
+      result.canonicalExecutableEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(forgedRow.status, 'rejected', diagnosticCase.id);
+    assert.equal(forgedRow.code, forgedCode, diagnosticCase.id);
+    assert.equal(
+      result.rows.some((row) => row.status === 'accepted'),
+      false,
+      diagnosticCase.id
+    );
+    assertNoNativeCleanupHookExecution(result, diagnosticCase.id);
+    for (const row of result.rows) {
+      assertNoNativeCleanupHookExecution(row, diagnosticCase.id);
+    }
+  }
+
+  for (const diagnosticCase of [
+    {
+      id: 'cleanup-hook-prototype-public-native-claim-alias',
+      row: cleanupHookPrototypeClaimRow(canonicalRoot, {
+        compatibilityClaimed: true
+      })
+    },
+    {
+      id: 'cleanup-hook-prototype-package-claim-alias',
+      row: cleanupHookPrototypeClaimRow(canonicalRoot, {
+        packageCompatibilityClaimed: true
+      })
+    }
+  ]) {
+    const result = validateCleanupHookEvidenceRows([diagnosticCase.row]);
+    assert.equal(result.acceptedCleanupEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(result.rejectedCleanupEvidenceCount, 1, diagnosticCase.id);
+    assert.equal(
+      result.canonicalExecutableEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(result.rows[0].status, 'rejected', diagnosticCase.id);
+    assert.equal(
+      result.rows[0].code,
+      'FAST_REACT_NAPI_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM',
+      diagnosticCase.id
+    );
+    assert.equal(result.rows[0].publicNativeCompatibility, false);
+    assertNoNativeCleanupHookExecution(result, diagnosticCase.id);
+    assertNoNativeCleanupHookExecution(result.rows[0], diagnosticCase.id);
+  }
+
   for (const diagnosticCase of [
     {
       id: 'cleanup-hook-callable-duplicate-root-rejected',
@@ -1259,7 +1512,7 @@ function assertPrivateCleanupHookPreflightCallable(native) {
       assert.equal(row.status, 'rejected', diagnosticCase.id);
       assert.equal(
         row.code,
-        'FAST_REACT_NAPI_CLEANUP_HOOK_CANONICAL_SET_MISMATCH',
+        canonicalSetMismatchCode,
         diagnosticCase.id
       );
       assert.equal(row.observedExecutionOrder, null, diagnosticCase.id);
