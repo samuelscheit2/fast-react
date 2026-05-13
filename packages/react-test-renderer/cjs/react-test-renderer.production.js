@@ -13570,6 +13570,26 @@ function throwInvalidRootRequest(message) {
   error.code = 'FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST';
   error.entrypoint = entrypoint;
   error.compatibilityTarget = compatibilityTarget;
+  error.rootRequestStatus = rootRequestStatus;
+  error.rootRequestExecutionStatus = rootRequestExecutionStatus;
+  error.rootRequestCompatibilityStatus = rootRequestCompatibilityStatus;
+  error.nativeAddonLoaded = false;
+  error.nativeBridgeAvailable = false;
+  error.nativeExecution = false;
+  error.rustExecution = false;
+  error.publicRouteAvailable = false;
+  error.publicCreateUpdateUnmountBehaviorAvailable = false;
+  error.serializationAvailable = false;
+  error.publicSerializationAvailable = false;
+  error.publicRootAvailable = false;
+  error.publicQueryMethodsAvailable = false;
+  error.publicTestInstanceAvailable = false;
+  error.publicActAvailable = false;
+  error.publicSchedulerAvailable = false;
+  error.jsPackageCompatibilityAvailable = false;
+  error.packageCompatibilityClaimed = false;
+  error.rendererRootsCompatibilityClaimed = false;
+  error.compatibilityClaimed = false;
   throw error;
 }
 
