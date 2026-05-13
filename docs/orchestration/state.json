@@ -562,11 +562,14 @@
 		{
 			"id": 1308,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Children currentness override prototype-alias hardening",
 			"agent": "worker_1308_children_currentness_override_aliases",
 			"branch": "worker/1308-children-currentness-override-aliases",
-			"audits": []
+			"audits": [
+				"audit_1308_source_contract",
+				"audit_1308_verification"
+			]
 		},
 		{
 			"id": 1309,
