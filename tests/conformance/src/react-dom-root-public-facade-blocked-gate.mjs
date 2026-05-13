@@ -177,6 +177,18 @@ const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_ESCAPED =
   "id removed &amp; &lt; &gt;";
 const MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED = "app&amp;&lt;&gt;&quot;";
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID_ESCAPED = "next&amp;&lt;&gt;&quot;";
+const MINIMAL_PUBLIC_DIV_SPAN_PARENT_ID = "nested&<>\"";
+const MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID = "nested-next&<>\"";
+const MINIMAL_PUBLIC_DIV_SPAN_TEXT = "nested & < >";
+const MINIMAL_PUBLIC_DIV_SPAN_TEXT_ESCAPED = "nested &amp; &lt; &gt;";
+const MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE = "nested again & < >";
+const MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE_ESCAPED =
+  "nested again &amp; &lt; &gt;";
+const MINIMAL_PUBLIC_DIV_SPAN_PARENT_ID_ESCAPED =
+  "nested&amp;&lt;&gt;&quot;";
+const MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID_ESCAPED =
+  "nested-next&amp;&lt;&gt;&quot;";
+const MINIMAL_PUBLIC_DIV_SPAN_CHILD_ELEMENT_SUMMARY = "react-element:span";
 
 function minimalPublicDivTextApi(text, id = MINIMAL_PUBLIC_DIV_TEXT_ID) {
   const props =
@@ -190,6 +202,10 @@ function rootRenderMinimalPublicDivTextApi(
   id = MINIMAL_PUBLIC_DIV_TEXT_ID
 ) {
   return `${rootName}.render(React.createElement("div", { id: ${JSON.stringify(id)} }, ${JSON.stringify(text)}))`;
+}
+
+function rootRenderMinimalPublicDivSpanApi(rootName, text, id) {
+  return `${rootName}.render(React.createElement("div", { id: ${JSON.stringify(id)} }, React.createElement("span", null, ${JSON.stringify(text)})))`;
 }
 
 function rootRenderNullApi(rootName) {
@@ -206,6 +222,19 @@ const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API = minimalPublicDivTextApi(
 );
 const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API =
   `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.render(React.createElement("div", null, ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL)}))`;
+const MINIMAL_PUBLIC_DIV_SPAN_UPDATE_API = [
+  "const root = ReactDOMClient.createRoot(container)",
+  rootRenderMinimalPublicDivSpanApi(
+    "root",
+    MINIMAL_PUBLIC_DIV_SPAN_TEXT,
+    MINIMAL_PUBLIC_DIV_SPAN_PARENT_ID
+  ),
+  rootRenderMinimalPublicDivSpanApi(
+    "root",
+    MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+    MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID
+  )
+].join("; ");
 const MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_API = [
   "const root = ReactDOMClient.createRoot(container)",
   rootRenderMinimalPublicDivTextApi("root", MINIMAL_PUBLIC_DIV_TEXT),
@@ -675,6 +704,65 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
       expectedMutationLog: [["appendChild", "DIV"]],
       expectedTextContent: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL,
       minimalHostOutputAdmission: "id-removal",
+      privateBridgeEvidence: "separate"
+    }),
+    Object.freeze({
+      id: "public-create-root-render-div-span-update",
+      publicApi: MINIMAL_PUBLIC_DIV_SPAN_UPDATE_API,
+      scenarioId: "update-host-render",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      ...publicRootLifecycleBlockedCompatibilityClaims(),
+      controlledDomShim: true,
+      expectedChildrenCount: 1,
+      expectedChildNodeNames: ["DIV"],
+      expectedFirstElementChildAttributes: [
+        ["id", MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID]
+      ],
+      expectedFirstElementChildChildNodeNames: ["SPAN"],
+      expectedFirstElementChildChildrenCount: 1,
+      expectedFirstElementChildFirstElementChildAttributes: [],
+      expectedFirstElementChildFirstElementChildChildNodeNames: ["#text"],
+      expectedFirstElementChildFirstElementChildFirstChildNodeName: "#text",
+      expectedFirstElementChildFirstElementChildFirstChildNodeValue:
+        MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+      expectedFirstElementChildFirstElementChildFirstChildTextContent:
+        MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+      expectedFirstElementChildFirstElementChildGetAttributeId: null,
+      expectedFirstElementChildFirstElementChildInnerHTML:
+        MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE_ESCAPED,
+      expectedFirstElementChildFirstElementChildMutationLog: [
+        ["appendChild", "#text"]
+      ],
+      expectedFirstElementChildFirstElementChildNodeName: "SPAN",
+      expectedFirstElementChildFirstElementChildStoredPropsChildren:
+        MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+      expectedFirstElementChildFirstElementChildStoredPropsHasId: false,
+      expectedFirstElementChildFirstElementChildStoredPropsId: null,
+      expectedFirstElementChildFirstElementChildStoredPropsSameObject: true,
+      expectedFirstElementChildFirstElementChildTagName: "SPAN",
+      expectedFirstElementChildFirstElementChildTextContent:
+        MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+      expectedFirstElementChildGetAttributeId:
+        MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID,
+      expectedFirstElementChildInnerHTML:
+        `<span>${MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE_ESCAPED}</span>`,
+      expectedFirstElementChildMutationLog: [["appendChild", "SPAN"]],
+      expectedFirstElementChildNodeName: "DIV",
+      expectedFirstElementChildStoredPropsChildren:
+        MINIMAL_PUBLIC_DIV_SPAN_CHILD_ELEMENT_SUMMARY,
+      expectedFirstElementChildStoredPropsHasId: true,
+      expectedFirstElementChildStoredPropsId:
+        MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID,
+      expectedFirstElementChildStoredPropsSameObject: true,
+      expectedFirstElementChildTagName: "DIV",
+      expectedFirstElementChildTextContent:
+        MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+      expectedInnerHTML:
+        `<div id="${MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID_ESCAPED}"><span>${MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE_ESCAPED}</span></div>`,
+      expectedMutationLog: [["appendChild", "DIV"]],
+      expectedTextContent: MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+      minimalHostOutputAdmission: "nested-div-span-update",
       privateBridgeEvidence: "separate"
     }),
     Object.freeze({
@@ -3959,26 +4047,32 @@ function validatePublicRootLifecycleBlocked({
       expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API
     },
     {
-      key: "renderNullCleanup",
+      key: "renderNestedDivSpan",
       expected: lifecycleRowSource[4],
+      expectedId: "public-create-root-render-div-span-update",
+      expectedLabel: MINIMAL_PUBLIC_DIV_SPAN_UPDATE_API
+    },
+    {
+      key: "renderNullCleanup",
+      expected: lifecycleRowSource[5],
       expectedId: "public-create-root-render-null-cleanup",
       expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_API
     },
     {
       key: "unmountAfterNull",
-      expected: lifecycleRowSource[5],
+      expected: lifecycleRowSource[6],
       expectedId: "public-create-root-unmount-after-null-idempotent",
       expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_API
     },
     {
       key: "unmount",
-      expected: lifecycleRowSource[6],
+      expected: lifecycleRowSource[7],
       expectedId: "public-create-root-unmount-call",
       expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API
     },
     {
       key: "recreateAfterUnmount",
-      expected: lifecycleRowSource[7],
+      expected: lifecycleRowSource[8],
       expectedId: "public-create-root-recreate-after-unmount",
       expectedLabel: MINIMAL_PUBLIC_DIV_TEXT_RECREATE_AFTER_UNMOUNT_API
     }
@@ -4037,8 +4131,11 @@ function validatePublicRootLifecycleBlocked({
       getRootFacadeMutationCount(operation.sideEffects) ===
         expected.expectedMutationLog.length &&
       ((expected.minimalHostOutputAdmission !== "update" &&
-        expected.minimalHostOutputAdmission !== "id-removal") ||
+        expected.minimalHostOutputAdmission !== "id-removal" &&
+        expected.minimalHostOutputAdmission !== "nested-div-span-update") ||
         operation.hostNodeReused === true) &&
+      (expected.minimalHostOutputAdmission !== "nested-div-span-update" ||
+        isPublicRootNestedDivSpanEvidenceExpected(operation)) &&
       (expected.minimalHostOutputAdmission !== "unmount" ||
         operation.duplicateRootTrackingCleared === true) &&
       (expected.minimalHostOutputAdmission !== "render-null-cleanup" ||
@@ -4057,12 +4154,15 @@ function validatePublicRootLifecycleBlocked({
         duplicateRootTrackingCleared:
           operation.duplicateRootTrackingCleared ?? false,
         hostNodeReused: operation.hostNodeReused ?? false,
+        childHostNodeReused: operation.childHostNodeReused ?? false,
         minimalDivTextHostOutputAdmitted:
           expected.minimalHostOutputAdmission === "render",
         minimalDivTextHostOutputUpdated:
           expected.minimalHostOutputAdmission === "update",
         minimalDivTextHostOutputIdRemoved:
           expected.minimalHostOutputAdmission === "id-removal",
+        minimalDivSpanHostOutputUpdated:
+          expected.minimalHostOutputAdmission === "nested-div-span-update",
         minimalDivTextHostOutputUnmounted:
           expected.minimalHostOutputAdmission === "unmount",
         minimalDivTextHostOutputRenderNullCleaned:
@@ -4073,6 +4173,11 @@ function validatePublicRootLifecycleBlocked({
           expected.minimalHostOutputAdmission === "recreate-after-unmount",
         minimalHostOutputAdmission: expected.minimalHostOutputAdmission,
         mutationCount: getRootFacadeMutationCount(operation.sideEffects),
+        nestedDivSpanEvidence:
+          expected.minimalHostOutputAdmission === "nested-div-span-update"
+            ? summarizePublicRootNestedDivSpanEvidence(operation)
+            : null,
+        parentHostNodeReused: operation.parentHostNodeReused ?? false,
         privateBridgeEvidence: "wrapped-private-facade-host-output",
         publicApi: expectedLabel,
         recreateAfterUnmountEvidence:
@@ -4085,6 +4190,7 @@ function validatePublicRootLifecycleBlocked({
             : null,
         renderReturnType: operation.value.type,
         scenarioId: expected.scenarioId,
+        textNodeReused: operation.textNodeReused ?? false,
         unmountAfterNullEvidence:
           expected.minimalHostOutputAdmission === "unmount-after-null"
             ? summarizePublicRootUnmountAfterNullEvidence(operation)
@@ -4187,6 +4293,14 @@ function validatePublicRootLifecycleBlocked({
 
 function getPublicRenderExpectedTextContent(expected) {
   return expected.expectedRenderTextContent ?? expected.expectedTextContent;
+}
+
+function isPublicRootNestedDivSpanEvidenceExpected(operation) {
+  return (
+    operation.parentHostNodeReused === true &&
+    operation.childHostNodeReused === true &&
+    operation.textNodeReused === true
+  );
 }
 
 function arePublicRootLifecycleCompatibilityClaimsBlocked(operation) {
@@ -4470,6 +4584,16 @@ function summarizePublicRootRecreateAfterUnmountEvidence(operation) {
   };
 }
 
+function summarizePublicRootNestedDivSpanEvidence(operation) {
+  return {
+    childHostNodeReused: operation.childHostNodeReused ?? false,
+    controlledDomSnapshot: operation.controlledDomSnapshot ?? null,
+    hostNodeReused: operation.hostNodeReused ?? false,
+    parentHostNodeReused: operation.parentHostNodeReused ?? false,
+    textNodeReused: operation.textNodeReused ?? false
+  };
+}
+
 function summarizePublicRootRenderNullCleanupEvidence(operation) {
   return {
     finalRenderNullAttempt: operation.finalRenderNullAttempt ?? null,
@@ -4575,7 +4699,81 @@ function isPublicRenderControlledDomShimExpectedSnapshot(snapshot, expected) {
     ) === null &&
     snapshot.containerTextContent === expected.expectedTextContent &&
     snapshot.ownerDocumentChildCount === 0 &&
-    findFirstDifferencePath(snapshot.ownerDocumentMutationLog, []) === null
+    findFirstDifferencePath(snapshot.ownerDocumentMutationLog, []) === null &&
+    isPublicRenderControlledDomShimExpectedNestedSnapshot(snapshot, expected)
+  );
+}
+
+function isPublicRenderControlledDomShimExpectedNestedSnapshot(
+  snapshot,
+  expected
+) {
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      expected,
+      "expectedFirstElementChildChildNodeNames"
+    )
+  ) {
+    return true;
+  }
+
+  return (
+    findFirstDifferencePath(
+      snapshot.containerFirstElementChildChildNodeNames,
+      expected.expectedFirstElementChildChildNodeNames
+    ) === null &&
+    snapshot.containerFirstElementChildChildrenCount ===
+      expected.expectedFirstElementChildChildrenCount &&
+    findFirstDifferencePath(
+      snapshot.containerFirstElementChildFirstElementChildAttributes,
+      expected.expectedFirstElementChildFirstElementChildAttributes
+    ) === null &&
+    findFirstDifferencePath(
+      snapshot.containerFirstElementChildFirstElementChildChildNodeNames,
+      expected.expectedFirstElementChildFirstElementChildChildNodeNames
+    ) === null &&
+    snapshot
+      .containerFirstElementChildFirstElementChildFirstChildNodeName ===
+      expected.expectedFirstElementChildFirstElementChildFirstChildNodeName &&
+    snapshot
+      .containerFirstElementChildFirstElementChildFirstChildNodeValue ===
+      expected.expectedFirstElementChildFirstElementChildFirstChildNodeValue &&
+    snapshot
+      .containerFirstElementChildFirstElementChildFirstChildTextContent ===
+      expected
+        .expectedFirstElementChildFirstElementChildFirstChildTextContent &&
+    snapshot
+      .containerFirstElementChildFirstElementChildGetAttributeId ===
+      expected.expectedFirstElementChildFirstElementChildGetAttributeId &&
+    snapshot.containerFirstElementChildFirstElementChildInnerHTML ===
+      expected.expectedFirstElementChildFirstElementChildInnerHTML &&
+    findFirstDifferencePath(
+      snapshot.containerFirstElementChildFirstElementChildMutationLog,
+      expected.expectedFirstElementChildFirstElementChildMutationLog
+    ) === null &&
+    snapshot.containerFirstElementChildFirstElementChildNodeName ===
+      expected.expectedFirstElementChildFirstElementChildNodeName &&
+    snapshot
+      .containerFirstElementChildFirstElementChildStoredPropsChildren ===
+      expected
+        .expectedFirstElementChildFirstElementChildStoredPropsChildren &&
+    snapshot
+      .containerFirstElementChildFirstElementChildStoredPropsHasId ===
+      expected.expectedFirstElementChildFirstElementChildStoredPropsHasId &&
+    snapshot.containerFirstElementChildFirstElementChildStoredPropsId ===
+      expected.expectedFirstElementChildFirstElementChildStoredPropsId &&
+    snapshot
+      .containerFirstElementChildFirstElementChildStoredPropsSameObject ===
+      expected
+        .expectedFirstElementChildFirstElementChildStoredPropsSameObject &&
+    snapshot.containerFirstElementChildFirstElementChildTagName ===
+      expected.expectedFirstElementChildFirstElementChildTagName &&
+    snapshot.containerFirstElementChildFirstElementChildTextContent ===
+      expected.expectedFirstElementChildFirstElementChildTextContent &&
+    findFirstDifferencePath(
+      snapshot.containerFirstElementChildMutationLog,
+      expected.expectedFirstElementChildMutationLog
+    ) === null
   );
 }
 
@@ -4847,6 +5045,15 @@ function inspectReactDomRootPublicFacadeLifecycle({
       componentTree,
       domContainer,
       label: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API,
+      listenerRegistry,
+      React,
+      reactDomClient,
+      rootMarkers
+    }),
+    renderNestedDivSpan: attemptControlledPublicRootRenderNestedDivSpanOperation({
+      componentTree,
+      domContainer,
+      label: MINIMAL_PUBLIC_DIV_SPAN_UPDATE_API,
       listenerRegistry,
       React,
       reactDomClient,
@@ -5295,6 +5502,120 @@ function attemptControlledPublicRootRenderIdRemovalOperation({
       rootMarkers,
       listenerRegistry
     )
+  };
+}
+
+function attemptControlledPublicRootRenderNestedDivSpanOperation({
+  componentTree,
+  domContainer,
+  label,
+  listenerRegistry,
+  React,
+  reactDomClient,
+  rootMarkers
+}) {
+  const { container, ownerDocument } = createPublicRenderControlledDomShim({
+    domContainer,
+    label
+  });
+  let childHostNodeReused = false;
+  let createRootAttempt = null;
+  let expectedLatestChildProps = null;
+  let expectedLatestParentProps = null;
+  let hostNodeReused = false;
+  let lifecycleOperationAttempted = false;
+  let parentHostNodeReused = false;
+  let rootObjectCreated = false;
+  let textNodeReused = false;
+
+  const result = attemptGateOperation(label, () => {
+    let root;
+    try {
+      root = reactDomClient.createRoot(container);
+      createRootAttempt = {
+        status: "ok",
+        value: describeLocalValue(root)
+      };
+      rootObjectCreated = root !== null && typeof root === "object";
+    } catch (error) {
+      createRootAttempt = {
+        status: "throws",
+        thrown: serializeGateError(error)
+      };
+      throw error;
+    }
+
+    lifecycleOperationAttempted = true;
+    const initialChildElement = React.createElement(
+      "span",
+      null,
+      MINIMAL_PUBLIC_DIV_SPAN_TEXT
+    );
+    const initialElement = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_SPAN_PARENT_ID },
+      initialChildElement
+    );
+    root.render(initialElement);
+    const initialParentNode = container.firstChild;
+    const initialChildNode = initialParentNode?.firstChild ?? null;
+    const initialTextNode = initialChildNode?.firstChild ?? null;
+
+    const updateChildElement = React.createElement(
+      "span",
+      null,
+      MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE
+    );
+    const updateElement = React.createElement(
+      "div",
+      { id: MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID },
+      updateChildElement
+    );
+    expectedLatestParentProps = updateElement.props;
+    expectedLatestChildProps = updateChildElement.props;
+    const value = root.render(updateElement);
+    const currentParentNode = container.firstChild;
+    const currentChildNode = currentParentNode?.firstChild ?? null;
+    const currentTextNode = currentChildNode?.firstChild ?? null;
+
+    parentHostNodeReused =
+      initialParentNode !== null && currentParentNode === initialParentNode;
+    hostNodeReused = parentHostNodeReused;
+    childHostNodeReused =
+      initialChildNode !== null && currentChildNode === initialChildNode;
+    textNodeReused =
+      initialTextNode !== null && currentTextNode === initialTextNode;
+    return value;
+  });
+
+  return {
+    ...result,
+    blockedAt: createRootAttempt?.status === "throws" ? "createRoot" : null,
+    childHostNodeReused,
+    compatibilityClaimed: false,
+    ...publicRootLifecycleBlockedCompatibilityClaims(),
+    controlledDomShim: true,
+    controlledDomSnapshot: summarizePublicRenderControlledDomShim({
+      componentTree,
+      container,
+      expectedLatestChildProps,
+      expectedLatestProps: expectedLatestParentProps,
+      ownerDocument
+    }),
+    createRootAttempt,
+    hostNodeReused,
+    lifecycleOperationAttempted,
+    parentHostNodeReused,
+    renderElementType: "div",
+    renderTextContent: MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+    rootObjectCreated,
+    sideEffects: inspectRootFacadeSideEffects(
+      container,
+      ownerDocument,
+      rootMarkers,
+      listenerRegistry
+    ),
+    textNodeReused
   };
 }
 
@@ -6218,6 +6539,7 @@ function createPublicRenderControlledDomShim({ domContainer, label }) {
 function summarizePublicRenderControlledDomShim({
   componentTree,
   container,
+  expectedLatestChildProps = null,
   expectedLatestProps,
   ownerDocument
 }) {
@@ -6237,7 +6559,7 @@ function summarizePublicRenderControlledDomShim({
     firstElementChild === null || latestPropsObject === null
       ? null
       : Object.prototype.hasOwnProperty.call(latestPropsObject, "id");
-  return {
+  const summary = {
     containerChildCount: container.childNodes.length,
     containerChildNodeNames: summarizeChildNodeNames(container),
     containerChildrenCount: container.children.length,
@@ -6253,7 +6575,7 @@ function summarizePublicRenderControlledDomShim({
       latestPropsObject === null ||
       !Object.prototype.hasOwnProperty.call(latestPropsObject, "children")
         ? null
-        : latestPropsObject.children,
+        : summarizeStoredPropsChildren(latestPropsObject.children),
     containerFirstElementChildStoredPropsHasId: latestPropsHasId,
     containerFirstElementChildStoredPropsId:
       latestPropsHasId === true ? latestPropsObject.id : null,
@@ -6269,6 +6591,97 @@ function summarizePublicRenderControlledDomShim({
     ownerDocumentChildCount: ownerDocument.childNodes.length,
     ownerDocumentMutationLog: ownerDocument.mutationLog.slice()
   };
+
+  if (expectedLatestChildProps !== null) {
+    Object.assign(
+      summary,
+      summarizePublicRenderControlledDomShimNestedElement({
+        componentTree,
+        expectedLatestChildProps,
+        firstElementChild
+      })
+    );
+  }
+
+  return summary;
+}
+
+function summarizePublicRenderControlledDomShimNestedElement({
+  componentTree,
+  expectedLatestChildProps,
+  firstElementChild
+}) {
+  const childElement = firstElementChild?.firstElementChild ?? null;
+  const childLatestProps =
+    childElement === null ||
+    componentTree === null ||
+    componentTree === undefined ||
+    typeof componentTree.getLatestPropsFromNode !== "function"
+      ? null
+      : componentTree.getLatestPropsFromNode(childElement);
+  const childLatestPropsObject =
+    childLatestProps !== null && typeof childLatestProps === "object"
+      ? childLatestProps
+      : null;
+  const childLatestPropsHasId =
+    childElement === null || childLatestPropsObject === null
+      ? null
+      : Object.prototype.hasOwnProperty.call(childLatestPropsObject, "id");
+  const textNode = childElement?.firstChild ?? null;
+
+  return {
+    containerFirstElementChildChildNodeNames:
+      firstElementChild === null ? null : summarizeChildNodeNames(firstElementChild),
+    containerFirstElementChildChildrenCount:
+      firstElementChild === null ? null : firstElementChild.children.length,
+    containerFirstElementChildFirstElementChildAttributes:
+      childElement === null ? null : attributeEntries(childElement),
+    containerFirstElementChildFirstElementChildChildNodeNames:
+      childElement === null ? null : summarizeChildNodeNames(childElement),
+    containerFirstElementChildFirstElementChildFirstChildNodeName:
+      textNode === null ? null : textNode.nodeName,
+    containerFirstElementChildFirstElementChildFirstChildNodeValue:
+      textNode === null ? null : textNode.nodeValue,
+    containerFirstElementChildFirstElementChildFirstChildTextContent:
+      textNode === null ? null : textNode.textContent,
+    containerFirstElementChildFirstElementChildGetAttributeId:
+      childElement === null ? null : childElement.getAttribute("id"),
+    containerFirstElementChildFirstElementChildInnerHTML:
+      childElement === null ? null : childElement.innerHTML,
+    containerFirstElementChildFirstElementChildMutationLog:
+      childElement === null ? null : childElement.mutationLog.slice(),
+    containerFirstElementChildFirstElementChildNodeName:
+      childElement === null ? null : childElement.nodeName,
+    containerFirstElementChildFirstElementChildStoredPropsChildren:
+      childLatestPropsObject === null ||
+      !Object.prototype.hasOwnProperty.call(childLatestPropsObject, "children")
+        ? null
+        : summarizeStoredPropsChildren(childLatestPropsObject.children),
+    containerFirstElementChildFirstElementChildStoredPropsHasId:
+      childLatestPropsHasId,
+    containerFirstElementChildFirstElementChildStoredPropsId:
+      childLatestPropsHasId === true ? childLatestPropsObject.id : null,
+    containerFirstElementChildFirstElementChildStoredPropsSameObject:
+      childElement === null
+        ? null
+        : childLatestProps === expectedLatestChildProps,
+    containerFirstElementChildFirstElementChildTagName:
+      childElement === null ? null : childElement.tagName,
+    containerFirstElementChildFirstElementChildTextContent:
+      childElement === null ? null : childElement.textContent,
+    containerFirstElementChildMutationLog:
+      firstElementChild === null ? null : firstElementChild.mutationLog.slice()
+  };
+}
+
+function summarizeStoredPropsChildren(children) {
+  if (children !== null && typeof children === "object") {
+    if (typeof children.type === "string") {
+      return `react-element:${children.type}`;
+    }
+    return describeLocalValue(children);
+  }
+  return children;
 }
 
 function attributeEntries(node) {
