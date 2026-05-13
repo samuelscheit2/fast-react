@@ -29,6 +29,23 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1280 Transition Hook Dispatcher Metadata
+
+- Worker 1280 hardened private transition hook dispatcher metadata so the
+  validator requires the source-owned singleton before reading fields. Shallow
+  clones, extra-claim clones, prototype-backed objects, and proxy wrappers now
+  reject without proxy trap inspection, and `markPrivateTransitionHookDispatcher`
+  with cloned metadata leaves the dispatcher unmarked.
+- The accepted change is negative/source-ownership evidence only. Public
+  `useTransition`, dispatcher routing, Scheduler, root, package, and broad hook
+  compatibility remain blocked.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed the React hook dispatcher oracle (31/31), hook dispatcher guard
+  (33/33), React workspace check, package-surface guard, import smoke, and
+  `git diff --check`.
+- The accepted state is main `1dbe4bef` after Worker 1280 merge `1dbe4bef`,
+  worker commit `83af487d`, and this orchestration-state update.
+
 ### Worker 1279 Native Cleanup-Hook Preflight Evidence
 
 - Worker 1279 hardened native cleanup-hook preflight evidence so accepted rows

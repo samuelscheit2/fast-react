@@ -48,7 +48,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted implementation head before this
-docs pass is main `7c4e3ab5` (`Merge worker 1279 native cleanup hook preflight`).
+docs pass is main `1dbe4bef` (`Merge worker 1280 transition hook dispatcher metadata`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -61,20 +61,18 @@ the pre-audit Worker 1215 full-hash typo.
 Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
-  1269, 1270, 1271, 1272, 1277, 1278, and 1279
+  1269, 1270, 1271, 1272, and 1277 through 1280
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
 - Scouts 1273 and 1276 reported concrete next-lane candidates.
 - Scout 1275 reported a concrete native/no-load next-lane candidate.
 - Scout 1274 reported a concrete React hooks/core facade next-lane candidate.
-- Worker 1280 is active for transition hook dispatcher metadata source-proof
-  canaries.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `7c4e3ab5`,
+implementation/evidence baseline main `1dbe4bef`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 30,464 lines
@@ -98,7 +96,7 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `7c4e3ab5` remains narrow.
+Accepted compatibility evidence through current main `1dbe4bef` remains narrow.
 The only public React DOM root behavior
 accepted so far is the fake-DOM div/text `createRoot().render(...)` lifecycle:
 initial render, same-root div/text/id update, id removal, `render(null)` cleanup,
@@ -155,6 +153,8 @@ evidence comments. React DOM public root rendering now rejects inherited
 element-prototype capability and diagnostic `public*` fields before private
 adapter render. Native cleanup-hook preflight evidence requires exact own rows
 and rejects broad inherited public/native/package/root/worker/execution aliases.
+Transition hook dispatcher metadata now requires source-owned singleton
+identity before field inspection.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -173,7 +173,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `7c4e3ab5` as
+1. Treat accepted compatibility evidence through current main `1dbe4bef` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, and the narrow fake-DOM public div/text
    plus nested fake-DOM lifecycle evidence described above, including
@@ -200,6 +200,9 @@ canonical evidence requirements.
    Children traversal, package, Scheduler, effects, test-renderer, or renderer
    compatibility. Native cleanup-hook preflight exactness is no-load private
    evidence only and does not open real native addon or worker execution.
+   Transition dispatcher metadata source ownership is private negative evidence
+   only and does not open public `useTransition`, Scheduler, root, package, or
+   hook compatibility.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct
