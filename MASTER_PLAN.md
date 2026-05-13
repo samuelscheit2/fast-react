@@ -67,7 +67,9 @@ Current orchestration queue:
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
 - Scouts 1273 and 1276 reported concrete next-lane candidates.
 - Scout 1275 reported a concrete native/no-load next-lane candidate.
-- Scout 1274 is active for React hooks/core facade next-lane candidates.
+- Scout 1274 reported a concrete React hooks/core facade next-lane candidate.
+- Worker 1280 is active for transition hook dispatcher metadata source-proof
+  canaries.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

@@ -236,7 +236,7 @@
 		{
 			"id": 1274,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "React hooks/core facade next-lane scout",
 			"agent": "scout_1274_react_hooks_next"
 		},
@@ -291,6 +291,15 @@
 				"audit_1279_repair_source",
 				"audit_1279_repair_verification"
 			]
+		},
+		{
+			"id": 1280,
+			"type": "worker",
+			"status": "active",
+			"title": "Transition hook dispatcher metadata source-proof canary",
+			"agent": "worker_1280_transition_hook_dispatcher_metadata",
+			"branch": "worker/1280-transition-hook-dispatcher-metadata",
+			"audits": []
 		}
 	]
 }
