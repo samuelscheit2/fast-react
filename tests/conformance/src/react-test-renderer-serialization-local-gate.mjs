@@ -892,6 +892,48 @@ const unmountPrivateRouteLifecycleSourceAssertions = freezeArray([
   jsBooleanPropertyAssertion("nativeExecution", false)
 ]);
 
+const createRoutingGateSourceAssertions = freezeArray([
+  jsStringPropertyAssertion(
+    "id",
+    "react-test-renderer-create-routing-prerequisite-gate"
+  ),
+  jsSourcePropertyAssertion("status", "createRoutingGateStatus"),
+  jsBooleanPropertyAssertion("deterministic", true),
+  jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+  jsBooleanPropertyAssertion("nativeExecution", false),
+  jsBooleanPropertyAssertion("privateRootRequestBridgeAvailable", true),
+  jsStringPropertyAssertion(
+    "privateRootRequestBridgeStatus",
+    "admitted-private-test-renderer-root-request-record"
+  ),
+  jsStringPropertyAssertion(
+    "privateRootRequestBridgeExecutionStatus",
+    "admitted-private-test-renderer-root-execution-bridge"
+  ),
+  jsBooleanPropertyAssertion("rootRequestRecordOnly", false),
+  jsBooleanPropertyAssertion("privateRootExecutionBridgeAvailable", true),
+  jsBooleanPropertyAssertion("rustRootExecutionBoundaryCallable", true),
+  jsBooleanPropertyAssertion("createRouteAvailable", false),
+  jsBooleanPropertyAssertion("updateRouteAvailable", false),
+  jsBooleanPropertyAssertion("unmountRouteAvailable", false),
+  jsBooleanPropertyAssertion("serializationAvailable", false),
+  jsBooleanPropertyAssertion("actIntegrationAvailable", false),
+  jsBooleanPropertyAssertion("schedulerIntegrationAvailable", false),
+  jsBooleanPropertyAssertion("compatibilityClaimed", false)
+]);
+
+const createRoutingGateCreateFunctionSourceCalls = freezeArray([
+  freezeRecord({
+    callee: "createPlaceholderRenderer",
+    arguments: freezeArray([
+      "createRoutingGate",
+      "element",
+      "options",
+      "createRequest"
+    ])
+  })
+]);
+
 export function inspectReactTestRendererSerializationLocalTargets({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT
 } = {}) {
@@ -2224,11 +2266,19 @@ export function inspectReactTestRendererErrorSurfaceLocalTargets({
     syncFlushSource
   ].join("\n");
   const createRoutingGatePresent =
-    hasSourcePattern(
-      testRendererSource,
-      /\breact-test-renderer-create-routing-prerequisite-gate\b/u
-    ) &&
-    hasSourcePattern(testRendererSource, /\bcreateRouteAvailable:\s*false\b/u);
+    publicJsReactTestRendererEntrypointSources.every(
+      (source) =>
+        jsObjectSourceAssertionsPass({
+          source,
+          declaration: "const createRoutingGate = Object.freeze",
+          assertions: createRoutingGateSourceAssertions
+        }) &&
+        jsFunctionDeclarationSourceCallsPass({
+          source,
+          functionName: "create",
+          calls: createRoutingGateCreateFunctionSourceCalls
+        })
+    );
   const updateUnmountRustLifecycleDiagnosticGateSourceEvidencePresent =
     publicJsReactTestRendererEntrypointSources.every((source) =>
       jsObjectSourceAssertionsPass({
@@ -4117,36 +4167,37 @@ function extractJsFunctionDeclarationBody({
   functionName,
   afterDeclaration = undefined
 }) {
-  const declarationIndex = findJsSourceOutsideCommentsAndStrings(
-    source,
-    `function ${functionName}`
-  );
-  if (declarationIndex < 0) {
-    return freezeRecord({
-      ok: false,
-      body: "",
-      bodyOpenIndex: -1,
-      bodyCloseIndex: -1,
-      error: "function-declaration-not-found"
-    });
+  const declarationNeedle = `function ${functionName}`;
+  let declarationIndex = -1;
+  let searchIndex = 0;
+
+  while (searchIndex < source.length) {
+    declarationIndex = findJsSourceOutsideCommentsAndStrings(
+      source,
+      declarationNeedle,
+      searchIndex
+    );
+    if (declarationIndex < 0) {
+      return freezeRecord({
+        ok: false,
+        body: "",
+        bodyOpenIndex: -1,
+        bodyCloseIndex: -1,
+        error: "function-declaration-not-found"
+      });
+    }
+
+    const afterCandidateNameIndex =
+      declarationIndex + declarationNeedle.length;
+    if (!/[A-Za-z0-9_$]/u.test(source[afterCandidateNameIndex] ?? "")) {
+      break;
+    }
+
+    searchIndex = afterCandidateNameIndex;
   }
 
-  const afterNameIndex = declarationIndex + `function ${functionName}`.length;
-  if (/[A-Za-z0-9_$]/u.test(source[afterNameIndex] ?? "")) {
-    return freezeRecord({
-      ok: false,
-      body: "",
-      bodyOpenIndex: -1,
-      bodyCloseIndex: -1,
-      error: "function-name-prefix-match"
-    });
-  }
-
-  const paramsOpenIndex = skipJsTrivia(
-    source,
-    afterNameIndex,
-    source.length
-  );
+  const afterNameIndex = declarationIndex + declarationNeedle.length;
+  const paramsOpenIndex = skipJsTrivia(source, afterNameIndex, source.length);
   if (source[paramsOpenIndex] !== "(") {
     return freezeRecord({
       ok: false,

@@ -255,6 +255,12 @@ const toJSONPrivateSerializationFacadeGateDeclaration =
   "const toJSONPrivateSerializationFacadeGate = Object.freeze({";
 const toTreePrivateFacadeGateDeclaration =
   "const toTreePrivateFacadeGate = Object.freeze({";
+const createRoutingGateDeclaration = "const createRoutingGate = Object.freeze";
+const createRoutingGateId =
+  "react-test-renderer-create-routing-prerequisite-gate";
+const createRouteAvailableBlockedSource = "createRouteAvailable: false";
+const createRoutingPrivateDiagnosticRowId =
+  "react-test-renderer-create-routing-private-diagnostic";
 
 test("react-test-renderer serialization gate is ready for private diagnostics while public compatibility stays blocked", () => {
   const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });
@@ -866,6 +872,107 @@ test("react-test-renderer error-surface lifecycle diagnostics reject comment str
         workspace.cleanup();
       }
     }
+  }
+});
+
+test("react-test-renderer create-routing local gate rejects renamed source with comment string template and regex spoofing", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate(text) {
+        assert.equal(
+          text.includes(createRoutingGateDeclaration),
+          true,
+          `${evidencePath} contains createRoutingGate declaration`
+        );
+        assert.equal(
+          text.includes(createRoutingGateId),
+          true,
+          `${evidencePath} contains createRoutingGate id`
+        );
+        assert.equal(
+          text.includes(createRouteAvailableBlockedSource),
+          true,
+          `${evidencePath} contains createRouteAvailable blocker`
+        );
+
+        return (
+          text
+            .replace(
+              createRoutingGateDeclaration,
+              "const createRoutingGateSpoofProbe = Object.freeze"
+            )
+            .replace(
+              createRoutingGateId,
+              "react-test-renderer-create-routing-spoof-probe"
+            )
+            .replace(
+              createRouteAvailableBlockedSource,
+              "createRouteAvailable: true"
+            ) + `\n${createRoutingGateSpoofSource()}\n`
+        );
+      }
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertCreateRoutingGateSourceProofRejected({
+      serializationGate,
+      errorSurfaceGate,
+      label: "renamed-create-routing-gate-spoof-source"
+    });
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer create-routing local gate rejects createRouteAvailable comment string template and regex spoofing", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate(text) {
+        assert.equal(
+          text.includes(createRouteAvailableBlockedSource),
+          true,
+          `${evidencePath} contains createRouteAvailable blocker`
+        );
+
+        return (
+          text.replace(
+            createRouteAvailableBlockedSource,
+            "createRouteAvailable: true"
+          ) + `\n${createRoutingGateSpoofSource()}\n`
+        );
+      }
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertCreateRoutingGateSourceProofRejected({
+      serializationGate,
+      errorSurfaceGate,
+      label: "create-route-available-spoof-source"
+    });
+  } finally {
+    workspace.cleanup();
   }
 });
 
@@ -6772,6 +6879,153 @@ function assertPlaceholderStatusRejectedAsPresent(gate) {
   assert.equal(gate.violations[0].actualStatus, "placeholder-present");
   assert.equal(gate.violations[1].expectedStatus, "present-in-workspace");
   assert.equal(gate.violations[1].actualStatus, "placeholder-present");
+}
+
+function createRoutingGateSpoofSource() {
+  const tokens = `${createRoutingGateId}\n${createRouteAvailableBlockedSource}`;
+
+  return [
+    `/*\n${tokens}\n*/`,
+    `const spoofedCreateRoutingGateString = ${JSON.stringify(tokens)};`,
+    `const spoofedCreateRoutingGateTemplate = \`${tokens}\`;`,
+    `/${createRoutingGateId}|${createRouteAvailableBlockedSource}/u;`
+  ].join("\n");
+}
+
+function assertCreateRoutingGateSourceProofRejected({
+  serializationGate,
+  errorSurfaceGate,
+  label
+}) {
+  assert.equal(
+    errorSurfaceGate.localChecks.createRoutingGatePresent,
+    false,
+    label
+  );
+  assert.equal(errorSurfaceGate.privateDiagnosticsReady, false, label);
+  assert.equal(
+    errorSurfaceGate.privateDiagnosticBlockers.includes(
+      createRoutingPrivateDiagnosticRowId
+    ),
+    true,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.privateDiagnosticRows.some(
+      (row) => row.id === createRoutingPrivateDiagnosticRowId
+    ),
+    false,
+    label
+  );
+
+  assertReactTestRendererPublicSurfacesRemainBlocked({
+    serializationGate,
+    errorSurfaceGate,
+    label
+  });
+}
+
+function assertReactTestRendererPublicSurfacesRemainBlocked({
+  serializationGate,
+  errorSurfaceGate,
+  label
+}) {
+  assert.equal(
+    serializationGate.localChecks.publicToJSONAvailable,
+    false,
+    label
+  );
+  assert.equal(
+    serializationGate.localChecks.publicToTreeAvailable,
+    false,
+    label
+  );
+  assert.equal(
+    serializationGate.localChecks.publicTestInstanceWrappersPresent,
+    false,
+    label
+  );
+  assert.equal(
+    serializationGate.localChecks.publicJsFacadeRoutingPresent,
+    false,
+    label
+  );
+  assert.equal(
+    serializationGate.localChecks.publicJsReactTestRendererFacadePlaceholder,
+    true,
+    label
+  );
+  assert.equal(serializationGate.publicCompatibilityReady, false, label);
+  assert.equal(serializationGate.publicCompatibilityClaimed, false, label);
+  assert.deepEqual(
+    serializationGate.publicCompatibilityBlockers,
+    [
+      "public-to-json-api",
+      "public-to-tree-api",
+      "public-test-instance-wrappers",
+      "public-js-react-test-renderer-routing"
+    ],
+    label
+  );
+
+  assert.equal(
+    errorSurfaceGate.localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked,
+    true,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.localChecks.publicSerializationErrorSurfaceBlocked,
+    true,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.localChecks.publicTestInstanceErrorSurfaceBlocked,
+    true,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.localChecks.publicActErrorSurfaceBlocked,
+    true,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.localChecks.publicSchedulerErrorSurfaceBlocked,
+    true,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.localChecks.publicCreateUpdateUnmountErrorSurfaceReady,
+    false,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.localChecks.publicSerializationErrorSurfaceReady,
+    false,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.localChecks.publicTestInstanceErrorSurfaceReady,
+    false,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.localChecks.publicActSchedulerErrorSurfaceReady,
+    false,
+    label
+  );
+  assert.equal(errorSurfaceGate.publicCompatibilityReady, false, label);
+  assert.equal(errorSurfaceGate.publicCompatibilityClaimed, false, label);
+  assert.deepEqual(
+    errorSurfaceGate.publicCompatibilityBlockers,
+    [
+      "public-create-update-unmount-error-surface",
+      "public-serialization-error-surface",
+      "public-test-instance-error-surface",
+      "public-act-scheduler-error-surface",
+      "public-shallow-error-surface"
+    ],
+    label
+  );
 }
 
 function createSerializationGateWorkspaceWithMutatedFile({
