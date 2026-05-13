@@ -439,7 +439,7 @@
 		{
 			"id": 1296,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Entangled transition queue-lane currentness source token",
 			"agent": "worker_1296_entangled_transition_currentness",
 			"branch": "worker/1296-entangled-transition-currentness",

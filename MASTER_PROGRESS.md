@@ -29,6 +29,23 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1296 Entangled Transition Currentness
+
+- Worker 1296 added source-owned currentness tokens for entangled transition
+  queue-lane continuations. Accepted entangled continuations now expose and
+  consume a currentness source token exactly once through the shared
+  finished-work queue-lane currentness path.
+- Hostile coverage rejects clone-without-token, replay-after-consume,
+  preserved-token metadata drift for `queue_handoff`, `queue_commit_handoff`,
+  and `commit`, plus stale live-root and cross-root state before consuming the
+  source.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed entangled continuation (3/3), entangled currentness (3/3), transition
+  queue-lane currentness (4/4), `cargo check -p fast-react-reconciler
+  --all-features`, `cargo fmt --all --check`, and `git diff --check`.
+- The accepted state is main `8fd0a049` after Worker 1296 merge `8fd0a049`,
+  worker commit `65f1eb0c`, and this orchestration-state update.
+
 ### Worker 1299 React DOM Own Element Alias Blocker
 
 - Worker 1299 hardened public `createRoot().render` so forged React element
