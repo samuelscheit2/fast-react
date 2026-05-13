@@ -4047,6 +4047,33 @@ function hasOwnDataNativeCurrentnessRowFields(row, fields) {
   );
 }
 
+function hasExactOwnDataNativeCurrentnessRowFields(
+  row,
+  fields,
+  optionalFields = Object.freeze([])
+) {
+  if (!isObjectLike(row)) {
+    return false;
+  }
+
+  const allowedFields = new Set(fields);
+  const optionalFieldSet = new Set(optionalFields);
+
+  if (Object.getOwnPropertySymbols(row).length !== 0) {
+    return false;
+  }
+
+  for (const field of Object.getOwnPropertyNames(row)) {
+    if (!allowedFields.has(field) || !hasOwnDataProperty(row, field)) {
+      return false;
+    }
+  }
+
+  return fields.every(
+    (field) => optionalFieldSet.has(field) || hasOwnDataProperty(row, field)
+  );
+}
+
 function getPropertyDescriptorInPrototypeChain(object, key) {
   if (!isObjectLike(object)) {
     return undefined;
@@ -7383,9 +7410,10 @@ function validateNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRow(
   }
 
   if (
-    !hasOwnDataNativeCurrentnessRowFields(
+    !hasExactOwnDataNativeCurrentnessRowFields(
       row,
-      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRowFields
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRowFields,
+      ['status', 'code']
     ) ||
     row?.sourceOwnedEvidence !== true ||
     row?.blockedPrivateEvidence !== true ||
