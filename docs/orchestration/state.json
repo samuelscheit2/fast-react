@@ -392,7 +392,7 @@
 		{
 			"id": 1290,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "react-test-renderer create-routing source-proof hardening",
 			"agent": "worker_1290_test_renderer_create_routing_source_proof",
 			"branch": "worker/1290-test-renderer-create-routing-source-proof",
@@ -439,20 +439,26 @@
 		{
 			"id": 1296,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Entangled transition queue-lane currentness source token",
 			"agent": "worker_1296_entangled_transition_currentness",
 			"branch": "worker/1296-entangled-transition-currentness",
-			"audits": []
+			"audits": [
+				"audit_1296_source_contract",
+				"audit_1296_verification"
+			]
 		},
 		{
 			"id": 1297,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Native inherited capability-claim blockers",
 			"agent": "worker_1297_native_inherited_capability_claims",
 			"branch": "worker/1297-native-inherited-capability-claims",
-			"audits": []
+			"audits": [
+				"audit_1297_source_contract",
+				"audit_1297_verification"
+			]
 		},
 		{
 			"id": 1298,
@@ -466,11 +472,14 @@
 		{
 			"id": 1299,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "React DOM own element compatibility alias blocker",
 			"agent": "worker_1299_react_dom_own_element_alias_blocker",
 			"branch": "worker/1299-react-dom-own-element-alias-blocker",
-			"audits": []
+			"audits": [
+				"audit_1299_source_contract",
+				"audit_1299_verification"
+			]
 		},
 		{
 			"id": 1300,

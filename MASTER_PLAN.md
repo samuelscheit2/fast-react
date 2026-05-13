@@ -61,7 +61,7 @@ the pre-audit Worker 1215 full-hash typo.
 Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
-  1269, 1270, 1271, 1272, 1277 through 1280, 1286 through 1289
+  1269, 1270, 1271, 1272, 1277 through 1280, and 1286 through 1290
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
@@ -74,18 +74,17 @@ Current orchestration queue:
 - Scout 1283 reported a concrete react-test-renderer next-lane candidate.
 - Scout 1285 reported a concrete React core/hooks next-lane candidate.
 - Scouts 1291 through 1295 reported concrete next-lane candidates.
-- Worker 1290 is auditing for react-test-renderer create-routing source-proof
-  hardening.
-- Workers 1296 through 1299 are active for entangled transition currentness,
-  native inherited capability-claim blockers, `startTransition` returned
-  thenables, and React DOM own element alias blockers.
+- Workers 1296, 1297, and 1299 are auditing for entangled transition
+  currentness, native inherited capability-claim blockers, and React DOM own
+  element alias blockers.
+- Worker 1298 is active for `startTransition` returned thenables.
 - Worker 1300 is active for react-test-renderer TestInstance query-bridge
   local-gate source proofing.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `a1848744`,
+implementation/evidence baseline main `ee7abf64`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 30,464 lines

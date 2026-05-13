@@ -29,6 +29,21 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1290 react-test-renderer Create Routing Source Proof
+
+- Worker 1290 hardened the react-test-renderer serialization local gate so
+  `createRoutingGatePresent` is proven by per-entrypoint source assertions
+  instead of broad whole-tree regex matches.
+- Hostile coverage rejects renamed or stale `createRoutingGate` sources and
+  flipped `createRouteAvailable` values when the required tokens exist only in
+  block comments, strings, templates, or regex literals. The private
+  create-routing readiness row now fails closed when the source proof is absent.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed the serialization local gate (58/58), create-routing gate (46/46), and
+  `git diff --check`.
+- The accepted state is main `ee7abf64` after Worker 1290 merge `ee7abf64`,
+  worker commit `df7a95dd`, and this orchestration-state update.
+
 ### Worker 1287 Native Cleanup-Hook Exact Evidence Set
 
 - Worker 1287 hardened native cleanup-hook preflight validation so canonical
