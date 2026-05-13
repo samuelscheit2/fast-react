@@ -3690,9 +3690,10 @@ function validateNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRow(
   }
 
   if (
-    !hasOwnDataNativeCurrentnessRowFields(
+    !hasExactOwnDataNativeCurrentnessRowFields(
       row,
-      nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRowFields
+      nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRowFields,
+      ['status', 'code']
     ) ||
     row?.sourceOwnedEvidence !== true ||
     row?.blockedPrivateEvidence !== true ||
