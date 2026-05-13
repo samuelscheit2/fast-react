@@ -5845,6 +5845,7 @@ test("React DOM public root facade records hostile render capability rejections"
       "unsupported-onSubmit-prop",
       "unsupported-onChange-prop",
       "unsupported-inherited-onClick-prop",
+      "unsupported-element-prototype-nonenumerable-publicDispatchEnabled-prop",
       "unsupported-nested-inherited-onClick-prop",
       "unsupported-object-prototype-polluted-public-props"
     ]
@@ -5857,7 +5858,8 @@ test("React DOM public root facade records hostile render capability rejections"
       "unsupported-callback-ref-prop",
       "unsupported-object-ref-prop",
       "unsupported-inherited-nonenumerable-refEffectsClaimed-prop",
-      "unsupported-nested-inherited-ref-prop"
+      "unsupported-nested-inherited-ref-prop",
+      "unsupported-nested-element-prototype-ref-prop"
     ]
   );
   const componentWrapperRows = rejectionRows.filter(
@@ -5943,7 +5945,70 @@ test("React DOM public root facade records hostile render capability rejections"
     rejectionRows.some(
       (row) =>
         row.label ===
+          "unsupported-element-prototype-nonenumerable-publicRootExecution-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-element-prototype-nonenumerable-nativeExecutionClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-element-prototype-nonenumerable-listenerInstallationClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-element-prototype-nonenumerable-publicRootCreated-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-element-prototype-nonenumerable-publicControlledBehaviorEnabled-prop" &&
+        row.blockedSurface === "controlled-input"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
           "unsupported-nested-inherited-nonenumerable-publicHydrateRootCompatibilityClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-nested-element-prototype-publicHydrateRootCompatibilityClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-nested-element-prototype-resource-form-alias-prop" &&
+        row.blockedSurface === "resource"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-nested-element-prototype-publicRootTouched-prop" &&
         row.blockedSurface === "compatibility-claim"
     )
   );
@@ -5966,6 +6031,14 @@ test("React DOM public root facade records hostile render capability rejections"
   assert.ok(
     rejectionRows.some(
       (row) =>
+        row.label ===
+          "unsupported-object-prototype-element-compatibility-alias-prop" &&
+        row.blockedSurface === "prototype-pollution"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
         row.label === "unsupported-inherited-parent-children-prop" &&
         row.blockedSurface === "prototype-children"
     )
@@ -5982,6 +6055,13 @@ test("React DOM public root facade records hostile render capability rejections"
       (row) =>
         row.label === "unsupported-accessor-public-prop" &&
         row.blockedSurface === "prop-accessor"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-proxy-element-prototype-public-props" &&
+        row.blockedSurface === "element-proxy"
     )
   );
   assert.ok(
