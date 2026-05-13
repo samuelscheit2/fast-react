@@ -5917,6 +5917,30 @@ test("React DOM public root facade records hostile render capability rejections"
   assert.ok(
     rejectionRows.some(
       (row) =>
+        row.label ===
+          "unsupported-inherited-nonenumerable-publicRootUpdateCompatibilityClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-nested-inherited-nonenumerable-publicHydrateRootCompatibilityClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-object-prototype-nonenumerable-publicDomMutationCompatibilityClaimed-prop" &&
+        row.blockedSurface === "prototype-pollution"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
         row.label === "unsupported-inherited-parent-children-prop" &&
         row.blockedSurface === "prototype-children"
     )

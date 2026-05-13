@@ -24,14 +24,11 @@ const reactElementType = Symbol.for('react.transitional.element');
 const legacyReactElementType = Symbol.for('react.element');
 const minimalPublicRootContainers = new WeakMap();
 const hasOwnProperty = Object.prototype.hasOwnProperty;
-const publicHostInheritedPropNames = new Set([
+const publicHostInheritedNonClaimPropNames = new Set([
   'action',
-  'behaviorCompatibilityClaimed',
-  'browserDomCompatibilityClaimed',
   'checked',
   'children',
   'className',
-  'compatibilityClaimed',
   'dangerouslySetInnerHTML',
   'defaultValue',
   'formAction',
@@ -39,35 +36,20 @@ const publicHostInheritedPropNames = new Set([
   'id',
   'key',
   'name',
-  'nativeCompatibilityClaimed',
-  'nativeExecution',
   'onChange',
   'onClick',
   'onClickCapture',
   'onError',
   'onLoad',
   'onSubmit',
-  'publicBrowserDomCompatibilityClaimed',
-  'publicCompatibilityClaimed',
-  'publicControlledInputCompatibilityClaimed',
   'publicCreateRootEnabled',
-  'publicEventCompatibilityClaimed',
-  'publicFormCompatibilityClaimed',
   'publicHydrateRootEnabled',
-  'publicHydrationCompatibilityClaimed',
-  'publicNativeCompatibilityClaimed',
-  'publicRenderCompatibilityClaimed',
-  'publicResourceCompatibilityClaimed',
-  'publicRootCompatibilityClaimed',
-  'publicRootCompatibilitySurface',
+  'publicHydrateRootSupported',
+  'publicRootBehaviorChanged',
+  'publicRootExecution',
   'publicRootObjectExposed',
-  'publicRootRenderCompatibilityClaimed',
-  'publicRootUnmountCompatibilityClaimed',
-  'publicTestRendererCompatibilityClaimed',
-  'reactDomCompatibilityClaimed',
   'ref',
   'rel',
-  'schedulerCompatibilityClaimed',
   'src',
   'style',
   'suppressHydrationWarning',
@@ -406,24 +388,106 @@ function assertNoInheritedHostProps(props) {
     );
   }
 
-  for (const name of publicHostInheritedPropNames) {
-    if (hasOwnProperty.call(props, name)) {
-      continue;
-    }
-    let inherited = false;
+  let prototype = getHostPropPrototype(props);
+  while (prototype !== null) {
+    assertNoProxyObject(
+      prototype,
+      'Public host props proxy prototypes remain blocked.'
+    );
+
+    let inheritedNames;
     try {
-      inherited = name in props;
+      inheritedNames = Object.getOwnPropertyNames(prototype);
     } catch (_error) {
       throwUnsupportedRootRender(
-        'Public host props prototype checks remain blocked.'
+        'Public host props prototype inspection remains blocked.'
       );
     }
-    if (inherited) {
-      throwUnsupportedRootRender(
-        `Inherited public host prop ${name} remains blocked.`
-      );
+    for (const name of inheritedNames) {
+      if (
+        publicHostInheritedNonClaimPropNames.has(name) ||
+        isPublicHostCompatibilityAliasName(name)
+      ) {
+        throwUnsupportedRootRender(
+          `Inherited public host prop ${name} remains blocked.`
+        );
+      }
     }
+
+    prototype = getHostPropPrototype(prototype);
   }
+}
+
+function getHostPropPrototype(value) {
+  try {
+    return Object.getPrototypeOf(value);
+  } catch (_error) {
+    throwUnsupportedRootRender(
+      'Public host props prototype access remains blocked.'
+    );
+  }
+}
+
+function isPublicHostCompatibilityAliasName(name) {
+  if (typeof name !== 'string') {
+    return false;
+  }
+
+  const normalized = name.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+  if (normalized === '') {
+    return false;
+  }
+
+  if (
+    normalized === 'compatibilityclaimed' ||
+    normalized === 'packagecompatibilityclaimed' ||
+    normalized === 'packagesurfacechanged' ||
+    normalized === 'nativeexecution' ||
+    normalized === 'nativeexecutionclaimed' ||
+    normalized === 'publicdommutation' ||
+    normalized === 'publicrootcompatibilitysurface' ||
+    normalized === 'publicrootexecution'
+  ) {
+    return true;
+  }
+
+  if (
+    normalized.includes('compatibilityclaimed') ||
+    normalized.includes('compatibilitysurface') ||
+    normalized.includes('compatibilitytarget')
+  ) {
+    return true;
+  }
+
+  const hasClaimSignal =
+    normalized.endsWith('claim') ||
+    normalized.endsWith('claimed') ||
+    normalized.includes('compatibility') ||
+    normalized.includes('surfacechanged');
+  if (!hasClaimSignal) {
+    return false;
+  }
+
+  return (
+    normalized.startsWith('public') ||
+    normalized.startsWith('browser') ||
+    normalized.startsWith('native') ||
+    normalized.startsWith('package') ||
+    normalized.startsWith('reactdom') ||
+    normalized.startsWith('scheduler') ||
+    normalized.startsWith('rust') ||
+    normalized.includes('root') ||
+    normalized.includes('dom') ||
+    normalized.includes('hydration') ||
+    normalized.includes('hydrate') ||
+    normalized.includes('event') ||
+    normalized.includes('resource') ||
+    normalized.includes('form') ||
+    normalized.includes('controlled') ||
+    normalized.includes('renderer') ||
+    normalized.includes('act') ||
+    normalized.includes('flushsync')
+  );
 }
 
 function assertNoProxyObject(value, detail) {

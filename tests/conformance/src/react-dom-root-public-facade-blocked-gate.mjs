@@ -948,6 +948,33 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "prototype-prop"
     }),
     publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-nonenumerable-publiccreaterootcompatibilityclaimed-prop",
+      label:
+        "unsupported-inherited-nonenumerable-publicCreateRootCompatibilityClaimed-prop",
+      publicApi:
+        "root.render(forged <div> with non-enumerable inherited publicCreateRootCompatibilityClaimed)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-nonenumerable-publicrootupdatecompatibilityclaimed-prop",
+      label:
+        "unsupported-inherited-nonenumerable-publicRootUpdateCompatibilityClaimed-prop",
+      publicApi:
+        "root.render(forged <div> with non-enumerable inherited publicRootUpdateCompatibilityClaimed)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-nonenumerable-publicpackagecompatibilityclaimed-prop",
+      label:
+        "unsupported-inherited-nonenumerable-publicPackageCompatibilityClaimed-prop",
+      publicApi:
+        "root.render(forged <div> with non-enumerable inherited publicPackageCompatibilityClaimed)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-keyed-div",
       label: "unsupported-keyed-div",
       publicApi: "root.render(<div key=\"blocked\">text</div>)",
@@ -1028,6 +1055,24 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "compatibility-claim"
     }),
     publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-inherited-nonenumerable-publichydraterootcompatibilityclaimed-prop",
+      label:
+        "unsupported-nested-inherited-nonenumerable-publicHydrateRootCompatibilityClaimed-prop",
+      publicApi:
+        "root.render(forged <div><span non-enumerable inherited publicHydrateRootCompatibilityClaimed /></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-inherited-nonenumerable-snake-root-update-compatibility-prop",
+      label:
+        "unsupported-nested-inherited-nonenumerable-snake-root-update-compatibility-prop",
+      publicApi:
+        "root.render(forged <div><span non-enumerable inherited public_root_update_compatibility_claimed /></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-nested-component",
       label: "unsupported-nested-component",
       publicApi: "root.render(<div><Component /></div>)",
@@ -1063,6 +1108,15 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       publicApi:
         "root.render(<div>text</div>) with enumerable public keys on Object.prototype",
       category: "event-listener-prop",
+      blockedSurface: "prototype-pollution"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-object-prototype-nonenumerable-publicdommutationcompatibilityclaimed-prop",
+      label:
+        "unsupported-object-prototype-nonenumerable-publicDomMutationCompatibilityClaimed-prop",
+      publicApi:
+        "root.render(<div>text</div>) with non-enumerable publicDomMutationCompatibilityClaimed on Object.prototype",
+      category: "browser-dom-expansion",
       blockedSurface: "prototype-pollution"
     }),
     publicFacadeCapabilityRejectionRow({
