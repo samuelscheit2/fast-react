@@ -847,6 +847,8 @@ fn validate_cleanup_previous_host_work_is_mount_owned(
         );
     }
 
+    previous.validate_detached_host_cleanup_ownership_for_canary(store)?;
+
     Ok(())
 }
 

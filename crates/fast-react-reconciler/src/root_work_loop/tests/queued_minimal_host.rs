@@ -628,6 +628,59 @@ fn root_work_loop_queued_minimal_host_root_rejects_extra_completed_child_before_
 }
 
 #[test]
+fn root_work_loop_queued_minimal_host_rejects_empty_detached_hosts_before_enqueue() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut source = TestHostTree::new();
+    let element = source.insert_host_element_with_text("section", "empty detached");
+    let mounted = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        element,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        None,
+        QUEUED_MINIMAL_SOURCE_ORDER + 160,
+        QUEUED_MINIMAL_COMMIT_ORDER + 160,
+    )
+    .unwrap();
+    let current = store.root(root_id).unwrap().current();
+    let current_child = mounted.host_work().root_child().unwrap();
+    let state_node = store.fiber_arena().get(current_child).unwrap().state_node();
+    let previous = HostWorkResult::from_detached_hosts_for_canary(
+        root_id,
+        current,
+        vec![current_child],
+        vec![current_child],
+        DetachedHostRecords::new_for_canary(),
+    );
+    let snapshot = queued_minimal_host_root_snapshot(&store, &host, root_id);
+
+    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        RootElementHandle::NONE,
+        QueuedMinimalHostRootUpdatePriority::Sync,
+        Lanes::SYNC,
+        &source,
+        Some(previous),
+        QUEUED_MINIMAL_SOURCE_ORDER + 161,
+        QUEUED_MINIMAL_COMMIT_ORDER + 161,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        QueuedMinimalHostRootCommitError::HostWork(HostWorkError::InvalidDetachedInstance {
+            handle: state_node,
+        })
+    );
+    assert_queued_minimal_host_root_snapshot(&store, &host, root_id, snapshot);
+}
+
+#[test]
 fn root_work_loop_queued_minimal_host_root_rejects_stale_render_lane_before_complete_or_commit() {
     let (mut store, root_id, mut host) = root_store();
     let mut source = TestHostTree::new();
