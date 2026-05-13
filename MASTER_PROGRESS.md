@@ -29,6 +29,31 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1260 Queued Minimal HostRoot Cleanup Currentness
+
+- Worker 1260 added private queued minimal HostRoot cleanup currentness
+  validation. Cleanup now validates same-root previous host work against live
+  current HostRoot topology before enqueue/render/commit, including current
+  fiber identity, root-child/completed-child evidence, updated-WIP alternate
+  rejection, and completed HostComponent/HostText detached-host ownership.
+- A source-audit blocker found same-topology caller-built previous host work
+  could still carry invalid or empty detached host records and fail only after
+  root current publication. The repair validates detached host ownership before
+  publication and adds hostile empty/missing detached-record coverage proving no
+  root current switch, finished-work metadata clearing, pending/render-phase
+  changes, or host ops occur on rejection.
+- Accepted mount -> cleanup, same-root update, wrong-root, stale WIP,
+  missing/stale/extra child id, and update -> cleanup fail-closed behavior
+  remains preserved. No public React DOM, test-renderer, root, `flushSync`,
+  Scheduler, effects, package, or broad renderer compatibility was opened.
+- Accepted validation includes clean source, repair-source, and verification
+  audits. Root reruns passed queued minimal host (12/12), `root_work_loop`
+  (151/151), `cargo check -p fast-react-reconciler --all-features`,
+  `cargo fmt --all --check`, and `git diff --check`.
+- The accepted state is main `31e3c2a0` after Worker 1260 merge `31e3c2a0`,
+  worker commits `690f86cf` and repair `4370fdd2`, and orchestration-state
+  commit `b09dbc30`.
+
 ### Workers 1258, 1259, and 1262 Acceptance Batch
 
 - Worker 1258 added private Rust scheduler canaries for same-lane transition

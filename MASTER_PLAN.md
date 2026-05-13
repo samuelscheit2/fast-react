@@ -48,7 +48,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted implementation head before this
-docs pass is main `2d1a0c4b` (`Merge worker 1259 native prototype rows`).
+docs pass is main `31e3c2a0` (`Merge worker 1260 queued cleanup currentness`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -60,16 +60,15 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Workers 1253, 1254, 1257, 1258, 1259, and 1262 have been reviewed, repaired
-  where needed, merged, and recorded as accepted history.
-- Worker 1260 has completed repair and is under repair audit.
+- Workers 1253, 1254, 1257, 1258, 1259, 1260, and 1262 have been reviewed,
+  repaired where needed, merged, and recorded as accepted history.
 - Worker 1261 is under repair for inherited non-enumerable React DOM
   compatibility-claim aliases.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `2d1a0c4b`,
+implementation/evidence baseline main `31e3c2a0`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 30,464 lines
@@ -93,7 +92,7 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `2d1a0c4b` remains narrow.
+Accepted compatibility evidence through current main `31e3c2a0` remains narrow.
 The only public React DOM root behavior
 accepted so far is the fake-DOM div/text `createRoot().render(...)` lifecycle:
 initial render, same-root div/text/id update, id removal, `render(null)` cleanup,
@@ -129,7 +128,8 @@ coverage, plus private `startTransition` rootless currentness evidence with
 exact report/array key validation, test-only Scheduler same-lane early rejection
 canaries, native no-load/source-currentness prototype-row rejection, and
 test-renderer private cross-entrypoint bridge currentness while public
-test-renderer behavior remains blocked.
+test-renderer behavior remains blocked. Queued minimal HostRoot cleanup also now
+validates detached-host ownership before publication.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -148,7 +148,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `2d1a0c4b` as
+1. Treat accepted compatibility evidence through current main `31e3c2a0` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, and the narrow fake-DOM public div/text
    plus nested fake-DOM lifecycle evidence described above, including
@@ -162,7 +162,8 @@ canonical evidence requirements.
    private `startTransition` rootless currentness with exact report validation,
    Scheduler same-lane early rejection canaries, native prototype-row rejection,
    test-renderer cross-entrypoint bridge currentness, passive destroy evidence,
-   scheduler root currentness completeness, scheduler local
+   queued minimal cleanup detached-host ownership validation, scheduler root
+   currentness completeness, scheduler local
    row/evidence source validation, test-renderer placeholder currentness, and
    test-renderer private create/serialization gates are blockers and currentness
    evidence only; they do not open broader public root, native, browser DOM,
