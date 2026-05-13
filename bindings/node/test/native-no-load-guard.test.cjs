@@ -1444,16 +1444,46 @@ function assertPrivateCleanupHookPreflightCallable(native) {
 
   for (const diagnosticCase of [
     {
-      id: 'cleanup-hook-prototype-public-native-claim-alias',
+      id: 'cleanup-hook-inherited-compatibility-claim-alias',
       row: cleanupHookPrototypeClaimRow(canonicalRoot, {
         compatibilityClaimed: true
-      })
+      }),
+      alias: 'compatibilityClaimed'
     },
     {
-      id: 'cleanup-hook-prototype-package-claim-alias',
+      id: 'cleanup-hook-inherited-public-native-execution',
+      row: cleanupHookPrototypeClaimRow(canonicalRoot, {
+        publicNativeExecution: true
+      }),
+      alias: 'publicNativeExecution'
+    },
+    {
+      id: 'cleanup-hook-inherited-native-addon-load-claimed',
+      row: cleanupHookPrototypeClaimRow(canonicalRoot, {
+        nativeAddonLoadClaimed: true
+      }),
+      alias: 'nativeAddonLoadClaimed'
+    },
+    {
+      id: 'cleanup-hook-inherited-package-exports-opened',
+      row: cleanupHookPrototypeClaimRow(canonicalRoot, {
+        packageExportsOpened: true
+      }),
+      alias: 'packageExportsOpened'
+    },
+    {
+      id: 'cleanup-hook-inherited-public-native-execution-snake-case',
+      row: cleanupHookPrototypeClaimRow(canonicalRoot, {
+        public_native_execution: true
+      }),
+      alias: 'public_native_execution'
+    },
+    {
+      id: 'cleanup-hook-inherited-package-compatibility-claim-alias',
       row: cleanupHookPrototypeClaimRow(canonicalRoot, {
         packageCompatibilityClaimed: true
-      })
+      }),
+      alias: 'packageCompatibilityClaimed'
     }
   ]) {
     const result = validateCleanupHookEvidenceRows([diagnosticCase.row]);
@@ -1471,6 +1501,11 @@ function assertPrivateCleanupHookPreflightCallable(native) {
       diagnosticCase.id
     );
     assert.equal(result.rows[0].publicNativeCompatibility, false);
+    assert.equal(
+      Object.hasOwn(result.rows[0], diagnosticCase.alias),
+      false,
+      diagnosticCase.id
+    );
     assertNoNativeCleanupHookExecution(result, diagnosticCase.id);
     assertNoNativeCleanupHookExecution(result.rows[0], diagnosticCase.id);
   }

@@ -1257,18 +1257,58 @@ const nativeRootBridgeWorkerThreadCleanupHookPreflightRowFields =
   ]);
 const nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFields =
   Object.freeze([
-    'nodeWorkerThreadsExecution',
-    'napiCleanupHookExecution',
-    'nativeAddonLoaded',
-    'nativeExecution',
-    'rendererExecution',
-    'reconcilerExecution',
-    'publicNativeCompatibility',
-    'compatibilityClaimed',
-    'nativeCompatibilityClaimed',
-    'nativePackageCompatibilityClaimed',
-    'packageCompatibilityClaimed'
+    ...new Set([
+      ...nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFields,
+      ...nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPublicClaimFields,
+      ...nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPackageClaimFields,
+      ...nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCompatibilityClaimFields,
+      ...nativeRootBridgeJsonBatchLifecycleGenerationAdmissionPublicClaimFields,
+      ...nativeRootBridgeJsonBatchLifecycleGenerationAdmissionPackageClaimFields,
+      ...nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCompatibilityAliasFields,
+      'nativeLoadAttempted',
+      'nativeAddonLoadAttempted',
+      'cleanupHookExecutionClaimed',
+      'cleanupHookPublicExecutionClaimed',
+      'nodeWorkerThreadsExecution',
+      'workerThreadExecution',
+      'workerThreadExecutionClaimed',
+      'workerThreadCreationAttempted',
+      'workerThreadLoadAttempted',
+      'childProcessExecution',
+      'childProcessLoadAttempted',
+      'httpExecution',
+      'httpLoadAttempted',
+      'httpsExecution',
+      'httpsLoadAttempted',
+      'networkExecution',
+      'publicNativeExecution',
+      'publicNativeCompatibilityClaimed',
+      'packageExportClaimed',
+      'packageExportsOpened',
+      'packageExportsChanged',
+      'packageCompatibilityClaimed',
+      'packageCompatibilityOpened',
+      'packageCompatibilityChanged',
+      'publicNativeExecutionClaimed',
+      'nativePackageCompatibilityClaimed',
+      'nativePackageExportClaimed',
+      'rootExecutionClaimed',
+      'rootCompatibilityClaimed',
+      'workerCompatibilityClaimed',
+      'executionCompatibilityClaimed',
+      'publicExecutionCompatibilityClaimed',
+      'publicNativeExecutionCompatibilityClaimed',
+      'nativeExecutionCompatibilityClaimed'
+    ])
   ]);
+const nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFieldSet =
+  new Set(nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFields);
+const nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimNormalizedFieldSet =
+  new Set(
+    nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFields.map(
+      normalizeNativeCapabilityClaimFieldName
+    )
+  );
 const nativeRootBridgeBatchLifecycleConsumerCleanupHookStatuses =
   Object.freeze([
     nativeRootBridgeBatchLifecycleConsumerCleanupHookNotRequiredStatus,
@@ -2378,10 +2418,36 @@ function getNativeRootBridgeWorkerThreadCleanupHookCanonicalRole(
 function hasNativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaim(
   evidence
 ) {
-  return hasNativeCapabilityClaimFields(
-    evidence,
-    nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFields
-  );
+  if (!isObjectLike(evidence)) {
+    return false;
+  }
+
+  for (
+    let candidate = evidence;
+    candidate !== null;
+    candidate = Object.getPrototypeOf(candidate)
+  ) {
+    for (const key of Reflect.ownKeys(candidate)) {
+      const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
+      if (descriptor === undefined) {
+        continue;
+      }
+
+      const claimField = getNativeCapabilityClaimFieldForKey(
+        key,
+        nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFieldSet,
+        nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimNormalizedFieldSet
+      );
+      if (
+        claimField !== null &&
+        isNativeCapabilityClaimDescriptorClaimed(descriptor)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function freezeNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink(
