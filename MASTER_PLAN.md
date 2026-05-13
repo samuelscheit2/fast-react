@@ -64,6 +64,10 @@ Current orchestration queue:
   repaired where needed, merged, and recorded as accepted history.
 - Worker 1261 is under repair for inherited non-enumerable React DOM
   compatibility-claim aliases.
+- Worker 1263 is active for private FunctionComponent deleted-subtree teardown
+  drift canaries in Rust.
+- Worker 1264 is active for native root work-loop metadata exact-key
+  hardening.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

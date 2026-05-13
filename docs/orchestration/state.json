@@ -119,6 +119,24 @@
 				"audit_1262_repair_source",
 				"audit_1262_repair_verification"
 			]
+		},
+		{
+			"id": 1263,
+			"type": "worker",
+			"status": "active",
+			"title": "FunctionComponent deleted-subtree teardown drift canaries",
+			"agent": "worker_1263_deleted_subtree_teardown_drift",
+			"branch": "worker/1263-deleted-subtree-teardown-drift",
+			"audits": []
+		},
+		{
+			"id": 1264,
+			"type": "worker",
+			"status": "active",
+			"title": "Native root work-loop metadata exact-key hardening",
+			"agent": "worker_1264_native_root_work_loop_exact_keys",
+			"branch": "worker/1264-native-root-work-loop-exact-keys",
+			"audits": []
 		}
 	]
 }
