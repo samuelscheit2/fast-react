@@ -75,13 +75,13 @@ Current orchestration queue:
 - Scout 1283 reported a concrete react-test-renderer next-lane candidate.
 - Scout 1285 reported a concrete React core/hooks next-lane candidate.
 - Scouts 1291 through 1295 reported concrete next-lane candidates.
-- Worker 1300 seventh repair completed implementation and is under source/
-  verification audit for react-test-renderer TestInstance query-bridge
-  local-gate source proofing after source audit found detached CJS stub false
-  greens, broken return wiring, first-return/top-level binding gaps,
+- Worker 1300 eighth repair is active for react-test-renderer TestInstance
+  query-bridge local-gate source proofing after source audit found detached CJS
+  stub false greens, broken return wiring, first-return/top-level binding gaps,
   control-flow, spread override, nested-return, guard-binding, duplicate-key,
   helper-order, `var` redeclaration, method duplicate-key, `\u0042` escaped-key,
   `\x42` escaped-key, destructuring redeclaration, and generator redeclaration
+  gaps, followed by returned bridge-method override and destructuring-assignment
   gaps.
 - Scout 1301 reported a Rust root/scheduler source-metadata currentness lane;
   Worker 1306 has been reviewed, merged, and recorded as accepted history.
