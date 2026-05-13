@@ -287,6 +287,8 @@ function isTransitionBatchActive() {
   return transitionDepth > 0;
 }
 
+function noop() {}
+
 function sanitizeStartTransitionRootlessCurrentnessReportOptions(overrides) {
   if (overrides == null) {
     return {
@@ -726,7 +728,14 @@ const startTransition = function (scope) {
   transitionDepth = previousTransitionDepth + 1;
 
   try {
-    scope();
+    const returnValue = scope();
+    if (
+      typeof returnValue === 'object' &&
+      returnValue !== null &&
+      typeof returnValue.then === 'function'
+    ) {
+      returnValue.then(noop, reportGlobalError);
+    }
   } catch (error) {
     reportGlobalError(error);
   } finally {
