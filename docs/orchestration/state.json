@@ -89,10 +89,14 @@
 		{
 			"id": 1261,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "React DOM public facade inherited-prop fail-closed guard",
 			"agent": "worker_1261_react_dom_inherited_props",
-			"branch": "worker/1261-react-dom-inherited-props"
+			"branch": "worker/1261-react-dom-inherited-props",
+			"audits": [
+				"audit_1261_source_contract",
+				"audit_1261_verification"
+			]
 		},
 		{
 			"id": 1262,
