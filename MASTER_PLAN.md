@@ -95,8 +95,8 @@ Current orchestration queue:
   and React core/hooks next-lane candidates. Scouts 1313 and 1314 returned no
   report. Workers 1316 and 1317 were attempted from the 1311/1312 reports but
   returned no implementation report and are not accepted input.
-- Active Worker 1318 is retrying the React DOM createRoot container
-  capability-alias blocker from Scout 1312.
+- Worker 1318 is under audit for the React DOM createRoot container
+  capability-alias blocker retry from Scout 1312.
 - Active Worker 1319 is implementing the startTransition rootless currentness
   option-alias hardening from Scout 1315.
 - Active Worker 1320 is retrying the queued minimal HostRoot update-to-null
