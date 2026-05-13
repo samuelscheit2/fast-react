@@ -509,7 +509,7 @@
 		{
 			"id": 1301,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Rust reconciler/root/scheduler next-lane scout",
 			"agent": "scout_1301_rust_root_next"
 		},
@@ -540,6 +540,15 @@
 			"status": "active",
 			"title": "React core/hooks next-lane scout",
 			"agent": "scout_1305_react_core_next"
+		},
+		{
+			"id": 1306,
+			"type": "worker",
+			"status": "active",
+			"title": "Root sync queue-lane source metadata seal",
+			"agent": "worker_1306_root_sync_queue_lane_source_metadata",
+			"branch": "worker/1306-root-sync-queue-lane-source-metadata",
+			"audits": []
 		}
 	]
 }

@@ -80,8 +80,10 @@ Current orchestration queue:
   stub false greens, broken return wiring, first-return/top-level binding gaps,
   control-flow, spread override, nested-return, guard-binding, duplicate-key,
   helper-order, `var` redeclaration, method duplicate-key, and escaped-key gaps.
-- Scouts 1301 through 1305 are active across Rust root/scheduler, React DOM,
-  react-test-renderer, native/no-load, and React core/hooks next-lane discovery.
+- Scout 1301 reported a Rust root/scheduler source-metadata currentness lane;
+  Worker 1306 is active for that private test-only root sync queue-lane seal.
+- Scouts 1302 through 1305 are active across React DOM, react-test-renderer,
+  native/no-load, and React core/hooks next-lane discovery.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
