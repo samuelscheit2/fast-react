@@ -1175,6 +1175,102 @@ test("react-test-renderer TestInstance query bridge preflight rejects executable
   }
 });
 
+test("react-test-renderer TestInstance query bridge preflight rejects CJS bridge void returns", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate: replaceQueryBridgePreflightBridgeMethodsWithDeadReturns
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "CJS bridge void returns"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight rejects unrelated wrapper preflight assignment", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate: replaceQueryBridgePreflightWrapperSourceWithDeadAssignment
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "unrelated wrapper preflight assignment"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight rejects dead helper return", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate: replaceQueryBridgePreflightHelperWithDeadReturn
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "dead helper return"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
 test("react-test-renderer TestInstance query bridge preflight requires production CJS live wiring", () => {
   const workspace = createSerializationGateWorkspaceWithMutatedFile({
     evidencePath: "packages/react-test-renderer/cjs/react-test-renderer.production.js",
@@ -7205,6 +7301,103 @@ function createPrivateTestInstanceQueryBridgePreflightRecord(
   });
 }
 `;
+}
+
+function replaceQueryBridgePreflightBridgeMethodsWithDeadReturns(text) {
+  let mutated = text;
+  const replacements = [
+    [
+      `    getTestInstanceQueryBridgePreflight(record) {
+      return getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`,
+      `    getTestInstanceQueryBridgePreflight(record) {
+      void getTestInstanceQueryBridgePreflightForRootRequest(record);
+      return null;
+    },`
+    ],
+    [
+      `    getRootTestInstanceQueryBridgePreflight(rootHandle) {
+      const request = getCurrentRootRequestForHandle(rootHandle);
+      return request === null
+        ? null
+        : getTestInstanceQueryBridgePreflightForRootRequest(request);
+    },`,
+      `    getRootTestInstanceQueryBridgePreflight(rootHandle) {
+      const request = getCurrentRootRequestForHandle(rootHandle);
+      if (request !== null) {
+        void getTestInstanceQueryBridgePreflightForRootRequest(request);
+      }
+      return null;
+    },`
+    ],
+    [
+      `    getRendererTestInstanceQueryBridgePreflight(renderer) {
+      const rootHandle = rendererRootHandles.get(renderer);
+      if (rootHandle === undefined) {
+        return null;
+      }
+      const request = getCurrentRootRequestForHandle(rootHandle);
+      return request === null
+        ? null
+        : getTestInstanceQueryBridgePreflightForRootRequest(request);
+    },`,
+      `    getRendererTestInstanceQueryBridgePreflight(renderer) {
+      const rootHandle = rendererRootHandles.get(renderer);
+      if (rootHandle === undefined) {
+        return null;
+      }
+      const request = getCurrentRootRequestForHandle(rootHandle);
+      if (request !== null) {
+        void getTestInstanceQueryBridgePreflightForRootRequest(request);
+      }
+      return null;
+    },`
+    ]
+  ];
+
+  for (const [find, replace] of replacements) {
+    mutated = replaceRequiredSourceFragment(mutated, find, replace);
+  }
+  return mutated;
+}
+
+function replaceQueryBridgePreflightWrapperSourceWithDeadAssignment(text) {
+  return replaceRequiredSourceFragment(
+    text,
+    `  const queryBridgePreflight =
+    createPrivateTestInstanceQueryBridgePreflightRecord(
+      rootRequest,
+      undefined,
+      acceptedLifecycleEvidence
+    );`,
+    `  void createPrivateTestInstanceQueryBridgePreflightRecord(
+    rootRequest,
+    undefined,
+    acceptedLifecycleEvidence
+  );
+  const queryBridgePreflight = null;`
+  );
+}
+
+function replaceQueryBridgePreflightHelperWithDeadReturn(text) {
+  return replaceRequiredSourceFragment(
+    text,
+    `function getTestInstanceQueryBridgePreflightForRootRequest(record) {
+  const diagnostics = getTestInstanceQueryDiagnosticsForRootRequest(record);
+  return diagnostics.queryBridgePreflight ?? diagnostics;
+}`,
+    `function getTestInstanceQueryBridgePreflightForRootRequest(record) {
+  const diagnostics = getTestInstanceQueryDiagnosticsForRootRequest(record);
+  void (diagnostics.queryBridgePreflight ?? diagnostics);
+  return null;
+}`
+  );
+}
+
+function replaceRequiredSourceFragment(text, find, replace) {
+  const parts = text.split(find);
+  assert.equal(parts.length, 2, find);
+  return `${parts[0]}${replace}${parts[1]}`;
 }
 
 function escapeRegexLiteralAlternative(value) {

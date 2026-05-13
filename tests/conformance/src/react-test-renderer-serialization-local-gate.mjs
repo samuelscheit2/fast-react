@@ -3979,7 +3979,7 @@ function cjsTestInstanceQueryBridgePreflightSourceEvidencePresentUncached(
   source
 ) {
   return (
-    jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
+    jsFunctionDeclarationReturnedFreezeRecordMethodReturnedCallsPass({
       source,
       functionName: "createTestRendererRootRequestBridge",
       methodCalls: freezeArray([
@@ -3997,7 +3997,13 @@ function cjsTestInstanceQueryBridgePreflightSourceEvidencePresentUncached(
           methodName: "getRendererTestInstanceQueryBridgePreflight",
           callee: "getTestInstanceQueryBridgePreflightForRootRequest",
           arguments: freezeArray(["request"])
-        }),
+        })
+      ])
+    }) &&
+    jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
+      source,
+      functionName: "createTestRendererRootRequestBridge",
+      methodCalls: freezeArray([
         freezeRecord({
           methodName: "canConsumeAcceptedRustTestInstanceQueryDiagnostics",
           callee: "consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest",
@@ -4020,18 +4026,15 @@ function cjsTestInstanceQueryBridgePreflightSourceEvidencePresentUncached(
         })
       ])
     }) &&
-    jsFunctionDeclarationSourceCallsPass({
+    jsFunctionDeclarationConstInitializerCallPass({
       source,
       functionName: "createPrivateTestInstanceWrapperRecordForRootRequest",
-      calls: freezeArray([
-        freezeRecord({
-          callee: "createPrivateTestInstanceQueryBridgePreflightRecord",
-          arguments: freezeArray([
-            "rootRequest",
-            "undefined",
-            "acceptedLifecycleEvidence"
-          ])
-        })
+      name: "queryBridgePreflight",
+      callee: "createPrivateTestInstanceQueryBridgePreflightRecord",
+      arguments: freezeArray([
+        "rootRequest",
+        "undefined",
+        "acceptedLifecycleEvidence"
       ])
     }) &&
     jsFunctionDeclarationSourceTokensPass({
@@ -4061,13 +4064,17 @@ function cjsTestInstanceQueryBridgePreflightSourceEvidencePresentUncached(
         "const privateTestInstanceQueryBridgePreflightGate = Object.freeze",
       assertions: privateTestInstanceQueryBridgePreflightGateSourceAssertions
     }) &&
-    jsFunctionDeclarationSourceTokensPass({
+    jsFunctionDeclarationConstInitializerCallPass({
       source,
       functionName: "getTestInstanceQueryBridgePreflightForRootRequest",
-      tokens: freezeArray([
-        "getTestInstanceQueryDiagnosticsForRootRequest(record)",
-        "diagnostics.queryBridgePreflight ?? diagnostics"
-      ])
+      name: "diagnostics",
+      callee: "getTestInstanceQueryDiagnosticsForRootRequest",
+      arguments: freezeArray(["record"])
+    }) &&
+    jsFunctionDeclarationTopLevelReturnExpressionPass({
+      source,
+      functionName: "getTestInstanceQueryBridgePreflightForRootRequest",
+      expression: "diagnostics.queryBridgePreflight ?? diagnostics"
     }) &&
     jsFunctionDeclarationSourceCallsPass({
       source,
@@ -4270,6 +4277,51 @@ function jsFunctionDeclarationSourceCallsPass({
   );
 }
 
+function jsFunctionDeclarationConstInitializerCallPass({
+  source,
+  functionName,
+  name,
+  callee,
+  arguments: expectedArguments
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  const initializer = extractJsConstDeclarationInitializerSource({
+    source: declaration.body,
+    name
+  });
+  return (
+    initializer.ok === true &&
+    jsExactCallExpressionWithArgumentsPass({
+      source: initializer.initializer,
+      callee,
+      expectedArguments
+    })
+  );
+}
+
+function jsFunctionDeclarationTopLevelReturnExpressionPass({
+  source,
+  functionName,
+  expression
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  return jsTopLevelReturnExpressionPass(declaration.body, expression);
+}
+
 function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
   source,
   functionName,
@@ -4302,6 +4354,45 @@ function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
     }
 
     return jsCallExpressionWithArgumentsPass({
+      source: method.body,
+      callee: methodCall.callee,
+      expectedArguments: methodCall.arguments
+    });
+  });
+}
+
+function jsFunctionDeclarationReturnedFreezeRecordMethodReturnedCallsPass({
+  source,
+  functionName,
+  methodCalls
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  const returnedObject = extractTopLevelReturnedFreezeRecordObject(
+    declaration.body
+  );
+  if (returnedObject.ok !== true) {
+    return false;
+  }
+
+  return methodCalls.every((methodCall) => {
+    const method = extractTopLevelJsObjectMethodBody({
+      source: declaration.body,
+      openIndex: returnedObject.openIndex,
+      closeIndex: returnedObject.closeIndex,
+      methodName: methodCall.methodName
+    });
+    if (method.ok !== true) {
+      return false;
+    }
+
+    return jsTopLevelReturnCallExpressionWithArgumentsPass({
       source: method.body,
       callee: methodCall.callee,
       expectedArguments: methodCall.arguments
@@ -4889,6 +4980,253 @@ function extractTopLevelJsObjectMethodBody({
     bodyCloseIndex: -1,
     error: "top-level-object-method-not-found"
   });
+}
+
+function jsTopLevelReturnExpressionPass(source, expectedExpression) {
+  const returnExpressions = readTopLevelJsReturnExpressions(source);
+  return (
+    returnExpressions !== null &&
+    returnExpressions.length > 0 &&
+    normalizeJsExpressionSource(returnExpressions[0]) ===
+      normalizeJsExpressionSource(expectedExpression)
+  );
+}
+
+function jsTopLevelReturnCallExpressionWithArgumentsPass({
+  source,
+  callee,
+  expectedArguments
+}) {
+  const returnExpressions = readTopLevelJsReturnExpressions(source);
+  return (
+    returnExpressions !== null &&
+    returnExpressions.length > 0 &&
+    jsExpressionReturnsCallExpressionWithArgumentsPass({
+      source: returnExpressions[0],
+      callee,
+      expectedArguments
+    })
+  );
+}
+
+function readTopLevelJsReturnExpressions(source) {
+  const returnExpressions = [];
+  let index = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (
+      braceDepth === 0 &&
+      bracketDepth === 0 &&
+      parenDepth === 0 &&
+      jsIdentifierAt(source, index, "return")
+    ) {
+      const expressionStart = skipJsTrivia(
+        source,
+        index + "return".length,
+        source.length
+      );
+      const statementEnd = findJsStatementEnd(source, expressionStart);
+      if (statementEnd < 0) {
+        return null;
+      }
+      returnExpressions.push(
+        source.slice(expressionStart, statementEnd).trim()
+      );
+      index = statementEnd + 1;
+      continue;
+    }
+
+    const character = source[index];
+    if (character === "{" && bracketDepth === 0 && parenDepth === 0) {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[" && braceDepth === 0 && parenDepth === 0) {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (character === "(" && braceDepth === 0 && bracketDepth === 0) {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    }
+
+    index += 1;
+  }
+
+  return freezeArray(returnExpressions);
+}
+
+function jsExpressionReturnsCallExpressionWithArgumentsPass({
+  source,
+  callee,
+  expectedArguments
+}) {
+  const expression = stripOuterJsExpressionParentheses(source);
+  if (
+    jsExactCallExpressionWithArgumentsPass({
+      source: expression,
+      callee,
+      expectedArguments
+    })
+  ) {
+    return true;
+  }
+
+  const conditional = splitTopLevelJsConditionalExpression(expression);
+  return (
+    conditional !== null &&
+    (jsExpressionReturnsCallExpressionWithArgumentsPass({
+      source: conditional.consequent,
+      callee,
+      expectedArguments
+    }) ||
+      jsExpressionReturnsCallExpressionWithArgumentsPass({
+        source: conditional.alternate,
+        callee,
+        expectedArguments
+      }))
+  );
+}
+
+function jsExactCallExpressionWithArgumentsPass({
+  source,
+  callee,
+  expectedArguments
+}) {
+  const expression = stripOuterJsExpressionParentheses(source);
+  const calleeIndex = skipJsTrivia(expression, 0, expression.length);
+  if (!jsIdentifierAt(expression, calleeIndex, callee)) {
+    return false;
+  }
+
+  const callOpenIndex = skipJsTrivia(
+    expression,
+    calleeIndex + callee.length,
+    expression.length
+  );
+  if (expression[callOpenIndex] !== "(") {
+    return false;
+  }
+
+  const callCloseIndex = findMatchingJsEnclosure(
+    expression,
+    callOpenIndex,
+    "(",
+    ")"
+  );
+  if (callCloseIndex < 0) {
+    return false;
+  }
+
+  const trailingIndex = skipJsTrivia(
+    expression,
+    callCloseIndex + 1,
+    expression.length
+  );
+  if (trailingIndex !== expression.length) {
+    return false;
+  }
+
+  const actualArguments = extractTopLevelJsCallArguments(
+    expression,
+    callOpenIndex,
+    callCloseIndex
+  );
+  return (
+    actualArguments.length === expectedArguments.length &&
+    actualArguments.every(
+      (actualArgument, index) => actualArgument === expectedArguments[index]
+    )
+  );
+}
+
+function splitTopLevelJsConditionalExpression(source) {
+  const expression = stripOuterJsExpressionParentheses(source);
+  let questionIndex = -1;
+  let nestedConditionalDepth = 0;
+  let index = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+
+  while (index < expression.length) {
+    const nextIndex = skipJsCommentStringOrRegex(expression, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const character = expression[index];
+    if (braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
+      if (character === "?") {
+        if (questionIndex < 0) {
+          questionIndex = index;
+        } else {
+          nestedConditionalDepth += 1;
+        }
+        index += 1;
+        continue;
+      }
+      if (character === ":" && questionIndex >= 0) {
+        if (nestedConditionalDepth === 0) {
+          return freezeRecord({
+            test: expression.slice(0, questionIndex).trim(),
+            consequent: expression.slice(questionIndex + 1, index).trim(),
+            alternate: expression.slice(index + 1).trim()
+          });
+        }
+        nestedConditionalDepth -= 1;
+        index += 1;
+        continue;
+      }
+    }
+
+    if (character === "{" && bracketDepth === 0 && parenDepth === 0) {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[" && braceDepth === 0 && parenDepth === 0) {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (character === "(" && braceDepth === 0 && bracketDepth === 0) {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    }
+
+    index += 1;
+  }
+
+  return null;
+}
+
+function stripOuterJsExpressionParentheses(source) {
+  let expression = source.trim();
+
+  while (expression[0] === "(") {
+    const closeIndex = findMatchingJsEnclosure(expression, 0, "(", ")");
+    if (closeIndex !== expression.length - 1) {
+      break;
+    }
+    expression = expression.slice(1, -1).trim();
+  }
+
+  return expression;
+}
+
+function normalizeJsExpressionSource(source) {
+  return stripOuterJsExpressionParentheses(source).replace(/\s+/gu, " ");
 }
 
 function jsCallExpressionWithArgumentsPass({
