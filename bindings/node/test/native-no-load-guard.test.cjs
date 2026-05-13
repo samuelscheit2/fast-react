@@ -584,7 +584,42 @@ function getGenerationAdmissionLedgerValidator(native) {
 }
 
 function generationAdmissionRow(row, overrides = {}) {
-  return Object.freeze({ ...row, ...overrides });
+  return Object.freeze({
+    ...row,
+    sourceFiles: Object.freeze([...row.sourceFiles]),
+    sourceIdentifiers: Object.freeze([...row.sourceIdentifiers]),
+    sourceIdentifierEvidenceByFile: generationAdmissionEvidenceByFile(row),
+    ...overrides
+  });
+}
+
+function generationAdmissionEvidenceByFile(row, overrides = {}) {
+  const evidenceByFile = {};
+
+  for (const sourceFile of row.sourceFiles) {
+    const identifiers = Object.hasOwn(overrides, sourceFile)
+      ? overrides[sourceFile]
+      : row.sourceIdentifierEvidenceByFile[sourceFile];
+    evidenceByFile[sourceFile] = Object.freeze([...identifiers]);
+  }
+
+  for (const [sourceFile, identifiers] of Object.entries(overrides)) {
+    if (!Object.hasOwn(evidenceByFile, sourceFile)) {
+      evidenceByFile[sourceFile] = Object.freeze([...identifiers]);
+    }
+  }
+
+  return Object.freeze(evidenceByFile);
+}
+
+function generationAdmissionEvidenceByFileFromEntries(entries) {
+  const evidenceByFile = {};
+
+  for (const [sourceFile, identifiers] of entries) {
+    evidenceByFile[sourceFile] = Object.freeze([...identifiers]);
+  }
+
+  return Object.freeze(evidenceByFile);
 }
 
 function generationAdmissionPrototypeClaimRow(row, prototypeClaims) {
@@ -610,6 +645,51 @@ function generationAdmissionExtraPropertyRow(row, key, descriptor) {
   Object.defineProperty(nextRow, key, descriptor);
 
   return Object.freeze(nextRow);
+}
+
+function generationAdmissionEvidenceExtraPropertyRow(row, key, descriptor) {
+  const nextEvidenceByFile = {};
+  for (const sourceFile of row.sourceFiles) {
+    nextEvidenceByFile[sourceFile] = Object.freeze([
+      ...row.sourceIdentifierEvidenceByFile[sourceFile]
+    ]);
+  }
+  Object.defineProperty(nextEvidenceByFile, key, descriptor);
+
+  return generationAdmissionRow(row, {
+    sourceIdentifierEvidenceByFile: Object.freeze(nextEvidenceByFile)
+  });
+}
+
+function generationAdmissionEvidencePrototypeRow(row, prototype) {
+  const nextEvidenceByFile = Object.create(Object.freeze(prototype));
+  for (const sourceFile of row.sourceFiles) {
+    nextEvidenceByFile[sourceFile] = Object.freeze([
+      ...row.sourceIdentifierEvidenceByFile[sourceFile]
+    ]);
+  }
+
+  return generationAdmissionRow(row, {
+    sourceIdentifierEvidenceByFile: Object.freeze(nextEvidenceByFile)
+  });
+}
+
+function generationAdmissionEvidencePrototypePropertyRow(
+  row,
+  prototypeProperties
+) {
+  return generationAdmissionEvidencePrototypeRow(row, prototypeProperties);
+}
+
+function generationAdmissionEvidencePrototypeDescriptorRow(
+  row,
+  key,
+  descriptor
+) {
+  const prototype = {};
+  Object.defineProperty(prototype, key, descriptor);
+
+  return generationAdmissionEvidencePrototypeRow(row, prototype);
 }
 
 function assertPrivateGenerationAdmissionLedger(native) {
@@ -660,6 +740,18 @@ function assertPrivateGenerationAdmissionLedger(native) {
     'crates/fast-react-napi/src/root_bridge_requests/json_transport_parser.rs',
     'crates/fast-react-napi/src/root_bridge_requests/batch_lifecycle.rs'
   ]);
+  const moduleSourceFile =
+    'crates/fast-react-napi/src/root_bridge_requests/mod.rs';
+  const jsonTransportSourceFile =
+    'crates/fast-react-napi/src/root_bridge_requests/json_transport.rs';
+  const batchLifecycleAlgorithmsSourceFile =
+    'crates/fast-react-napi/src/root_bridge_requests/batch_lifecycle_algorithms.rs';
+  const errorsSourceFile =
+    'crates/fast-react-napi/src/root_bridge_requests/errors.rs';
+  const jsonTransportParserSourceFile =
+    'crates/fast-react-napi/src/root_bridge_requests/json_transport_parser.rs';
+  const batchLifecycleSourceFile =
+    'crates/fast-react-napi/src/root_bridge_requests/batch_lifecycle.rs';
   assert.equal(ledger.sourceOwnedEvidenceRequired, true);
   assert.equal(ledger.blockedPrivateEvidenceOnly, true);
   assert.equal(ledger.publicAdmission, false);
@@ -733,6 +825,7 @@ function assertPrivateGenerationAdmissionLedger(native) {
     assert.ok(Object.isFrozen(row), row.id);
     assert.ok(Object.isFrozen(row.sourceFiles), row.id);
     assert.ok(Object.isFrozen(row.sourceIdentifiers), row.id);
+    assert.ok(Object.isFrozen(row.sourceIdentifierEvidenceByFile), row.id);
     assert.deepEqual(Object.keys(row), ledger.generationAdmissionRowFields);
     assert.equal(
       row.evidenceKind,
@@ -746,6 +839,11 @@ function assertPrivateGenerationAdmissionLedger(native) {
         `${row.id} source file ${sourceFile}`
       );
     }
+    assert.deepEqual(
+      Object.keys(row.sourceIdentifierEvidenceByFile),
+      row.sourceFiles,
+      row.id
+    );
     assert.equal(row.sourceOwnedEvidence, true, row.id);
     assert.equal(row.blockedPrivateEvidence, true, row.id);
     assert.equal(row.publicAdmission, false, row.id);
@@ -756,15 +854,32 @@ function assertPrivateGenerationAdmissionLedger(native) {
     assert.equal(row.sourceSyntaxOnly, false, row.id);
     assert.equal(row.compatibilityAlias, null, row.id);
     assertNoNativeGenerationLedgerExecution(row, row.id);
-    const rowRustSources = row.sourceFiles.map((sourceFile) =>
-      rustSourceByFile.get(sourceFile)
+    const sourceIdentifiersFromEvidence = [];
+    for (const sourceFile of row.sourceFiles) {
+      const sourceFileIdentifiers =
+        row.sourceIdentifierEvidenceByFile[sourceFile];
+      assert.ok(Object.isFrozen(sourceFileIdentifiers), row.id);
+      sourceIdentifiersFromEvidence.push(...sourceFileIdentifiers);
+
+      for (const sourceIdentifier of sourceFileIdentifiers) {
+        assert.ok(
+          rustSourceByFile.get(sourceFile).includes(sourceIdentifier),
+          `${row.id} ${sourceFile} source identifier ${sourceIdentifier}`
+        );
+      }
+    }
+    assert.deepEqual(
+      [...sourceIdentifiersFromEvidence].sort(),
+      [...row.sourceIdentifiers].sort(),
+      `${row.id} source identifier evidence set`
     );
     for (const sourceIdentifier of row.sourceIdentifiers) {
-      assert.ok(
-        rowRustSources.some((rustSource) =>
-          rustSource.includes(sourceIdentifier)
-        ),
-        `${row.id} source identifier ${sourceIdentifier}`
+      assert.equal(
+        sourceIdentifiersFromEvidence.filter(
+          (candidate) => candidate === sourceIdentifier
+        ).length,
+        1,
+        `${row.id} exact source identifier evidence ${sourceIdentifier}`
       );
     }
   }
@@ -781,8 +896,27 @@ function assertPrivateGenerationAdmissionLedger(native) {
 
   const canonicalStatus = ledger.rows[0];
   const canonicalGuard = ledger.rows[1];
+  const canonicalExecutorRow = ledger.rows[2];
+  const canonicalAllocation = ledger.rows[3];
   const canonicalReplay = ledger.rows[5];
   const codes = ledger.rejectionCodes;
+  assert.deepEqual(
+    canonicalExecutorRow.sourceIdentifierEvidenceByFile[
+      batchLifecycleAlgorithmsSourceFile
+    ],
+    ['NativeRootBridgeJsonBatchLifecycleExecutorRow::applied']
+  );
+  assert.deepEqual(
+    canonicalAllocation.sourceIdentifierEvidenceByFile[errorsSourceFile],
+    ['FAST_REACT_NAPI_ROOT_REQUEST_VALUE_HANDLE_REUSE']
+  );
+  assert.deepEqual(
+    canonicalReplay.sourceIdentifierEvidenceByFile[batchLifecycleSourceFile],
+    [
+      'json_batch_lifecycle_executor_replay_guard_consumed',
+      'json_batch_lifecycle_executor_source_rows_validated'
+    ]
+  );
 
   const inheritedCanonicalRowsResult = validateGenerationAdmissionRows(
     ledger.rows.map((row) => Object.create(row))
@@ -809,6 +943,7 @@ function assertPrivateGenerationAdmissionLedger(native) {
     assert.deepEqual(row.sourceFiles, []);
     assert.equal(row.evidenceKind, null);
     assert.deepEqual(row.sourceIdentifiers, []);
+    assert.deepEqual(row.sourceIdentifierEvidenceByFile, {});
     assert.equal(row.sourceOwnedEvidence, false);
     assert.equal(row.blockedPrivateEvidence, false);
     assert.equal(row.publicAdmission, false);
@@ -999,11 +1134,401 @@ function assertPrivateGenerationAdmissionLedger(native) {
     assertNoNativeGenerationLedgerExecution(result, diagnosticCase.id);
   }
 
+  const exactSourceOwnershipCases = [
+    {
+      id: 'generation-ledger-applied-attributed-to-json-transport',
+      row: generationAdmissionRow(canonicalExecutorRow, {
+        sourceIdentifierEvidenceByFile: generationAdmissionEvidenceByFile(
+          canonicalExecutorRow,
+          {
+            [jsonTransportSourceFile]: [
+              ...canonicalExecutorRow.sourceIdentifierEvidenceByFile[
+                jsonTransportSourceFile
+              ],
+              'NativeRootBridgeJsonBatchLifecycleExecutorRow::applied'
+            ],
+            [batchLifecycleAlgorithmsSourceFile]: []
+          }
+        )
+      }),
+      code: codes.staleOrForeign
+    },
+    {
+      id: 'generation-ledger-reuse-code-attributed-to-algorithms',
+      row: generationAdmissionRow(canonicalAllocation, {
+        sourceIdentifierEvidenceByFile: generationAdmissionEvidenceByFile(
+          canonicalAllocation,
+          {
+            [batchLifecycleAlgorithmsSourceFile]: [
+              ...canonicalAllocation.sourceIdentifierEvidenceByFile[
+                batchLifecycleAlgorithmsSourceFile
+              ],
+              'FAST_REACT_NAPI_ROOT_REQUEST_VALUE_HANDLE_REUSE'
+            ],
+            [errorsSourceFile]: []
+          }
+        )
+      }),
+      code: codes.staleOrForeign
+    },
+    {
+      id: 'generation-ledger-replay-consumed-attributed-to-parser',
+      row: generationAdmissionRow(canonicalReplay, {
+        sourceIdentifierEvidenceByFile: generationAdmissionEvidenceByFile(
+          canonicalReplay,
+          {
+            [jsonTransportParserSourceFile]: [
+              ...canonicalReplay.sourceIdentifierEvidenceByFile[
+                jsonTransportParserSourceFile
+              ],
+              'json_batch_lifecycle_executor_replay_guard_consumed'
+            ],
+            [batchLifecycleSourceFile]: [
+              'json_batch_lifecycle_executor_source_rows_validated'
+            ]
+          }
+        )
+      }),
+      code: codes.staleOrForeign
+    },
+    {
+      id: 'generation-ledger-extra-evidence-source-file',
+      row: generationAdmissionRow(canonicalReplay, {
+        sourceIdentifierEvidenceByFile: generationAdmissionEvidenceByFile(
+          canonicalReplay,
+          {
+            'crates/fast-react-napi/src/root_bridge_requests/stale_generation.rs':
+              []
+          }
+        )
+      }),
+      code: codes.callerBuilt,
+      extraEvidenceKey:
+        'crates/fast-react-napi/src/root_bridge_requests/stale_generation.rs'
+    },
+    {
+      id: 'generation-ledger-missing-evidence-source-file',
+      row: generationAdmissionRow(canonicalReplay, {
+        sourceIdentifierEvidenceByFile:
+          generationAdmissionEvidenceByFileFromEntries([
+            [
+              jsonTransportParserSourceFile,
+              canonicalReplay.sourceIdentifierEvidenceByFile[
+                jsonTransportParserSourceFile
+              ]
+            ],
+            [
+              moduleSourceFile,
+              canonicalReplay.sourceIdentifierEvidenceByFile[
+                moduleSourceFile
+              ]
+            ]
+          ])
+      }),
+      code: codes.callerBuilt
+    },
+    {
+      id: 'generation-ledger-non-enumerable-evidence-alias',
+      row: generationAdmissionEvidenceExtraPropertyRow(
+        canonicalReplay,
+        'sourceEvidenceAlias',
+        {
+          value: ['caller-supplied-source-alias'],
+          enumerable: false
+        }
+      ),
+      code: codes.callerBuilt,
+      extraEvidenceKey: 'sourceEvidenceAlias'
+    },
+    {
+      id: 'generation-ledger-string-evidence-alias',
+      row: generationAdmissionEvidenceExtraPropertyRow(
+        canonicalReplay,
+        'sourceEvidenceAlias',
+        {
+          value: ['caller-supplied-source-alias'],
+          enumerable: true
+        }
+      ),
+      code: codes.callerBuilt,
+      extraEvidenceKey: 'sourceEvidenceAlias'
+    },
+    {
+      id: 'generation-ledger-symbol-evidence-alias',
+      row: generationAdmissionEvidenceExtraPropertyRow(
+        canonicalReplay,
+        Symbol.for('fast-react.generation.sourceEvidenceAlias'),
+        {
+          value: ['caller-supplied-source-alias'],
+          enumerable: true
+        }
+      ),
+      code: codes.callerBuilt,
+      extraEvidenceSymbol: Symbol.for(
+        'fast-react.generation.sourceEvidenceAlias'
+      )
+    }
+  ];
+
+  for (const diagnosticCase of exactSourceOwnershipCases) {
+    if (diagnosticCase.extraEvidenceKey !== undefined) {
+      assert.ok(
+        Object.getOwnPropertyDescriptor(
+          diagnosticCase.row.sourceIdentifierEvidenceByFile,
+          diagnosticCase.extraEvidenceKey
+        ),
+        diagnosticCase.id
+      );
+    }
+    if (diagnosticCase.extraEvidenceSymbol !== undefined) {
+      assert.equal(
+        Object.getOwnPropertySymbols(
+          diagnosticCase.row.sourceIdentifierEvidenceByFile
+        ).includes(diagnosticCase.extraEvidenceSymbol),
+        true,
+        diagnosticCase.id
+      );
+    }
+
+    const result = validateGenerationAdmissionRows([diagnosticCase.row]);
+    assert.ok(Object.isFrozen(result), diagnosticCase.id);
+    assert.equal(result.rows.length, 1, diagnosticCase.id);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(result.rejectedEvidenceCount, 1, diagnosticCase.id);
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assertNoNativeGenerationLedgerExecution(result, diagnosticCase.id);
+
+    const [row] = result.rows;
+    assert.equal(row.id, diagnosticCase.row.id, diagnosticCase.id);
+    assert.equal(row.status, ledger.rejectedStatus, diagnosticCase.id);
+    assert.equal(row.code, diagnosticCase.code, diagnosticCase.id);
+    assert.ok(Object.isFrozen(row.sourceIdentifierEvidenceByFile));
+    if (diagnosticCase.extraEvidenceKey !== undefined) {
+      assert.equal(
+        Object.hasOwn(
+          row.sourceIdentifierEvidenceByFile,
+          diagnosticCase.extraEvidenceKey
+        ),
+        false,
+        diagnosticCase.id
+      );
+    }
+    assert.equal(
+      Object.getOwnPropertySymbols(row.sourceIdentifierEvidenceByFile)
+        .length,
+      0,
+      diagnosticCase.id
+    );
+    assertNoNativeGenerationLedgerExecution(row, diagnosticCase.id);
+  }
+
+  let inheritedEvidenceGetterInvoked = false;
+  const inheritedEvidenceAliasCases = [
+    {
+      id: 'generation-ledger-inherited-source-evidence-alias',
+      row: generationAdmissionEvidencePrototypePropertyRow(canonicalReplay, {
+        sourceEvidenceAlias: ['caller-supplied-source-alias']
+      }),
+      inheritedEvidenceKey: 'sourceEvidenceAlias'
+    },
+    {
+      id: 'generation-ledger-inherited-symbol-source-evidence-alias',
+      row: generationAdmissionEvidencePrototypeDescriptorRow(
+        canonicalReplay,
+        Symbol.for('fast-react.generation.sourceEvidenceAlias'),
+        {
+          value: ['caller-supplied-source-alias'],
+          enumerable: true
+        }
+      ),
+      inheritedEvidenceKey: Symbol.for(
+        'fast-react.generation.sourceEvidenceAlias'
+      )
+    },
+    {
+      id: 'generation-ledger-inherited-symbol-public-native-alias',
+      row: generationAdmissionEvidencePrototypeDescriptorRow(
+        canonicalReplay,
+        Symbol.for('fast-react.generation.publicNativeExecution'),
+        {
+          value: true,
+          enumerable: true
+        }
+      ),
+      inheritedEvidenceKey: Symbol.for(
+        'fast-react.generation.publicNativeExecution'
+      )
+    },
+    {
+      id: 'generation-ledger-inherited-symbol-native-execution-alias',
+      row: generationAdmissionEvidencePrototypeDescriptorRow(
+        canonicalReplay,
+        Symbol.for('fast-react.generation.nativeExecution'),
+        {
+          value: true,
+          enumerable: true
+        }
+      ),
+      inheritedEvidenceKey: Symbol.for(
+        'fast-react.generation.nativeExecution'
+      )
+    },
+    {
+      id: 'generation-ledger-inherited-getter-source-evidence-alias',
+      row: generationAdmissionEvidencePrototypeDescriptorRow(
+        canonicalReplay,
+        'sourceEvidenceAlias',
+        {
+          get() {
+            inheritedEvidenceGetterInvoked = true;
+            return ['caller-supplied-source-alias'];
+          },
+          enumerable: true
+        }
+      ),
+      inheritedEvidenceKey: 'sourceEvidenceAlias'
+    }
+  ];
+
+  for (const diagnosticCase of inheritedEvidenceAliasCases) {
+    const inputEvidenceByFile =
+      diagnosticCase.row.sourceIdentifierEvidenceByFile;
+    assert.deepEqual(
+      Object.keys(inputEvidenceByFile),
+      diagnosticCase.row.sourceFiles,
+      diagnosticCase.id
+    );
+    assert.ok(
+      Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(inputEvidenceByFile),
+        diagnosticCase.inheritedEvidenceKey
+      ),
+      diagnosticCase.id
+    );
+
+    const result = validateGenerationAdmissionRows([diagnosticCase.row]);
+    assert.ok(Object.isFrozen(result), diagnosticCase.id);
+    assert.equal(result.rows.length, 1, diagnosticCase.id);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(result.rejectedEvidenceCount, 1, diagnosticCase.id);
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assertNoNativeGenerationLedgerExecution(result, diagnosticCase.id);
+
+    const [row] = result.rows;
+    assert.equal(row.id, diagnosticCase.row.id, diagnosticCase.id);
+    assert.equal(row.status, ledger.rejectedStatus, diagnosticCase.id);
+    assert.equal(row.code, codes.callerBuilt, diagnosticCase.id);
+    assert.ok(Object.isFrozen(row.sourceIdentifierEvidenceByFile));
+    assert.equal(
+      Object.hasOwn(row.sourceIdentifierEvidenceByFile, 'sourceEvidenceAlias'),
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(
+      Object.getOwnPropertySymbols(row.sourceIdentifierEvidenceByFile)
+        .length,
+      0,
+      diagnosticCase.id
+    );
+    assertNoNativeGenerationLedgerExecution(row, diagnosticCase.id);
+  }
+  assert.equal(
+    inheritedEvidenceGetterInvoked,
+    false,
+    'generation inherited evidence alias getter must not be invoked'
+  );
+
+  let objectPrototypeEvidenceGetterInvoked = false;
+  const objectPrototypeEvidenceAliasKey = 'sourceEvidenceAlias';
+  const previousObjectPrototypeEvidenceAliasDescriptor =
+    Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      objectPrototypeEvidenceAliasKey
+    );
+  Object.defineProperty(Object.prototype, objectPrototypeEvidenceAliasKey, {
+    get() {
+      objectPrototypeEvidenceGetterInvoked = true;
+      return ['object-prototype-source-alias'];
+    },
+    configurable: true
+  });
+  try {
+    const pollutedResult = validateGenerationAdmissionRows([
+      generationAdmissionRow(canonicalReplay)
+    ]);
+    assert.equal(
+      pollutedResult.acceptedEvidenceCount,
+      0,
+      'generation ledger Object.prototype source alias'
+    );
+    assert.equal(
+      pollutedResult.rejectedEvidenceCount,
+      1,
+      'generation ledger Object.prototype source alias'
+    );
+    assert.equal(
+      pollutedResult.canonicalSourceEvidenceAccepted,
+      false,
+      'generation ledger Object.prototype source alias'
+    );
+    assert.equal(
+      pollutedResult.rows[0].code,
+      codes.callerBuilt,
+      'generation ledger Object.prototype source alias'
+    );
+    assert.equal(
+      objectPrototypeEvidenceGetterInvoked,
+      false,
+      'generation Object.prototype evidence alias getter must not be invoked'
+    );
+    assertNoNativeGenerationLedgerExecution(
+      pollutedResult,
+      'generation ledger Object.prototype source alias'
+    );
+    assertNoNativeGenerationLedgerExecution(
+      pollutedResult.rows[0],
+      'generation ledger Object.prototype source alias'
+    );
+  } finally {
+    if (previousObjectPrototypeEvidenceAliasDescriptor === undefined) {
+      delete Object.prototype[objectPrototypeEvidenceAliasKey];
+    } else {
+      Object.defineProperty(
+        Object.prototype,
+        objectPrototypeEvidenceAliasKey,
+        previousObjectPrototypeEvidenceAliasDescriptor
+      );
+    }
+  }
+  assert.equal(
+    objectPrototypeEvidenceGetterInvoked,
+    false,
+    'generation Object.prototype evidence alias getter must not be invoked'
+  );
+
   const cases = [
     {
       row: generationAdmissionRow(canonicalGuard, {
         id: 'generation-ledger-stale-source-identifiers',
-        sourceIdentifiers: ['NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard']
+        sourceIdentifiers: [
+          'NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard'
+        ],
+        sourceIdentifierEvidenceByFile: generationAdmissionEvidenceByFile(
+          canonicalGuard,
+          {
+            [jsonTransportSourceFile]: [
+              'NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard'
+            ]
+          }
+        )
       }),
       code: codes.staleOrForeign
     },
