@@ -485,6 +485,96 @@ test("private startTransition rootless currentness rejects forged reports and cl
   );
 });
 
+test("private startTransition rootless currentness rejects inherited option aliases", () => {
+  const inheritedAliasOptions = Object.create({
+    publicTransitionCompatibilityClaimed: true
+  });
+
+  assertStartTransitionCurrentnessRejected(
+    Transition.createStartTransitionRootlessCurrentnessReport(
+      inheritedAliasOptions
+    ),
+    "startTransition-rootless-currentness-source-proof"
+  );
+
+  let getterReads = 0;
+  const getterAliasPrototype = {};
+  Object.defineProperty(getterAliasPrototype, "publicRootCompatibilityClaimed", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return true;
+    }
+  });
+
+  assertStartTransitionCurrentnessRejected(
+    Transition.createStartTransitionRootlessCurrentnessReport(
+      Object.create(getterAliasPrototype)
+    ),
+    "startTransition-rootless-currentness-source-proof"
+  );
+  assert.equal(getterReads, 0);
+
+  assertStartTransitionCurrentnessRejected(
+    Transition.createStartTransitionRootlessCurrentnessReport({
+      publicTransitionCompatibilityClaimed: true
+    }),
+    "startTransition-rootless-currentness-source-proof"
+  );
+});
+
+test("private startTransition rootless currentness rejects Object.prototype option alias pollution", () => {
+  for (const propertyName of [
+    "publicTransitionCompatibilityClaimed",
+    "rootlessCurrentness",
+    "source",
+    "compatibilityClaimed"
+  ]) {
+    let getterReads = 0;
+    const previousDescriptor = Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      propertyName
+    );
+
+    const report = withTemporaryObjectPrototypeProperty(
+      propertyName,
+      {
+        configurable: true,
+        enumerable: false,
+        get() {
+          getterReads += 1;
+          return true;
+        }
+      },
+      () => Transition.createStartTransitionRootlessCurrentnessReport({})
+    );
+
+    assert.equal(getterReads, 0, propertyName);
+    assert.deepEqual(
+      Object.getOwnPropertyDescriptor(Object.prototype, propertyName),
+      previousDescriptor,
+      propertyName
+    );
+    assertStartTransitionCurrentnessRejected(
+      report,
+      "startTransition-rootless-currentness-source-proof"
+    );
+  }
+
+  const report = Transition.createStartTransitionRootlessCurrentnessReport();
+  assert.equal(
+    Transition.validateStartTransitionRootlessCurrentnessReport(report),
+    null
+  );
+
+  const observation = withCapturedGlobalErrors(() =>
+    React.startTransition(() => {})
+  );
+  assert.equal(observation.value, undefined);
+  assert.deepEqual(observation.errors, []);
+});
+
 test("private startTransition rootless currentness rejects mutable nested evidence", () => {
   const mutableRootlessMetadata = withObjectFreezeSelectivelyBypassed(
     () => Transition.createStartTransitionRootlessCurrentnessReport(),
@@ -1086,6 +1176,32 @@ function withObjectFreezePollution(callback, shouldPollute, pollute) {
     };
   } finally {
     Object.freeze = originalFreeze;
+  }
+}
+
+function withTemporaryObjectPrototypeProperty(
+  propertyName,
+  descriptor,
+  callback
+) {
+  const previousDescriptor = Object.getOwnPropertyDescriptor(
+    Object.prototype,
+    propertyName
+  );
+
+  Object.defineProperty(Object.prototype, propertyName, descriptor);
+  try {
+    return callback();
+  } finally {
+    if (previousDescriptor === undefined) {
+      delete Object.prototype[propertyName];
+    } else {
+      Object.defineProperty(
+        Object.prototype,
+        propertyName,
+        previousDescriptor
+      );
+    }
   }
 }
 
