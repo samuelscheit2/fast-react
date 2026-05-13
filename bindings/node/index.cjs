@@ -793,6 +793,36 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCompatibilityAliasFie
     'reactNativeCompatibility',
     'publicCompatibilityAlias'
   ]);
+const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAliasFields =
+  Object.freeze([
+    'sourceEvidenceAlias',
+    'sourceIdentifierEvidence',
+    'sourceIdentifierEvidenceAlias',
+    'sourceIdentifierEvidenceByFileAlias',
+    'sourceOwnedEvidenceAlias',
+    'nativeLoadAttempted',
+    'nativeAddonLoaded',
+    'nativeAddonLoadAttempted',
+    'nodeWorkerThreadsExecution',
+    'napiCleanupHookExecution',
+    'rendererExecution',
+    'reconcilerExecution',
+    'reactBehaviorError',
+    'compatibilityAlias',
+    ...nativeRootBridgeJsonBatchLifecycleGenerationAdmissionPublicClaimFields,
+    ...nativeRootBridgeJsonBatchLifecycleGenerationAdmissionPackageClaimFields,
+    ...nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCompatibilityAliasFields
+  ]);
+const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAliasFieldSet =
+  new Set(
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAliasFields
+  );
+const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAliasNormalizedFieldSet =
+  new Set(
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAliasFields.map(
+      normalizeNativeCapabilityClaimFieldName
+    )
+  );
 const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRowFields =
   Object.freeze([
     'id',
@@ -4325,7 +4355,10 @@ function hasExactNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIden
   if (
     !isObjectLike(evidenceByFile) ||
     Array.isArray(evidenceByFile) ||
-    Object.getOwnPropertySymbols(evidenceByFile).length !== 0
+    Object.getOwnPropertySymbols(evidenceByFile).length !== 0 ||
+    hasInheritedNativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAlias(
+      evidenceByFile
+    )
   ) {
     return false;
   }
@@ -4360,6 +4393,68 @@ function hasExactNativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIden
   }
 
   return stringMultisetEquals(evidenceIdentifiers, sourceIdentifiers);
+}
+
+function hasInheritedNativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAlias(
+  evidenceByFile
+) {
+  for (
+    let candidate = Object.getPrototypeOf(evidenceByFile);
+    candidate !== null;
+    candidate = Object.getPrototypeOf(candidate)
+  ) {
+    for (const key of Reflect.ownKeys(candidate)) {
+      const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
+      if (
+        descriptor !== undefined &&
+        isNativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAliasKey(
+          key
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function isNativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAliasKey(
+  key
+) {
+  const keyText = getNativeCapabilityClaimKeyText(key);
+  if (keyText === '') {
+    return false;
+  }
+
+  if (
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAliasFieldSet.has(
+      keyText
+    )
+  ) {
+    return true;
+  }
+
+  const normalizedKeyText = normalizeNativeCapabilityClaimFieldName(keyText);
+  if (
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAliasNormalizedFieldSet.has(
+      normalizedKeyText
+    )
+  ) {
+    return true;
+  }
+
+  if (typeof key !== 'symbol') {
+    return false;
+  }
+
+  for (const normalizedAlias of nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvidenceAliasNormalizedFieldSet) {
+    if (normalizedKeyText.endsWith(normalizedAlias)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceIdentifierEvidenceByFileEquals(

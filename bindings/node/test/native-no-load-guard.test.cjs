@@ -661,6 +661,37 @@ function generationAdmissionEvidenceExtraPropertyRow(row, key, descriptor) {
   });
 }
 
+function generationAdmissionEvidencePrototypeRow(row, prototype) {
+  const nextEvidenceByFile = Object.create(Object.freeze(prototype));
+  for (const sourceFile of row.sourceFiles) {
+    nextEvidenceByFile[sourceFile] = Object.freeze([
+      ...row.sourceIdentifierEvidenceByFile[sourceFile]
+    ]);
+  }
+
+  return generationAdmissionRow(row, {
+    sourceIdentifierEvidenceByFile: Object.freeze(nextEvidenceByFile)
+  });
+}
+
+function generationAdmissionEvidencePrototypePropertyRow(
+  row,
+  prototypeProperties
+) {
+  return generationAdmissionEvidencePrototypeRow(row, prototypeProperties);
+}
+
+function generationAdmissionEvidencePrototypeDescriptorRow(
+  row,
+  key,
+  descriptor
+) {
+  const prototype = {};
+  Object.defineProperty(prototype, key, descriptor);
+
+  return generationAdmissionEvidencePrototypeRow(row, prototype);
+}
+
 function assertPrivateGenerationAdmissionLedger(native) {
   const ledger = getGenerationAdmissionLedger(native);
   const validateGenerationAdmissionRows =
@@ -1294,6 +1325,194 @@ function assertPrivateGenerationAdmissionLedger(native) {
     );
     assertNoNativeGenerationLedgerExecution(row, diagnosticCase.id);
   }
+
+  let inheritedEvidenceGetterInvoked = false;
+  const inheritedEvidenceAliasCases = [
+    {
+      id: 'generation-ledger-inherited-source-evidence-alias',
+      row: generationAdmissionEvidencePrototypePropertyRow(canonicalReplay, {
+        sourceEvidenceAlias: ['caller-supplied-source-alias']
+      }),
+      inheritedEvidenceKey: 'sourceEvidenceAlias'
+    },
+    {
+      id: 'generation-ledger-inherited-symbol-source-evidence-alias',
+      row: generationAdmissionEvidencePrototypeDescriptorRow(
+        canonicalReplay,
+        Symbol.for('fast-react.generation.sourceEvidenceAlias'),
+        {
+          value: ['caller-supplied-source-alias'],
+          enumerable: true
+        }
+      ),
+      inheritedEvidenceKey: Symbol.for(
+        'fast-react.generation.sourceEvidenceAlias'
+      )
+    },
+    {
+      id: 'generation-ledger-inherited-symbol-public-native-alias',
+      row: generationAdmissionEvidencePrototypeDescriptorRow(
+        canonicalReplay,
+        Symbol.for('fast-react.generation.publicNativeExecution'),
+        {
+          value: true,
+          enumerable: true
+        }
+      ),
+      inheritedEvidenceKey: Symbol.for(
+        'fast-react.generation.publicNativeExecution'
+      )
+    },
+    {
+      id: 'generation-ledger-inherited-symbol-native-execution-alias',
+      row: generationAdmissionEvidencePrototypeDescriptorRow(
+        canonicalReplay,
+        Symbol.for('fast-react.generation.nativeExecution'),
+        {
+          value: true,
+          enumerable: true
+        }
+      ),
+      inheritedEvidenceKey: Symbol.for(
+        'fast-react.generation.nativeExecution'
+      )
+    },
+    {
+      id: 'generation-ledger-inherited-getter-source-evidence-alias',
+      row: generationAdmissionEvidencePrototypeDescriptorRow(
+        canonicalReplay,
+        'sourceEvidenceAlias',
+        {
+          get() {
+            inheritedEvidenceGetterInvoked = true;
+            return ['caller-supplied-source-alias'];
+          },
+          enumerable: true
+        }
+      ),
+      inheritedEvidenceKey: 'sourceEvidenceAlias'
+    }
+  ];
+
+  for (const diagnosticCase of inheritedEvidenceAliasCases) {
+    const inputEvidenceByFile =
+      diagnosticCase.row.sourceIdentifierEvidenceByFile;
+    assert.deepEqual(
+      Object.keys(inputEvidenceByFile),
+      diagnosticCase.row.sourceFiles,
+      diagnosticCase.id
+    );
+    assert.ok(
+      Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(inputEvidenceByFile),
+        diagnosticCase.inheritedEvidenceKey
+      ),
+      diagnosticCase.id
+    );
+
+    const result = validateGenerationAdmissionRows([diagnosticCase.row]);
+    assert.ok(Object.isFrozen(result), diagnosticCase.id);
+    assert.equal(result.rows.length, 1, diagnosticCase.id);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(result.rejectedEvidenceCount, 1, diagnosticCase.id);
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assertNoNativeGenerationLedgerExecution(result, diagnosticCase.id);
+
+    const [row] = result.rows;
+    assert.equal(row.id, diagnosticCase.row.id, diagnosticCase.id);
+    assert.equal(row.status, ledger.rejectedStatus, diagnosticCase.id);
+    assert.equal(row.code, codes.callerBuilt, diagnosticCase.id);
+    assert.ok(Object.isFrozen(row.sourceIdentifierEvidenceByFile));
+    assert.equal(
+      Object.hasOwn(row.sourceIdentifierEvidenceByFile, 'sourceEvidenceAlias'),
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(
+      Object.getOwnPropertySymbols(row.sourceIdentifierEvidenceByFile)
+        .length,
+      0,
+      diagnosticCase.id
+    );
+    assertNoNativeGenerationLedgerExecution(row, diagnosticCase.id);
+  }
+  assert.equal(
+    inheritedEvidenceGetterInvoked,
+    false,
+    'generation inherited evidence alias getter must not be invoked'
+  );
+
+  let objectPrototypeEvidenceGetterInvoked = false;
+  const objectPrototypeEvidenceAliasKey = 'sourceEvidenceAlias';
+  const previousObjectPrototypeEvidenceAliasDescriptor =
+    Object.getOwnPropertyDescriptor(
+      Object.prototype,
+      objectPrototypeEvidenceAliasKey
+    );
+  Object.defineProperty(Object.prototype, objectPrototypeEvidenceAliasKey, {
+    get() {
+      objectPrototypeEvidenceGetterInvoked = true;
+      return ['object-prototype-source-alias'];
+    },
+    configurable: true
+  });
+  try {
+    const pollutedResult = validateGenerationAdmissionRows([
+      generationAdmissionRow(canonicalReplay)
+    ]);
+    assert.equal(
+      pollutedResult.acceptedEvidenceCount,
+      0,
+      'generation ledger Object.prototype source alias'
+    );
+    assert.equal(
+      pollutedResult.rejectedEvidenceCount,
+      1,
+      'generation ledger Object.prototype source alias'
+    );
+    assert.equal(
+      pollutedResult.canonicalSourceEvidenceAccepted,
+      false,
+      'generation ledger Object.prototype source alias'
+    );
+    assert.equal(
+      pollutedResult.rows[0].code,
+      codes.callerBuilt,
+      'generation ledger Object.prototype source alias'
+    );
+    assert.equal(
+      objectPrototypeEvidenceGetterInvoked,
+      false,
+      'generation Object.prototype evidence alias getter must not be invoked'
+    );
+    assertNoNativeGenerationLedgerExecution(
+      pollutedResult,
+      'generation ledger Object.prototype source alias'
+    );
+    assertNoNativeGenerationLedgerExecution(
+      pollutedResult.rows[0],
+      'generation ledger Object.prototype source alias'
+    );
+  } finally {
+    if (previousObjectPrototypeEvidenceAliasDescriptor === undefined) {
+      delete Object.prototype[objectPrototypeEvidenceAliasKey];
+    } else {
+      Object.defineProperty(
+        Object.prototype,
+        objectPrototypeEvidenceAliasKey,
+        previousObjectPrototypeEvidenceAliasDescriptor
+      );
+    }
+  }
+  assert.equal(
+    objectPrototypeEvidenceGetterInvoked,
+    false,
+    'generation Object.prototype evidence alias getter must not be invoked'
+  );
 
   const cases = [
     {
