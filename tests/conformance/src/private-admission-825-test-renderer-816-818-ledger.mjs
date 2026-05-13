@@ -10,14 +10,20 @@ import {
   PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_EVIDENCE,
   PRIVATE_ADMISSION_733_736_BRIDGE_ROW_CONTRACT,
   PRIVATE_ADMISSION_733_736_BRIDGE_WORKERS,
-  evaluatePrivateAdmission733736BridgeLedger
+  evaluatePrivateAdmission733736BridgeLedger,
+  stripPrivateAdmissionSourceComments
 } from "./private-admission-733-736-bridge-ledger.mjs";
 
 const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
   new URL("../../../", import.meta.url)
 );
 
-const testRendererRustSource = "crates/fast-react-test-renderer/src/lib.rs";
+const testRendererConstantsRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/constants.rs";
+const testRendererJsonDiagnosticsRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/json.rs";
+const testRendererSerializationExecutionRustSource =
+  "crates/fast-react-test-renderer/src/root_impl/serialization_execution.rs";
 const bridgeLedgerSource =
   "tests/conformance/src/private-admission-733-736-bridge-ledger.mjs";
 const sourceTokenPolicy =
@@ -150,7 +156,11 @@ const privateAdmission825Rows = freezeArray([
       "accepted-private-test-renderer-unmount-nested-source-report-gate",
     sourceEvidenceArea:
       "test-renderer-unmount-nested-source-report-private-admission",
-    implementationPaths: freezeArray([testRendererRustSource]),
+    implementationPaths: freezeArray([
+      testRendererConstantsRustSource,
+      testRendererJsonDiagnosticsRustSource,
+      testRendererSerializationExecutionRustSource
+    ]),
     statusIds: PRIVATE_ADMISSION_825_REQUIRED_STATUS_IDS[worker816],
     bridgeLedgerContext:
       PRIVATE_ADMISSION_825_REQUIRED_BRIDGE_LEDGER_CONTEXT[worker816],
@@ -158,7 +168,7 @@ const privateAdmission825Rows = freezeArray([
     evidenceRows: [
       evidenceData({
         evidenceId: "worker-816-unmount-nested-status-constants",
-        path: testRendererRustSource,
+        path: testRendererConstantsRustSource,
         sliceStart: "TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME",
         sliceEnd: "TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID",
         tokens: [
@@ -172,7 +182,7 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-unmount-nested-gate-record-fields",
-        path: testRendererRustSource,
+        path: testRendererJsonDiagnosticsRustSource,
         sliceStart: "TestRendererPrivateUnmountNestedSourceReportAdmissionGate",
         sliceEnd: "public_native_package_js_surfaces_blocked",
         tokens: [
@@ -220,7 +230,7 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-unmount-nested-gate-methods",
-        path: testRendererRustSource,
+        path: testRendererJsonDiagnosticsRustSource,
         sliceStart: "public_native_package_js_surfaces_blocked",
         sliceEnd: "TestRendererPrivateToJsonSiblingSnapshotFinishedWorkIdentityBlocker",
         tokens: [
@@ -251,10 +261,10 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-unmount-nested-admission-builder",
-        path: testRendererRustSource,
+        path: testRendererSerializationExecutionRustSource,
         sliceStart:
           "describe_private_unmount_nested_source_report_admission_gate_for_canary",
-        sliceEnd: "describe_private_tree_committed_fiber_inspection_for_canary",
+        sliceEnd: "private_to_json_facade_result_from_report",
         tokens: [
           "describe_private_unmount_nested_source_report_admission_gate_for_canary",
           "validate_private_unmount_nested_source_report_nested_route_for_canary",
@@ -282,7 +292,7 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-route-admission-validators",
-        path: testRendererRustSource,
+        path: testRendererSerializationExecutionRustSource,
         tokens: [
           "validate_private_unmount_nested_source_report_nested_route_for_canary",
           "validate_private_unmount_nested_source_report_unmount_admission_for_canary",
@@ -317,7 +327,7 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-nested-source-report-ownership-validator",
-        path: testRendererRustSource,
+        path: testRendererSerializationExecutionRustSource,
         tokens: [
           "validate_private_unmount_nested_source_report_ownership_for_canary",
           "TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME",
@@ -346,7 +356,7 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-unmount-nested-gate-validator",
-        path: testRendererRustSource,
+        path: testRendererSerializationExecutionRustSource,
         sliceStart:
           "validate_private_unmount_nested_source_report_admission_gate_for_canary",
         sliceEnd: "validate_private_update_native_execution_matches_handoff_for_canary",
@@ -1000,14 +1010,20 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
           sliceEnd: evidenceRow.sliceEnd
         })
       : fileText;
+  const commentFreeSourceText =
+    sourceText.ok === true
+      ? stripPrivateAdmissionSourceComments(sourceText.value, evidenceRow.path)
+      : "";
   const missingTokens =
     sourceText.ok === true
-      ? evidenceRow.tokens.filter((token) => !sourceText.value.includes(token))
+      ? evidenceRow.tokens.filter(
+          (token) => !commentFreeSourceText.includes(token)
+        )
       : evidenceRow.tokens;
   const forbiddenTokensPresent =
     sourceText.ok === true
       ? evidenceRow.forbiddenTokens.filter((token) =>
-          sourceText.value.includes(token)
+          commentFreeSourceText.includes(token)
         )
       : [];
 
