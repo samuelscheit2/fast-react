@@ -1827,6 +1827,7 @@ export async function runReactDomRootPublicFacadeBlockedGate({
     checkedOracle,
     currentOracle: resolvedCurrentOracle,
     clientRootOracle,
+    workspaceRoot,
     localPublicFacadeBoundary: inspectReactDomRootPublicFacadeBoundary({
       workspaceRoot
     }),
@@ -1843,9 +1844,16 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
   checkedOracle,
   currentOracle,
   clientRootOracle,
-  localPublicFacadeBoundary = inspectReactDomRootPublicFacadeBoundary(),
-  lifecycleSourceLedger = inspectReactDomRootPublicFacadeLifecycleSourceLedger(),
-  privateRootBridgeBoundary = inspectReactDomPrivateRootBridgeBoundary(),
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT,
+  localPublicFacadeBoundary = inspectReactDomRootPublicFacadeBoundary({
+    workspaceRoot
+  }),
+  lifecycleSourceLedger = inspectReactDomRootPublicFacadeLifecycleSourceLedger({
+    workspaceRoot
+  }),
+  privateRootBridgeBoundary = inspectReactDomPrivateRootBridgeBoundary({
+    workspaceRoot
+  }),
   publicFacadeLifecycleRows = REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
   rootRenderGateResult: providedRootRenderGateResult = null
 } = {}) {
@@ -1879,6 +1887,7 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
   validatePublicFacadeBoundary({
     localPublicFacadeBoundary,
     lifecycleSourceLedger,
+    workspaceRoot,
     publicFacadeLifecycleRows,
     blockedPublicFacadeRows,
     failures
@@ -2275,9 +2284,9 @@ export function inspectReactDomRootPublicFacadeLifecycleSourceLedger({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT
 } = {}) {
   try {
-    const rootBridge = require(
-      join(workspaceRoot, "packages/react-dom/src/client/root-bridge.js")
-    );
+    const rootBridge = loadReactDomRootBridgeForPublicFacadeLedger({
+      workspaceRoot
+    });
     const {
       createSourceOwnedReactDomLifecycleBoundary
     } = require(
@@ -2326,8 +2335,7 @@ export function inspectReactDomRootPublicFacadeLifecycleSourceLedger({
       summary: summarizePublicFacadeLifecycleSourceEvidence({
         boundaryRecord,
         snapshotRecord
-      }),
-      rootBridge
+      })
     };
   } catch (error) {
     return {
@@ -3691,6 +3699,7 @@ function validatePublicFacadeScenarioAdmissions({
 function validatePublicFacadeBoundary({
   localPublicFacadeBoundary,
   lifecycleSourceLedger,
+  workspaceRoot,
   publicFacadeLifecycleRows,
   blockedPublicFacadeRows,
   failures
@@ -3802,6 +3811,7 @@ function validatePublicFacadeBoundary({
   validatePublicRootLifecycleBlocked({
     publicRootLifecycle: localPublicFacadeBoundary.publicRootLifecycle,
     lifecycleSourceLedger,
+    workspaceRoot,
     publicFacadeLifecycleRows,
     blockedPublicFacadeRows,
     failures
@@ -4084,6 +4094,7 @@ function isStablePublicRootMethodDescriptor(descriptor, expectedLength) {
 function validatePublicRootLifecycleBlocked({
   publicRootLifecycle,
   lifecycleSourceLedger,
+  workspaceRoot,
   publicFacadeLifecycleRows,
   blockedPublicFacadeRows,
   failures
@@ -4380,6 +4391,7 @@ function validatePublicRootLifecycleBlocked({
   validatePublicFacadeLifecycleSourceLedger({
     lifecycleSourceLedger,
     expectedRows: lifecycleRowSource,
+    workspaceRoot,
     failures
   });
 }
@@ -4387,6 +4399,7 @@ function validatePublicRootLifecycleBlocked({
 function validatePublicFacadeLifecycleSourceLedger({
   lifecycleSourceLedger,
   expectedRows,
+  workspaceRoot,
   failures
 }) {
   if (!lifecycleSourceLedger || typeof lifecycleSourceLedger !== "object") {
@@ -4427,10 +4440,22 @@ function validatePublicFacadeLifecycleSourceLedger({
   }
 
   const evidence = lifecycleSourceLedger.evidence;
-  const rootBridge = lifecycleSourceLedger.rootBridge;
-  if (!evidence || !rootBridge) {
+  if (!evidence) {
     failures.push({
       gateStatus: "missing-public-root-lifecycle-source-owned-evidence"
+    });
+    return;
+  }
+
+  let rootBridge;
+  try {
+    rootBridge = loadReactDomRootBridgeForPublicFacadeLedger({
+      workspaceRoot
+    });
+  } catch (error) {
+    failures.push({
+      gateStatus: "public-root-lifecycle-source-owned-ledger-load-error",
+      error: serializeGateError(error)
     });
     return;
   }
@@ -4518,6 +4543,14 @@ function validatePublicFacadeLifecycleSourceLedger({
       })
     });
   }
+}
+
+function loadReactDomRootBridgeForPublicFacadeLedger({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  return require(
+    join(workspaceRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
 }
 
 function summarizePublicFacadeLifecycleSourceLedgerForRow(

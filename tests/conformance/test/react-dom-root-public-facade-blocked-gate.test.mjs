@@ -6114,6 +6114,39 @@ test("React DOM public root facade lifecycle source ledger rejects hostile priva
     "cloned boundary object"
   );
 
+  const forgedEvidence = {
+    ...ledger.evidence,
+    boundaryRecord: {
+      ...ledger.evidence.boundaryRecord
+    },
+    boundaryPayload: {
+      ...ledger.evidence.boundaryPayload
+    },
+    snapshotRecord: {
+      ...ledger.evidence.snapshotRecord
+    },
+    snapshotPayload: {
+      ...ledger.evidence.snapshotPayload
+    }
+  };
+  assertRejected(
+    {
+      ...ledger,
+      evidence: forgedEvidence,
+      rootBridge: {
+        isPrivateRootLifecycleRequestBoundaryRecord: () => true,
+        getPrivateRootLifecycleRequestBoundaryPayload: () =>
+          forgedEvidence.boundaryPayload,
+        isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission:
+          () => true,
+        isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord: () => true,
+        getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload: () =>
+          forgedEvidence.snapshotPayload
+      }
+    },
+    "caller-supplied fake root bridge"
+  );
+
   const foreignLedger = inspectReactDomRootPublicFacadeLifecycleSourceLedger();
   assertRejected(
     {
@@ -6149,8 +6182,7 @@ test("React DOM public root facade lifecycle source ledger rejects hostile priva
           staleLifecycle.rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
             staleLifecycle.initialDiagnostic.sourceContainerSnapshot
           )?.sourceRecord ?? null
-      },
-      rootBridge: staleLifecycle.rootBridge
+      }
     },
     "stale same-container boundary"
   );
