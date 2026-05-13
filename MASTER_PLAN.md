@@ -47,10 +47,10 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current root head is main `87cbb477`
-(`Merge worker 1319 startTransition option aliases`) before this docs pass.
-Current accepted implementation head is main `87cbb477`
-(`Merge worker 1319 startTransition option aliases`).
+Top-level cap: 30 workers. Current root head is main `f4983d0b`
+(`Merge worker 1320 queued cleanup ownership transfer`) before this docs pass.
+Current accepted implementation head is main `f4983d0b`
+(`Merge worker 1320 queued cleanup ownership transfer`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -64,7 +64,7 @@ Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
   1269, 1270, 1271, 1272, 1277 through 1280, 1286 through 1290,
-  1296 through 1300, 1306 through 1310, 1318, and 1319
+  1296 through 1300, 1306 through 1310, and 1318 through 1320
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
@@ -100,9 +100,16 @@ Current orchestration queue:
 - Worker 1319 has been reviewed, merged, and recorded as accepted history for
   the startTransition rootless currentness option-alias hardening from Scout
   1315.
-- Worker 1320 is under repair audit for the queued minimal HostRoot
-  update-to-null cleanup ownership transfer retry from Scout 1311 after source
-  audit required source-owned, not updated-owned, detached metadata.
+- Worker 1320 has been repaired, reviewed, merged, and recorded as accepted
+  history for the queued minimal HostRoot update-to-null cleanup ownership
+  transfer retry from Scout 1311. The final repair source-owned deletion cleanup
+  tokens for transferred host cleanup and kept the cleanup record topology on
+  the deleted updated fiber.
+- Parallel scouts 1322, 1323, and 1324 reported future React DOM public
+  facade lifecycle source-ledger, react-test-renderer root-handle WeakMap
+  ledger, and native source-currentness normalized claim-alias candidates.
+  Scout 1321 returned no responsible Rust report because the local command
+  runner hit file-descriptor pressure during scouting.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

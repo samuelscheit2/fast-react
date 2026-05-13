@@ -687,7 +687,7 @@
 		{
 			"id": 1320,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Queued minimal HostRoot update-to-null cleanup ownership transfer retry",
 			"agent": "worker_1320_queued_cleanup_update_transfer_retry",
 			"branch": "worker/1320-queued-cleanup-update-transfer-retry",
@@ -695,8 +695,38 @@
 				"audit_1320_source_contract",
 				"audit_1320_verification",
 				"audit_1320_repair_source",
-				"audit_1320_repair_verification"
+				"audit_1320_repair_verification",
+				"audit_1320_repair2_source",
+				"audit_1320_repair2_verification"
 			]
+		},
+		{
+			"id": 1321,
+			"type": "scout",
+			"status": "no-report",
+			"title": "Rust reconciler/root/scheduler next-lane scout",
+			"agent": "scout_1321_rust_root_next"
+		},
+		{
+			"id": 1322,
+			"type": "scout",
+			"status": "reported",
+			"title": "React DOM public facade lifecycle source-ledger scout",
+			"agent": "scout_1322_react_dom_next"
+		},
+		{
+			"id": 1323,
+			"type": "scout",
+			"status": "reported",
+			"title": "react-test-renderer root-handle WeakMap ledger scout",
+			"agent": "scout_1323_test_renderer_next"
+		},
+		{
+			"id": 1324,
+			"type": "scout",
+			"status": "reported",
+			"title": "Native source-currentness normalized claim-alias scout",
+			"agent": "scout_1324_native_next"
 		}
 	]
 }

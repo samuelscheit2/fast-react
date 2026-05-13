@@ -29,6 +29,35 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1320 Queued Cleanup Ownership Transfer
+
+- Worker 1320 added private/test-host evidence for queued minimal HostRoot
+  mount -> update -> `RootElementHandle::NONE` cleanup using previous host
+  work from the update path.
+- The accepted repair requires detached host cleanup metadata to remain
+  source-owned after update. Updated-owned detached metadata is rejected, and
+  transferred cleanup validation now compares both source metadata and the
+  resolved source owner before cleanup can apply.
+- The second repair closed the apply-time deletion path: cleanup tokens are
+  issued to the alternate/source owner for transferred stateful host cleanup,
+  while `HostRootDeletionCleanupRecord.fiber()` still records the deleted
+  updated fiber for topology/order diagnostics. Apply-time token validation and
+  detached-host invalidation use the resolved owner.
+- Focused coverage proves update -> null cleanup consumes transferred work,
+  source-owned cleanup tokens validate for source fibers and reject updated
+  fibers, updated-owned detached metadata rejects before publication, and root
+  unmount, host-work update, deletion, and root-commit deletion paths remain
+  green.
+- The accepted change is Rust private/test-host evidence only. It does not open
+  public React DOM, test-renderer, Scheduler, native, package, renderer, or
+  broad HostRoot compatibility.
+- Accepted validation includes clean source and verification audits after both
+  repairs. Root post-merge reruns passed queued minimal host (15/15), root
+  unmount (4/4), host-work updates (23/23), host-work deletions (9/9),
+  root-commit deletions (8/8), `cargo check -p fast-react-reconciler
+  --all-features`, `cargo fmt --all --check`, and `git diff --check`.
+- The accepted merge is main `f4983d0b` after Worker 1320 commit `5001d1d2`.
+
 ### Worker 1319 startTransition Option Alias Hardening
 
 - Worker 1319 hardened private rootless `startTransition` currentness report
