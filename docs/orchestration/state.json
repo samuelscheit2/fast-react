@@ -17,13 +17,15 @@
 		{
 			"id": 1254,
 			"type": "worker",
-			"status": "repair-active",
+			"status": "repair-auditing",
 			"title": "startTransition rootless currentness",
 			"agent": "worker_1254_start_transition_currentness",
 			"branch": "worker/1254-start-transition-currentness",
 			"audits": [
 				"audit_1254_source_contract",
-				"audit_1254_verification"
+				"audit_1254_verification",
+				"audit_1254_repair_source",
+				"audit_1254_repair_verification"
 			]
 		},
 		{
