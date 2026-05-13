@@ -479,6 +479,8 @@ const nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields =
     'publicHydrateRootCompatibilityClaimed',
     'publicHydrationCompatibilityClaimed',
     'publicNativeCompatibility',
+    'publicNativeExecution',
+    'publicNativeExecutionClaimed',
     'publicRootCompatibilitySurface',
     'publicRootCreated',
     'publicRootCreatedClaimed',
@@ -501,6 +503,8 @@ const nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFields =
     'public_hydrate_root_compatibility_claimed',
     'public_hydration_compatibility_claimed',
     'public_native_compatibility',
+    'public_native_execution',
+    'public_native_execution_claimed',
     'public_root_compatibility_surface',
     'public_root_created',
     'public_root_created_claimed',
@@ -549,11 +553,17 @@ const nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFields =
     'native_addon_loaded',
     'native_addon_load_claimed',
     'packageCompatibilityClaimed',
+    'packageExportClaimed',
     'packageExportCompatibility',
     'packageExportCompatibilityClaimed',
+    'packageExportsChanged',
+    'packageExportsOpened',
     'package_compatibility_claimed',
+    'package_export_claimed',
     'package_export_compatibility',
     'package_export_compatibility_claimed',
+    'package_exports_changed',
+    'package_exports_opened',
     'publicNativeCompatibilityClaimed',
     'publicNativeCompatibilitySurface',
     'public_native_compatibility_claimed',
@@ -4319,6 +4329,51 @@ function formatNativeCapabilityClaimPath(path, key) {
     : `${path}[Symbol(${JSON.stringify(description)})]`;
 }
 
+function findNativeCapabilityClaimInPropertyChain(
+  object,
+  path,
+  blockedFieldSet,
+  blockedNormalizedFieldSet,
+  allowedTruePaths = Object.freeze([])
+) {
+  if (!isObjectLike(object)) {
+    return null;
+  }
+
+  for (
+    let candidate = object;
+    candidate !== null;
+    candidate = Object.getPrototypeOf(candidate)
+  ) {
+    for (const key of Reflect.ownKeys(candidate)) {
+      const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
+      if (descriptor === undefined) {
+        continue;
+      }
+
+      const claimField = getNativeCapabilityClaimFieldForKey(
+        key,
+        blockedFieldSet,
+        blockedNormalizedFieldSet
+      );
+      const claimPath = formatNativeCapabilityClaimPath(path, key);
+      if (
+        claimField !== null &&
+        !allowedTruePaths.includes(claimPath) &&
+        isNativeCapabilityClaimDescriptorClaimed(descriptor)
+      ) {
+        return {
+          field: claimField,
+          key,
+          path: claimPath
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 function getNativeCapabilityClaimKeyMetadata(key) {
   if (typeof key !== 'symbol') {
     return {
@@ -4553,24 +4608,18 @@ function assertBlockedNativeRootBridgeHandoff(input) {
 }
 
 function assertBlockedNativeRootBridgeHandoffClaims(input) {
-  for (const key of Reflect.ownKeys(input)) {
-    const descriptor = Object.getOwnPropertyDescriptor(input, key);
-    if (!descriptor) {
-      continue;
-    }
-
-    const flag = getNativeCapabilityClaimFieldForKey(
-      key,
-      nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFieldSet,
-      nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimNormalizedFieldSet
+  const claim = findNativeCapabilityClaimInPropertyChain(
+    input,
+    'handoff',
+    nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFieldSet,
+    nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimNormalizedFieldSet
+  );
+  if (claim !== null) {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge handoff must not claim ${claim.field}.`,
+      nativeRootBridgeRequestShapeErrorCode,
+      { flag: claim.field }
     );
-    if (flag !== null && isNativeCapabilityClaimDescriptorClaimed(descriptor)) {
-      throwNativeRootBridgeRequestShapeError(
-        `Native root bridge handoff must not claim ${flag}.`,
-        nativeRootBridgeRequestShapeErrorCode,
-        { flag }
-      );
-    }
   }
 }
 
@@ -7248,6 +7297,27 @@ function assertNativeReactDomRenderHandoffAdmissionHasNoCapabilityClaims(
     }
     seen.add(candidate);
 
+    const claim = findNativeCapabilityClaimInPropertyChain(
+      candidate,
+      path,
+      nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFieldSet,
+      nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimNormalizedFieldSet,
+      allowedTruePaths
+    );
+    if (claim !== null) {
+      const keyMetadata = getNativeCapabilityClaimKeyMetadata(claim.key);
+      throwNativeReactDomRenderHandoffAdmissionError(
+        'Private React DOM render handoff admission cannot accept public, native, browser DOM, or compatibility claims.',
+        nativeReactDomRenderHandoffAdmissionCapabilityClaimErrorCode,
+        {
+          field: claim.field,
+          path: claim.path,
+          label,
+          ...keyMetadata
+        }
+      );
+    }
+
     for (const key of Reflect.ownKeys(candidate)) {
       const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
       if (!descriptor) {
@@ -7255,29 +7325,6 @@ function assertNativeReactDomRenderHandoffAdmissionHasNoCapabilityClaims(
       }
 
       const childPath = formatNativeCapabilityClaimPath(path, key);
-      const claimField = getNativeCapabilityClaimFieldForKey(
-        key,
-        nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFieldSet,
-        nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimNormalizedFieldSet
-      );
-      if (
-        claimField !== null &&
-        !allowedTruePaths.includes(childPath) &&
-        isNativeCapabilityClaimDescriptorClaimed(descriptor)
-      ) {
-        const keyMetadata = getNativeCapabilityClaimKeyMetadata(key);
-        throwNativeReactDomRenderHandoffAdmissionError(
-          'Private React DOM render handoff admission cannot accept public, native, browser DOM, or compatibility claims.',
-          nativeReactDomRenderHandoffAdmissionCapabilityClaimErrorCode,
-          {
-            field: claimField,
-            path: childPath,
-            label,
-            ...keyMetadata
-          }
-        );
-      }
-
       if (hasOwn(descriptor, 'value')) {
         visit(descriptor.value, childPath);
       }
@@ -8067,32 +8114,31 @@ function assertNativeRootWorkLoopFinishedWorkMetadataHasNoCapabilityClaims(
     }
     seen.add(candidate);
 
+    const claim = findNativeCapabilityClaimInPropertyChain(
+      candidate,
+      path,
+      nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFieldSet,
+      nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimNormalizedFieldSet
+    );
+    if (claim !== null) {
+      const keyMetadata = getNativeCapabilityClaimKeyMetadata(claim.key);
+      throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
+        'Native root work-loop finished-work metadata factory cannot accept public, native, DOM, hydration, event, ref, marker, listener, scheduler, Rust, or compatibility capability claims.',
+        nativeRootWorkLoopFinishedWorkMetadataFactoryCapabilityClaimErrorCode,
+        {
+          field: claim.field,
+          path: claim.path,
+          ...keyMetadata
+        }
+      );
+    }
+
     for (const key of Reflect.ownKeys(candidate)) {
       const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
       if (!descriptor) {
         continue;
       }
       const childPath = formatNativeCapabilityClaimPath(path, key);
-      const claimField = getNativeCapabilityClaimFieldForKey(
-        key,
-        nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimFieldSet,
-        nativeRootWorkLoopFinishedWorkMetadataBlockedCapabilityClaimNormalizedFieldSet
-      );
-      if (
-        claimField !== null &&
-        isNativeCapabilityClaimDescriptorClaimed(descriptor)
-      ) {
-        const keyMetadata = getNativeCapabilityClaimKeyMetadata(key);
-        throwNativeRootWorkLoopFinishedWorkMetadataFactoryError(
-          'Native root work-loop finished-work metadata factory cannot accept public, native, DOM, hydration, event, ref, marker, listener, scheduler, Rust, or compatibility capability claims.',
-          nativeRootWorkLoopFinishedWorkMetadataFactoryCapabilityClaimErrorCode,
-          {
-            field: claimField,
-            path: childPath,
-            ...keyMetadata
-          }
-        );
-      }
       if (hasOwn(descriptor, 'value')) {
         visit(descriptor.value, childPath);
       }

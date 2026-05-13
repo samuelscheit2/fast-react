@@ -279,6 +279,37 @@ function createValidNativeRootBridgeRequestRecord(overrides = {}) {
   };
 }
 
+function createObjectWithPrototypeClaims(object, prototypeClaims) {
+  const target = Object.create(Object.freeze(prototypeClaims));
+  Object.defineProperties(target, Object.getOwnPropertyDescriptors(object));
+  return Object.freeze(target);
+}
+
+function assertBlockedNativeRootBridgeInput(
+  native,
+  input,
+  expectedFlag,
+  label
+) {
+  assert.throws(
+    () => native.createNativeRootBridgeRequestShapeGate(input),
+    (error) => {
+      assert.equal(error.name, 'FastReactNativeRequestShapeError');
+      assert.equal(
+        error.code,
+        'FAST_REACT_NATIVE_ROOT_BRIDGE_REQUEST_SHAPE_INVALID'
+      );
+      assert.deepEqual(error.details, { flag: expectedFlag });
+      assert.equal(error.nativeAddonLoaded, false);
+      assert.equal(error.nativeExecution, false);
+      assert.equal(error.rendererExecution, false);
+      assert.equal(error.reconcilerExecution, false);
+      return true;
+    },
+    label
+  );
+}
+
 function assertBlockedNativeRootBridgeClaim(native, blockedClaim) {
   for (const [label, input] of [
     [
@@ -301,24 +332,90 @@ function assertBlockedNativeRootBridgeClaim(native, blockedClaim) {
       }
     ]
   ]) {
-    assert.throws(
-      () => native.createNativeRootBridgeRequestShapeGate(input),
-      (error) => {
-        assert.equal(error.name, 'FastReactNativeRequestShapeError');
-        assert.equal(
-          error.code,
-          'FAST_REACT_NATIVE_ROOT_BRIDGE_REQUEST_SHAPE_INVALID'
-        );
-        assert.deepEqual(error.details, { flag: blockedClaim });
-        assert.equal(error.nativeAddonLoaded, false);
-        assert.equal(error.nativeExecution, false);
-        assert.equal(error.rendererExecution, false);
-        assert.equal(error.reconcilerExecution, false);
-        return true;
-      },
+    assertBlockedNativeRootBridgeInput(
+      native,
+      input,
+      blockedClaim,
       `native no-load guard must reject ${blockedClaim} on ${label}`
     );
   }
+}
+
+function assertBlockedNativeRootBridgePrototypeClaims(native) {
+  assertBlockedNativeRootBridgeInput(
+    native,
+    createObjectWithPrototypeClaims(createValidNativeRootBridgeRequestRecord(), {
+      nativeExecution: true
+    }),
+    'nativeExecution',
+    'native no-load guard must reject inherited nativeExecution on request'
+  );
+  assertBlockedNativeRootBridgeInput(
+    native,
+    createObjectWithPrototypeClaims(createValidNativeRootBridgeRequestRecord(), {
+      public_native_execution: true
+    }),
+    'public_native_execution',
+    'native no-load guard must reject inherited public_native_execution'
+  );
+  assertBlockedNativeRootBridgeInput(
+    native,
+    createObjectWithPrototypeClaims(
+      {
+        nativeRequestRecord: createValidNativeRootBridgeRequestRecord()
+      },
+      {
+        packageExportsOpened: true
+      }
+    ),
+    'packageExportsOpened',
+    'native no-load guard must reject inherited package export opening claims'
+  );
+  assertBlockedNativeRootBridgeInput(
+    native,
+    {
+      nativeRequestRecord: createObjectWithPrototypeClaims(
+        createValidNativeRootBridgeRequestRecord(),
+        {
+          publicNativeCompatibility: true
+        }
+      )
+    },
+    'publicNativeCompatibility',
+    'native no-load guard must reject nested inherited compatibility claims'
+  );
+  assertBlockedNativeRootBridgeInput(
+    native,
+    createObjectWithPrototypeClaims(createValidNativeRootBridgeRequestRecord(), {
+      [Symbol.for('publicRootExecution')]: true
+    }),
+    'publicRootExecution',
+    'native no-load guard must reject inherited public root symbol claims'
+  );
+
+  let getterInvoked = false;
+  const accessorClaimPrototype = {};
+  Object.defineProperty(accessorClaimPrototype, 'nativeExecution', {
+    get() {
+      getterInvoked = true;
+      return true;
+    },
+    enumerable: true
+  });
+  assertBlockedNativeRootBridgeInput(
+    native,
+    createObjectWithPrototypeClaims(
+      createValidNativeRootBridgeRequestRecord(),
+      accessorClaimPrototype
+    ),
+    'nativeExecution',
+    'native no-load guard must reject inherited accessor claims'
+  );
+  assert.equal(
+    getterInvoked,
+    false,
+    'native no-load guard must not invoke inherited claim getters'
+  );
 }
 
 function assertNativeRootWorkLoopFinishedWorkMetadataFactoryNoLoad(native) {
@@ -2022,6 +2119,7 @@ async function main() {
     ]) {
       assertBlockedNativeRootBridgeClaim(native, blockedClaim);
     }
+    assertBlockedNativeRootBridgePrototypeClaims(native);
     assert.equal(
       native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
         .teardownGateStatus,

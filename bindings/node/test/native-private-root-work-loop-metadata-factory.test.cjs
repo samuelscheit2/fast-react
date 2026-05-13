@@ -36,6 +36,12 @@ const validOptions = Object.freeze({
   textContent: 'text'
 });
 
+function createObjectWithPrototypeClaims(object, prototypeClaims) {
+  const target = Object.create(Object.freeze(prototypeClaims));
+  Object.defineProperties(target, Object.getOwnPropertyDescriptors(object));
+  return Object.freeze(target);
+}
+
 function assertNoPublicStringKeyLeak(object, label) {
   const stringKeys = Object.getOwnPropertyNames(object);
 
@@ -1093,6 +1099,12 @@ async function main() {
   for (const [label, input] of [
     ['top-level native execution claim', { ...validOptions, nativeExecution: true }],
     [
+      'inherited public native compatibility claim',
+      createObjectWithPrototypeClaims(validOptions, {
+        public_native_compatibility: true
+      })
+    ],
+    [
       'top-level public root execution claim',
       { ...validOptions, publicRootExecution: true }
     ],
@@ -1104,6 +1116,26 @@ async function main() {
   ]) {
     assertFactoryError(input, capabilityClaimCode, label);
   }
+
+  let getterInvoked = false;
+  const accessorClaimPrototype = {};
+  Object.defineProperty(accessorClaimPrototype, 'nativeExecution', {
+    get() {
+      getterInvoked = true;
+      return true;
+    },
+    enumerable: true
+  });
+  assertFactoryError(
+    createObjectWithPrototypeClaims(validOptions, accessorClaimPrototype),
+    capabilityClaimCode,
+    'inherited accessor native execution claim'
+  );
+  assert.equal(
+    getterInvoked,
+    false,
+    'metadata factory must not invoke inherited claim getters'
+  );
 }
 
 main()
