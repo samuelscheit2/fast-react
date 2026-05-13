@@ -675,7 +675,7 @@
 		{
 			"id": 1319,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "startTransition rootless currentness option-alias hardening",
 			"agent": "worker_1319_start_transition_option_aliases",
 			"branch": "worker/1319-start-transition-option-aliases",

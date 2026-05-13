@@ -29,6 +29,31 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1319 startTransition Option Alias Hardening
+
+- Worker 1319 hardened private rootless `startTransition` currentness report
+  options so inherited/prototype-only aliases and temporary
+  `Object.prototype` pollution reject instead of being normalized away.
+- The sanitizer now builds null-prototype option bags, scans the prototype
+  chain with descriptor reads rather than value reads, and covers option names,
+  report fields, currentness fields, surface-row fields, and explicit claimed
+  compatibility aliases without invoking getters.
+- Surface-currentness row freezing now defines own row fields directly, keeping
+  non-enumerable `Object.prototype` accessor pollution from interfering with
+  private row construction while preserving freeze/validation behavior.
+- Focused coverage rejects inherited public transition/root compatibility
+  aliases, inherited getter aliases without getter reads, own non-option
+  claimed aliases, and non-enumerable `Object.prototype` pollution for
+  recognized fields, with cleanup. No-options report creation, normal
+  `startTransition`, and Worker 1298 returned-thenable behavior remain green.
+- The accepted change is private React transition currentness evidence only. It
+  does not add roots, Scheduler timing, hook dispatcher routing, React DOM,
+  test-renderer, native/package, or broad compatibility claims.
+- Accepted validation includes clean source and verification audits. Worktree
+  and root reruns passed the transition facade gate (23/23), React workspace
+  check, import-entrypoint smoke, and `git diff --check`.
+- The accepted merge is main `87cbb477` after Worker 1319 commit `6e3cb96b`.
+
 ### Worker 1318 React DOM createRoot Container Alias Blocker
 
 - Worker 1318 hardened public `createRoot(container)` so hostile fake-DOM
