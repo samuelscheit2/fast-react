@@ -463,11 +463,14 @@
 		{
 			"id": 1298,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "startTransition returned-thenable currentness",
 			"agent": "worker_1298_start_transition_thenable_currentness",
 			"branch": "worker/1298-start-transition-thenable-currentness",
-			"audits": []
+			"audits": [
+				"audit_1298_source_contract",
+				"audit_1298_verification"
+			]
 		},
 		{
 			"id": 1299,
@@ -484,11 +487,14 @@
 		{
 			"id": 1300,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "react-test-renderer TestInstance query-bridge source proof",
 			"agent": "worker_1300_test_renderer_query_bridge_source_proof",
 			"branch": "worker/1300-test-renderer-query-bridge-source-proof",
-			"audits": []
+			"audits": [
+				"audit_1300_source_contract",
+				"audit_1300_verification"
+			]
 		}
 	]
 }

@@ -75,8 +75,8 @@ Current orchestration queue:
 - Scout 1283 reported a concrete react-test-renderer next-lane candidate.
 - Scout 1285 reported a concrete React core/hooks next-lane candidate.
 - Scouts 1291 through 1295 reported concrete next-lane candidates.
-- Worker 1298 is active for `startTransition` returned thenables.
-- Worker 1300 is active for react-test-renderer TestInstance query-bridge
+- Worker 1298 is auditing for `startTransition` returned thenables.
+- Worker 1300 is auditing for react-test-renderer TestInstance query-bridge
   local-gate source proofing.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
