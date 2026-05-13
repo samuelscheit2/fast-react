@@ -257,7 +257,8 @@ export const REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROWS = [
     id: "react-test-renderer-test-instance-private-fiber-diagnostic",
     area: "TestInstance",
     publicSurface: "create().root/find*/findBy*",
-    privatePrerequisite: "accepted committed-fiber inspection diagnostics"
+    privatePrerequisite:
+      "accepted CJS TestInstance query bridge preflight diagnostics"
   },
   {
     id: "react-test-renderer-act-scheduler-private-diagnostic",
@@ -731,6 +732,11 @@ const publicJsReactTestRendererEntrypointSourcePaths = freezeArray([
   "packages/react-test-renderer/cjs/react-test-renderer.production.js"
 ]);
 
+const publicJsReactTestRendererCjsEntrypointSourcePaths = freezeArray([
+  "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+  "packages/react-test-renderer/cjs/react-test-renderer.production.js"
+]);
+
 const publicJsReactTestRendererExactPlaceholderPackageRoot =
   "packages/react-test-renderer";
 
@@ -892,6 +898,121 @@ const unmountPrivateRouteLifecycleSourceAssertions = freezeArray([
   jsBooleanPropertyAssertion("nativeExecution", false)
 ]);
 
+const privateTestInstanceQueryBridgePreflightGateSourceAssertions = freezeArray([
+  jsQuotedStringPropertyAssertion(
+    "id",
+    "react-test-renderer-private-test-instance-query-bridge-preflight-gate"
+  ),
+  jsSourcePropertyAssertion(
+    "diagnosticName",
+    "privateTestInstanceQueryBridgePreflightDiagnosticName"
+  ),
+  jsSourcePropertyAssertion(
+    "status",
+    "privateTestInstanceQueryBridgePreflightStatus"
+  ),
+  jsQuotedStringPropertyAssertion(
+    "publicSurface",
+    "create().root/ReactTestInstance.find*"
+  ),
+  jsQuotedStringPropertyAssertion(
+    "acceptedWorker",
+    "worker-515-test-renderer-live-query-bridge-preflight"
+  ),
+  jsQuotedStringPropertyAssertion("acceptedRustCrate", "fast-react-test-renderer"),
+  jsSourcePropertyAssertion(
+    "acceptedRustDiagnosticName",
+    "privateTestInstanceQueryBridgePreflightDiagnosticName"
+  ),
+  jsQuotedStringArrayPropertyIncludesAssertion("acceptedRustApis", [
+    "TestRendererRoot::describe_private_test_instance_query_bridge_preflight_for_canary",
+    "TestRendererRoot::describe_private_test_instance_query_bridge_preflight_after_update_for_canary",
+    "TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics"
+  ]),
+  jsQuotedStringArrayPropertyIncludesAssertion("acceptedRustTests", [
+    "root_private_test_instance_query_bridge_preflight_ties_find_all_and_find_by_records",
+    "root_private_test_instance_query_bridge_preflight_follows_update_records"
+  ]),
+  jsQuotedStringPropertyAssertion(
+    "bridgeSource",
+    "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery"
+  ),
+  jsSourcePropertyAssertion(
+    "wrapperRecordSymbol",
+    "privateTestInstanceWrapperRecordSymbol.description"
+  ),
+  jsSourcePropertyAssertion(
+    "sourceFindAllDiagnosticName",
+    "privateTestInstanceFindAllPredicateDiagnostics.diagnosticName"
+  ),
+  jsSourcePropertyAssertion(
+    "sourceFindByDiagnosticName",
+    "privateTestInstanceFindByQueryDiagnostics.diagnosticName"
+  ),
+  jsBooleanPropertyAssertion("consumesAcceptedRustFindAllDiagnostics", true),
+  jsBooleanPropertyAssertion("consumesAcceptedRustFindByDiagnostics", true),
+  jsBooleanPropertyAssertion("recordOnlyDiagnosticConsumption", true),
+  jsBooleanPropertyAssertion("publicRootAvailable", false),
+  jsBooleanPropertyAssertion("publicQueryMethodsAvailable", false),
+  jsBooleanPropertyAssertion("publicTestInstanceObjectAvailable", false),
+  jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+  jsBooleanPropertyAssertion("nativeExecution", false),
+  jsBooleanPropertyAssertion("rustExecutionFromJs", false),
+  jsBooleanPropertyAssertion("compatibilityClaimed", false)
+]);
+
+const privateTestInstanceQueryBridgePreflightRecordSourceAssertions =
+  freezeArray([
+    jsQuotedStringPropertyAssertion(
+      "id",
+      "react-test-renderer-private-test-instance-query-bridge-preflight"
+    ),
+    jsQuotedStringPropertyAssertion(
+      "kind",
+      "FastReactTestRendererPrivateTestInstanceQueryBridgePreflight"
+    ),
+    jsSourcePropertyAssertion(
+      "diagnosticName",
+      "privateTestInstanceQueryBridgePreflightDiagnosticName"
+    ),
+    jsSourcePropertyAssertion(
+      "status",
+      "privateTestInstanceQueryBridgePreflightStatus"
+    ),
+    jsSourcePropertyAssertion("gate", "privateTestInstanceQueryBridgePreflightGate"),
+    jsBooleanPropertyAssertion("privateRootLifecycleEvidenceAccepted", true),
+    jsQuotedStringPropertyAssertion(
+      "bridgeSource",
+      "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery"
+    ),
+    jsSourcePropertyAssertion(
+      "wrapperRecordSymbol",
+      "privateTestInstanceWrapperRecordSymbol.description"
+    ),
+    jsSourcePropertyAssertion(
+      "sourceFindAllDiagnosticName",
+      "normalizedFindAll.diagnosticName"
+    ),
+    jsSourcePropertyAssertion(
+      "sourceFindByDiagnosticName",
+      "normalizedFindBy.diagnosticName"
+    ),
+    jsBooleanPropertyAssertion("consumesAcceptedRustFindAllDiagnostics", true),
+    jsBooleanPropertyAssertion("consumesAcceptedRustFindByDiagnostics", true),
+    jsBooleanPropertyAssertion(
+      "consumesPrivateRootLifecycleExecutionEvidence",
+      true
+    ),
+    jsBooleanPropertyAssertion("recordOnlyDiagnosticConsumption", true),
+    jsBooleanPropertyAssertion("publicRootAvailable", false),
+    jsBooleanPropertyAssertion("publicQueryMethodsAvailable", false),
+    jsBooleanPropertyAssertion("publicTestInstanceObjectAvailable", false),
+    jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+    jsBooleanPropertyAssertion("nativeExecution", false),
+    jsBooleanPropertyAssertion("rustExecutionFromJs", false),
+    jsBooleanPropertyAssertion("compatibilityClaimed", false)
+  ]);
+
 export function inspectReactTestRendererSerializationLocalTargets({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT
 } = {}) {
@@ -917,6 +1038,10 @@ export function inspectReactTestRendererSerializationLocalTargets({
     ).join("\n");
   const publicJsReactTestRendererEntrypointSources =
     publicJsReactTestRendererEntrypointSourcePaths.map((path) =>
+      readWorkspaceFile(workspaceRoot, path)
+    );
+  const publicJsReactTestRendererCjsEntrypointSources =
+    publicJsReactTestRendererCjsEntrypointSourcePaths.map((path) =>
       readWorkspaceFile(workspaceRoot, path)
     );
   const privateToJSONFinishedWorkIdentitySourceEvidencePresent =
@@ -2068,52 +2193,14 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bfindByPredicateExecution\s*:\s*false\b/u
     );
-  const privateTestInstanceQueryBridgePreflightPresent =
-    privateTestInstanceFindByQueryDiagnosticsPresent &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bprivateTestInstanceQueryBridgePreflightGate\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /fast-react-test-renderer\.testinstance\.query-bridge-preflight/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bFastReactTestRendererPrivateTestInstanceQueryBridgePreflight\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bTestRendererRoot::describe_private_test_instance_query_bridge_preflight_for_canary\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bworker-515-test-renderer-live-query-bridge-preflight\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bconsumeAcceptedRustTestInstanceQueryDiagnosticsForRequest\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bgetTestInstanceQueryBridgePreflightForRootRequest\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bconsumesAcceptedRustFindAllDiagnostics\s*:\s*true\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\bconsumesAcceptedRustFindByDiagnostics\s*:\s*true\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\brecordOnlyDiagnosticConsumption\s*:\s*true\b/u
-    ) &&
-    hasSourcePattern(
-      publicJsReactTestRendererPackageSource,
-      /\brustExecutionFromJs\s*:\s*false\b/u
+  const privateCjsTestInstanceQueryBridgePreflightPresent =
+    publicJsReactTestRendererCjsEntrypointSources.length ===
+      publicJsReactTestRendererCjsEntrypointSourcePaths.length &&
+    publicJsReactTestRendererCjsEntrypointSources.every((source) =>
+      cjsTestInstanceQueryBridgePreflightSourceEvidencePresent(source)
     );
+  const privateTestInstanceQueryBridgePreflightPresent =
+    privateCjsTestInstanceQueryBridgePreflightPresent;
   const publicJsFacadeRoutingPresent =
     publicJsReactTestRendererFacadePresent &&
     !publicJsReactTestRendererFacadePlaceholder &&
@@ -2177,6 +2264,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateTestInstanceBridgeQueryDiagnosticsPresent,
     privateTestInstanceFindAllQueryDiagnosticsPresent,
     privateTestInstanceFindByQueryDiagnosticsPresent,
+    privateCjsTestInstanceQueryBridgePreflightPresent,
     privateTestInstanceQueryBridgePreflightPresent,
     publicToJSONAvailable,
     publicToTreeAvailable,
@@ -3849,12 +3937,77 @@ function jsStringPropertyAssertion(property, value) {
   });
 }
 
+function jsQuotedStringPropertyAssertion(property, value) {
+  return freezeRecord({
+    kind: "js-quoted-string-property",
+    property,
+    value
+  });
+}
+
 function jsSourcePropertyAssertion(property, value) {
   return freezeRecord({
     kind: "js-source-property",
     property,
     value
   });
+}
+
+function jsQuotedStringArrayPropertyIncludesAssertion(property, values) {
+  return freezeRecord({
+    kind: "js-quoted-string-array-property-includes",
+    property,
+    values: freezeArray(values)
+  });
+}
+
+function cjsTestInstanceQueryBridgePreflightSourceEvidencePresent(source) {
+  return (
+    jsConstQuotedStringDeclarationPass({
+      source,
+      name: "privateTestInstanceQueryBridgePreflightDiagnosticName",
+      value: "fast-react-test-renderer.testinstance.query-bridge-preflight"
+    }) &&
+    jsConstQuotedStringDeclarationPass({
+      source,
+      name: "privateTestInstanceQueryBridgePreflightStatus",
+      value:
+        "private-test-instance-query-bridge-preflight-ready-public-test-instance-blocked"
+    }) &&
+    jsObjectSourceAssertionsPass({
+      source,
+      declaration:
+        "const privateTestInstanceQueryBridgePreflightGate = Object.freeze",
+      assertions: privateTestInstanceQueryBridgePreflightGateSourceAssertions
+    }) &&
+    jsFunctionDeclarationSourceTokensPass({
+      source,
+      functionName: "getTestInstanceQueryBridgePreflightForRootRequest",
+      tokens: freezeArray([
+        "getTestInstanceQueryDiagnosticsForRootRequest(record)",
+        "diagnostics.queryBridgePreflight ?? diagnostics"
+      ])
+    }) &&
+    jsFunctionDeclarationSourceCallsPass({
+      source,
+      functionName: "consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest",
+      calls: freezeArray([
+        freezeRecord({
+          callee: "assertAcceptedTestInstanceLifecycleEvidenceForRootRequest",
+          arguments: freezeArray(["record"])
+        }),
+        freezeRecord({
+          callee: "createPrivateTestInstanceQueryBridgePreflightRecord",
+          arguments: freezeArray(["record", "diagnostics", "lifecycleEvidence"])
+        })
+      ])
+    }) &&
+    jsFunctionDeclarationReturnedFreezeRecordAssertionsPass({
+      source,
+      functionName: "createPrivateTestInstanceQueryBridgePreflightRecord",
+      assertions: privateTestInstanceQueryBridgePreflightRecordSourceAssertions
+    })
+  );
 }
 
 function jsObjectSourceAssertionsPass({ source, declaration, assertions }) {
@@ -3866,16 +4019,30 @@ function jsObjectSourceAssertionsPass({ source, declaration, assertions }) {
     return false;
   }
 
+  return jsObjectPropertyAssertionsPass(extracted.properties, assertions);
+}
+
+function jsObjectPropertyAssertionsPass(properties, assertions) {
   return assertions.every((assertion) => {
-    const actualSource = extracted.properties.get(assertion.property);
+    const actualSource = properties.get(assertion.property);
     if (assertion.kind === "js-boolean-property") {
       return actualSource === String(assertion.value);
     }
     if (assertion.kind === "js-string-property") {
       return parseJsStringLiteralSource(actualSource) === assertion.value;
     }
+    if (assertion.kind === "js-quoted-string-property") {
+      return parseJsQuotedStringLiteralSource(actualSource) === assertion.value;
+    }
     if (assertion.kind === "js-source-property") {
       return actualSource === assertion.value;
+    }
+    if (assertion.kind === "js-quoted-string-array-property-includes") {
+      const actualValues = parseJsQuotedStringArrayExpressionSource(actualSource);
+      return (
+        actualValues !== null &&
+        assertion.values.every((value) => actualValues.includes(value))
+      );
     }
     return false;
   });
@@ -3904,6 +4071,71 @@ function parseJsStringLiteralSource(source) {
     value += source[index];
   }
   return value;
+}
+
+function parseJsQuotedStringLiteralSource(source) {
+  if (typeof source !== "string" || source[0] === "`") {
+    return null;
+  }
+  return parseJsStringLiteralSource(source);
+}
+
+function parseJsQuotedStringArrayExpressionSource(source) {
+  if (typeof source !== "string") {
+    return null;
+  }
+
+  const calleeIndex = skipJsTrivia(source, 0, source.length);
+  if (!source.startsWith("Object.freeze", calleeIndex)) {
+    return null;
+  }
+  const callOpenIndex = skipJsTrivia(
+    source,
+    calleeIndex + "Object.freeze".length,
+    source.length
+  );
+  if (source[callOpenIndex] !== "(") {
+    return null;
+  }
+  const callCloseIndex = findMatchingJsEnclosure(
+    source,
+    callOpenIndex,
+    "(",
+    ")"
+  );
+  if (callCloseIndex < 0) {
+    return null;
+  }
+  const openIndex = skipJsTrivia(source, callOpenIndex + 1, callCloseIndex);
+  if (source[openIndex] !== "[") {
+    return null;
+  }
+  const closeIndex = findMatchingJsEnclosure(source, openIndex, "[", "]");
+  if (closeIndex < 0 || closeIndex > callCloseIndex) {
+    return null;
+  }
+
+  const elements = extractTopLevelJsCallArguments(source, openIndex, closeIndex);
+  const values = [];
+  for (const element of elements) {
+    const value = parseJsQuotedStringLiteralSource(element);
+    if (value === null) {
+      return null;
+    }
+    values.push(value);
+  }
+  return freezeArray(values);
+}
+
+function jsConstQuotedStringDeclarationPass({ source, name, value }) {
+  const declaration = extractJsConstDeclarationInitializerSource({
+    source,
+    name
+  });
+  return (
+    declaration.ok === true &&
+    parseJsQuotedStringLiteralSource(declaration.initializer) === value
+  );
 }
 
 function jsSourceTokensOutsideCommentsAndStringsPass(source, tokens) {
@@ -3994,6 +4226,38 @@ function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
       expectedArguments: methodCall.arguments
     });
   });
+}
+
+function jsFunctionDeclarationReturnedFreezeRecordAssertionsPass({
+  source,
+  functionName,
+  assertions
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  const returnedObject = extractTopLevelReturnedFreezeRecordObject(
+    declaration.body
+  );
+  if (returnedObject.ok !== true) {
+    return false;
+  }
+
+  const extracted = extractTopLevelJsObjectProperties(
+    declaration.body,
+    returnedObject.openIndex,
+    returnedObject.closeIndex
+  );
+  if (extracted.ok !== true) {
+    return false;
+  }
+
+  return jsObjectPropertyAssertionsPass(extracted.properties, assertions);
 }
 
 function extractTopLevelReturnedFreezeRecordObject(source) {
@@ -4218,6 +4482,69 @@ function extractJsFunctionDeclarationBody({
     bodyOpenIndex,
     bodyCloseIndex,
     error: null
+  });
+}
+
+function extractJsConstDeclarationInitializerSource({ source, name }) {
+  let searchIndex = 0;
+  const declarationPrefix = "const ";
+
+  while (searchIndex < source.length) {
+    const declarationIndex = findJsSourceOutsideCommentsAndStrings(
+      source,
+      declarationPrefix,
+      searchIndex
+    );
+    if (declarationIndex < 0) {
+      return freezeRecord({
+        ok: false,
+        initializer: "",
+        error: "const-declaration-not-found"
+      });
+    }
+
+    const nameIndex = skipJsTrivia(
+      source,
+      declarationIndex + declarationPrefix.length,
+      source.length
+    );
+    if (!jsIdentifierAt(source, nameIndex, name)) {
+      searchIndex = declarationIndex + declarationPrefix.length;
+      continue;
+    }
+
+    const afterNameIndex = nameIndex + name.length;
+    const equalsIndex = skipJsTrivia(source, afterNameIndex, source.length);
+    if (source[equalsIndex] !== "=") {
+      searchIndex = afterNameIndex;
+      continue;
+    }
+
+    const initializerStart = skipJsTrivia(
+      source,
+      equalsIndex + 1,
+      source.length
+    );
+    const statementEnd = findJsStatementEnd(source, initializerStart);
+    if (statementEnd < 0) {
+      return freezeRecord({
+        ok: false,
+        initializer: "",
+        error: "const-declaration-not-terminated"
+      });
+    }
+
+    return freezeRecord({
+      ok: true,
+      initializer: source.slice(initializerStart, statementEnd).trim(),
+      error: null
+    });
+  }
+
+  return freezeRecord({
+    ok: false,
+    initializer: "",
+    error: "const-declaration-not-found"
   });
 }
 

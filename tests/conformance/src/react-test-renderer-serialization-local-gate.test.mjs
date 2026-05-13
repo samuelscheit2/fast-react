@@ -251,10 +251,28 @@ const serializationGateEntrypointSourceFiles = [
   "packages/react-test-renderer/cjs/react-test-renderer.development.js",
   "packages/react-test-renderer/cjs/react-test-renderer.production.js"
 ];
+const serializationGateCjsEntrypointSourceFiles =
+  serializationGateEntrypointSourceFiles.filter((sourceFile) =>
+    sourceFile.includes("/cjs/")
+  );
 const toJSONPrivateSerializationFacadeGateDeclaration =
   "const toJSONPrivateSerializationFacadeGate = Object.freeze({";
 const toTreePrivateFacadeGateDeclaration =
   "const toTreePrivateFacadeGate = Object.freeze({";
+const queryBridgePreflightSpoofTokens = [
+  "privateTestInstanceQueryBridgePreflightGate",
+  "fast-react-test-renderer.testinstance.query-bridge-preflight",
+  "FastReactTestRendererPrivateTestInstanceQueryBridgePreflight",
+  "TestRendererRoot::describe_private_test_instance_query_bridge_preflight_for_canary",
+  "worker-515-test-renderer-live-query-bridge-preflight",
+  "consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest",
+  "getTestInstanceQueryBridgePreflightForRootRequest",
+  "consumesAcceptedRustFindAllDiagnostics: true",
+  "consumesAcceptedRustFindByDiagnostics: true",
+  "recordOnlyDiagnosticConsumption: true",
+  "rustExecutionFromJs: false"
+];
+const queryBridgePreflightSpoofBody = queryBridgePreflightSpoofTokens.join("\n");
 
 test("react-test-renderer serialization gate is ready for private diagnostics while public compatibility stays blocked", () => {
   const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });
@@ -310,6 +328,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateTestInstanceBridgeQueryDiagnosticsPresent: true,
     privateTestInstanceFindAllQueryDiagnosticsPresent: true,
     privateTestInstanceFindByQueryDiagnosticsPresent: true,
+    privateCjsTestInstanceQueryBridgePreflightPresent: true,
     privateTestInstanceQueryBridgePreflightPresent: true,
     publicToJSONAvailable: false,
     publicToTreeAvailable: false,
@@ -1053,6 +1072,103 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
   assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);
   assert.equal(gate.localChecks.publicJsFacadeRoutingPresent, false);
   assert.deepEqual(gate.admittedScenarios, []);
+});
+
+test("react-test-renderer TestInstance query bridge preflight ignores aggregate package-root spoofing", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: [
+      ...serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+        evidencePath,
+        mutate: removeQueryBridgePreflightSourceEvidence
+      })),
+      {
+        evidencePath: "packages/react-test-renderer/index.js",
+        mutate(text) {
+          return `${text}${queryBridgePreflightSpoofSource("block-comment")}${queryBridgePreflightSpoofSource("string")}${queryBridgePreflightSpoofSource("template")}${queryBridgePreflightSpoofSource("regex")}`;
+        }
+      }
+    ]
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertQueryBridgePreflightRejected(serializationGate, errorSurfaceGate);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight rejects CJS comment string template and regex spoofing", () => {
+  const spoofSource =
+    queryBridgePreflightSpoofSource("block-comment") +
+    queryBridgePreflightSpoofSource("string") +
+    queryBridgePreflightSpoofSource("template") +
+    queryBridgePreflightSpoofSource("regex");
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate(text) {
+        return `${removeQueryBridgePreflightSourceEvidence(text)}${spoofSource}`;
+      }
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "CJS comment string template regex spoofing"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight requires production CJS source evidence", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/cjs/react-test-renderer.production.js",
+    mutate: removeQueryBridgePreflightSourceEvidence
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "production CJS removed"
+    );
+  } finally {
+    workspace.cleanup();
+  }
 });
 
 test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics without public serialization", () => {
@@ -6772,6 +6888,134 @@ function assertPlaceholderStatusRejectedAsPresent(gate) {
   assert.equal(gate.violations[0].actualStatus, "placeholder-present");
   assert.equal(gate.violations[1].expectedStatus, "present-in-workspace");
   assert.equal(gate.violations[1].actualStatus, "placeholder-present");
+}
+
+function assertQueryBridgePreflightRejected(
+  serializationGate,
+  errorSurfaceGate,
+  label = "query bridge preflight spoof"
+) {
+  assert.equal(
+    serializationGate.localChecks.privateCjsTestInstanceQueryBridgePreflightPresent,
+    false,
+    label
+  );
+  assert.equal(
+    serializationGate.localChecks.privateTestInstanceQueryBridgePreflightPresent,
+    false,
+    label
+  );
+  assert.equal(
+    serializationGate.localChecks.publicTestInstanceWrappersPresent,
+    false,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.privateDiagnosticBlockers.includes(
+      "react-test-renderer-test-instance-private-fiber-diagnostic"
+    ),
+    true,
+    label
+  );
+  assert.equal(
+    errorSurfaceGate.privateDiagnosticRows.some(
+      (row) =>
+        row.id === "react-test-renderer-test-instance-private-fiber-diagnostic"
+    ),
+    false,
+    label
+  );
+}
+
+function removeQueryBridgePreflightSourceEvidence(text) {
+  const replacements = [
+    [
+      "privateTestInstanceQueryBridgePreflightDiagnosticName",
+      "privateTestInstanceQueryBridgeSpoofedDiagnosticName"
+    ],
+    [
+      "privateTestInstanceQueryBridgePreflightStatus",
+      "privateTestInstanceQueryBridgeSpoofedStatus"
+    ],
+    [
+      "privateTestInstanceQueryBridgePreflightGate",
+      "privateTestInstanceQueryBridgeSpoofedGate"
+    ],
+    [
+      "getTestInstanceQueryBridgePreflightForRootRequest",
+      "getTestInstanceQueryBridgeSpoofedForRootRequest"
+    ],
+    [
+      "consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest",
+      "consumeAcceptedRustTestInstanceQueryDiagnosticsSpoofedForRequest"
+    ],
+    [
+      "createPrivateTestInstanceQueryBridgePreflightRecord",
+      "createPrivateTestInstanceQueryBridgeSpoofedRecord"
+    ],
+    [
+      "FastReactTestRendererPrivateTestInstanceQueryBridgePreflight",
+      "FastReactTestRendererPrivateTestInstanceQueryBridgeSpoofed"
+    ],
+    [
+      "TestRendererRoot::describe_private_test_instance_query_bridge_preflight_for_canary",
+      "TestRendererRoot::describe_private_test_instance_query_bridge_spoofed_for_canary"
+    ],
+    [
+      "TestRendererRoot::describe_private_test_instance_query_bridge_preflight_after_update_for_canary",
+      "TestRendererRoot::describe_private_test_instance_query_bridge_spoofed_after_update_for_canary"
+    ],
+    [
+      "TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics",
+      "TestRendererPrivateTestInstanceQueryBridgeSpoofedDiagnostics"
+    ],
+    [
+      "root_private_test_instance_query_bridge_preflight_ties_find_all_and_find_by_records",
+      "root_private_test_instance_query_bridge_spoofed_ties_find_all_and_find_by_records"
+    ],
+    [
+      "root_private_test_instance_query_bridge_preflight_follows_update_records",
+      "root_private_test_instance_query_bridge_spoofed_follows_update_records"
+    ],
+    [
+      "fast-react-test-renderer.testinstance.query-bridge-preflight",
+      "fast-react-test-renderer.testinstance.query-bridge-spoofed"
+    ],
+    [
+      "private-test-instance-query-bridge-preflight-ready-public-test-instance-blocked",
+      "private-test-instance-query-bridge-spoofed-public-test-instance-blocked"
+    ],
+    [
+      "worker-515-test-renderer-live-query-bridge-preflight",
+      "worker-515-test-renderer-live-query-bridge-spoofed"
+    ]
+  ];
+  let mutated = text;
+  for (const [find, replace] of replacements) {
+    assert.equal(mutated.includes(find), true, find);
+    mutated = mutated.split(find).join(replace);
+  }
+  return mutated;
+}
+
+function queryBridgePreflightSpoofSource(kind) {
+  if (kind === "block-comment") {
+    return `\n/*\n${queryBridgePreflightSpoofBody}\n*/\n`;
+  }
+  if (kind === "string") {
+    return `\nconst queryBridgePreflightSpoofString = ${JSON.stringify(queryBridgePreflightSpoofBody)};\n`;
+  }
+  if (kind === "template") {
+    return `\nconst queryBridgePreflightSpoofTemplate = \`${queryBridgePreflightSpoofBody}\`;\n`;
+  }
+  if (kind === "regex") {
+    return `\n/${queryBridgePreflightSpoofTokens.map(escapeRegexLiteralAlternative).join("|")}/u;\n`;
+  }
+  throw new Error(`Unknown query bridge preflight spoof kind: ${kind}`);
+}
+
+function escapeRegexLiteralAlternative(value) {
+  return value.replace(/[\\/\][{}()*+?.^$|-]/gu, "\\$&");
 }
 
 function createSerializationGateWorkspaceWithMutatedFile({
