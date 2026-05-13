@@ -1141,10 +1141,14 @@ test("react-test-renderer TestInstance query bridge preflight rejects CJS commen
   }
 });
 
-test("react-test-renderer TestInstance query bridge preflight requires production CJS source evidence", () => {
-  const workspace = createSerializationGateWorkspaceWithMutatedFile({
-    evidencePath: "packages/react-test-renderer/cjs/react-test-renderer.production.js",
-    mutate: removeQueryBridgePreflightSourceEvidence
+test("react-test-renderer TestInstance query bridge preflight rejects executable dead CJS stubs", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate(text) {
+        return `${removeQueryBridgePreflightSourceEvidence(text)}${queryBridgePreflightExecutableDeadStubSource()}`;
+      }
+    }))
   });
 
   try {
@@ -1164,7 +1168,101 @@ test("react-test-renderer TestInstance query bridge preflight requires productio
     assertQueryBridgePreflightRejected(
       serializationGate,
       errorSurfaceGate,
-      "production CJS removed"
+      "CJS executable dead stubs"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight requires production CJS live wiring", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/cjs/react-test-renderer.production.js",
+    mutate(text) {
+      return `${removeQueryBridgePreflightSourceEvidence(text)}${queryBridgePreflightExecutableDeadStubSource()}`;
+    }
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "production CJS live wiring removed"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight requires development CJS live wiring", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+    mutate(text) {
+      return `${removeQueryBridgePreflightSourceEvidence(text)}${queryBridgePreflightExecutableDeadStubSource()}`;
+    }
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "development CJS live wiring removed"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight fails closed without package root metadata", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: [],
+    removePaths: ["packages/react-test-renderer/package.json"]
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.publicJsReactTestRendererFacadePresent,
+      false
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "package root metadata removed"
     );
   } finally {
     workspace.cleanup();
@@ -7014,6 +7112,101 @@ function queryBridgePreflightSpoofSource(kind) {
   throw new Error(`Unknown query bridge preflight spoof kind: ${kind}`);
 }
 
+function queryBridgePreflightExecutableDeadStubSource() {
+  return `
+const privateTestInstanceQueryBridgePreflightDiagnosticName =
+  'fast-react-test-renderer.testinstance.query-bridge-preflight';
+const privateTestInstanceQueryBridgePreflightStatus =
+  'private-test-instance-query-bridge-preflight-ready-public-test-instance-blocked';
+const privateTestInstanceQueryBridgePreflightGate = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-query-bridge-preflight-gate',
+  diagnosticName: privateTestInstanceQueryBridgePreflightDiagnosticName,
+  status: privateTestInstanceQueryBridgePreflightStatus,
+  publicSurface: 'create().root/ReactTestInstance.find*',
+  acceptedWorker: 'worker-515-test-renderer-live-query-bridge-preflight',
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustDiagnosticName: privateTestInstanceQueryBridgePreflightDiagnosticName,
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_test_instance_query_bridge_preflight_for_canary',
+    'TestRendererRoot::describe_private_test_instance_query_bridge_preflight_after_update_for_canary',
+    'TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_test_instance_query_bridge_preflight_ties_find_all_and_find_by_records',
+    'root_private_test_instance_query_bridge_preflight_follows_update_records'
+  ]),
+  bridgeSource:
+    'FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery',
+  wrapperRecordSymbol: privateTestInstanceWrapperRecordSymbol.description,
+  sourceFindAllDiagnosticName:
+    privateTestInstanceFindAllPredicateDiagnostics.diagnosticName,
+  sourceFindByDiagnosticName:
+    privateTestInstanceFindByQueryDiagnostics.diagnosticName,
+  consumesAcceptedRustFindAllDiagnostics: true,
+  consumesAcceptedRustFindByDiagnostics: true,
+  recordOnlyDiagnosticConsumption: true,
+  publicRootAvailable: false,
+  publicQueryMethodsAvailable: false,
+  publicTestInstanceObjectAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  compatibilityClaimed: false
+});
+
+function getTestInstanceQueryBridgePreflightForRootRequest(record) {
+  const diagnostics = getTestInstanceQueryDiagnosticsForRootRequest(record);
+  return diagnostics.queryBridgePreflight ?? diagnostics;
+}
+
+function consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest(
+  record,
+  diagnostics
+) {
+  const lifecycleEvidence =
+    assertAcceptedTestInstanceLifecycleEvidenceForRootRequest(record);
+  return createPrivateTestInstanceQueryBridgePreflightRecord(
+    record,
+    diagnostics,
+    lifecycleEvidence
+  );
+}
+
+function createPrivateTestInstanceQueryBridgePreflightRecord(
+  rootRequest,
+  diagnostics,
+  lifecycleEvidence
+) {
+  const normalizedFindAll = { diagnosticName: 'dead-stub-find-all' };
+  const normalizedFindBy = { diagnosticName: 'dead-stub-find-by' };
+  return freezeRecord({
+    id: 'react-test-renderer-private-test-instance-query-bridge-preflight',
+    kind: 'FastReactTestRendererPrivateTestInstanceQueryBridgePreflight',
+    diagnosticName: privateTestInstanceQueryBridgePreflightDiagnosticName,
+    status: privateTestInstanceQueryBridgePreflightStatus,
+    gate: privateTestInstanceQueryBridgePreflightGate,
+    privateRootLifecycleEvidenceAccepted: true,
+    bridgeSource:
+      'FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery',
+    wrapperRecordSymbol: privateTestInstanceWrapperRecordSymbol.description,
+    sourceFindAllDiagnosticName: normalizedFindAll.diagnosticName,
+    sourceFindByDiagnosticName: normalizedFindBy.diagnosticName,
+    consumesAcceptedRustFindAllDiagnostics: true,
+    consumesAcceptedRustFindByDiagnostics: true,
+    consumesPrivateRootLifecycleExecutionEvidence: true,
+    recordOnlyDiagnosticConsumption: true,
+    publicRootAvailable: false,
+    publicQueryMethodsAvailable: false,
+    publicTestInstanceObjectAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+`;
+}
+
 function escapeRegexLiteralAlternative(value) {
   return value.replace(/[\\/\][{}()*+?.^$|-]/gu, "\\$&");
 }
@@ -7027,7 +7220,10 @@ function createSerializationGateWorkspaceWithMutatedFile({
   });
 }
 
-function createSerializationGateWorkspaceWithMutatedFiles({ mutations }) {
+function createSerializationGateWorkspaceWithMutatedFiles({
+  mutations,
+  removePaths = []
+}) {
   const root = mkdtempSync(join(tmpdir(), "serialization-local-gate-"));
   const copiedPaths = [
     "crates/fast-react-test-renderer/Cargo.toml",
@@ -7048,6 +7244,10 @@ function createSerializationGateWorkspaceWithMutatedFiles({ mutations }) {
         throw error;
       }
     }
+  }
+
+  for (const relativePath of removePaths) {
+    rmSync(join(root, relativePath), { recursive: true, force: true });
   }
 
   for (const { evidencePath, mutate } of mutations) {

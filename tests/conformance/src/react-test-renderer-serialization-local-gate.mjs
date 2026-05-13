@@ -1013,6 +1013,8 @@ const privateTestInstanceQueryBridgePreflightRecordSourceAssertions =
     jsBooleanPropertyAssertion("compatibilityClaimed", false)
   ]);
 
+const cjsTestInstanceQueryBridgePreflightSourceEvidenceCache = new Map();
+
 export function inspectReactTestRendererSerializationLocalTargets({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT
 } = {}) {
@@ -2194,6 +2196,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
       /\bfindByPredicateExecution\s*:\s*false\b/u
     );
   const privateCjsTestInstanceQueryBridgePreflightPresent =
+    publicJsReactTestRendererFacadePresent &&
     publicJsReactTestRendererCjsEntrypointSources.length ===
       publicJsReactTestRendererCjsEntrypointSourcePaths.length &&
     publicJsReactTestRendererCjsEntrypointSources.every((source) =>
@@ -3962,7 +3965,85 @@ function jsQuotedStringArrayPropertyIncludesAssertion(property, values) {
 }
 
 function cjsTestInstanceQueryBridgePreflightSourceEvidencePresent(source) {
+  if (cjsTestInstanceQueryBridgePreflightSourceEvidenceCache.has(source)) {
+    return cjsTestInstanceQueryBridgePreflightSourceEvidenceCache.get(source);
+  }
+
+  const present =
+    cjsTestInstanceQueryBridgePreflightSourceEvidencePresentUncached(source);
+  cjsTestInstanceQueryBridgePreflightSourceEvidenceCache.set(source, present);
+  return present;
+}
+
+function cjsTestInstanceQueryBridgePreflightSourceEvidencePresentUncached(
+  source
+) {
   return (
+    jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
+      source,
+      functionName: "createTestRendererRootRequestBridge",
+      methodCalls: freezeArray([
+        freezeRecord({
+          methodName: "getTestInstanceQueryBridgePreflight",
+          callee: "getTestInstanceQueryBridgePreflightForRootRequest",
+          arguments: freezeArray(["record"])
+        }),
+        freezeRecord({
+          methodName: "getRootTestInstanceQueryBridgePreflight",
+          callee: "getTestInstanceQueryBridgePreflightForRootRequest",
+          arguments: freezeArray(["request"])
+        }),
+        freezeRecord({
+          methodName: "getRendererTestInstanceQueryBridgePreflight",
+          callee: "getTestInstanceQueryBridgePreflightForRootRequest",
+          arguments: freezeArray(["request"])
+        }),
+        freezeRecord({
+          methodName: "canConsumeAcceptedRustTestInstanceQueryDiagnostics",
+          callee: "consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest",
+          arguments: freezeArray(["record", "diagnostics"])
+        }),
+        freezeRecord({
+          methodName: "consumeAcceptedRustTestInstanceQueryDiagnostics",
+          callee: "consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest",
+          arguments: freezeArray(["record", "diagnostics"])
+        })
+      ])
+    }) &&
+    jsFunctionDeclarationSourceCallsPass({
+      source,
+      functionName: "getTestInstanceQueryDiagnosticsForRootRequest",
+      calls: freezeArray([
+        freezeRecord({
+          callee: "createPrivateTestInstanceWrapperRecordForRootRequest",
+          arguments: freezeArray(["record", "lifecycleEvidence"])
+        })
+      ])
+    }) &&
+    jsFunctionDeclarationSourceCallsPass({
+      source,
+      functionName: "createPrivateTestInstanceWrapperRecordForRootRequest",
+      calls: freezeArray([
+        freezeRecord({
+          callee: "createPrivateTestInstanceQueryBridgePreflightRecord",
+          arguments: freezeArray([
+            "rootRequest",
+            "undefined",
+            "acceptedLifecycleEvidence"
+          ])
+        })
+      ])
+    }) &&
+    jsFunctionDeclarationSourceTokensPass({
+      source,
+      functionName: "createPrivateTestInstanceWrapperRecordForRootRequest",
+      tokens: freezeArray([
+        "const queryBridgePreflight =",
+        "queryBridgePreflight,",
+        "queryBridgePreflight.acceptedRustFindAllDiagnostics",
+        "queryBridgePreflight.acceptedRustFindByDiagnostics"
+      ])
+    }) &&
     jsConstQuotedStringDeclarationPass({
       source,
       name: "privateTestInstanceQueryBridgePreflightDiagnosticName",
