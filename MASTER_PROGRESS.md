@@ -29,6 +29,23 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1286 Scheduler Nested Handoff Drift Canaries
+
+- Worker 1286 added private Rust same-lane transition currentness canaries for
+  preserved-token nested metadata drift. Cloned continuations with drifted
+  `queue_handoff`, `root_commit_handoff`, or `commit` metadata reject as
+  `TransitionWrapperMetadataMismatch` before source-token consumption.
+- The accepted change is test-only in `root_scheduler/tests.rs`. It asserts
+  pending and consumed source counts stay unchanged, no host ops occur, public
+  compatibility flags remain false, and the original continuation still
+  consumes.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed same-lane currentness (3/3), same-lane queue-lane continuation (10/10),
+  `cargo check -p fast-react-reconciler --all-features`,
+  `cargo fmt --all --check`, and `git diff --check`.
+- The accepted state is main `f61d4f73` after Worker 1286 merge `f61d4f73`,
+  worker commit `54a3557c`, and this orchestration-state update.
+
 ### Worker 1280 Transition Hook Dispatcher Metadata
 
 - Worker 1280 hardened private transition hook dispatcher metadata so the

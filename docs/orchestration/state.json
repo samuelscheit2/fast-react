@@ -342,7 +342,7 @@
 		{
 			"id": 1286,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Same-lane transition nested handoff metadata drift canaries",
 			"agent": "worker_1286_scheduler_nested_handoff_drift",
 			"branch": "worker/1286-scheduler-nested-handoff-drift",
@@ -354,7 +354,7 @@
 		{
 			"id": 1287,
 			"type": "worker",
-			"status": "auditing",
+			"status": "repair-active",
 			"title": "Native cleanup-hook preflight exact evidence-set counting",
 			"agent": "worker_1287_native_cleanup_hook_exact_set",
 			"branch": "worker/1287-native-cleanup-hook-exact-set",
@@ -378,11 +378,14 @@
 		{
 			"id": 1289,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "React DOM root object prototype blocker",
 			"agent": "worker_1289_react_dom_root_object_prototype_blocker",
 			"branch": "worker/1289-react-dom-root-object-prototype-blocker",
-			"audits": []
+			"audits": [
+				"audit_1289_source_contract",
+				"audit_1289_verification"
+			]
 		},
 		{
 			"id": 1290,
