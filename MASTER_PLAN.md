@@ -153,7 +153,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `31e3c2a0` as
+1. Treat accepted compatibility evidence through current main `d38bb298` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, and the narrow fake-DOM public div/text
    plus nested fake-DOM lifecycle evidence described above, including

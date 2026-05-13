@@ -145,6 +145,34 @@
 				"audit_1264_source_contract",
 				"audit_1264_verification"
 			]
+		},
+		{
+			"id": 1265,
+			"type": "scout",
+			"status": "active",
+			"title": "Rust root/scheduler next-lane scout",
+			"agent": "scout_1265_rust_next"
+		},
+		{
+			"id": 1266,
+			"type": "scout",
+			"status": "active",
+			"title": "React DOM facade/root next-lane scout",
+			"agent": "scout_1266_react_dom_next"
+		},
+		{
+			"id": 1267,
+			"type": "scout",
+			"status": "active",
+			"title": "react-test-renderer next-lane scout",
+			"agent": "scout_1267_test_renderer_next"
+		},
+		{
+			"id": 1268,
+			"type": "scout",
+			"status": "active",
+			"title": "Native/no-load next-lane scout",
+			"agent": "scout_1268_native_next"
 		}
 	]
 }
