@@ -1176,6 +1176,216 @@ test("react-test-renderer private root request bridge records Rust canary-shaped
   }
 });
 
+test("react-test-renderer private root request bridges reject cross-entrypoint records handles and renderers", () => {
+  const contexts = entrypoints.map(createPrivateRootBridgeContext);
+
+  for (const consumer of contexts) {
+    for (const owner of contexts) {
+      if (consumer === owner) {
+        continue;
+      }
+
+      const label = `${consumer.entry.entrypoint} rejects ${owner.entry.entrypoint}`;
+      const executionResult = createRecordOnlyRootExecutionResultSource(
+        owner.createRequest
+      );
+
+      assertPrivateRootBridgeCallRejects(
+        () => consumer.bridge.createRootExecutionHandoff(owner.createRequest),
+        consumer.entry.entrypoint,
+        `${label} createRootExecutionHandoff request`,
+        /root request record/u
+      );
+      assertPrivateRootBridgeCallRejects(
+        () =>
+          consumer.bridge.consumeRootExecutionResult(
+            owner.createRequest,
+            executionResult
+          ),
+        consumer.entry.entrypoint,
+        `${label} consumeRootExecutionResult request`,
+        /root request record/u
+      );
+      assertPrivateRootBridgeCallRejects(
+        () => consumer.bridge.createRootExecutionHandoff(owner.renderer),
+        consumer.entry.entrypoint,
+        `${label} createRootExecutionHandoff renderer`,
+        /root request record/u
+      );
+      assertPrivateRootBridgeCallRejects(
+        () =>
+          consumer.bridge.consumeRootExecutionResult(
+            owner.renderer,
+            executionResult
+          ),
+        consumer.entry.entrypoint,
+        `${label} consumeRootExecutionResult renderer`,
+        /root request record/u
+      );
+      assertPrivateRootBridgeCallRejects(
+        () =>
+          consumer.bridge.updateRootRequest(owner.rootHandle, {
+            type: "cross-entrypoint-update"
+          }),
+        consumer.entry.entrypoint,
+        `${label} updateRootRequest handle`,
+        /root handle/u
+      );
+      assertPrivateRootBridgeCallRejects(
+        () => consumer.bridge.unmountRootRequest(owner.rootHandle),
+        consumer.entry.entrypoint,
+        `${label} unmountRootRequest handle`,
+        /root handle/u
+      );
+      assertPrivateRootBridgeCallRejects(
+        () =>
+          consumer.bridge.updateRootRequest(owner.renderer, {
+            type: "cross-entrypoint-renderer-update"
+          }),
+        consumer.entry.entrypoint,
+        `${label} updateRootRequest renderer`,
+        /root handle/u
+      );
+      assertPrivateRootBridgeCallRejects(
+        () => consumer.bridge.unmountRootRequest(owner.renderer),
+        consumer.entry.entrypoint,
+        `${label} unmountRootRequest renderer`,
+        /root handle/u
+      );
+
+      assert.deepEqual(
+        consumer.bridge
+          .getRendererRootRequests(consumer.renderer)
+          .map((request) => request.operation),
+        ["create"],
+        `${label} consumer request history remains isolated`
+      );
+      assert.deepEqual(
+        owner.bridge
+          .getRendererRootRequests(owner.renderer)
+          .map((request) => request.operation),
+        ["create"],
+        `${label} owner request history remains isolated`
+      );
+    }
+  }
+});
+
+test("react-test-renderer private root request bridges reject cloned request records without WeakMap ownership", () => {
+  for (const context of entrypoints.map(createPrivateRootBridgeContext)) {
+    const copiedRequest = Object.freeze({ ...context.createRequest });
+    const globalTypeRequest = Object.freeze({
+      ...context.createRequest,
+      $$typeof: Symbol.for(context.createRequest.$$typeof)
+    });
+
+    for (const [variant, clonedRequest] of [
+      ["copied fields", copiedRequest],
+      ["global $$typeof", globalTypeRequest]
+    ]) {
+      const label = `${context.entry.entrypoint} ${variant} clone`;
+
+      assert.equal(
+        context.bridge.isRootRequestRecord(clonedRequest),
+        false,
+        `${label} is not source-owned`
+      );
+      assert.equal(
+        context.bridge.canConsumeRootExecutionResult(
+          clonedRequest,
+          createRecordOnlyRootExecutionResultSource(context.createRequest)
+        ),
+        false,
+        `${label} canConsumeRootExecutionResult`
+      );
+      assertPrivateRootBridgeCallRejects(
+        () => context.bridge.createRootExecutionHandoff(clonedRequest),
+        context.entry.entrypoint,
+        `${label} createRootExecutionHandoff`,
+        /root request record/u
+      );
+      assertPrivateRootBridgeCallRejects(
+        () =>
+          context.bridge.consumeRootExecutionResult(
+            clonedRequest,
+            createRecordOnlyRootExecutionResultSource(context.createRequest)
+          ),
+        context.entry.entrypoint,
+        `${label} consumeRootExecutionResult`,
+        /root request record/u
+      );
+    }
+
+    assert.deepEqual(
+      context.bridge
+        .getRendererRootRequests(context.renderer)
+        .map((request) => request.operation),
+      ["create"],
+      `${context.entry.entrypoint} clone rejection leaves history untouched`
+    );
+  }
+});
+
+test("react-test-renderer private root request history snapshots are frozen copies", () => {
+  for (const entry of entrypoints) {
+    const context = createPrivateRootBridgeContext(entry);
+    const updateError = captureThrown(() =>
+      context.renderer.update({ props: { children: "next" }, type: "span" })
+    );
+    assertReactTestRendererUnimplemented(
+      updateError,
+      entry.entrypoint,
+      "create().update"
+    );
+
+    const requests = context.bridge.getRendererRootRequests(context.renderer);
+    assert.equal(Object.isFrozen(requests), true, entry.entrypoint);
+    assert.deepEqual(
+      requests.map((request) => request.operation),
+      ["create", "update"],
+      entry.entrypoint
+    );
+    assert.throws(
+      () => requests.push(updateError.rootRequest),
+      TypeError,
+      `${entry.entrypoint} push`
+    );
+    assert.throws(
+      () => {
+        requests[0] = updateError.rootRequest;
+      },
+      TypeError,
+      `${entry.entrypoint} assignment`
+    );
+
+    const afterMutationAttempt = context.bridge.getRendererRootRequests(
+      context.renderer
+    );
+    assert.notEqual(afterMutationAttempt, requests, entry.entrypoint);
+    assert.deepEqual(
+      afterMutationAttempt.map((request) => request.operation),
+      ["create", "update"],
+      entry.entrypoint
+    );
+    assert.equal(afterMutationAttempt[0], context.createRequest, entry.entrypoint);
+    assert.equal(afterMutationAttempt[1], updateError.rootRequest, entry.entrypoint);
+
+    const unmountError = captureThrown(() => context.renderer.unmount());
+    assertReactTestRendererUnimplemented(
+      unmountError,
+      entry.entrypoint,
+      "create().unmount"
+    );
+    assert.deepEqual(
+      context.bridge
+        .getRendererRootRequests(context.renderer)
+        .map((request) => request.operation),
+      ["create", "update", "unmount"],
+      entry.entrypoint
+    );
+  }
+});
+
 test("react-test-renderer private update route admission consumes Rust work-loop evidence", () => {
   for (const entry of cjsEntrypoints) {
     const moduleExports = loadFresh(entry.modulePath);
@@ -9636,6 +9846,94 @@ function loadFresh(relativePath) {
   const resolved = require.resolve(absolutePath);
   delete require.cache[resolved];
   return require(resolved);
+}
+
+function createPrivateRootBridgeContext(entry) {
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create(
+    { props: { children: entry.entrypoint }, type: "span" },
+    {}
+  );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const rootHandle = bridge.getRendererRootHandle(renderer);
+
+  assert.notEqual(createRequest, undefined, entry.entrypoint);
+  assert.notEqual(rootHandle, null, entry.entrypoint);
+
+  return {
+    bridge,
+    createRequest,
+    entry,
+    moduleExports,
+    renderer,
+    rootHandle
+  };
+}
+
+function createRecordOnlyRootExecutionResultSource(request) {
+  return {
+    rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(request),
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecution: true,
+    publicRouteAvailable: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    serializationAvailable: false,
+    publicSerializationAvailable: false,
+    packageCompatibilityClaimed: false,
+    jsPackageCompatibilityAvailable: false,
+    compatibilityClaimed: false
+  };
+}
+
+function assertPrivateRootBridgeCallRejects(
+  callback,
+  entrypoint,
+  label,
+  messagePattern
+) {
+  const error = captureThrown(callback);
+
+  assert.equal(
+    error.name,
+    "FastReactTestRendererPrivateRootRequestError",
+    label
+  );
+  assert.equal(
+    error.code,
+    "FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST",
+    label
+  );
+  assert.equal(error.entrypoint, entrypoint, label);
+  assert.equal(error.compatibilityTarget, compatibilityTarget, label);
+  assert.match(error.message, messagePattern, label);
+
+  for (const field of [
+    "nativeAddonLoaded",
+    "nativeBridgeAvailable",
+    "nativeExecution",
+    "rustExecution",
+    "publicRouteAvailable",
+    "publicCreateUpdateUnmountBehaviorAvailable",
+    "serializationAvailable",
+    "publicSerializationAvailable",
+    "publicRootAvailable",
+    "publicQueryMethodsAvailable",
+    "publicTestInstanceAvailable",
+    "publicActAvailable",
+    "publicSchedulerAvailable",
+    "jsPackageCompatibilityAvailable",
+    "packageCompatibilityClaimed",
+    "rendererRootsCompatibilityClaimed",
+    "compatibilityClaimed"
+  ]) {
+    assert.equal(error[field], false, `${label} ${field}`);
+  }
 }
 
 function createFakeSchedulerHelperWithDiagnostics(diagnostics) {
