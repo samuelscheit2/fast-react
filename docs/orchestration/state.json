@@ -81,7 +81,7 @@
 		{
 			"id": 1260,
 			"type": "worker",
-			"status": "auditing",
+			"status": "repair-active",
 			"title": "Queued minimal HostRoot cleanup currentness gate",
 			"agent": "worker_1260_queued_cleanup_currentness",
 			"branch": "worker/1260-queued-cleanup-currentness",
