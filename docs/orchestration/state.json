@@ -101,13 +101,15 @@
 		{
 			"id": 1262,
 			"type": "worker",
-			"status": "repair-active",
+			"status": "repair-auditing",
 			"title": "react-test-renderer private root bridge cross-entrypoint currentness",
 			"agent": "worker_1262_test_renderer_cross_entrypoint",
 			"branch": "worker/1262-test-renderer-cross-entrypoint",
 			"audits": [
 				"audit_1262_source_contract",
-				"audit_1262_verification"
+				"audit_1262_verification",
+				"audit_1262_repair_source",
+				"audit_1262_repair_verification"
 			]
 		}
 	]
