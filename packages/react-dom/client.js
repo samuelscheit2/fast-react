@@ -757,25 +757,74 @@ function throwUnsupportedRootUnmount(detail) {
   );
 }
 
+function throwUnsupportedCreateRoot(detail) {
+  throw createUnsupportedError(
+    entrypoint,
+    'createRoot',
+    'was called',
+    detail
+  );
+}
+
 function assertCreateRootContainerAvailable(container) {
   if (
     container !== null &&
     (typeof container === 'object' || typeof container === 'function') &&
     minimalPublicRootContainers.has(container)
   ) {
-    throw createUnsupportedError(
-      entrypoint,
-      'createRoot',
-      'was called',
+    throwUnsupportedCreateRoot(
       'Duplicate public roots for the same container remain blocked.'
     );
   }
+  assertCreateRootContainerHasNoCapabilityAliases(container);
   if (isContainerMarkedAsRoot(container)) {
-    throw createUnsupportedError(
-      entrypoint,
-      'createRoot',
-      'was called',
+    throwUnsupportedCreateRoot(
       'Containers with existing React root markers remain blocked.'
     );
+  }
+}
+
+function assertCreateRootContainerHasNoCapabilityAliases(container) {
+  if (
+    container === null ||
+    (typeof container !== 'object' && typeof container !== 'function')
+  ) {
+    return;
+  }
+
+  if (utilTypes.isProxy(container)) {
+    throwUnsupportedCreateRoot(
+      'Proxy containers remain blocked by the public createRoot facade.'
+    );
+  }
+
+  let ownKeys;
+  try {
+    ownKeys = Reflect.ownKeys(container);
+  } catch (_error) {
+    throwUnsupportedCreateRoot(
+      'Public createRoot container inspection remains blocked.'
+    );
+  }
+
+  for (const name of ownKeys) {
+    if (
+      typeof name === 'string' &&
+      isPublicHostCompatibilityAliasName(name)
+    ) {
+      let descriptor;
+      try {
+        descriptor = Object.getOwnPropertyDescriptor(container, name);
+      } catch (_error) {
+        throwUnsupportedCreateRoot(
+          'Public createRoot container descriptor inspection remains blocked.'
+        );
+      }
+      if (descriptor !== undefined) {
+        throwUnsupportedCreateRoot(
+          `Public createRoot container capability alias ${name} remains blocked.`
+        );
+      }
+    }
   }
 }
