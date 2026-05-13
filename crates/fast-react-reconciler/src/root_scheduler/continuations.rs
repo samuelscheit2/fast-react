@@ -537,6 +537,25 @@ pub(crate) enum RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary {
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct RootSyncSchedulerQueueLaneContinuationExecutionMetadataForCanary {
+    pub(super) handoff: RootSyncFlushRecord,
+    pub(super) requested_callback_node: RootSchedulerCallbackHandle,
+    pub(super) current_callback_node: RootSchedulerCallbackHandle,
+    pub(super) selected_lanes: Lanes,
+    pub(super) pending_passive_blocker: Option<RootSyncSchedulerPendingPassiveBlockerRecord>,
+    pub(super) finished_work_handoff_identity:
+        Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary>,
+    pub(super) status: RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary,
+    pub(super) queue_handoff: Option<HostRootUpdateQueueLaneHandoffRecordForCanary>,
+    pub(super) queue_handoff_error:
+        Option<HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary>,
+    pub(super) queue_commit_handoff:
+        Option<HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary>,
+    pub(super) commit: Option<HostRootCommitRecord>,
+}
+
+#[cfg(test)]
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
     pub(super) handoff: RootSyncFlushRecord,
@@ -553,6 +572,7 @@ pub(crate) struct RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary
     pub(super) queue_commit_handoff:
         Option<HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary>,
     pub(super) commit: Option<HostRootCommitRecord>,
+    pub(super) source_metadata: RootSyncSchedulerQueueLaneContinuationExecutionMetadataForCanary,
     pub(super) currentness_source_token:
         Option<RootFinishedWorkQueueLaneCommitCurrentnessSourceTokenForCanary>,
 }
@@ -572,6 +592,7 @@ impl Clone for RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
             queue_handoff_error: self.queue_handoff_error.clone(),
             queue_commit_handoff: self.queue_commit_handoff.clone(),
             commit: self.commit.clone(),
+            source_metadata: self.source_metadata.clone(),
             currentness_source_token: None,
         }
     }
@@ -888,6 +909,17 @@ pub(crate) fn consume_finished_work_queue_lane_commit_currentness_for_canary<H: 
     RootFinishedWorkQueueLaneCommitCurrentnessRecordForCanary,
     RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary,
 > {
+    if let Some(field) =
+        root_sync_queue_lane_continuation_source_metadata_mismatch_for_canary(execution)
+    {
+        return Err(
+            RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceMetadataMismatch {
+                root: execution.root(),
+                field,
+            },
+        );
+    }
+
     if !execution.routed_through_root_scheduler_queue_lane_and_commit_evidence_for_canary() {
         return Err(
             RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::UnacceptedSchedulerContinuation,
@@ -992,6 +1024,48 @@ pub(crate) fn consume_finished_work_queue_lane_commit_currentness_for_canary<H: 
         commit_mutation_record_count,
         commit_deletion_list_count,
     })
+}
+
+#[cfg(test)]
+fn root_sync_queue_lane_continuation_source_metadata_mismatch_for_canary(
+    execution: &RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary,
+) -> Option<&'static str> {
+    let source = &execution.source_metadata;
+    if execution.handoff != source.handoff {
+        return Some("handoff");
+    }
+    if execution.requested_callback_node != source.requested_callback_node {
+        return Some("requested_callback_node");
+    }
+    if execution.current_callback_node != source.current_callback_node {
+        return Some("current_callback_node");
+    }
+    if execution.selected_lanes != source.selected_lanes {
+        return Some("selected_lanes");
+    }
+    if execution.pending_passive_blocker != source.pending_passive_blocker {
+        return Some("pending_passive_blocker");
+    }
+    if execution.finished_work_handoff_identity != source.finished_work_handoff_identity {
+        return Some("finished_work_handoff_identity");
+    }
+    if execution.status != source.status {
+        return Some("status");
+    }
+    if execution.queue_handoff != source.queue_handoff {
+        return Some("queue_handoff");
+    }
+    if execution.queue_handoff_error != source.queue_handoff_error {
+        return Some("queue_handoff_error");
+    }
+    if execution.queue_commit_handoff != source.queue_commit_handoff {
+        return Some("queue_commit_handoff");
+    }
+    if execution.commit != source.commit {
+        return Some("commit");
+    }
+
+    None
 }
 
 #[cfg(test)]

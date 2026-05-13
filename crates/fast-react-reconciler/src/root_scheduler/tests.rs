@@ -639,6 +639,7 @@ fn clone_queue_lane_continuation_preserving_currentness_source(
         queue_handoff_error: record.queue_handoff_error.clone(),
         queue_commit_handoff: record.queue_commit_handoff.clone(),
         commit: record.commit.clone(),
+        source_metadata: record.source_metadata.clone(),
         currentness_source_token: record.currentness_source_token,
     }
 }
@@ -707,6 +708,47 @@ fn clone_entangled_transition_queue_lane_continuation_preserving_currentness_sou
         source_metadata: record.source_metadata.clone(),
         currentness_source_token: record.currentness_source_token,
     }
+}
+
+fn assert_queue_lane_currentness_rejects_source_metadata_mismatch_without_consuming_source(
+    store: &mut FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    continuation: &RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary,
+    field: &'static str,
+    pending_source_count: usize,
+    consumed_source_count: usize,
+    host: &RecordingHost,
+) {
+    assert!(continuation.currentness_source_token().is_some());
+    assert!(!continuation.public_root_compatibility_claimed());
+    assert!(!continuation.public_scheduler_timing_compatibility_claimed());
+    assert!(!continuation.public_act_compatibility_claimed());
+    assert!(!continuation.react_dom_compatibility_claimed());
+    assert!(!continuation.test_renderer_compatibility_claimed());
+    assert!(!continuation.native_execution_compatibility_claimed());
+    assert!(!continuation.package_compatibility_claimed());
+    assert!(!continuation.executes_public_effects());
+    assert_eq!(
+        consume_finished_work_queue_lane_commit_currentness_for_canary(store, continuation,)
+            .unwrap_err(),
+        RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceMetadataMismatch {
+            root: root_id,
+            field
+        }
+    );
+    assert_eq!(
+        store
+            .root_scheduler()
+            .pending_finished_work_queue_lane_commit_currentness_source_count(),
+        pending_source_count
+    );
+    assert_eq!(
+        store
+            .root_scheduler()
+            .consumed_finished_work_queue_lane_commit_currentness_source_count(),
+        consumed_source_count
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
 }
 
 fn assert_same_lane_multi_update_currentness_rejects_metadata_mismatch_without_consuming_source(
@@ -7240,6 +7282,112 @@ fn root_scheduler_finished_work_queue_lane_commit_currentness_rejects_preconsume
 }
 
 #[test]
+fn root_scheduler_finished_work_queue_lane_commit_currentness_rejects_source_metadata_drift_before_consuming_source()
+ {
+    let (mut store, root_id, host) = root_store();
+    let (_accepted, handoff, queue_handoff) =
+        sync_queue_lane_scheduler_handoff(&mut store, root_id, RootElementHandle::from_raw(94822));
+    let execution = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+        &mut store,
+        handoff,
+        RootSchedulerCallbackHandle::NONE,
+        Some(&queue_handoff),
+    )
+    .unwrap();
+    let source_token = execution.currentness_source_token();
+    let commit = execution.commit().unwrap();
+
+    assert!(source_token.is_some());
+    assert_eq!(
+        store
+            .root_scheduler()
+            .pending_finished_work_queue_lane_commit_currentness_source_count(),
+        1
+    );
+    assert_eq!(
+        store
+            .root_scheduler()
+            .consumed_finished_work_queue_lane_commit_currentness_source_count(),
+        0
+    );
+
+    let mut pending_passive_drift =
+        clone_queue_lane_continuation_preserving_currentness_source(&execution);
+    pending_passive_drift.pending_passive_blocker =
+        Some(RootSyncSchedulerPendingPassiveBlockerRecord {
+            root: root_id,
+            finished_work: Some(commit.finished_work()),
+            lanes: Lanes::SYNC,
+            pending_unmount_count: 1,
+            pending_mount_count: 0,
+        });
+    assert_eq!(
+        pending_passive_drift.currentness_source_token(),
+        source_token
+    );
+    assert!(
+        pending_passive_drift
+            .routed_through_root_scheduler_queue_lane_and_commit_evidence_for_canary()
+    );
+    assert_queue_lane_currentness_rejects_source_metadata_mismatch_without_consuming_source(
+        &mut store,
+        root_id,
+        &pending_passive_drift,
+        "pending_passive_blocker",
+        1,
+        0,
+        &host,
+    );
+
+    let mut queue_handoff_error_drift =
+        clone_queue_lane_continuation_preserving_currentness_source(&execution);
+    queue_handoff_error_drift.queue_handoff_error = Some(
+        HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::MissingQueueHandoff {
+            root: root_id,
+            finished_work: commit.finished_work(),
+        },
+    );
+    assert_eq!(
+        queue_handoff_error_drift.currentness_source_token(),
+        source_token
+    );
+    assert!(
+        queue_handoff_error_drift
+            .routed_through_root_scheduler_queue_lane_and_commit_evidence_for_canary()
+    );
+    assert_queue_lane_currentness_rejects_source_metadata_mismatch_without_consuming_source(
+        &mut store,
+        root_id,
+        &queue_handoff_error_drift,
+        "queue_handoff_error",
+        1,
+        0,
+        &host,
+    );
+
+    let currentness =
+        consume_finished_work_queue_lane_commit_currentness_for_canary(&mut store, &execution)
+            .unwrap();
+    assert!(currentness.source_pending_before_consume());
+    assert!(currentness.source_consumed_after());
+    assert!(currentness.source_owned_currentness_consumed());
+    assert!(currentness.ties_finished_work_queue_lane_commit_to_live_tree_state_for_canary());
+    assert_eq!(
+        store
+            .root_scheduler()
+            .pending_finished_work_queue_lane_commit_currentness_source_count(),
+        0
+    );
+    assert_eq!(
+        store
+            .root_scheduler()
+            .consumed_finished_work_queue_lane_commit_currentness_source_count(),
+        1
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
+#[test]
 fn root_scheduler_finished_work_queue_lane_commit_currentness_rejects_replay_and_caller_built_callback()
  {
     let (mut store, root_id, host) = root_store();
@@ -7276,10 +7424,9 @@ fn root_scheduler_finished_work_queue_lane_commit_currentness_rejects_replay_and
             .unwrap_err();
     assert_eq!(
         caller_built_error,
-        RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceNotPending {
+        RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary::SourceMetadataMismatch {
             root: root_id,
-            finished_work: consumed.finished_work(),
-            commit_order: consumed.commit_order()
+            field: "requested_callback_node"
         }
     );
     assert_eq!(
