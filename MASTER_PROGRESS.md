@@ -29,6 +29,29 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1277 and 1278 Acceptance Batch
+
+- Worker 1277 added a private Rust queued minimal HostRoot cleanup canary for
+  live extra-sibling topology drift. Cleanup with source-owned prior host work
+  now has test coverage proving a live HostRoot child list of
+  `[current_child, extra_child]` rejects against prior evidence for
+  `[current_child]` before enqueue, render, commit, current switch,
+  finished-work cleanup, or host mutation.
+- Worker 1278 added private react-test-renderer root-handle ownership canaries.
+  Cloned, `Symbol.for(...)`-spoofed, and prototype-backed root handles now have
+  conformance coverage proving `updateRootRequest` and `unmountRootRequest`
+  reject handles not owned by the private WeakMap while request history remains
+  at the original create request.
+- Accepted validation includes clean source and verification audits for both
+  workers. Root reruns passed react-test-renderer create routing (46/46),
+  queued minimal host (15/15), `root_work_loop` (157/157),
+  `cargo check -p fast-react-reconciler --all-features`,
+  `cargo fmt --all --check`, package-surface guard, import smoke, and
+  `git diff --check`.
+- The accepted state is main `5d1d02b6` after Worker 1278 merge `cc9f7c9d`,
+  Worker 1277 merge `5d1d02b6`, worker commits `646d2713` and `0ffdbafc`,
+  and this orchestration-state update.
+
 ### Workers 1269 and 1270 Acceptance Batch
 
 - Worker 1269 added private Rust queued minimal HostRoot source-preflight
