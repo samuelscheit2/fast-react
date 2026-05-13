@@ -4,38 +4,41 @@
 	"tasks": [
 		{
 			"id": 1253,
-			"type": "scout",
+			"type": "worker",
 			"status": "active",
-			"title": "React Children helper next lane scout",
-			"agent": "scout_1253_react_children_next"
+			"title": "React Children object key coercion",
+			"agent": "worker_1253_react_children_key_coercion",
+			"branch": "worker/1253-react-children-key-coercion"
 		},
 		{
 			"id": 1254,
-			"type": "scout",
+			"type": "worker",
 			"status": "active",
-			"title": "React hook facade next lane scout",
-			"agent": "scout_1254_hooks_next"
+			"title": "startTransition rootless currentness",
+			"agent": "worker_1254_start_transition_currentness",
+			"branch": "worker/1254-start-transition-currentness"
 		},
 		{
 			"id": 1255,
 			"type": "scout",
-			"status": "active",
+			"status": "no-report",
 			"title": "Scheduler variant/root-scheduler next lane scout",
 			"agent": "scout_1255_scheduler_next"
 		},
 		{
 			"id": 1256,
 			"type": "scout",
-			"status": "active",
+			"status": "no-report",
 			"title": "Native lifecycle/no-load next lane scout",
 			"agent": "scout_1256_native_next"
 		},
 		{
 			"id": 1257,
-			"type": "scout",
+			"type": "worker",
 			"status": "active",
-			"title": "Conformance/benchmark harness next lane scout",
-			"agent": "scout_1257_conformance_next"
+			"title": "Conformance discovery static re-export coverage",
+			"agent": "worker_1257_conformance_reexport_discovery",
+			"branch": "worker/1257-conformance-reexport-discovery"
 		}
 	]
 }
