@@ -416,6 +416,22 @@ test("private startTransition rootless currentness rejects forged reports and cl
   );
   assertStartTransitionCurrentnessRejected(
     Transition.createStartTransitionRootlessCurrentnessReport({
+      rootlessCurrentness: {
+        transitionScopeExecution: "async"
+      }
+    }),
+    "startTransition-rootless-currentness-rootless-metadata"
+  );
+  assertStartTransitionCurrentnessRejected(
+    Transition.createStartTransitionRootlessCurrentnessReport({
+      rootlessCurrentness: {
+        onStartTransitionFinishCompatibility: true
+      }
+    }),
+    "startTransition-rootless-currentness-rootless-metadata"
+  );
+  assertStartTransitionCurrentnessRejected(
+    Transition.createStartTransitionRootlessCurrentnessReport({
       surfaceCurrentnessFieldNames: ["surfaceId"]
     }),
     "startTransition-rootless-currentness-shape"
@@ -839,6 +855,91 @@ test("startTransition callback error handling restores nested depth to the curre
     ["inner-before-throw", true],
     ["outer-after-inner", true]
   ]);
+  assert.equal(Transition.isTransitionBatchActive(), false);
+});
+
+test("startTransition reports synchronously rejected returned thenables", () => {
+  const rejected = new Error("returned transition thenable rejected");
+  const thenCalls = [];
+
+  const observation = withCapturedGlobalErrors(() =>
+    React.startTransition(() => ({
+      then(resolve, reject) {
+        thenCalls.push({
+          active: Transition.isTransitionBatchActive(),
+          rejectType: typeof reject,
+          resolveType: typeof resolve
+        });
+        reject(rejected);
+      }
+    }))
+  );
+
+  assert.equal(observation.value, undefined);
+  assert.deepEqual(thenCalls, [
+    {
+      active: true,
+      rejectType: "function",
+      resolveType: "function"
+    }
+  ]);
+  assert.deepEqual(observation.errors, [rejected]);
+  assert.equal(Transition.isTransitionBatchActive(), false);
+});
+
+test("startTransition reports errors thrown while observing returned thenables", () => {
+  const thrown = new Error("returned transition then threw");
+  const thenable = {
+    then() {
+      throw thrown;
+    }
+  };
+
+  const observation = withCapturedGlobalErrors(() =>
+    React.startTransition(() => thenable)
+  );
+
+  assert.equal(observation.value, undefined);
+  assert.deepEqual(observation.errors, [thrown]);
+  assert.equal(Transition.isTransitionBatchActive(), false);
+});
+
+test("startTransition fails closed for accessor-backed returned thenables", () => {
+  const thrown = new Error("returned transition then accessor threw");
+  const thenable = {};
+  let thenReads = 0;
+  Object.defineProperty(thenable, "then", {
+    configurable: true,
+    get() {
+      thenReads += 1;
+      throw thrown;
+    }
+  });
+
+  const observation = withCapturedGlobalErrors(() =>
+    React.startTransition(() => thenable)
+  );
+
+  assert.equal(observation.value, undefined);
+  assert.equal(thenReads, 1);
+  assert.deepEqual(observation.errors, [thrown]);
+  assert.equal(Transition.isTransitionBatchActive(), false);
+});
+
+test("startTransition does not broaden returned thenable handling to functions", () => {
+  const thenCalls = [];
+  function returnedFunction() {}
+  returnedFunction.then = () => {
+    thenCalls.push("then");
+  };
+
+  const observation = withCapturedGlobalErrors(() =>
+    React.startTransition(() => returnedFunction)
+  );
+
+  assert.equal(observation.value, undefined);
+  assert.deepEqual(thenCalls, []);
+  assert.deepEqual(observation.errors, []);
   assert.equal(Transition.isTransitionBatchActive(), false);
 });
 
