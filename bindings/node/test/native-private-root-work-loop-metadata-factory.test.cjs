@@ -121,6 +121,33 @@ function sourceCurrentnessRow(row, overrides = {}) {
   });
 }
 
+function sourceCurrentnessRawRow(row, overrides = {}) {
+  const rawRow = {};
+  for (const [field, value] of Object.entries(
+    sourceCurrentnessRow(row, overrides)
+  )) {
+    if (field !== 'status' && field !== 'code') {
+      rawRow[field] = value;
+    }
+  }
+
+  return Object.freeze(rawRow);
+}
+
+function sourceCurrentnessExtraPropertyRow(row, key, descriptor) {
+  const nextRow = {
+    ...row,
+    sourceFiles: Object.freeze([...row.sourceFiles]),
+    rustIdentifiers: Object.freeze([...row.rustIdentifiers]),
+    jsFactoryFields: Object.freeze([...row.jsFactoryFields]),
+    jsonFieldPaths: Object.freeze([...row.jsonFieldPaths]),
+    expectedFactoryValues: row.expectedFactoryValues
+  };
+  Object.defineProperty(nextRow, key, descriptor);
+
+  return Object.freeze(nextRow);
+}
+
 function sourceCurrentnessPrototypeClaimRow(row, prototypeClaims) {
   return Object.freeze(
     Object.assign(Object.create(Object.freeze(prototypeClaims)), row)
@@ -426,6 +453,15 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     'mirrored source-currentness ledger'
   );
 
+  const rawMirrored = validateSourceCurrentnessRows(
+    ledger.rows.map((row) => sourceCurrentnessRawRow(row))
+  );
+  assert.deepEqual(rawMirrored, ledger);
+  assertNoNativeLedgerExecution(
+    rawMirrored,
+    'raw mirrored source-currentness ledger'
+  );
+
   const canonicalSource = ledger.rows[0];
   const canonicalFields = ledger.rows[1];
   const canonicalCommit = ledger.rows[4];
@@ -512,6 +548,130 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     assert.equal(row.packageExportCompatibility, false, diagnosticCase.id);
     assertNoNativeLedgerExecution(result, diagnosticCase.id);
     assertNoNativeLedgerExecution(row, diagnosticCase.id);
+  }
+
+  const extraOwnKeyCases = [
+    {
+      id: 'root-work-loop-metadata-extra-worker-progress-path',
+      row: sourceCurrentnessRow(canonicalCommit, {
+        workerProgressEvidencePath:
+          'worker-progress/native-root-work-loop-metadata.md'
+      }),
+      extraKey: 'workerProgressEvidencePath'
+    },
+    {
+      id: 'root-work-loop-metadata-non-enumerable-source-alias',
+      row: sourceCurrentnessExtraPropertyRow(
+        canonicalCommit,
+        'sourceEvidenceAlias',
+        {
+          value: 'caller-supplied-source-alias',
+          enumerable: false
+        }
+      ),
+      extraKey: 'sourceEvidenceAlias'
+    },
+    {
+      id: 'root-work-loop-metadata-symbol-package-export-false',
+      row: sourceCurrentnessExtraPropertyRow(
+        canonicalCommit,
+        Symbol.for('packageExportsChanged'),
+        {
+          value: false,
+          enumerable: true
+        }
+      ),
+      extraSymbol: Symbol.for('packageExportsChanged')
+    }
+  ];
+
+  for (const diagnosticCase of extraOwnKeyCases) {
+    if (diagnosticCase.extraKey !== undefined) {
+      assert.ok(
+        Object.getOwnPropertyDescriptor(
+          diagnosticCase.row,
+          diagnosticCase.extraKey
+        ),
+        diagnosticCase.id
+      );
+    }
+    if (diagnosticCase.extraSymbol !== undefined) {
+      assert.equal(
+        Object.getOwnPropertySymbols(diagnosticCase.row).includes(
+          diagnosticCase.extraSymbol
+        ),
+        true,
+        diagnosticCase.id
+      );
+    }
+
+    const result = validateSourceCurrentnessRows([diagnosticCase.row]);
+    assert.ok(Object.isFrozen(result), diagnosticCase.id);
+    assert.ok(Object.isFrozen(result.rows), diagnosticCase.id);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(result.rejectedEvidenceCount, 1, diagnosticCase.id);
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+
+    const [row] = result.rows;
+    assert.ok(Object.isFrozen(row), diagnosticCase.id);
+    assert.equal(row.id, canonicalCommit.id, diagnosticCase.id);
+    assert.equal(row.status, ledger.rejectedStatus, diagnosticCase.id);
+    assert.equal(row.code, codes.callerBuilt, diagnosticCase.id);
+    if (diagnosticCase.extraKey !== undefined) {
+      assert.equal(
+        Object.hasOwn(row, diagnosticCase.extraKey),
+        false,
+        diagnosticCase.id
+      );
+    }
+    assert.equal(
+      Object.getOwnPropertySymbols(row).length,
+      0,
+      diagnosticCase.id
+    );
+    assertNoNativeLedgerExecution(result, diagnosticCase.id);
+    assertNoNativeLedgerExecution(row, diagnosticCase.id);
+  }
+
+  for (const diagnosticCase of extraOwnKeyCases) {
+    const result = validateSourceCurrentnessRows(
+      ledger.rows.map((row) =>
+        row.id === canonicalCommit.id ? diagnosticCase.row : row
+      )
+    );
+    const extraRow = result.rows.find(
+      (row) => row.id === canonicalCommit.id
+    );
+
+    assert.ok(Object.isFrozen(result), diagnosticCase.id);
+    assert.ok(Object.isFrozen(result.rows), diagnosticCase.id);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(
+      result.rejectedEvidenceCount,
+      ledger.rows.length,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.rows.some((row) => row.status === ledger.acceptedStatus),
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(extraRow.status, ledger.rejectedStatus, diagnosticCase.id);
+    assert.equal(extraRow.code, codes.callerBuilt, diagnosticCase.id);
+    for (const row of result.rows) {
+      assert.ok(Object.isFrozen(row), diagnosticCase.id);
+      assertNoNativeLedgerExecution(row, diagnosticCase.id);
+    }
+    assertNoNativeLedgerExecution(result, diagnosticCase.id);
   }
 
   const cases = [
