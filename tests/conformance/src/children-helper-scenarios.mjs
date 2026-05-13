@@ -77,6 +77,17 @@ export const CHILDREN_HELPER_SCENARIOS = [
     ]
   },
   {
+    id: "children-key-coercion",
+    area: "Children key coercion",
+    entrypoints: ["react"],
+    captures: [
+      "object keys use default-hint coercion for portal-shaped child traversal",
+      "callback-returned valid element object keys use default-hint coercion",
+      "same-key child and mapped element path avoids extra mapped-key coercion",
+      "symbol keys throw with development-only unsupported-key warning"
+    ]
+  },
+  {
     id: "children-iterable-values",
     area: "Children iterable traversal",
     entrypoints: ["react"],

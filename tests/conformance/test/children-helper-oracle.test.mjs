@@ -67,7 +67,7 @@ test("children-helper oracle keeps Fast React compatibility claims false", () =>
       generatedProbe: false,
       statusCounts: {
         "known-mismatch": 4,
-        "unsupported-placeholder": 40
+        "unsupported-placeholder": 44
       },
       compatibilityClaimed: false
     },
@@ -75,7 +75,7 @@ test("children-helper oracle keeps Fast React compatibility claims false", () =>
       source: "generated fastReactComparisons in this oracle artifact",
       generatedProbe: true,
       statusCounts: {
-        "matched-but-compatibility-not-claimed": 44
+        "matched-but-compatibility-not-claimed": 48
       },
       compatibilityClaimed: false
     }
@@ -95,6 +95,7 @@ test("children-helper oracle covers every scenario in every probe mode", () => {
     "Children element and fragment leaves",
     "Children.map return handling",
     "Children.toArray key synthesis",
+    "Children key coercion",
     "Children iterable traversal",
     "Children thenable traversal",
     "Children lazy traversal",
@@ -298,6 +299,81 @@ test("React oracle captures map return filtering and key synthesis", () => {
   assert.equal(toArray.unkeyedResultIdentity, false);
 });
 
+test("React oracle captures object and symbol key coercion", () => {
+  const scenario = oracle.scenarios.find(
+    (candidate) => candidate.id === "children-key-coercion"
+  );
+  assert.ok(scenario);
+  assert.equal(scenario.area, "Children key coercion");
+
+  for (const mode of CHILDREN_HELPER_PROBE_MODES) {
+    const keyCoercion = operationValue(mode.id, "children-key-coercion");
+    const coercionCount = mode.nodeEnv === "development" ? 2 : 1;
+
+    assert.deepEqual(
+      keyCoercion.portalObjectKey.coercions,
+      Array(coercionCount).fill("portal-key:default"),
+      mode.id
+    );
+    assert.equal(keyCoercion.portalObjectKey.toArray.status, "ok");
+    assert.equal(keyCoercion.portalObjectKey.sameIdentity, true);
+
+    assert.deepEqual(
+      keyCoercion.fakeReturnedElementObjectKey.coercions,
+      Array(coercionCount).fill("fake-returned-key:default"),
+      mode.id
+    );
+    assert.deepEqual(
+      childKeys(keyCoercion.fakeReturnedElementObjectKey.map.value.items),
+      ["default-fake-returned-key/.0"]
+    );
+    assert.equal(keyCoercion.fakeReturnedElementObjectKey.sameIdentity, false);
+
+    assert.deepEqual(
+      keyCoercion.sameKeyMappedElementObjectKey.coercions,
+      Array(coercionCount).fill("same-key:default"),
+      mode.id
+    );
+    assert.deepEqual(
+      childKeys(keyCoercion.sameKeyMappedElementObjectKey.map.value.items),
+      [".$default-same-key"]
+    );
+    assert.equal(keyCoercion.sameKeyMappedElementObjectKey.sameIdentity, false);
+
+    assert.equal(keyCoercion.symbolPortalKey.status, "throws");
+    assert.equal(keyCoercion.symbolPortalKey.error.name, "TypeError");
+    assert.equal(
+      keyCoercion.symbolPortalKey.error.message,
+      "Cannot convert a Symbol value to a string"
+    );
+
+    const consoleCalls = reactObservation(
+      mode.id,
+      "children-key-coercion"
+    ).result.consoleCalls;
+    if (mode.nodeEnv === "development") {
+      assert.deepEqual(consoleCalls, [
+        {
+          method: "error",
+          args: [
+            {
+              type: "string",
+              value:
+                "The provided key is an unsupported type %s. This value must be coerced to a string before using it here."
+            },
+            {
+              type: "string",
+              value: "Symbol"
+            }
+          ]
+        }
+      ]);
+    } else {
+      assert.deepEqual(consoleCalls, []);
+    }
+  }
+});
+
 test("React oracle captures iterable and thenable behavior", () => {
   const iterables = operationValue(
     "default-node-development",
@@ -470,7 +546,7 @@ test("Fast React Children helper observations match without compatibility claim"
   );
   assert.deepEqual(totalCounts, {
     "known-mismatch": 0,
-    "matched-but-compatibility-not-claimed": 44,
+    "matched-but-compatibility-not-claimed": 48,
     "unsupported-placeholder": 0
   });
 
@@ -482,7 +558,7 @@ test("Fast React Children helper observations match without compatibility claim"
       modeCounts,
       {
         "known-mismatch": 0,
-        "matched-but-compatibility-not-claimed": 11,
+        "matched-but-compatibility-not-claimed": 12,
         "unsupported-placeholder": 0
       },
       mode.id

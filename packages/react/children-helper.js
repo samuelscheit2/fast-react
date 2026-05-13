@@ -205,6 +205,22 @@ const childrenTraversalKeyPathEscapingRows = freezeRecordArray([
     ]),
     fastReactImplemented: true,
     compatibilityClaimed: false
+  },
+  {
+    id: 'object-key-default-coercion',
+    reactSourceAnchor: 'ReactChildren.getElementKey key coercion',
+    sourceTokens: freezeArray([
+      "'' + key uses default hint",
+      'String(key) string hint rejected'
+    ]),
+    oracleScenario: 'children-key-coercion',
+    oracleExampleKeys: freezeArray([
+      '.$default-portal-key',
+      'default-fake-returned-key/.0',
+      '.$default-same-key'
+    ]),
+    fastReactImplemented: true,
+    compatibilityClaimed: false
   }
 ]);
 
@@ -826,6 +842,7 @@ const childrenTraversalBehaviorCurrentnessFieldNames = freezeArray([
   'elementAndFragmentLeavesCurrent',
   'portalShapeLeafCurrent',
   'keyPathEscapingCurrent',
+  'objectKeyDefaultCoercionCurrent',
   'arrayReturnKeyEscapingCurrent',
   'setAndGeneratorIterablesCurrent',
   'mapEntryIterableCurrent',
@@ -1098,6 +1115,7 @@ function mapIntoArray(
     } else if (mappedChild !== null && mappedChild !== undefined) {
       if (isValidElement(mappedChild)) {
         if (
+          isDevelopment &&
           mappedChild.key != null &&
           (!child || child.key !== mappedChild.key)
         ) {
@@ -1108,7 +1126,7 @@ function mapIntoArray(
           escapedPrefix +
           (mappedChild.key == null || (child && child.key === mappedChild.key)
             ? ''
-            : `${String(mappedChild.key).replace(
+            : `${coerceKeyToString(mappedChild.key).replace(
                 userProvidedKeyEscapeRegex,
                 '$&/'
               )}/`) +
@@ -1209,8 +1227,10 @@ function getIteratorFn(maybeIterable) {
 
 function getElementKey(element, index) {
   if (typeof element === 'object' && element !== null && element.key != null) {
-    checkKeyStringCoercion(element.key);
-    return escapeKey(String(element.key));
+    if (isDevelopment) {
+      checkKeyStringCoercion(element.key);
+    }
+    return escapeKey(coerceKeyToString(element.key));
   }
 
   return index.toString(36);
@@ -1332,6 +1352,10 @@ function checkKeyStringCoercion(value) {
 }
 
 function testStringCoercion(value) {
+  return coerceKeyToString(value);
+}
+
+function coerceKeyToString(value) {
   return '' + value;
 }
 
@@ -1764,6 +1788,44 @@ function createChildrenTraversalBehaviorCurrentness() {
         ];
       })
     );
+    const objectKeyExpectedCoercions = isDevelopment
+      ? ['default', 'default']
+      : ['default'];
+    const portalObjectKeyCoercions = [];
+    const portalObjectKey = createCoercionLoggingKey(
+      'portal-key',
+      portalObjectKeyCoercions
+    );
+    const portalObjectKeyChild = {
+      $$typeof: REACT_PORTAL_TYPE,
+      key: portalObjectKey,
+      children: 'portal-child'
+    };
+    const portalObjectKeyAttempt = captureOperation(function () {
+      return helpers.toArray([portalObjectKeyChild]);
+    });
+    const fakeReturnedKeyCoercions = [];
+    const fakeReturnedKey = createCoercionLoggingKey(
+      'fake-returned-key',
+      fakeReturnedKeyCoercions
+    );
+    const fakeReturnedElement = createFakeReactElement(
+      'b',
+      fakeReturnedKey,
+      { id: 'fake-returned' }
+    );
+    const fakeReturnedElements = helpers.map(['source-child'], function () {
+      return fakeReturnedElement;
+    });
+    const sameKeyCoercions = [];
+    const sameKeyElement = createFakeReactElement(
+      'i',
+      createCoercionLoggingKey('same-key', sameKeyCoercions),
+      { id: 'same-key' }
+    );
+    const sameKeyElements = helpers.map([sameKeyElement], function (child) {
+      return child;
+    });
 
     const setKeys = childKeys(
       helpers.toArray(
@@ -1926,6 +1988,23 @@ function createChildrenTraversalBehaviorCurrentness() {
         null,
         '.3:0:$slash/key'
       ]),
+      objectKeyDefaultCoercionCurrent:
+        portalObjectKeyAttempt.status === 'ok' &&
+        portalObjectKeyAttempt.value[0] === portalObjectKeyChild &&
+        arraysEqual(
+          portalObjectKeyCoercions,
+          objectKeyExpectedCoercions
+        ) &&
+        arraysEqual(
+          fakeReturnedKeyCoercions,
+          objectKeyExpectedCoercions
+        ) &&
+        childKeys(fakeReturnedElements)[0] ===
+          'default-fake-returned-key/.0' &&
+        fakeReturnedElements[0] !== fakeReturnedElement &&
+        arraysEqual(sameKeyCoercions, objectKeyExpectedCoercions) &&
+        childKeys(sameKeyElements)[0] === '.$default-same-key' &&
+        sameKeyElements[0] !== sameKeyElement,
       arrayReturnKeyEscapingCurrent: arraysEqual(arrayReturnKeys, [
         '.$orig/.$inner/key',
         '.$orig/.1'
@@ -2113,6 +2192,26 @@ function createRejectedThenable(reason) {
     then: function then(_resolve, reject) {
       reject(reason);
     }
+  };
+}
+
+function createCoercionLoggingKey(label, coercions) {
+  return {
+    [Symbol.toPrimitive]: function toPrimitive(hint) {
+      coercions.push(hint);
+      return `${hint}-${label}`;
+    }
+  };
+}
+
+function createFakeReactElement(type, key, props) {
+  return {
+    $$typeof: REACT_ELEMENT_TYPE,
+    type,
+    key,
+    ref: null,
+    props,
+    _owner: null
   };
 }
 

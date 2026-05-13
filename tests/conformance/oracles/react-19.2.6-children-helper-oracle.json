@@ -45,7 +45,7 @@
       "generatedProbe": false,
       "statusCounts": {
         "known-mismatch": 4,
-        "unsupported-placeholder": 40
+        "unsupported-placeholder": 44
       },
       "compatibilityClaimed": false
     },
@@ -53,7 +53,7 @@
       "source": "generated fastReactComparisons in this oracle artifact",
       "generatedProbe": true,
       "statusCounts": {
-        "matched-but-compatibility-not-claimed": 44
+        "matched-but-compatibility-not-claimed": 48
       },
       "compatibilityClaimed": false
     }
@@ -193,6 +193,19 @@
         "nested array key paths",
         "slash-preserving user keys",
         "unkeyed element validation marker"
+      ]
+    },
+    {
+      "id": "children-key-coercion",
+      "area": "Children key coercion",
+      "entrypoints": [
+        "react"
+      ],
+      "captures": [
+        "object keys use default-hint coercion for portal-shaped child traversal",
+        "callback-returned valid element object keys use default-hint coercion",
+        "same-key child and mapped element path avoids extra mapped-key coercion",
+        "symbol keys throw with development-only unsupported-key warning"
       ]
     },
     {
@@ -5358,6 +5371,361 @@
             }
           },
           "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "children-key-coercion",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "children-key-coercion",
+          "result": {
+            "label": "children-key-coercion",
+            "status": "ok",
+            "value": {
+              "portalObjectKey": {
+                "toArray": {
+                  "label": "Children.toArray([portal with object key])",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "prototype": "Object.prototype"
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "portal-key:default",
+                  "portal-key:default"
+                ],
+                "sameIdentity": true
+              },
+              "fakeReturnedElementObjectKey": {
+                "map": {
+                  "label": "Children.map callback returns fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_owner"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_store"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugInfo"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugStack"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugTask"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "props",
+                          "_owner",
+                          "_store"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": "default-fake-returned-key/.0"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "b"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": false,
+                          "configurable": false,
+                          "kind": "data",
+                          "writable": false,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "fake-returned"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": true,
+                            "sealed": true,
+                            "extensible": false
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "state": {
+                          "frozen": true,
+                          "sealed": true,
+                          "extensible": false
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "fake-returned-key:default",
+                  "fake-returned-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "sameKeyMappedElementObjectKey": {
+                "map": {
+                  "label": "Children.map returns same fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_owner"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_store"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugInfo"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugStack"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugTask"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "props",
+                          "_owner",
+                          "_store"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": ".$default-same-key"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "i"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": false,
+                          "configurable": false,
+                          "kind": "data",
+                          "writable": false,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "same-key"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": true,
+                            "sealed": true,
+                            "extensible": false
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "state": {
+                          "frozen": true,
+                          "sealed": true,
+                          "extensible": false
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "same-key:default",
+                  "same-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "symbolPortalKey": {
+                "label": "Children.toArray([portal with symbol key])",
+                "status": "throws",
+                "error": {
+                  "thrownValue": {
+                    "type": "object",
+                    "objectTag": "[object Error]",
+                    "prototype": "TypeError.prototype",
+                    "error": {
+                      "name": "TypeError",
+                      "message": "Cannot convert a Symbol value to a string"
+                    }
+                  },
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "Cannot convert a Symbol value to a string",
+                  "entrypoint": null,
+                  "exportName": null,
+                  "objectKeys": []
+                }
+              }
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "The provided key is an unsupported type %s. This value must be coerced to a string before using it here."
+                },
+                {
+                  "type": "string",
+                  "value": "Symbol"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -11433,6 +11801,300 @@
                 ]
               },
               "unkeyedResultIdentity": false
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "children-key-coercion",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "children-key-coercion",
+          "result": {
+            "label": "children-key-coercion",
+            "status": "ok",
+            "value": {
+              "portalObjectKey": {
+                "toArray": {
+                  "label": "Children.toArray([portal with object key])",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "prototype": "Object.prototype"
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "portal-key:default"
+                ],
+                "sameIdentity": true
+              },
+              "fakeReturnedElementObjectKey": {
+                "map": {
+                  "label": "Children.map callback returns fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "ref",
+                          "props"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": "default-fake-returned-key/.0"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "b"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": true,
+                          "configurable": true,
+                          "kind": "data",
+                          "writable": true,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "fake-returned"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": false,
+                            "sealed": false,
+                            "extensible": true
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "missing"
+                        },
+                        "state": {
+                          "frozen": false,
+                          "sealed": false,
+                          "extensible": true
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "fake-returned-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "sameKeyMappedElementObjectKey": {
+                "map": {
+                  "label": "Children.map returns same fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "ref",
+                          "props"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": ".$default-same-key"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "i"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": true,
+                          "configurable": true,
+                          "kind": "data",
+                          "writable": true,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "same-key"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": false,
+                            "sealed": false,
+                            "extensible": true
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "missing"
+                        },
+                        "state": {
+                          "frozen": false,
+                          "sealed": false,
+                          "extensible": true
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "same-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "symbolPortalKey": {
+                "label": "Children.toArray([portal with symbol key])",
+                "status": "throws",
+                "error": {
+                  "thrownValue": {
+                    "type": "object",
+                    "objectTag": "[object Error]",
+                    "prototype": "TypeError.prototype",
+                    "error": {
+                      "name": "TypeError",
+                      "message": "Cannot convert a Symbol value to a string"
+                    }
+                  },
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "Cannot convert a Symbol value to a string",
+                  "entrypoint": null,
+                  "exportName": null,
+                  "objectKeys": []
+                }
+              }
             }
           },
           "consoleCalls": []
@@ -17966,6 +18628,361 @@
         }
       },
       {
+        "scenarioId": "children-key-coercion",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "children-key-coercion",
+          "result": {
+            "label": "children-key-coercion",
+            "status": "ok",
+            "value": {
+              "portalObjectKey": {
+                "toArray": {
+                  "label": "Children.toArray([portal with object key])",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "prototype": "Object.prototype"
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "portal-key:default",
+                  "portal-key:default"
+                ],
+                "sameIdentity": true
+              },
+              "fakeReturnedElementObjectKey": {
+                "map": {
+                  "label": "Children.map callback returns fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_owner"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_store"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugInfo"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugStack"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugTask"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "props",
+                          "_owner",
+                          "_store"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": "default-fake-returned-key/.0"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "b"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": false,
+                          "configurable": false,
+                          "kind": "data",
+                          "writable": false,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "fake-returned"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": true,
+                            "sealed": true,
+                            "extensible": false
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "state": {
+                          "frozen": true,
+                          "sealed": true,
+                          "extensible": false
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "fake-returned-key:default",
+                  "fake-returned-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "sameKeyMappedElementObjectKey": {
+                "map": {
+                  "label": "Children.map returns same fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_owner"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_store"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugInfo"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugStack"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugTask"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "props",
+                          "_owner",
+                          "_store"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": ".$default-same-key"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "i"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": false,
+                          "configurable": false,
+                          "kind": "data",
+                          "writable": false,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "same-key"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": true,
+                            "sealed": true,
+                            "extensible": false
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "state": {
+                          "frozen": true,
+                          "sealed": true,
+                          "extensible": false
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "same-key:default",
+                  "same-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "symbolPortalKey": {
+                "label": "Children.toArray([portal with symbol key])",
+                "status": "throws",
+                "error": {
+                  "thrownValue": {
+                    "type": "object",
+                    "objectTag": "[object Error]",
+                    "prototype": "TypeError.prototype",
+                    "error": {
+                      "name": "TypeError",
+                      "message": "Cannot convert a Symbol value to a string"
+                    }
+                  },
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "Cannot convert a Symbol value to a string",
+                  "entrypoint": null,
+                  "exportName": null,
+                  "objectKeys": []
+                }
+              }
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "The provided key is an unsupported type %s. This value must be coerced to a string before using it here."
+                },
+                {
+                  "type": "string",
+                  "value": "Symbol"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
         "scenarioId": "children-iterable-values",
         "packageName": "react",
         "nodeEnv": "development",
@@ -24038,6 +25055,300 @@
                 ]
               },
               "unkeyedResultIdentity": false
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "children-key-coercion",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "children-key-coercion",
+          "result": {
+            "label": "children-key-coercion",
+            "status": "ok",
+            "value": {
+              "portalObjectKey": {
+                "toArray": {
+                  "label": "Children.toArray([portal with object key])",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "prototype": "Object.prototype"
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "portal-key:default"
+                ],
+                "sameIdentity": true
+              },
+              "fakeReturnedElementObjectKey": {
+                "map": {
+                  "label": "Children.map callback returns fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "ref",
+                          "props"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": "default-fake-returned-key/.0"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "b"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": true,
+                          "configurable": true,
+                          "kind": "data",
+                          "writable": true,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "fake-returned"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": false,
+                            "sealed": false,
+                            "extensible": true
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "missing"
+                        },
+                        "state": {
+                          "frozen": false,
+                          "sealed": false,
+                          "extensible": true
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "fake-returned-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "sameKeyMappedElementObjectKey": {
+                "map": {
+                  "label": "Children.map returns same fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "ref",
+                          "props"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": ".$default-same-key"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "i"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": true,
+                          "configurable": true,
+                          "kind": "data",
+                          "writable": true,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "same-key"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": false,
+                            "sealed": false,
+                            "extensible": true
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "missing"
+                        },
+                        "state": {
+                          "frozen": false,
+                          "sealed": false,
+                          "extensible": true
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "same-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "symbolPortalKey": {
+                "label": "Children.toArray([portal with symbol key])",
+                "status": "throws",
+                "error": {
+                  "thrownValue": {
+                    "type": "object",
+                    "objectTag": "[object Error]",
+                    "prototype": "TypeError.prototype",
+                    "error": {
+                      "name": "TypeError",
+                      "message": "Cannot convert a Symbol value to a string"
+                    }
+                  },
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "Cannot convert a Symbol value to a string",
+                  "entrypoint": null,
+                  "exportName": null,
+                  "objectKeys": []
+                }
+              }
             }
           },
           "consoleCalls": []
@@ -30573,6 +31884,361 @@
         }
       },
       {
+        "scenarioId": "children-key-coercion",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "children-key-coercion",
+          "result": {
+            "label": "children-key-coercion",
+            "status": "ok",
+            "value": {
+              "portalObjectKey": {
+                "toArray": {
+                  "label": "Children.toArray([portal with object key])",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "prototype": "Object.prototype"
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "portal-key:default",
+                  "portal-key:default"
+                ],
+                "sameIdentity": true
+              },
+              "fakeReturnedElementObjectKey": {
+                "map": {
+                  "label": "Children.map callback returns fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_owner"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_store"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugInfo"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugStack"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugTask"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "props",
+                          "_owner",
+                          "_store"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": "default-fake-returned-key/.0"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "b"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": false,
+                          "configurable": false,
+                          "kind": "data",
+                          "writable": false,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "fake-returned"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": true,
+                            "sealed": true,
+                            "extensible": false
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "state": {
+                          "frozen": true,
+                          "sealed": true,
+                          "extensible": false
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "fake-returned-key:default",
+                  "fake-returned-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "sameKeyMappedElementObjectKey": {
+                "map": {
+                  "label": "Children.map returns same fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_owner"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_store"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugInfo"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugStack"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugTask"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "props",
+                          "_owner",
+                          "_store"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": ".$default-same-key"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "i"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": false,
+                          "configurable": false,
+                          "kind": "data",
+                          "writable": false,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "same-key"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": true,
+                            "sealed": true,
+                            "extensible": false
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "state": {
+                          "frozen": true,
+                          "sealed": true,
+                          "extensible": false
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "same-key:default",
+                  "same-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "symbolPortalKey": {
+                "label": "Children.toArray([portal with symbol key])",
+                "status": "throws",
+                "error": {
+                  "thrownValue": {
+                    "type": "object",
+                    "objectTag": "[object Error]",
+                    "prototype": "TypeError.prototype",
+                    "error": {
+                      "name": "TypeError",
+                      "message": "Cannot convert a Symbol value to a string"
+                    }
+                  },
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "Cannot convert a Symbol value to a string",
+                  "entrypoint": null,
+                  "exportName": null,
+                  "objectKeys": []
+                }
+              }
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "The provided key is an unsupported type %s. This value must be coerced to a string before using it here."
+                },
+                {
+                  "type": "string",
+                  "value": "Symbol"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
         "scenarioId": "children-iterable-values",
         "packageName": "@fast-react/react",
         "nodeEnv": "development",
@@ -36645,6 +38311,300 @@
                 ]
               },
               "unkeyedResultIdentity": false
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "children-key-coercion",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "children-key-coercion",
+          "result": {
+            "label": "children-key-coercion",
+            "status": "ok",
+            "value": {
+              "portalObjectKey": {
+                "toArray": {
+                  "label": "Children.toArray([portal with object key])",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "prototype": "Object.prototype"
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "portal-key:default"
+                ],
+                "sameIdentity": true
+              },
+              "fakeReturnedElementObjectKey": {
+                "map": {
+                  "label": "Children.map callback returns fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "ref",
+                          "props"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": "default-fake-returned-key/.0"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "b"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": true,
+                          "configurable": true,
+                          "kind": "data",
+                          "writable": true,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "fake-returned"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": false,
+                            "sealed": false,
+                            "extensible": true
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "missing"
+                        },
+                        "state": {
+                          "frozen": false,
+                          "sealed": false,
+                          "extensible": true
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "fake-returned-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "sameKeyMappedElementObjectKey": {
+                "map": {
+                  "label": "Children.map returns same fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "ref",
+                          "props"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": ".$default-same-key"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "i"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": true,
+                          "configurable": true,
+                          "kind": "data",
+                          "writable": true,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "same-key"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": false,
+                            "sealed": false,
+                            "extensible": true
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "missing"
+                        },
+                        "state": {
+                          "frozen": false,
+                          "sealed": false,
+                          "extensible": true
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "same-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "symbolPortalKey": {
+                "label": "Children.toArray([portal with symbol key])",
+                "status": "throws",
+                "error": {
+                  "thrownValue": {
+                    "type": "object",
+                    "objectTag": "[object Error]",
+                    "prototype": "TypeError.prototype",
+                    "error": {
+                      "name": "TypeError",
+                      "message": "Cannot convert a Symbol value to a string"
+                    }
+                  },
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "Cannot convert a Symbol value to a string",
+                  "entrypoint": null,
+                  "exportName": null,
+                  "objectKeys": []
+                }
+              }
             }
           },
           "consoleCalls": []
@@ -43178,6 +45138,361 @@
         }
       },
       {
+        "scenarioId": "children-key-coercion",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "children-key-coercion",
+          "result": {
+            "label": "children-key-coercion",
+            "status": "ok",
+            "value": {
+              "portalObjectKey": {
+                "toArray": {
+                  "label": "Children.toArray([portal with object key])",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "prototype": "Object.prototype"
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "portal-key:default",
+                  "portal-key:default"
+                ],
+                "sameIdentity": true
+              },
+              "fakeReturnedElementObjectKey": {
+                "map": {
+                  "label": "Children.map callback returns fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_owner"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_store"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugInfo"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugStack"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugTask"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "props",
+                          "_owner",
+                          "_store"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": "default-fake-returned-key/.0"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "b"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": false,
+                          "configurable": false,
+                          "kind": "data",
+                          "writable": false,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "fake-returned"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": true,
+                            "sealed": true,
+                            "extensible": false
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "state": {
+                          "frozen": true,
+                          "sealed": true,
+                          "extensible": false
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "fake-returned-key:default",
+                  "fake-returned-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "sameKeyMappedElementObjectKey": {
+                "map": {
+                  "label": "Children.map returns same fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_owner"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_store"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugInfo"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugStack"
+                          },
+                          {
+                            "type": "string",
+                            "value": "_debugTask"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "props",
+                          "_owner",
+                          "_store"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": ".$default-same-key"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "i"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": false,
+                          "configurable": false,
+                          "kind": "data",
+                          "writable": false,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "same-key"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": true,
+                            "sealed": true,
+                            "extensible": false
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "state": {
+                          "frozen": true,
+                          "sealed": true,
+                          "extensible": false
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "same-key:default",
+                  "same-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "symbolPortalKey": {
+                "label": "Children.toArray([portal with symbol key])",
+                "status": "throws",
+                "error": {
+                  "thrownValue": {
+                    "type": "object",
+                    "objectTag": "[object Error]",
+                    "prototype": "TypeError.prototype",
+                    "error": {
+                      "name": "TypeError",
+                      "message": "Cannot convert a Symbol value to a string"
+                    }
+                  },
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "Cannot convert a Symbol value to a string",
+                  "entrypoint": null,
+                  "exportName": null,
+                  "objectKeys": []
+                }
+              }
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "The provided key is an unsupported type %s. This value must be coerced to a string before using it here."
+                },
+                {
+                  "type": "string",
+                  "value": "Symbol"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
         "scenarioId": "children-iterable-values",
         "packageName": "@fast-react/react",
         "nodeEnv": "development",
@@ -49256,6 +51571,300 @@
         }
       },
       {
+        "scenarioId": "children-key-coercion",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "children-key-coercion",
+          "result": {
+            "label": "children-key-coercion",
+            "status": "ok",
+            "value": {
+              "portalObjectKey": {
+                "toArray": {
+                  "label": "Children.toArray([portal with object key])",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "prototype": "Object.prototype"
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "portal-key:default"
+                ],
+                "sameIdentity": true
+              },
+              "fakeReturnedElementObjectKey": {
+                "map": {
+                  "label": "Children.map callback returns fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "ref",
+                          "props"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": "default-fake-returned-key/.0"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "b"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": true,
+                          "configurable": true,
+                          "kind": "data",
+                          "writable": true,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "fake-returned"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": false,
+                            "sealed": false,
+                            "extensible": true
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "missing"
+                        },
+                        "state": {
+                          "frozen": false,
+                          "sealed": false,
+                          "extensible": true
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "fake-returned-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "sameKeyMappedElementObjectKey": {
+                "map": {
+                  "label": "Children.map returns same fake valid element with object key",
+                  "status": "ok",
+                  "value": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Array]",
+                      "prototype": "Array.prototype",
+                      "arrayLength": 1
+                    },
+                    "length": 1,
+                    "items": [
+                      {
+                        "summary": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "prototype": "Object.prototype",
+                          "reactElement": true
+                        },
+                        "ownKeys": [
+                          {
+                            "type": "string",
+                            "value": "$$typeof"
+                          },
+                          {
+                            "type": "string",
+                            "value": "type"
+                          },
+                          {
+                            "type": "string",
+                            "value": "key"
+                          },
+                          {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          {
+                            "type": "string",
+                            "value": "props"
+                          }
+                        ],
+                        "objectKeys": [
+                          "$$typeof",
+                          "type",
+                          "key",
+                          "ref",
+                          "props"
+                        ],
+                        "key": {
+                          "type": "string",
+                          "value": ".$default-same-key"
+                        },
+                        "type": {
+                          "type": "string",
+                          "value": "i"
+                        },
+                        "ref": {
+                          "key": {
+                            "type": "string",
+                            "value": "ref"
+                          },
+                          "enumerable": true,
+                          "configurable": true,
+                          "kind": "data",
+                          "writable": true,
+                          "value": {
+                            "type": "null"
+                          }
+                        },
+                        "props": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "id"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "id"
+                            }
+                          ],
+                          "id": {
+                            "type": "string",
+                            "value": "same-key"
+                          },
+                          "children": {
+                            "type": "absent"
+                          },
+                          "state": {
+                            "frozen": false,
+                            "sealed": false,
+                            "extensible": true
+                          }
+                        },
+                        "storeValidated": {
+                          "type": "missing"
+                        },
+                        "state": {
+                          "frozen": false,
+                          "sealed": false,
+                          "extensible": true
+                        }
+                      }
+                    ]
+                  }
+                },
+                "coercions": [
+                  "same-key:default"
+                ],
+                "sameIdentity": false
+              },
+              "symbolPortalKey": {
+                "label": "Children.toArray([portal with symbol key])",
+                "status": "throws",
+                "error": {
+                  "thrownValue": {
+                    "type": "object",
+                    "objectTag": "[object Error]",
+                    "prototype": "TypeError.prototype",
+                    "error": {
+                      "name": "TypeError",
+                      "message": "Cannot convert a Symbol value to a string"
+                    }
+                  },
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "Cannot convert a Symbol value to a string",
+                  "entrypoint": null,
+                  "exportName": null,
+                  "objectKeys": []
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
         "scenarioId": "children-iterable-values",
         "packageName": "@fast-react/react",
         "nodeEnv": "production",
@@ -50833,6 +53442,17 @@
         "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
       },
       {
+        "scenarioId": "children-key-coercion",
+        "nodeEnv": "development",
+        "condition": "default",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
         "scenarioId": "children-iterable-values",
         "nodeEnv": "development",
         "condition": "default",
@@ -50946,6 +53566,17 @@
       },
       {
         "scenarioId": "children-to-array-key-synthesis",
+        "nodeEnv": "production",
+        "condition": "default",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "children-key-coercion",
         "nodeEnv": "production",
         "condition": "default",
         "status": "matched-but-compatibility-not-claimed",
@@ -51079,6 +53710,17 @@
         "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
       },
       {
+        "scenarioId": "children-key-coercion",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
         "scenarioId": "children-iterable-values",
         "nodeEnv": "development",
         "condition": "react-server",
@@ -51192,6 +53834,17 @@
       },
       {
         "scenarioId": "children-to-array-key-synthesis",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "children-key-coercion",
         "nodeEnv": "production",
         "condition": "react-server",
         "status": "matched-but-compatibility-not-claimed",

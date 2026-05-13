@@ -251,6 +251,93 @@ const scenarios = {
     };
   },
 
+  "children-key-coercion": (target) => {
+    const React = loadReact(target);
+
+    const portalKeyCoercions = [];
+    const portalKey = createCoercionLoggingKey(
+      "portal-key",
+      portalKeyCoercions
+    );
+    const portal = {
+      $$typeof: Symbol.for("react.portal"),
+      key: portalKey,
+      children: "portal-child"
+    };
+    let portalToArrayRaw = null;
+    const portalToArray = captureOperation(
+      "Children.toArray([portal with object key])",
+      () => {
+        portalToArrayRaw = React.Children.toArray([portal]);
+        return describeChildArray(portalToArrayRaw);
+      }
+    );
+
+    const fakeReturnedKeyCoercions = [];
+    const fakeReturnedKey = createCoercionLoggingKey(
+      "fake-returned-key",
+      fakeReturnedKeyCoercions
+    );
+    const fakeReturnedElement = createFakeReactElement(
+      "b",
+      fakeReturnedKey,
+      { id: "fake-returned" }
+    );
+    let fakeReturnedRaw = null;
+    const fakeReturnedMap = captureOperation(
+      "Children.map callback returns fake valid element with object key",
+      () => {
+        fakeReturnedRaw = React.Children.map(
+          ["source-child"],
+          () => fakeReturnedElement
+        );
+        return describeChildArray(fakeReturnedRaw);
+      }
+    );
+
+    const sameKeyCoercions = [];
+    const sameKey = createCoercionLoggingKey("same-key", sameKeyCoercions);
+    const sameKeyElement = createFakeReactElement("i", sameKey, {
+      id: "same-key"
+    });
+    let sameKeyRaw = null;
+    const sameKeyMap = captureOperation(
+      "Children.map returns same fake valid element with object key",
+      () => {
+        sameKeyRaw = React.Children.map([sameKeyElement], (child) => child);
+        return describeChildArray(sameKeyRaw);
+      }
+    );
+
+    const symbolPortal = {
+      $$typeof: Symbol.for("react.portal"),
+      key: Symbol("symbol-key"),
+      children: "symbol-key-child"
+    };
+
+    return {
+      portalObjectKey: {
+        toArray: portalToArray,
+        coercions: portalKeyCoercions,
+        sameIdentity: portalToArrayRaw?.[0] === portal
+      },
+      fakeReturnedElementObjectKey: {
+        map: fakeReturnedMap,
+        coercions: fakeReturnedKeyCoercions,
+        sameIdentity: fakeReturnedRaw?.[0] === fakeReturnedElement
+      },
+      sameKeyMappedElementObjectKey: {
+        map: sameKeyMap,
+        coercions: sameKeyCoercions,
+        sameIdentity: sameKeyRaw?.[0] === sameKeyElement
+      },
+      symbolPortalKey: captureOperation(
+        "Children.toArray([portal with symbol key])",
+        () => describeChildArray(React.Children.toArray([symbolPortal]))
+      )
+    };
+  },
+
   "children-iterable-values": (target) => {
     const React = loadReact(target);
     const set = new Set([
@@ -714,6 +801,26 @@ function createRejectedThenable(reason) {
     then(_resolve, reject) {
       reject(reason);
     }
+  };
+}
+
+function createCoercionLoggingKey(label, coercions) {
+  return {
+    [Symbol.toPrimitive](hint) {
+      coercions.push(`${label}:${hint}`);
+      return `${hint}-${label}`;
+    }
+  };
+}
+
+function createFakeReactElement(type, key, props) {
+  return {
+    $$typeof: Symbol.for("react.transitional.element"),
+    type,
+    key,
+    ref: null,
+    props,
+    _owner: null
   };
 }
 
