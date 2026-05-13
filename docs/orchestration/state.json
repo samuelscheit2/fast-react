@@ -354,7 +354,7 @@
 		{
 			"id": 1287,
 			"type": "worker",
-			"status": "repair-auditing",
+			"status": "accepted",
 			"title": "Native cleanup-hook preflight exact evidence-set counting",
 			"agent": "worker_1287_native_cleanup_hook_exact_set",
 			"branch": "worker/1287-native-cleanup-hook-exact-set",
@@ -392,46 +392,94 @@
 		{
 			"id": 1290,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "react-test-renderer create-routing source-proof hardening",
 			"agent": "worker_1290_test_renderer_create_routing_source_proof",
 			"branch": "worker/1290-test-renderer-create-routing-source-proof",
-			"audits": []
+			"audits": [
+				"audit_1290_source_contract",
+				"audit_1290_verification"
+			]
 		},
 		{
 			"id": 1291,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Rust reconciler/root/scheduler next-lane scout",
 			"agent": "scout_1291_rust_root_next"
 		},
 		{
 			"id": 1292,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "React DOM facade/root next-lane scout",
 			"agent": "scout_1292_react_dom_next"
 		},
 		{
 			"id": 1293,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "react-test-renderer next-lane scout",
 			"agent": "scout_1293_test_renderer_next"
 		},
 		{
 			"id": 1294,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Native/no-load next-lane scout",
 			"agent": "scout_1294_native_next"
 		},
 		{
 			"id": 1295,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "React core/hooks next-lane scout",
 			"agent": "scout_1295_react_core_next"
+		},
+		{
+			"id": 1296,
+			"type": "worker",
+			"status": "active",
+			"title": "Entangled transition queue-lane currentness source token",
+			"agent": "worker_1296_entangled_transition_currentness",
+			"branch": "worker/1296-entangled-transition-currentness",
+			"audits": []
+		},
+		{
+			"id": 1297,
+			"type": "worker",
+			"status": "active",
+			"title": "Native inherited capability-claim blockers",
+			"agent": "worker_1297_native_inherited_capability_claims",
+			"branch": "worker/1297-native-inherited-capability-claims",
+			"audits": []
+		},
+		{
+			"id": 1298,
+			"type": "worker",
+			"status": "active",
+			"title": "startTransition returned-thenable currentness",
+			"agent": "worker_1298_start_transition_thenable_currentness",
+			"branch": "worker/1298-start-transition-thenable-currentness",
+			"audits": []
+		},
+		{
+			"id": 1299,
+			"type": "worker",
+			"status": "active",
+			"title": "React DOM own element compatibility alias blocker",
+			"agent": "worker_1299_react_dom_own_element_alias_blocker",
+			"branch": "worker/1299-react-dom-own-element-alias-blocker",
+			"audits": []
+		},
+		{
+			"id": 1300,
+			"type": "worker",
+			"status": "active",
+			"title": "react-test-renderer TestInstance query-bridge source proof",
+			"agent": "worker_1300_test_renderer_query_bridge_source_proof",
+			"branch": "worker/1300-test-renderer-query-bridge-source-proof",
+			"audits": []
 		}
 	]
 }

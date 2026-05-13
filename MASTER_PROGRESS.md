@@ -29,6 +29,24 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1287 Native Cleanup-Hook Exact Evidence Set
+
+- Worker 1287 hardened native cleanup-hook preflight validation so canonical
+  executable evidence requires the exact four-row set: accepted root, accepted
+  value, expected stale rejection, and expected forged rejection.
+- The initial JS facade change was repaired after source audit found the Rust
+  N-API cleanup path still accepted root/value-only evidence. The repair now
+  field-checks accepted and rejected Rust cleanup rows, rejects missing rejected
+  rows, extra forged rows, duplicate stale/forged rows, and reused `id`/`code`
+  rows with wrong source fields.
+- Accepted validation includes the initial source-audit blocker, clean repair
+  source and verification audits, and root reruns passing `cargo test -p
+  fast-react-napi` (94/94), native no-load guard, native loader, native
+  workspace check, package-surface guard, import smoke, and `git diff --check`.
+- The accepted state is main `a1848744` after Worker 1287 merge `a1848744`,
+  worker commits `b1a9fa5d` and repair `31849d90`, and this
+  orchestration-state update.
+
 ### Worker 1289 React DOM Root Object Prototype Blocker
 
 - Worker 1289 hardened the public `createRoot` returned root object against
