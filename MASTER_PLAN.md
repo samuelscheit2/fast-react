@@ -69,11 +69,12 @@ Current orchestration queue:
 - Scout 1275 reported a concrete native/no-load next-lane candidate.
 - Scout 1274 reported a concrete React hooks/core facade next-lane candidate.
 - Scout 1281 reported a concrete Rust scheduler/root next-lane candidate.
-- Scouts 1282, 1283, 1284, and 1285 are active for
-  React DOM, react-test-renderer, native/no-load, and React core/hooks
-  next-lane candidates.
+- Scout 1284 reported a concrete native/no-load next-lane candidate.
+- Scouts 1282, 1283, and 1285 are active for React DOM,
+  react-test-renderer, and React core/hooks next-lane candidates.
 - Worker 1286 is active for same-lane transition nested handoff metadata drift
   canaries.
+- Worker 1287 is active for native cleanup-hook exact evidence-set counting.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

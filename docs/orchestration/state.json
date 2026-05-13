@@ -328,7 +328,7 @@
 		{
 			"id": 1284,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Native/no-load next-lane scout",
 			"agent": "scout_1284_native_next"
 		},
@@ -346,6 +346,15 @@
 			"title": "Same-lane transition nested handoff metadata drift canaries",
 			"agent": "worker_1286_scheduler_nested_handoff_drift",
 			"branch": "worker/1286-scheduler-nested-handoff-drift",
+			"audits": []
+		},
+		{
+			"id": 1287,
+			"type": "worker",
+			"status": "active",
+			"title": "Native cleanup-hook preflight exact evidence-set counting",
+			"agent": "worker_1287_native_cleanup_hook_exact_set",
+			"branch": "worker/1287-native-cleanup-hook-exact-set",
 			"audits": []
 		}
 	]
