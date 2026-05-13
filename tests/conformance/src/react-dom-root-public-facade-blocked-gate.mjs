@@ -80,6 +80,9 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS =
 export const REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS =
   "blocked-private-root-bridge-record-only";
 
+export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_SOURCE_LEDGER_STATUS =
+  "blocked-public-root-facade-source-owned-lifecycle-ledger";
+
 export const REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_GATE_ID =
   "public-facade-private-promotion-503-533-blocked-gate-1";
 
@@ -1827,6 +1830,9 @@ export async function runReactDomRootPublicFacadeBlockedGate({
     localPublicFacadeBoundary: inspectReactDomRootPublicFacadeBoundary({
       workspaceRoot
     }),
+    lifecycleSourceLedger: inspectReactDomRootPublicFacadeLifecycleSourceLedger({
+      workspaceRoot
+    }),
     privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary({
       workspaceRoot
     })
@@ -1838,6 +1844,7 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
   currentOracle,
   clientRootOracle,
   localPublicFacadeBoundary = inspectReactDomRootPublicFacadeBoundary(),
+  lifecycleSourceLedger = inspectReactDomRootPublicFacadeLifecycleSourceLedger(),
   privateRootBridgeBoundary = inspectReactDomPrivateRootBridgeBoundary(),
   publicFacadeLifecycleRows = REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
   rootRenderGateResult: providedRootRenderGateResult = null
@@ -1871,6 +1878,7 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
   });
   validatePublicFacadeBoundary({
     localPublicFacadeBoundary,
+    lifecycleSourceLedger,
     publicFacadeLifecycleRows,
     blockedPublicFacadeRows,
     failures
@@ -1915,6 +1923,7 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
       rootRenderGateResult?.privatePromotionRejectionRows503533 ?? [],
     localPublicFacadeBoundary,
     privateRootBridgeBoundary,
+    lifecycleSourceLedger,
     failures,
     summary: {
       acceptedClientRootScenarioModeRowCount:
@@ -2254,6 +2263,71 @@ export function inspectReactDomPrivateRootBridgeBoundary({
         rootMarkers,
         listenerRegistry
       )
+    };
+  } catch (error) {
+    return {
+      loadError: serializeGateError(error)
+    };
+  }
+}
+
+export function inspectReactDomRootPublicFacadeLifecycleSourceLedger({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  try {
+    const rootBridge = require(
+      join(workspaceRoot, "packages/react-dom/src/client/root-bridge.js")
+    );
+    const {
+      createSourceOwnedReactDomLifecycleBoundary
+    } = require(
+      join(
+        workspaceRoot,
+        "tests/conformance/src/react-dom-source-owned-lifecycle-boundary.cjs"
+      )
+    );
+    const lifecycle = createSourceOwnedReactDomLifecycleBoundary(
+      "public-facade-source-ledger"
+    );
+    const diagnostic = lifecycle.updateDiagnostic;
+    const boundaryRecord = diagnostic.lifecycleRequestBoundary;
+    const snapshotRecord = diagnostic.sourceContainerSnapshot;
+    const admissionRecord = diagnostic.lifecycleRequestAdmission;
+    const boundaryPayload =
+      rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(boundaryRecord);
+    const snapshotPayload =
+      rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
+        snapshotRecord
+      );
+
+    return {
+      loadError: null,
+      gateStatus:
+        REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_SOURCE_LEDGER_STATUS,
+      compatibilityClaimed: false,
+      publicRootCompatibilitySurface: false,
+      publicRenderCompatibilityClaimed: false,
+      publicRootRenderCompatibilityClaimed: false,
+      publicHydrationCompatibilityClaimed: false,
+      publicEventCompatibilityClaimed: false,
+      lifecycleRows: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS.map(
+        (row) => row.id
+      ),
+      evidence: {
+        id: "source-owned-public-facade-lifecycle-update-boundary",
+        admissionRecord,
+        boundaryRecord,
+        boundaryPayload,
+        snapshotRecord,
+        snapshotPayload,
+        sourceRecord: snapshotPayload?.sourceRecord ?? null,
+        createRecord: snapshotPayload?.createRecord ?? null
+      },
+      summary: summarizePublicFacadeLifecycleSourceEvidence({
+        boundaryRecord,
+        snapshotRecord
+      }),
+      rootBridge
     };
   } catch (error) {
     return {
@@ -3616,6 +3690,7 @@ function validatePublicFacadeScenarioAdmissions({
 
 function validatePublicFacadeBoundary({
   localPublicFacadeBoundary,
+  lifecycleSourceLedger,
   publicFacadeLifecycleRows,
   blockedPublicFacadeRows,
   failures
@@ -3726,6 +3801,7 @@ function validatePublicFacadeBoundary({
   });
   validatePublicRootLifecycleBlocked({
     publicRootLifecycle: localPublicFacadeBoundary.publicRootLifecycle,
+    lifecycleSourceLedger,
     publicFacadeLifecycleRows,
     blockedPublicFacadeRows,
     failures
@@ -4007,6 +4083,7 @@ function isStablePublicRootMethodDescriptor(descriptor, expectedLength) {
 
 function validatePublicRootLifecycleBlocked({
   publicRootLifecycle,
+  lifecycleSourceLedger,
   publicFacadeLifecycleRows,
   blockedPublicFacadeRows,
   failures
@@ -4179,6 +4256,11 @@ function validatePublicRootLifecycleBlocked({
             : null,
         parentHostNodeReused: operation.parentHostNodeReused ?? false,
         privateBridgeEvidence: "wrapped-private-facade-host-output",
+        sourceOwnedLifecycleEvidence:
+          summarizePublicFacadeLifecycleSourceLedgerForRow(
+            lifecycleSourceLedger,
+            expected.id
+          ),
         publicApi: expectedLabel,
         recreateAfterUnmountEvidence:
           expected.minimalHostOutputAdmission === "recreate-after-unmount"
@@ -4277,6 +4359,11 @@ function validatePublicRootLifecycleBlocked({
         controlledDomShim: operation.controlledDomShim ?? false,
         controlledDomSnapshot: operation.controlledDomSnapshot ?? null,
         privateBridgeEvidence: "separate",
+        sourceOwnedLifecycleEvidence:
+          summarizePublicFacadeLifecycleSourceLedgerForRow(
+            lifecycleSourceLedger,
+            expected.id
+          ),
         publicApi: expectedLabel,
         scenarioId: expected.scenarioId
       });
@@ -4289,6 +4376,225 @@ function validatePublicRootLifecycleBlocked({
       operation
     });
   }
+
+  validatePublicFacadeLifecycleSourceLedger({
+    lifecycleSourceLedger,
+    expectedRows: lifecycleRowSource,
+    failures
+  });
+}
+
+function validatePublicFacadeLifecycleSourceLedger({
+  lifecycleSourceLedger,
+  expectedRows,
+  failures
+}) {
+  if (!lifecycleSourceLedger || typeof lifecycleSourceLedger !== "object") {
+    failures.push({
+      gateStatus: "missing-public-root-lifecycle-source-owned-ledger"
+    });
+    return;
+  }
+  if (lifecycleSourceLedger.loadError) {
+    failures.push({
+      gateStatus: "public-root-lifecycle-source-owned-ledger-load-error",
+      error: lifecycleSourceLedger.loadError
+    });
+    return;
+  }
+
+  const expectedRowIds = expectedRows.map((row) => row?.id ?? null);
+  if (
+    lifecycleSourceLedger.gateStatus !==
+      REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_SOURCE_LEDGER_STATUS ||
+    lifecycleSourceLedger.compatibilityClaimed !== false ||
+    lifecycleSourceLedger.publicRootCompatibilitySurface !== false ||
+    lifecycleSourceLedger.publicRenderCompatibilityClaimed !== false ||
+    lifecycleSourceLedger.publicRootRenderCompatibilityClaimed !== false ||
+    lifecycleSourceLedger.publicHydrationCompatibilityClaimed !== false ||
+    lifecycleSourceLedger.publicEventCompatibilityClaimed !== false ||
+    findFirstDifferencePath(lifecycleSourceLedger.lifecycleRows, expectedRowIds) !==
+      null
+  ) {
+    failures.push({
+      gateStatus: "public-root-lifecycle-source-owned-ledger-claims-compatibility",
+      ledger: summarizePublicFacadeLifecycleSourceLedgerForFailure(
+        lifecycleSourceLedger
+      ),
+      expectedRowIds
+    });
+    return;
+  }
+
+  const evidence = lifecycleSourceLedger.evidence;
+  const rootBridge = lifecycleSourceLedger.rootBridge;
+  if (!evidence || !rootBridge) {
+    failures.push({
+      gateStatus: "missing-public-root-lifecycle-source-owned-evidence"
+    });
+    return;
+  }
+
+  const {
+    admissionRecord,
+    boundaryRecord,
+    boundaryPayload,
+    createRecord,
+    snapshotPayload,
+    snapshotRecord,
+    sourceRecord
+  } = evidence;
+  const boundaryAccepted =
+    rootBridge.isPrivateRootLifecycleRequestBoundaryRecord(boundaryRecord) &&
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(boundaryRecord) ===
+      boundaryPayload &&
+    rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      admissionRecord,
+      boundaryRecord
+    );
+  const snapshotAccepted =
+    rootBridge.isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord(
+      snapshotRecord
+    ) &&
+    rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
+      snapshotRecord
+    ) === snapshotPayload;
+
+  if (
+    !boundaryAccepted ||
+    !snapshotAccepted ||
+    boundaryRecord.sourceOwned !== true ||
+    boundaryRecord.requestBoundaryCurrent !== true ||
+    snapshotRecord.sourceOwned !== true ||
+    snapshotRecord.fakeDomOnly !== true ||
+    snapshotRecord.markerListenerStatePreserved !== true ||
+    boundaryPayload?.sourceRecord !== sourceRecord ||
+    snapshotPayload?.sourceRecord !== sourceRecord ||
+    snapshotPayload?.createRecord !== createRecord ||
+    boundaryRecord.sourceRequestId !== snapshotRecord.sourceRequestId ||
+    boundaryRecord.sourceRequestSequence !==
+      snapshotRecord.sourceRequestSequence ||
+    boundaryRecord.rootId !== snapshotRecord.rootId ||
+    boundaryRecord.publicRootExecution !== false ||
+    boundaryRecord.nativeExecution !== false ||
+    boundaryRecord.reconcilerExecution !== false ||
+    boundaryRecord.domMutation !== false ||
+    boundaryRecord.browserDomMutation !== false ||
+    boundaryRecord.markerWrites !== false ||
+    boundaryRecord.listenerInstallation !== false ||
+    boundaryRecord.hydration !== false ||
+    boundaryRecord.eventDispatch !== false ||
+    boundaryRecord.refEffects !== false ||
+    boundaryRecord.packageCompatibility !== false ||
+    boundaryRecord.compatibilityClaimed !== false ||
+    snapshotRecord.publicRootExecution !== false ||
+    snapshotRecord.publicRootCompatibilitySurface !== false ||
+    snapshotRecord.nativeExecution !== false ||
+    snapshotRecord.reconcilerExecution !== false ||
+    snapshotRecord.browserDomMutation !== false ||
+    snapshotRecord.markerWrites !== false ||
+    snapshotRecord.listenerInstallation !== false ||
+    snapshotRecord.hydration !== false ||
+    snapshotRecord.eventDispatch !== false ||
+    snapshotRecord.compatibilityClaimed !== false ||
+    snapshotRecord.rootMarkerPropertyCountBefore !==
+      snapshotRecord.rootMarkerPropertyCountAfter ||
+    snapshotRecord.rootListenerRegistrationCountBefore !==
+      snapshotRecord.rootListenerRegistrationCountAfter ||
+    snapshotRecord.ownerDocumentListenerRegistrationCountBefore !==
+      snapshotRecord.ownerDocumentListenerRegistrationCountAfter ||
+    snapshotRecord.rootMutationCountBefore !==
+      snapshotRecord.rootMutationCountAfter ||
+    snapshotRecord.ownerDocumentMutationCountBefore !==
+      snapshotRecord.ownerDocumentMutationCountAfter
+  ) {
+    failures.push({
+      gateStatus: "public-root-lifecycle-source-owned-evidence-rejected",
+      boundaryAccepted,
+      snapshotAccepted,
+      evidence: summarizePublicFacadeLifecycleSourceEvidence({
+        boundaryRecord,
+        snapshotRecord
+      })
+    });
+  }
+}
+
+function summarizePublicFacadeLifecycleSourceLedgerForRow(
+  lifecycleSourceLedger,
+  lifecycleRowId
+) {
+  if (!lifecycleSourceLedger || lifecycleSourceLedger.loadError) {
+    return {
+      gateStatus: "missing",
+      lifecycleRowId
+    };
+  }
+  return {
+    ...lifecycleSourceLedger.summary,
+    lifecycleRowId,
+    sourceOwned: true
+  };
+}
+
+function summarizePublicFacadeLifecycleSourceLedgerForFailure(
+  lifecycleSourceLedger
+) {
+  return {
+    gateStatus: lifecycleSourceLedger?.gateStatus ?? null,
+    compatibilityClaimed: lifecycleSourceLedger?.compatibilityClaimed ?? null,
+    publicRootCompatibilitySurface:
+      lifecycleSourceLedger?.publicRootCompatibilitySurface ?? null,
+    publicRenderCompatibilityClaimed:
+      lifecycleSourceLedger?.publicRenderCompatibilityClaimed ?? null,
+    publicRootRenderCompatibilityClaimed:
+      lifecycleSourceLedger?.publicRootRenderCompatibilityClaimed ?? null,
+    publicHydrationCompatibilityClaimed:
+      lifecycleSourceLedger?.publicHydrationCompatibilityClaimed ?? null,
+    publicEventCompatibilityClaimed:
+      lifecycleSourceLedger?.publicEventCompatibilityClaimed ?? null,
+    lifecycleRows: lifecycleSourceLedger?.lifecycleRows ?? null
+  };
+}
+
+function summarizePublicFacadeLifecycleSourceEvidence({
+  boundaryRecord,
+  snapshotRecord
+}) {
+  return {
+    gateStatus:
+      REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_SOURCE_LEDGER_STATUS,
+    boundaryId: boundaryRecord?.boundaryId ?? null,
+    boundarySourceOwned: boundaryRecord?.sourceOwned ?? null,
+    requestBoundaryCurrent: boundaryRecord?.requestBoundaryCurrent ?? null,
+    sourceRequestId: boundaryRecord?.sourceRequestId ?? null,
+    sourceRequestSequence: boundaryRecord?.sourceRequestSequence ?? null,
+    rootId: boundaryRecord?.rootId ?? null,
+    snapshotId: snapshotRecord?.snapshotId ?? null,
+    snapshotPhase: snapshotRecord?.phase ?? null,
+    snapshotSourceOwned: snapshotRecord?.sourceOwned ?? null,
+    fakeDomOnly: snapshotRecord?.fakeDomOnly ?? null,
+    markerListenerStatePreserved:
+      snapshotRecord?.markerListenerStatePreserved ?? null,
+    rootMarkerPropertyCountBefore:
+      snapshotRecord?.rootMarkerPropertyCountBefore ?? null,
+    rootMarkerPropertyCountAfter:
+      snapshotRecord?.rootMarkerPropertyCountAfter ?? null,
+    rootListenerRegistrationCountBefore:
+      snapshotRecord?.rootListenerRegistrationCountBefore ?? null,
+    rootListenerRegistrationCountAfter:
+      snapshotRecord?.rootListenerRegistrationCountAfter ?? null,
+    ownerDocumentListenerRegistrationCountBefore:
+      snapshotRecord?.ownerDocumentListenerRegistrationCountBefore ?? null,
+    ownerDocumentListenerRegistrationCountAfter:
+      snapshotRecord?.ownerDocumentListenerRegistrationCountAfter ?? null,
+    rootMutationCountBefore: snapshotRecord?.rootMutationCountBefore ?? null,
+    rootMutationCountAfter: snapshotRecord?.rootMutationCountAfter ?? null,
+    ownerDocumentMutationCountBefore:
+      snapshotRecord?.ownerDocumentMutationCountBefore ?? null,
+    ownerDocumentMutationCountAfter:
+      snapshotRecord?.ownerDocumentMutationCountAfter ?? null
+  };
 }
 
 function getPublicRenderExpectedTextContent(expected) {

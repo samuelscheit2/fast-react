@@ -42,6 +42,10 @@ import {
   inspectReactDomPrivateRootBridgeBoundary,
   inspectReactDomRootPublicFacadeBoundary
 } from "../src/react-dom-root-render-e2e-conformance-gate.mjs";
+import {
+  REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_SOURCE_LEDGER_STATUS,
+  inspectReactDomRootPublicFacadeLifecycleSourceLedger
+} from "../src/react-dom-root-public-facade-blocked-gate.mjs";
 
 const rootRenderOracle = readCheckedReactDomRootRenderE2EOracle();
 const clientRootOracle = readCheckedReactDomClientRootOracle();
@@ -5760,6 +5764,23 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
   for (const row of lifecycleRows) {
     assert.equal(row.gateStatus, REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS);
     assert.equal(row.compatibilityClaimed, false);
+    assert.equal(
+      row.sourceOwnedLifecycleEvidence.gateStatus,
+      REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_SOURCE_LEDGER_STATUS
+    );
+    assert.equal(row.sourceOwnedLifecycleEvidence.sourceOwned, true);
+    assert.equal(
+      row.sourceOwnedLifecycleEvidence.snapshotPhase,
+      "update"
+    );
+    assert.equal(
+      row.sourceOwnedLifecycleEvidence.rootMutationCountBefore,
+      row.sourceOwnedLifecycleEvidence.rootMutationCountAfter
+    );
+    assert.equal(
+      row.sourceOwnedLifecycleEvidence.rootListenerRegistrationCountBefore,
+      row.sourceOwnedLifecycleEvidence.rootListenerRegistrationCountAfter
+    );
     if (row.id !== "public-create-root-render-initial") {
       continue;
     }
@@ -6037,6 +6058,174 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
     gate.blockedPrivateBridgeRows.some(
       (row) => row.id === "private-root-unmount-admission"
     )
+  );
+});
+
+test("React DOM public root facade lifecycle source ledger rejects hostile private evidence", () => {
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  const privateBoundary = inspectReactDomPrivateRootBridgeBoundary();
+  const ledger = inspectReactDomRootPublicFacadeLifecycleSourceLedger();
+  const {
+    createSourceOwnedReactDomLifecycleBoundary
+  } = require("../src/react-dom-source-owned-lifecycle-boundary.cjs");
+
+  const assertRejected = (lifecycleSourceLedger, label) => {
+    const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle,
+      clientRootOracle,
+      localPublicFacadeBoundary: publicBoundary,
+      privateRootBridgeBoundary: privateBoundary,
+      lifecycleSourceLedger
+    });
+    assert.equal(gate.ok, false, label);
+    assert.ok(
+      gate.blockedPublicFacadeRows.some(
+        (row) => row.id === "public-create-root-render-div-text"
+      ),
+      label
+    );
+    assert.ok(
+      gate.failures.some(
+        (failure) =>
+          failure.gateStatus ===
+            "public-root-lifecycle-source-owned-evidence-rejected" ||
+          failure.gateStatus ===
+            "missing-public-root-lifecycle-source-owned-ledger" ||
+          failure.gateStatus ===
+            "public-root-lifecycle-source-owned-ledger-claims-compatibility"
+      ),
+      label
+    );
+  };
+
+  assertRejected(null, "missing lifecycle boundary evidence");
+
+  assertRejected(
+    {
+      ...ledger,
+      evidence: {
+        ...ledger.evidence,
+        boundaryRecord: {
+          ...ledger.evidence.boundaryRecord
+        }
+      }
+    },
+    "cloned boundary object"
+  );
+
+  const foreignLedger = inspectReactDomRootPublicFacadeLifecycleSourceLedger();
+  assertRejected(
+    {
+      ...ledger,
+      evidence: {
+        ...ledger.evidence,
+        boundaryRecord: foreignLedger.evidence.boundaryRecord
+      },
+      summary: foreignLedger.summary
+    },
+    "foreign-root boundary"
+  );
+
+  const staleLifecycle =
+    createSourceOwnedReactDomLifecycleBoundary("public-facade-stale-ledger");
+  assertRejected(
+    {
+      ...ledger,
+      evidence: {
+        ...ledger.evidence,
+        admissionRecord: staleLifecycle.initialDiagnostic.lifecycleRequestAdmission,
+        boundaryRecord: staleLifecycle.initialDiagnostic.lifecycleRequestBoundary,
+        boundaryPayload:
+          staleLifecycle.rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+            staleLifecycle.initialDiagnostic.lifecycleRequestBoundary
+          ),
+        snapshotRecord: staleLifecycle.initialDiagnostic.sourceContainerSnapshot,
+        snapshotPayload:
+          staleLifecycle.rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
+            staleLifecycle.initialDiagnostic.sourceContainerSnapshot
+          ),
+        sourceRecord:
+          staleLifecycle.rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
+            staleLifecycle.initialDiagnostic.sourceContainerSnapshot
+          )?.sourceRecord ?? null
+      },
+      rootBridge: staleLifecycle.rootBridge
+    },
+    "stale same-container boundary"
+  );
+
+  for (const mutate of [
+    (candidate) => {
+      candidate.boundaryRecord = {
+        ...candidate.boundaryRecord,
+        sourceOwned: false
+      };
+    },
+    (candidate) => {
+      candidate.boundaryRecord = {
+        ...candidate.boundaryRecord,
+        requestBoundaryCurrent: false
+      };
+    },
+    (candidate) => {
+      candidate.boundaryRecord = {
+        ...candidate.boundaryRecord,
+        publicRootExecution: true
+      };
+    },
+    (candidate) => {
+      candidate.boundaryRecord = {
+        ...candidate.boundaryRecord,
+        listenerInstallation: true
+      };
+    },
+    (candidate) => {
+      candidate.boundaryRecord = {
+        ...candidate.boundaryRecord,
+        compatibilityClaimed: true
+      };
+    },
+    (candidate) => {
+      candidate.snapshotRecord = {
+        ...candidate.snapshotRecord,
+        browserDomMutation: true
+      };
+    },
+    (candidate) => {
+      candidate.snapshotRecord = {
+        ...candidate.snapshotRecord,
+        rootListenerRegistrationCountAfter:
+          candidate.snapshotRecord.rootListenerRegistrationCountBefore + 1
+      };
+    },
+    (candidate) => {
+      candidate.snapshotRecord = {
+        ...candidate.snapshotRecord,
+        ownerDocumentMutationCountAfter:
+          candidate.snapshotRecord.ownerDocumentMutationCountBefore + 1
+      };
+    }
+  ]) {
+    const evidence = {
+      ...ledger.evidence
+    };
+    mutate(evidence);
+    assertRejected(
+      {
+        ...ledger,
+        evidence
+      },
+      "tampered source-owned lifecycle evidence"
+    );
+  }
+
+  assertRejected(
+    {
+      ...ledger,
+      compatibilityClaimed: true
+    },
+    "ledger public compatibility promotion"
   );
 });
 
