@@ -321,7 +321,7 @@
 		{
 			"id": 1283,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "react-test-renderer blocker next-lane scout",
 			"agent": "scout_1283_test_renderer_next"
 		},
@@ -373,6 +373,15 @@
 			"title": "React DOM root object prototype blocker",
 			"agent": "worker_1289_react_dom_root_object_prototype_blocker",
 			"branch": "worker/1289-react-dom-root-object-prototype-blocker",
+			"audits": []
+		},
+		{
+			"id": 1290,
+			"type": "worker",
+			"status": "active",
+			"title": "react-test-renderer create-routing source-proof hardening",
+			"agent": "worker_1290_test_renderer_create_routing_source_proof",
+			"branch": "worker/1290-test-renderer-create-routing-source-proof",
 			"audits": []
 		}
 	]
