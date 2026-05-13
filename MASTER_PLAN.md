@@ -73,11 +73,14 @@ Current orchestration queue:
 - Scout 1282 reported a concrete React DOM next-lane candidate.
 - Scout 1283 reported a concrete react-test-renderer next-lane candidate.
 - Scout 1285 reported a concrete React core/hooks next-lane candidate.
-- Worker 1287 is repair-active for native cleanup-hook exact evidence-set
+- Worker 1287 is repair-auditing for native cleanup-hook exact evidence-set
   counting after source audit found the Rust/N-API cleanup path still accepted
   only root/value evidence.
 - Worker 1290 is active for react-test-renderer create-routing source-proof
   hardening.
+- Scouts 1291 through 1295 are active for the next Rust, React DOM,
+  react-test-renderer, native/no-load, and React core/hooks lanes, scoped away
+  from the active 1287 repair and 1290 worker.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

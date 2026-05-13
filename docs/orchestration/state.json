@@ -354,13 +354,15 @@
 		{
 			"id": 1287,
 			"type": "worker",
-			"status": "repair-active",
+			"status": "repair-auditing",
 			"title": "Native cleanup-hook preflight exact evidence-set counting",
 			"agent": "worker_1287_native_cleanup_hook_exact_set",
 			"branch": "worker/1287-native-cleanup-hook-exact-set",
 			"audits": [
 				"audit_1287_source_contract",
-				"audit_1287_verification"
+				"audit_1287_verification",
+				"audit_1287_repair_source",
+				"audit_1287_repair_verification"
 			]
 		},
 		{
@@ -395,6 +397,41 @@
 			"agent": "worker_1290_test_renderer_create_routing_source_proof",
 			"branch": "worker/1290-test-renderer-create-routing-source-proof",
 			"audits": []
+		},
+		{
+			"id": 1291,
+			"type": "scout",
+			"status": "active",
+			"title": "Rust reconciler/root/scheduler next-lane scout",
+			"agent": "scout_1291_rust_root_next"
+		},
+		{
+			"id": 1292,
+			"type": "scout",
+			"status": "active",
+			"title": "React DOM facade/root next-lane scout",
+			"agent": "scout_1292_react_dom_next"
+		},
+		{
+			"id": 1293,
+			"type": "scout",
+			"status": "active",
+			"title": "react-test-renderer next-lane scout",
+			"agent": "scout_1293_test_renderer_next"
+		},
+		{
+			"id": 1294,
+			"type": "scout",
+			"status": "active",
+			"title": "Native/no-load next-lane scout",
+			"agent": "scout_1294_native_next"
+		},
+		{
+			"id": 1295,
+			"type": "scout",
+			"status": "active",
+			"title": "React core/hooks next-lane scout",
+			"agent": "scout_1295_react_core_next"
 		}
 	]
 }
