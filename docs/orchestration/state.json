@@ -487,7 +487,7 @@
 		{
 			"id": 1300,
 			"type": "worker",
-			"status": "repair-active",
+			"status": "auditing",
 			"title": "react-test-renderer TestInstance query-bridge source proof",
 			"agent": "worker_1300_test_renderer_query_bridge_source_proof",
 			"branch": "worker/1300-test-renderer-query-bridge-source-proof",
@@ -507,7 +507,9 @@
 				"audit_1300_repair6_source",
 				"audit_1300_repair6_verification",
 				"audit_1300_repair7_source",
-				"audit_1300_repair7_verification"
+				"audit_1300_repair7_verification",
+				"audit_1300_repair8_source",
+				"audit_1300_repair8_verification"
 			]
 		},
 		{
@@ -610,37 +612,53 @@
 		{
 			"id": 1311,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Rust reconciler/root/scheduler next-lane scout",
 			"agent": "scout_1311_rust_root_next"
 		},
 		{
 			"id": 1312,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "React DOM facade/root next-lane scout",
 			"agent": "scout_1312_react_dom_next"
 		},
 		{
 			"id": 1313,
 			"type": "scout",
-			"status": "active",
+			"status": "no-report",
 			"title": "react-test-renderer next-lane scout",
 			"agent": "scout_1313_test_renderer_next"
 		},
 		{
 			"id": 1314,
 			"type": "scout",
-			"status": "active",
+			"status": "no-report",
 			"title": "Native/no-load next-lane scout",
 			"agent": "scout_1314_native_next"
 		},
 		{
 			"id": 1315,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "React core/hooks next-lane scout",
 			"agent": "scout_1315_react_core_next"
+		},
+		{
+			"id": 1316,
+			"type": "worker",
+			"status": "no-report",
+			"title": "Queued minimal HostRoot update-to-null cleanup ownership transfer",
+			"agent": "worker_1316_queued_cleanup_update_transfer",
+			"branch": "worker/1316-queued-cleanup-update-transfer"
+		},
+		{
+			"id": 1317,
+			"type": "worker",
+			"status": "no-report",
+			"title": "React DOM createRoot container capability-alias blocker",
+			"agent": "worker_1317_react_dom_container_alias_blocker",
+			"branch": "worker/1317-react-dom-container-alias-blocker"
 		}
 	]
 }

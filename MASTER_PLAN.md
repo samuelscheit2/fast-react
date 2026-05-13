@@ -75,7 +75,7 @@ Current orchestration queue:
 - Scout 1283 reported a concrete react-test-renderer next-lane candidate.
 - Scout 1285 reported a concrete React core/hooks next-lane candidate.
 - Scouts 1291 through 1295 reported concrete next-lane candidates.
-- Worker 1300 eighth repair is active for react-test-renderer TestInstance
+- Worker 1300 eighth repair is under audit for react-test-renderer TestInstance
   query-bridge local-gate source proofing after source audit found detached CJS
   stub false greens, broken return wiring, first-return/top-level binding gaps,
   control-flow, spread override, nested-return, guard-binding, duplicate-key,
@@ -93,8 +93,10 @@ Current orchestration queue:
   1308 has been reviewed, merged, and recorded as accepted history.
 - Scout 1303 reported a react-test-renderer error-surface row-contract lane;
   Worker 1310 has been reviewed, merged, and recorded as accepted history.
-- Scouts 1311 through 1315 are active across Rust root/scheduler, React DOM,
-  react-test-renderer, native/no-load, and React core/hooks next-lane discovery.
+- Scouts 1311, 1312, and 1315 reported concrete Rust root/scheduler, React DOM,
+  and React core/hooks next-lane candidates. Scouts 1313 and 1314 returned no
+  report. Workers 1316 and 1317 were attempted from the 1311/1312 reports but
+  returned no implementation report and are not accepted input.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
