@@ -295,11 +295,14 @@
 		{
 			"id": 1280,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Transition hook dispatcher metadata source-proof canary",
 			"agent": "worker_1280_transition_hook_dispatcher_metadata",
 			"branch": "worker/1280-transition-hook-dispatcher-metadata",
-			"audits": []
+			"audits": [
+				"audit_1280_source_contract",
+				"audit_1280_verification"
+			]
 		}
 	]
 }
