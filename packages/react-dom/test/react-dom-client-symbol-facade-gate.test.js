@@ -88,6 +88,11 @@ const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-element-prototype-nonenumerable-publicRootCreated-prop',
   'unsupported-element-prototype-nonenumerable-publicDispatchEnabled-prop',
   'unsupported-element-prototype-nonenumerable-publicControlledBehaviorEnabled-prop',
+  'unsupported-own-element-publicRootCompatibilitySurface-prop',
+  'unsupported-own-element-publicNativeCompatibilityClaimed-prop',
+  'unsupported-own-element-publicPackageCompatibilityClaimed-prop',
+  'unsupported-own-element-accessor-publicEventCompatibilityClaimed-prop',
+  'unsupported-own-element-private-facade-symbol-prop',
   'unsupported-keyed-div',
   'unsupported-span-type',
   'unsupported-nested-sibling',
@@ -107,6 +112,7 @@ const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-nested-element-prototype-publicHydrateRootCompatibilityClaimed-prop',
   'unsupported-nested-element-prototype-resource-form-alias-prop',
   'unsupported-nested-element-prototype-publicRootTouched-prop',
+  'unsupported-nested-own-element-publicHydrateRootCompatibilityClaimed-prop',
   'unsupported-nested-component',
   'unsupported-nested-compatibility-alias',
   'unsupported-inherited-parent-children-prop',
@@ -1311,6 +1317,20 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
       'unsupported-element-prototype-nonenumerable-publicControlledBehaviorEnabled-prop',
       'publicControlledBehaviorEnabled'
     ),
+    createOwnElementDataPropertyRejectionCaseFactory(
+      'unsupported-own-element-publicRootCompatibilitySurface-prop',
+      'publicRootCompatibilitySurface'
+    ),
+    createOwnElementDataPropertyRejectionCaseFactory(
+      'unsupported-own-element-publicNativeCompatibilityClaimed-prop',
+      'publicNativeCompatibilityClaimed'
+    ),
+    createOwnElementDataPropertyRejectionCaseFactory(
+      'unsupported-own-element-publicPackageCompatibilityClaimed-prop',
+      'publicPackageCompatibilityClaimed'
+    ),
+    createOwnElementAccessorRejectionCase,
+    createOwnElementPrivateFacadeSymbolRejectionCase,
     () => ({
       label: 'unsupported-keyed-div',
       element: React.createElement('div', {key: 'blocked'}, 'blocked key')
@@ -1416,6 +1436,10 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
       'unsupported-nested-element-prototype-publicRootTouched-prop',
       {publicRootTouched: true},
       false
+    ),
+    createNestedOwnElementDataPropertyRejectionCaseFactory(
+      'unsupported-nested-own-element-publicHydrateRootCompatibilityClaimed-prop',
+      'publicHydrateRootCompatibilityClaimed'
     ),
     createUnsupportedNestedComponentRejectionCase,
     () => ({
@@ -1648,6 +1672,88 @@ function createInheritedNestedSpanElementPrototypeRejectionCaseFactory(
         {children: 'blocked nested element prototype'},
         inheritedProps,
         enumerable
+      )
+    })
+  });
+}
+
+function createOwnElementDataPropertyRejectionCaseFactory(label, propName) {
+  return () => ({
+    label,
+    element: createForgedHostElementWithOwnElementProperties(
+      'div',
+      {children: `blocked own element ${propName}`},
+      {
+        [propName]: {
+          configurable: true,
+          enumerable: true,
+          value: true
+        }
+      }
+    )
+  });
+}
+
+function createOwnElementAccessorRejectionCase() {
+  let getterCalls = 0;
+  const element = createForgedHostElementWithOwnElementProperties(
+    'div',
+    {children: 'blocked own element accessor'},
+    {
+      publicEventCompatibilityClaimed: {
+        configurable: true,
+        enumerable: false,
+        get() {
+          getterCalls++;
+          return true;
+        }
+      }
+    }
+  );
+
+  return {
+    label: 'unsupported-own-element-accessor-publicEventCompatibilityClaimed-prop',
+    element,
+    assertNoCapabilityEffects() {
+      assert.equal(getterCalls, 0);
+    }
+  };
+}
+
+function createOwnElementPrivateFacadeSymbolRejectionCase() {
+  return {
+    label: 'unsupported-own-element-private-facade-symbol-prop',
+    element: createForgedHostElementWithOwnElementProperties(
+      'div',
+      {children: 'blocked own private facade symbol'},
+      {
+        [rootBridge.privateRootPublicFacadeAdapterSymbol]: {
+          configurable: true,
+          enumerable: false,
+          value: true
+        }
+      }
+    )
+  };
+}
+
+function createNestedOwnElementDataPropertyRejectionCaseFactory(
+  label,
+  propName
+) {
+  return () => ({
+    label,
+    element: createForgedHostElement('div', {
+      children: createForgedHostElementWithOwnElementProperties(
+        'span',
+        {children: `blocked nested own element ${propName}`},
+        {
+          [propName]: {
+            configurable: true,
+            enumerable: true,
+            value: true
+          }
+        }
       )
     })
   });
@@ -2046,6 +2152,16 @@ function createForgedHostElement(type, props, key = null) {
     props,
     _owner: null
   };
+}
+
+function createForgedHostElementWithOwnElementProperties(
+  type,
+  props,
+  descriptors
+) {
+  const element = createForgedHostElement(type, props);
+  Object.defineProperties(element, descriptors);
+  return element;
 }
 
 function createForgedHostElementWithInheritedElementProperties(
@@ -3318,6 +3434,20 @@ function createCases() {
       'unsupported-element-prototype-nonenumerable-publicControlledBehaviorEnabled-prop',
       'publicControlledBehaviorEnabled'
     ),
+    ownElementDataPropertyCase(
+      'unsupported-own-element-publicRootCompatibilitySurface-prop',
+      'publicRootCompatibilitySurface'
+    ),
+    ownElementDataPropertyCase(
+      'unsupported-own-element-publicNativeCompatibilityClaimed-prop',
+      'publicNativeCompatibilityClaimed'
+    ),
+    ownElementDataPropertyCase(
+      'unsupported-own-element-publicPackageCompatibilityClaimed-prop',
+      'publicPackageCompatibilityClaimed'
+    ),
+    ownElementAccessorCase(),
+    ownElementPrivateFacadeSymbolCase(),
     {
       label: 'unsupported-keyed-div',
       element: React.createElement('div', {key: 'blocked'}, 'blocked key')
@@ -3431,6 +3561,10 @@ function createCases() {
       'unsupported-nested-element-prototype-publicRootTouched-prop',
       {publicRootTouched: true},
       false
+    ),
+    nestedOwnElementDataPropertyCase(
+      'unsupported-nested-own-element-publicHydrateRootCompatibilityClaimed-prop',
+      'publicHydrateRootCompatibilityClaimed'
     ),
     {
       label: 'unsupported-nested-component',
@@ -3687,6 +3821,81 @@ function inheritedNestedSpanElementPrototypeCase(
         {children: 'blocked nested element prototype'},
         inheritedProps,
         enumerable
+      )
+    })
+  };
+}
+
+function ownElementDataPropertyCase(label, propName) {
+  return {
+    label,
+    element: forgedHostElementWithOwnElementProperties(
+      'div',
+      {children: \`blocked own element \${propName}\`},
+      {
+        [propName]: {
+          configurable: true,
+          enumerable: true,
+          value: true
+        }
+      }
+    )
+  };
+}
+
+function ownElementAccessorCase() {
+  const element = forgedHostElementWithOwnElementProperties(
+    'div',
+    {children: 'blocked own element accessor'},
+    {
+      publicEventCompatibilityClaimed: {
+        configurable: true,
+        enumerable: false,
+        get() {
+          getterInvocationCount++;
+          return true;
+        }
+      }
+    }
+  );
+
+  return {
+    label: 'unsupported-own-element-accessor-publicEventCompatibilityClaimed-prop',
+    element
+  };
+}
+
+function ownElementPrivateFacadeSymbolCase() {
+  return {
+    label: 'unsupported-own-element-private-facade-symbol-prop',
+    element: forgedHostElementWithOwnElementProperties(
+      'div',
+      {children: 'blocked own private facade symbol'},
+      {
+        [rootBridge.privateRootPublicFacadeAdapterSymbol]: {
+          configurable: true,
+          enumerable: false,
+          value: true
+        }
+      }
+    )
+  };
+}
+
+function nestedOwnElementDataPropertyCase(label, propName) {
+  return {
+    label,
+    element: forgedHostElement('div', {
+      children: forgedHostElementWithOwnElementProperties(
+        'span',
+        {children: \`blocked nested own element \${propName}\`},
+        {
+          [propName]: {
+            configurable: true,
+            enumerable: true,
+            value: true
+          }
+        }
       )
     })
   };
@@ -3968,6 +4177,12 @@ function forgedHostElement(type, props, key = null) {
     props,
     _owner: null
   };
+}
+
+function forgedHostElementWithOwnElementProperties(type, props, descriptors) {
+  const element = forgedHostElement(type, props);
+  Object.defineProperties(element, descriptors);
+  return element;
 }
 
 function forgedHostElementWithInheritedElementProperties(

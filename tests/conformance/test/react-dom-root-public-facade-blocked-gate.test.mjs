@@ -6045,6 +6045,45 @@ test("React DOM public root facade records hostile render capability rejections"
     rejectionRows.some(
       (row) =>
         row.label ===
+          "unsupported-own-element-publicRootCompatibilitySurface-prop" &&
+        row.blockedSurface === "element-shell-compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-own-element-publicNativeCompatibilityClaimed-prop" &&
+        row.blockedSurface === "element-shell-compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-own-element-publicPackageCompatibilityClaimed-prop" &&
+        row.blockedSurface === "element-shell-compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-own-element-accessor-publicEventCompatibilityClaimed-prop" &&
+        row.blockedSurface === "element-shell-accessor"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-own-element-private-facade-symbol-prop" &&
+        row.blockedSurface === "element-shell-symbol"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
           "unsupported-nested-inherited-nonenumerable-publicHydrateRootCompatibilityClaimed-prop" &&
         row.blockedSurface === "compatibility-claim"
     )
@@ -6070,6 +6109,14 @@ test("React DOM public root facade records hostile render capability rejections"
       (row) =>
         row.label === "unsupported-nested-element-prototype-publicRootTouched-prop" &&
         row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-nested-own-element-publicHydrateRootCompatibilityClaimed-prop" &&
+        row.blockedSurface === "element-shell-compatibility-claim"
     )
   );
   assert.ok(

@@ -1075,6 +1075,47 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "controlled-input"
     }),
     publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-own-element-publicrootcompatibilitysurface-prop",
+      label: "unsupported-own-element-publicRootCompatibilitySurface-prop",
+      publicApi:
+        "root.render(forged <div> with own publicRootCompatibilitySurface element alias)",
+      category: "browser-dom-expansion",
+      blockedSurface: "element-shell-compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-own-element-publicnativecompatibilityclaimed-prop",
+      label: "unsupported-own-element-publicNativeCompatibilityClaimed-prop",
+      publicApi:
+        "root.render(forged <div> with own publicNativeCompatibilityClaimed element alias)",
+      category: "browser-dom-expansion",
+      blockedSurface: "element-shell-compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-own-element-publicpackagecompatibilityclaimed-prop",
+      label: "unsupported-own-element-publicPackageCompatibilityClaimed-prop",
+      publicApi:
+        "root.render(forged <div> with own publicPackageCompatibilityClaimed element alias)",
+      category: "browser-dom-expansion",
+      blockedSurface: "element-shell-compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-own-element-accessor-publiceventcompatibilityclaimed-prop",
+      label:
+        "unsupported-own-element-accessor-publicEventCompatibilityClaimed-prop",
+      publicApi:
+        "root.render(forged <div> with own accessor publicEventCompatibilityClaimed element alias)",
+      category: "browser-dom-expansion",
+      blockedSurface: "element-shell-accessor"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-own-element-private-facade-symbol-prop",
+      label: "unsupported-own-element-private-facade-symbol-prop",
+      publicApi:
+        "root.render(forged <div> with own private facade symbol element marker)",
+      category: "browser-dom-expansion",
+      blockedSurface: "element-shell-symbol"
+    }),
+    publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-keyed-div",
       label: "unsupported-keyed-div",
       publicApi: "root.render(<div key=\"blocked\">text</div>)",
@@ -1222,6 +1263,15 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
         "root.render(forged <div><span inherited element publicRootTouched /></div>)",
       category: "browser-dom-expansion",
       blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-own-element-publichydraterootcompatibilityclaimed-prop",
+      label:
+        "unsupported-nested-own-element-publicHydrateRootCompatibilityClaimed-prop",
+      publicApi:
+        "root.render(forged <div><span own publicHydrateRootCompatibilityClaimed element alias /></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "element-shell-compatibility-claim"
     }),
     publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-nested-component",
