@@ -69,6 +69,9 @@ Current orchestration queue:
   capability blockers.
 - Worker 1272 is under audit for test-renderer private-admission source-token
   comment proofing.
+- Scouts 1273, 1274, 1275, and 1276 are active for Rust root/work-loop, React
+  hooks/core facade, native/no-load, and react-test-renderer next-lane
+  candidates.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

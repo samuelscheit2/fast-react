@@ -221,6 +221,34 @@
 				"audit_1272_source_contract",
 				"audit_1272_verification"
 			]
+		},
+		{
+			"id": 1273,
+			"type": "scout",
+			"status": "active",
+			"title": "Rust root/work-loop next-lane scout",
+			"agent": "scout_1273_rust_root_next"
+		},
+		{
+			"id": 1274,
+			"type": "scout",
+			"status": "active",
+			"title": "React hooks/core facade next-lane scout",
+			"agent": "scout_1274_react_hooks_next"
+		},
+		{
+			"id": 1275,
+			"type": "scout",
+			"status": "active",
+			"title": "Native/no-load private-ledger next-lane scout",
+			"agent": "scout_1275_native_next"
+		},
+		{
+			"id": 1276,
+			"type": "scout",
+			"status": "active",
+			"title": "react-test-renderer private/public blocker next-lane scout",
+			"agent": "scout_1276_test_renderer_next"
 		}
 	]
 }
