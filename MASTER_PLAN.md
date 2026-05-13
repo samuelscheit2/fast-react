@@ -86,8 +86,8 @@ Current orchestration queue:
 - Scout 1302 reported a React DOM conformance-only nested lifecycle lane;
   Worker 1307 has been reviewed, merged, and recorded as accepted history.
 - Scout 1304 reported a native no-load generation source-ownership lane;
-  Worker 1309 is under repair after source audit found inherited
-  `sourceIdentifierEvidenceByFile` alias gaps.
+  Worker 1309 repair completed and is under source/verification audit after
+  source audit found inherited `sourceIdentifierEvidenceByFile` alias gaps.
 - Scout 1305 reported a React Children currentness override alias lane; Worker
   1308 has been reviewed, merged, and recorded as accepted history.
 - Scout 1303 reported a react-test-renderer error-surface row-contract lane;
