@@ -508,6 +508,13 @@ function generationAdmissionAccessorClaimRow(row, field) {
   return Object.freeze(nextRow);
 }
 
+function generationAdmissionExtraPropertyRow(row, key, descriptor) {
+  const nextRow = { ...row };
+  Object.defineProperty(nextRow, key, descriptor);
+
+  return Object.freeze(nextRow);
+}
+
 function assertPrivateGenerationAdmissionLedger(native) {
   const ledger = getGenerationAdmissionLedger(native);
   const validateGenerationAdmissionRows =
@@ -757,6 +764,142 @@ function assertPrivateGenerationAdmissionLedger(native) {
     assert.equal(row.packageExportCompatibility, false, diagnosticCase.id);
     assertNoNativeGenerationLedgerExecution(result, diagnosticCase.id);
     assertNoNativeGenerationLedgerExecution(row, diagnosticCase.id);
+  }
+
+  const extraOwnKeyCases = [
+    {
+      id: 'generation-ledger-extra-worker-progress-path',
+      row: generationAdmissionRow(canonicalReplay, {
+        workerProgressEvidencePath:
+          'worker-progress/native-json-batch-lifecycle-generation.md'
+      }),
+      extraKey: 'workerProgressEvidencePath'
+    },
+    {
+      id: 'generation-ledger-non-enumerable-source-alias',
+      row: generationAdmissionExtraPropertyRow(
+        canonicalReplay,
+        'sourceEvidenceAlias',
+        {
+          value: 'caller-supplied-source-alias',
+          enumerable: false
+        }
+      ),
+      extraKey: 'sourceEvidenceAlias'
+    },
+    {
+      id: 'generation-ledger-symbol-package-export-false',
+      row: generationAdmissionExtraPropertyRow(
+        canonicalReplay,
+        Symbol.for('packageExportsChanged'),
+        {
+          value: false,
+          enumerable: true
+        }
+      ),
+      extraSymbol: Symbol.for('packageExportsChanged')
+    }
+  ];
+
+  for (const diagnosticCase of extraOwnKeyCases) {
+    if (diagnosticCase.extraKey !== undefined) {
+      assert.ok(
+        Object.getOwnPropertyDescriptor(
+          diagnosticCase.row,
+          diagnosticCase.extraKey
+        ),
+        diagnosticCase.id
+      );
+    }
+    if (diagnosticCase.extraSymbol !== undefined) {
+      assert.equal(
+        Object.getOwnPropertySymbols(diagnosticCase.row).includes(
+          diagnosticCase.extraSymbol
+        ),
+        true,
+        diagnosticCase.id
+      );
+    }
+
+    const result = validateGenerationAdmissionRows([diagnosticCase.row]);
+    assert.ok(Object.isFrozen(result), diagnosticCase.id);
+    assert.ok(Object.isFrozen(result.rows), diagnosticCase.id);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(result.rejectedEvidenceCount, 1, diagnosticCase.id);
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+
+    const [row] = result.rows;
+    assert.ok(Object.isFrozen(row), diagnosticCase.id);
+    assert.equal(row.id, canonicalReplay.id, diagnosticCase.id);
+    assert.equal(row.status, ledger.rejectedStatus, diagnosticCase.id);
+    assert.equal(row.code, codes.callerBuilt, diagnosticCase.id);
+    if (diagnosticCase.extraKey !== undefined) {
+      assert.equal(
+        Object.hasOwn(row, diagnosticCase.extraKey),
+        false,
+        diagnosticCase.id
+      );
+    }
+    assert.equal(
+      Object.getOwnPropertySymbols(row).length,
+      0,
+      diagnosticCase.id
+    );
+    assertNoNativeGenerationLedgerExecution(result, diagnosticCase.id);
+    assertNoNativeGenerationLedgerExecution(row, diagnosticCase.id);
+  }
+
+  for (const diagnosticCase of extraOwnKeyCases) {
+    const result = validateGenerationAdmissionRows(
+      ledger.rows.map((row) =>
+        row.id === canonicalReplay.id ? diagnosticCase.row : row
+      )
+    );
+    const extraRow = result.rows.find(
+      (row) => row.id === canonicalReplay.id
+    );
+
+    assert.ok(Object.isFrozen(result), diagnosticCase.id);
+    assert.ok(Object.isFrozen(result.rows), diagnosticCase.id);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(
+      result.rejectedEvidenceCount,
+      ledger.rows.length,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(
+      result.rows.some((row) => row.status === ledger.acceptedStatus),
+      false,
+      diagnosticCase.id
+    );
+    assert.equal(extraRow.status, ledger.rejectedStatus, diagnosticCase.id);
+    assert.equal(extraRow.code, codes.callerBuilt, diagnosticCase.id);
+    for (const row of result.rows) {
+      assert.ok(Object.isFrozen(row), diagnosticCase.id);
+      if (diagnosticCase.extraKey !== undefined) {
+        assert.equal(
+          Object.hasOwn(row, diagnosticCase.extraKey),
+          false,
+          diagnosticCase.id
+        );
+      }
+      assert.equal(
+        Object.getOwnPropertySymbols(row).length,
+        0,
+        diagnosticCase.id
+      );
+      assertNoNativeGenerationLedgerExecution(row, diagnosticCase.id);
+    }
+    assertNoNativeGenerationLedgerExecution(result, diagnosticCase.id);
   }
 
   const cases = [
