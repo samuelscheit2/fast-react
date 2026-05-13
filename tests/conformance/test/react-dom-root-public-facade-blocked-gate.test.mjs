@@ -5843,14 +5843,22 @@ test("React DOM public root facade records hostile render capability rejections"
       "unsupported-onClick-prop",
       "unsupported-onClickCapture-prop",
       "unsupported-onSubmit-prop",
-      "unsupported-onChange-prop"
+      "unsupported-onChange-prop",
+      "unsupported-inherited-onClick-prop",
+      "unsupported-nested-inherited-onClick-prop",
+      "unsupported-object-prototype-polluted-public-props"
     ]
   );
   assert.deepEqual(
     rejectionRows
       .filter((row) => row.category === "ref-prop")
       .map((row) => row.label),
-    ["unsupported-callback-ref-prop", "unsupported-object-ref-prop"]
+    [
+      "unsupported-callback-ref-prop",
+      "unsupported-object-ref-prop",
+      "unsupported-inherited-nonenumerable-refEffectsClaimed-prop",
+      "unsupported-nested-inherited-ref-prop"
+    ]
   );
   const componentWrapperRows = rejectionRows.filter(
     (row) => row.blockedSurface === "component"
@@ -5905,6 +5913,89 @@ test("React DOM public root facade records hostile render capability rejections"
       (row) =>
         row.label === "unsupported-nested-compatibility-alias" &&
         row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-inherited-nonenumerable-publicRootUpdateCompatibilityClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-inherited-nonenumerable-listenerInstallationClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-inherited-nonenumerable-reconcilerExecutionClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-nested-inherited-nonenumerable-publicHydrateRootCompatibilityClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-object-prototype-nonenumerable-publicDomMutationCompatibilityClaimed-prop" &&
+        row.blockedSurface === "prototype-pollution"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-object-prototype-nonenumerable-listenerInstallationClaimed-prop" &&
+        row.blockedSurface === "prototype-pollution"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-inherited-parent-children-prop" &&
+        row.blockedSurface === "prototype-children"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-inherited-child-children-prop" &&
+        row.blockedSurface === "prototype-children"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-accessor-public-prop" &&
+        row.blockedSurface === "prop-accessor"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-proxy-public-props" &&
+        row.blockedSurface === "prop-proxy"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-proxy-prototype-public-props" &&
+        row.blockedSurface === "prop-proxy"
     )
   );
   assert.ok(
