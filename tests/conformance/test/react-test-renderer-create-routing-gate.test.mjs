@@ -1341,6 +1341,78 @@ test("react-test-renderer private root request bridges reject cloned request rec
   }
 });
 
+test("react-test-renderer private root request bridges reject cloned root handles without WeakMap ownership", () => {
+  for (const context of entrypoints.map(createPrivateRootBridgeContext)) {
+    const rootHandleOwnKeys = [
+      "$$typeof",
+      "kind",
+      "entrypoint",
+      "rootId",
+      "rootSequence",
+      "lifecycleStatus",
+      "nativeBridgeAvailable",
+      "nativeExecution",
+      "rustExecution",
+      "compatibilityClaimed"
+    ];
+
+    assert.deepEqual(
+      Reflect.ownKeys(context.rootHandle),
+      rootHandleOwnKeys,
+      `${context.entry.entrypoint} source root handle own keys`
+    );
+
+    const copiedHandle = Object.freeze({ ...context.rootHandle });
+    const symbolSpoofedHandle = Object.freeze({
+      ...context.rootHandle,
+      $$typeof: Symbol.for(context.rootHandle.$$typeof)
+    });
+    const prototypeBackedHandle = Object.freeze(
+      Object.create(context.rootHandle)
+    );
+
+    for (const [variant, clonedHandle] of [
+      ["copied fields", copiedHandle],
+      ["global $$typeof", symbolSpoofedHandle],
+      ["prototype-backed fields", prototypeBackedHandle]
+    ]) {
+      const label = `${context.entry.entrypoint} ${variant} root handle clone`;
+
+      assertPrivateRootBridgeCallRejects(
+        () =>
+          context.bridge.updateRootRequest(clonedHandle, {
+            props: { children: variant },
+            type: "span"
+          }),
+        context.entry.entrypoint,
+        `${label} updateRootRequest`,
+        /root handle/u
+      );
+      assert.deepEqual(
+        context.bridge
+          .getRendererRootRequests(context.renderer)
+          .map((request) => request.operation),
+        ["create"],
+        `${label} updateRootRequest leaves history untouched`
+      );
+
+      assertPrivateRootBridgeCallRejects(
+        () => context.bridge.unmountRootRequest(clonedHandle),
+        context.entry.entrypoint,
+        `${label} unmountRootRequest`,
+        /root handle/u
+      );
+      assert.deepEqual(
+        context.bridge
+          .getRendererRootRequests(context.renderer)
+          .map((request) => request.operation),
+        ["create"],
+        `${label} unmountRootRequest leaves history untouched`
+      );
+    }
+  }
+});
+
 test("react-test-renderer private root request history snapshots are frozen copies", () => {
   for (const entry of entrypoints) {
     const context = createPrivateRootBridgeContext(entry);
