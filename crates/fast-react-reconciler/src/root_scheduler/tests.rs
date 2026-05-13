@@ -687,6 +687,52 @@ fn clone_same_transition_multi_update_continuation_preserving_currentness_source
     }
 }
 
+fn assert_same_lane_multi_update_currentness_rejects_metadata_mismatch_without_consuming_source(
+    store: &mut FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    continuation: &RootTransitionSameLaneMultiUpdateQueueLaneContinuationRecordForCanary,
+    field: &'static str,
+    pending_source_count: usize,
+    consumed_source_count: usize,
+    host: &RecordingHost,
+) {
+    assert!(continuation.currentness_source_token().is_some());
+    assert!(!continuation.public_root_compatibility_claimed());
+    assert!(!continuation.public_scheduler_timing_compatibility_claimed());
+    assert!(!continuation.public_transition_hooks_compatibility_claimed());
+    assert!(!continuation.public_act_compatibility_claimed());
+    assert!(!continuation.react_dom_compatibility_claimed());
+    assert!(!continuation.test_renderer_compatibility_claimed());
+    assert!(!continuation.native_execution_compatibility_claimed());
+    assert!(!continuation.package_compatibility_claimed());
+    assert!(!continuation.renderer_compatibility_claimed());
+    assert!(!continuation.executes_public_effects());
+    assert_eq!(
+        consume_transition_same_lane_multi_update_queue_lane_commit_currentness_for_canary(
+            store,
+            continuation,
+        )
+        .unwrap_err(),
+        RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessErrorForCanary::TransitionWrapperMetadataMismatch {
+            root: root_id,
+            field
+        }
+    );
+    assert_eq!(
+        store
+            .root_scheduler()
+            .pending_finished_work_queue_lane_commit_currentness_source_count(),
+        pending_source_count
+    );
+    assert_eq!(
+        store
+            .root_scheduler()
+            .consumed_finished_work_queue_lane_commit_currentness_source_count(),
+        consumed_source_count
+    );
+    assert_eq!(host.operations(), Vec::<&'static str>::new());
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SameLaneMultiUpdateRejectionRootSnapshotForCanary {
     current: FiberId,
@@ -3489,6 +3535,12 @@ fn root_scheduler_transition_same_lane_multi_update_currentness_rejects_clone_re
         1
     );
     assert_eq!(
+        store
+            .root_scheduler()
+            .consumed_finished_work_queue_lane_commit_currentness_source_count(),
+        0
+    );
+    assert_eq!(
         consume_transition_same_lane_multi_update_queue_lane_commit_currentness_for_canary(
             &mut store,
             &cloned,
@@ -3502,6 +3554,18 @@ fn root_scheduler_transition_same_lane_multi_update_currentness_rejects_clone_re
             }
         )
     );
+    assert_eq!(
+        store
+            .root_scheduler()
+            .pending_finished_work_queue_lane_commit_currentness_source_count(),
+        1
+    );
+    assert_eq!(
+        store
+            .root_scheduler()
+            .consumed_finished_work_queue_lane_commit_currentness_source_count(),
+        0
+    );
 
     let mut caller_shaped =
         clone_same_transition_multi_update_continuation_preserving_currentness_source(
@@ -3509,16 +3573,69 @@ fn root_scheduler_transition_same_lane_multi_update_currentness_rejects_clone_re
         );
     caller_shaped.current_event_transition_lane = Lane::TRANSITION_2;
     assert_eq!(caller_shaped.currentness_source_token(), source_token);
+    assert_same_lane_multi_update_currentness_rejects_metadata_mismatch_without_consuming_source(
+        &mut store,
+        root_id,
+        &caller_shaped,
+        "current_event_transition_lane",
+        1,
+        0,
+        &host,
+    );
+
+    let mut queue_handoff_drift =
+        clone_same_transition_multi_update_continuation_preserving_currentness_source(
+            &continuation,
+        );
+    queue_handoff_drift
+        .queue_handoff
+        .as_mut()
+        .unwrap()
+        .remaining_lanes = Lanes::SYNC;
+    assert_eq!(queue_handoff_drift.currentness_source_token(), source_token);
+    assert_same_lane_multi_update_currentness_rejects_metadata_mismatch_without_consuming_source(
+        &mut store,
+        root_id,
+        &queue_handoff_drift,
+        "queue_handoff",
+        1,
+        0,
+        &host,
+    );
+
+    let mut root_commit_handoff_drift =
+        clone_same_transition_multi_update_continuation_preserving_currentness_source(
+            &continuation,
+        );
+    root_commit_handoff_drift.root_commit_handoff = None;
     assert_eq!(
-        consume_transition_same_lane_multi_update_queue_lane_commit_currentness_for_canary(
-            &mut store,
-            &caller_shaped,
-        )
-        .unwrap_err(),
-        RootTransitionSameLaneMultiUpdateQueueLaneCommitCurrentnessErrorForCanary::TransitionWrapperMetadataMismatch {
-            root: root_id,
-            field: "current_event_transition_lane"
-        }
+        root_commit_handoff_drift.currentness_source_token(),
+        source_token
+    );
+    assert_same_lane_multi_update_currentness_rejects_metadata_mismatch_without_consuming_source(
+        &mut store,
+        root_id,
+        &root_commit_handoff_drift,
+        "root_commit_handoff",
+        1,
+        0,
+        &host,
+    );
+
+    let mut commit_drift =
+        clone_same_transition_multi_update_continuation_preserving_currentness_source(
+            &continuation,
+        );
+    commit_drift.commit = None;
+    assert_eq!(commit_drift.currentness_source_token(), source_token);
+    assert_same_lane_multi_update_currentness_rejects_metadata_mismatch_without_consuming_source(
+        &mut store,
+        root_id,
+        &commit_drift,
+        "commit",
+        1,
+        0,
+        &host,
     );
 
     let consumed =
