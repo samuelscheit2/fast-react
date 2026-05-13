@@ -59,6 +59,14 @@ const hostilePublicRootObjectPrototypeAliasKeys = Object.freeze([
   'public_root_render_compatibility_claimed',
   'public-test-renderer-compatibility-claimed'
 ]);
+const publicCreateRootContainerCapabilityRejectionLabels = Object.freeze([
+  'own-compatibilityClaimed-container',
+  'own-nonenumerable-publicRootExecution-container',
+  'own-accessor-publicCreateRootCompatibilityClaimed-container',
+  'own-snake-public-root-render-compatibility-claimed-container',
+  'own-dash-public-root-render-compatibility-claimed-container',
+  'proxy-container'
+]);
 const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-onClick-prop',
   'unsupported-onClickCapture-prop',
@@ -1004,6 +1012,60 @@ test('public createRoot invokes only the private adapter factory while other pub
     profilingCreateRootListenerCount: 0,
     profilingCreateRootMutationCount: 0
   });
+});
+
+test('public createRoot rejects hostile containers before adapter.createRoot', () => {
+  const result = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        '-e',
+        createCreateRootContainerCapabilityRejectionSpyScript(packageRoot)
+      ],
+      {
+        encoding: 'utf8'
+      }
+    )
+  );
+
+  assert.deepEqual(
+    result.rejectedLabels,
+    publicCreateRootContainerCapabilityRejectionLabels
+  );
+  assert.deepEqual(
+    result.rejectionResults.map((rejection) => rejection.status),
+    publicCreateRootContainerCapabilityRejectionLabels.map(() => 'throws')
+  );
+  assert.deepEqual(
+    result.rejectionResults.map((rejection) => rejection.exportName),
+    publicCreateRootContainerCapabilityRejectionLabels.map(() => 'createRoot')
+  );
+  assert.deepEqual(
+    result.rejectionResults.map((rejection) => rejection.code),
+    publicCreateRootContainerCapabilityRejectionLabels.map(
+      () => 'FAST_REACT_UNIMPLEMENTED'
+    )
+  );
+  assert.equal(result.adapterCreateRootCallsAfterRejections, 0);
+  assert.equal(result.accessorGetterCalls, 0);
+  assert.equal(result.proxyGetTrapCalls, 0);
+  assert.equal(result.proxyGetOwnPropertyDescriptorTrapCalls, 0);
+  assert.equal(result.proxyHasTrapCalls, 0);
+  assert.equal(result.proxyOwnKeysTrapCalls, 0);
+  assert.equal(result.proxySetTrapCalls, 0);
+  assert.deepEqual(result.acceptedLifecycleStatuses, [
+    'ok',
+    'ok',
+    'ok',
+    'ok',
+    'ok',
+    'ok',
+    'ok'
+  ]);
+  assert.equal(result.adapterCreateRootCalls, 2);
+  assert.equal(result.adapterRenderCalls, 1);
+  assert.equal(result.adapterClearHostOutputCalls, 1);
+  assert.equal(result.adapterUnmountCalls, 2);
 });
 
 test('public createRoot root object ignores inherited public compatibility aliases', () => {
@@ -3077,6 +3139,288 @@ function recordPublicCall(label, fn) {
       status: 'throws'
     });
   }
+}
+
+function createDocument(label) {
+  const document = createEventTarget({
+    label,
+    nodeName: '#document',
+    nodeType: 9
+  });
+  document.ownerDocument = document;
+  document.defaultView = createEventTarget({
+    label: \`\${label}-window\`,
+    nodeName: 'window'
+  });
+  return document;
+}
+
+function createElement(nodeName, ownerDocument) {
+  return createEventTarget({
+    nodeName,
+    nodeType: 1,
+    ownerDocument
+  });
+}
+
+function createEventTarget(fields) {
+  return {
+    ...fields,
+    childNodes: [],
+    __mutationLog: [],
+    __registrations: [],
+    addEventListener(type, listener, options) {
+      this.__registrations.push({listener, options, type});
+    },
+    appendChild(child) {
+      this.childNodes.push(child);
+      child.parentNode = this;
+      this.__mutationLog.push({child, type: 'appendChild'});
+      return child;
+    }
+  };
+}
+`;
+}
+
+function createCreateRootContainerCapabilityRejectionSpyScript(packageRootPath) {
+  return `
+'use strict';
+
+const path = require('node:path');
+const packageRoot = ${JSON.stringify(packageRootPath)};
+const rootBridgePath = path.join(packageRoot, 'src/client/root-bridge.js');
+const rootBridgeCacheKey = require.resolve(rootBridgePath);
+const React = require(path.join(packageRoot, '..', 'react', 'index.js'));
+const rejectionResults = [];
+const acceptedLifecycle = [];
+let accessorGetterCalls = 0;
+let adapterClearHostOutputCalls = 0;
+let adapterCreateRootCalls = 0;
+let adapterRenderCalls = 0;
+let adapterUnmountCalls = 0;
+let proxyGetOwnPropertyDescriptorTrapCalls = 0;
+let proxyGetTrapCalls = 0;
+let proxyHasTrapCalls = 0;
+let proxyOwnKeysTrapCalls = 0;
+let proxySetTrapCalls = 0;
+
+const rootBridge = Object.freeze({
+  privateRootPublicFacadeAdapterSymbol: Symbol.for(
+    'fast.react_dom.client.private_root_public_facade_adapter'
+  ),
+  privateRootPublicFacadePreflightSymbol: Symbol.for(
+    'fast.react_dom.client.private_root_public_facade_preflight'
+  ),
+  privateHydrateRootPublicFacadePreflightSymbol: Symbol.for(
+    'fast.react_dom.client.private_hydrate_root_public_facade_preflight'
+  ),
+  createPrivateRootPublicFacadeAdapter() {
+    return {
+      clearHostOutput() {
+        adapterClearHostOutputCalls++;
+      },
+      createRoot() {
+        adapterCreateRootCalls++;
+        return {
+          render() {
+            adapterRenderCalls++;
+          },
+          unmount() {
+            adapterUnmountCalls++;
+          }
+        };
+      }
+    };
+  },
+  createPrivateRootPublicFacadePreflight() {
+    return {};
+  },
+  createPrivateHydrateRootPublicFacadePreflight() {
+    return {};
+  }
+});
+
+require.cache[rootBridgeCacheKey] = {
+  id: rootBridgeCacheKey,
+  filename: rootBridgeCacheKey,
+  loaded: true,
+  exports: rootBridge
+};
+
+const client = require(path.join(packageRoot, 'client.js'));
+
+recordContainerRejection(
+  'own-compatibilityClaimed-container',
+  createContainerWithOwnCompatibilityClaim
+);
+recordContainerRejection(
+  'own-nonenumerable-publicRootExecution-container',
+  createContainerWithOwnNonEnumerablePublicRootExecution
+);
+recordContainerRejection(
+  'own-accessor-publicCreateRootCompatibilityClaimed-container',
+  createContainerWithOwnAccessorPublicCreateRootCompatibilityClaim
+);
+recordContainerRejection(
+  'own-snake-public-root-render-compatibility-claimed-container',
+  createContainerWithOwnSnakePublicRootRenderCompatibilityClaim
+);
+recordContainerRejection(
+  'own-dash-public-root-render-compatibility-claimed-container',
+  createContainerWithOwnDashPublicRootRenderCompatibilityClaim
+);
+recordContainerRejection('proxy-container', createProxyContainer);
+
+const adapterCreateRootCallsAfterRejections = adapterCreateRootCalls;
+recordAcceptedLifecycle();
+
+process.stdout.write(JSON.stringify({
+  acceptedLifecycleStatuses: acceptedLifecycle.map((entry) => entry.status),
+  accessorGetterCalls,
+  adapterClearHostOutputCalls,
+  adapterCreateRootCalls,
+  adapterCreateRootCallsAfterRejections,
+  adapterRenderCalls,
+  adapterUnmountCalls,
+  proxyGetOwnPropertyDescriptorTrapCalls,
+  proxyGetTrapCalls,
+  proxyHasTrapCalls,
+  proxyOwnKeysTrapCalls,
+  proxySetTrapCalls,
+  rejectedLabels: rejectionResults.map((rejection) => rejection.label),
+  rejectionResults
+}));
+
+function recordContainerRejection(label, createContainer) {
+  try {
+    client.createRoot(createContainer(label));
+    rejectionResults.push({label, status: 'ok'});
+  } catch (error) {
+    rejectionResults.push({
+      code: error.code,
+      entrypoint: error.entrypoint,
+      exportName: error.exportName,
+      label,
+      status: 'throws'
+    });
+  }
+}
+
+function recordAcceptedLifecycle() {
+  const document = createDocument('accepted-clean-container');
+  const container = createElement('DIV', document);
+  let root;
+  let recreatedRoot;
+
+  recordAcceptedStep('createRoot-clean-container', () => {
+    root = client.createRoot(container);
+  });
+  recordAcceptedStep('render-clean-container', () => {
+    root.render(React.createElement('div', {id: 'safe'}, 'safe'));
+  });
+  recordAcceptedStep('render-null-clean-container', () => {
+    root.render(null);
+  });
+  recordAcceptedStep('unmount-clean-container', () => {
+    root.unmount();
+  });
+  recordAcceptedStep('idempotent-unmount-clean-container', () => {
+    root.unmount();
+  });
+  recordAcceptedStep('recreate-clean-container', () => {
+    recreatedRoot = client.createRoot(container);
+  });
+  recordAcceptedStep('unmount-recreated-clean-container', () => {
+    recreatedRoot.unmount();
+  });
+}
+
+function recordAcceptedStep(label, fn) {
+  try {
+    fn();
+    acceptedLifecycle.push({label, status: 'ok'});
+  } catch (error) {
+    acceptedLifecycle.push({
+      code: error.code,
+      exportName: error.exportName,
+      label,
+      status: 'throws'
+    });
+  }
+}
+
+function createContainerWithOwnCompatibilityClaim(label) {
+  const container = createCleanContainer(label);
+  container.compatibilityClaimed = true;
+  return container;
+}
+
+function createContainerWithOwnNonEnumerablePublicRootExecution(label) {
+  const container = createCleanContainer(label);
+  Object.defineProperty(container, 'publicRootExecution', {
+    configurable: true,
+    enumerable: false,
+    value: true
+  });
+  return container;
+}
+
+function createContainerWithOwnAccessorPublicCreateRootCompatibilityClaim(
+  label
+) {
+  const container = createCleanContainer(label);
+  Object.defineProperty(container, 'publicCreateRootCompatibilityClaimed', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      accessorGetterCalls++;
+      return true;
+    }
+  });
+  return container;
+}
+
+function createContainerWithOwnSnakePublicRootRenderCompatibilityClaim(label) {
+  const container = createCleanContainer(label);
+  container.public_root_render_compatibility_claimed = true;
+  return container;
+}
+
+function createContainerWithOwnDashPublicRootRenderCompatibilityClaim(label) {
+  const container = createCleanContainer(label);
+  container['public-root-render-compatibility-claimed'] = true;
+  return container;
+}
+
+function createProxyContainer(label) {
+  return new Proxy(createCleanContainer(label), {
+    get(target, property, receiver) {
+      proxyGetTrapCalls++;
+      return Reflect.get(target, property, receiver);
+    },
+    getOwnPropertyDescriptor(target, property) {
+      proxyGetOwnPropertyDescriptorTrapCalls++;
+      return Reflect.getOwnPropertyDescriptor(target, property);
+    },
+    has(target, property) {
+      proxyHasTrapCalls++;
+      return Reflect.has(target, property);
+    },
+    ownKeys(target) {
+      proxyOwnKeysTrapCalls++;
+      return Reflect.ownKeys(target);
+    },
+    set(target, property, value, receiver) {
+      proxySetTrapCalls++;
+      return Reflect.set(target, property, value, receiver);
+    }
+  });
+}
+
+function createCleanContainer(label) {
+  const document = createDocument(label);
+  return createElement('DIV', document);
 }
 
 function createDocument(label) {
