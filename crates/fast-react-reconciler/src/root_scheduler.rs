@@ -443,6 +443,10 @@ pub(crate) enum RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary {
         finished_work: FiberId,
         commit_order: usize,
     },
+    SourceMetadataMismatch {
+        root: FiberRootId,
+        field: &'static str,
+    },
     LiveRootStateMismatch {
         root: FiberRootId,
         expected_current: FiberId,
@@ -508,6 +512,12 @@ impl Display for RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary {
                 root.raw(),
                 finished_work.slot().get(),
                 commit_order
+            ),
+            Self::SourceMetadataMismatch { root, field } => write!(
+                formatter,
+                "root {} queue-lane currentness source metadata mismatch for {}",
+                root.raw(),
+                field
             ),
             Self::LiveRootStateMismatch {
                 root,
@@ -582,6 +592,7 @@ impl Error for RootFinishedWorkQueueLaneCommitCurrentnessErrorForCanary {
             | Self::MissingQueueCommitHandoff
             | Self::SourceAlreadyConsumed { .. }
             | Self::SourceNotPending { .. }
+            | Self::SourceMetadataMismatch { .. }
             | Self::LiveRootStateMismatch { .. }
             | Self::CommittedTreeStateMismatch { .. }
             | Self::QueueRowMetadataMismatch { .. }
@@ -2495,28 +2506,29 @@ fn entangled_transition_queue_lane_currentness_sync_continuation_for_canary(
         }
     };
 
-    Some(
-        RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
-            handoff: root_sync_flush_record_for_canary(
+    let mut queue_lane_continuation =
+        sync_scheduler_queue_lane_continuation_execution_record_for_canary(
+            root_sync_flush_record_for_canary(
                 0,
                 transition_continuation.root(),
                 transition_continuation.selected_lanes(),
                 render_phase,
             ),
-            requested_callback_node: transition_continuation.callback_node(),
-            current_callback_node: transition_continuation.current_callback_node(),
-            selected_lanes: transition_continuation.selected_lanes(),
-            pending_passive_blocker: None,
-            finished_work_handoff_identity: transition_continuation
-                .finished_work_handoff_identity(),
+            transition_continuation.callback_node(),
+            transition_continuation.current_callback_node(),
+            transition_continuation.selected_lanes(),
+            None,
+            transition_continuation.finished_work_handoff_identity(),
             status,
-            queue_handoff: transition_continuation.queue_handoff.clone(),
-            queue_handoff_error: transition_continuation.queue_handoff_error.clone(),
-            queue_commit_handoff: transition_continuation.queue_commit_handoff.clone(),
-            commit: transition_continuation.commit.clone(),
-            currentness_source_token: transition_continuation.currentness_source_token(),
-        },
-    )
+            transition_continuation.queue_handoff.as_ref(),
+            transition_continuation.queue_handoff_error.clone(),
+            transition_continuation.queue_commit_handoff.clone(),
+            transition_continuation.commit.clone(),
+        );
+    queue_lane_continuation.currentness_source_token =
+        transition_continuation.currentness_source_token();
+
+    Some(queue_lane_continuation)
 }
 
 #[cfg(test)]
@@ -2919,28 +2931,29 @@ fn transition_queue_lane_currentness_sync_continuation_for_canary(
         }
     };
 
-    Some(
-        RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
-            handoff: root_sync_flush_record_for_canary(
+    let mut queue_lane_continuation =
+        sync_scheduler_queue_lane_continuation_execution_record_for_canary(
+            root_sync_flush_record_for_canary(
                 0,
                 transition_continuation.root(),
                 transition_continuation.selected_lanes(),
                 render_phase,
             ),
-            requested_callback_node: transition_continuation.callback_node(),
-            current_callback_node: transition_continuation.current_callback_node(),
-            selected_lanes: transition_continuation.selected_lanes(),
-            pending_passive_blocker: None,
-            finished_work_handoff_identity: transition_continuation
-                .finished_work_handoff_identity(),
+            transition_continuation.callback_node(),
+            transition_continuation.current_callback_node(),
+            transition_continuation.selected_lanes(),
+            None,
+            transition_continuation.finished_work_handoff_identity(),
             status,
-            queue_handoff: transition_continuation.queue_handoff.clone(),
-            queue_handoff_error: transition_continuation.queue_handoff_error.clone(),
-            queue_commit_handoff: transition_continuation.queue_commit_handoff.clone(),
-            commit: transition_continuation.commit.clone(),
-            currentness_source_token: transition_continuation.currentness_source_token(),
-        },
-    )
+            transition_continuation.queue_handoff.as_ref(),
+            transition_continuation.queue_handoff_error.clone(),
+            transition_continuation.queue_commit_handoff.clone(),
+            transition_continuation.commit.clone(),
+        );
+    queue_lane_continuation.currentness_source_token =
+        transition_continuation.currentness_source_token();
+
+    Some(queue_lane_continuation)
 }
 
 #[cfg(test)]
@@ -7624,6 +7637,21 @@ fn sync_scheduler_queue_lane_continuation_execution_record_for_canary(
     queue_commit_handoff: Option<HostRootUpdateQueueFinishedWorkCommitHandoffRecordForCanary>,
     commit: Option<HostRootCommitRecord>,
 ) -> RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
+    let queue_handoff = queue_handoff.cloned();
+    let source_metadata =
+        continuations::RootSyncSchedulerQueueLaneContinuationExecutionMetadataForCanary {
+            handoff,
+            requested_callback_node,
+            current_callback_node,
+            selected_lanes,
+            pending_passive_blocker,
+            finished_work_handoff_identity,
+            status,
+            queue_handoff: queue_handoff.clone(),
+            queue_handoff_error: queue_handoff_error.clone(),
+            queue_commit_handoff: queue_commit_handoff.clone(),
+            commit: commit.clone(),
+        };
     RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
         handoff,
         requested_callback_node,
@@ -7632,10 +7660,11 @@ fn sync_scheduler_queue_lane_continuation_execution_record_for_canary(
         pending_passive_blocker,
         finished_work_handoff_identity,
         status,
-        queue_handoff: queue_handoff.cloned(),
+        queue_handoff,
         queue_handoff_error,
         queue_commit_handoff,
         commit,
+        source_metadata,
         currentness_source_token: None,
     }
 }
