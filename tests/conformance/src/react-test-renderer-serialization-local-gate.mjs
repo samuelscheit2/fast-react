@@ -4155,6 +4155,27 @@ function jsObjectSpreadsCanOverrideAssertedProperties({
   });
 }
 
+function jsObjectPropertyCanBeOverriddenAfterStartIndex({
+  extracted,
+  property,
+  propertyStartIndex
+}) {
+  const occurrenceStartIndexes =
+    extracted.propertyOccurrenceStartIndexes.get(property) ?? freezeArray([]);
+  return (
+    occurrenceStartIndexes.some(
+      (occurrenceStartIndex) => occurrenceStartIndex > propertyStartIndex
+    ) ||
+    extracted.spreadStartIndexes.some(
+      (spreadStartIndex) => spreadStartIndex > propertyStartIndex
+    ) ||
+    extracted.unsupportedKeyStartIndexes.some(
+      (unsupportedKeyStartIndex) =>
+        unsupportedKeyStartIndex > propertyStartIndex
+    )
+  );
+}
+
 function jsObjectPropertyAssertionsPass(properties, assertions) {
   return assertions.every((assertion) => {
     const actualSource = properties.get(assertion.property);
@@ -4531,6 +4552,14 @@ function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
   if (returnedObject.ok !== true) {
     return false;
   }
+  const extracted = extractTopLevelJsObjectProperties(
+    declaration.body,
+    returnedObject.openIndex,
+    returnedObject.closeIndex
+  );
+  if (extracted.ok !== true) {
+    return false;
+  }
 
   return methodCalls.every((methodCall) => {
     const method = extractTopLevelJsObjectMethodBody({
@@ -4540,6 +4569,15 @@ function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
       methodName: methodCall.methodName
     });
     if (method.ok !== true) {
+      return false;
+    }
+    if (
+      jsObjectPropertyCanBeOverriddenAfterStartIndex({
+        extracted,
+        property: methodCall.methodName,
+        propertyStartIndex: method.propertyStartIndex
+      })
+    ) {
       return false;
     }
 
@@ -4570,6 +4608,14 @@ function jsFunctionDeclarationReturnedFreezeRecordMethodReturnedCallsPass({
   if (returnedObject.ok !== true) {
     return false;
   }
+  const extracted = extractTopLevelJsObjectProperties(
+    declaration.body,
+    returnedObject.openIndex,
+    returnedObject.closeIndex
+  );
+  if (extracted.ok !== true) {
+    return false;
+  }
 
   return methodCalls.every((methodCall) => {
     const method = extractTopLevelJsObjectMethodBody({
@@ -4579,6 +4625,15 @@ function jsFunctionDeclarationReturnedFreezeRecordMethodReturnedCallsPass({
       methodName: methodCall.methodName
     });
     if (method.ok !== true) {
+      return false;
+    }
+    if (
+      jsObjectPropertyCanBeOverriddenAfterStartIndex({
+        extracted,
+        property: methodCall.methodName,
+        propertyStartIndex: method.propertyStartIndex
+      })
+    ) {
       return false;
     }
 
@@ -5076,6 +5131,7 @@ function extractJsObjectFreezePropertiesForDeclaration({
 function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
   const properties = new Map();
   const propertyStartIndexes = new Map();
+  const propertyOccurrenceStartIndexes = new Map();
   const spreadStartIndexes = [];
   const unsupportedKeyStartIndexes = [];
   let index = openIndex + 1;
@@ -5127,6 +5183,10 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
           ok: true,
           properties,
           propertyStartIndexes,
+          propertyOccurrenceStartIndexes:
+            freezeJsObjectPropertyOccurrenceStartIndexes(
+              propertyOccurrenceStartIndexes
+            ),
           spreadStartIndexes: freezeArray(spreadStartIndexes),
           unsupportedKeyStartIndexes: freezeArray(unsupportedKeyStartIndexes),
           error: null
@@ -5156,6 +5216,10 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
           ok: true,
           properties,
           propertyStartIndexes,
+          propertyOccurrenceStartIndexes:
+            freezeJsObjectPropertyOccurrenceStartIndexes(
+              propertyOccurrenceStartIndexes
+            ),
           spreadStartIndexes: freezeArray(spreadStartIndexes),
           unsupportedKeyStartIndexes: freezeArray(unsupportedKeyStartIndexes),
           error: null
@@ -5167,6 +5231,11 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
         source.slice(propertyStartIndex, bodyCloseIndex + 1).trim()
       );
       propertyStartIndexes.set(propertyKey.key, propertyStartIndex);
+      recordJsObjectPropertyOccurrenceStartIndex(
+        propertyOccurrenceStartIndexes,
+        propertyKey.key,
+        propertyStartIndex
+      );
       index = bodyCloseIndex + 1;
       continue;
     }
@@ -5180,6 +5249,11 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
       if (source.slice(index, nextIndex).trim() === "") {
         properties.set(propertyKey.key, propertyKey.key);
         propertyStartIndexes.set(propertyKey.key, propertyStartIndex);
+        recordJsObjectPropertyOccurrenceStartIndex(
+          propertyOccurrenceStartIndexes,
+          propertyKey.key,
+          propertyStartIndex
+        );
       } else {
         unsupportedKeyStartIndexes.push(propertyStartIndex);
       }
@@ -5195,6 +5269,11 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
     );
     properties.set(propertyKey.key, source.slice(valueStart, valueEnd).trim());
     propertyStartIndexes.set(propertyKey.key, propertyStartIndex);
+    recordJsObjectPropertyOccurrenceStartIndex(
+      propertyOccurrenceStartIndexes,
+      propertyKey.key,
+      propertyStartIndex
+    );
     index = valueEnd < closeIndex ? valueEnd + 1 : closeIndex;
   }
 
@@ -5202,10 +5281,34 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
     ok: true,
     properties,
     propertyStartIndexes,
+    propertyOccurrenceStartIndexes:
+      freezeJsObjectPropertyOccurrenceStartIndexes(
+        propertyOccurrenceStartIndexes
+      ),
     spreadStartIndexes: freezeArray(spreadStartIndexes),
     unsupportedKeyStartIndexes: freezeArray(unsupportedKeyStartIndexes),
     error: null
   });
+}
+
+function recordJsObjectPropertyOccurrenceStartIndex(
+  propertyOccurrenceStartIndexes,
+  property,
+  propertyStartIndex
+) {
+  const startIndexes = propertyOccurrenceStartIndexes.get(property) ?? [];
+  startIndexes.push(propertyStartIndex);
+  propertyOccurrenceStartIndexes.set(property, startIndexes);
+}
+
+function freezeJsObjectPropertyOccurrenceStartIndexes(
+  propertyOccurrenceStartIndexes
+) {
+  const frozen = new Map();
+  for (const [property, startIndexes] of propertyOccurrenceStartIndexes) {
+    frozen.set(property, freezeArray(startIndexes));
+  }
+  return frozen;
 }
 
 function findJsSourceOutsideCommentsAndStrings(source, needle, fromIndex = 0) {
@@ -5285,6 +5388,7 @@ function extractTopLevelJsObjectMethodBody({
   methodName
 }) {
   let index = openIndex + 1;
+  let matchedMethod = null;
 
   while (index < closeIndex) {
     index = skipJsTrivia(source, index, closeIndex);
@@ -5295,8 +5399,38 @@ function extractTopLevelJsObjectMethodBody({
       break;
     }
 
+    if (source.startsWith("...", index)) {
+      if (matchedMethod !== null) {
+        return freezeRecord({
+          ok: false,
+          body: "",
+          bodyOpenIndex: -1,
+          bodyCloseIndex: -1,
+          error: "object-method-overridden-by-spread"
+        });
+      }
+
+      const nextIndex = findNextTopLevelPropertySeparator(
+        source,
+        index + "...".length,
+        closeIndex
+      );
+      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+      continue;
+    }
+
     const propertyKey = readJsObjectPropertyKey(source, index, closeIndex);
     if (propertyKey.ok !== true) {
+      if (matchedMethod !== null) {
+        return freezeRecord({
+          ok: false,
+          body: "",
+          bodyOpenIndex: -1,
+          bodyCloseIndex: -1,
+          error: "object-method-overridden-by-unsupported-key"
+        });
+      }
+
       const nextIndex = findNextTopLevelPropertySeparator(
         source,
         index,
@@ -5351,7 +5485,17 @@ function extractTopLevelJsObjectMethodBody({
       }
 
       if (propertyKey.key === methodName) {
-        return freezeRecord({
+        if (matchedMethod !== null) {
+          return freezeRecord({
+            ok: false,
+            body: "",
+            bodyOpenIndex: -1,
+            bodyCloseIndex: -1,
+            error: "object-method-overridden-by-duplicate-method"
+          });
+        }
+
+        matchedMethod = freezeRecord({
           ok: true,
           body: source.slice(bodyOpenIndex + 1, bodyCloseIndex),
           params: freezeArray(
@@ -5361,6 +5505,7 @@ function extractTopLevelJsObjectMethodBody({
               paramsCloseIndex
             )
           ),
+          propertyStartIndex: index,
           bodyOpenIndex,
           bodyCloseIndex,
           error: null
@@ -5371,12 +5516,26 @@ function extractTopLevelJsObjectMethodBody({
       continue;
     }
 
+    if (propertyKey.key === methodName && matchedMethod !== null) {
+      return freezeRecord({
+        ok: false,
+        body: "",
+        bodyOpenIndex: -1,
+        bodyCloseIndex: -1,
+        error: "object-method-overridden-by-property"
+      });
+    }
+
     const nextIndex = findNextTopLevelPropertySeparator(
       source,
       afterKeyIndex,
       closeIndex
     );
     index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+  }
+
+  if (matchedMethod !== null) {
+    return matchedMethod;
   }
 
   return freezeRecord({
@@ -5679,6 +5838,16 @@ function jsIdentifierHasAssignmentBeforeIndex({
     return true;
   }
 
+  if (
+    jsIdentifierAppearsInDestructuringAssignmentBeforeIndex({
+      source,
+      identifier,
+      beforeIndex
+    })
+  ) {
+    return true;
+  }
+
   let index = 0;
 
   while (index < beforeIndex) {
@@ -5729,6 +5898,77 @@ function jsIdentifierHasAssignmentBeforeIndex({
   }
 
   return false;
+}
+
+function jsIdentifierAppearsInDestructuringAssignmentBeforeIndex({
+  source,
+  identifier,
+  beforeIndex
+}) {
+  let index = 0;
+
+  while (index < beforeIndex) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const assignmentOperator = readJsAssignmentOperatorAt(source, index);
+    if (assignmentOperator.ok !== true) {
+      index += 1;
+      continue;
+    }
+
+    const pattern = readJsDestructuringAssignmentPatternBeforeOperator(
+      source,
+      index
+    );
+    if (
+      pattern !== null &&
+      jsDestructuringAssignmentPatternContainsIdentifier(pattern, identifier)
+    ) {
+      return true;
+    }
+
+    index = assignmentOperator.end;
+  }
+
+  return false;
+}
+
+function readJsDestructuringAssignmentPatternBeforeOperator(
+  source,
+  operatorIndex
+) {
+  const patternEnd = skipJsWhitespaceBackward(source, operatorIndex - 1);
+  const closeCharacter = source[patternEnd];
+  const openCharacter =
+    closeCharacter === "}" ? "{" : closeCharacter === "]" ? "[" : "";
+  if (openCharacter === "") {
+    return null;
+  }
+
+  const patternOpenIndex = findMatchingJsOpeningEnclosure(
+    source,
+    patternEnd,
+    openCharacter,
+    closeCharacter
+  );
+  if (patternOpenIndex < 0) {
+    return null;
+  }
+
+  return source.slice(patternOpenIndex, patternEnd + 1);
+}
+
+function jsDestructuringAssignmentPatternContainsIdentifier(
+  source,
+  identifier
+) {
+  const bindings = new Set();
+  collectJsIdentifiersInSource(source, bindings);
+  return bindings.has(identifier);
 }
 
 function jsIdentifierHasBindingDeclarationBeforeIndex({
