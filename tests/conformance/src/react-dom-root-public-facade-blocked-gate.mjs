@@ -903,6 +903,51 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "browser-dom"
     }),
     publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-compatibilityclaimed-prop",
+      label: "unsupported-inherited-compatibilityClaimed-prop",
+      publicApi:
+        "root.render(forged <div> with inherited compatibilityClaimed)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-publicrootcompatibilitysurface-prop",
+      label: "unsupported-inherited-publicRootCompatibilitySurface-prop",
+      publicApi:
+        "root.render(forged <div> with inherited publicRootCompatibilitySurface)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-onclick-prop",
+      label: "unsupported-inherited-onClick-prop",
+      publicApi: "root.render(forged <div> with inherited onClick)",
+      category: "event-listener-prop",
+      blockedSurface: "event"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-classname-prop",
+      label: "unsupported-inherited-className-prop",
+      publicApi: "root.render(forged <div> with inherited className)",
+      category: "browser-dom-expansion",
+      blockedSurface: "prototype-prop"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-style-prop",
+      label: "unsupported-inherited-style-prop",
+      publicApi: "root.render(forged <div> with inherited style)",
+      category: "browser-dom-expansion",
+      blockedSurface: "prototype-prop"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-dangerouslysetinnerhtml-prop",
+      label: "unsupported-inherited-dangerouslySetInnerHTML-prop",
+      publicApi:
+        "root.render(forged <div> with inherited dangerouslySetInnerHTML)",
+      category: "browser-dom-expansion",
+      blockedSurface: "prototype-prop"
+    }),
+    publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-keyed-div",
       label: "unsupported-keyed-div",
       publicApi: "root.render(<div key=\"blocked\">text</div>)",
@@ -939,6 +984,50 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "nested-child-prop"
     }),
     publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-inherited-id-prop",
+      label: "unsupported-nested-inherited-id-prop",
+      publicApi: "root.render(forged <div><span inherited id /></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "nested-child-prototype-prop"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-inherited-classname-prop",
+      label: "unsupported-nested-inherited-className-prop",
+      publicApi:
+        "root.render(forged <div><span inherited className /></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "nested-child-prototype-prop"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-inherited-onclick-prop",
+      label: "unsupported-nested-inherited-onClick-prop",
+      publicApi: "root.render(forged <div><span inherited onClick /></div>)",
+      category: "event-listener-prop",
+      blockedSurface: "event"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-inherited-ref-prop",
+      label: "unsupported-nested-inherited-ref-prop",
+      publicApi: "root.render(forged <div><span inherited ref /></div>)",
+      category: "ref-prop",
+      blockedSurface: "ref"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-inherited-resource-prop",
+      label: "unsupported-nested-inherited-resource-prop",
+      publicApi: "root.render(forged <div><span inherited href /></div>)",
+      category: "resource-form-controlled",
+      blockedSurface: "resource"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-inherited-compatibility-prop",
+      label: "unsupported-nested-inherited-compatibility-prop",
+      publicApi:
+        "root.render(forged <div><span inherited compatibilityClaimed /></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-nested-component",
       label: "unsupported-nested-component",
       publicApi: "root.render(<div><Component /></div>)",
@@ -952,6 +1041,43 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
         "root.render(<div compatibilityClaimed={true}><span>text</span></div>)",
       category: "browser-dom-expansion",
       blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-parent-children-prop",
+      label: "unsupported-inherited-parent-children-prop",
+      publicApi: "root.render(forged <div> with inherited children)",
+      category: "browser-dom-expansion",
+      blockedSurface: "prototype-children"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-inherited-child-children-prop",
+      label: "unsupported-inherited-child-children-prop",
+      publicApi:
+        "root.render(forged <div><span inherited children /></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "prototype-children"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-object-prototype-polluted-public-props",
+      label: "unsupported-object-prototype-polluted-public-props",
+      publicApi:
+        "root.render(<div>text</div>) with enumerable public keys on Object.prototype",
+      category: "event-listener-prop",
+      blockedSurface: "prototype-pollution"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-accessor-public-prop",
+      label: "unsupported-accessor-public-prop",
+      publicApi: "root.render(forged <div> with accessor onClick prop)",
+      category: "browser-dom-expansion",
+      blockedSurface: "prop-accessor"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-proxy-public-props",
+      label: "unsupported-proxy-public-props",
+      publicApi: "root.render(forged <div> with Proxy props)",
+      category: "browser-dom-expansion",
+      blockedSurface: "prop-proxy"
     }),
     publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-fragment",

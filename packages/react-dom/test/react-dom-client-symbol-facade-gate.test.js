@@ -32,6 +32,7 @@ const {
   TEXT_NODE
 } = require(path.join(packageRoot, 'src/client/dom-container.js'));
 
+const reactElementType = Symbol.for('react.transitional.element');
 const privateFacadeSymbols = Object.freeze([
   rootBridge.privateRootPublicFacadeAdapterSymbol,
   rootBridge.privateRootPublicFacadePreflightSymbol,
@@ -58,13 +59,30 @@ const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-className-prop',
   'unsupported-style-prop',
   'unsupported-dangerouslySetInnerHTML-prop',
+  'unsupported-inherited-compatibilityClaimed-prop',
+  'unsupported-inherited-publicRootCompatibilitySurface-prop',
+  'unsupported-inherited-onClick-prop',
+  'unsupported-inherited-className-prop',
+  'unsupported-inherited-style-prop',
+  'unsupported-inherited-dangerouslySetInnerHTML-prop',
   'unsupported-keyed-div',
   'unsupported-span-type',
   'unsupported-nested-sibling',
   'unsupported-nested-span-id-prop',
   'unsupported-nested-span-className-prop',
+  'unsupported-nested-inherited-id-prop',
+  'unsupported-nested-inherited-className-prop',
+  'unsupported-nested-inherited-onClick-prop',
+  'unsupported-nested-inherited-ref-prop',
+  'unsupported-nested-inherited-resource-prop',
+  'unsupported-nested-inherited-compatibility-prop',
   'unsupported-nested-component',
   'unsupported-nested-compatibility-alias',
+  'unsupported-inherited-parent-children-prop',
+  'unsupported-inherited-child-children-prop',
+  'unsupported-object-prototype-polluted-public-props',
+  'unsupported-accessor-public-prop',
+  'unsupported-proxy-public-props',
   'unsupported-fragment',
   'unsupported-array',
   'unsupported-suppressHydrationWarning-prop',
@@ -648,13 +666,17 @@ test('public createRoot exposes only minimal host-output render while hydrateRoo
     assertPublicRenderFailureDoesNotLeak(
       freshCase.element,
       freshCase.label,
-      freshCase.assertNoCapabilityEffects
+      freshCase.assertNoCapabilityEffects,
+      freshCase.cleanup,
+      freshCase.prepare
     );
     const updateCase = createCase();
     assertPublicRenderUpdateFailureDoesNotLeak(
       updateCase.element,
       updateCase.label,
-      updateCase.assertNoCapabilityEffects
+      updateCase.assertNoCapabilityEffects,
+      updateCase.cleanup,
+      updateCase.prepare
     );
   }
 
@@ -971,7 +993,10 @@ test('public createRoot render rejects unsupported inputs before adapter root.re
   assert.equal(result.forwardRefRefCurrent, null);
   assert.equal(result.refCallbackCalls, 0);
   assert.equal(result.formCallbackCalls, 0);
+  assert.equal(result.getterInvocationCount, 0);
   assert.equal(result.objectRefCurrent, null);
+  assert.equal(result.objectPrototypePollutionCleaned, true);
+  assert.equal(result.proxyGetTrapCount, 0);
   assert.equal(result.unsupportedComponentCalls, 0);
   assert.equal(result.unsupportedNestedComponentCalls, 0);
   assert.equal(result.unsupportedMemoComponentCalls, 0);
@@ -1124,6 +1149,36 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
         dangerouslySetInnerHTML: {__html: '<span>blocked</span>'}
       })
     }),
+    createInheritedParentPropRejectionCaseFactory(
+      'unsupported-inherited-compatibilityClaimed-prop',
+      'compatibilityClaimed',
+      true
+    ),
+    createInheritedParentPropRejectionCaseFactory(
+      'unsupported-inherited-publicRootCompatibilitySurface-prop',
+      'publicRootCompatibilitySurface',
+      true
+    ),
+    createInheritedParentPropRejectionCaseFactory(
+      'unsupported-inherited-onClick-prop',
+      'onClick',
+      function blockedInheritedClick() {}
+    ),
+    createInheritedParentPropRejectionCaseFactory(
+      'unsupported-inherited-className-prop',
+      'className',
+      'blocked'
+    ),
+    createInheritedParentPropRejectionCaseFactory(
+      'unsupported-inherited-style-prop',
+      'style',
+      {color: 'red'}
+    ),
+    createInheritedParentPropRejectionCaseFactory(
+      'unsupported-inherited-dangerouslySetInnerHTML-prop',
+      'dangerouslySetInnerHTML',
+      {__html: '<span>blocked</span>'}
+    ),
     () => ({
       label: 'unsupported-keyed-div',
       element: React.createElement('div', {key: 'blocked'}, 'blocked key')
@@ -1161,6 +1216,36 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
         )
       )
     }),
+    createInheritedNestedSpanPropRejectionCaseFactory(
+      'unsupported-nested-inherited-id-prop',
+      'id',
+      'blocked'
+    ),
+    createInheritedNestedSpanPropRejectionCaseFactory(
+      'unsupported-nested-inherited-className-prop',
+      'className',
+      'blocked'
+    ),
+    createInheritedNestedSpanPropRejectionCaseFactory(
+      'unsupported-nested-inherited-onClick-prop',
+      'onClick',
+      function blockedNestedInheritedClick() {}
+    ),
+    createInheritedNestedSpanPropRejectionCaseFactory(
+      'unsupported-nested-inherited-ref-prop',
+      'ref',
+      function blockedNestedInheritedRef() {}
+    ),
+    createInheritedNestedSpanPropRejectionCaseFactory(
+      'unsupported-nested-inherited-resource-prop',
+      'href',
+      '/blocked.css'
+    ),
+    createInheritedNestedSpanPropRejectionCaseFactory(
+      'unsupported-nested-inherited-compatibility-prop',
+      'compatibilityClaimed',
+      true
+    ),
     createUnsupportedNestedComponentRejectionCase,
     () => ({
       label: 'unsupported-nested-compatibility-alias',
@@ -1170,6 +1255,11 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
         React.createElement('span', null, 'blocked compatibility claim')
       )
     }),
+    createInheritedParentChildrenRejectionCase,
+    createInheritedChildChildrenRejectionCase,
+    createObjectPrototypePollutionRejectionCase,
+    createAccessorPublicPropRejectionCase,
+    createProxyPublicPropsRejectionCase,
     () => ({
       label: 'unsupported-fragment',
       element: React.createElement(
@@ -1282,6 +1372,171 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
     publicRenderCapabilityRejectionLabels
   );
   return factories;
+}
+
+function createInheritedParentPropRejectionCaseFactory(label, propName, value) {
+  return () => ({
+    label,
+    element: createForgedHostElement(
+      'div',
+      createPropsWithInherited(
+        {[propName]: value},
+        {children: `blocked inherited ${propName}`}
+      )
+    )
+  });
+}
+
+function createInheritedNestedSpanPropRejectionCaseFactory(
+  label,
+  propName,
+  value
+) {
+  return () => ({
+    label,
+    element: createForgedHostElement('div', {
+      children: createForgedHostElement(
+        'span',
+        createPropsWithInherited(
+          {[propName]: value},
+          {children: `blocked nested inherited ${propName}`}
+        )
+      )
+    })
+  });
+}
+
+function createInheritedParentChildrenRejectionCase() {
+  return {
+    label: 'unsupported-inherited-parent-children-prop',
+    element: createForgedHostElement(
+      'div',
+      createPropsWithInherited({children: 'blocked inherited children'}, {})
+    )
+  };
+}
+
+function createInheritedChildChildrenRejectionCase() {
+  return {
+    label: 'unsupported-inherited-child-children-prop',
+    element: createForgedHostElement('div', {
+      children: createForgedHostElement(
+        'span',
+        createPropsWithInherited({children: 'blocked inherited child'}, {})
+      )
+    })
+  };
+}
+
+function createObjectPrototypePollutionRejectionCase() {
+  let callbackCalls = 0;
+
+  return {
+    label: 'unsupported-object-prototype-polluted-public-props',
+    element: React.createElement('div', null, 'blocked pollution'),
+    prepare() {
+      Object.defineProperties(Object.prototype, {
+        compatibilityClaimed: {
+          configurable: true,
+          enumerable: true,
+          value: true
+        },
+        onClick: {
+          configurable: true,
+          enumerable: true,
+          value() {
+            callbackCalls++;
+          }
+        }
+      });
+    },
+    cleanup() {
+      delete Object.prototype.compatibilityClaimed;
+      delete Object.prototype.onClick;
+    },
+    assertNoCapabilityEffects() {
+      assert.equal(callbackCalls, 0);
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(
+          Object.prototype,
+          'compatibilityClaimed'
+        ),
+        false
+      );
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(Object.prototype, 'onClick'),
+        false
+      );
+    }
+  };
+}
+
+function createAccessorPublicPropRejectionCase() {
+  let getterCalls = 0;
+  let callbackCalls = 0;
+  const props = {children: 'blocked accessor'};
+  Object.defineProperty(props, 'onClick', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      getterCalls++;
+      return function blockedAccessorClick() {
+        callbackCalls++;
+      };
+    }
+  });
+
+  return {
+    label: 'unsupported-accessor-public-prop',
+    element: createForgedHostElement('div', props),
+    assertNoCapabilityEffects() {
+      assert.equal(getterCalls, 0);
+      assert.equal(callbackCalls, 0);
+    }
+  };
+}
+
+function createProxyPublicPropsRejectionCase() {
+  let getTrapCalls = 0;
+  let callbackCalls = 0;
+  const props = new Proxy(
+    {
+      children: 'blocked proxy',
+      onClick() {
+        callbackCalls++;
+      }
+    },
+    {
+      get(target, property, receiver) {
+        getTrapCalls++;
+        return Reflect.get(target, property, receiver);
+      }
+    }
+  );
+
+  return {
+    label: 'unsupported-proxy-public-props',
+    element: createForgedHostElement('div', props),
+    assertNoCapabilityEffects() {
+      assert.equal(getTrapCalls, 0);
+      assert.equal(callbackCalls, 0);
+    }
+  };
+}
+
+function createForgedHostElement(type, props, key = null) {
+  return {
+    $$typeof: reactElementType,
+    type,
+    key,
+    props,
+    _owner: null
+  };
+}
+
+function createPropsWithInherited(inheritedProps, ownProps) {
+  const props = Object.create(inheritedProps);
+  return Object.assign(props, ownProps);
 }
 
 function createUnsupportedComponentRejectionCase() {
@@ -1540,23 +1795,30 @@ function assertNoRootMarkerOrListenerLeak(container, document) {
 function assertPublicRenderFailureDoesNotLeak(
   element,
   label,
-  assertNoCapabilityEffects = () => {}
+  assertNoCapabilityEffects = () => {},
+  cleanup = () => {},
+  prepare = () => {}
 ) {
   const document = createDocument(`public-create-root-${label}`);
   const container = document.createElement('div');
   document.__mutationLog.length = 0;
   const root = reactDomClient.createRoot(container);
 
-  assert.throws(
-    () => {
-      root.render(element);
-    },
-    {
-      code: 'FAST_REACT_UNIMPLEMENTED',
-      entrypoint: 'react-dom/client',
-      exportName: 'createRoot().render'
-    }
-  );
+  try {
+    prepare();
+    assert.throws(
+      () => {
+        root.render(element);
+      },
+      {
+        code: 'FAST_REACT_UNIMPLEMENTED',
+        entrypoint: 'react-dom/client',
+        exportName: 'createRoot().render'
+      }
+    );
+  } finally {
+    cleanup();
+  }
   assertContainerUntouched(container, document);
   assertNoCapabilityEffects();
 }
@@ -1564,7 +1826,9 @@ function assertPublicRenderFailureDoesNotLeak(
 function assertPublicRenderUpdateFailureDoesNotLeak(
   element,
   label,
-  assertNoCapabilityEffects = () => {}
+  assertNoCapabilityEffects = () => {},
+  cleanup = () => {},
+  prepare = () => {}
 ) {
   const document = createDocument(`public-create-root-update-${label}`);
   const container = document.createElement('div');
@@ -1582,16 +1846,21 @@ function assertPublicRenderUpdateFailureDoesNotLeak(
   assert.equal(initialHostNode.getAttribute('id'), 'safe');
   assert.equal(latestPropsBefore, acceptedElement.props);
 
-  assert.throws(
-    () => {
-      root.render(element);
-    },
-    {
-      code: 'FAST_REACT_UNIMPLEMENTED',
-      entrypoint: 'react-dom/client',
-      exportName: 'createRoot().render'
-    }
-  );
+  try {
+    prepare();
+    assert.throws(
+      () => {
+        root.render(element);
+      },
+      {
+        code: 'FAST_REACT_UNIMPLEMENTED',
+        entrypoint: 'react-dom/client',
+        exportName: 'createRoot().render'
+      }
+    );
+  } finally {
+    cleanup();
+  }
   const latestPropsAfter = componentTree.getLatestPropsFromNode(
     container.firstChild
   );
@@ -2136,6 +2405,8 @@ let unsupportedLazyLoaderCalls = 0;
 let unsupportedMemoComponentCalls = 0;
 let unsupportedNestedComponentCalls = 0;
 let formCallbackCalls = 0;
+let getterInvocationCount = 0;
+let proxyGetTrapCount = 0;
 let refCallbackCalls = 0;
 const objectRef = {current: null};
 const forwardRefRef = {current: null};
@@ -2181,6 +2452,7 @@ require.cache[rootBridgeCacheKey] = {
 
 const client = require(path.join(packageRoot, 'client.js'));
 const React = require(path.join(packageRoot, '..', 'react', 'index.js'));
+const reactElementType = Symbol.for('react.transitional.element');
 const root = client.createRoot({});
 
 for (const rejectionCase of createCases()) {
@@ -2204,9 +2476,17 @@ process.stdout.write(JSON.stringify({
   formCallbackCalls,
   freshErrors,
   freshRejectedLabels: freshErrors.map((error) => error.label),
+  getterInvocationCount,
   objectRefCurrent: objectRef.current,
+  objectPrototypePollutionCleaned:
+    !Object.prototype.hasOwnProperty.call(
+      Object.prototype,
+      'compatibilityClaimed'
+    ) &&
+    !Object.prototype.hasOwnProperty.call(Object.prototype, 'onClick'),
   postAcceptedErrors,
   postAcceptedRejectedLabels: postAcceptedErrors.map((error) => error.label),
+  proxyGetTrapCount,
   refCallbackCalls,
   unsupportedComponentCalls,
   unsupportedForwardRefRenderCalls,
@@ -2218,6 +2498,9 @@ process.stdout.write(JSON.stringify({
 function renderExpectingRejection(root, rejectionCase, errors) {
   currentRenderLabel = rejectionCase.label;
   try {
+    if (typeof rejectionCase.prepare === 'function') {
+      rejectionCase.prepare();
+    }
     root.render(rejectionCase.element);
     errors.push({
       label: rejectionCase.label,
@@ -2232,6 +2515,9 @@ function renderExpectingRejection(root, rejectionCase, errors) {
       status: 'throws'
     });
   } finally {
+    if (typeof rejectionCase.cleanup === 'function') {
+      rejectionCase.cleanup();
+    }
     currentRenderLabel = null;
   }
 }
@@ -2277,6 +2563,38 @@ function createCases() {
         dangerouslySetInnerHTML: {__html: '<span>blocked</span>'}
       })
     },
+    inheritedParentCase(
+      'unsupported-inherited-compatibilityClaimed-prop',
+      'compatibilityClaimed',
+      true
+    ),
+    inheritedParentCase(
+      'unsupported-inherited-publicRootCompatibilitySurface-prop',
+      'publicRootCompatibilitySurface',
+      true
+    ),
+    inheritedParentCase(
+      'unsupported-inherited-onClick-prop',
+      'onClick',
+      function blockedInheritedClick() {
+        eventCallbackCalls++;
+      }
+    ),
+    inheritedParentCase(
+      'unsupported-inherited-className-prop',
+      'className',
+      'blocked'
+    ),
+    inheritedParentCase(
+      'unsupported-inherited-style-prop',
+      'style',
+      {color: 'red'}
+    ),
+    inheritedParentCase(
+      'unsupported-inherited-dangerouslySetInnerHTML-prop',
+      'dangerouslySetInnerHTML',
+      {__html: '<span>blocked</span>'}
+    ),
     {
       label: 'unsupported-keyed-div',
       element: React.createElement('div', {key: 'blocked'}, 'blocked key')
@@ -2314,6 +2632,40 @@ function createCases() {
         )
       )
     },
+    inheritedNestedSpanCase(
+      'unsupported-nested-inherited-id-prop',
+      'id',
+      'blocked'
+    ),
+    inheritedNestedSpanCase(
+      'unsupported-nested-inherited-className-prop',
+      'className',
+      'blocked'
+    ),
+    inheritedNestedSpanCase(
+      'unsupported-nested-inherited-onClick-prop',
+      'onClick',
+      function blockedNestedInheritedClick() {
+        eventCallbackCalls++;
+      }
+    ),
+    inheritedNestedSpanCase(
+      'unsupported-nested-inherited-ref-prop',
+      'ref',
+      function blockedNestedInheritedRef() {
+        refCallbackCalls++;
+      }
+    ),
+    inheritedNestedSpanCase(
+      'unsupported-nested-inherited-resource-prop',
+      'href',
+      '/blocked.css'
+    ),
+    inheritedNestedSpanCase(
+      'unsupported-nested-inherited-compatibility-prop',
+      'compatibilityClaimed',
+      true
+    ),
     {
       label: 'unsupported-nested-component',
       element: React.createElement(
@@ -2333,6 +2685,11 @@ function createCases() {
         React.createElement('span', null, 'blocked compatibility claim')
       )
     },
+    inheritedParentChildrenCase(),
+    inheritedChildChildrenCase(),
+    objectPrototypePollutionCase(),
+    accessorPublicPropCase(),
+    proxyPublicPropsCase(),
     {
       label: 'unsupported-fragment',
       element: React.createElement(
@@ -2472,6 +2829,139 @@ function createCases() {
       )
     }
   ];
+}
+
+function inheritedParentCase(label, propName, value) {
+  return {
+    label,
+    element: forgedHostElement(
+      'div',
+      propsWithInherited(
+        {[propName]: value},
+        {children: \`blocked inherited \${propName}\`}
+      )
+    )
+  };
+}
+
+function inheritedNestedSpanCase(label, propName, value) {
+  return {
+    label,
+    element: forgedHostElement('div', {
+      children: forgedHostElement(
+        'span',
+        propsWithInherited(
+          {[propName]: value},
+          {children: \`blocked nested inherited \${propName}\`}
+        )
+      )
+    })
+  };
+}
+
+function inheritedParentChildrenCase() {
+  return {
+    label: 'unsupported-inherited-parent-children-prop',
+    element: forgedHostElement(
+      'div',
+      propsWithInherited({children: 'blocked inherited children'}, {})
+    )
+  };
+}
+
+function inheritedChildChildrenCase() {
+  return {
+    label: 'unsupported-inherited-child-children-prop',
+    element: forgedHostElement('div', {
+      children: forgedHostElement(
+        'span',
+        propsWithInherited({children: 'blocked inherited child'}, {})
+      )
+    })
+  };
+}
+
+function objectPrototypePollutionCase() {
+  return {
+    label: 'unsupported-object-prototype-polluted-public-props',
+    element: React.createElement('div', null, 'blocked pollution'),
+    prepare() {
+      Object.defineProperties(Object.prototype, {
+        compatibilityClaimed: {
+          configurable: true,
+          enumerable: true,
+          value: true
+        },
+        onClick: {
+          configurable: true,
+          enumerable: true,
+          value() {
+            eventCallbackCalls++;
+          }
+        }
+      });
+    },
+    cleanup() {
+      delete Object.prototype.compatibilityClaimed;
+      delete Object.prototype.onClick;
+    }
+  };
+}
+
+function accessorPublicPropCase() {
+  const props = {children: 'blocked accessor'};
+  Object.defineProperty(props, 'onClick', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      getterInvocationCount++;
+      return function blockedAccessorClick() {
+        eventCallbackCalls++;
+      };
+    }
+  });
+
+  return {
+    label: 'unsupported-accessor-public-prop',
+    element: forgedHostElement('div', props)
+  };
+}
+
+function proxyPublicPropsCase() {
+  const props = new Proxy(
+    {
+      children: 'blocked proxy',
+      onClick() {
+        eventCallbackCalls++;
+      }
+    },
+    {
+      get(target, property, receiver) {
+        proxyGetTrapCount++;
+        return Reflect.get(target, property, receiver);
+      }
+    }
+  );
+
+  return {
+    label: 'unsupported-proxy-public-props',
+    element: forgedHostElement('div', props)
+  };
+}
+
+function forgedHostElement(type, props, key = null) {
+  return {
+    $$typeof: reactElementType,
+    type,
+    key,
+    props,
+    _owner: null
+  };
+}
+
+function propsWithInherited(inheritedProps, ownProps) {
+  const props = Object.create(inheritedProps);
+  return Object.assign(props, ownProps);
 }
 
 function eventCase(label, propName) {
