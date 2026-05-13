@@ -65,6 +65,27 @@
 			"status": "active",
 			"title": "Native lifecycle/no-load replacement scout",
 			"agent": "scout_1259_native_next"
+		},
+		{
+			"id": 1260,
+			"type": "scout",
+			"status": "active",
+			"title": "Rust root/sync-flush next lane scout",
+			"agent": "scout_1260_rust_root_next"
+		},
+		{
+			"id": 1261,
+			"type": "scout",
+			"status": "active",
+			"title": "React DOM facade/native handoff next lane scout",
+			"agent": "scout_1261_react_dom_next"
+		},
+		{
+			"id": 1262,
+			"type": "scout",
+			"status": "active",
+			"title": "Test-renderer private bridge next lane scout",
+			"agent": "scout_1262_test_renderer_next"
 		}
 	]
 }
