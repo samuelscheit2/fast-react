@@ -4116,7 +4116,38 @@ function jsObjectSourceAssertionsPass({ source, declaration, assertions }) {
     return false;
   }
 
+  if (
+    jsObjectSpreadsCanOverrideAssertedProperties({
+      extracted,
+      assertions
+    })
+  ) {
+    return false;
+  }
+
   return jsObjectPropertyAssertionsPass(extracted.properties, assertions);
+}
+
+function jsObjectSpreadsCanOverrideAssertedProperties({
+  extracted,
+  assertions
+}) {
+  if (extracted.spreadStartIndexes.length === 0) {
+    return false;
+  }
+
+  return assertions.some((assertion) => {
+    const propertyStartIndex = extracted.propertyStartIndexes.get(
+      assertion.property
+    );
+    if (propertyStartIndex === undefined) {
+      return false;
+    }
+
+    return extracted.spreadStartIndexes.some(
+      (spreadStartIndex) => spreadStartIndex > propertyStartIndex
+    );
+  });
 }
 
 function jsObjectPropertyAssertionsPass(properties, assertions) {
@@ -4438,6 +4469,15 @@ function jsFunctionDeclarationReturnedFreezeRecordAssertionsPass({
     return false;
   }
 
+  if (
+    jsObjectSpreadsCanOverrideAssertedProperties({
+      extracted,
+      assertions
+    })
+  ) {
+    return false;
+  }
+
   return jsObjectPropertyAssertionsPass(extracted.properties, assertions);
 }
 
@@ -4452,6 +4492,17 @@ function extractTopLevelReturnedFreezeRecordObject(source) {
     if (nextIndex !== index) {
       index = nextIndex;
       continue;
+    }
+
+    if (jsIdentifierAt(source, index, "return")) {
+      if (braceDepth !== 0 || bracketDepth !== 0 || parenDepth !== 0) {
+        return freezeRecord({
+          ok: false,
+          openIndex: -1,
+          closeIndex: -1,
+          error: "nested-return-before-top-level-freeze-record"
+        });
+      }
     }
 
     if (
@@ -4862,6 +4913,8 @@ function extractJsObjectFreezePropertiesForDeclaration({
 
 function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
   const properties = new Map();
+  const propertyStartIndexes = new Map();
+  const spreadStartIndexes = [];
   let index = openIndex + 1;
 
   while (index < closeIndex) {
@@ -4871,6 +4924,17 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
     }
     if (index >= closeIndex) {
       break;
+    }
+
+    if (source.startsWith("...", index)) {
+      spreadStartIndexes.push(index);
+      const nextIndex = findNextTopLevelPropertySeparator(
+        source,
+        index + "...".length,
+        closeIndex
+      );
+      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+      continue;
     }
 
     const propertyKey = readJsObjectPropertyKey(source, index, closeIndex);
@@ -4893,6 +4957,7 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
       );
       if (source.slice(index, nextIndex).trim() === "") {
         properties.set(propertyKey.key, propertyKey.key);
+        propertyStartIndexes.set(propertyKey.key, index);
       }
       index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
       continue;
@@ -4905,12 +4970,15 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
       closeIndex
     );
     properties.set(propertyKey.key, source.slice(valueStart, valueEnd).trim());
+    propertyStartIndexes.set(propertyKey.key, index);
     index = valueEnd < closeIndex ? valueEnd + 1 : closeIndex;
   }
 
   return freezeRecord({
     ok: true,
     properties,
+    propertyStartIndexes,
+    spreadStartIndexes: freezeArray(spreadStartIndexes),
     error: null
   });
 }
@@ -5196,7 +5264,12 @@ function jsExpressionReturnsCallExpressionWithArgumentsPass({
   const nullishGuard = parseJsNullishEqualityGuardExpression(
     conditional.test
   );
-  if (nullishGuard === null) {
+  if (
+    nullishGuard === null ||
+    expectedArguments.length !== 1 ||
+    normalizeJsExpressionSource(nullishGuard.operand) !==
+      normalizeJsExpressionSource(expectedArguments[0])
+  ) {
     return false;
   }
 
@@ -5228,7 +5301,10 @@ function parseJsNullishEqualityGuardExpression(source) {
     direct !== null &&
     isSimpleJsMemberExpression(direct[1].trim())
   ) {
-    return freezeRecord({ operator: direct[2] });
+    return freezeRecord({
+      operand: direct[1].trim(),
+      operator: direct[2]
+    });
   }
 
   const reversed = expression.match(/^(null|undefined)\s*(===|!==)\s*(.+)$/u);
@@ -5236,7 +5312,10 @@ function parseJsNullishEqualityGuardExpression(source) {
     reversed !== null &&
     isSimpleJsMemberExpression(reversed[3].trim())
   ) {
-    return freezeRecord({ operator: reversed[2] });
+    return freezeRecord({
+      operand: reversed[3].trim(),
+      operator: reversed[2]
+    });
   }
 
   return null;
