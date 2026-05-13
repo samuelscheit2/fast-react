@@ -287,7 +287,9 @@
 			"branch": "worker/1279-native-cleanup-hook-preflight",
 			"audits": [
 				"audit_1279_source_contract",
-				"audit_1279_verification"
+				"audit_1279_verification",
+				"audit_1279_repair_source",
+				"audit_1279_repair_verification"
 			]
 		}
 	]
