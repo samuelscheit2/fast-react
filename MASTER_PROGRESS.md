@@ -29,6 +29,27 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1309 Native Generation Source Ownership Map
+
+- Worker 1309 hardened the native no-load
+  `jsonBatchLifecycleGenerationAdmissionLedger` so each generation source
+  identifier is attributed to its exact Rust source file instead of any file in
+  a row's aggregate `sourceFiles` set.
+- The accepted repair rejects inherited string and symbol aliases on
+  `sourceIdentifierEvidenceByFile` without invoking getters, after source audit
+  found inherited evidence-map aliases still false-greened. Exact own file-key
+  checks, wrong-attribution rejection, accepted/rejected row freezing, and
+  sanitized evidence maps remain intact.
+- The accepted change is private no-load ledger evidence only. It does not load
+  `.node`, change worker execution, package exports, Rust, React DOM,
+  react-test-renderer, or public/native compatibility.
+- Accepted validation includes the initial source-audit blocker, clean repair
+  source and verification audits, and root reruns passing native no-load guard,
+  native private root work-loop metadata factory, native workspace check, and
+  `git diff --check`.
+- The accepted merge is main `1480aa58` after Worker 1309 commits `e310b069`
+  and repair `f41ca98a`.
+
 ### Worker 1307 React DOM Nested Lifecycle Conformance Canary
 
 - Worker 1307 added conformance-only blocked-gate coverage for the already

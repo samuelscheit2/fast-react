@@ -582,7 +582,7 @@
 		{
 			"id": 1309,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Native generation source ownership map",
 			"agent": "worker_1309_native_generation_source_ownership",
 			"branch": "worker/1309-native-generation-source-ownership",
