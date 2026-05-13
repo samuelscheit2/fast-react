@@ -297,6 +297,19 @@ pub use complete_handoff::{
     describe_minimal_host_root_render_complete_placement_for_private_bridge,
 };
 mod context_provider;
+#[cfg(test)]
+mod queued_minimal_host;
+#[cfg(test)]
+#[allow(
+    unused_imports,
+    reason = "private queued minimal HostRoot records are exposed for focused canaries"
+)]
+pub(crate) use queued_minimal_host::{
+    QueuedMinimalHostRootCommitError, QueuedMinimalHostRootCommitPhase,
+    QueuedMinimalHostRootCommitRecord, QueuedMinimalHostRootOutput,
+    QueuedMinimalHostRootUpdatePriority,
+    enqueue_render_complete_commit_minimal_host_root_for_canary,
+};
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]

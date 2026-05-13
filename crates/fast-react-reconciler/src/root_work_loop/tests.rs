@@ -109,5 +109,6 @@ mod function_component_tail;
 mod host_complete;
 mod host_update;
 mod managed_child;
+mod queued_minimal_host;
 mod suspense;
 mod unmount;
