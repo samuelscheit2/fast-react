@@ -2092,31 +2092,34 @@ function enforceNativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceSet(
 function hasExactNativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceSet(
   rows
 ) {
-  let rootCount = 0;
-  let valueCount = 0;
+  if (
+    rows.length !==
+    nativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceRows.length
+  ) {
+    return false;
+  }
 
-  for (const row of rows) {
-    const role =
-      getNativeRootBridgeWorkerThreadCleanupHookAcceptedCanonicalRole(row);
-    if (role === nativeRootBridgeHandleKindRoot) {
-      rootCount += 1;
-    } else if (role === nativeRootBridgeHandleKindValue) {
-      valueCount += 1;
+  for (const canonicalRow of nativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceRows) {
+    const matchingRows = rows.filter((row) =>
+      nativeRootBridgeWorkerThreadCleanupHookRowsEqual(row, canonicalRow)
+    );
+
+    if (matchingRows.length !== 1) {
+      return false;
     }
   }
 
-  return rootCount === 1 && valueCount === 1;
+  return true;
 }
 
-function getNativeRootBridgeWorkerThreadCleanupHookAcceptedCanonicalRole(row) {
-  if (row.status !== 'accepted' || row.canonicalExecutableEvidence !== true) {
-    return null;
+function nativeRootBridgeWorkerThreadCleanupHookRowsEqual(actual, expected) {
+  for (const field of nativeRootBridgeWorkerThreadCleanupHookPreflightRowFields) {
+    if (actual[field] !== expected[field]) {
+      return false;
+    }
   }
 
-  return getNativeRootBridgeWorkerThreadCleanupHookCanonicalRole(
-    row.sourceRowId,
-    row.sourceHandleKind
-  );
+  return true;
 }
 
 function validateNativeRootBridgeWorkerThreadCleanupHookPreflightRows(rows) {
@@ -3378,8 +3381,8 @@ const nativeRootBridgeWorkerThreadTeardownExecutablePreflight = Object.freeze({
   reactBehaviorError: false
 });
 
-const nativeRootBridgeWorkerThreadCleanupHookPreflight =
-  createNativeRootBridgeWorkerThreadCleanupHookPreflight([
+const nativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceRows =
+  Object.freeze([
     freezeNativeRootBridgeWorkerThreadCleanupHookPreflightRow({
       id: 'cleanup-hook-worker-root-before-value-release',
       operation: 'cleanup-hook-order-preflight',
@@ -3485,6 +3488,11 @@ const nativeRootBridgeWorkerThreadCleanupHookPreflight =
       staleOrForgedCleanupEvidenceRejected: true
     })
   ]);
+
+const nativeRootBridgeWorkerThreadCleanupHookPreflight =
+  createNativeRootBridgeWorkerThreadCleanupHookPreflight(
+    nativeRootBridgeWorkerThreadCleanupHookCanonicalEvidenceRows
+  );
 
 const nativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink =
   freezeNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink({
