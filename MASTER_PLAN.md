@@ -75,7 +75,7 @@ Current orchestration queue:
 - Scout 1283 reported a concrete react-test-renderer next-lane candidate.
 - Scout 1285 reported a concrete React core/hooks next-lane candidate.
 - Scouts 1291 through 1295 reported concrete next-lane candidates.
-- Worker 1300 is repair-active for react-test-renderer TestInstance query-bridge
+- Worker 1300 is repair-auditing for react-test-renderer TestInstance query-bridge
   local-gate source proofing after source audit found detached CJS stub false
   greens, broken return wiring, and remaining first-return/top-level binding
   gaps.
