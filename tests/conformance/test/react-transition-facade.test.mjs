@@ -512,6 +512,148 @@ test("private startTransition rootless currentness rejects mutable nested eviden
   );
 });
 
+test("private startTransition rootless currentness rejects frozen reports with extra own keys", () => {
+  const topLevelClaim = withObjectFreezePollution(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) =>
+      value?.kind === "fast-react.private.start_transition_rootless_currentness",
+    (value) => defineExtraClaim(value, "publicTransitionCompatibilityClaimed")
+  );
+  assertPollutionApplied(topLevelClaim);
+  assert.equal(
+    topLevelClaim.report.publicTransitionCompatibilityClaimed,
+    true
+  );
+  assertStartTransitionCurrentnessRejected(
+    topLevelClaim.report,
+    "startTransition-rootless-currentness-shape"
+  );
+
+  const rootlessMetadataClaim = withObjectFreezePollution(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) =>
+      value?.apiName === "startTransition" &&
+      value?.currentPublicExport === "react.startTransition facade",
+    (value) => defineExtraClaim(value, "publicRootCompatibilityClaimed")
+  );
+  assertPollutionApplied(rootlessMetadataClaim);
+  assert.equal(
+    rootlessMetadataClaim.report.rootlessCurrentness
+      .publicRootCompatibilityClaimed,
+    true
+  );
+  assertStartTransitionCurrentnessRejected(
+    rootlessMetadataClaim.report,
+    "startTransition-rootless-currentness-rootless-metadata"
+  );
+
+  const surfaceRowClaim = withObjectFreezePollution(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) => value?.surfaceId === "react-root",
+    (value) => defineExtraClaim(value, "schedulerIntegrationClaimed")
+  );
+  assertPollutionApplied(surfaceRowClaim);
+  assert.equal(
+    surfaceRowClaim.report.surfaceCurrentnessRows[0]
+      .schedulerIntegrationClaimed,
+    true
+  );
+  assertStartTransitionCurrentnessRejected(
+    surfaceRowClaim.report,
+    "startTransition-rootless-currentness-surface-currentness"
+  );
+});
+
+test("private startTransition rootless currentness rejects frozen arrays with extra own keys", () => {
+  const rootlessFieldNamesClaim = withObjectFreezePollution(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) =>
+      Array.isArray(value) &&
+      value.includes("apiName") &&
+      value.includes("blocker"),
+    (value) => defineExtraClaim(value, "fieldNameClaimAlias")
+  );
+  assertPollutionApplied(rootlessFieldNamesClaim);
+  assert.equal(
+    rootlessFieldNamesClaim.report.rootlessCurrentnessFieldNames
+      .fieldNameClaimAlias,
+    true
+  );
+  assertStartTransitionCurrentnessRejected(
+    rootlessFieldNamesClaim.report,
+    "startTransition-rootless-currentness-shape"
+  );
+
+  const surfaceFieldNamesClaim = withObjectFreezePollution(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) =>
+      Array.isArray(value) &&
+      value.includes("surfaceId") &&
+      value.includes("moduleShape"),
+    (value) => defineExtraClaim(value, "fieldNameClaimAlias")
+  );
+  assertPollutionApplied(surfaceFieldNamesClaim);
+  assert.equal(
+    surfaceFieldNamesClaim.report.surfaceCurrentnessFieldNames
+      .fieldNameClaimAlias,
+    true
+  );
+  assertStartTransitionCurrentnessRejected(
+    surfaceFieldNamesClaim.report,
+    "startTransition-rootless-currentness-shape"
+  );
+
+  const rowsArrayClaim = withObjectFreezePollution(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) =>
+      Array.isArray(value) && value[0]?.surfaceId === "react-root",
+    (value) => defineExtraClaim(value, "packageCompatibilityClaimed")
+  );
+  assertPollutionApplied(rowsArrayClaim);
+  assert.equal(
+    rowsArrayClaim.report.surfaceCurrentnessRows.packageCompatibilityClaimed,
+    true
+  );
+  assertStartTransitionCurrentnessRejected(
+    rowsArrayClaim.report,
+    "startTransition-rootless-currentness-surface-currentness"
+  );
+
+  const blockedExecutionClaim = withObjectFreezePollution(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) =>
+      Array.isArray(value) && value.includes("dispatcher-routing"),
+    (value) => defineExtraClaim(value, "schedulerIntegrationClaimed")
+  );
+  assertPollutionApplied(blockedExecutionClaim);
+  assert.equal(
+    blockedExecutionClaim.report.surfaceCurrentnessRows[0]
+      .blockedExecutionPaths.schedulerIntegrationClaimed,
+    true
+  );
+  assertStartTransitionCurrentnessRejected(
+    blockedExecutionClaim.report,
+    "startTransition-rootless-currentness-surface-currentness"
+  );
+
+  const blockedCompatibilityClaim = withObjectFreezePollution(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) =>
+      Array.isArray(value) && value.includes("public-transition"),
+    (value) => defineExtraClaim(value, "packageCompatibilityClaimed")
+  );
+  assertPollutionApplied(blockedCompatibilityClaim);
+  assert.equal(
+    blockedCompatibilityClaim.report.surfaceCurrentnessRows[0]
+      .blockedCompatibilityClaims.packageCompatibilityClaimed,
+    true
+  );
+  assertStartTransitionCurrentnessRejected(
+    blockedCompatibilityClaim.report,
+    "startTransition-rootless-currentness-surface-currentness"
+  );
+});
+
 test("private startTransition rootless currentness rejects public surface drift", () => {
   const originalStartTransition = React.startTransition;
   const fakeStartTransition = createSameShapeFakeStartTransition();
@@ -821,6 +963,46 @@ function withObjectFreezeSelectivelyBypassed(callback, shouldBypass) {
     };
   } finally {
     Object.freeze = originalFreeze;
+  }
+}
+
+function withObjectFreezePollution(callback, shouldPollute, pollute) {
+  const originalFreeze = Object.freeze;
+  const polluted = [];
+  Object.freeze = (value) => {
+    if (shouldPollute(value)) {
+      pollute(value);
+      polluted.push(value);
+    }
+
+    return originalFreeze(value);
+  };
+
+  try {
+    return {
+      report: callback(),
+      polluted
+    };
+  } finally {
+    Object.freeze = originalFreeze;
+  }
+}
+
+function defineExtraClaim(value, propertyName) {
+  Object.defineProperty(value, propertyName, {
+    configurable: true,
+    enumerable: true,
+    value: true,
+    writable: true
+  });
+}
+
+function assertPollutionApplied({ report, polluted }) {
+  assert.equal(Object.isFrozen(report), true);
+  assert.notEqual(polluted.length, 0);
+
+  for (const value of polluted) {
+    assert.equal(Object.isFrozen(value), true);
   }
 }
 

@@ -213,6 +213,38 @@ const startTransitionRootlessCurrentnessCompatibilityFalseFlags = freezeArray([
   'packageCompatibility',
   'compatibilityClaimed'
 ]);
+const startTransitionRootlessCurrentnessReportFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'compatibilityTarget',
+  'apiName',
+  'rootlessCurrentnessFieldNames',
+  'rootlessCurrentness',
+  'surfaceCurrentnessFieldNames',
+  'surfaceCurrentnessRows',
+  'publicTransitionCompatibilityBlocked',
+  'publicRootCompatibilityBlocked',
+  'schedulerCompatibilityBlocked',
+  'schedulerPackageCompatibilityBlocked',
+  'packageCompatibilityBlocked',
+  'dispatcherRoutingBlocked',
+  'schedulerExecutionBlocked',
+  'rootLaneIntegrationBlocked',
+  'rootSchedulingBlocked',
+  'rootExecutionBlocked',
+  'callbackExecutionBlocked',
+  'publicTransitionCompatibility',
+  'publicRootCompatibility',
+  'publicSchedulerCompatibility',
+  'schedulerIntegration',
+  'rootLaneIntegration',
+  'rootScheduling',
+  'rootExecution',
+  'schedulerCallbackExecution',
+  'packageCompatibility',
+  'compatibilityClaimed'
+]);
 
 function reportGlobalError(error) {
   if (typeof reportError === 'function') {
@@ -474,6 +506,10 @@ function validateStartTransitionRootlessCurrentnessReport(report) {
   }
 
   if (
+    !hasExactOwnKeys(
+      report,
+      startTransitionRootlessCurrentnessReportFieldNames
+    ) ||
     report.kind !== startTransitionRootlessCurrentnessReportKind ||
     report.version !== startTransitionRootlessCurrentnessReportVersion ||
     report.status !== startTransitionRootlessCurrentnessStatus ||
@@ -746,6 +782,7 @@ function hasSameFrozenStringArray(actual, expected) {
   if (
     !Array.isArray(actual) ||
     !Object.isFrozen(actual) ||
+    !hasExactOwnKeys(actual, Reflect.ownKeys(expected)) ||
     actual.length !== expected.length
   ) {
     return false;
@@ -765,8 +802,7 @@ function hasSameFrozenRecordFields(actual, expected, fieldNames) {
     return false;
   }
 
-  const actualKeys = Reflect.ownKeys(actual);
-  if (actualKeys.length !== fieldNames.length) {
+  if (!hasExactOwnKeys(actual, fieldNames)) {
     return false;
   }
 
@@ -786,6 +822,7 @@ function hasSameStartTransitionRootlessSurfaceCurrentnessRows(actual, expected) 
   if (
     !Array.isArray(actual) ||
     !Object.isFrozen(actual) ||
+    !hasExactOwnKeys(actual, Reflect.ownKeys(expected)) ||
     actual.length !== expected.length
   ) {
     return false;
@@ -810,8 +847,12 @@ function hasSameStartTransitionRootlessSurfaceCurrentnessRow(actual, expected) {
     return false;
   }
 
-  const actualKeys = Reflect.ownKeys(actual);
-  if (actualKeys.length !== startTransitionRootlessSurfaceCurrentnessFieldNames.length) {
+  if (
+    !hasExactOwnKeys(
+      actual,
+      startTransitionRootlessSurfaceCurrentnessFieldNames
+    )
+  ) {
     return false;
   }
 
@@ -834,6 +875,22 @@ function hasSameStartTransitionRootlessSurfaceCurrentnessRow(actual, expected) {
     }
 
     if (actual[fieldName] !== expected[fieldName]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasExactOwnKeys(actual, expectedKeys) {
+  const actualKeys = Reflect.ownKeys(actual);
+
+  if (actualKeys.length !== expectedKeys.length) {
+    return false;
+  }
+
+  for (const expectedKey of expectedKeys) {
+    if (!actualKeys.includes(expectedKey)) {
       return false;
     }
   }
