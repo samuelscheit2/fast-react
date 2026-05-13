@@ -93,6 +93,8 @@ Current orchestration queue:
   1308 has been reviewed, merged, and recorded as accepted history.
 - Scout 1303 reported a react-test-renderer error-surface row-contract lane;
   Worker 1310 has been reviewed, merged, and recorded as accepted history.
+- Scouts 1311 through 1315 are active across Rust root/scheduler, React DOM,
+  react-test-renderer, native/no-load, and React core/hooks next-lane discovery.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
