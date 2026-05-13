@@ -47,8 +47,10 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current accepted implementation head before this
-docs pass is main `316985ef` (`Merge worker 1300 test renderer query bridge source proof`).
+Top-level cap: 30 workers. Current root head is main `9530ba8e`
+(`Record worker 1300 accepted`) before this docs pass. Current accepted
+implementation head is main `316985ef`
+(`Merge worker 1300 test renderer query bridge source proof`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -93,6 +95,12 @@ Current orchestration queue:
   and React core/hooks next-lane candidates. Scouts 1313 and 1314 returned no
   report. Workers 1316 and 1317 were attempted from the 1311/1312 reports but
   returned no implementation report and are not accepted input.
+- Active Worker 1318 is retrying the React DOM createRoot container
+  capability-alias blocker from Scout 1312.
+- Active Worker 1319 is implementing the startTransition rootless currentness
+  option-alias hardening from Scout 1315.
+- Active Worker 1320 is retrying the queued minimal HostRoot update-to-null
+  cleanup ownership transfer from Scout 1311.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

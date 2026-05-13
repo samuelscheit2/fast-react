@@ -659,6 +659,30 @@
 			"title": "React DOM createRoot container capability-alias blocker",
 			"agent": "worker_1317_react_dom_container_alias_blocker",
 			"branch": "worker/1317-react-dom-container-alias-blocker"
+		},
+		{
+			"id": 1318,
+			"type": "worker",
+			"status": "active",
+			"title": "React DOM createRoot container capability-alias blocker retry",
+			"agent": "worker_1318_react_dom_container_alias_blocker_retry",
+			"branch": "worker/1318-react-dom-container-alias-blocker-retry"
+		},
+		{
+			"id": 1319,
+			"type": "worker",
+			"status": "active",
+			"title": "startTransition rootless currentness option-alias hardening",
+			"agent": "worker_1319_start_transition_option_aliases",
+			"branch": "worker/1319-start-transition-option-aliases"
+		},
+		{
+			"id": 1320,
+			"type": "worker",
+			"status": "active",
+			"title": "Queued minimal HostRoot update-to-null cleanup ownership transfer retry",
+			"agent": "worker_1320_queued_cleanup_update_transfer_retry",
+			"branch": "worker/1320-queued-cleanup-update-transfer-retry"
 		}
 	]
 }
