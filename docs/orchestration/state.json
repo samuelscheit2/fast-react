@@ -281,7 +281,7 @@
 		{
 			"id": 1279,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Native cleanup-hook preflight evidence exactness",
 			"agent": "worker_1279_native_cleanup_hook_preflight",
 			"branch": "worker/1279-native-cleanup-hook-preflight",

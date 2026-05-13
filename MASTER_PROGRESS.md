@@ -29,6 +29,27 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1279 Native Cleanup-Hook Preflight Evidence
+
+- Worker 1279 hardened native cleanup-hook preflight evidence so accepted rows
+  require exact own fields and reject inherited rows, accessor-backed required
+  fields, extra enumerable/non-enumerable/symbol keys, forged accepted
+  `id`/`operation` labels, and broad inherited public/native/package/root/
+  worker/execution compatibility aliases.
+- The accepted repair broadened cleanup-hook alias rejection to shared native
+  capability/package blocklists plus explicit cleanup/root/worker/execution
+  aliases. Hostile coverage includes inherited `publicNativeExecution`,
+  `nativeAddonLoadClaimed`, `packageExportsOpened`, and
+  `public_native_execution`, with zero accepted cleanup evidence and all native,
+  worker, package, renderer, reconciler, and cleanup-hook execution flags false.
+- Accepted validation includes the initial source-audit blocker, clean repair
+  source and verification audits, and root reruns passing native no-load guard,
+  native private root work-loop metadata factory, native loader, native
+  workspace check, package-surface guard, import smoke, and `git diff --check`.
+- The accepted state is main `7c4e3ab5` after Worker 1279 merge `7c4e3ab5`,
+  worker commits `4d67809a` and repair `2f493c61`, and this
+  orchestration-state update.
+
 ### Worker 1271 React DOM Element Prototype Blocker
 
 - Worker 1271 hardened the public React DOM `createRoot().render` facade
