@@ -201,7 +201,7 @@
 		{
 			"id": 1271,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "React DOM public root element-prototype capability blocker",
 			"agent": "worker_1271_react_dom_element_prototype_blocker",
 			"branch": "worker/1271-react-dom-element-prototype-blocker",

@@ -29,6 +29,31 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1271 React DOM Element Prototype Blocker
+
+- Worker 1271 hardened the public React DOM `createRoot().render` facade
+  against forged React element prototypes. Inherited element prototypes are
+  inspected before private adapter render, proxy prototypes remain blocked
+  before traps, and any normalized inherited `public*` field now fails closed,
+  including the repaired `publicRootCreated`, `publicDispatchEnabled`,
+  `publicControlledBehaviorEnabled`, `publicRootTouched`, and
+  `publicRootErrorCallbacksInvoked` cases.
+- Hostile coverage includes top-level non-enumerable inherited public/native/
+  listener claims, nested forged span prototype `ref`, hydration/resource/form
+  aliases, Object.prototype element-level pollution, proxy element prototypes,
+  and the repaired broad `public*` diagnostic fields. The accepted fake-DOM
+  div/text/id and nested `div > span/text` lifecycles remain preserved.
+- Accepted validation includes the initial source-audit blocker, clean repair
+  source and verification audits, and root reruns passing React DOM package
+  public facade tests (5/5), public facade conformance (47/47),
+  `root-public-facade:conformance` with 108 blocked public facade rows and zero
+  failures, `root-render-e2e:conformance` with zero failures, React DOM
+  workspace check (237/237), package-surface guard, import smoke, and
+  `git diff --check`.
+- The accepted state is main `7ba06529` after Worker 1271 merge `7ba06529`,
+  worker commits `bddeb9f` and repair `f79fa33f`, and this
+  orchestration-state update.
+
 ### Worker 1272 Test Renderer Ledger Comment Proofing
 
 - Worker 1272 hardened private test-renderer 816/818 and delegated 733/736
