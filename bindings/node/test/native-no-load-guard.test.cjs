@@ -11,6 +11,7 @@ const forbiddenLoads = [];
 const nativeRootWorkLoopFinishedWorkMetadataFactorySymbol = Symbol.for(
   'fast.react_native.private_root_work_loop_finished_work_metadata_factory'
 );
+const repoRoot = path.resolve(__dirname, '../../..');
 const originalLoad = Module._load;
 const originalNodeExtension = Module._extensions['.node'];
 let moduleLoadHooks = null;
@@ -424,6 +425,23 @@ function assertNoNativeGenerationLedgerExecution(record, label) {
   assert.equal(record.reactBehaviorError, false, `${label} React behavior`);
 }
 
+function assertTrackedSourceEvidencePaths(sourceEvidencePaths, label) {
+  assert.ok(Object.isFrozen(sourceEvidencePaths), `${label} frozen`);
+  assert.ok(sourceEvidencePaths.length > 0, `${label} non-empty`);
+  for (const sourceEvidencePath of sourceEvidencePaths) {
+    assert.equal(
+      sourceEvidencePath.startsWith('worker-progress/'),
+      false,
+      `${label} must not use deleted worker-progress evidence`
+    );
+    assert.equal(
+      fs.existsSync(path.join(repoRoot, sourceEvidencePath)),
+      true,
+      `${label} ${sourceEvidencePath} exists`
+    );
+  }
+}
+
 function getGenerationAdmissionLedger(native) {
   const descriptor = Object.getOwnPropertyDescriptor(
     native.nativeRootBridgeRequestShape,
@@ -511,6 +529,20 @@ function assertPrivateGenerationAdmissionLedger(native) {
     ledger.sourceWorker,
     'worker-873-native-lifecycle-no-stale-execution'
   );
+  assert.deepEqual(ledger.sourceEvidencePaths, [
+    'bindings/node/index.cjs',
+    'crates/fast-react-napi/src/root_bridge_requests/mod.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/json_transport.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/batch_lifecycle_algorithms.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/errors.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/json_transport_parser.rs',
+    'crates/fast-react-napi/src/root_bridge_requests/batch_lifecycle.rs',
+    'bindings/node/test/native-no-load-guard.test.cjs'
+  ]);
+  assertTrackedSourceEvidencePaths(
+    ledger.sourceEvidencePaths,
+    'generation source evidence'
+  );
   assert.equal(
     ledger.sourceFile,
     'crates/fast-react-napi/src/root_bridge_requests/mod.rs'
@@ -582,11 +614,16 @@ function assertPrivateGenerationAdmissionLedger(native) {
       )
     ])
   );
-  const workerProgress = fs.readFileSync(
-    path.resolve(__dirname, '../../../', ledger.sourceWorkerProgress),
+  const nativeSource = fs.readFileSync(
+    path.join(repoRoot, 'bindings/node/index.cjs'),
     'utf8'
   );
-  assert.match(workerProgress, /private source-owned generation guard/u);
+  const testSource = fs.readFileSync(__filename, 'utf8');
+  assert.match(
+    nativeSource,
+    /source-owned-generation-handle-table-guard/u
+  );
+  assert.match(testSource, /Object\.create\(row\)/u);
 
   for (const row of ledger.rows) {
     assert.ok(Object.isFrozen(row), row.id);

@@ -54,8 +54,12 @@ const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceFile =
   'crates/fast-react-napi/src/root_work_loop_metadata.rs';
 const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceWorker =
   'worker-1228-native-metadata-no-load-source-ledger';
-const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceWorkerProgress =
-  'worker-progress/worker-1228-native-metadata-no-load-source-ledger.md';
+const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceEvidencePaths =
+  Object.freeze([
+    'bindings/node/index.cjs',
+    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceFile,
+    'bindings/node/test/native-private-root-work-loop-metadata-factory.test.cjs'
+  ]);
 const nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes =
   Object.freeze({
     callerBuilt:
@@ -698,8 +702,17 @@ const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFile =
   nativeRootBridgeJsonBatchLifecycleGenerationAdmissionModuleSourceFile;
 const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceWorker =
   'worker-873-native-lifecycle-no-stale-execution';
-const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceWorkerProgress =
-  'worker-progress/worker-873-native-lifecycle-no-stale-execution.md';
+const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceEvidencePaths =
+  Object.freeze([
+    'bindings/node/index.cjs',
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionModuleSourceFile,
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportSourceFile,
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleAlgorithmsSourceFile,
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionErrorsSourceFile,
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionJsonTransportParserSourceFile,
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionBatchLifecycleSourceFile,
+    'bindings/node/test/native-no-load-guard.test.cjs'
+  ]);
 const nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectionCodes =
   Object.freeze({
     callerBuilt:
@@ -3568,8 +3581,8 @@ function createNativeRootBridgeJsonBatchLifecycleGenerationAdmissionLedger(
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionEvaluationMode,
     sourceWorker:
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceWorker,
-    sourceWorkerProgress:
-      nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceWorkerProgress,
+    sourceEvidencePaths:
+      nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceEvidencePaths,
     sourceFile:
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionSourceFile,
     sourceFiles:
@@ -7258,8 +7271,8 @@ function createNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessLedger(
       nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessEvaluationMode,
     sourceWorker:
       nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceWorker,
-    sourceWorkerProgress:
-      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceWorkerProgress,
+    sourceEvidencePaths:
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceEvidencePaths,
     sourceFile:
       nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessSourceFile,
     sourceFiles:

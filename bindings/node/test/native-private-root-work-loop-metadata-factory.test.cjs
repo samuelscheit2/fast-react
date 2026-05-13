@@ -23,9 +23,10 @@ const rustMetadataSourcePath = path.join(
   repoRoot,
   'crates/fast-react-napi/src/root_work_loop_metadata.rs'
 );
-const workerProgressPath = path.join(
+const nativeIndexPath = path.join(repoRoot, 'bindings/node/index.cjs');
+const nativeMetadataFactoryTestPath = path.join(
   repoRoot,
-  'worker-progress/worker-1228-native-metadata-no-load-source-ledger.md'
+  'bindings/node/test/native-private-root-work-loop-metadata-factory.test.cjs'
 );
 const validOptions = Object.freeze({
   hostType: 'div',
@@ -160,6 +161,23 @@ function assertNoNativeLedgerExecution(record, label) {
   assert.equal(record.reactBehaviorError, false, `${label} React behavior`);
 }
 
+function assertTrackedSourceEvidencePaths(sourceEvidencePaths, label) {
+  assert.ok(Object.isFrozen(sourceEvidencePaths), `${label} frozen`);
+  assert.ok(sourceEvidencePaths.length > 0, `${label} non-empty`);
+  for (const sourceEvidencePath of sourceEvidencePaths) {
+    assert.equal(
+      sourceEvidencePath.startsWith('worker-progress/'),
+      false,
+      `${label} must not use deleted worker-progress evidence`
+    );
+    assert.equal(
+      fs.existsSync(path.join(repoRoot, sourceEvidencePath)),
+      true,
+      `${label} ${sourceEvidencePath} exists`
+    );
+  }
+}
+
 function getSourceCurrentnessLedger(factory) {
   const symbols = Object.getOwnPropertySymbols(factory);
   const ledgerDescriptors = symbols
@@ -266,7 +284,8 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
   const validateSourceCurrentnessRows =
     getSourceCurrentnessLedgerValidator(ledger);
   const rustSource = fs.readFileSync(rustMetadataSourcePath, 'utf8');
-  const workerProgress = fs.readFileSync(workerProgressPath, 'utf8');
+  const nativeSource = fs.readFileSync(nativeIndexPath, 'utf8');
+  const testSource = fs.readFileSync(nativeMetadataFactoryTestPath, 'utf8');
 
   assert.equal(
     ledger.ledgerStatus,
@@ -285,9 +304,14 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     ledger.sourceWorker,
     'worker-1228-native-metadata-no-load-source-ledger'
   );
-  assert.equal(
-    ledger.sourceWorkerProgress,
-    'worker-progress/worker-1228-native-metadata-no-load-source-ledger.md'
+  assert.deepEqual(ledger.sourceEvidencePaths, [
+    'bindings/node/index.cjs',
+    'crates/fast-react-napi/src/root_work_loop_metadata.rs',
+    'bindings/node/test/native-private-root-work-loop-metadata-factory.test.cjs'
+  ]);
+  assertTrackedSourceEvidencePaths(
+    ledger.sourceEvidencePaths,
+    'source-currentness source evidence'
   );
   assert.equal(
     ledger.sourceFile,
@@ -327,9 +351,10 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     'root-work-loop-metadata-private-factory-options'
   ]);
   assert.match(
-    workerProgress,
-    /source-owned Rust identifiers and JS factory shape/u
+    nativeSource,
+    /source-owned-rust-identifier-set-and-js-factory-shape/u
   );
+  assert.match(testSource, /Object\.create\(row\)/u);
 
   for (const row of ledger.rows) {
     assert.ok(Object.isFrozen(row), row.id);
