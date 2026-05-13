@@ -181,6 +181,82 @@ fn root_work_loop_queued_minimal_host_root_null_cleanup_consumes_sync_root_updat
 }
 
 #[test]
+fn root_work_loop_queued_minimal_host_root_rejects_missing_source_element_before_enqueue() {
+    let (mut store, root_id, mut host) = root_store();
+    let source = TestHostTree::new();
+    let missing_element = RootElementHandle::from_raw(1_269_001);
+    let snapshot = queued_minimal_host_root_snapshot(&store, &host, root_id);
+    assert_eq!(snapshot.current_child, None);
+    assert_eq!(snapshot.finished_work, None);
+    assert_eq!(snapshot.finished_lanes, Lanes::NO);
+    assert_eq!(snapshot.pending_lanes, Lanes::NO);
+    assert_eq!(snapshot.render_phase_work, None);
+    assert!(snapshot.operations.is_empty());
+    assert_eq!(snapshot.element, RootElementHandle::NONE);
+
+    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        missing_element,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        None,
+        QUEUED_MINIMAL_SOURCE_ORDER + 32,
+        QUEUED_MINIMAL_COMMIT_ORDER + 32,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        QueuedMinimalHostRootCommitError::MissingRootElement {
+            root: root_id,
+            element: missing_element,
+        }
+    );
+    assert_queued_minimal_host_root_snapshot(&store, &host, root_id, snapshot);
+}
+
+#[test]
+fn root_work_loop_queued_minimal_host_root_rejects_text_source_root_before_enqueue() {
+    let (mut store, root_id, mut host) = root_store();
+    let mut source = TestHostTree::new();
+    let text_root = source.insert_text("queued text root");
+    let snapshot = queued_minimal_host_root_snapshot(&store, &host, root_id);
+    assert_eq!(snapshot.current_child, None);
+    assert_eq!(snapshot.finished_work, None);
+    assert_eq!(snapshot.finished_lanes, Lanes::NO);
+    assert_eq!(snapshot.pending_lanes, Lanes::NO);
+    assert_eq!(snapshot.render_phase_work, None);
+    assert!(snapshot.operations.is_empty());
+    assert_eq!(snapshot.element, RootElementHandle::NONE);
+
+    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+        &mut store,
+        &mut host,
+        root_id,
+        text_root,
+        QueuedMinimalHostRootUpdatePriority::Default,
+        Lanes::DEFAULT,
+        &source,
+        None,
+        QUEUED_MINIMAL_SOURCE_ORDER + 33,
+        QUEUED_MINIMAL_COMMIT_ORDER + 33,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        QueuedMinimalHostRootCommitError::ExpectedHostComponentRoot {
+            root: root_id,
+            element: text_root,
+        }
+    );
+    assert_queued_minimal_host_root_snapshot(&store, &host, root_id, snapshot);
+}
+
+#[test]
 fn root_work_loop_queued_minimal_host_root_rejects_cleanup_when_live_current_child_is_missing() {
     let (mut store, root_id, mut host) = root_store();
     let mut source = TestHostTree::new();
@@ -764,6 +840,7 @@ fn root_work_loop_queued_minimal_host_root_rejects_replayed_finished_work_handof
 struct QueuedMinimalHostRootSnapshot {
     current: FiberId,
     current_child: Option<FiberId>,
+    fiber_count: usize,
     finished_work: Option<FiberId>,
     finished_lanes: Lanes,
     pending_lanes: Lanes,
@@ -782,6 +859,7 @@ fn queued_minimal_host_root_snapshot(
     QueuedMinimalHostRootSnapshot {
         current,
         current_child: store.fiber_arena().get(current).unwrap().child(),
+        fiber_count: store.fiber_arena().len(),
         finished_work: root.finished_work(),
         finished_lanes: root.finished_lanes(),
         pending_lanes: root.lanes().pending_lanes(),
