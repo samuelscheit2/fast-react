@@ -487,13 +487,15 @@
 		{
 			"id": 1300,
 			"type": "worker",
-			"status": "repair-active",
+			"status": "repair-auditing",
 			"title": "react-test-renderer TestInstance query-bridge source proof",
 			"agent": "worker_1300_test_renderer_query_bridge_source_proof",
 			"branch": "worker/1300-test-renderer-query-bridge-source-proof",
 			"audits": [
 				"audit_1300_source_contract",
-				"audit_1300_verification"
+				"audit_1300_verification",
+				"audit_1300_repair_source",
+				"audit_1300_repair_verification"
 			]
 		}
 	]
