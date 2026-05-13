@@ -4073,16 +4073,12 @@ function cjsTestInstanceQueryBridgePreflightSourceEvidencePresentUncached(
         "const privateTestInstanceQueryBridgePreflightGate = Object.freeze",
       assertions: privateTestInstanceQueryBridgePreflightGateSourceAssertions
     }) &&
-    jsFunctionDeclarationConstInitializerCallPass({
+    jsFunctionDeclarationConstInitializerBeforeTopLevelReturnExpressionPass({
       source,
       functionName: "getTestInstanceQueryBridgePreflightForRootRequest",
       name: "diagnostics",
       callee: "getTestInstanceQueryDiagnosticsForRootRequest",
-      arguments: freezeArray(["record"])
-    }) &&
-    jsFunctionDeclarationTopLevelReturnExpressionPass({
-      source,
-      functionName: "getTestInstanceQueryBridgePreflightForRootRequest",
+      arguments: freezeArray(["record"]),
       expression: "diagnostics.queryBridgePreflight ?? diagnostics"
     }) &&
     jsFunctionDeclarationSourceCallsPass({
@@ -4204,10 +4200,53 @@ function parseJsStringLiteralSource(source) {
       if (index >= source.length - 1) {
         return null;
       }
+      if (source[index] === "u") {
+        const escaped = readJsUnicodeEscapeSequence(source, index);
+        if (escaped === null || escaped.end >= source.length) {
+          return null;
+        }
+        value += escaped.value;
+        index = escaped.end - 1;
+        continue;
+      }
     }
     value += source[index];
   }
   return value;
+}
+
+function readJsUnicodeEscapeSequence(source, index) {
+  if (source[index] !== "u") {
+    return null;
+  }
+
+  if (source[index + 1] === "{") {
+    const closeIndex = source.indexOf("}", index + 2);
+    if (closeIndex < 0) {
+      return null;
+    }
+    const hexSource = source.slice(index + 2, closeIndex);
+    if (!/^[0-9A-Fa-f]{1,6}$/u.test(hexSource)) {
+      return null;
+    }
+    const codePoint = Number.parseInt(hexSource, 16);
+    if (!Number.isSafeInteger(codePoint) || codePoint > 0x10ffff) {
+      return null;
+    }
+    return freezeRecord({
+      value: String.fromCodePoint(codePoint),
+      end: closeIndex + 1
+    });
+  }
+
+  const hexSource = source.slice(index + 1, index + 5);
+  if (!/^[0-9A-Fa-f]{4}$/u.test(hexSource)) {
+    return null;
+  }
+  return freezeRecord({
+    value: String.fromCharCode(Number.parseInt(hexSource, 16)),
+    end: index + 5
+  });
 }
 
 function parseJsQuotedStringLiteralSource(source) {
@@ -4369,6 +4408,47 @@ function jsFunctionDeclarationTopLevelReturnExpressionPass({
   }
 
   return jsTopLevelReturnExpressionPass(declaration.body, expression);
+}
+
+function jsFunctionDeclarationConstInitializerBeforeTopLevelReturnExpressionPass({
+  source,
+  functionName,
+  name,
+  callee,
+  arguments: expectedArguments,
+  expression
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  const returnExpressions = readTopLevelJsReturnExpressions(declaration.body);
+  if (
+    returnExpressions === null ||
+    returnExpressions.length !== 1 ||
+    normalizeJsExpressionSource(returnExpressions[0].expression) !==
+      normalizeJsExpressionSource(expression)
+  ) {
+    return false;
+  }
+
+  const initializer = extractTopLevelJsConstDeclarationInitializerSource({
+    source: declaration.body,
+    name,
+    beforeIndex: returnExpressions[0].returnIndex
+  });
+  return (
+    initializer.ok === true &&
+    jsExactCallExpressionWithArgumentsPass({
+      source: initializer.initializer,
+      callee,
+      expectedArguments
+    })
+  );
 }
 
 function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
@@ -4959,6 +5039,7 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
       continue;
     }
 
+    const propertyStartIndex = index;
     const propertyKey = readJsObjectPropertyKey(source, index, closeIndex);
     if (propertyKey.ok !== true) {
       unsupportedKeyStartIndexes.push(index);
@@ -4972,6 +5053,63 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
     }
 
     index = skipJsTrivia(source, propertyKey.end, closeIndex);
+    if (source[index] === "(") {
+      const paramsCloseIndex = findMatchingJsEnclosure(
+        source,
+        index,
+        "(",
+        ")"
+      );
+      if (paramsCloseIndex < 0 || paramsCloseIndex > closeIndex) {
+        unsupportedKeyStartIndexes.push(propertyStartIndex);
+        return freezeRecord({
+          ok: true,
+          properties,
+          propertyStartIndexes,
+          spreadStartIndexes: freezeArray(spreadStartIndexes),
+          unsupportedKeyStartIndexes: freezeArray(unsupportedKeyStartIndexes),
+          error: null
+        });
+      }
+
+      const bodyOpenIndex = skipJsTrivia(
+        source,
+        paramsCloseIndex + 1,
+        closeIndex
+      );
+      if (source[bodyOpenIndex] !== "{") {
+        unsupportedKeyStartIndexes.push(propertyStartIndex);
+        const nextIndex = findNextTopLevelPropertySeparator(
+          source,
+          paramsCloseIndex + 1,
+          closeIndex
+        );
+        index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+        continue;
+      }
+
+      const bodyCloseIndex = findMatchingJsBrace(source, bodyOpenIndex);
+      if (bodyCloseIndex < 0 || bodyCloseIndex > closeIndex) {
+        unsupportedKeyStartIndexes.push(propertyStartIndex);
+        return freezeRecord({
+          ok: true,
+          properties,
+          propertyStartIndexes,
+          spreadStartIndexes: freezeArray(spreadStartIndexes),
+          unsupportedKeyStartIndexes: freezeArray(unsupportedKeyStartIndexes),
+          error: null
+        });
+      }
+
+      properties.set(
+        propertyKey.key,
+        source.slice(propertyStartIndex, bodyCloseIndex + 1).trim()
+      );
+      propertyStartIndexes.set(propertyKey.key, propertyStartIndex);
+      index = bodyCloseIndex + 1;
+      continue;
+    }
+
     if (source[index] !== ":") {
       const nextIndex = findNextTopLevelPropertySeparator(
         source,
@@ -4980,7 +5118,9 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
       );
       if (source.slice(index, nextIndex).trim() === "") {
         properties.set(propertyKey.key, propertyKey.key);
-        propertyStartIndexes.set(propertyKey.key, index);
+        propertyStartIndexes.set(propertyKey.key, propertyStartIndex);
+      } else {
+        unsupportedKeyStartIndexes.push(propertyStartIndex);
       }
       index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
       continue;
@@ -4993,7 +5133,7 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
       closeIndex
     );
     properties.set(propertyKey.key, source.slice(valueStart, valueEnd).trim());
-    propertyStartIndexes.set(propertyKey.key, index);
+    propertyStartIndexes.set(propertyKey.key, propertyStartIndex);
     index = valueEnd < closeIndex ? valueEnd + 1 : closeIndex;
   }
 
@@ -5400,7 +5540,8 @@ function jsExpressionHasLiveBindingProof({
     return !jsIdentifierHasAssignmentBeforeIndex({
       source,
       identifier,
-      beforeIndex
+      beforeIndex,
+      treatDeclarationsAsAssignments: true
     });
   }
 
@@ -5414,7 +5555,9 @@ function jsExpressionHasLiveBindingProof({
     !jsIdentifierHasAssignmentBeforeIndex({
       source,
       identifier,
-      beforeIndex
+      beforeIndex,
+      ignoredDeclarationIndex: declaration.declarationIndex,
+      treatDeclarationsAsAssignments: true
     }) &&
     jsConstInitializerHasLiveBindingProof({
       source,
@@ -5459,7 +5602,9 @@ function jsConstInitializerHasLiveBindingProof({
 function jsIdentifierHasAssignmentBeforeIndex({
   source,
   identifier,
-  beforeIndex
+  beforeIndex,
+  ignoredDeclarationIndex = -1,
+  treatDeclarationsAsAssignments = false
 }) {
   let index = 0;
 
@@ -5475,16 +5620,23 @@ function jsIdentifierHasAssignmentBeforeIndex({
       continue;
     }
 
-    const previousWord = readPreviousJsIdentifier(source, index);
+    const previousToken = findPreviousJsSignificantToken(source, index);
     const afterIdentifierIndex = skipJsTrivia(
       source,
       index + identifier.length,
       beforeIndex
     );
     if (
-      ["const", "let", "var", "function"].includes(previousWord.value) &&
-      source[afterIdentifierIndex] === "="
+      previousToken !== null &&
+      previousToken.type === "word" &&
+      ["const", "let", "var", "function"].includes(previousToken.value)
     ) {
+      if (
+        treatDeclarationsAsAssignments &&
+        previousToken.start !== ignoredDeclarationIndex
+      ) {
+        return true;
+      }
       index = afterIdentifierIndex + 1;
       continue;
     }
@@ -6063,14 +6215,18 @@ function findPreviousJsSignificantToken(source, index) {
       }
       previousToken = freezeRecord({
         type: "word",
-        value: source.slice(start, cursor)
+        value: source.slice(start, cursor),
+        start,
+        end: cursor
       });
       continue;
     }
 
     previousToken = freezeRecord({
       type: "punctuator",
-      value: character
+      value: character,
+      start: cursor,
+      end: cursor + 1
     });
     cursor += 1;
   }
