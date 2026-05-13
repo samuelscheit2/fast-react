@@ -29,6 +29,41 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1299 React DOM Own Element Alias Blocker
+
+- Worker 1299 hardened public `createRoot().render` so forged React element
+  objects with own element-level public/native/package/compatibility aliases
+  reject before private adapter rendering.
+- The own element shell guard allows only accepted React element shell keys,
+  rejects own accessors without invoking getters, and keeps private facade
+  symbol markers unsupported. Minimal fake-DOM render/update, `render(null)`,
+  nested host output, recreate, unmount, returned root null-prototype behavior,
+  hydrateRoot, portals, resources/forms/events, native/Rust, test-renderer, and
+  package compatibility remain preserved or blocked as before.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed the React DOM client symbol facade gate (6/6), public facade blocked
+  gate (47/47), private root bridge shell tests (77/77), React DOM workspace
+  check (238/238), root public facade conformance with zero failures, and
+  `git diff --check`.
+- The accepted state is main `71576391` after Worker 1299 merge `71576391`,
+  worker commit `21415744`, and this orchestration-state update.
+
+### Worker 1297 Native Inherited Capability Claims
+
+- Worker 1297 hardened native no-load/private N-API capability-claim scanners
+  so inherited prototype aliases reject like own claims across native root
+  bridge handoff, React DOM render handoff admission, and root work-loop
+  finished-work metadata.
+- Descriptor-based prototype-chain scanning rejects inherited accessors without
+  invoking getters, and preserves normalized/symbol alias handling for claims
+  such as `public_native_compatibility` and `Symbol.for("publicRootExecution")`.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed native no-load guard, private root work-loop metadata factory, native
+  React DOM render handoff admission, native package check, package-surface
+  guard, and `git diff --check`.
+- The accepted state is main `56849550` after Worker 1297 merge `56849550`,
+  worker commit `c44ac0c7`, and this orchestration-state update.
+
 ### Worker 1290 react-test-renderer Create Routing Source Proof
 
 - Worker 1290 hardened the react-test-renderer serialization local gate so

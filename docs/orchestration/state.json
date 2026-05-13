@@ -451,7 +451,7 @@
 		{
 			"id": 1297,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Native inherited capability-claim blockers",
 			"agent": "worker_1297_native_inherited_capability_claims",
 			"branch": "worker/1297-native-inherited-capability-claims",
@@ -472,7 +472,7 @@
 		{
 			"id": 1299,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "React DOM own element compatibility alias blocker",
 			"agent": "worker_1299_react_dom_own_element_alias_blocker",
 			"branch": "worker/1299-react-dom-own-element-alias-blocker",
