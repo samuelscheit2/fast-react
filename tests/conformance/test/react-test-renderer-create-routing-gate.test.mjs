@@ -1243,14 +1243,29 @@ test("react-test-renderer private root request bridges reject cross-entrypoint r
             type: "cross-entrypoint-renderer-update"
           }),
         consumer.entry.entrypoint,
-        `${label} updateRootRequest renderer`,
+        `${label} updateRootRequest renderer as handle`,
         /root handle/u
       );
       assertPrivateRootBridgeCallRejects(
         () => consumer.bridge.unmountRootRequest(owner.renderer),
         consumer.entry.entrypoint,
-        `${label} unmountRootRequest renderer`,
+        `${label} unmountRootRequest renderer as handle`,
         /root handle/u
+      );
+      assertPrivateRootBridgeCallRejects(
+        () =>
+          consumer.bridge.updateRendererRootRequest(owner.renderer, {
+            type: "cross-entrypoint-renderer-api-update"
+          }),
+        consumer.entry.entrypoint,
+        `${label} updateRendererRootRequest renderer`,
+        /placeholder created by this root request bridge/u
+      );
+      assertPrivateRootBridgeCallRejects(
+        () => consumer.bridge.unmountRendererRootRequest(owner.renderer),
+        consumer.entry.entrypoint,
+        `${label} unmountRendererRootRequest renderer`,
+        /placeholder created by this root request bridge/u
       );
 
       assert.deepEqual(
@@ -10066,6 +10081,8 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
   assert.equal(typeof bridge.createRootRequest, "function");
   assert.equal(typeof bridge.updateRootRequest, "function");
   assert.equal(typeof bridge.unmountRootRequest, "function");
+  assert.equal(typeof bridge.updateRendererRootRequest, "function");
+  assert.equal(typeof bridge.unmountRendererRootRequest, "function");
   assert.equal(typeof bridge.getRendererRootRequests, "function");
   assert.equal(typeof bridge.getRequestPayload, "function");
   assert.equal(typeof bridge.getRustCanaryMetadata, "function");
