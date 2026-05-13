@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {
-  existsSync,
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   PRIVATE_ADMISSION_733_736_BRIDGE_LEDGER_STATUS,
@@ -35,7 +36,11 @@ const worker816 =
 const worker818 = "worker-818-private-admission-733-736-bridge-ledger";
 const worker736 = "worker-736-nested-tojson-source-report-identity";
 const expectedWorkers = [worker816, worker818];
-const testRendererRustSource = "crates/fast-react-test-renderer/src/lib.rs";
+const workspaceRoot = fileURLToPath(new URL("../../../", import.meta.url));
+const bridgeLedgerSource =
+  "tests/conformance/src/private-admission-733-736-bridge-ledger.mjs";
+const testRendererConstantsRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/constants.rs";
 const sourceTokenPolicy =
   "source-owned-identifiers-statuses-functions-fields-and-constants";
 
@@ -315,7 +320,7 @@ test("private admission 825 ledger rejects missing evidence, stale status ids, a
 
 test("private admission 825 ledger rejects corrupted Worker 816 source and Worker 818 bridge ledger evidence", () => {
   const workspace = createWorkspaceWithMutatedEvidenceFile({
-    evidencePath: testRendererRustSource,
+    evidencePath: testRendererConstantsRustSource,
     find: "private-unmount-nested-source-report-admission-validated-public-native-package-blocked",
     replace:
       "private-unmount-nested-source-report-admission-stale-public-native-package-blocked"
@@ -375,6 +380,55 @@ test("private admission 825 ledger rejects corrupted Worker 816 source and Worke
   assert.deepEqual(bridgeViolation.rows[0].bridgeViolationIds, [
     "bridge-required-evidence-mismatch"
   ]);
+});
+
+test("private admission 825 ledger rejects Worker 816 Rust evidence tokens left only in comments", () => {
+  const token =
+    "private-unmount-nested-source-report-admission-validated-public-native-package-blocked";
+  const staleToken =
+    "private-unmount-nested-source-report-admission-stale-public-native-package-blocked";
+  const sourceLine = `    "${token}";`;
+
+  assertCommentOnlyTokenRejected({
+    evidencePath: testRendererConstantsRustSource,
+    find: sourceLine,
+    replace: `    "${staleToken}"; // ${token}`,
+    workerId: worker816,
+    evidenceId: "worker-816-unmount-nested-status-constants",
+    token
+  });
+
+  assertCommentOnlyTokenRejected({
+    evidencePath: testRendererConstantsRustSource,
+    find: sourceLine,
+    replace: `    "${staleToken}"; /* ${token} */`,
+    workerId: worker816,
+    evidenceId: "worker-816-unmount-nested-status-constants",
+    token
+  });
+});
+
+test("private admission 825 ledger rejects Worker 818 JS evidence tokens left only in comments", () => {
+  const token = "bridge-rust-source-identifier-missing";
+  const sourceLine = `    "${token}",`;
+
+  assertCommentOnlyTokenRejected({
+    evidencePath: bridgeLedgerSource,
+    find: sourceLine,
+    replace: `    "bridge-rust-source-identifier-stale",\n    // ${token}`,
+    workerId: worker818,
+    evidenceId: "worker-818-bridge-row-contract-and-evaluator",
+    token
+  });
+
+  assertCommentOnlyTokenRejected({
+    evidencePath: bridgeLedgerSource,
+    find: sourceLine,
+    replace: `    "bridge-rust-source-identifier-stale",\n    /* ${token} */`,
+    workerId: worker818,
+    evidenceId: "worker-818-bridge-row-contract-and-evaluator",
+    token
+  });
 });
 
 test("private admission 825 ledger rejects public, native, package, root, act, scheduler, broad multichild, and compatibility claims", () => {
@@ -533,6 +587,52 @@ function assertEvidenceRecognized(ledger, workerId, evidenceId, expected) {
   assert.equal(evidenceRow.recognized, expected, evidenceId);
 }
 
+function assertCommentOnlyTokenRejected({
+  evidencePath,
+  find,
+  replace,
+  workerId,
+  evidenceId,
+  token
+}) {
+  const workspace = createWorkspaceWithMutatedEvidenceFile({
+    evidencePath,
+    find,
+    replace
+  });
+
+  try {
+    const ledger = evaluatePrivateAdmission825TestRenderer816818Ledger({
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      ledger.status,
+      PRIVATE_ADMISSION_825_LEDGER_VIOLATION_STATUS
+    );
+    assert.equal(ledger.evidenceRecognized, false);
+    assertEvidenceRecognized(ledger, workerId, evidenceId, false);
+    assertViolationIds(ledger, [
+      "private-admission-825-source-evidence-token-missing"
+    ]);
+    assertMissingEvidenceToken(ledger, workerId, evidenceId, token);
+  } finally {
+    workspace.cleanup();
+  }
+}
+
+function assertMissingEvidenceToken(ledger, workerId, evidenceId, token) {
+  const violation = ledger.violations.find(
+    (row) => row.id === "private-admission-825-source-evidence-token-missing"
+  );
+  assert.notEqual(violation, undefined);
+  const evidenceViolation = violation.rows.find(
+    (row) => row.workerId === workerId && row.evidenceId === evidenceId
+  );
+  assert.notEqual(evidenceViolation, undefined, evidenceId);
+  assert.equal(evidenceViolation.missingTokens.includes(token), true, token);
+}
+
 function assertDurableEvidenceValue({ evidenceId, field, value }) {
   if (value === null) {
     return;
@@ -576,7 +676,6 @@ function rowContract(row) {
 
 function createWorkspaceWithMutatedEvidenceFile({ evidencePath, find, replace }) {
   const root = mkdtempSync(join(tmpdir(), "private-admission-825-"));
-  const workspaceRoot = findWorkspaceRoot();
   const evidencePaths = new Set([
     ...PRIVATE_ADMISSION_825_ROWS.flatMap((row) =>
       row.evidence.map((evidenceRow) => evidenceRow.path)
@@ -585,6 +684,12 @@ function createWorkspaceWithMutatedEvidenceFile({ evidencePath, find, replace })
       row.evidence.map((evidenceRow) => evidenceRow.path)
     )
   ]);
+
+  cpSync(
+    join(workspaceRoot, "crates/fast-react-test-renderer/src"),
+    join(root, "crates/fast-react-test-renderer/src"),
+    { recursive: true }
+  );
 
   for (const path of evidencePaths) {
     const sourcePath = join(workspaceRoot, path);
@@ -603,19 +708,6 @@ function createWorkspaceWithMutatedEvidenceFile({ evidencePath, find, replace })
       rmSync(root, { recursive: true, force: true });
     }
   };
-}
-
-function findWorkspaceRoot() {
-  let current = process.cwd();
-  while (true) {
-    if (existsSync(join(current, "WORKER_BRIEF.md"))) {
-      return current;
-    }
-
-    const parent = dirname(current);
-    assert.notEqual(parent, current, "workspace root not found");
-    current = parent;
-  }
 }
 
 function replaceFirst(text, find, replace) {

@@ -8,6 +8,7 @@ import {
   PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_BINDINGS,
   PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_CARRY_FORWARD_BLOCKERS,
   PRIVATE_ADMISSION_733_736_BRIDGE_REQUIRED_EVIDENCE,
+  PRIVATE_ADMISSION_733_736_BRIDGE_ROWS,
   PRIVATE_ADMISSION_733_736_BRIDGE_ROW_CONTRACT,
   PRIVATE_ADMISSION_733_736_BRIDGE_WORKERS,
   evaluatePrivateAdmission733736BridgeLedger
@@ -18,6 +19,18 @@ const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
 );
 
 const testRendererRustSource = "crates/fast-react-test-renderer/src/lib.rs";
+const testRendererConstantsRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/constants.rs";
+const testRendererFixturesRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/fixtures.rs";
+const testRendererHostNodeCleanupRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/host_node_cleanup.rs";
+const testRendererJsonDiagnosticsRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/json.rs";
+const testRendererSerializationExecutionRustSource =
+  "crates/fast-react-test-renderer/src/root_impl/serialization_execution.rs";
+const testRendererUpdateRouteRustSource =
+  "crates/fast-react-test-renderer/src/diagnostics/update_route.rs";
 const bridgeLedgerSource =
   "tests/conformance/src/private-admission-733-736-bridge-ledger.mjs";
 const sourceTokenPolicy =
@@ -150,7 +163,11 @@ const privateAdmission825Rows = freezeArray([
       "accepted-private-test-renderer-unmount-nested-source-report-gate",
     sourceEvidenceArea:
       "test-renderer-unmount-nested-source-report-private-admission",
-    implementationPaths: freezeArray([testRendererRustSource]),
+    implementationPaths: freezeArray([
+      testRendererConstantsRustSource,
+      testRendererJsonDiagnosticsRustSource,
+      testRendererSerializationExecutionRustSource
+    ]),
     statusIds: PRIVATE_ADMISSION_825_REQUIRED_STATUS_IDS[worker816],
     bridgeLedgerContext:
       PRIVATE_ADMISSION_825_REQUIRED_BRIDGE_LEDGER_CONTEXT[worker816],
@@ -158,7 +175,7 @@ const privateAdmission825Rows = freezeArray([
     evidenceRows: [
       evidenceData({
         evidenceId: "worker-816-unmount-nested-status-constants",
-        path: testRendererRustSource,
+        path: testRendererConstantsRustSource,
         sliceStart: "TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME",
         sliceEnd: "TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID",
         tokens: [
@@ -172,7 +189,7 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-unmount-nested-gate-record-fields",
-        path: testRendererRustSource,
+        path: testRendererJsonDiagnosticsRustSource,
         sliceStart: "TestRendererPrivateUnmountNestedSourceReportAdmissionGate",
         sliceEnd: "public_native_package_js_surfaces_blocked",
         tokens: [
@@ -220,7 +237,7 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-unmount-nested-gate-methods",
-        path: testRendererRustSource,
+        path: testRendererJsonDiagnosticsRustSource,
         sliceStart: "public_native_package_js_surfaces_blocked",
         sliceEnd: "TestRendererPrivateToJsonSiblingSnapshotFinishedWorkIdentityBlocker",
         tokens: [
@@ -251,10 +268,10 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-unmount-nested-admission-builder",
-        path: testRendererRustSource,
+        path: testRendererSerializationExecutionRustSource,
         sliceStart:
           "describe_private_unmount_nested_source_report_admission_gate_for_canary",
-        sliceEnd: "describe_private_tree_committed_fiber_inspection_for_canary",
+        sliceEnd: "private_to_json_facade_result_from_report",
         tokens: [
           "describe_private_unmount_nested_source_report_admission_gate_for_canary",
           "validate_private_unmount_nested_source_report_nested_route_for_canary",
@@ -282,7 +299,7 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-route-admission-validators",
-        path: testRendererRustSource,
+        path: testRendererSerializationExecutionRustSource,
         tokens: [
           "validate_private_unmount_nested_source_report_nested_route_for_canary",
           "validate_private_unmount_nested_source_report_unmount_admission_for_canary",
@@ -317,7 +334,7 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-nested-source-report-ownership-validator",
-        path: testRendererRustSource,
+        path: testRendererSerializationExecutionRustSource,
         tokens: [
           "validate_private_unmount_nested_source_report_ownership_for_canary",
           "TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME",
@@ -346,7 +363,7 @@ const privateAdmission825Rows = freezeArray([
       }),
       evidenceData({
         evidenceId: "worker-816-unmount-nested-gate-validator",
-        path: testRendererRustSource,
+        path: testRendererSerializationExecutionRustSource,
         sliceStart:
           "validate_private_unmount_nested_source_report_admission_gate_for_canary",
         sliceEnd: "validate_private_update_native_execution_matches_handoff_for_canary",
@@ -468,6 +485,58 @@ export const PRIVATE_ADMISSION_825_ROWS = freezeArray(
   )
 );
 
+const bridgeLedgerSplitSourcePathByEvidenceId = freezeRecord({
+  "worker-733-unmount-native-admission-struct":
+    testRendererHostNodeCleanupRustSource,
+  "worker-733-unmount-native-status-constants":
+    testRendererConstantsRustSource,
+  "worker-733-unmount-native-record-validators":
+    testRendererSerializationExecutionRustSource,
+  "worker-733-unmount-handoff-matches-identity":
+    testRendererSerializationExecutionRustSource,
+  "worker-736-update-route-admission-record":
+    testRendererUpdateRouteRustSource,
+  "worker-736-nested-report-struct": testRendererJsonDiagnosticsRustSource,
+  "worker-736-nested-current-fibers-variant":
+    testRendererFixturesRustSource
+});
+
+const bridgeLedgerSplitSourceSliceEndByEvidenceId = freezeRecord({
+  "worker-733-unmount-finished-work-identity-builder":
+    "const fn instance_state_node_raw",
+  "worker-736-nested-report-struct": null,
+  "worker-736-nested-current-fibers-variant": null
+});
+
+const bridgeLedgerSplitSourceRowOverrides = freezeRecord(
+  Object.fromEntries(
+    PRIVATE_ADMISSION_733_736_BRIDGE_ROWS.map((row) => [
+      row.workerId,
+      freezeRecord({
+        evidence: freezeArray(
+          row.evidence.map((evidenceRow) =>
+            freezeRecord({
+              ...evidenceRow,
+              path:
+                bridgeLedgerSplitSourcePathByEvidenceId[
+                  evidenceRow.evidenceId
+                ] ?? evidenceRow.path,
+              sliceEnd: Object.hasOwn(
+                bridgeLedgerSplitSourceSliceEndByEvidenceId,
+                evidenceRow.evidenceId
+              )
+                ? bridgeLedgerSplitSourceSliceEndByEvidenceId[
+                    evidenceRow.evidenceId
+                  ]
+                : evidenceRow.sliceEnd
+            })
+          )
+        )
+      })
+    ])
+  )
+);
+
 export const PRIVATE_ADMISSION_825_REQUIRED_EVIDENCE = freezeRecord(
   Object.fromEntries(
     PRIVATE_ADMISSION_825_ROWS.map((row) => [
@@ -522,7 +591,10 @@ export function evaluatePrivateAdmission825TestRenderer816818Ledger({
   );
   const bridgeLedger = evaluatePrivateAdmission733736BridgeLedger({
     workspaceRoot,
-    rowOverrides: bridgeRowOverrides
+    rowOverrides: mergeBridgeRowOverrides(
+      bridgeLedgerSplitSourceRowOverrides,
+      bridgeRowOverrides
+    )
   });
 
   const actualWorkerIds = rows.map((row) => row.workerId);
@@ -972,6 +1044,17 @@ function mergeRowOverride(row, override) {
   return freezeRecord(merged);
 }
 
+function mergeBridgeRowOverrides(defaultOverrides, overrides) {
+  const merged = { ...defaultOverrides };
+  for (const [workerId, override] of Object.entries(overrides ?? {})) {
+    merged[workerId] = freezeRecord({
+      ...(defaultOverrides[workerId] ?? {}),
+      ...override
+    });
+  }
+  return freezeRecord(merged);
+}
+
 function evaluateLedgerRow({ fileCache, row, workspaceRoot }) {
   const evidence = row.evidence.map((evidenceRow) =>
     evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot })
@@ -1000,14 +1083,20 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
           sliceEnd: evidenceRow.sliceEnd
         })
       : fileText;
+  const commentFreeSourceText =
+    sourceText.ok === true
+      ? stripSourceComments(sourceText.value, evidenceRow.path)
+      : "";
   const missingTokens =
     sourceText.ok === true
-      ? evidenceRow.tokens.filter((token) => !sourceText.value.includes(token))
+      ? evidenceRow.tokens.filter(
+          (token) => !commentFreeSourceText.includes(token)
+        )
       : evidenceRow.tokens;
   const forbiddenTokensPresent =
     sourceText.ok === true
       ? evidenceRow.forbiddenTokens.filter((token) =>
-          sourceText.value.includes(token)
+          commentFreeSourceText.includes(token)
         )
       : [];
 
@@ -1070,6 +1159,127 @@ function extractEvidenceSourceSlice({ text, sliceStart, sliceEnd }) {
   }
 
   return freezeRecord({ ok: true, value: text.slice(startIndex, endIndex) });
+}
+
+function stripSourceComments(text, path) {
+  const rustSource = path.endsWith(".rs");
+  const javascriptSource = /\.(?:cjs|js|mjs)$/.test(path);
+  const output = [];
+  let index = 0;
+
+  while (index < text.length) {
+    const rawStringEnd = rustSource
+      ? findRustRawStringEnd(text, index)
+      : -1;
+    if (rawStringEnd >= 0) {
+      output.push(text.slice(index, rawStringEnd));
+      index = rawStringEnd;
+      continue;
+    }
+
+    const character = text[index];
+    const nextCharacter = text[index + 1];
+
+    if (
+      (character === `"` && rustSource) ||
+      (javascriptSource &&
+        (character === `"` || character === "'" || character === "`"))
+    ) {
+      const stringEnd = findQuotedStringEnd(text, index, character);
+      output.push(text.slice(index, stringEnd));
+      index = stringEnd;
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "/") {
+      index = skipLineComment(text, index, output);
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "*") {
+      index = skipBlockComment(text, index, output, rustSource);
+      continue;
+    }
+
+    output.push(character);
+    index += 1;
+  }
+
+  return output.join("");
+}
+
+function findRustRawStringEnd(text, index) {
+  let rawPrefixIndex = index;
+  if (text[index] === "b" && text[index + 1] === "r") {
+    rawPrefixIndex += 1;
+  }
+  if (text[rawPrefixIndex] !== "r") {
+    return -1;
+  }
+
+  let cursor = rawPrefixIndex + 1;
+  while (text[cursor] === "#") {
+    cursor += 1;
+  }
+  if (text[cursor] !== `"`) {
+    return -1;
+  }
+
+  const terminator = `"` + "#".repeat(cursor - rawPrefixIndex - 1);
+  const endIndex = text.indexOf(terminator, cursor + 1);
+  return endIndex < 0 ? text.length : endIndex + terminator.length;
+}
+
+function findQuotedStringEnd(text, index, quote) {
+  let cursor = index + 1;
+  while (cursor < text.length) {
+    if (text[cursor] === "\\") {
+      cursor += 2;
+      continue;
+    }
+    cursor += 1;
+    if (text[cursor - 1] === quote) {
+      return cursor;
+    }
+  }
+  return text.length;
+}
+
+function skipLineComment(text, index, output) {
+  output.push(" ");
+  let cursor = index + 2;
+  while (cursor < text.length && text[cursor] !== "\n") {
+    cursor += 1;
+  }
+  if (cursor < text.length) {
+    output.push(text[cursor]);
+    cursor += 1;
+  }
+  return cursor;
+}
+
+function skipBlockComment(text, index, output, nested) {
+  output.push(" ");
+  let cursor = index + 2;
+  let depth = 1;
+  while (cursor < text.length && depth > 0) {
+    if (nested && text[cursor] === "/" && text[cursor + 1] === "*") {
+      depth += 1;
+      cursor += 2;
+      continue;
+    }
+    if (text[cursor] === "*" && text[cursor + 1] === "/") {
+      depth -= 1;
+      cursor += 2;
+      continue;
+    }
+    if (text[cursor] === "\n") {
+      output.push("\n");
+    }
+    cursor += 1;
+  }
+  output.push(" ");
+  return cursor;
 }
 
 function createRequiredSetMismatches({
