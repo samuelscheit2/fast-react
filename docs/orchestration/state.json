@@ -487,7 +487,7 @@
 		{
 			"id": 1300,
 			"type": "worker",
-			"status": "repair-active",
+			"status": "auditing",
 			"title": "react-test-renderer TestInstance query-bridge source proof",
 			"agent": "worker_1300_test_renderer_query_bridge_source_proof",
 			"branch": "worker/1300-test-renderer-query-bridge-source-proof",
@@ -503,7 +503,9 @@
 				"audit_1300_repair4_source",
 				"audit_1300_repair4_verification",
 				"audit_1300_repair5_source",
-				"audit_1300_repair5_verification"
+				"audit_1300_repair5_verification",
+				"audit_1300_repair6_source",
+				"audit_1300_repair6_verification"
 			]
 		},
 		{
@@ -580,7 +582,7 @@
 		{
 			"id": 1309,
 			"type": "worker",
-			"status": "auditing",
+			"status": "repair-active",
 			"title": "Native generation source ownership map",
 			"agent": "worker_1309_native_generation_source_ownership",
 			"branch": "worker/1309-native-generation-source-ownership",

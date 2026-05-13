@@ -75,9 +75,10 @@ Current orchestration queue:
 - Scout 1283 reported a concrete react-test-renderer next-lane candidate.
 - Scout 1285 reported a concrete React core/hooks next-lane candidate.
 - Scouts 1291 through 1295 reported concrete next-lane candidates.
-- Worker 1300 sixth repair is active for react-test-renderer TestInstance
-  query-bridge local-gate source proofing after source audit found detached CJS
-  stub false greens, broken return wiring, first-return/top-level binding gaps,
+- Worker 1300 sixth repair completed implementation and is under source/
+  verification audit for react-test-renderer TestInstance query-bridge
+  local-gate source proofing after source audit found detached CJS stub false
+  greens, broken return wiring, first-return/top-level binding gaps,
   control-flow, spread override, nested-return, guard-binding, duplicate-key,
   helper-order, `var` redeclaration, method duplicate-key, and escaped-key gaps.
 - Scout 1301 reported a Rust root/scheduler source-metadata currentness lane;
@@ -85,7 +86,8 @@ Current orchestration queue:
 - Scout 1302 reported a React DOM conformance-only nested lifecycle lane;
   Worker 1307 completed implementation and is under source/verification audit.
 - Scout 1304 reported a native no-load generation source-ownership lane;
-  Worker 1309 completed implementation and is under source/verification audit.
+  Worker 1309 is under repair after source audit found inherited
+  `sourceIdentifierEvidenceByFile` alias gaps.
 - Scout 1305 reported a React Children currentness override alias lane; Worker
   1308 has been reviewed, merged, and recorded as accepted history.
 - Scout 1303 reported a react-test-renderer error-surface row-contract lane;
