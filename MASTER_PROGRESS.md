@@ -29,6 +29,39 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1258, 1259, and 1262 Acceptance Batch
+
+- Worker 1258 added private Rust scheduler canaries for same-lane transition
+  early rejection paths. Test-only coverage now proves `NoTransitionWork`,
+  `StaleTransitionDiagnostics`, and `BlockedByTransitionEntanglementMismatch`
+  reject without committing, switching current, creating handoff/currentness
+  tokens, or producing host ops, while exact-two/exact-three same-lane positive
+  currentness remains preserved.
+- Worker 1259 hardened native no-load/private metadata ledgers so generation
+  admission and root-work-loop metadata source-currentness rows require own data
+  properties for canonical evidence fields. Prototype-only rows, inherited
+  source arrays/booleans/evidence, and prototype/accessor claim aliases now fail
+  closed. The repair removed stale `worker-progress` file reads and replaced
+  them with tracked source/test evidence while keeping native loading/execution
+  and public native/package compatibility blocked.
+- Worker 1262 added react-test-renderer private bridge currentness coverage for
+  package-root and CJS development/production cross-entrypoint records,
+  handles, renderers, cloned request records, frozen request-history snapshots,
+  and renderer-specific `updateRendererRootRequest` /
+  `unmountRendererRootRequest` APIs. Public serialization, `.root`,
+  TestInstance/query, `act`, Scheduler, native execution, package, and broad
+  renderer compatibility remain blocked.
+- Accepted validation includes clean source/repair and verification audits for
+  all three workers. Root reruns passed scheduler same-lane Rust filters
+  (10/10 and 3/3), native private metadata and no-load tests, native workspace
+  check, test-renderer create routing (45/45), test-renderer workspace check,
+  package-surface guard, import smoke, `cargo check -p fast-react-reconciler
+  --all-features`, `cargo fmt --all --check`, and `git diff --check`.
+- The accepted state is main `2d1a0c4b` after Worker 1258 merge `4721e202`,
+  Worker 1262 merge `e15b3da1`, Worker 1259 merge `2d1a0c4b`, worker commits
+  `ecc81dc8`, `c1507bbb`, and `a0f76b74`, and orchestration-state commit
+  `93314f89`.
+
 ### Worker 1254 startTransition Rootless Currentness
 
 - Worker 1254 added a private-only `startTransition` rootless currentness
