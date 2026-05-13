@@ -1527,6 +1527,138 @@ test("react-test-renderer TestInstance query bridge preflight rejects var-redecl
   }
 });
 
+test("react-test-renderer TestInstance query bridge preflight rejects destructured var-redeclared bridge guard", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate:
+        replaceQueryBridgePreflightBridgeMethodWithDestructuredVarRedeclaredGuardConditional
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "destructured var-redeclared bridge guard"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight rejects destructured let-redeclared bridge guard", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate:
+        replaceQueryBridgePreflightBridgeMethodWithDestructuredLetRedeclaredGuardConditional
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "destructured let-redeclared bridge guard"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight rejects generator-redeclared bridge guard", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate:
+        replaceQueryBridgePreflightBridgeMethodWithGeneratorRedeclaredGuardConditional
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "generator-redeclared bridge guard"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight rejects class-redeclared bridge guard", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate:
+        replaceQueryBridgePreflightBridgeMethodWithClassRedeclaredGuardConditional
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "class-redeclared bridge guard"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
 test("react-test-renderer TestInstance query bridge preflight rejects null-initialized conditional bridge guard", () => {
   const workspace = createSerializationGateWorkspaceWithMutatedFiles({
     mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
@@ -1623,6 +1755,39 @@ test("react-test-renderer TestInstance query bridge preflight rejects later esca
   }
 });
 
+test("react-test-renderer TestInstance query bridge preflight rejects later hex-escaped wrapper key duplicate", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate:
+        insertQueryBridgePreflightWrapperSourceWithLaterHexEscapedDuplicate
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "later hex-escaped wrapper key duplicate"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
 test("react-test-renderer TestInstance query bridge preflight rejects later wrapper spread overrides", () => {
   const workspace = createSerializationGateWorkspaceWithMutatedFiles({
     mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
@@ -1713,6 +1878,39 @@ test("react-test-renderer TestInstance query bridge preflight rejects later comp
       serializationGate,
       errorSurfaceGate,
       "later computed wrapper key override"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight rejects later computed hex-escaped wrapper key override", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate:
+        insertQueryBridgePreflightWrapperSourceWithLaterComputedHexEscapedDuplicate
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "later computed hex-escaped wrapper key override"
     );
   } finally {
     workspace.cleanup();
@@ -7964,6 +8162,74 @@ function replaceQueryBridgePreflightBridgeMethodWithVarRedeclaredGuardConditiona
   );
 }
 
+function replaceQueryBridgePreflightBridgeMethodWithDestructuredVarRedeclaredGuardConditional(
+  text
+) {
+  return replaceRequiredSourceFragment(
+    text,
+    `    getTestInstanceQueryBridgePreflight(record) {
+      return getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`,
+    `    getTestInstanceQueryBridgePreflight(record) {
+      var { record } = { record: null };
+      return record === null
+        ? null
+        : getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`
+  );
+}
+
+function replaceQueryBridgePreflightBridgeMethodWithDestructuredLetRedeclaredGuardConditional(
+  text
+) {
+  return replaceRequiredSourceFragment(
+    text,
+    `    getTestInstanceQueryBridgePreflight(record) {
+      return getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`,
+    `    getTestInstanceQueryBridgePreflight(record) {
+      let [record] = [null];
+      return record === null
+        ? null
+        : getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`
+  );
+}
+
+function replaceQueryBridgePreflightBridgeMethodWithGeneratorRedeclaredGuardConditional(
+  text
+) {
+  return replaceRequiredSourceFragment(
+    text,
+    `    getTestInstanceQueryBridgePreflight(record) {
+      return getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`,
+    `    getTestInstanceQueryBridgePreflight(record) {
+      function* record() {}
+      return record === null
+        ? null
+        : getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`
+  );
+}
+
+function replaceQueryBridgePreflightBridgeMethodWithClassRedeclaredGuardConditional(
+  text
+) {
+  return replaceRequiredSourceFragment(
+    text,
+    `    getTestInstanceQueryBridgePreflight(record) {
+      return getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`,
+    `    getTestInstanceQueryBridgePreflight(record) {
+      class record {}
+      return record === null
+        ? null
+        : getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`
+  );
+}
+
 function replaceQueryBridgePreflightBridgeMethodWithNullInitializedGuardConditional(
   text
 ) {
@@ -8012,6 +8278,21 @@ function insertQueryBridgePreflightWrapperSourceWithLaterEscapedDuplicate(text) 
   );
 }
 
+function insertQueryBridgePreflightWrapperSourceWithLaterHexEscapedDuplicate(
+  text
+) {
+  return replaceRequiredSourceFragment(
+    text,
+    `    queryBridgePreflight,
+    acceptedRustFindAllDiagnostics:
+      queryBridgePreflight.acceptedRustFindAllDiagnostics,`,
+    `    queryBridgePreflight,
+    "query\\x42ridgePreflight": null,
+    acceptedRustFindAllDiagnostics:
+      queryBridgePreflight.acceptedRustFindAllDiagnostics,`
+  );
+}
+
 function insertQueryBridgePreflightWrapperSourceWithLaterSpreadOverride(text) {
   return replaceRequiredSourceFragment(
     text,
@@ -8050,6 +8331,21 @@ function insertQueryBridgePreflightWrapperSourceWithLaterComputedDuplicate(text)
       queryBridgePreflight.acceptedRustFindAllDiagnostics,`,
     `    queryBridgePreflight,
     ["queryBridgePreflight"]: null,
+    acceptedRustFindAllDiagnostics:
+      queryBridgePreflight.acceptedRustFindAllDiagnostics,`
+  );
+}
+
+function insertQueryBridgePreflightWrapperSourceWithLaterComputedHexEscapedDuplicate(
+  text
+) {
+  return replaceRequiredSourceFragment(
+    text,
+    `    queryBridgePreflight,
+    acceptedRustFindAllDiagnostics:
+      queryBridgePreflight.acceptedRustFindAllDiagnostics,`,
+    `    queryBridgePreflight,
+    ["query\\x42ridgePreflight"]: null,
     acceptedRustFindAllDiagnostics:
       queryBridgePreflight.acceptedRustFindAllDiagnostics,`
   );

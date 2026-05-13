@@ -4209,6 +4209,52 @@ function parseJsStringLiteralSource(source) {
         index = escaped.end - 1;
         continue;
       }
+      if (source[index] === "x") {
+        const escaped = readJsHexEscapeSequence(source, index);
+        if (escaped === null || escaped.end >= source.length) {
+          return null;
+        }
+        value += escaped.value;
+        index = escaped.end - 1;
+        continue;
+      }
+      if (source[index] === "\r" || source[index] === "\n") {
+        if (source[index] === "\r" && source[index + 1] === "\n") {
+          index += 1;
+        }
+        continue;
+      }
+      if (source[index] === "b") {
+        value += "\b";
+        continue;
+      }
+      if (source[index] === "f") {
+        value += "\f";
+        continue;
+      }
+      if (source[index] === "n") {
+        value += "\n";
+        continue;
+      }
+      if (source[index] === "r") {
+        value += "\r";
+        continue;
+      }
+      if (source[index] === "t") {
+        value += "\t";
+        continue;
+      }
+      if (source[index] === "v") {
+        value += "\x0b";
+        continue;
+      }
+      if (
+        source[index] === "0" &&
+        !/[0-9]/u.test(source[index + 1] ?? "")
+      ) {
+        value += "\0";
+        continue;
+      }
     }
     value += source[index];
   }
@@ -4246,6 +4292,21 @@ function readJsUnicodeEscapeSequence(source, index) {
   return freezeRecord({
     value: String.fromCharCode(Number.parseInt(hexSource, 16)),
     end: index + 5
+  });
+}
+
+function readJsHexEscapeSequence(source, index) {
+  if (source[index] !== "x") {
+    return null;
+  }
+
+  const hexSource = source.slice(index + 1, index + 3);
+  if (!/^[0-9A-Fa-f]{2}$/u.test(hexSource)) {
+    return null;
+  }
+  return freezeRecord({
+    value: String.fromCharCode(Number.parseInt(hexSource, 16)),
+    end: index + 3
   });
 }
 
@@ -5606,6 +5667,18 @@ function jsIdentifierHasAssignmentBeforeIndex({
   ignoredDeclarationIndex = -1,
   treatDeclarationsAsAssignments = false
 }) {
+  if (
+    treatDeclarationsAsAssignments &&
+    jsIdentifierHasBindingDeclarationBeforeIndex({
+      source,
+      identifier,
+      beforeIndex,
+      ignoredDeclarationIndex
+    })
+  ) {
+    return true;
+  }
+
   let index = 0;
 
   while (index < beforeIndex) {
@@ -5629,7 +5702,9 @@ function jsIdentifierHasAssignmentBeforeIndex({
     if (
       previousToken !== null &&
       previousToken.type === "word" &&
-      ["const", "let", "var", "function"].includes(previousToken.value)
+      ["class", "const", "let", "var", "function"].includes(
+        previousToken.value
+      )
     ) {
       if (
         treatDeclarationsAsAssignments &&
@@ -5654,6 +5729,237 @@ function jsIdentifierHasAssignmentBeforeIndex({
   }
 
   return false;
+}
+
+function jsIdentifierHasBindingDeclarationBeforeIndex({
+  source,
+  identifier,
+  beforeIndex,
+  ignoredDeclarationIndex
+}) {
+  let index = 0;
+
+  while (index < beforeIndex) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const declaration = readJsBindingDeclarationAt({
+      source,
+      index,
+      endIndex: beforeIndex
+    });
+    if (declaration.ok === true) {
+      if (
+        declaration.start !== ignoredDeclarationIndex &&
+        declaration.bindings.includes(identifier)
+      ) {
+        return true;
+      }
+      index = Math.max(index + 1, declaration.nameSearchEnd);
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return false;
+}
+
+function readJsBindingDeclarationAt({ source, index, endIndex }) {
+  const variableDeclaration = readJsVariableBindingDeclarationAt({
+    source,
+    index,
+    endIndex
+  });
+  if (variableDeclaration.ok === true) {
+    return variableDeclaration;
+  }
+
+  const functionDeclaration = readJsFunctionBindingDeclarationAt({
+    source,
+    index,
+    endIndex
+  });
+  if (functionDeclaration.ok === true) {
+    return functionDeclaration;
+  }
+
+  return readJsClassBindingDeclarationAt({ source, index, endIndex });
+}
+
+function readJsVariableBindingDeclarationAt({ source, index, endIndex }) {
+  const keyword = ["const", "let", "var"].find((candidate) =>
+    jsIdentifierAt(source, index, candidate)
+  );
+  if (keyword === undefined) {
+    return freezeRecord({
+      ok: false,
+      start: index,
+      bindings: freezeArray([]),
+      nameSearchEnd: index
+    });
+  }
+
+  const declaratorsStart = skipJsTrivia(
+    source,
+    index + keyword.length,
+    endIndex
+  );
+  const statementEnd = findJsStatementEnd(source, declaratorsStart);
+  const declarationEnd =
+    statementEnd < 0 || statementEnd > endIndex ? endIndex : statementEnd;
+  const bindings = new Set();
+  let cursor = declaratorsStart;
+
+  while (cursor < declarationEnd) {
+    const declaratorStart = skipJsTrivia(source, cursor, declarationEnd);
+    if (declaratorStart >= declarationEnd) {
+      break;
+    }
+
+    const declaratorEnd = findNextTopLevelPropertySeparator(
+      source,
+      declaratorStart,
+      declarationEnd
+    );
+    collectJsVariableDeclaratorBindingIdentifiers(
+      source.slice(declaratorStart, declaratorEnd),
+      bindings
+    );
+    cursor = declaratorEnd < declarationEnd ? declaratorEnd + 1 : declarationEnd;
+  }
+
+  return freezeRecord({
+    ok: true,
+    start: index,
+    bindings: freezeArray(bindings),
+    nameSearchEnd: declaratorsStart
+  });
+}
+
+function collectJsVariableDeclaratorBindingIdentifiers(source, bindings) {
+  const startIndex = skipJsTrivia(source, 0, source.length);
+  const character = source[startIndex];
+  if (character === "{" || character === "[") {
+    const closeCharacter = character === "{" ? "}" : "]";
+    const patternEnd = findMatchingJsEnclosure(
+      source,
+      startIndex,
+      character,
+      closeCharacter
+    );
+    if (patternEnd >= 0) {
+      collectJsIdentifiersInSource(
+        source.slice(startIndex, patternEnd + 1),
+        bindings
+      );
+    }
+    return;
+  }
+
+  const identifier = readJsIdentifier(source, startIndex, source.length);
+  if (identifier.ok === true) {
+    bindings.add(identifier.name);
+  }
+}
+
+function readJsFunctionBindingDeclarationAt({ source, index, endIndex }) {
+  const startIndex = index;
+  let cursor = index;
+
+  if (jsIdentifierAt(source, cursor, "async")) {
+    cursor = skipJsTrivia(source, cursor + "async".length, endIndex);
+    if (!jsIdentifierAt(source, cursor, "function")) {
+      return freezeRecord({
+        ok: false,
+        start: startIndex,
+        bindings: freezeArray([]),
+        nameSearchEnd: index
+      });
+    }
+  } else if (!jsIdentifierAt(source, cursor, "function")) {
+    return freezeRecord({
+      ok: false,
+      start: startIndex,
+      bindings: freezeArray([]),
+      nameSearchEnd: index
+    });
+  }
+
+  cursor = skipJsTrivia(source, cursor + "function".length, endIndex);
+  if (source[cursor] === "*") {
+    cursor = skipJsTrivia(source, cursor + 1, endIndex);
+  }
+
+  const identifier = readJsIdentifier(source, cursor, endIndex);
+  if (identifier.ok !== true) {
+    return freezeRecord({
+      ok: false,
+      start: startIndex,
+      bindings: freezeArray([]),
+      nameSearchEnd: cursor
+    });
+  }
+
+  return freezeRecord({
+    ok: true,
+    start: startIndex,
+    bindings: freezeArray([identifier.name]),
+    nameSearchEnd: identifier.end
+  });
+}
+
+function readJsClassBindingDeclarationAt({ source, index, endIndex }) {
+  if (!jsIdentifierAt(source, index, "class")) {
+    return freezeRecord({
+      ok: false,
+      start: index,
+      bindings: freezeArray([]),
+      nameSearchEnd: index
+    });
+  }
+
+  const nameStart = skipJsTrivia(source, index + "class".length, endIndex);
+  const identifier = readJsIdentifier(source, nameStart, endIndex);
+  if (identifier.ok !== true) {
+    return freezeRecord({
+      ok: false,
+      start: index,
+      bindings: freezeArray([]),
+      nameSearchEnd: nameStart
+    });
+  }
+
+  return freezeRecord({
+    ok: true,
+    start: index,
+    bindings: freezeArray([identifier.name]),
+    nameSearchEnd: identifier.end
+  });
+}
+
+function collectJsIdentifiersInSource(source, bindings) {
+  let index = 0;
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const identifier = readJsIdentifier(source, index, source.length);
+    if (identifier.ok === true) {
+      bindings.add(identifier.name);
+      index = identifier.end;
+      continue;
+    }
+
+    index += 1;
+  }
 }
 
 function parseJsSimpleCallExpression(source) {
