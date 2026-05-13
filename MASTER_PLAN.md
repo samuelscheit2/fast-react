@@ -63,6 +63,15 @@ Current orchestration queue:
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, and 1264
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
+- Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
+- Worker 1269 is active for queued minimal HostRoot invalid source preflight
+  inertness canaries.
+- Worker 1270 is active for native generation-admission ledger exact-key
+  hardening.
+- Worker 1271 is active for React DOM public root element-prototype capability
+  blockers.
+- Worker 1272 is active for test-renderer private-admission source-token
+  comment proofing.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

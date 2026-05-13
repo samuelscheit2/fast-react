@@ -149,30 +149,66 @@
 		{
 			"id": 1265,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Rust root/scheduler next-lane scout",
 			"agent": "scout_1265_rust_next"
 		},
 		{
 			"id": 1266,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "React DOM facade/root next-lane scout",
 			"agent": "scout_1266_react_dom_next"
 		},
 		{
 			"id": 1267,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "react-test-renderer next-lane scout",
 			"agent": "scout_1267_test_renderer_next"
 		},
 		{
 			"id": 1268,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Native/no-load next-lane scout",
 			"agent": "scout_1268_native_next"
+		},
+		{
+			"id": 1269,
+			"type": "worker",
+			"status": "active",
+			"title": "Queued minimal HostRoot source preflight inertness",
+			"agent": "worker_1269_queued_minimal_source_preflight",
+			"branch": "worker/1269-queued-minimal-source-preflight",
+			"audits": []
+		},
+		{
+			"id": 1270,
+			"type": "worker",
+			"status": "active",
+			"title": "Native generation-admission ledger exact-key hardening",
+			"agent": "worker_1270_native_generation_exact_keys",
+			"branch": "worker/1270-native-generation-exact-keys",
+			"audits": []
+		},
+		{
+			"id": 1271,
+			"type": "worker",
+			"status": "active",
+			"title": "React DOM public root element-prototype capability blocker",
+			"agent": "worker_1271_react_dom_element_prototype_blocker",
+			"branch": "worker/1271-react-dom-element-prototype-blocker",
+			"audits": []
+		},
+		{
+			"id": 1272,
+			"type": "worker",
+			"status": "active",
+			"title": "test-renderer private-admission source-token comment proofing",
+			"agent": "worker_1272_test_renderer_ledger_comment_tokens",
+			"branch": "worker/1272-test-renderer-ledger-comment-tokens",
+			"audits": []
 		}
 	]
 }
