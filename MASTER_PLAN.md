@@ -48,7 +48,7 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Current accepted implementation head before this
-docs pass is main `5d1d02b6` (`Merge worker 1277 queued cleanup extra sibling drift`).
+docs pass is main `500e7db1` (`Merge worker 1272 test renderer ledger comment tokens`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -61,14 +61,12 @@ the pre-audit Worker 1215 full-hash typo.
 Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
-  1269, 1270, 1277, and 1278
+  1269, 1270, 1272, 1277, and 1278
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
 - Worker 1271 is under audit for React DOM public root element-prototype
   capability blockers.
-- Worker 1272 is under audit for test-renderer private-admission source-token
-  comment proofing.
 - Scouts 1273 and 1276 reported concrete next-lane candidates.
 - Scout 1275 reported a concrete native/no-load next-lane candidate.
 - Scout 1274 is active for React hooks/core facade next-lane candidates.
@@ -78,7 +76,7 @@ Current orchestration queue:
   findings seeded Workers 1258 and 1259.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `5d1d02b6`,
+implementation/evidence baseline main `500e7db1`,
 excluding generated oracle JSON and package CJS published artifacts:
 
 - `packages/react-dom/src/client/root-bridge.js`: 30,464 lines
@@ -102,7 +100,7 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `5d1d02b6` remains narrow.
+Accepted compatibility evidence through current main `500e7db1` remains narrow.
 The only public React DOM root behavior
 accepted so far is the fake-DOM div/text `createRoot().render(...)` lifecycle:
 initial render, same-root div/text/id update, id removal, `render(null)` cleanup,
@@ -152,7 +150,10 @@ lanes, render-phase work, or host mutation. Native generation-admission ledger
 rows require exact own data keys. Queued minimal HostRoot cleanup now has
 extra-sibling live topology drift canaries, and react-test-renderer private root
 handle update/unmount routes reject cloned, symbol-spoofed, and
-prototype-backed handles without WeakMap ownership.
+prototype-backed handles without WeakMap ownership. Test-renderer private
+admission ledgers reject required evidence tokens left only in comments,
+including JS template interpolation comments and delegated 733/736 bridge
+evidence comments.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -171,7 +172,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `5d1d02b6` as
+1. Treat accepted compatibility evidence through current main `500e7db1` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, and the narrow fake-DOM public div/text
    plus nested fake-DOM lifecycle evidence described above, including
@@ -191,10 +192,10 @@ canonical evidence requirements.
    test-renderer private create/serialization gates, queued minimal source
    preflight inertness, native generation exact-key admission, queued minimal
    cleanup live-sibling drift rejection, and test-renderer root-handle WeakMap
-   ownership canaries are blockers and currentness evidence only; they do not
-   open broader public root, native, browser DOM, component rendering, Children
-   traversal, package, Scheduler, effects, test-renderer, or renderer
-   compatibility.
+   ownership canaries, plus private ledger comment-proof token evidence, are
+   blockers and currentness evidence only; they do not open broader public root,
+   native, browser DOM, component rendering, Children traversal, package,
+   Scheduler, effects, test-renderer, or renderer compatibility.
 2. Review future workers and audits against the accepted source-owned
    lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
    scheduler continuation/currentness, reconciler/test-renderer direct

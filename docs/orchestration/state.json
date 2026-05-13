@@ -215,7 +215,7 @@
 		{
 			"id": 1272,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "test-renderer private-admission source-token comment proofing",
 			"agent": "worker_1272_test_renderer_ledger_comment_tokens",
 			"branch": "worker/1272-test-renderer-ledger-comment-tokens",

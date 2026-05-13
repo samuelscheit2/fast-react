@@ -29,6 +29,25 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1272 Test Renderer Ledger Comment Proofing
+
+- Worker 1272 hardened private test-renderer 816/818 and delegated 733/736
+  admission ledgers so required evidence tokens cannot be satisfied from line
+  or block comments. The accepted repair shares comment-stripped source
+  scanning, handles JS template interpolation comment bodies, preserves Rust raw
+  strings and nested Rust block comments, and adds direct 733/736 coverage plus
+  825 delegated-evidence coverage.
+- Public test-renderer serialization, `.root`, TestInstance/query, `act`,
+  Scheduler, native execution, package compatibility, and broad renderer
+  compatibility remain blocked.
+- Accepted validation includes a source audit that cleared the initial
+  interpolation/delegation findings and a clean repair verification audit. Root
+  reruns passed private-admission 825 ledger (10/10), 733/736 bridge ledger
+  (9/9), package-surface guard, import smoke, and `git diff --check`.
+- The accepted state is main `500e7db1` after Worker 1272 merge `500e7db1`,
+  worker commits `816c961d` and repair `63ee00ef`, and this
+  orchestration-state update.
+
 ### Workers 1277 and 1278 Acceptance Batch
 
 - Worker 1277 added a private Rust queued minimal HostRoot cleanup canary for
