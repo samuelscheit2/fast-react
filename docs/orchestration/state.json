@@ -687,10 +687,14 @@
 		{
 			"id": 1320,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Queued minimal HostRoot update-to-null cleanup ownership transfer retry",
 			"agent": "worker_1320_queued_cleanup_update_transfer_retry",
-			"branch": "worker/1320-queued-cleanup-update-transfer-retry"
+			"branch": "worker/1320-queued-cleanup-update-transfer-retry",
+			"audits": [
+				"audit_1320_source_contract",
+				"audit_1320_verification"
+			]
 		}
 	]
 }
