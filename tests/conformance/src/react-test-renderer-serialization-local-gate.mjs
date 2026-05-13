@@ -1013,6 +1013,19 @@ const privateTestInstanceQueryBridgePreflightRecordSourceAssertions =
     jsBooleanPropertyAssertion("compatibilityClaimed", false)
   ]);
 
+const privateTestInstanceWrapperQueryBridgePreflightSourceAssertions =
+  freezeArray([
+    jsSourcePropertyAssertion("queryBridgePreflight", "queryBridgePreflight"),
+    jsSourcePropertyAssertion(
+      "acceptedRustFindAllDiagnostics",
+      "queryBridgePreflight.acceptedRustFindAllDiagnostics"
+    ),
+    jsSourcePropertyAssertion(
+      "acceptedRustFindByDiagnostics",
+      "queryBridgePreflight.acceptedRustFindByDiagnostics"
+    )
+  ]);
+
 const cjsTestInstanceQueryBridgePreflightSourceEvidenceCache = new Map();
 
 export function inspectReactTestRendererSerializationLocalTargets({
@@ -4037,15 +4050,11 @@ function cjsTestInstanceQueryBridgePreflightSourceEvidencePresentUncached(
         "acceptedLifecycleEvidence"
       ])
     }) &&
-    jsFunctionDeclarationSourceTokensPass({
+    jsFunctionDeclarationReturnedFreezeRecordAssertionsPass({
       source,
       functionName: "createPrivateTestInstanceWrapperRecordForRootRequest",
-      tokens: freezeArray([
-        "const queryBridgePreflight =",
-        "queryBridgePreflight,",
-        "queryBridgePreflight.acceptedRustFindAllDiagnostics",
-        "queryBridgePreflight.acceptedRustFindByDiagnostics"
-      ])
+      assertions:
+        privateTestInstanceWrapperQueryBridgePreflightSourceAssertions
     }) &&
     jsConstQuotedStringDeclarationPass({
       source,
@@ -4292,7 +4301,7 @@ function jsFunctionDeclarationConstInitializerCallPass({
     return false;
   }
 
-  const initializer = extractJsConstDeclarationInitializerSource({
+  const initializer = extractTopLevelJsConstDeclarationInitializerSource({
     source: declaration.body,
     name
   });
@@ -4457,8 +4466,12 @@ function extractTopLevelReturnedFreezeRecordObject(source) {
         source.length
       );
       if (!jsIdentifierAt(source, calleeIndex, "freezeRecord")) {
-        index += "return".length;
-        continue;
+        return freezeRecord({
+          ok: false,
+          openIndex: -1,
+          closeIndex: -1,
+          error: "first-top-level-return-not-freeze-record"
+        });
       }
 
       const callOpenIndex = skipJsTrivia(
@@ -4720,6 +4733,96 @@ function extractJsConstDeclarationInitializerSource({ source, name }) {
   });
 }
 
+function extractTopLevelJsConstDeclarationInitializerSource({
+  source,
+  name
+}) {
+  let index = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  const declarationPrefix = "const ";
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (
+      braceDepth === 0 &&
+      bracketDepth === 0 &&
+      parenDepth === 0 &&
+      source.startsWith(declarationPrefix, index)
+    ) {
+      const nameIndex = skipJsTrivia(
+        source,
+        index + declarationPrefix.length,
+        source.length
+      );
+      if (!jsIdentifierAt(source, nameIndex, name)) {
+        index += declarationPrefix.length;
+        continue;
+      }
+
+      const afterNameIndex = nameIndex + name.length;
+      const equalsIndex = skipJsTrivia(
+        source,
+        afterNameIndex,
+        source.length
+      );
+      if (source[equalsIndex] !== "=") {
+        index = afterNameIndex;
+        continue;
+      }
+
+      const initializerStart = skipJsTrivia(
+        source,
+        equalsIndex + 1,
+        source.length
+      );
+      const statementEnd = findJsStatementEnd(source, initializerStart);
+      if (statementEnd < 0) {
+        return freezeRecord({
+          ok: false,
+          initializer: "",
+          error: "const-declaration-not-terminated"
+        });
+      }
+
+      return freezeRecord({
+        ok: true,
+        initializer: source.slice(initializerStart, statementEnd).trim(),
+        error: null
+      });
+    }
+
+    const character = source[index];
+    if (character === "{" && bracketDepth === 0 && parenDepth === 0) {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[" && braceDepth === 0 && parenDepth === 0) {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (character === "(" && braceDepth === 0 && bracketDepth === 0) {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    }
+
+    index += 1;
+  }
+
+  return freezeRecord({
+    ok: false,
+    initializer: "",
+    error: "top-level-const-declaration-not-found"
+  });
+}
+
 function extractJsObjectFreezePropertiesForDeclaration({
   source,
   declaration
@@ -4788,6 +4891,9 @@ function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
         index,
         closeIndex
       );
+      if (source.slice(index, nextIndex).trim() === "") {
+        properties.set(propertyKey.key, propertyKey.key);
+      }
       index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
       continue;
     }
@@ -5083,19 +5189,67 @@ function jsExpressionReturnsCallExpressionWithArgumentsPass({
   }
 
   const conditional = splitTopLevelJsConditionalExpression(expression);
-  return (
-    conditional !== null &&
-    (jsExpressionReturnsCallExpressionWithArgumentsPass({
-      source: conditional.consequent,
-      callee,
-      expectedArguments
-    }) ||
-      jsExpressionReturnsCallExpressionWithArgumentsPass({
+  if (conditional === null) {
+    return false;
+  }
+
+  const nullishGuard = parseJsNullishEqualityGuardExpression(
+    conditional.test
+  );
+  if (nullishGuard === null) {
+    return false;
+  }
+
+  if (nullishGuard.operator === "===") {
+    return (
+      isJsNullLiteralExpression(conditional.consequent) &&
+      jsExactCallExpressionWithArgumentsPass({
         source: conditional.alternate,
         callee,
         expectedArguments
-      }))
+      })
+    );
+  }
+
+  return (
+    isJsNullLiteralExpression(conditional.alternate) &&
+    jsExactCallExpressionWithArgumentsPass({
+      source: conditional.consequent,
+      callee,
+      expectedArguments
+    })
   );
+}
+
+function parseJsNullishEqualityGuardExpression(source) {
+  const expression = normalizeJsExpressionSource(source);
+  const direct = expression.match(/^(.+?)\s*(===|!==)\s*(null|undefined)$/u);
+  if (
+    direct !== null &&
+    isSimpleJsMemberExpression(direct[1].trim())
+  ) {
+    return freezeRecord({ operator: direct[2] });
+  }
+
+  const reversed = expression.match(/^(null|undefined)\s*(===|!==)\s*(.+)$/u);
+  if (
+    reversed !== null &&
+    isSimpleJsMemberExpression(reversed[3].trim())
+  ) {
+    return freezeRecord({ operator: reversed[2] });
+  }
+
+  return null;
+}
+
+function isSimpleJsMemberExpression(source) {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/u.test(
+    source
+  );
+}
+
+function isJsNullLiteralExpression(source) {
+  return normalizeJsExpressionSource(source) === "null";
 }
 
 function jsExactCallExpressionWithArgumentsPass({

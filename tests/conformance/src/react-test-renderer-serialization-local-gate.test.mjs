@@ -1271,6 +1271,134 @@ test("react-test-renderer TestInstance query bridge preflight rejects dead helpe
   }
 });
 
+test("react-test-renderer TestInstance query bridge preflight rejects earlier top-level bridge return", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate: insertQueryBridgePreflightBridgeEarlyNullReturn
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "earlier top-level bridge return"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight rejects conditional dead-branch bridge return", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate: replaceQueryBridgePreflightBridgeMethodWithDeadConditional
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "conditional dead-branch bridge return"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight rejects dead nested wrapper initializer", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate: replaceQueryBridgePreflightWrapperSourceWithDeadNestedInitializer
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "dead nested wrapper initializer"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer TestInstance query bridge preflight rejects dead nested diagnostics initializer", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: serializationGateCjsEntrypointSourceFiles.map((evidencePath) => ({
+      evidencePath,
+      mutate: replaceQueryBridgePreflightHelperDiagnosticsWithDeadNestedInitializer
+    }))
+  });
+
+  try {
+    const serializationGate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+    const errorSurfaceGate = evaluateReactTestRendererErrorSurfaceLocalGate({
+      oracle: errorSurfaceOracle,
+      workspaceRoot: workspace.root
+    });
+
+    assert.equal(
+      serializationGate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+      true
+    );
+    assertQueryBridgePreflightRejected(
+      serializationGate,
+      errorSurfaceGate,
+      "dead nested diagnostics initializer"
+    );
+  } finally {
+    workspace.cleanup();
+  }
+});
+
 test("react-test-renderer TestInstance query bridge preflight requires production CJS live wiring", () => {
   const workspace = createSerializationGateWorkspaceWithMutatedFile({
     evidencePath: "packages/react-test-renderer/cjs/react-test-renderer.production.js",
@@ -7361,6 +7489,32 @@ function replaceQueryBridgePreflightBridgeMethodsWithDeadReturns(text) {
   return mutated;
 }
 
+function insertQueryBridgePreflightBridgeEarlyNullReturn(text) {
+  return replaceRequiredSourceFragment(
+    text,
+    `  return freezeRecord({
+    bridgeKind: 'FastReactTestRendererPrivateRootRequestBridge',`,
+    `  return null;
+
+  return freezeRecord({
+    bridgeKind: 'FastReactTestRendererPrivateRootRequestBridge',`
+  );
+}
+
+function replaceQueryBridgePreflightBridgeMethodWithDeadConditional(text) {
+  return replaceRequiredSourceFragment(
+    text,
+    `    getTestInstanceQueryBridgePreflight(record) {
+      return getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`,
+    `    getTestInstanceQueryBridgePreflight(record) {
+      return true
+        ? null
+        : getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },`
+  );
+}
+
 function replaceQueryBridgePreflightWrapperSourceWithDeadAssignment(text) {
   return replaceRequiredSourceFragment(
     text,
@@ -7379,6 +7533,29 @@ function replaceQueryBridgePreflightWrapperSourceWithDeadAssignment(text) {
   );
 }
 
+function replaceQueryBridgePreflightWrapperSourceWithDeadNestedInitializer(text) {
+  return replaceRequiredSourceFragment(
+    text,
+    `  const queryBridgePreflight =
+    createPrivateTestInstanceQueryBridgePreflightRecord(
+      rootRequest,
+      undefined,
+      acceptedLifecycleEvidence
+    );`,
+    `  function createDeadQueryBridgePreflightInitializer() {
+    const queryBridgePreflight =
+      createPrivateTestInstanceQueryBridgePreflightRecord(
+        rootRequest,
+        undefined,
+        acceptedLifecycleEvidence
+      );
+    return queryBridgePreflight;
+  }
+  void createDeadQueryBridgePreflightInitializer;
+  const queryBridgePreflight = null;`
+  );
+}
+
 function replaceQueryBridgePreflightHelperWithDeadReturn(text) {
   return replaceRequiredSourceFragment(
     text,
@@ -7390,6 +7567,27 @@ function replaceQueryBridgePreflightHelperWithDeadReturn(text) {
   const diagnostics = getTestInstanceQueryDiagnosticsForRootRequest(record);
   void (diagnostics.queryBridgePreflight ?? diagnostics);
   return null;
+}`
+  );
+}
+
+function replaceQueryBridgePreflightHelperDiagnosticsWithDeadNestedInitializer(
+  text
+) {
+  return replaceRequiredSourceFragment(
+    text,
+    `function getTestInstanceQueryBridgePreflightForRootRequest(record) {
+  const diagnostics = getTestInstanceQueryDiagnosticsForRootRequest(record);
+  return diagnostics.queryBridgePreflight ?? diagnostics;
+}`,
+    `function getTestInstanceQueryBridgePreflightForRootRequest(record) {
+  function readDeadQueryBridgeDiagnosticsInitializer() {
+    const diagnostics = getTestInstanceQueryDiagnosticsForRootRequest(record);
+    return diagnostics;
+  }
+  void readDeadQueryBridgeDiagnosticsInitializer;
+  const diagnostics = null;
+  return diagnostics.queryBridgePreflight ?? diagnostics;
 }`
   );
 }
