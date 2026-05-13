@@ -558,7 +558,7 @@
 		{
 			"id": 1307,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "React DOM nested lifecycle conformance canary",
 			"agent": "worker_1307_react_dom_nested_lifecycle_conformance",
 			"branch": "worker/1307-react-dom-nested-lifecycle-conformance",

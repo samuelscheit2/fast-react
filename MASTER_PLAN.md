@@ -62,7 +62,7 @@ Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
   1269, 1270, 1271, 1272, 1277 through 1280, 1286 through 1290,
-  1296 through 1299, and 1306, 1308, and 1310
+  1296 through 1299, 1306 through 1308, and 1310
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
@@ -84,7 +84,7 @@ Current orchestration queue:
 - Scout 1301 reported a Rust root/scheduler source-metadata currentness lane;
   Worker 1306 has been reviewed, merged, and recorded as accepted history.
 - Scout 1302 reported a React DOM conformance-only nested lifecycle lane;
-  Worker 1307 completed implementation and is under source/verification audit.
+  Worker 1307 has been reviewed, merged, and recorded as accepted history.
 - Scout 1304 reported a native no-load generation source-ownership lane;
   Worker 1309 is under repair after source audit found inherited
   `sourceIdentifierEvidenceByFile` alias gaps.

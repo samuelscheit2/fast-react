@@ -29,6 +29,24 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1307 React DOM Nested Lifecycle Conformance Canary
+
+- Worker 1307 added conformance-only blocked-gate coverage for the already
+  admitted public fake-DOM `div > span` lifecycle row, including nested update
+  snapshots, node reuse, and latest-props identity checks.
+- Hostile coverage rejects stale parent/text snapshots, missing parent/child/
+  text node reuse, wrong latest-props identity, marker/listener leaks, public or
+  native compatibility claims, and tampered nested row labels or ordering.
+- The accepted change does not touch React DOM runtime files. Browser DOM,
+  native/Rust execution, listeners, markers, refs/events/hydration, resources,
+  forms, package compatibility, and broader public React DOM compatibility
+  remain blocked.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed the public facade blocked gate (47/47), React DOM client symbol facade
+  gate (6/6), private root bridge smoke, root render E2E gate (12/12), and
+  `git diff --check`.
+- The accepted merge is main `eccb7ec2` after Worker 1307 commit `d72abd2e`.
+
 ### Worker 1310 react-test-renderer Error Surface Row Contract
 
 - Worker 1310 aligned the private react-test-renderer error-boundary oracle rows
