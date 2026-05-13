@@ -14,8 +14,27 @@ const repoRoot = path.resolve(
 );
 const reactPackageRoot = path.join(repoRoot, "packages", "react");
 const React = require(path.join(reactPackageRoot, "index.js"));
+const ReactCjsDevelopment = require(path.join(
+  reactPackageRoot,
+  "cjs",
+  "react.development.js"
+));
+const ReactCjsProduction = require(path.join(
+  reactPackageRoot,
+  "cjs",
+  "react.production.js"
+));
 const ReactServer = require(path.join(reactPackageRoot, "react.react-server.js"));
 const Transition = require(path.join(reactPackageRoot, "transition.js"));
+const hookDispatcher = require(path.join(
+  reactPackageRoot,
+  "hook-dispatcher.js"
+));
+const reactCjsDevelopmentPath = path.join(
+  reactPackageRoot,
+  "cjs",
+  "react.development.js"
+);
 
 const expectedStartTransitionRootlessCurrentnessFieldNames = [
   "apiName",
@@ -54,6 +73,140 @@ const expectedStartTransitionRootlessCurrentness = {
   blocker:
     "startTransition remains a rootless facade until scheduler and root-lane integration are admitted"
 };
+const expectedStartTransitionBlockedExecutionPaths = [
+  "dispatcher-routing",
+  "scheduler-callback",
+  "root-lane-selection",
+  "root-scheduling",
+  "root-execution"
+];
+const expectedStartTransitionBlockedCompatibilityClaims = [
+  "public-transition",
+  "public-root",
+  "scheduler-package",
+  "package-compatibility"
+];
+const expectedStartTransitionRootlessSurfaceCurrentnessFieldNames = [
+  "surfaceId",
+  "source",
+  "entrypoint",
+  "moduleShape",
+  "hasStartTransitionExport",
+  "sameAsRootlessFacade",
+  "sameAsRootExport",
+  "sameAsCjsDevelopmentExport",
+  "sameAsCjsProductionExport",
+  "reactServerStartTransitionAbsent",
+  "functionName",
+  "functionLength",
+  "rootlessFacade",
+  "blockedExecutionPaths",
+  "blockedCompatibilityClaims",
+  "compatibilityClaimed"
+];
+const expectedStartTransitionRootlessSurfaceCurrentnessRows = [
+  {
+    surfaceId: "react-root",
+    source: "packages/react/index.js",
+    entrypoint: "react",
+    moduleShape: "CommonJS root export",
+    hasStartTransitionExport: true,
+    sameAsRootlessFacade: true,
+    sameAsRootExport: true,
+    sameAsCjsDevelopmentExport: true,
+    sameAsCjsProductionExport: true,
+    reactServerStartTransitionAbsent: true,
+    functionName: "",
+    functionLength: 1,
+    rootlessFacade: true,
+    blockedExecutionPaths: expectedStartTransitionBlockedExecutionPaths,
+    blockedCompatibilityClaims:
+      expectedStartTransitionBlockedCompatibilityClaims,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: "react-cjs-development",
+    source: "packages/react/cjs/react.development.js",
+    entrypoint: "react/cjs/react.development.js",
+    moduleShape: "CommonJS alias export",
+    hasStartTransitionExport: true,
+    sameAsRootlessFacade: true,
+    sameAsRootExport: true,
+    sameAsCjsDevelopmentExport: true,
+    sameAsCjsProductionExport: true,
+    reactServerStartTransitionAbsent: true,
+    functionName: "",
+    functionLength: 1,
+    rootlessFacade: true,
+    blockedExecutionPaths: expectedStartTransitionBlockedExecutionPaths,
+    blockedCompatibilityClaims:
+      expectedStartTransitionBlockedCompatibilityClaims,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: "react-cjs-production",
+    source: "packages/react/cjs/react.production.js",
+    entrypoint: "react/cjs/react.production.js",
+    moduleShape: "CommonJS alias export",
+    hasStartTransitionExport: true,
+    sameAsRootlessFacade: true,
+    sameAsRootExport: true,
+    sameAsCjsDevelopmentExport: true,
+    sameAsCjsProductionExport: true,
+    reactServerStartTransitionAbsent: true,
+    functionName: "",
+    functionLength: 1,
+    rootlessFacade: true,
+    blockedExecutionPaths: expectedStartTransitionBlockedExecutionPaths,
+    blockedCompatibilityClaims:
+      expectedStartTransitionBlockedCompatibilityClaims,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: "react-server",
+    source: "packages/react/react.react-server.js",
+    entrypoint: "react react-server",
+    moduleShape: "React Server CommonJS export",
+    hasStartTransitionExport: false,
+    sameAsRootlessFacade: false,
+    sameAsRootExport: false,
+    sameAsCjsDevelopmentExport: false,
+    sameAsCjsProductionExport: false,
+    reactServerStartTransitionAbsent: true,
+    functionName: null,
+    functionLength: null,
+    rootlessFacade: false,
+    blockedExecutionPaths: expectedStartTransitionBlockedExecutionPaths,
+    blockedCompatibilityClaims:
+      expectedStartTransitionBlockedCompatibilityClaims,
+    compatibilityClaimed: false
+  }
+];
+const expectedStartTransitionBlockedFlags = [
+  "publicTransitionCompatibilityBlocked",
+  "publicRootCompatibilityBlocked",
+  "schedulerCompatibilityBlocked",
+  "schedulerPackageCompatibilityBlocked",
+  "packageCompatibilityBlocked",
+  "dispatcherRoutingBlocked",
+  "schedulerExecutionBlocked",
+  "rootLaneIntegrationBlocked",
+  "rootSchedulingBlocked",
+  "rootExecutionBlocked",
+  "callbackExecutionBlocked"
+];
+const expectedStartTransitionCompatibilityFalseFlags = [
+  "publicTransitionCompatibility",
+  "publicRootCompatibility",
+  "publicSchedulerCompatibility",
+  "schedulerIntegration",
+  "rootLaneIntegration",
+  "rootScheduling",
+  "rootExecution",
+  "schedulerCallbackExecution",
+  "packageCompatibility",
+  "compatibilityClaimed"
+];
 
 function withCapturedGlobalErrors(callback) {
   const hadReportError = Object.hasOwn(globalThis, "reportError");
@@ -105,6 +258,10 @@ test("React startTransition export has the React 19.2.6 CommonJS shape", () => {
   assert.equal(React.startTransition.name, "");
   assert.equal(React.startTransition.length, 1);
   assert.equal(React.startTransition, Transition.startTransition);
+  assert.equal(ReactCjsDevelopment.startTransition, Transition.startTransition);
+  assert.equal(ReactCjsProduction.startTransition, Transition.startTransition);
+  assert.equal(ReactCjsDevelopment.startTransition, React.startTransition);
+  assert.equal(ReactCjsProduction.startTransition, React.startTransition);
   assert.equal(Object.hasOwn(ReactServer, "startTransition"), false);
 });
 
@@ -131,6 +288,310 @@ test("startTransition rootless currentness metadata keeps scheduler and root wor
   assert.equal(metadata.compatibilityClaimed, false);
 });
 
+test("private startTransition rootless currentness report proves root and alias surfaces", () => {
+  const report = Transition.createStartTransitionRootlessCurrentnessReport();
+
+  assert.equal(
+    report.kind,
+    "fast-react.private.start_transition_rootless_currentness"
+  );
+  assert.equal(report.version, 1);
+  assert.equal(report.status, Transition.startTransitionRootlessCurrentnessStatus);
+  assert.equal(report.compatibilityTarget, "react@19.2.6");
+  assert.equal(report.apiName, "startTransition");
+  assert.deepEqual(
+    report.rootlessCurrentnessFieldNames,
+    expectedStartTransitionRootlessCurrentnessFieldNames
+  );
+  assert.deepEqual(
+    report.rootlessCurrentness,
+    expectedStartTransitionRootlessCurrentness
+  );
+  assert.deepEqual(
+    report.surfaceCurrentnessFieldNames,
+    expectedStartTransitionRootlessSurfaceCurrentnessFieldNames
+  );
+  assert.deepEqual(
+    report.surfaceCurrentnessRows,
+    expectedStartTransitionRootlessSurfaceCurrentnessRows
+  );
+  assert.equal(Object.isFrozen(report), true);
+  assert.equal(Object.isFrozen(report.rootlessCurrentnessFieldNames), true);
+  assert.equal(Object.isFrozen(report.rootlessCurrentness), true);
+  assert.equal(Object.isFrozen(report.surfaceCurrentnessFieldNames), true);
+  assert.equal(Object.isFrozen(report.surfaceCurrentnessRows), true);
+  for (const row of report.surfaceCurrentnessRows) {
+    assert.equal(Object.isFrozen(row), true, row.surfaceId);
+    assert.equal(Object.isFrozen(row.blockedExecutionPaths), true);
+    assert.equal(Object.isFrozen(row.blockedCompatibilityClaims), true);
+  }
+  for (const flagName of expectedStartTransitionBlockedFlags) {
+    assert.equal(report[flagName], true, flagName);
+  }
+  for (const flagName of expectedStartTransitionCompatibilityFalseFlags) {
+    assert.equal(report[flagName], false, flagName);
+  }
+  assert.equal(
+    Transition.validateStartTransitionRootlessCurrentnessReport(report),
+    null
+  );
+  assert.equal(
+    Transition.isStartTransitionRootlessCurrentnessReport(report),
+    true
+  );
+
+  const consumption =
+    Transition.consumeStartTransitionRootlessCurrentnessReport(report);
+  assert.equal(
+    consumption.status,
+    Transition.startTransitionRootlessCurrentnessConsumptionStatus
+  );
+  assert.equal(consumption.accepted, true);
+  assert.equal(consumption.currentnessStatus, report.status);
+  assert.equal(consumption.compatibilityTarget, "react@19.2.6");
+  assert.equal(consumption.rootlessFacade, true);
+  assert.deepEqual(
+    consumption.rootlessCurrentness,
+    expectedStartTransitionRootlessCurrentness
+  );
+  assert.deepEqual(
+    consumption.surfaceCurrentnessRows,
+    expectedStartTransitionRootlessSurfaceCurrentnessRows
+  );
+  for (const flagName of expectedStartTransitionBlockedFlags) {
+    assert.equal(consumption[flagName], true, flagName);
+  }
+  for (const flagName of expectedStartTransitionCompatibilityFalseFlags) {
+    assert.equal(consumption[flagName], false, flagName);
+  }
+
+  for (const privateName of [
+    "createStartTransitionRootlessCurrentnessReport",
+    "validateStartTransitionRootlessCurrentnessReport",
+    "consumeStartTransitionRootlessCurrentnessReport",
+    "isStartTransitionRootlessCurrentnessReport"
+  ]) {
+    assert.equal(React[privateName], undefined, privateName);
+    assert.equal(ReactCjsDevelopment[privateName], undefined, privateName);
+    assert.equal(ReactCjsProduction[privateName], undefined, privateName);
+    assert.equal(ReactServer[privateName], undefined, privateName);
+  }
+});
+
+test("private startTransition rootless currentness rejects forged reports and claims", () => {
+  const report = Transition.createStartTransitionRootlessCurrentnessReport();
+
+  assertStartTransitionCurrentnessRejected(
+    Object.freeze({ ...report }),
+    "startTransition-rootless-currentness-source-proof"
+  );
+  assertStartTransitionCurrentnessRejected(
+    { ...report },
+    "startTransition-rootless-currentness-source-proof"
+  );
+
+  const hostile = createHostileReportProxy("startTransition currentness");
+  assertStartTransitionCurrentnessRejected(
+    hostile.report,
+    "startTransition-rootless-currentness-source-proof"
+  );
+  assert.equal(hostile.getTrapCalls(), 0);
+
+  const mutableReport = withObjectFreezeBypassed(() =>
+    Transition.createStartTransitionRootlessCurrentnessReport()
+  );
+  assert.equal(Object.isFrozen(mutableReport), false);
+  assertStartTransitionCurrentnessRejected(
+    mutableReport,
+    "startTransition-rootless-currentness-not-frozen"
+  );
+
+  assertStartTransitionCurrentnessRejected(
+    Transition.createStartTransitionRootlessCurrentnessReport({
+      rootlessCurrentness: {
+        schedulerIntegration: true
+      }
+    }),
+    "startTransition-rootless-currentness-rootless-metadata"
+  );
+  assertStartTransitionCurrentnessRejected(
+    Transition.createStartTransitionRootlessCurrentnessReport({
+      surfaceCurrentnessFieldNames: ["surfaceId"]
+    }),
+    "startTransition-rootless-currentness-shape"
+  );
+
+  for (const flagName of expectedStartTransitionBlockedFlags) {
+    assertStartTransitionCurrentnessRejected(
+      Transition.createStartTransitionRootlessCurrentnessReport({
+        [flagName]: false
+      }),
+      "startTransition-rootless-currentness-blocker-claim"
+    );
+  }
+  for (const flagName of expectedStartTransitionCompatibilityFalseFlags) {
+    assertStartTransitionCurrentnessRejected(
+      Transition.createStartTransitionRootlessCurrentnessReport({
+        [flagName]: true
+      }),
+      "startTransition-rootless-currentness-compatibility-claim"
+    );
+  }
+
+  let accessorRead = false;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, "compatibilityClaimed", {
+    enumerable: true,
+    get() {
+      accessorRead = true;
+      return true;
+    }
+  });
+  assertStartTransitionCurrentnessRejected(
+    Transition.createStartTransitionRootlessCurrentnessReport(accessorOptions),
+    "startTransition-rootless-currentness-source-proof"
+  );
+  assert.equal(accessorRead, false);
+
+  const ambiguousProxyOptions = new Proxy(
+    {},
+    {
+      ownKeys() {
+        throw new Error("ambiguous startTransition options");
+      }
+    }
+  );
+  assertStartTransitionCurrentnessRejected(
+    Transition.createStartTransitionRootlessCurrentnessReport(
+      ambiguousProxyOptions
+    ),
+    "startTransition-rootless-currentness-source-proof"
+  );
+});
+
+test("private startTransition rootless currentness rejects mutable nested evidence", () => {
+  const mutableRootlessMetadata = withObjectFreezeSelectivelyBypassed(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) =>
+      value?.apiName === "startTransition" &&
+      value?.currentPublicExport === "react.startTransition facade"
+  );
+  assertNestedFreezeBypass(mutableRootlessMetadata, (report) => [
+    report.rootlessCurrentness
+  ]);
+  assertStartTransitionCurrentnessRejected(
+    mutableRootlessMetadata.report,
+    "startTransition-rootless-currentness-rootless-metadata"
+  );
+
+  const mutableSurfaceRow = withObjectFreezeSelectivelyBypassed(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) => value?.surfaceId === "react-root"
+  );
+  assertNestedFreezeBypass(mutableSurfaceRow, (report) => [
+    report.surfaceCurrentnessRows.find(
+      (row) => row.surfaceId === "react-root"
+    )
+  ]);
+  assertStartTransitionCurrentnessRejected(
+    mutableSurfaceRow.report,
+    "startTransition-rootless-currentness-surface-currentness"
+  );
+
+  const mutableSurfaceArray = withObjectFreezeSelectivelyBypassed(
+    () => Transition.createStartTransitionRootlessCurrentnessReport(),
+    (value) =>
+      Array.isArray(value) && value.includes("dispatcher-routing")
+  );
+  assertNestedFreezeBypass(mutableSurfaceArray, (report) => [
+    report.surfaceCurrentnessRows[0].blockedExecutionPaths
+  ]);
+  assertStartTransitionCurrentnessRejected(
+    mutableSurfaceArray.report,
+    "startTransition-rootless-currentness-surface-currentness"
+  );
+});
+
+test("private startTransition rootless currentness rejects public surface drift", () => {
+  const originalStartTransition = React.startTransition;
+  const fakeStartTransition = createSameShapeFakeStartTransition();
+
+  React.startTransition = fakeStartTransition;
+  try {
+    assert.equal(React.startTransition.name, "");
+    assert.equal(React.startTransition.length, 1);
+    assert.equal(ReactCjsDevelopment.startTransition, fakeStartTransition);
+    assert.equal(ReactCjsProduction.startTransition, fakeStartTransition);
+
+    const report = Transition.createStartTransitionRootlessCurrentnessReport();
+    const rootRow = report.surfaceCurrentnessRows.find(
+      (row) => row.surfaceId === "react-root"
+    );
+
+    assert.equal(rootRow.hasStartTransitionExport, true);
+    assert.equal(rootRow.sameAsRootlessFacade, false);
+    assert.equal(rootRow.rootlessFacade, false);
+    assertStartTransitionCurrentnessRejected(
+      report,
+      "startTransition-rootless-currentness-surface-currentness"
+    );
+  } finally {
+    React.startTransition = originalStartTransition;
+  }
+});
+
+test("private startTransition rootless currentness rejects CJS alias drift", () => {
+  const fakeStartTransition = createSameShapeFakeStartTransition();
+
+  withTemporaryCjsDevelopmentExports(
+    {
+      ...React,
+      startTransition: fakeStartTransition
+    },
+    () => {
+      const report =
+        Transition.createStartTransitionRootlessCurrentnessReport();
+      const cjsDevelopmentRow = report.surfaceCurrentnessRows.find(
+        (row) => row.surfaceId === "react-cjs-development"
+      );
+
+      assert.equal(cjsDevelopmentRow.hasStartTransitionExport, true);
+      assert.equal(cjsDevelopmentRow.sameAsRootlessFacade, false);
+      assert.equal(cjsDevelopmentRow.sameAsRootExport, false);
+      assertStartTransitionCurrentnessRejected(
+        report,
+        "startTransition-rootless-currentness-surface-currentness"
+      );
+    }
+  );
+});
+
+test("private startTransition rootless currentness rejects react-server export presence", () => {
+  const hadStartTransition = Object.hasOwn(ReactServer, "startTransition");
+  const previousStartTransition = ReactServer.startTransition;
+
+  ReactServer.startTransition = Transition.startTransition;
+  try {
+    const report = Transition.createStartTransitionRootlessCurrentnessReport();
+    const serverRow = report.surfaceCurrentnessRows.find(
+      (row) => row.surfaceId === "react-server"
+    );
+
+    assert.equal(serverRow.hasStartTransitionExport, true);
+    assert.equal(serverRow.reactServerStartTransitionAbsent, false);
+    assertStartTransitionCurrentnessRejected(
+      report,
+      "startTransition-rootless-currentness-surface-currentness"
+    );
+  } finally {
+    if (hadStartTransition) {
+      ReactServer.startTransition = previousStartTransition;
+    } else {
+      delete ReactServer.startTransition;
+    }
+  }
+});
+
 test("startTransition runs a valid scope synchronously and returns undefined", () => {
   const observations = [];
 
@@ -145,6 +606,34 @@ test("startTransition runs a valid scope synchronously and returns undefined", (
   assert.equal(result, undefined);
   assert.deepEqual(observations, ["scope-start", true, "after-call"]);
   assert.equal(Transition.isTransitionBatchActive(), false);
+});
+
+test("startTransition ignores installed hook dispatchers and opens no root scheduling path", () => {
+  const previousDispatcher = hookDispatcher.ReactCurrentDispatcher.current;
+  const dispatcherCalls = [];
+  const scopeCalls = [];
+
+  hookDispatcher.ReactCurrentDispatcher.current = new Proxy(
+    {},
+    {
+      get(_target, property) {
+        dispatcherCalls.push(String(property));
+        return () => dispatcherCalls.push(`call:${String(property)}`);
+      }
+    }
+  );
+
+  try {
+    const result = React.startTransition(() => {
+      scopeCalls.push("scope");
+    });
+
+    assert.equal(result, undefined);
+    assert.deepEqual(scopeCalls, ["scope"]);
+    assert.deepEqual(dispatcherCalls, []);
+  } finally {
+    hookDispatcher.ReactCurrentDispatcher.current = previousDispatcher;
+  }
 });
 
 test("nested startTransition calls keep the transition marker active until the outer scope exits", () => {
@@ -238,4 +727,143 @@ test("startTransition facade source stays rootless and scheduler-free", () => {
   assert.equal(source.includes("requestUpdateLane"), false);
   assert.equal(source.includes("requestDeferredLane"), false);
   assert.equal(source.includes("markRootUpdated"), false);
+  assert.equal(source.includes("ReactCurrentDispatcher"), false);
+  assert.equal(source.includes("resolveDispatcher"), false);
+  assert.equal(source.includes("scheduler/index"), false);
 });
+
+function assertStartTransitionCurrentnessRejected(report, reason) {
+  assert.equal(
+    Transition.validateStartTransitionRootlessCurrentnessReport(report),
+    reason
+  );
+  assert.equal(
+    Transition.isStartTransitionRootlessCurrentnessReport(report),
+    false
+  );
+  assert.throws(
+    () => Transition.consumeStartTransitionRootlessCurrentnessReport(report),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", reason);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", reason);
+      assert.equal(error.entrypoint, "react", reason);
+      assert.equal(
+        error.exportName,
+        "startTransitionRootlessCurrentness",
+        reason
+      );
+      assert.equal(error.compatibilityTarget, "react@19.2.6", reason);
+      assert.equal(error.reason, reason);
+      assert.equal(error.apiName, "startTransition", reason);
+      for (const flagName of expectedStartTransitionBlockedFlags) {
+        assert.equal(error[flagName], true, `${reason}:${flagName}`);
+      }
+      for (const flagName of expectedStartTransitionCompatibilityFalseFlags) {
+        assert.equal(error[flagName], false, `${reason}:${flagName}`);
+      }
+      return true;
+    },
+    reason
+  );
+}
+
+function createHostileReportProxy(label) {
+  let trapCalls = 0;
+  const trap = () => {
+    trapCalls += 1;
+    throw new Error(`${label} inspected before source proof`);
+  };
+
+  return {
+    report: new Proxy(
+      {},
+      {
+        get: trap,
+        getOwnPropertyDescriptor: trap,
+        getPrototypeOf: trap,
+        isExtensible: trap,
+        ownKeys: trap
+      }
+    ),
+    getTrapCalls() {
+      return trapCalls;
+    }
+  };
+}
+
+function withObjectFreezeBypassed(callback) {
+  const originalFreeze = Object.freeze;
+  Object.freeze = (value) => value;
+
+  try {
+    return callback();
+  } finally {
+    Object.freeze = originalFreeze;
+  }
+}
+
+function withObjectFreezeSelectivelyBypassed(callback, shouldBypass) {
+  const originalFreeze = Object.freeze;
+  const bypassed = [];
+  Object.freeze = (value) => {
+    if (shouldBypass(value)) {
+      bypassed.push(value);
+      return value;
+    }
+
+    return originalFreeze(value);
+  };
+
+  try {
+    return {
+      report: callback(),
+      bypassed
+    };
+  } finally {
+    Object.freeze = originalFreeze;
+  }
+}
+
+function assertNestedFreezeBypass({ report, bypassed }, getNestedValues) {
+  assert.equal(Object.isFrozen(report), true);
+  assert.notEqual(bypassed.length, 0);
+
+  for (const nestedValue of getNestedValues(report)) {
+    assert.equal(Object.isFrozen(nestedValue), false);
+    assert.equal(bypassed.includes(nestedValue), true);
+  }
+}
+
+function createSameShapeFakeStartTransition() {
+  const fakeStartTransition = function (scope) {
+    if (typeof scope === "function") {
+      scope();
+    }
+  };
+
+  Object.defineProperties(fakeStartTransition, {
+    length: {
+      configurable: true,
+      value: 1
+    },
+    name: {
+      configurable: true,
+      value: ""
+    }
+  });
+
+  return fakeStartTransition;
+}
+
+function withTemporaryCjsDevelopmentExports(exportsObject, callback) {
+  const moduleId = require.resolve(reactCjsDevelopmentPath);
+  const moduleRecord = require.cache[moduleId];
+  const previousExports = moduleRecord.exports;
+
+  moduleRecord.exports = exportsObject;
+  try {
+    return callback();
+  } finally {
+    moduleRecord.exports = previousExports;
+  }
+}
