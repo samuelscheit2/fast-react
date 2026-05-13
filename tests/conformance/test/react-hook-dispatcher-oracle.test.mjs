@@ -3743,6 +3743,81 @@ test("private transition-hook dispatcher marker rejects forged blocker currentne
   assert.deepEqual(calls, []);
 });
 
+test("private transition-hook dispatcher metadata requires source ownership", () => {
+  const metadata = hookDispatcher.privateTransitionHookDispatcherMetadata;
+  const clonedMetadata = {
+    ...metadata
+  };
+  const extraClaimMetadata = {
+    ...metadata,
+    publicTransitionHookCompatibilityClaimed: true,
+    nativeTransitionHookCompatibilityClaimed: true,
+    packageCompatibilityClaimed: true,
+    rootCompatibilityClaimed: true,
+    schedulerCompatibilityClaimed: true
+  };
+  const prototypeBackedMetadata = Object.create(metadata);
+  let proxyTrapCalls = 0;
+  const trap = () => {
+    proxyTrapCalls += 1;
+    throw new Error("transition metadata proxy inspected");
+  };
+  const proxyMetadata = new Proxy(metadata, {
+    get: trap,
+    getOwnPropertyDescriptor: trap,
+    getPrototypeOf: trap,
+    ownKeys: trap
+  });
+
+  assert.equal(
+    hookDispatcher.isPrivateTransitionHookDispatcherMetadata(clonedMetadata),
+    false,
+    "shallow clone"
+  );
+  assert.equal(
+    hookDispatcher.isPrivateTransitionHookDispatcherMetadata(
+      extraClaimMetadata
+    ),
+    false,
+    "extra compatibility claims"
+  );
+  assert.equal(
+    hookDispatcher.isPrivateTransitionHookDispatcherMetadata(
+      prototypeBackedMetadata
+    ),
+    false,
+    "prototype-backed metadata"
+  );
+  assert.equal(
+    hookDispatcher.isPrivateTransitionHookDispatcherMetadata(proxyMetadata),
+    false,
+    "proxy metadata"
+  );
+  assert.equal(proxyTrapCalls, 0, "proxy metadata inspected");
+
+  const dispatcher = {
+    useDeferredValue(value) {
+      return value;
+    },
+    useTransition() {
+      return [false, () => {}];
+    }
+  };
+
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.markPrivateTransitionHookDispatcher(
+        dispatcher,
+        clonedMetadata
+      ),
+    "useTransition"
+  );
+  assert.equal(
+    hookDispatcher.isPrivateTransitionHookDispatcher(dispatcher),
+    false
+  );
+});
+
 test("private transition-hook metadata rejects compatibility flags flipped true", () => {
   const metadata = hookDispatcher.privateTransitionHookDispatcherMetadata;
   const dispatcher = {
