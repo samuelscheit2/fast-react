@@ -1,5 +1,41 @@
 {
 	"version": 1,
 	"workerCap": 30,
-	"tasks": []
+	"tasks": [
+		{
+			"id": 1253,
+			"type": "scout",
+			"status": "active",
+			"title": "React Children helper next lane scout",
+			"agent": "scout_1253_react_children_next"
+		},
+		{
+			"id": 1254,
+			"type": "scout",
+			"status": "active",
+			"title": "React hook facade next lane scout",
+			"agent": "scout_1254_hooks_next"
+		},
+		{
+			"id": 1255,
+			"type": "scout",
+			"status": "active",
+			"title": "Scheduler variant/root-scheduler next lane scout",
+			"agent": "scout_1255_scheduler_next"
+		},
+		{
+			"id": 1256,
+			"type": "scout",
+			"status": "active",
+			"title": "Native lifecycle/no-load next lane scout",
+			"agent": "scout_1256_native_next"
+		},
+		{
+			"id": 1257,
+			"type": "scout",
+			"status": "active",
+			"title": "Conformance/benchmark harness next lane scout",
+			"agent": "scout_1257_conformance_next"
+		}
+	]
 }
