@@ -1009,6 +1009,33 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "ref"
     }),
     publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-element-prototype-nonenumerable-publicrootexecution-prop",
+      label:
+        "unsupported-element-prototype-nonenumerable-publicRootExecution-prop",
+      publicApi:
+        "root.render(forged <div> with non-enumerable inherited element publicRootExecution)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-element-prototype-nonenumerable-nativeexecutionclaimed-prop",
+      label:
+        "unsupported-element-prototype-nonenumerable-nativeExecutionClaimed-prop",
+      publicApi:
+        "root.render(forged <div> with non-enumerable inherited element nativeExecutionClaimed)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-element-prototype-nonenumerable-listenerinstallationclaimed-prop",
+      label:
+        "unsupported-element-prototype-nonenumerable-listenerInstallationClaimed-prop",
+      publicApi:
+        "root.render(forged <div> with non-enumerable inherited element listenerInstallationClaimed)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-keyed-div",
       label: "unsupported-keyed-div",
       publicApi: "root.render(<div key=\"blocked\">text</div>)",
@@ -1125,6 +1152,31 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "compatibility-claim"
     }),
     publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-element-prototype-ref-prop",
+      label: "unsupported-nested-element-prototype-ref-prop",
+      publicApi:
+        "root.render(forged <div><span inherited element ref /></div>)",
+      category: "ref-prop",
+      blockedSurface: "ref"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-element-prototype-publichydraterootcompatibilityclaimed-prop",
+      label:
+        "unsupported-nested-element-prototype-publicHydrateRootCompatibilityClaimed-prop",
+      publicApi:
+        "root.render(forged <div><span inherited element publicHydrateRootCompatibilityClaimed /></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-element-prototype-resource-form-alias-prop",
+      label: "unsupported-nested-element-prototype-resource-form-alias-prop",
+      publicApi:
+        "root.render(forged <div><span inherited element resource/form compatibility aliases /></div>)",
+      category: "resource-form-controlled",
+      blockedSurface: "resource"
+    }),
+    publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-nested-component",
       label: "unsupported-nested-component",
       publicApi: "root.render(<div><Component /></div>)",
@@ -1179,6 +1231,21 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
         "root.render(<div>text</div>) with non-enumerable listenerInstallationClaimed on Object.prototype",
       category: "browser-dom-expansion",
       blockedSurface: "prototype-pollution"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-object-prototype-element-compatibility-alias-prop",
+      label: "unsupported-object-prototype-element-compatibility-alias-prop",
+      publicApi:
+        "root.render(<div>text</div>) with element-level compatibility aliases on Object.prototype",
+      category: "browser-dom-expansion",
+      blockedSurface: "prototype-pollution"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-proxy-element-prototype-public-props",
+      label: "unsupported-proxy-element-prototype-public-props",
+      publicApi: "root.render(forged <div> with Proxy element prototype)",
+      category: "browser-dom-expansion",
+      blockedSurface: "element-proxy"
     }),
     publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-proxy-prototype-public-props",

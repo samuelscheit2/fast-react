@@ -25,6 +25,11 @@ const legacyReactElementType = Symbol.for('react.element');
 const minimalPublicRootContainers = new WeakMap();
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 const publicHostInheritedNonClaimPropNames = new Set([
+  '$$typeof',
+  '_owner',
+  '_self',
+  '_source',
+  '_store',
   'action',
   'checked',
   'children',
@@ -42,6 +47,7 @@ const publicHostInheritedNonClaimPropNames = new Set([
   'onError',
   'onLoad',
   'onSubmit',
+  'props',
   'publicCreateRootEnabled',
   'publicHydrateRootEnabled',
   'publicHydrateRootSupported',
@@ -96,6 +102,13 @@ const rootBridgeCapabilityClaimFieldNames = new Set([
   'publicEventCompatibilityClaimed',
   'publicHydrateRootCompatibilityClaimed',
   'publicHydrationCompatibilityClaimed',
+  'publicResourceCompatibilityClaimed',
+  'publicResourceDomInsertionCompatibilityClaimed',
+  'publicStylesheetCompatibilityClaimed',
+  'publicFormCompatibilityClaimed',
+  'publicFormActionCompatibilityClaimed',
+  'publicFormResetCompatibilityClaimed',
+  'publicControlledInputCompatibilityClaimed',
   'publicNativeCompatibility',
   'publicNativeCompatibilityClaimed',
   'publicNativeCompatibilitySurface',
@@ -313,6 +326,7 @@ function assertReactElementObject(element, detail) {
     throwUnsupportedRootRender(detail);
   }
   assertNoProxyObject(element, detail);
+  assertNoInheritedElementProps(element);
   const elementType = getOwnDataPropertyValue(
     element,
     '$$typeof',
@@ -450,6 +464,64 @@ function getOwnHostPropDescriptor(props, name) {
   } catch (_error) {
     throwUnsupportedRootRender(
       'Public host props accessors and proxies remain blocked by the minimal host-output facade.'
+    );
+  }
+}
+
+function assertNoInheritedElementProps(element) {
+  let prototype = getElementPrototype(element);
+  while (prototype !== null) {
+    assertNoProxyObject(
+      prototype,
+      'Public React element proxy prototypes remain blocked.'
+    );
+
+    let inheritedKeys;
+    try {
+      inheritedKeys = Reflect.ownKeys(prototype);
+    } catch (_error) {
+      throwUnsupportedRootRender(
+        'Public React element prototype inspection remains blocked.'
+      );
+    }
+    for (const name of inheritedKeys) {
+      const descriptor = getInheritedElementPropDescriptor(prototype, name);
+      if (descriptor?.enumerable === true) {
+        throwUnsupportedRootRender(
+          `Inherited public React element prop ${String(name)} remains blocked.`
+        );
+      }
+      if (
+        typeof name === 'string' &&
+        (publicHostInheritedNonClaimPropNames.has(name) ||
+          isPublicHostCompatibilityAliasName(name))
+      ) {
+        throwUnsupportedRootRender(
+          `Inherited public React element prop ${name} remains blocked.`
+        );
+      }
+    }
+
+    prototype = getElementPrototype(prototype);
+  }
+}
+
+function getInheritedElementPropDescriptor(prototype, name) {
+  try {
+    return Object.getOwnPropertyDescriptor(prototype, name);
+  } catch (_error) {
+    throwUnsupportedRootRender(
+      'Public React element prototype descriptor inspection remains blocked.'
+    );
+  }
+}
+
+function getElementPrototype(value) {
+  try {
+    return Object.getPrototypeOf(value);
+  } catch (_error) {
+    throwUnsupportedRootRender(
+      'Public React element prototype access remains blocked.'
     );
   }
 }
