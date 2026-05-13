@@ -47,10 +47,11 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current root head is main `f4983d0b`
-(`Merge worker 1320 queued cleanup ownership transfer`) before this docs pass.
-Current accepted implementation head is main `f4983d0b`
-(`Merge worker 1320 queued cleanup ownership transfer`).
+Top-level cap: 30 workers. Current root head is main `0ebb5c53`
+(`Merge worker 1326 test renderer root handle WeakMap ledger`) before this
+docs pass.
+Current accepted implementation head is main `0ebb5c53`
+(`Merge worker 1326 test renderer root handle WeakMap ledger`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -64,7 +65,7 @@ Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
   1269, 1270, 1271, 1272, 1277 through 1280, 1286 through 1290,
-  1296 through 1300, 1306 through 1310, and 1318 through 1320
+  1296 through 1300, 1306 through 1310, 1318 through 1320, 1325, and 1326
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
@@ -110,6 +111,12 @@ Current orchestration queue:
   ledger, and native source-currentness normalized claim-alias candidates.
   Scout 1321 returned no responsible Rust report because the local command
   runner hit file-descriptor pressure during scouting.
+- Worker 1325 has been reviewed, merged, and recorded as accepted history for
+  the native source-currentness normalized claim-alias candidate from Scout
+  1324.
+- Worker 1326 has been reviewed, merged, and recorded as accepted history for
+  the react-test-renderer root-handle WeakMap source-ledger candidate from
+  Scout 1323.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

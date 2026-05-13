@@ -29,6 +29,49 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1326 react-test-renderer Root-Handle WeakMap Ledger
+
+- Worker 1326 added a private conformance source-proof ledger for
+  react-test-renderer root-handle ownership, proving the private bridge still
+  depends on `WeakMap` identity state rather than structural `$$typeof` or
+  own-key-shaped objects.
+- The ledger strips comments, strings, templates, and regex literals before
+  source proof and rejects source mutations that replace WeakMap storage,
+  accept structural root handles, read request history from copied handle
+  fields, or claim public compatibility.
+- Existing runtime routing gates remain the behavior guard for cloned private
+  requests and root handles; this accepted change is static private evidence
+  only. It does not open public `.root`, TestInstance query APIs, `act`,
+  Scheduler, native, serialization, package, or broad renderer compatibility.
+- Accepted validation includes clean source and verification audits. Root
+  post-merge reruns passed the new ledger test (7/7), the
+  react-test-renderer create-routing gate (46/46), and `git diff --check`.
+- The accepted merge is main `0ebb5c53` after Worker 1326 commit `10cbabab`.
+
+### Worker 1325 Native Source-Currentness Claim Aliases
+
+- Worker 1325 hardened the private native root work-loop source-currentness
+  ledger so normalized string aliases and symbol keys are classified into the
+  existing capability-specific blocker codes.
+- The classifier now uses the descriptor-based alias helper path for own and
+  inherited keys, covering symbols, non-enumerable properties, and prototypes
+  without invoking getters. `Symbol.for('nativeAddonLoadAttempted')` routes to
+  `nativeAddonLoadClaim`, and normalized package/public/native aliases route
+  to their specific claim blockers before generic caller-built rejection.
+- Hostile coverage proves truthy own/inherited normalized aliases reject,
+  accessor descriptors do not run, false/null aliases are not capability
+  claims, extra own keys remain caller-built, and canonical row sets with one
+  alias claim produce no accepted rows.
+- The accepted change is no-load/static native ledger evidence only. It does
+  not load `.node`, spawn worker threads, change package exports, touch Rust,
+  React DOM, or test-renderer, or claim real native/public/package
+  compatibility.
+- Accepted validation includes clean source and verification audits. Root
+  post-merge reruns passed the native private root work-loop metadata factory
+  test, `npm run check --workspace @fast-react/native`, and `git diff --check`
+  with only the existing npm `minimum-release-age` warning.
+- The accepted merge is main `f5453491` after Worker 1325 commit `4609a862`.
+
 ### Worker 1320 Queued Cleanup Ownership Transfer
 
 - Worker 1320 added private/test-host evidence for queued minimal HostRoot

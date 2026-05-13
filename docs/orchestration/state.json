@@ -727,6 +727,30 @@
 			"status": "reported",
 			"title": "Native source-currentness normalized claim-alias scout",
 			"agent": "scout_1324_native_next"
+		},
+		{
+			"id": 1325,
+			"type": "worker",
+			"status": "accepted",
+			"title": "Native source-currentness normalized claim aliases",
+			"agent": "worker_1325_native_source_currentness_claim_aliases",
+			"branch": "worker/1325-native-source-currentness-claim-aliases",
+			"audits": [
+				"audit_1325_source_contract",
+				"audit_1325_verification"
+			]
+		},
+		{
+			"id": 1326,
+			"type": "worker",
+			"status": "accepted",
+			"title": "react-test-renderer root-handle WeakMap source ledger",
+			"agent": "worker_1326_test_renderer_root_handle_weakmap_ledger",
+			"branch": "worker/1326-test-renderer-root-handle-weakmap-ledger",
+			"audits": [
+				"audit_1326_source_contract",
+				"audit_1326_verification"
+			]
 		}
 	]
 }
