@@ -487,7 +487,7 @@
 		{
 			"id": 1300,
 			"type": "worker",
-			"status": "repair-blocked",
+			"status": "repair-active",
 			"title": "react-test-renderer TestInstance query-bridge source proof",
 			"agent": "worker_1300_test_renderer_query_bridge_source_proof",
 			"branch": "worker/1300-test-renderer-query-bridge-source-proof",
@@ -505,6 +505,41 @@
 				"audit_1300_repair5_source",
 				"audit_1300_repair5_verification"
 			]
+		},
+		{
+			"id": 1301,
+			"type": "scout",
+			"status": "active",
+			"title": "Rust reconciler/root/scheduler next-lane scout",
+			"agent": "scout_1301_rust_root_next"
+		},
+		{
+			"id": 1302,
+			"type": "scout",
+			"status": "active",
+			"title": "React DOM facade/root next-lane scout",
+			"agent": "scout_1302_react_dom_next"
+		},
+		{
+			"id": 1303,
+			"type": "scout",
+			"status": "active",
+			"title": "react-test-renderer next-lane scout",
+			"agent": "scout_1303_test_renderer_next"
+		},
+		{
+			"id": 1304,
+			"type": "scout",
+			"status": "active",
+			"title": "Native/no-load next-lane scout",
+			"agent": "scout_1304_native_next"
+		},
+		{
+			"id": 1305,
+			"type": "scout",
+			"status": "active",
+			"title": "React core/hooks next-lane scout",
+			"agent": "scout_1305_react_core_next"
 		}
 	]
 }
