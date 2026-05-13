@@ -24,6 +24,20 @@ const reactElementType = Symbol.for('react.transitional.element');
 const legacyReactElementType = Symbol.for('react.element');
 const minimalPublicRootContainers = new WeakMap();
 const hasOwnProperty = Object.prototype.hasOwnProperty;
+const supportedReactElementOwnPropNames = new Set([
+  '$$typeof',
+  'type',
+  'key',
+  'props',
+  '_owner',
+  'ref',
+  '_store',
+  '_self',
+  '_source',
+  '_debugInfo',
+  '_debugStack',
+  '_debugTask'
+]);
 const publicHostInheritedNonClaimPropNames = new Set([
   '$$typeof',
   '_owner',
@@ -326,6 +340,7 @@ function assertReactElementObject(element, detail) {
     throwUnsupportedRootRender(detail);
   }
   assertNoProxyObject(element, detail);
+  assertOnlySupportedOwnElementProps(element);
   assertNoInheritedElementProps(element);
   const elementType = getOwnDataPropertyValue(
     element,
@@ -337,6 +352,47 @@ function assertReactElementObject(element, detail) {
     elementType !== legacyReactElementType
   ) {
     throwUnsupportedRootRender(detail);
+  }
+}
+
+function assertOnlySupportedOwnElementProps(element) {
+  let ownKeys;
+  try {
+    ownKeys = Reflect.ownKeys(element);
+  } catch (_error) {
+    throwUnsupportedRootRender(
+      'Public React element shell inspection remains blocked.'
+    );
+  }
+
+  for (const name of ownKeys) {
+    const descriptor = getOwnElementPropDescriptor(element, name);
+    if (
+      descriptor === undefined ||
+      !hasOwnProperty.call(descriptor, 'value')
+    ) {
+      throwUnsupportedRootRender(
+        `Public React element shell prop ${String(name)} accessors remain blocked.`
+      );
+    }
+    if (
+      typeof name !== 'string' ||
+      !supportedReactElementOwnPropNames.has(name)
+    ) {
+      throwUnsupportedRootRender(
+        `Public React element shell prop ${String(name)} remains blocked.`
+      );
+    }
+  }
+}
+
+function getOwnElementPropDescriptor(element, name) {
+  try {
+    return Object.getOwnPropertyDescriptor(element, name);
+  } catch (_error) {
+    throwUnsupportedRootRender(
+      'Public React element shell descriptor inspection remains blocked.'
+    );
   }
 }
 
