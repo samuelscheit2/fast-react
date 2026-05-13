@@ -103,7 +103,7 @@ use crate::passive_effects::{
 #[cfg(test)]
 use crate::root_commit::HostRootTextUpdateCommitExecutionRequestForCanary;
 use crate::root_commit::{
-    HostRootDangerousHtmlTextResetCommitHandoffRecordForCanary,
+    HostRootDangerousHtmlTextResetCommitHandoffRecordForCanary, HostRootDeletionCleanupRecord,
     HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary,
     HostRootFinishedWorkCommitHandoffErrorForCanary,
     HostRootFinishedWorkCommitHandoffRecordForCanary,
@@ -232,6 +232,22 @@ pub(crate) enum HostWorkError {
         fiber: FiberId,
         prop_name: &'static str,
         violation: TestHostComponentPropertyPayloadViolation,
+    },
+    MissingDetachedHostCleanupOwnershipTransfer {
+        root: FiberRootId,
+        work_in_progress: FiberId,
+        updated_fiber: FiberId,
+        source_fiber: FiberId,
+        tag: FiberTag,
+        state_node: StateNodeHandle,
+    },
+    InvalidDetachedHostCleanupOwnershipTransfer {
+        root: FiberRootId,
+        work_in_progress: FiberId,
+        updated_fiber: FiberId,
+        source_fiber: FiberId,
+        tag: FiberTag,
+        state_node: StateNodeHandle,
     },
 }
 
@@ -451,6 +467,40 @@ impl Display for HostWorkError {
                 root.raw(),
                 fiber.slot().get()
             ),
+            Self::MissingDetachedHostCleanupOwnershipTransfer {
+                root,
+                work_in_progress,
+                updated_fiber,
+                source_fiber,
+                tag,
+                state_node,
+            } => write!(
+                formatter,
+                "root {} HostWorkResult for work-in-progress slot {} cannot clean up updated {:?} fiber slot {} state node {} without source-owned transfer from alternate slot {}",
+                root.raw(),
+                work_in_progress.slot().get(),
+                tag,
+                updated_fiber.slot().get(),
+                state_node.raw(),
+                source_fiber.slot().get()
+            ),
+            Self::InvalidDetachedHostCleanupOwnershipTransfer {
+                root,
+                work_in_progress,
+                updated_fiber,
+                source_fiber,
+                tag,
+                state_node,
+            } => write!(
+                formatter,
+                "root {} HostWorkResult for work-in-progress slot {} has invalid cleanup ownership transfer for updated {:?} fiber slot {} state node {} from alternate slot {}",
+                root.raw(),
+                work_in_progress.slot().get(),
+                tag,
+                updated_fiber.slot().get(),
+                state_node.raw(),
+                source_fiber.slot().get()
+            ),
         }
     }
 }
@@ -484,7 +534,9 @@ impl Error for HostWorkError {
             | Self::UnchangedHostTextUpdatePayload { .. }
             | Self::HostTextCommitRecordMismatch { .. }
             | Self::InvalidHostTextCommitExecutionRequest { .. }
-            | Self::InvalidHostComponentPropertyUpdatePayload { .. } => None,
+            | Self::InvalidHostComponentPropertyUpdatePayload { .. }
+            | Self::MissingDetachedHostCleanupOwnershipTransfer { .. }
+            | Self::InvalidDetachedHostCleanupOwnershipTransfer { .. } => None,
         }
     }
 }
@@ -612,6 +664,18 @@ impl DetachedHostRecords {
     ) -> Result<HostNodeMetadata, HostWorkError> {
         let scope = self.scope(handle, HostFiberTokenTarget::TextInstance)?;
         Ok(self.nodes.text_metadata(handle, scope)?)
+    }
+
+    fn metadata_for_target(
+        &self,
+        handle: StateNodeHandle,
+        target: HostFiberTokenTarget,
+    ) -> Result<HostNodeMetadata, HostWorkError> {
+        match target {
+            HostFiberTokenTarget::Instance => self.instance_metadata(handle),
+            HostFiberTokenTarget::TextInstance => self.text_metadata(handle),
+            _ => Err(Self::invalid_handle(handle, target)),
+        }
     }
 
     pub(crate) fn invalidate_text_for_canary(
@@ -1160,6 +1224,51 @@ impl TestHostTextRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DetachedHostCleanupOwnershipTransfer {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    source_fiber: FiberId,
+    updated_fiber: FiberId,
+    owner_fiber: FiberId,
+    tag: FiberTag,
+    state_node: StateNodeHandle,
+    target: HostFiberTokenTarget,
+    source_metadata: HostNodeMetadata,
+}
+
+impl DetachedHostCleanupOwnershipTransfer {
+    #[must_use]
+    const fn new(
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        source_fiber: FiberId,
+        updated_fiber: FiberId,
+        owner_fiber: FiberId,
+        tag: FiberTag,
+        state_node: StateNodeHandle,
+        target: HostFiberTokenTarget,
+        source_metadata: HostNodeMetadata,
+    ) -> Self {
+        Self {
+            root,
+            host_root_work_in_progress,
+            source_fiber,
+            updated_fiber,
+            owner_fiber,
+            tag,
+            state_node,
+            target,
+            source_metadata,
+        }
+    }
+
+    #[must_use]
+    const fn owner_fiber(self) -> FiberId {
+        self.owner_fiber
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct HostWorkResult {
     root: FiberRootId,
@@ -1173,6 +1282,7 @@ pub(crate) struct HostWorkResult {
     consumed_sync_flush_host_mutations: Vec<SyncFlushHostMutationExecutionIdentityForCanary>,
     consumed_root_child_replacements:
         Vec<root_replacement::RootChildReplacementExecutionIdentityForCanary>,
+    cleanup_ownership_transfers: Vec<DetachedHostCleanupOwnershipTransfer>,
 }
 
 impl HostWorkResult {
@@ -1214,6 +1324,22 @@ impl HostWorkResult {
 
     pub(crate) fn detached_text_count(&self) -> usize {
         self.detached_hosts.text_count()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn detached_instance_metadata_for_canary(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<HostNodeMetadata, HostWorkError> {
+        self.detached_hosts.instance_metadata(handle)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn detached_text_metadata_for_canary(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<HostNodeMetadata, HostWorkError> {
+        self.detached_hosts.text_metadata(handle)
     }
 
     pub(crate) fn test_host_text_record_text_for_canary(
@@ -1311,6 +1437,31 @@ impl HostWorkResult {
         self.detached_hosts
     }
 
+    pub(super) fn deletion_cleanup_owner_for_canary(
+        &self,
+        store: &FiberRootStore<RecordingHost>,
+        cleanup: HostRootDeletionCleanupRecord,
+    ) -> Result<FiberId, HostWorkError> {
+        if cleanup.state_node().is_none() {
+            return Ok(cleanup.fiber());
+        }
+
+        let node = store.fiber_arena().get(cleanup.fiber())?;
+        let Some(source_fiber) = node.alternate() else {
+            return Ok(cleanup.fiber());
+        };
+
+        let transfer = self.validate_transferred_detached_host_cleanup_ownership_for_canary(
+            store,
+            cleanup.fiber(),
+            source_fiber,
+            cleanup.tag(),
+            cleanup.state_node(),
+            None,
+        )?;
+        Ok(transfer.owner_fiber())
+    }
+
     pub(crate) fn validate_detached_host_cleanup_ownership_for_canary(
         &self,
         store: &FiberRootStore<RecordingHost>,
@@ -1336,13 +1487,8 @@ impl HostWorkResult {
                 if state_node.is_none() {
                     return Err(HostWorkError::MissingStateNode { fiber, tag });
                 }
-                owned_detached_host_child_for_fiber(
-                    store,
-                    &self.detached_hosts,
-                    self.root,
-                    fiber,
-                    tag,
-                    state_node,
+                self.validate_detached_host_cleanup_fiber_ownership_for_canary(
+                    store, fiber, tag, state_node,
                 )?;
                 while let Some(child_id) = child {
                     let sibling = store.fiber_arena().get(child_id)?.sibling();
@@ -1357,13 +1503,8 @@ impl HostWorkResult {
                 if state_node.is_none() {
                     return Err(HostWorkError::MissingStateNode { fiber, tag });
                 }
-                owned_detached_host_child_for_fiber(
-                    store,
-                    &self.detached_hosts,
-                    self.root,
-                    fiber,
-                    tag,
-                    state_node,
+                self.validate_detached_host_cleanup_fiber_ownership_for_canary(
+                    store, fiber, tag, state_node,
                 )?;
                 Ok(())
             }
@@ -1373,6 +1514,102 @@ impl HostWorkResult {
                 actual,
             }),
         }
+    }
+
+    fn validate_detached_host_cleanup_fiber_ownership_for_canary(
+        &self,
+        store: &FiberRootStore<RecordingHost>,
+        fiber: FiberId,
+        tag: FiberTag,
+        state_node: StateNodeHandle,
+    ) -> Result<(), HostWorkError> {
+        let node = store.fiber_arena().get(fiber)?;
+        if let Some(source_fiber) = node.alternate() {
+            self.validate_transferred_detached_host_cleanup_ownership_for_canary(
+                store,
+                fiber,
+                source_fiber,
+                tag,
+                state_node,
+                Some(self.work_in_progress),
+            )?;
+        } else {
+            owned_detached_host_child_for_fiber(
+                store,
+                &self.detached_hosts,
+                self.root,
+                fiber,
+                tag,
+                state_node,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn validate_transferred_detached_host_cleanup_ownership_for_canary(
+        &self,
+        store: &FiberRootStore<RecordingHost>,
+        updated_fiber: FiberId,
+        source_fiber: FiberId,
+        tag: FiberTag,
+        state_node: StateNodeHandle,
+        expected_host_root_work_in_progress: Option<FiberId>,
+    ) -> Result<DetachedHostCleanupOwnershipTransfer, HostWorkError> {
+        store
+            .fiber_arena()
+            .validate_alternate_pair(source_fiber, updated_fiber)?;
+        let target = host_fiber_token_target_for_detached_host_tag(updated_fiber, tag)?;
+        let transfer = self
+            .cleanup_ownership_transfers
+            .iter()
+            .copied()
+            .find(|transfer| {
+                transfer.root == self.root
+                    && transfer.source_fiber == source_fiber
+                    && transfer.updated_fiber == updated_fiber
+                    && transfer.tag == tag
+                    && transfer.target == target
+            })
+            .ok_or(HostWorkError::MissingDetachedHostCleanupOwnershipTransfer {
+                root: self.root,
+                work_in_progress: self.work_in_progress,
+                updated_fiber,
+                source_fiber,
+                tag,
+                state_node,
+            })?;
+
+        if expected_host_root_work_in_progress
+            .is_some_and(|expected| transfer.host_root_work_in_progress != expected)
+            || transfer.owner_fiber != source_fiber
+        {
+            return Err(HostWorkError::InvalidDetachedHostCleanupOwnershipTransfer {
+                root: self.root,
+                work_in_progress: self.work_in_progress,
+                updated_fiber,
+                source_fiber,
+                tag,
+                state_node,
+            });
+        }
+
+        let metadata = self
+            .detached_hosts
+            .metadata_for_target(state_node, target)?;
+        validate_transferred_detached_host_cleanup_metadata(
+            state_node, target, transfer, metadata,
+        )?;
+        if transfer.state_node != state_node {
+            return Err(HostWorkError::InvalidDetachedHostCleanupOwnershipTransfer {
+                root: self.root,
+                work_in_progress: self.work_in_progress,
+                updated_fiber,
+                source_fiber,
+                tag,
+                state_node,
+            });
+        }
+        Ok(transfer)
     }
 
     #[cfg(test)]
@@ -1396,6 +1633,7 @@ impl HostWorkResult {
             sync_flush_host_work_epoch: 0,
             consumed_sync_flush_host_mutations: Vec::new(),
             consumed_root_child_replacements: Vec::new(),
+            cleanup_ownership_transfers: Vec::new(),
         }
     }
 
@@ -1447,6 +1685,104 @@ impl HostWorkResult {
         self.completed_child = completed_child;
         self.completed_children = completed_children;
     }
+}
+
+fn host_fiber_token_target_for_detached_host_tag(
+    fiber: FiberId,
+    tag: FiberTag,
+) -> Result<HostFiberTokenTarget, HostWorkError> {
+    match tag {
+        FiberTag::HostComponent => Ok(HostFiberTokenTarget::Instance),
+        FiberTag::HostText => Ok(HostFiberTokenTarget::TextInstance),
+        actual => Err(HostWorkError::ExpectedFiberTag {
+            fiber,
+            expected: FiberTag::HostComponent,
+            actual,
+        }),
+    }
+}
+
+fn validate_transferred_detached_host_cleanup_metadata(
+    state_node: StateNodeHandle,
+    target: HostFiberTokenTarget,
+    transfer: DetachedHostCleanupOwnershipTransfer,
+    metadata: HostNodeMetadata,
+) -> Result<(), HostWorkError> {
+    let violation = if metadata.handle() != transfer.source_metadata.handle() {
+        Some(HostNodeViolation::InvalidHandle)
+    } else if metadata.target() != target || metadata.target() != transfer.source_metadata.target()
+    {
+        Some(HostNodeViolation::WrongTarget)
+    } else if metadata.root_id() != transfer.root
+        || metadata.root_id() != transfer.source_metadata.root_id()
+    {
+        Some(HostNodeViolation::WrongRoot)
+    } else if metadata.fiber_id() != transfer.owner_fiber
+        || metadata.fiber_id() != transfer.source_metadata.fiber_id()
+    {
+        Some(HostNodeViolation::WrongFiber)
+    } else if metadata.token_id() != transfer.source_metadata.token_id()
+        || metadata.phase() != transfer.source_metadata.phase()
+    {
+        Some(HostNodeViolation::WrongToken)
+    } else if !metadata.is_active() || !transfer.source_metadata.is_active() {
+        Some(HostNodeViolation::Stale)
+    } else {
+        None
+    };
+
+    if let Some(violation) = violation {
+        return Err(
+            HostNodeValidationError::new(state_node, metadata.phase(), target, violation).into(),
+        );
+    }
+
+    Ok(())
+}
+
+fn detached_host_cleanup_ownership_transfer_for_update(
+    detached_hosts: &DetachedHostRecords,
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    source_fiber: FiberId,
+    updated_fiber: FiberId,
+    tag: FiberTag,
+    state_node: StateNodeHandle,
+    target: HostFiberTokenTarget,
+) -> Result<DetachedHostCleanupOwnershipTransfer, HostWorkError> {
+    let source_metadata = detached_hosts.metadata_for_target(state_node, target)?;
+    let violation = if source_metadata.target() != target {
+        Some(HostNodeViolation::WrongTarget)
+    } else if source_metadata.root_id() != root {
+        Some(HostNodeViolation::WrongRoot)
+    } else if source_metadata.fiber_id() != source_fiber {
+        Some(HostNodeViolation::WrongFiber)
+    } else if !source_metadata.is_active() {
+        Some(HostNodeViolation::Stale)
+    } else {
+        None
+    };
+    if let Some(violation) = violation {
+        return Err(HostNodeValidationError::new(
+            state_node,
+            source_metadata.phase(),
+            target,
+            violation,
+        )
+        .into());
+    }
+
+    Ok(DetachedHostCleanupOwnershipTransfer::new(
+        root,
+        host_root_work_in_progress,
+        source_fiber,
+        updated_fiber,
+        source_metadata.fiber_id(),
+        tag,
+        state_node,
+        target,
+        source_metadata,
+    ))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2546,6 +2882,7 @@ pub(crate) fn complete_test_function_component_single_host_update_work_for_canar
         sync_flush_host_work_epoch: 0,
         consumed_sync_flush_host_mutations: Vec::new(),
         consumed_root_child_replacements: Vec::new(),
+        cleanup_ownership_transfers: Vec::new(),
     })
 }
 
@@ -3877,8 +4214,9 @@ fn apply_test_host_root_mutation_record(
             Ok(TestHostRootMutationApplyStatus::RecordedOnly)
         }
         HostRootMutationApplyRecordKind::RemoveDeletedFromContainer => {
-            let child = detached_host_child_for_apply_record(store, &*detached_hosts, mutation)?;
-            host.remove_child_from_container(container, child)?;
+            let child =
+                owned_detached_host_child_for_apply_record(store, detached_hosts, mutation)?;
+            host.remove_child_from_container(container, child.as_host_child())?;
             Ok(TestHostRootMutationApplyStatus::Applied(
                 TestHostRootMutationHostCall::RemoveChildFromContainer,
             ))
@@ -4477,6 +4815,7 @@ pub(crate) fn mount_test_host_work(
         sync_flush_host_work_epoch: 0,
         consumed_sync_flush_host_mutations: Vec::new(),
         consumed_root_child_replacements: Vec::new(),
+        cleanup_ownership_transfers: Vec::new(),
     })
 }
 
@@ -4813,6 +5152,7 @@ pub(crate) fn mount_test_host_sibling_work_with_detached_hosts_for_canary(
         sync_flush_host_work_epoch: 0,
         consumed_sync_flush_host_mutations: Vec::new(),
         consumed_root_child_replacements: Vec::new(),
+        cleanup_ownership_transfers: Vec::new(),
     })
 }
 
@@ -4869,6 +5209,7 @@ pub(crate) fn mount_test_function_component_single_host_child_work(
         sync_flush_host_work_epoch: 0,
         consumed_sync_flush_host_mutations: Vec::new(),
         consumed_root_child_replacements: Vec::new(),
+        cleanup_ownership_transfers: Vec::new(),
     })
 }
 
@@ -4949,6 +5290,7 @@ pub(crate) fn update_test_host_root_work_with_detached_hosts_for_canary(
         sync_flush_host_work_epoch: 0,
         consumed_sync_flush_host_mutations: Vec::new(),
         consumed_root_child_replacements: Vec::new(),
+        cleanup_ownership_transfers: Vec::new(),
     })
 }
 
@@ -5031,6 +5373,7 @@ pub(crate) fn replace_test_host_root_child_work_with_detached_hosts_for_canary(
         sync_flush_host_work_epoch: 0,
         consumed_sync_flush_host_mutations: Vec::new(),
         consumed_root_child_replacements: Vec::new(),
+        cleanup_ownership_transfers: Vec::new(),
     })
 }
 
@@ -5146,6 +5489,7 @@ pub(crate) fn replace_test_host_root_child_before_stable_sibling_work_with_detac
         sync_flush_host_work_epoch: 0,
         consumed_sync_flush_host_mutations: Vec::new(),
         consumed_root_child_replacements: Vec::new(),
+        cleanup_ownership_transfers: Vec::new(),
     })
 }
 
@@ -5284,6 +5628,7 @@ pub(crate) fn replace_test_host_root_child_between_stable_siblings_work_with_det
         sync_flush_host_work_epoch: 0,
         consumed_sync_flush_host_mutations: Vec::new(),
         consumed_root_child_replacements: Vec::new(),
+        cleanup_ownership_transfers: Vec::new(),
     })
 }
 
@@ -5361,6 +5706,28 @@ pub(crate) fn update_test_host_root_component_with_text_child_work_with_detached
         .fiber_arena_mut()
         .set_children(render.work_in_progress(), &[payload.work_in_progress()])?;
     complete_host_root(store, render.work_in_progress())?;
+    let cleanup_ownership_transfers = vec![
+        detached_host_cleanup_ownership_transfer_for_update(
+            &detached_hosts,
+            render.root(),
+            render.work_in_progress(),
+            payload.current(),
+            payload.work_in_progress(),
+            FiberTag::HostComponent,
+            payload.state_node(),
+            HostFiberTokenTarget::Instance,
+        )?,
+        detached_host_cleanup_ownership_transfer_for_update(
+            &detached_hosts,
+            render.root(),
+            render.work_in_progress(),
+            diff.current(),
+            diff.work_in_progress(),
+            FiberTag::HostText,
+            diff.state_node(),
+            HostFiberTokenTarget::TextInstance,
+        )?,
+    ];
 
     Ok(HostWorkResult {
         root: render.root(),
@@ -5373,6 +5740,7 @@ pub(crate) fn update_test_host_root_component_with_text_child_work_with_detached
         sync_flush_host_work_epoch: 0,
         consumed_sync_flush_host_mutations: Vec::new(),
         consumed_root_child_replacements: Vec::new(),
+        cleanup_ownership_transfers,
     })
 }
 
@@ -5769,8 +6137,8 @@ fn complete_host_component_update(
         });
     }
 
-    detached_hosts.validated_scope(
-        store.host_tokens(),
+    detached_hosts.validated_scope_for_apply_fiber(
+        store,
         state_node,
         root_id,
         current,
@@ -5834,8 +6202,8 @@ fn complete_host_text_update(
         });
     }
 
-    let scope = detached_hosts.validated_scope(
-        store.host_tokens(),
+    let scope = detached_hosts.validated_scope_for_apply_fiber(
+        store,
         state_node,
         root_id,
         current,

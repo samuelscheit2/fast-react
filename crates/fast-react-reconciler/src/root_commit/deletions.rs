@@ -1583,16 +1583,17 @@ pub(super) fn materialize_host_node_deletion_cleanup_log<H: HostTypes>(
     let mut log = HostRootDeletionCleanupLog::new(root, finished_work);
     for pending in pending_records {
         let token_phase = HostFiberTokenPhase::Deletion;
+        let token_owner = deletion_cleanup_token_owner(store.fiber_arena(), &pending)?;
         let token = store.host_tokens_mut().issue(
             pending.root,
-            pending.fiber,
+            token_owner,
             token_phase,
             pending.token_target,
         );
         store.host_tokens().validate(
             token,
             pending.root,
-            pending.fiber,
+            token_owner,
             token_phase,
             pending.token_target,
         )?;
@@ -1624,6 +1625,22 @@ pub(super) fn materialize_host_node_deletion_cleanup_log<H: HostTypes>(
     }
 
     Ok(log)
+}
+
+fn deletion_cleanup_token_owner(
+    arena: &FiberArena,
+    pending: &PendingHostRootDeletionCleanupRecord,
+) -> Result<FiberId, RootCommitError> {
+    if pending.state_node.is_none() {
+        return Ok(pending.fiber);
+    }
+
+    let node = arena.get(pending.fiber)?;
+    let Some(owner) = node.alternate() else {
+        return Ok(pending.fiber);
+    };
+    arena.validate_alternate_pair(owner, pending.fiber)?;
+    Ok(owner)
 }
 
 pub(super) fn materialize_deletion_cleanup_order_gate(
