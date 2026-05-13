@@ -4595,6 +4595,10 @@ function isPrivateEffectHookDispatcherMetadata(metadata) {
 }
 
 function isPrivateTransitionHookDispatcherMetadata(metadata) {
+  if (metadata !== privateTransitionHookDispatcherMetadata) {
+    return false;
+  }
+
   if (
     !isObjectLike(metadata) ||
     metadata.capability !==
