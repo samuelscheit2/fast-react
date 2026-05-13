@@ -111,6 +111,42 @@ test("discovery helper accepts standalone gates imported by covered wrapper test
   ]);
 });
 
+test("discovery helper accepts standalone gates re-exported by covered wrapper tests", () => {
+  const requiredEntries = [
+    "test/named-reexport-gate.mjs",
+    "test/non-relative-gate.mjs",
+    "test/reexport-wrapper.test.mjs",
+    "test/star-reexport-gate.mjs"
+  ];
+  const wrapperEntry = "test/reexport-wrapper.test.mjs";
+  const importedEntries = discoverRequiredStaticImportsFromSource({
+    entry: wrapperEntry,
+    source: [
+      'export * from "./star-reexport-gate.mjs";',
+      'export { value } from "./named-reexport-gate.mjs";',
+      'export * from "test/non-relative-gate.mjs";'
+    ].join("\n"),
+    requiredEntries
+  });
+  const analysis = analyzeConformanceTestScriptCoverage({
+    testScript: "node --test test/*.test.mjs",
+    requiredEntries,
+    importedEntriesByEntry: new Map([[wrapperEntry, importedEntries]])
+  });
+
+  assert.deepEqual(importedEntries, [
+    "test/named-reexport-gate.mjs",
+    "test/star-reexport-gate.mjs"
+  ]);
+  assert.deepEqual(analysis.importCoveredEntries, [
+    "test/named-reexport-gate.mjs",
+    "test/star-reexport-gate.mjs"
+  ]);
+  assert.deepEqual(analysis.uncoveredEntries, [
+    "test/non-relative-gate.mjs"
+  ]);
+});
+
 test("static wrapper import discovery ignores commented-out imports", () => {
   const requiredEntries = [
     "test/commented-gate.mjs",
@@ -161,6 +197,43 @@ test("static wrapper import discovery ignores import-looking string literals", (
   assert.deepEqual(importedEntries, ["test/root-render-gate.mjs"]);
   assert.deepEqual(analysis.uncoveredEntries, [
     "test/string-literal-gate.mjs"
+  ]);
+});
+
+test("static wrapper re-export discovery ignores comments and literals", () => {
+  const requiredEntries = [
+    "test/commented-gate.mjs",
+    "test/literal-gate.mjs",
+    "test/root-render-gate.mjs",
+    "test/root-render-gate.test.mjs",
+    "test/template-gate.mjs"
+  ];
+  const wrapperEntry = "test/root-render-gate.test.mjs";
+  const importedEntries = discoverRequiredStaticImportsFromSource({
+    entry: wrapperEntry,
+    source: [
+      '// export * from "./commented-gate.mjs";',
+      '/* export { value } from "./commented-gate.mjs"; */',
+      'const text = "export * from \\"./literal-gate.mjs\\"";',
+      "const template = `export { value } from \"./template-gate.mjs\"`;",
+      "const nested = `${`",
+      'export * from "./template-gate.mjs";',
+      "`}`;",
+      'export { value } from "./root-render-gate.mjs";'
+    ].join("\n"),
+    requiredEntries
+  });
+  const analysis = analyzeConformanceTestScriptCoverage({
+    testScript: "node --test test/*.test.mjs",
+    requiredEntries,
+    importedEntriesByEntry: new Map([[wrapperEntry, importedEntries]])
+  });
+
+  assert.deepEqual(importedEntries, ["test/root-render-gate.mjs"]);
+  assert.deepEqual(analysis.uncoveredEntries, [
+    "test/commented-gate.mjs",
+    "test/literal-gate.mjs",
+    "test/template-gate.mjs"
   ]);
 });
 
@@ -340,6 +413,61 @@ test("static import graph discovery follows transitive wrapper coverage", async 
   }
 });
 
+test("static re-export graph discovery follows transitive wrapper coverage", async () => {
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "fast-react-conformance-discovery-")
+  );
+
+  try {
+    await writeConformanceFixtureFile(
+      root,
+      "test/root-wrapper.test.mjs",
+      'export { value } from "./intermediate-wrapper.mjs";\n'
+    );
+    await writeConformanceFixtureFile(
+      root,
+      "test/intermediate-wrapper.mjs",
+      'export * from "./final-gate.mjs";\n'
+    );
+    await writeConformanceFixtureFile(root, "test/final-gate.mjs");
+    await writeConformanceFixtureFile(root, "src/source-helper.mjs");
+
+    const requiredEntries = await discoverRequiredConformanceTestEntries(root);
+    const directAnalysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries
+    });
+    const importedEntriesByEntry = await discoverStaticImportsForEntries({
+      root,
+      entries: directAnalysis.directCoveredEntries,
+      requiredEntries
+    });
+    const analysis = analyzeConformanceTestScriptCoverage({
+      testScript: "node --test test/*.test.mjs",
+      requiredEntries,
+      importedEntriesByEntry
+    });
+
+    assert.deepEqual(requiredEntries, [
+      "test/final-gate.mjs",
+      "test/intermediate-wrapper.mjs",
+      "test/root-wrapper.test.mjs"
+    ]);
+    assert.deepEqual(importedEntriesByEntry, new Map([
+      ["test/final-gate.mjs", []],
+      ["test/intermediate-wrapper.mjs", ["test/final-gate.mjs"]],
+      ["test/root-wrapper.test.mjs", ["test/intermediate-wrapper.mjs"]]
+    ]));
+    assert.deepEqual(analysis.uncoveredEntries, []);
+    assert.deepEqual(analysis.importCoveredEntries, [
+      "test/final-gate.mjs",
+      "test/intermediate-wrapper.mjs"
+    ]);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("static import graph discovery does not bridge through nested template imports", async () => {
   const root = await fs.mkdtemp(
     path.join(os.tmpdir(), "fast-react-conformance-discovery-")
@@ -357,8 +485,9 @@ test("static import graph discovery does not bridge through nested template impo
       [
         "const hostile = `${`",
         'import "./bridge-wrapper.mjs";',
+        'export * from "./bridge-wrapper.mjs";',
         "`}`;",
-        'import "./real-leaf.mjs";',
+        'export { value } from "./real-leaf.mjs";',
         ""
       ].join("\n")
     );
@@ -413,7 +542,7 @@ test("static import graph discovery does not bridge through nested template impo
   }
 });
 
-test("static import coverage does not bridge through non-required fixtures", async () => {
+test("static module edge coverage does not bridge through non-required fixtures", async () => {
   const root = await fs.mkdtemp(
     path.join(os.tmpdir(), "fast-react-conformance-discovery-")
   );
@@ -422,12 +551,12 @@ test("static import coverage does not bridge through non-required fixtures", asy
     await writeConformanceFixtureFile(
       root,
       "test/root-wrapper.test.mjs",
-      'import "../fixtures/sidecar.mjs";\n'
+      'export * from "../fixtures/sidecar.mjs";\n'
     );
     await writeConformanceFixtureFile(
       root,
       "fixtures/sidecar.mjs",
-      'import "../test/missed-gate.mjs";\n'
+      'export * from "../test/missed-gate.mjs";\n'
     );
     await writeConformanceFixtureFile(root, "test/missed-gate.mjs");
     await writeConformanceFixtureFile(root, "src/source-helper.mjs");
@@ -476,7 +605,7 @@ test("static import coverage does not bridge through non-required fixtures", asy
   }
 });
 
-test("recursive static import coverage is cycle-safe and ignores false-green imports", async () => {
+test("recursive static module edge coverage is cycle-safe and ignores false-green edges", async () => {
   const root = await fs.mkdtemp(
     path.join(os.tmpdir(), "fast-react-conformance-discovery-")
   );
@@ -490,26 +619,30 @@ test("recursive static import coverage is cycle-safe and ignores false-green imp
         'import "./nonstatic-wrapper.mjs";',
         'import "../fixtures/unrelated-sidecar.mjs";',
         'import "react";',
+        'export * from "external-cycle.mjs";',
         ""
       ].join("\n")
     );
     await writeConformanceFixtureFile(
       root,
       "test/cycle-a.mjs",
-      'import "./cycle-b.mjs";\n'
+      'export * from "./cycle-b.mjs";\n'
     );
     await writeConformanceFixtureFile(
       root,
       "test/cycle-b.mjs",
-      'import "./cycle-a.mjs";\n'
+      'export { value } from "./cycle-a.mjs";\n'
     );
     await writeConformanceFixtureFile(
       root,
       "test/nonstatic-wrapper.mjs",
       [
         '// import "./missed-gate.mjs";',
+        '// export * from "./missed-gate.mjs";',
         'const text = "import \\"./missed-gate.mjs\\"";',
+        'const exportText = "export * from \\"./missed-gate.mjs\\"";',
         "const template = `import \"./missed-gate.mjs\"`;",
+        "const exportTemplate = `export { value } from \"./missed-gate.mjs\"`;",
         'const load = () => import("./missed-gate.mjs");',
         "export { load };",
         ""
@@ -629,7 +762,7 @@ function discoverRequiredStaticImportsFromSource({
 }
 
 function discoverStaticRelativeMjsImportsFromSource({ entry, source }) {
-  return parseStaticRelativeMjsImports(source)
+  return parseStaticRelativeMjsModuleSpecifiers(source)
     .map((specifier) =>
       normalizeEntry(path.posix.join(path.posix.dirname(entry), specifier))
     )
@@ -645,8 +778,8 @@ function isConformanceRelativeEntry(entry) {
   );
 }
 
-function parseStaticRelativeMjsImports(source) {
-  const imports = [];
+function parseStaticRelativeMjsModuleSpecifiers(source) {
+  const moduleSpecifiers = [];
   let parenDepth = 0;
   let braceDepth = 0;
   let bracketDepth = 0;
@@ -675,22 +808,14 @@ function parseStaticRelativeMjsImports(source) {
       continue;
     }
 
-    if (
-      parenDepth === 0 &&
-      braceDepth === 0 &&
-      bracketDepth === 0 &&
-      source.startsWith("import", index) &&
-      isLineStartBefore(source, index) &&
-      isIdentifierBoundary(source[index - 1]) &&
-      isIdentifierBoundary(source[index + "import".length])
-    ) {
-      const result = readStaticImportDeclaration(source, index);
+    if (parenDepth === 0 && braceDepth === 0 && bracketDepth === 0) {
+      const result = readStaticModuleDeclaration(source, index);
       if (result) {
         if (
           result.specifier.startsWith("./") ||
           result.specifier.startsWith("../")
         ) {
-          imports.push(result.specifier);
+          moduleSpecifiers.push(result.specifier);
         }
         index = result.endIndex;
         continue;
@@ -712,7 +837,29 @@ function parseStaticRelativeMjsImports(source) {
     }
   }
 
-  return imports;
+  return moduleSpecifiers;
+}
+
+function readStaticModuleDeclaration(source, startIndex) {
+  if (
+    source.startsWith("import", startIndex) &&
+    isLineStartBefore(source, startIndex) &&
+    isIdentifierBoundary(source[startIndex - 1]) &&
+    isIdentifierBoundary(source[startIndex + "import".length])
+  ) {
+    return readStaticImportDeclaration(source, startIndex);
+  }
+
+  if (
+    source.startsWith("export", startIndex) &&
+    isLineStartBefore(source, startIndex) &&
+    isIdentifierBoundary(source[startIndex - 1]) &&
+    isIdentifierBoundary(source[startIndex + "export".length])
+  ) {
+    return readStaticExportDeclaration(source, startIndex);
+  }
+
+  return null;
 }
 
 function readStaticImportDeclaration(source, startIndex) {
@@ -727,7 +874,7 @@ function readStaticImportDeclaration(source, startIndex) {
     const literal = readStringLiteral(source, index);
     return {
       specifier: literal.value,
-      endIndex: skipImportDeclarationTail(source, literal.endIndex)
+      endIndex: skipStaticDeclarationTail(source, literal.endIndex)
     };
   }
 
@@ -747,18 +894,7 @@ function readStaticImportDeclaration(source, startIndex) {
       isIdentifierBoundary(source[index - 1]) &&
       isIdentifierBoundary(source[index + "from".length])
     ) {
-      const specifierStart = skipWhitespaceAndComments(
-        source,
-        index + "from".length
-      );
-      if (source[specifierStart] !== "'" && source[specifierStart] !== "\"") {
-        return null;
-      }
-      const literal = readStringLiteral(source, specifierStart);
-      return {
-        specifier: literal.value,
-        endIndex: skipImportDeclarationTail(source, literal.endIndex)
-      };
+      return readModuleSpecifierAfterFrom(source, index);
     }
 
     if (character === "/" && nextCharacter === "/") {
@@ -805,6 +941,109 @@ function readStaticImportDeclaration(source, startIndex) {
   return null;
 }
 
+function readStaticExportDeclaration(source, startIndex) {
+  let index = startIndex + "export".length;
+  index = skipWhitespaceAndComments(source, index);
+
+  if (source[index] === "*") {
+    return readStaticDeclarationFromClause(source, index + 1);
+  }
+
+  if (source[index] === "{") {
+    const closingBraceIndex = findMatchingBrace(source, index);
+    if (closingBraceIndex === null) {
+      return null;
+    }
+
+    const fromIndex = skipWhitespaceAndComments(source, closingBraceIndex + 1);
+    if (!isFromKeyword(source, fromIndex)) {
+      return null;
+    }
+
+    return readModuleSpecifierAfterFrom(source, fromIndex);
+  }
+
+  return null;
+}
+
+function readStaticDeclarationFromClause(source, startIndex) {
+  let index = startIndex;
+  let localParenDepth = 0;
+  let localBraceDepth = 0;
+  let localBracketDepth = 0;
+
+  while (index < source.length) {
+    const character = source[index];
+    const nextCharacter = source[index + 1];
+
+    if (
+      localParenDepth === 0 &&
+      localBraceDepth === 0 &&
+      localBracketDepth === 0 &&
+      isFromKeyword(source, index)
+    ) {
+      return readModuleSpecifierAfterFrom(source, index);
+    }
+
+    if (character === "/" && nextCharacter === "/") {
+      index = skipLineComment(source, index) + 1;
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "*") {
+      index = skipBlockComment(source, index) + 1;
+      continue;
+    }
+
+    if (character === "'" || character === "\"") {
+      index = skipStringLiteral(source, index) + 1;
+      continue;
+    }
+
+    if (character === "`") {
+      index = skipTemplateLiteral(source, index) + 1;
+      continue;
+    }
+
+    if (character === ";") {
+      return null;
+    }
+
+    if (character === "(") {
+      localParenDepth += 1;
+    } else if (character === ")" && localParenDepth > 0) {
+      localParenDepth -= 1;
+    } else if (character === "{") {
+      localBraceDepth += 1;
+    } else if (character === "}" && localBraceDepth > 0) {
+      localBraceDepth -= 1;
+    } else if (character === "[") {
+      localBracketDepth += 1;
+    } else if (character === "]" && localBracketDepth > 0) {
+      localBracketDepth -= 1;
+    }
+
+    index += 1;
+  }
+
+  return null;
+}
+
+function readModuleSpecifierAfterFrom(source, fromIndex) {
+  const specifierStart = skipWhitespaceAndComments(
+    source,
+    fromIndex + "from".length
+  );
+  if (source[specifierStart] !== "'" && source[specifierStart] !== "\"") {
+    return null;
+  }
+  const literal = readStringLiteral(source, specifierStart);
+  return {
+    specifier: literal.value,
+    endIndex: skipStaticDeclarationTail(source, literal.endIndex)
+  };
+}
+
 function skipWhitespaceAndComments(source, startIndex) {
   let index = startIndex;
 
@@ -823,7 +1062,7 @@ function skipWhitespaceAndComments(source, startIndex) {
   return index;
 }
 
-function skipImportDeclarationTail(source, startIndex) {
+function skipStaticDeclarationTail(source, startIndex) {
   let index = startIndex;
 
   while (index < source.length) {
@@ -843,6 +1082,46 @@ function skipImportDeclarationTail(source, startIndex) {
   }
 
   return source.length - 1;
+}
+
+function findMatchingBrace(source, startIndex) {
+  let braceDepth = 1;
+
+  for (let index = startIndex + 1; index < source.length; index += 1) {
+    const character = source[index];
+    const nextCharacter = source[index + 1];
+
+    if (character === "/" && nextCharacter === "/") {
+      index = skipLineComment(source, index);
+      continue;
+    }
+
+    if (character === "/" && nextCharacter === "*") {
+      index = skipBlockComment(source, index);
+      continue;
+    }
+
+    if (character === "'" || character === "\"") {
+      index = skipStringLiteral(source, index);
+      continue;
+    }
+
+    if (character === "`") {
+      index = skipTemplateLiteral(source, index);
+      continue;
+    }
+
+    if (character === "{") {
+      braceDepth += 1;
+    } else if (character === "}") {
+      braceDepth -= 1;
+      if (braceDepth === 0) {
+        return index;
+      }
+    }
+  }
+
+  return null;
 }
 
 function readStringLiteral(source, startIndex) {
@@ -950,6 +1229,14 @@ function skipBlockComment(source, startIndex) {
 
 function isIdentifierBoundary(character) {
   return character === undefined || !/[A-Za-z0-9_$]/u.test(character);
+}
+
+function isFromKeyword(source, index) {
+  return (
+    source.startsWith("from", index) &&
+    isIdentifierBoundary(source[index - 1]) &&
+    isIdentifierBoundary(source[index + "from".length])
+  );
 }
 
 function isLineStartBefore(source, index) {
