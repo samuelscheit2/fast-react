@@ -5,8 +5,8 @@ Last updated: 2026-05-13
 This file is the human-readable current and future work plan. Machine-readable
 live task state and deterministic transitions belong in
 `docs/orchestration/state.json`. Accepted history belongs in
-`MASTER_PROGRESS.md`; durable orchestration policy belongs in `ORCHESTRATOR.md`;
-worker-facing rules belong in `WORKER_BRIEF.md`.
+`MASTER_PROGRESS.md`; project orchestration configuration belongs in
+`docs/orchestration/PROJECT.md`.
 
 ## Planning Inputs
 
@@ -47,10 +47,11 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current root head is main `3f51cf33` (`Record
-workers 1245 and 1248 acceptance`). Accepted implementation, cleanup,
-planning, and docs-only history that is not under active repair is recorded in
-`MASTER_PROGRESS.md`; this plan lists only current/future work.
+Top-level cap: 30 workers. Current accepted implementation head before this
+docs pass is main `cd641e3f` (`Repair integrated test renderer create preflight
+fixture`). Accepted implementation, cleanup, planning, and docs-only history
+that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
+lists only current/future work.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 Worker 1219's docs-only branch is superseded by main `8f611f0e` and is not
@@ -59,30 +60,26 @@ the pre-audit Worker 1215 full-hash typo.
 
 Current orchestration queue:
 
-- Active Worker 1246 hardens react-test-renderer placeholder-surface
-  currentness so `placeholder-present` requires exact package-root, JS, CJS dev,
-  CJS prod, and shallow placeholder/blocker surfaces with public compatibility
-  still blocked.
-- Active Worker 1247 adds a private/test-only committed-fiber inspection
-  consumer for the accepted sync-flush minimal HostRoot placement canary.
-- Clean idle worktrees exist for `worker/1250-rust-hostroot-update-render-commit`,
-  `worker/1251-react-dom-nested-fakedom-lifecycle`, and
-  `worker/1252-test-renderer-private-create-bridge`. Do not consume, delete, or
-  treat them as accepted evidence without a fresh owner/prompt and state check.
+- No worker tasks are currently recorded in `docs/orchestration/state.json`.
+- Workers 1246, 1247, 1250, 1251, and 1252 have been reviewed, repaired where
+  needed, merged, and recorded as accepted history.
+- Next workers should be seeded from the candidate lanes below or from a fresh
+  scout pass, with `docs/orchestration/state.json` updated when tasks become
+  live.
 
 Current project-owned source/test large-file baseline after accepted
-implementation/evidence baseline main `4aa248fb`,
+implementation/evidence baseline main `cd641e3f`,
 excluding generated oracle JSON and package CJS published artifacts:
 
-- `packages/react-dom/src/client/root-bridge.js`: 29,564 lines
-- `tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`: 18,216 lines
-- `packages/react-test-renderer/index.js`: 15,407 lines
+- `packages/react-dom/src/client/root-bridge.js`: 30,464 lines
+- `tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`: 18,639 lines
+- `packages/react-test-renderer/index.js`: 17,231 lines
 - `packages/react-dom/src/resource-form-internals-gate.js`: 14,641 lines
 - `packages/react-dom/src/client/controlled-restore-queue.js`: 10,949 lines
 - `tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs`: 10,282 lines
 - `packages/react-dom/src/events/plugin-event-system.js`: 9,533 lines
 - `crates/fast-react-reconciler/src/root_scheduler/tests.rs`: 9,283 lines
-- `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: 8,809 lines
+- `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`: 9,241 lines
 - `crates/fast-react-reconciler/src/root_scheduler.rs`: 8,545 lines
 
 Do not run a broad large-file cleanup lane before public React DOM root/render
@@ -95,14 +92,16 @@ Do not consume future worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair, audit, or validation lane
 lands, move the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted compatibility evidence through current main `340e4072` remains narrow.
+Accepted compatibility evidence through current main `cd641e3f` remains narrow.
 The only public React DOM root behavior
 accepted so far is the fake-DOM div/text `createRoot().render(...)` lifecycle:
 initial render, same-root div/text/id update, id removal, `render(null)` cleanup,
-rendered-root unmount cleanup, idempotent repeated unmount, recreate-after-unmount,
-and the test/conformance/smoke-only observable fake-DOM fields plus explicit
-public-facade null/unmount conformance rows already recorded in progress. Recent
-accepted evidence adds
+rendered-root unmount cleanup, idempotent repeated unmount,
+recreate-after-unmount, and the narrow nested fake-DOM
+`<div id?><span>{text}</span></div>` lifecycle with source-owned parent/child
+mutation evidence plus the test/conformance/smoke-only observable fake-DOM
+fields and explicit public-facade null/unmount conformance rows already recorded
+in progress. Recent accepted evidence adds
 recursive conformance discovery coverage, no-load private native metadata source
 ledgers with exact capability-claim blockers, React DOM private subpath/native
 alias denylists, public render capability rejection rows, aligned smoke and
@@ -119,7 +118,12 @@ claim-alias blockers, scheduler local observation row and behavior evidence
 exact-shape validation against source/evidence smuggling including inherited
 `Object.prototype` source-metadata blockers, and
 react-test-renderer serialization oracle/local-status gates for the current
-placeholder package while public test-renderer behavior remains blocked.
+placeholder package, exact placeholder package-root/JS/CJS/shallow currentness,
+private package-root create bridge admission guards requiring source-owned
+root-create preflight evidence, private/test-only sync-flush placement
+committed-fiber inspection, and private queued minimal HostRoot update evidence
+with update-then-cleanup fail-closed coverage while public test-renderer
+behavior remains blocked.
 Broader public root render/update/unmount compatibility, real `.node`
 loading/N-API runtime, browser DOM compatibility, refs/events/hydration/listeners,
 public `React.act` compatibility, act queue flushing, callbacks, thenables,
@@ -138,17 +142,19 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat accepted compatibility evidence through current main `340e4072` as
+1. Treat accepted compatibility evidence through current main `cd641e3f` as
    private evidence, negative public evidence, package-private adapter evidence,
    file-organization/planning evidence, and the narrow fake-DOM public div/text
-   lifecycle evidence described above, including `render(null)` cleanup and
-   idempotent unmount cleanup. Public render capability rejection rows, public
-   wrapper execution blockers, private native metadata and admission ledgers,
-   React DOM private denylist parity, React Children freeze/proxy currentness
-   hardening, exact-two/exact-three private same-transition currentness,
-   sync-flush placement, passive destroy evidence, scheduler root currentness
-   completeness, scheduler local row/evidence source validation, and
-   test-renderer serialization status gates are blockers and currentness
+   plus nested fake-DOM lifecycle evidence described above, including
+   `render(null)` cleanup and idempotent unmount cleanup. Public render
+   capability rejection rows, public wrapper execution blockers, private native
+   metadata and admission ledgers, React DOM private denylist parity, React
+   Children freeze/proxy currentness hardening, exact-two/exact-three private
+   same-transition currentness, sync-flush placement and committed-fiber
+   inspection, queued minimal HostRoot private update evidence, passive destroy
+   evidence, scheduler root currentness completeness, scheduler local
+   row/evidence source validation, test-renderer placeholder currentness, and
+   test-renderer private create/serialization gates are blockers and currentness
    evidence only; they do not open broader public root, native, browser DOM,
    component rendering, Children traversal, package, Scheduler, effects,
    test-renderer, or renderer compatibility.
@@ -161,11 +167,12 @@ canonical evidence requirements.
    hints, input/change extraction, controlled-restore queue currentness,
    host-node currentness, Scheduler variant/root currentness, package-surface,
    private-admission ledger, and public blocker requirements before any merge.
-3. Use the current `ORCHESTRATOR.md` audit policy: worker self-reports are
-   inputs only, and non-trivial or risky implementation changes get independent
-   read-only audits whose number and focus are chosen case by case. Hostile
-   source review and regression-command reruns are examples, not a mandatory
-   pair.
+3. Use the current orchestration policy represented by
+   `docs/orchestration/PROJECT.md` and live state in
+   `docs/orchestration/state.json`: worker self-reports are inputs only, and
+   non-trivial or risky implementation changes get independent read-only audits
+   whose number and focus are chosen case by case. Hostile source review and
+   regression-command reruns are examples, not a mandatory pair.
 4. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.

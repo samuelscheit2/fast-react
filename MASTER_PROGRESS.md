@@ -29,6 +29,59 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 1246, 1247, 1250, 1251, and 1252 Acceptance Batch
+
+- Worker 1246 hardened the react-test-renderer serialization local gate so the
+  current placeholder package requires exact package-root, JS, CJS development,
+  CJS production, and shallow placeholder/blocker surfaces. Hostile coverage now
+  rejects comments/strings/templates/regex marker spoofing, partial entrypoint
+  drift, package-root/native/public export smuggling, CommonJS alias smuggling,
+  executable template mutations, repeated shallow `module.exports`, sibling
+  package-root aliases, and local comparison/compatibility claims while public
+  `toJSON`, `toTree`, `ReactTestInstance`, package/native, and broad renderer
+  compatibility remain blocked.
+- Worker 1247 added a private/test-only committed-fiber inspection consumer for
+  the accepted sync-flush minimal HostRoot placement canary. The proof re-reads
+  the live committed tree, binds source rows to current root/finished-work/lane
+  evidence, validates component/text/state-node shape, and rejects stale current,
+  tampered ids/state nodes, cross-root source rows, stale finished metadata, and
+  all guarded public compatibility claim flags without broadening public
+  surfaces.
+- Worker 1250 added private queued minimal HostRoot mount/update/null-cleanup
+  evidence. Same-root mount and update canaries consume root updates, mount ->
+  cleanup remains accepted, and update -> cleanup now fails closed before root
+  current publication, finished-work cleanup, or host mutation attempts until a
+  source-owned ownership-transfer proof exists.
+- Worker 1251 extended only the narrow public fake-DOM lifecycle to
+  `<div id?><span>{text}</span></div>`. Nested parent `id` and child text
+  updates now carry source-owned parent/child mutation evidence and are
+  transactional; hostile nested props/components/siblings/compatibility aliases
+  remain rejected, with no browser DOM, events, refs, hydration, Scheduler,
+  `act`, `flushSync`, native, or broad React DOM compatibility opened.
+- Worker 1252 added package-root private test-renderer create bridge admission
+  evidence. The bridge requires source-owned Rust create-route admission plus
+  root-create preflight evidence, probes known hidden/proxy public-compatibility
+  aliases directly, and keeps public `.root`, serialization, TestInstance/query,
+  `act`, Scheduler, native execution, package, and broad renderer compatibility
+  blocked.
+- The post-merge integration repair `cd641e3f` aligned the serialization local
+  gate fixture with Worker 1252's stricter root-create preflight requirement by
+  embedding Rust-shaped preflight work-loop evidence instead of direct internal
+  JS preflight records.
+- Accepted validation includes clean repair/source/verification audits for the
+  worker branches, merge rehearsals on top of the cleanup baseline, and root
+  reruns passing sync-flush fiber inspection (7/7), queued minimal host (6/6),
+  react-test-renderer create routing (42/42), react-test-renderer serialization
+  aggregate (84/84), React DOM public facade gate (47/47), React DOM root-render
+  E2E gate (12/12), React DOM package tests/check (237/237 plus import smoke),
+  `npm run check --workspace @fast-react/react-test-renderer`, package-surface
+  guard, import smoke, `cargo check -p fast-react-reconciler --all-features`,
+  `cargo fmt --all --check`, and `git diff --check`.
+- The accepted state is main `cd641e3f` after merge commits `fe8fa165`,
+  `e116d833`, `5c771219`, `1d709ecf`, and `1ea59f66`, worker repair commits
+  `3020e5dd`, `a89fdac0`, `fa4db07c`, `3739233f`, and `dfa641e3`, and the
+  orchestration-state baseline commit `7a032939`.
+
 ### Worker 1248 Public Null/Unmount Conformance Hardening
 
 - Worker 1248 added explicit public-facade conformance rows for the already
