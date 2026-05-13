@@ -4580,6 +4580,17 @@ function hasNativeCapabilityClaimFields(object, fields) {
   );
 }
 
+function hasNativeCapabilityClaimFieldAliases(object, fields) {
+  return (
+    findNativeCapabilityClaimInPropertyChain(
+      object,
+      'row',
+      new Set(fields),
+      new Set(fields.map(normalizeNativeCapabilityClaimFieldName))
+    ) !== null
+  );
+}
+
 function isNativeCompatibilityAliasFieldClaimed(object, key) {
   const descriptor = getPropertyDescriptorInPrototypeChain(object, key);
   if (descriptor === undefined) {
@@ -8006,7 +8017,7 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   }
 
   if (
-    hasNativeCapabilityClaimFields(row, [
+    hasNativeCapabilityClaimFieldAliases(row, [
       'nativeLoadAttempted',
       'nativeAddonLoaded',
       'nativeAddonLoadAttempted',
@@ -8020,7 +8031,7 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   }
 
   if (
-    hasNativeCapabilityClaimFields(
+    hasNativeCapabilityClaimFieldAliases(
       row,
       nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPublicClaimFields
     )
@@ -8030,7 +8041,7 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   }
 
   if (
-    hasNativeCapabilityClaimFields(
+    hasNativeCapabilityClaimFieldAliases(
       row,
       nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPackageClaimFields
     )
@@ -8040,7 +8051,7 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   }
 
   if (
-    hasNativeCapabilityClaimFields(row, [
+    hasNativeCapabilityClaimFieldAliases(row, [
       'nodeWorkerThreadsExecution',
       'workerThreadCreationAttempted',
       'workerThreadLoadAttempted',
@@ -8058,7 +8069,7 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   }
 
   if (
-    hasNativeCapabilityClaimFields(row, [
+    hasNativeCapabilityClaimFieldAliases(row, [
       'rendererExecution',
       'reconcilerExecution',
       'reactBehaviorError'
@@ -8069,7 +8080,7 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   }
 
   if (
-    hasNativeCapabilityClaimFields(
+    hasNativeCapabilityClaimFieldAliases(
       row,
       nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCompatibilityClaimFields
     )
