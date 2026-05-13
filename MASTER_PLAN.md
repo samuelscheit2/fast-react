@@ -100,8 +100,9 @@ Current orchestration queue:
 - Worker 1319 has been reviewed, merged, and recorded as accepted history for
   the startTransition rootless currentness option-alias hardening from Scout
   1315.
-- Worker 1320 is under audit for the queued minimal HostRoot update-to-null
-  cleanup ownership transfer retry from Scout 1311.
+- Worker 1320 is under repair audit for the queued minimal HostRoot
+  update-to-null cleanup ownership transfer retry from Scout 1311 after source
+  audit required source-owned, not updated-owned, detached metadata.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

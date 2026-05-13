@@ -693,7 +693,9 @@
 			"branch": "worker/1320-queued-cleanup-update-transfer-retry",
 			"audits": [
 				"audit_1320_source_contract",
-				"audit_1320_verification"
+				"audit_1320_verification",
+				"audit_1320_repair_source",
+				"audit_1320_repair_verification"
 			]
 		}
 	]
