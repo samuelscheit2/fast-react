@@ -49,6 +49,16 @@ const compatibilityClaimKeys = Object.freeze([
   'reactDomCompatibilityClaimed',
   'schedulerCompatibilityClaimed'
 ]);
+const hostilePublicRootObjectPrototypeAliasKeys = Object.freeze([
+  'publicRootCompatibilitySurface',
+  'publicRootObjectExposed',
+  'publicRootRenderCompatibilityClaimed',
+  'publicEventCompatibilityClaimed',
+  'publicNativeCompatibilityClaimed',
+  'publicPackageCompatibilityClaimed',
+  'public_root_render_compatibility_claimed',
+  'public-test-renderer-compatibility-claimed'
+]);
 const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-onClick-prop',
   'unsupported-onClickCapture-prop',
@@ -988,6 +998,33 @@ test('public createRoot invokes only the private adapter factory while other pub
     profilingCreateRootListenerCount: 0,
     profilingCreateRootMutationCount: 0
   });
+});
+
+test('public createRoot root object ignores inherited public compatibility aliases', () => {
+  const document = createDocument('public-create-root-root-object-prototype');
+  const container = document.createElement('div');
+  let root;
+
+  withHostilePublicRootObjectPrototypeAliases((getGetterInvocationCount) => {
+    root = reactDomClient.createRoot(container);
+
+    assertPublicRootObjectHasMinimalNullPrototypeShape(root);
+    for (const key of hostilePublicRootObjectPrototypeAliasKeys) {
+      assert.equal(key in root, false, key);
+      assert.equal(hasOwnProperty.call(root, key), false, key);
+      assert.equal(root[key], undefined, key);
+    }
+    assert.equal(getGetterInvocationCount(), 0);
+  });
+
+  assert.equal(
+    root.render(React.createElement('div', {id: 'safe'}, 'safe')),
+    undefined
+  );
+  assert.equal(container.innerHTML, '<div id="safe">safe</div>');
+  assert.equal(root.unmount(), undefined);
+  assert.equal(container.innerHTML, '');
+  assertNoRootMarkerOrListenerLeak(container, document);
 });
 
 test('public createRoot render rejects unsupported inputs before adapter root.render', () => {
@@ -2309,6 +2346,72 @@ function assertNoRootMarkerOrListenerLeak(container, document) {
   assert.equal(listenerRegistry.hasListeningMarker(document), false);
   assert.equal(container.__registrations.length, 0);
   assert.equal(document.__registrations.length, 0);
+}
+
+function assertPublicRootObjectHasMinimalNullPrototypeShape(root) {
+  assert.equal(Object.getPrototypeOf(root), null);
+  assert.equal(Object.isFrozen(root), true);
+  assert.deepEqual(Object.keys(root), ['render', 'unmount']);
+  assert.deepEqual(Object.getOwnPropertyNames(root), ['render', 'unmount']);
+  assert.deepEqual(Object.getOwnPropertySymbols(root), []);
+  assert.equal(root.render.length, 1);
+  assert.equal(root.unmount.length, 0);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(root, 'render'), {
+    configurable: false,
+    enumerable: true,
+    value: root.render,
+    writable: false
+  });
+  assert.deepEqual(Object.getOwnPropertyDescriptor(root, 'unmount'), {
+    configurable: false,
+    enumerable: true,
+    value: root.unmount,
+    writable: false
+  });
+  assert.throws(() => {
+    root.publicRootCompatibilitySurface = true;
+  }, TypeError);
+}
+
+function withHostilePublicRootObjectPrototypeAliases(callback) {
+  let getterInvocationCount = 0;
+  const previousDescriptors = new Map(
+    hostilePublicRootObjectPrototypeAliasKeys.map((key) => [
+      key,
+      Object.getOwnPropertyDescriptor(Object.prototype, key)
+    ])
+  );
+  const descriptors = {};
+
+  for (const key of hostilePublicRootObjectPrototypeAliasKeys) {
+    descriptors[key] = {
+      configurable: true,
+      enumerable: false,
+      value: true
+    };
+  }
+  descriptors.publicEventCompatibilityClaimed = {
+    configurable: true,
+    enumerable: false,
+    get() {
+      getterInvocationCount++;
+      return true;
+    }
+  };
+
+  Object.defineProperties(Object.prototype, descriptors);
+  try {
+    return callback(() => getterInvocationCount);
+  } finally {
+    for (const key of hostilePublicRootObjectPrototypeAliasKeys) {
+      const descriptor = previousDescriptors.get(key);
+      if (descriptor === undefined) {
+        delete Object.prototype[key];
+      } else {
+        Object.defineProperty(Object.prototype, key, descriptor);
+      }
+    }
+  }
 }
 
 function assertPublicRenderFailureDoesNotLeak(

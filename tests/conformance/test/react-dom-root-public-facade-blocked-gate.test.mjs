@@ -102,6 +102,17 @@ const hydrateRootLifecycleBoundaryBlockedFields = Object.freeze([
   "publicHydrationCompatibilityClaimed",
   "publicHydrationReplayCompatibilityClaimed"
 ]);
+const REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS =
+  Object.freeze([
+    "publicRootCompatibilitySurface",
+    "publicRootObjectExposed",
+    "publicRootRenderCompatibilityClaimed",
+    "publicEventCompatibilityClaimed",
+    "publicNativeCompatibilityClaimed",
+    "publicPackageCompatibilityClaimed",
+    "public_root_render_compatibility_claimed",
+    "public-test-renderer-compatibility-claimed"
+  ]);
 
 const MINIMAL_PUBLIC_DIV_TEXT_ID = 'app&<>"';
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID = 'next&<>"';
@@ -454,6 +465,52 @@ function assertMinimalPublicCreateRootBoundary(publicBoundary) {
   });
   assert.equal(publicBoundary.createRoot.rootObjectCreated, true);
   assertPublicRootFacadeSideEffectFree(publicBoundary.createRoot.sideEffects);
+}
+
+function assertPublicRootObjectPrototypeAliasBoundary(publicBoundary) {
+  const boundary = publicBoundary.rootObjectPrototypeCompatibilityAliases;
+
+  assert.equal(boundary.createRootAttempt.status, "ok");
+  assert.deepEqual(
+    boundary.aliasKeys,
+    REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS
+  );
+  assert.equal(boundary.compatibilityClaimed, false);
+  assert.equal(boundary.rootObjectCreated, true);
+  assert.equal(boundary.rootShape.prototypeIsNull, true);
+  assert.equal(boundary.rootShape.frozen, true);
+  assert.deepEqual(boundary.rootShape.keys, ["render", "unmount"]);
+  assert.deepEqual(boundary.rootShape.ownPropertyNames, ["render", "unmount"]);
+  assert.equal(boundary.rootShape.ownSymbolCount, 0);
+  assert.equal(boundary.rootShape.renderLength, 1);
+  assert.equal(boundary.rootShape.unmountLength, 0);
+  assert.deepEqual(boundary.rootShape.renderDescriptor, {
+    configurable: false,
+    enumerable: true,
+    valueLength: 1,
+    valueType: "function",
+    writable: false
+  });
+  assert.deepEqual(boundary.rootShape.unmountDescriptor, {
+    configurable: false,
+    enumerable: true,
+    valueLength: 0,
+    valueType: "function",
+    writable: false
+  });
+  for (const key of REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS) {
+    assert.deepEqual(boundary.aliasObservations[key], {
+      inRoot: false,
+      own: false,
+      value: {
+        type: "undefined"
+      }
+    });
+  }
+  assert.equal(boundary.getterInvocationCount, 0);
+  assert.equal(boundary.cleanupRestored, true);
+  assert.equal(boundary.renderAfterCleanupAttempt.status, "ok");
+  assert.equal(boundary.unmountAfterCleanupAttempt.status, "ok");
 }
 
 function assertBlockedPublicHydrateRootBoundary(publicBoundary) {
@@ -886,6 +943,7 @@ function assertBlockedPublicLifecycleOperation(operation, exportName) {
 
 function assertMinimalPublicRootBoundary(publicBoundary) {
   assertMinimalPublicCreateRootBoundary(publicBoundary);
+  assertPublicRootObjectPrototypeAliasBoundary(publicBoundary);
   assertBlockedPublicHydrateRootBoundary(publicBoundary);
   assertBlockedPublicLifecycleOperation(
     publicBoundary.publicRootLifecycle.renderInitial,
@@ -1539,6 +1597,8 @@ test("React DOM public createRoot rejects explicit options and extra arguments",
   const container = createPrivateGateElement("DIV", document, domContainer);
   const root = reactDomClient.createRoot(container);
 
+  assert.equal(Object.getPrototypeOf(root), null);
+  assert.equal(Object.isFrozen(root), true);
   assert.deepEqual(Object.keys(root), ["render", "unmount"]);
   assert.equal(
     root.render(
@@ -6125,8 +6185,18 @@ test("React DOM public root facade gate records minimal public createRoot withou
   const createRootRow = gate.blockedPublicFacadeRows.find(
     (row) => row.id === "public-create-root"
   );
+  const rootObjectPrototypeAliasRow = gate.blockedPublicFacadeRows.find(
+    (row) => row.id === "public-root-object-prototype-compatibility-aliases"
+  );
   assert.equal(createRootRow.minimalPublicRootObjectExposed, true);
   assert.equal(createRootRow.compatibilityClaimed, false);
+  assert.equal(rootObjectPrototypeAliasRow.compatibilityClaimed, false);
+  assert.equal(rootObjectPrototypeAliasRow.nullPrototypeRootObject, true);
+  assert.equal(rootObjectPrototypeAliasRow.getterInvocationCount, 0);
+  assert.equal(
+    rootObjectPrototypeAliasRow.inheritedAliasKeysBlocked,
+    REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS.length
+  );
   assert.equal(gate.summary.compatibilityAdmitted, false);
   assert.equal(gate.summary.compatibilityClaimed, false);
 

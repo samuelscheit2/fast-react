@@ -112,6 +112,18 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_BLOCKED_SURF
     "test-renderer"
   ]);
 
+export const REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS =
+  Object.freeze([
+    "publicRootCompatibilitySurface",
+    "publicRootObjectExposed",
+    "publicRootRenderCompatibilityClaimed",
+    "publicEventCompatibilityClaimed",
+    "publicNativeCompatibilityClaimed",
+    "publicPackageCompatibilityClaimed",
+    "public_root_render_compatibility_claimed",
+    "public-test-renderer-compatibility-claimed"
+  ]);
+
 function privatePromotion503533Claims() {
   return Object.freeze(
     Object.fromEntries(
@@ -1524,6 +1536,16 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
       compatibilityClaimed: false
     }),
+    Object.freeze({
+      id: "public-root-object-prototype-compatibility-aliases",
+      publicApi: "Object.prototype compatibility aliases inherited by createRoot() root",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      inheritedAliasKeysBlocked:
+        REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS.length,
+      getterInvocationCount: 0
+    }),
     ...REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
     ...REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS,
     Object.freeze({
@@ -1986,6 +2008,14 @@ export function inspectReactDomRootPublicFacadeBoundary({
       reactDomClient,
       rootMarkers
     });
+    const rootObjectPrototypeCompatibilityAliases =
+      inspectPublicRootObjectPrototypeCompatibilityAliases({
+        domContainer,
+        listenerRegistry,
+        React,
+        reactDomClient,
+        rootMarkers
+      });
 
     return {
       loadError: null,
@@ -1999,7 +2029,8 @@ export function inspectReactDomRootPublicFacadeBoundary({
       hydrateRootExport: describeLocalFunction(reactDomClient.hydrateRoot),
       createRoot,
       hydrateRoot,
-      publicRootLifecycle
+      publicRootLifecycle,
+      rootObjectPrototypeCompatibilityAliases
     };
   } catch (error) {
     return {
@@ -3549,6 +3580,12 @@ function validatePublicFacadeBoundary({
     });
   }
 
+  validatePublicRootObjectPrototypeCompatibilityAliasesBlocked({
+    rootObjectPrototypeCompatibilityAliases:
+      localPublicFacadeBoundary.rootObjectPrototypeCompatibilityAliases,
+    blockedPublicFacadeRows,
+    failures
+  });
   validatePublicRootLifecycleBlocked({
     publicRootLifecycle: localPublicFacadeBoundary.publicRootLifecycle,
     publicFacadeLifecycleRows,
@@ -3740,6 +3777,94 @@ function validatePublicRootExportBlocked({
     exportName,
     operation
   });
+}
+
+function validatePublicRootObjectPrototypeCompatibilityAliasesBlocked({
+  rootObjectPrototypeCompatibilityAliases,
+  blockedPublicFacadeRows,
+  failures
+}) {
+  if (
+    !rootObjectPrototypeCompatibilityAliases ||
+    typeof rootObjectPrototypeCompatibilityAliases !== "object"
+  ) {
+    failures.push({
+      gateStatus: "missing-public-root-object-prototype-alias-boundary"
+    });
+    return;
+  }
+
+  const inspection = rootObjectPrototypeCompatibilityAliases;
+  const rootShape = inspection.rootShape ?? {};
+  const aliasObservations = inspection.aliasObservations ?? {};
+  const visibleAliasKeys =
+    REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS.filter(
+      (key) => {
+        const observation = aliasObservations[key];
+        return (
+          observation?.inRoot === true ||
+          observation?.own === true ||
+          observation?.value?.type !== "undefined" ||
+          observation?.readError !== undefined
+        );
+      }
+    );
+
+  if (
+    findFirstDifferencePath(
+      inspection.aliasKeys,
+      REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS
+    ) === null &&
+    inspection.createRootAttempt?.status === "ok" &&
+    inspection.rootObjectCreated === true &&
+    inspection.compatibilityClaimed === false &&
+    rootShape.prototypeIsNull === true &&
+    rootShape.frozen === true &&
+    findFirstDifferencePath(rootShape.keys, ["render", "unmount"]) === null &&
+    findFirstDifferencePath(rootShape.ownPropertyNames, [
+      "render",
+      "unmount"
+    ]) === null &&
+    rootShape.ownSymbolCount === 0 &&
+    isStablePublicRootMethodDescriptor(rootShape.renderDescriptor, 1) &&
+    isStablePublicRootMethodDescriptor(rootShape.unmountDescriptor, 0) &&
+    rootShape.renderLength === 1 &&
+    rootShape.unmountLength === 0 &&
+    visibleAliasKeys.length === 0 &&
+    inspection.getterInvocationCount === 0 &&
+    inspection.cleanupRestored === true &&
+    inspection.renderAfterCleanupAttempt?.status === "ok" &&
+    inspection.unmountAfterCleanupAttempt?.status === "ok"
+  ) {
+    blockedPublicFacadeRows.push({
+      id: "public-root-object-prototype-compatibility-aliases",
+      gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      inheritedAliasKeysBlocked:
+        REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS.length,
+      getterInvocationCount: inspection.getterInvocationCount,
+      nullPrototypeRootObject: true,
+      reason:
+        "The public createRoot root object has a null prototype, so inherited public/native/package/test-renderer compatibility aliases remain invisible and cannot promote broad root compatibility."
+    });
+    return;
+  }
+
+  failures.push({
+    gateStatus: "public-root-object-prototype-aliases-visible",
+    inspection,
+    visibleAliasKeys
+  });
+}
+
+function isStablePublicRootMethodDescriptor(descriptor, expectedLength) {
+  return (
+    descriptor?.configurable === false &&
+    descriptor.enumerable === true &&
+    descriptor.valueType === "function" &&
+    descriptor.valueLength === expectedLength &&
+    descriptor.writable === false
+  );
 }
 
 function validatePublicRootLifecycleBlocked({
@@ -4716,6 +4841,118 @@ function inspectReactDomRootPublicFacadeLifecycle({
   };
 }
 
+function inspectPublicRootObjectPrototypeCompatibilityAliases({
+  domContainer,
+  listenerRegistry,
+  React,
+  reactDomClient,
+  rootMarkers
+}) {
+  const label = "public-root-object-prototype-compatibility-aliases";
+  const { container, ownerDocument } = createPublicRenderControlledDomShim({
+    domContainer,
+    label
+  });
+  const previousDescriptors = new Map(
+    REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS.map((key) => [
+      key,
+      Object.getOwnPropertyDescriptor(Object.prototype, key)
+    ])
+  );
+  let cleanupRestored = false;
+  let createRootAttempt = null;
+  let getterInvocationCount = 0;
+  let root = null;
+  let rootObjectCreated = false;
+  let rootShape = null;
+  let aliasObservations = {};
+
+  try {
+    const descriptors = {};
+    for (const key of REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS) {
+      descriptors[key] = {
+        configurable: true,
+        enumerable: false,
+        value: true
+      };
+    }
+    descriptors.publicEventCompatibilityClaimed = {
+      configurable: true,
+      enumerable: false,
+      get() {
+        getterInvocationCount++;
+        return true;
+      }
+    };
+    Object.defineProperties(Object.prototype, descriptors);
+
+    try {
+      root = reactDomClient.createRoot(container);
+      createRootAttempt = {
+        status: "ok",
+        value: describeLocalValue(root)
+      };
+      rootObjectCreated = root !== null && typeof root === "object";
+      if (rootObjectCreated) {
+        rootShape = describePublicRootObjectShape(root);
+        aliasObservations =
+          inspectRootObjectInheritedCompatibilityAliasVisibility(root);
+      }
+    } catch (error) {
+      createRootAttempt = {
+        status: "throws",
+        thrown: serializeGateError(error)
+      };
+    }
+  } finally {
+    restoreObjectPrototypeDescriptors(previousDescriptors);
+    cleanupRestored = objectPrototypeDescriptorsMatch(previousDescriptors);
+  }
+
+  let renderAfterCleanupAttempt = null;
+  let unmountAfterCleanupAttempt = null;
+  if (rootObjectCreated) {
+    const renderAfterCleanup = attemptGateOperationWithValue(
+      "root.render after Object.prototype public alias cleanup",
+      () =>
+        root.render(
+          React.createElement(
+            "div",
+            { id: "prototype-clean" },
+            "prototype clean"
+          )
+        )
+    );
+    renderAfterCleanupAttempt = renderAfterCleanup.attempt;
+
+    const unmountAfterCleanup = attemptGateOperationWithValue(
+      "root.unmount after Object.prototype public alias cleanup",
+      () => root.unmount()
+    );
+    unmountAfterCleanupAttempt = unmountAfterCleanup.attempt;
+  }
+
+  return {
+    aliasKeys: REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS,
+    aliasObservations,
+    cleanupRestored,
+    compatibilityClaimed: false,
+    createRootAttempt,
+    getterInvocationCount,
+    label,
+    renderAfterCleanupAttempt,
+    rootObjectCreated,
+    rootShape,
+    sideEffects: inspectRootFacadeSideEffects(
+      container,
+      ownerDocument,
+      rootMarkers,
+      listenerRegistry
+    ),
+    unmountAfterCleanupAttempt
+  };
+}
+
 function attemptChainedPublicRootOperation({
   domContainer,
   label,
@@ -5630,6 +5867,106 @@ function attemptGateOperationWithValue(label, callback) {
       error
     };
   }
+}
+
+function describePublicRootObjectShape(root) {
+  return {
+    frozen: Object.isFrozen(root),
+    keys: Object.keys(root),
+    ownPropertyNames: Object.getOwnPropertyNames(root),
+    ownSymbolCount: Object.getOwnPropertySymbols(root).length,
+    prototypeIsNull: Object.getPrototypeOf(root) === null,
+    renderDescriptor: describePublicRootMethodDescriptor(root, "render"),
+    renderLength: typeof root.render === "function" ? root.render.length : null,
+    unmountDescriptor: describePublicRootMethodDescriptor(root, "unmount"),
+    unmountLength:
+      typeof root.unmount === "function" ? root.unmount.length : null
+  };
+}
+
+function describePublicRootMethodDescriptor(root, key) {
+  const descriptor = Object.getOwnPropertyDescriptor(root, key);
+  if (descriptor === undefined) {
+    return null;
+  }
+
+  return {
+    configurable: descriptor.configurable,
+    enumerable: descriptor.enumerable,
+    valueLength:
+      typeof descriptor.value === "function" ? descriptor.value.length : null,
+    valueType: typeof descriptor.value,
+    writable: descriptor.writable
+  };
+}
+
+function inspectRootObjectInheritedCompatibilityAliasVisibility(root) {
+  return Object.fromEntries(
+    REACT_DOM_ROOT_PUBLIC_FACADE_ROOT_OBJECT_PROTOTYPE_ALIAS_KEYS.map((key) => {
+      let value;
+      try {
+        value = root[key];
+      } catch (error) {
+        return [
+          key,
+          {
+            inRoot: key in root,
+            own: Object.prototype.hasOwnProperty.call(root, key),
+            readError: serializeGateError(error)
+          }
+        ];
+      }
+
+      return [
+        key,
+        {
+          inRoot: key in root,
+          own: Object.prototype.hasOwnProperty.call(root, key),
+          value: describeLocalValue(value)
+        }
+      ];
+    })
+  );
+}
+
+function restoreObjectPrototypeDescriptors(previousDescriptors) {
+  for (const [
+    key,
+    descriptor
+  ] of previousDescriptors) {
+    if (descriptor === undefined) {
+      delete Object.prototype[key];
+    } else {
+      Object.defineProperty(Object.prototype, key, descriptor);
+    }
+  }
+}
+
+function objectPrototypeDescriptorsMatch(previousDescriptors) {
+  for (const [
+    key,
+    previousDescriptor
+  ] of previousDescriptors) {
+    const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, key);
+    if (!propertyDescriptorsEqual(descriptor, previousDescriptor)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function propertyDescriptorsEqual(left, right) {
+  if (left === undefined || right === undefined) {
+    return left === right;
+  }
+  return (
+    left.configurable === right.configurable &&
+    left.enumerable === right.enumerable &&
+    left.value === right.value &&
+    left.writable === right.writable &&
+    left.get === right.get &&
+    left.set === right.set
+  );
 }
 
 function attemptRootFacadeOperation(

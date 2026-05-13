@@ -166,7 +166,7 @@ const createRoot = defineFunctionShape(function createRoot(
   let unmounted = false;
   minimalPublicRootContainers.set(container, true);
 
-  const root = {};
+  const root = Object.create(null);
   Object.defineProperties(root, {
     render: {
       enumerable: true,
