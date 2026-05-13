@@ -1257,18 +1257,58 @@ const nativeRootBridgeWorkerThreadCleanupHookPreflightRowFields =
   ]);
 const nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFields =
   Object.freeze([
-    'nodeWorkerThreadsExecution',
-    'napiCleanupHookExecution',
-    'nativeAddonLoaded',
-    'nativeExecution',
-    'rendererExecution',
-    'reconcilerExecution',
-    'publicNativeCompatibility',
-    'compatibilityClaimed',
-    'nativeCompatibilityClaimed',
-    'nativePackageCompatibilityClaimed',
-    'packageCompatibilityClaimed'
+    ...new Set([
+      ...nativeReactDomRenderHandoffAdmissionBlockedCapabilityClaimFields,
+      ...nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPublicClaimFields,
+      ...nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPackageClaimFields,
+      ...nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCompatibilityClaimFields,
+      ...nativeRootBridgeJsonBatchLifecycleGenerationAdmissionPublicClaimFields,
+      ...nativeRootBridgeJsonBatchLifecycleGenerationAdmissionPackageClaimFields,
+      ...nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCompatibilityAliasFields,
+      'nativeLoadAttempted',
+      'nativeAddonLoadAttempted',
+      'cleanupHookExecutionClaimed',
+      'cleanupHookPublicExecutionClaimed',
+      'nodeWorkerThreadsExecution',
+      'workerThreadExecution',
+      'workerThreadExecutionClaimed',
+      'workerThreadCreationAttempted',
+      'workerThreadLoadAttempted',
+      'childProcessExecution',
+      'childProcessLoadAttempted',
+      'httpExecution',
+      'httpLoadAttempted',
+      'httpsExecution',
+      'httpsLoadAttempted',
+      'networkExecution',
+      'publicNativeExecution',
+      'publicNativeCompatibilityClaimed',
+      'packageExportClaimed',
+      'packageExportsOpened',
+      'packageExportsChanged',
+      'packageCompatibilityClaimed',
+      'packageCompatibilityOpened',
+      'packageCompatibilityChanged',
+      'publicNativeExecutionClaimed',
+      'nativePackageCompatibilityClaimed',
+      'nativePackageExportClaimed',
+      'rootExecutionClaimed',
+      'rootCompatibilityClaimed',
+      'workerCompatibilityClaimed',
+      'executionCompatibilityClaimed',
+      'publicExecutionCompatibilityClaimed',
+      'publicNativeExecutionCompatibilityClaimed',
+      'nativeExecutionCompatibilityClaimed'
+    ])
   ]);
+const nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFieldSet =
+  new Set(nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFields);
+const nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimNormalizedFieldSet =
+  new Set(
+    nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFields.map(
+      normalizeNativeCapabilityClaimFieldName
+    )
+  );
 const nativeRootBridgeBatchLifecycleConsumerCleanupHookStatuses =
   Object.freeze([
     nativeRootBridgeBatchLifecycleConsumerCleanupHookNotRequiredStatus,
@@ -2086,6 +2126,29 @@ function validateNativeRootBridgeWorkerThreadCleanupHookPreflightRows(rows) {
 function validateNativeRootBridgeWorkerThreadCleanupHookEvidenceForPreflight(
   evidence
 ) {
+  if (
+    hasNativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaim(
+      evidence
+    )
+  ) {
+    return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
+      evidence,
+      nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimCode
+    );
+  }
+
+  if (
+    !hasExactOwnDataNativeCurrentnessRowFields(
+      evidence,
+      nativeRootBridgeWorkerThreadCleanupHookPreflightRowFields
+    )
+  ) {
+    return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
+      evidence,
+      nativeRootBridgeWorkerThreadCleanupHookForgedEvidenceCode
+    );
+  }
+
   if (evidence.status === 'rejected') {
     return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
       evidence,
@@ -2097,13 +2160,6 @@ function validateNativeRootBridgeWorkerThreadCleanupHookEvidenceForPreflight(
     return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
       evidence,
       nativeRootBridgeWorkerThreadCleanupHookForgedEvidenceCode
-    );
-  }
-
-  if (hasNativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaim(evidence)) {
-    return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
-      evidence,
-      nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimCode
     );
   }
 
@@ -2191,6 +2247,16 @@ function validateNativeRootBridgeWorkerThreadCleanupHookEvidenceForPreflight(
     );
   }
 
+  if (
+    evidence.id !== expectedIdentity.id ||
+    evidence.operation !== expectedIdentity.operation
+  ) {
+    return freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
+      evidence,
+      nativeRootBridgeWorkerThreadCleanupHookForgedEvidenceCode
+    );
+  }
+
   return freezeNativeRootBridgeWorkerThreadCleanupHookPreflightRow({
     id: evidence.id,
     operation: evidence.operation,
@@ -2223,25 +2289,65 @@ function freezeNativeRootBridgeWorkerThreadCleanupHookRejectedRow(
   code
 ) {
   return freezeNativeRootBridgeWorkerThreadCleanupHookPreflightRow({
-    id: evidence.id,
-    operation: evidence.operation,
-    cleanupHookId: evidence.cleanupHookId,
+    id: getOwnDataPropertyValue(evidence, 'id', null),
+    operation: getOwnDataPropertyValue(evidence, 'operation', null),
+    cleanupHookId: getOwnDataPropertyValue(evidence, 'cleanupHookId', null),
     cleanupHookFunctionIdentityToken:
-      evidence.cleanupHookFunctionIdentityToken,
+      getOwnDataPropertyValue(
+        evidence,
+        'cleanupHookFunctionIdentityToken',
+        null
+      ),
     cleanupHookArgumentIdentityToken:
-      evidence.cleanupHookArgumentIdentityToken,
-    registrationOrder: evidence.registrationOrder,
-    expectedExecutionOrder: evidence.expectedExecutionOrder,
+      getOwnDataPropertyValue(
+        evidence,
+        'cleanupHookArgumentIdentityToken',
+        null
+      ),
+    registrationOrder: getOwnDataPropertyValue(
+      evidence,
+      'registrationOrder',
+      null
+    ),
+    expectedExecutionOrder: getOwnDataPropertyValue(
+      evidence,
+      'expectedExecutionOrder',
+      null
+    ),
     observedExecutionOrder: null,
     status: 'rejected',
     code,
-    sourcePreflightStatus: evidence.sourcePreflightStatus,
-    sourceWorkerThreadId: evidence.sourceWorkerThreadId,
-    sourceEnvironmentId: evidence.sourceEnvironmentId,
-    sourceRowId: evidence.sourceRowId,
-    sourceHandleKind: evidence.sourceHandleKind,
-    sourceErrorCode: evidence.sourceErrorCode,
-    sourceBoundaryErrorCode: evidence.sourceBoundaryErrorCode,
+    sourcePreflightStatus: getOwnDataPropertyValue(
+      evidence,
+      'sourcePreflightStatus',
+      null
+    ),
+    sourceWorkerThreadId: getOwnDataPropertyValue(
+      evidence,
+      'sourceWorkerThreadId',
+      null
+    ),
+    sourceEnvironmentId: getOwnDataPropertyValue(
+      evidence,
+      'sourceEnvironmentId',
+      null
+    ),
+    sourceRowId: getOwnDataPropertyValue(evidence, 'sourceRowId', null),
+    sourceHandleKind: getOwnDataPropertyValue(
+      evidence,
+      'sourceHandleKind',
+      null
+    ),
+    sourceErrorCode: getOwnDataPropertyValue(
+      evidence,
+      'sourceErrorCode',
+      null
+    ),
+    sourceBoundaryErrorCode: getOwnDataPropertyValue(
+      evidence,
+      'sourceBoundaryErrorCode',
+      null
+    ),
     canonicalExecutableEvidence: false,
     cleanupHookOrderPrivate: true,
     cleanupHookIdentityPrivate: true,
@@ -2259,6 +2365,8 @@ function getNativeRootBridgeWorkerThreadCleanupHookExpectedIdentity(sourceRow) {
 
   if (role === nativeRootBridgeHandleKindRoot) {
     return {
+      id: 'cleanup-hook-worker-root-before-value-release',
+      operation: 'cleanup-hook-order-preflight',
       cleanupHookId: nativeRootBridgeWorkerThreadCleanupHookRootId,
       cleanupHookFunctionIdentityToken:
         nativeRootBridgeWorkerThreadCleanupHookRootFunctionIdentityToken,
@@ -2271,6 +2379,8 @@ function getNativeRootBridgeWorkerThreadCleanupHookExpectedIdentity(sourceRow) {
 
   if (role === nativeRootBridgeHandleKindValue) {
     return {
+      id: 'cleanup-hook-worker-value-after-root-release',
+      operation: 'cleanup-hook-order-preflight',
       cleanupHookId: nativeRootBridgeWorkerThreadCleanupHookValueId,
       cleanupHookFunctionIdentityToken:
         nativeRootBridgeWorkerThreadCleanupHookValueFunctionIdentityToken,
@@ -2308,9 +2418,36 @@ function getNativeRootBridgeWorkerThreadCleanupHookCanonicalRole(
 function hasNativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaim(
   evidence
 ) {
-  return nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFields.some(
-    (field) => evidence[field] === true
-  );
+  if (!isObjectLike(evidence)) {
+    return false;
+  }
+
+  for (
+    let candidate = evidence;
+    candidate !== null;
+    candidate = Object.getPrototypeOf(candidate)
+  ) {
+    for (const key of Reflect.ownKeys(candidate)) {
+      const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
+      if (descriptor === undefined) {
+        continue;
+      }
+
+      const claimField = getNativeCapabilityClaimFieldForKey(
+        key,
+        nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimFieldSet,
+        nativeRootBridgeWorkerThreadCleanupHookPublicNativePackageClaimNormalizedFieldSet
+      );
+      if (
+        claimField !== null &&
+        isNativeCapabilityClaimDescriptorClaimed(descriptor)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function freezeNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink(
