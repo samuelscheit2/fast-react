@@ -316,7 +316,7 @@ fn root_work_loop_queued_minimal_host_root_rejects_cleanup_when_live_current_chi
 }
 
 #[test]
-fn root_work_loop_queued_minimal_host_root_rejects_update_then_cleanup_before_publication() {
+fn root_work_loop_queued_minimal_host_root_update_then_null_cleanup_consumes_transferred_work() {
     let (mut store, root_id, mut host) = root_store();
     let mut source = TestHostTree::new();
     let initial = source.insert_host_element_with_text("article", "queued mount");
@@ -356,21 +356,42 @@ fn root_work_loop_queued_minimal_host_root_rejects_update_then_cleanup_before_pu
             .alternate()
             .is_some()
     );
+    let source_root_child = store
+        .fiber_arena()
+        .get(updated_root_child)
+        .unwrap()
+        .alternate()
+        .unwrap();
+    let updated_text = store
+        .fiber_arena()
+        .get(updated_root_child)
+        .unwrap()
+        .child()
+        .unwrap();
+    let source_text = store
+        .fiber_arena()
+        .get(updated_text)
+        .unwrap()
+        .alternate()
+        .unwrap();
+    let updated_component_state_node = store
+        .fiber_arena()
+        .get(updated_root_child)
+        .unwrap()
+        .state_node();
+    let updated_text_state_node = store.fiber_arena().get(updated_text).unwrap().state_node();
 
-    let current_before = store.root(root_id).unwrap().current();
-    let current_child_before = store.fiber_arena().get(current_before).unwrap().child();
-    let finished_work_before = store.root(root_id).unwrap().finished_work();
-    let finished_lanes_before = store.root(root_id).unwrap().finished_lanes();
-    let pending_lanes_before = store.root(root_id).unwrap().lanes().pending_lanes();
-    let render_phase_work_before = store.root(root_id).unwrap().scheduling().work_in_progress();
-    let operations_before = host.operations();
     assert_eq!(current_host_root_element(&store, root_id), updated_element);
-    assert_eq!(current_child_before, Some(updated_root_child));
-    assert_eq!(finished_work_before, None);
-    assert_eq!(finished_lanes_before, Lanes::NO);
-    assert_eq!(pending_lanes_before, Lanes::NO);
+    assert_eq!(
+        store
+            .fiber_arena()
+            .get(store.root(root_id).unwrap().current())
+            .unwrap()
+            .child(),
+        Some(updated_root_child)
+    );
 
-    let error = enqueue_render_complete_commit_minimal_host_root_for_canary(
+    let cleaned = enqueue_render_complete_commit_minimal_host_root_for_canary(
         &mut store,
         &mut host,
         root_id,
@@ -382,37 +403,110 @@ fn root_work_loop_queued_minimal_host_root_rejects_update_then_cleanup_before_pu
         QUEUED_MINIMAL_SOURCE_ORDER + 60,
         QUEUED_MINIMAL_COMMIT_ORDER + 60,
     )
-    .unwrap_err();
+    .unwrap();
+    let cleaned_record = cleaned.record();
+    let cleanup = cleaned_record.deletion_cleanup().unwrap();
 
     assert_eq!(
-        error,
-        QueuedMinimalHostRootCommitError::UpdatedPreviousHostWorkCleanupUnsupported {
-            root: root_id,
-            updated_fiber: updated_root_child,
-        }
-    );
-    assert_eq!(host.operations(), operations_before);
-    assert_eq!(current_host_root_element(&store, root_id), updated_element);
-    assert_eq!(store.root(root_id).unwrap().current(), current_before);
-    assert_eq!(
-        store.fiber_arena().get(current_before).unwrap().child(),
-        current_child_before
+        cleaned_record.phase(),
+        QueuedMinimalHostRootCommitPhase::Cleanup
     );
     assert_eq!(
-        store.root(root_id).unwrap().finished_work(),
-        finished_work_before
+        cleaned_record.priority(),
+        QueuedMinimalHostRootUpdatePriority::Sync
+    );
+    assert_eq!(cleaned_record.queued_element(), RootElementHandle::NONE);
+    assert_eq!(cleaned_record.resulting_element(), RootElementHandle::NONE);
+    assert!(cleaned_record.proves_queued_update_render_complete_commit());
+    assert_eq!(
+        cleaned_record.mutation_apply().records()[0]
+            .mutation()
+            .kind(),
+        HostRootMutationApplyRecordKind::RemoveDeletedFromContainer
+    );
+    let cleanup_records = cleaned_record
+        .commit()
+        .host_node_deletion_cleanup_log()
+        .records();
+    let component_cleanup = cleanup_records
+        .iter()
+        .find(|record| record.fiber() == updated_root_child)
+        .unwrap();
+    let text_cleanup = cleanup_records
+        .iter()
+        .find(|record| record.fiber() == updated_text)
+        .unwrap();
+    store
+        .host_tokens()
+        .validate(
+            component_cleanup.token(),
+            root_id,
+            source_root_child,
+            component_cleanup.token_phase(),
+            component_cleanup.token_target(),
+        )
+        .unwrap();
+    assert!(
+        store
+            .host_tokens()
+            .validate(
+                component_cleanup.token(),
+                root_id,
+                updated_root_child,
+                component_cleanup.token_phase(),
+                component_cleanup.token_target(),
+            )
+            .is_err()
+    );
+    store
+        .host_tokens()
+        .validate(
+            text_cleanup.token(),
+            root_id,
+            source_text,
+            text_cleanup.token_phase(),
+            text_cleanup.token_target(),
+        )
+        .unwrap();
+    assert!(
+        store
+            .host_tokens()
+            .validate(
+                text_cleanup.token(),
+                root_id,
+                updated_text,
+                text_cleanup.token_phase(),
+                text_cleanup.token_target(),
+            )
+            .is_err()
+    );
+    assert_eq!(cleanup.detached_instance_count(), 1);
+    assert_eq!(cleanup.invalidated_text_count(), 1);
+    assert_eq!(
+        current_host_root_element(&store, root_id),
+        RootElementHandle::NONE
     );
     assert_eq!(
-        store.root(root_id).unwrap().finished_lanes(),
-        finished_lanes_before
+        store
+            .fiber_arena()
+            .get(cleaned_record.commit().current())
+            .unwrap()
+            .child(),
+        None
     );
-    assert_eq!(
-        store.root(root_id).unwrap().lanes().pending_lanes(),
-        pending_lanes_before
+    assert!(
+        !cleaned
+            .host_work()
+            .detached_instance_metadata_for_canary(updated_component_state_node)
+            .unwrap()
+            .is_active()
     );
-    assert_eq!(
-        store.root(root_id).unwrap().scheduling().work_in_progress(),
-        render_phase_work_before
+    assert!(
+        !cleaned
+            .host_work()
+            .detached_text_metadata_for_canary(updated_text_state_node)
+            .unwrap()
+            .is_active()
     );
 }
 

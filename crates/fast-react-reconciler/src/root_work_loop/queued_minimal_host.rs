@@ -281,10 +281,6 @@ pub(crate) enum QueuedMinimalHostRootCommitError {
     MissingPreviousHostWorkForCleanup {
         root: FiberRootId,
     },
-    UpdatedPreviousHostWorkCleanupUnsupported {
-        root: FiberRootId,
-        updated_fiber: FiberId,
-    },
     MissingRootElement {
         root: FiberRootId,
         element: RootElementHandle,
@@ -379,15 +375,6 @@ impl Display for QueuedMinimalHostRootCommitError {
                 "queued minimal HostRoot cleanup for root {} requires mounted host work",
                 root.raw()
             ),
-            Self::UpdatedPreviousHostWorkCleanupUnsupported {
-                root,
-                updated_fiber,
-            } => write!(
-                formatter,
-                "queued minimal HostRoot cleanup for root {} cannot consume updated host work fiber {:?} before ownership transfer is proven",
-                root.raw(),
-                updated_fiber
-            ),
             Self::MissingRootElement { root, element } => write!(
                 formatter,
                 "queued minimal HostRoot commit for root {} cannot resolve element {}",
@@ -452,7 +439,6 @@ impl Error for QueuedMinimalHostRootCommitError {
             | Self::PreviousHostWorkRootChildMismatch { .. }
             | Self::PreviousHostWorkCompletedChildMismatch { .. }
             | Self::MissingPreviousHostWorkForCleanup { .. }
-            | Self::UpdatedPreviousHostWorkCleanupUnsupported { .. }
             | Self::MissingRootElement { .. }
             | Self::ExpectedHostComponentRoot { .. }
             | Self::ExpectedSingleHostTextChild { .. }
@@ -816,32 +802,24 @@ fn validate_cleanup_previous_host_work_is_mount_owned(
         );
     }
 
-    for &fiber in previous.completed_children() {
-        let node = store
-            .fiber_arena()
-            .get(fiber)
-            .map_err(HostWorkError::from)?;
-        // Updated WIP fibers still rely on detached host records owned by their
-        // original alternates; cleanup needs an explicit ownership-transfer proof.
-        if node.alternate().is_some() {
-            return Err(
-                QueuedMinimalHostRootCommitError::UpdatedPreviousHostWorkCleanupUnsupported {
-                    root,
-                    updated_fiber: fiber,
-                },
-            );
-        }
-    }
-
     if previous.completed_child() != current_child
-        || previous.completed_children() != current_children.as_slice()
+        || !previous_completed_children_match_cleanup_current_subtree(
+            store,
+            current_child.expect("current child checked above"),
+            current_children.as_slice(),
+            previous.completed_children(),
+        )?
     {
         return Err(
             QueuedMinimalHostRootCommitError::PreviousHostWorkCompletedChildMismatch {
                 root,
                 expected_completed_child: current_child,
                 actual_completed_child: previous.completed_child(),
-                expected_completed_children: current_children,
+                expected_completed_children: expected_previous_completed_children_for_cleanup(
+                    store,
+                    current_child.expect("current child checked above"),
+                    current_children.as_slice(),
+                )?,
                 actual_completed_children: previous.completed_children().to_vec(),
             },
         );
@@ -849,6 +827,71 @@ fn validate_cleanup_previous_host_work_is_mount_owned(
 
     previous.validate_detached_host_cleanup_ownership_for_canary(store)?;
 
+    Ok(())
+}
+
+fn previous_completed_children_match_cleanup_current_subtree(
+    store: &FiberRootStore<RecordingHost>,
+    current_child: FiberId,
+    current_children: &[FiberId],
+    previous_completed_children: &[FiberId],
+) -> Result<bool, QueuedMinimalHostRootCommitError> {
+    if previous_completed_children == current_children {
+        return Ok(true);
+    }
+
+    if store
+        .fiber_arena()
+        .get(current_child)
+        .map_err(HostWorkError::from)?
+        .alternate()
+        .is_none()
+    {
+        return Ok(false);
+    }
+
+    Ok(previous_completed_children
+        == expected_previous_completed_children_for_cleanup(
+            store,
+            current_child,
+            current_children,
+        )?
+        .as_slice())
+}
+
+fn expected_previous_completed_children_for_cleanup(
+    store: &FiberRootStore<RecordingHost>,
+    current_child: FiberId,
+    current_children: &[FiberId],
+) -> Result<Vec<FiberId>, QueuedMinimalHostRootCommitError> {
+    if store
+        .fiber_arena()
+        .get(current_child)
+        .map_err(HostWorkError::from)?
+        .alternate()
+        .is_none()
+    {
+        return Ok(current_children.to_vec());
+    }
+
+    let mut completed_children = Vec::new();
+    collect_host_cleanup_subtree_children(store, current_child, &mut completed_children)?;
+    Ok(completed_children)
+}
+
+fn collect_host_cleanup_subtree_children(
+    store: &FiberRootStore<RecordingHost>,
+    fiber: FiberId,
+    completed_children: &mut Vec<FiberId>,
+) -> Result<(), QueuedMinimalHostRootCommitError> {
+    completed_children.push(fiber);
+    for child in store
+        .fiber_arena()
+        .child_ids(fiber)
+        .map_err(HostWorkError::from)?
+    {
+        collect_host_cleanup_subtree_children(store, child, completed_children)?;
+    }
     Ok(())
 }
 

@@ -519,6 +519,48 @@ fn host_work_host_component_rejects_property_payload_metadata_mismatch_before_co
             .is_empty()
     );
 }
+
+#[test]
+fn host_work_rejects_update_cleanup_transfer_when_detached_metadata_is_updated_owned() {
+    let fixture = root_component_update_apply_fixture();
+    let source_scope = fixture
+        .detached_hosts
+        .scope(fixture.state_node, HostFiberTokenTarget::Instance)
+        .unwrap();
+    let instance = fixture
+        .detached_hosts
+        .instance(fixture.state_node)
+        .unwrap()
+        .clone();
+    let mut updated_owned_detached_hosts = DetachedHostRecords::default();
+    let updated_owned_state_node = updated_owned_detached_hosts.insert_instance(
+        HostNodeScope::new(
+            fixture.root_id,
+            fixture.payload.work_in_progress(),
+            source_scope.token_id(),
+            source_scope.phase(),
+        ),
+        instance,
+    );
+
+    let error = detached_host_cleanup_ownership_transfer_for_update(
+        &updated_owned_detached_hosts,
+        fixture.root_id,
+        fixture.commit.finished_work(),
+        fixture.payload.current(),
+        fixture.payload.work_in_progress(),
+        FiberTag::HostComponent,
+        updated_owned_state_node,
+        HostFiberTokenTarget::Instance,
+    )
+    .unwrap_err();
+
+    let HostWorkError::HostNode(error) = error else {
+        panic!("expected HostNode wrong-fiber error for updated-owned cleanup transfer");
+    };
+    assert_eq!(error.violation(), HostNodeViolation::WrongFiber);
+}
+
 #[test]
 fn host_work_host_component_rejects_stale_property_update_handles_before_commit_token_issue() {
     let mut fixture = root_component_update_apply_fixture();
