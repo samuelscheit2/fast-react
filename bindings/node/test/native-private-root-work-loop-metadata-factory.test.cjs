@@ -23,9 +23,10 @@ const rustMetadataSourcePath = path.join(
   repoRoot,
   'crates/fast-react-napi/src/root_work_loop_metadata.rs'
 );
-const workerProgressPath = path.join(
+const nativeIndexPath = path.join(repoRoot, 'bindings/node/index.cjs');
+const nativeMetadataFactoryTestPath = path.join(
   repoRoot,
-  'worker-progress/worker-1228-native-metadata-no-load-source-ledger.md'
+  'bindings/node/test/native-private-root-work-loop-metadata-factory.test.cjs'
 );
 const validOptions = Object.freeze({
   hostType: 'div',
@@ -120,6 +121,31 @@ function sourceCurrentnessRow(row, overrides = {}) {
   });
 }
 
+function sourceCurrentnessPrototypeClaimRow(row, prototypeClaims) {
+  return Object.freeze(
+    Object.assign(Object.create(Object.freeze(prototypeClaims)), row)
+  );
+}
+
+function sourceCurrentnessAccessorClaimRow(row, field) {
+  const nextRow = {
+    ...row,
+    sourceFiles: Object.freeze([...row.sourceFiles]),
+    rustIdentifiers: Object.freeze([...row.rustIdentifiers]),
+    jsFactoryFields: Object.freeze([...row.jsFactoryFields]),
+    jsonFieldPaths: Object.freeze([...row.jsonFieldPaths]),
+    expectedFactoryValues: row.expectedFactoryValues
+  };
+  Object.defineProperty(nextRow, field, {
+    get() {
+      return false;
+    },
+    enumerable: true
+  });
+
+  return Object.freeze(nextRow);
+}
+
 function assertNoNativeLedgerExecution(record, label) {
   assert.equal(record.nativeAddonLoaded, false, `${label} addon`);
   assert.equal(record.nativeExecution, false, `${label} native`);
@@ -133,6 +159,23 @@ function assertNoNativeLedgerExecution(record, label) {
   assert.equal(record.packageExportCompatibility, false, `${label} package`);
   assert.equal(record.compatibilityClaimed, false, `${label} compatibility`);
   assert.equal(record.reactBehaviorError, false, `${label} React behavior`);
+}
+
+function assertTrackedSourceEvidencePaths(sourceEvidencePaths, label) {
+  assert.ok(Object.isFrozen(sourceEvidencePaths), `${label} frozen`);
+  assert.ok(sourceEvidencePaths.length > 0, `${label} non-empty`);
+  for (const sourceEvidencePath of sourceEvidencePaths) {
+    assert.equal(
+      sourceEvidencePath.startsWith('worker-progress/'),
+      false,
+      `${label} must not use deleted worker-progress evidence`
+    );
+    assert.equal(
+      fs.existsSync(path.join(repoRoot, sourceEvidencePath)),
+      true,
+      `${label} ${sourceEvidencePath} exists`
+    );
+  }
 }
 
 function getSourceCurrentnessLedger(factory) {
@@ -241,7 +284,8 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
   const validateSourceCurrentnessRows =
     getSourceCurrentnessLedgerValidator(ledger);
   const rustSource = fs.readFileSync(rustMetadataSourcePath, 'utf8');
-  const workerProgress = fs.readFileSync(workerProgressPath, 'utf8');
+  const nativeSource = fs.readFileSync(nativeIndexPath, 'utf8');
+  const testSource = fs.readFileSync(nativeMetadataFactoryTestPath, 'utf8');
 
   assert.equal(
     ledger.ledgerStatus,
@@ -260,9 +304,14 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     ledger.sourceWorker,
     'worker-1228-native-metadata-no-load-source-ledger'
   );
-  assert.equal(
-    ledger.sourceWorkerProgress,
-    'worker-progress/worker-1228-native-metadata-no-load-source-ledger.md'
+  assert.deepEqual(ledger.sourceEvidencePaths, [
+    'bindings/node/index.cjs',
+    'crates/fast-react-napi/src/root_work_loop_metadata.rs',
+    'bindings/node/test/native-private-root-work-loop-metadata-factory.test.cjs'
+  ]);
+  assertTrackedSourceEvidencePaths(
+    ledger.sourceEvidencePaths,
+    'source-currentness source evidence'
   );
   assert.equal(
     ledger.sourceFile,
@@ -302,9 +351,10 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
     'root-work-loop-metadata-private-factory-options'
   ]);
   assert.match(
-    workerProgress,
-    /source-owned Rust identifiers and JS factory shape/u
+    nativeSource,
+    /source-owned-rust-identifier-set-and-js-factory-shape/u
   );
+  assert.match(testSource, /Object\.create\(row\)/u);
 
   for (const row of ledger.rows) {
     assert.ok(Object.isFrozen(row), row.id);
@@ -381,6 +431,89 @@ function assertPrivateSourceCurrentnessLedger(factory, metadata) {
   const canonicalCommit = ledger.rows[4];
   const canonicalOptions = ledger.rows[5];
   const codes = ledger.rejectionCodes;
+
+  const inheritedCanonicalRowsResult = validateSourceCurrentnessRows(
+    ledger.rows.map((row) => Object.create(row))
+  );
+  assert.equal(inheritedCanonicalRowsResult.acceptedEvidenceCount, 0);
+  assert.equal(
+    inheritedCanonicalRowsResult.rejectedEvidenceCount,
+    ledger.rows.length
+  );
+  assert.equal(
+    inheritedCanonicalRowsResult.canonicalSourceEvidenceAccepted,
+    false
+  );
+  assertNoNativeLedgerExecution(
+    inheritedCanonicalRowsResult,
+    'source-currentness inherited canonical rows'
+  );
+  for (const row of inheritedCanonicalRowsResult.rows) {
+    assert.equal(row.status, ledger.rejectedStatus);
+    assert.equal(row.code, codes.callerBuilt);
+    assert.equal(row.id, null);
+    assert.equal(row.role, null);
+    assert.equal(row.sourceFile, null);
+    assert.deepEqual(row.sourceFiles, []);
+    assert.equal(row.evidenceKind, null);
+    assert.deepEqual(row.rustIdentifiers, []);
+    assert.deepEqual(row.jsFactoryFields, []);
+    assert.deepEqual(row.jsonFieldPaths, []);
+    assert.deepEqual(row.expectedFactoryValues, {});
+    assert.equal(row.sourceOwnedEvidence, false);
+    assert.equal(row.blockedPrivateEvidence, false);
+    assert.equal(row.publicAdmission, false);
+    assert.equal(row.callerShapedEvidence, false);
+    assertNoNativeLedgerExecution(
+      row,
+      'source-currentness inherited canonical row'
+    );
+  }
+
+  for (const diagnosticCase of [
+    {
+      id: 'root-work-loop-metadata-prototype-public-claim-alias',
+      row: sourceCurrentnessPrototypeClaimRow(canonicalCommit, {
+        publicRuntimeExecutionClaimed: true
+      }),
+      code: codes.publicNativeExecutionClaim
+    },
+    {
+      id: 'root-work-loop-metadata-prototype-package-claim-alias',
+      row: sourceCurrentnessPrototypeClaimRow(canonicalCommit, {
+        packageExportsChanged: true
+      }),
+      code: codes.packageExportClaim
+    },
+    {
+      id: 'root-work-loop-metadata-accessor-native-addon-claim',
+      row: sourceCurrentnessAccessorClaimRow(
+        canonicalCommit,
+        'nativeAddonLoadAttempted'
+      ),
+      code: codes.nativeAddonLoadClaim
+    }
+  ]) {
+    const result = validateSourceCurrentnessRows([diagnosticCase.row]);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(result.rejectedEvidenceCount, 1, diagnosticCase.id);
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+
+    const [row] = result.rows;
+    assert.equal(row.id, canonicalCommit.id, diagnosticCase.id);
+    assert.equal(row.status, ledger.rejectedStatus, diagnosticCase.id);
+    assert.equal(row.code, diagnosticCase.code, diagnosticCase.id);
+    assert.equal(row.nativeAddonLoaded, false, diagnosticCase.id);
+    assert.equal(row.nativeExecution, false, diagnosticCase.id);
+    assert.equal(row.packageExportCompatibility, false, diagnosticCase.id);
+    assertNoNativeLedgerExecution(result, diagnosticCase.id);
+    assertNoNativeLedgerExecution(row, diagnosticCase.id);
+  }
+
   const cases = [
     {
       row: sourceCurrentnessRow(canonicalSource, {
