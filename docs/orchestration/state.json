@@ -189,11 +189,14 @@
 		{
 			"id": 1270,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Native generation-admission ledger exact-key hardening",
 			"agent": "worker_1270_native_generation_exact_keys",
 			"branch": "worker/1270-native-generation-exact-keys",
-			"audits": []
+			"audits": [
+				"audit_1270_source_contract",
+				"audit_1270_verification"
+			]
 		},
 		{
 			"id": 1271,
