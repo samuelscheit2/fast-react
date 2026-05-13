@@ -69,7 +69,7 @@
 		{
 			"id": 1259,
 			"type": "worker",
-			"status": "repair-auditing",
+			"status": "accepted",
 			"title": "Native no-load ledgers reject prototype-only rows",
 			"agent": "worker_1259_native_prototype_rows",
 			"branch": "worker/1259-native-prototype-rows",
