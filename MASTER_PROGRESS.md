@@ -29,6 +29,24 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1298 startTransition Returned Thenables
+
+- Worker 1298 made rootless `startTransition` observe object returned thenables
+  and report rejected returned thenables through the existing global error
+  channel.
+- The accepted change stays narrow: function-valued `.then` returns remain
+  ignored, accessor-backed `then`, throwing `then`, and synchronously rejected
+  thenables are reported without adding Scheduler/root lane/dispatcher/on-finish
+  compatibility, and forged async/on-finish metadata claims remain blocked.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed the transition facade tests (21/21), React workspace check, smoke test,
+  and `git diff --check`. The broad `npm test --workspace @fast-react/conformance
+  -- react-transition-facade` command remains red because the npm script runs
+  unrelated package-wide gates; both audits confirmed the transition facade tests
+  pass and the unrelated failures are outside this two-file diff.
+- The accepted state is main `446897a1` after Worker 1298 merge `446897a1`,
+  worker commit `f8deebe9`, and this orchestration-state update.
+
 ### Worker 1296 Entangled Transition Currentness
 
 - Worker 1296 added source-owned currentness tokens for entangled transition
