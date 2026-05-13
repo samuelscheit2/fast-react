@@ -105,7 +105,7 @@
 		{
 			"id": 1262,
 			"type": "worker",
-			"status": "repair-auditing",
+			"status": "accepted",
 			"title": "react-test-renderer private root bridge cross-entrypoint currentness",
 			"agent": "worker_1262_test_renderer_cross_entrypoint",
 			"branch": "worker/1262-test-renderer-cross-entrypoint",
