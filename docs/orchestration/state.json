@@ -675,10 +675,14 @@
 		{
 			"id": 1319,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "startTransition rootless currentness option-alias hardening",
 			"agent": "worker_1319_start_transition_option_aliases",
-			"branch": "worker/1319-start-transition-option-aliases"
+			"branch": "worker/1319-start-transition-option-aliases",
+			"audits": [
+				"audit_1319_source_contract",
+				"audit_1319_verification"
+			]
 		},
 		{
 			"id": 1320,

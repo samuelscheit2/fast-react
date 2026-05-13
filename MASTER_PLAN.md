@@ -97,7 +97,7 @@ Current orchestration queue:
   returned no implementation report and are not accepted input.
 - Worker 1318 has been reviewed, merged, and recorded as accepted history for
   the React DOM createRoot container capability-alias blocker from Scout 1312.
-- Active Worker 1319 is implementing the startTransition rootless currentness
+- Worker 1319 is under audit for the startTransition rootless currentness
   option-alias hardening from Scout 1315.
 - Active Worker 1320 is retrying the queued minimal HostRoot update-to-null
   cleanup ownership transfer from Scout 1311.
