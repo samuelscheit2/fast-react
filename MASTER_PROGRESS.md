@@ -29,6 +29,34 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1318 React DOM createRoot Container Alias Blocker
+
+- Worker 1318 hardened public `createRoot(container)` so hostile fake-DOM
+  containers with own public/native/root/package/compatibility aliases reject
+  before adapter root creation. Proxy containers now reject before root-marker
+  property access or DOM method traps.
+- The guard uses the existing React DOM public-host alias normalization, covers
+  own non-enumerable aliases and accessor aliases without invoking getters, and
+  keeps snake/dash variants blocked. Duplicate-root and existing-root-marker
+  failures remain intact after the new preflight.
+- Focused coverage proves own `compatibilityClaimed`, non-enumerable
+  `publicRootExecution`, accessor `publicCreateRootCompatibilityClaimed`,
+  snake/dash public root render compatibility aliases, and proxy containers are
+  rejected before `adapter.createRoot`, while a clean fake-DOM container still
+  supports create/render/null/unmount/recreate.
+- The accepted change is scoped to `react-dom/client.js` and its focused symbol
+  facade gate. It does not touch `root-bridge.js`, native/Rust, hydration,
+  events/listeners, resource/form internals, package exports, or broader
+  browser DOM compatibility.
+- Accepted validation includes clean source and verification audits. Worktree
+  reruns passed the React DOM client symbol facade gate (7/7), public facade
+  blocked gate (47/47), root public facade conformance (`Failures: 0`), root
+  render E2E conformance (`Failures: 0`), React DOM workspace check (239/239
+  plus smoke), package-surface check, import-entrypoint smoke, and
+  `git diff --check`. Root post-merge reruns passed the symbol facade gate
+  (7/7), public facade blocked gate (47/47), and `git diff --check`.
+- The accepted merge is main `c83db16a` after Worker 1318 commit `c5756082`.
+
 ### Worker 1300 react-test-renderer TestInstance Query Bridge Source Proof
 
 - Worker 1300 hardened the react-test-renderer serialization local gate's

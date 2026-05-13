@@ -663,7 +663,7 @@
 		{
 			"id": 1318,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "React DOM createRoot container capability-alias blocker retry",
 			"agent": "worker_1318_react_dom_container_alias_blocker_retry",
 			"branch": "worker/1318-react-dom-container-alias-blocker-retry",

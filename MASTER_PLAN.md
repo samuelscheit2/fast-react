@@ -47,10 +47,10 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Current root head is main `9530ba8e`
-(`Record worker 1300 accepted`) before this docs pass. Current accepted
-implementation head is main `316985ef`
-(`Merge worker 1300 test renderer query bridge source proof`).
+Top-level cap: 30 workers. Current root head is main `c83db16a`
+(`Merge worker 1318 React DOM container alias blocker`) before this docs pass.
+Current accepted implementation head is main `c83db16a`
+(`Merge worker 1318 React DOM container alias blocker`).
 Accepted implementation, cleanup, planning, and docs-only history
 that is not under active repair is recorded in `MASTER_PROGRESS.md`; this plan
 lists only current/future work.
@@ -64,7 +64,7 @@ Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
   1269, 1270, 1271, 1272, 1277 through 1280, 1286 through 1290,
-  1296 through 1300, and 1306 through 1310
+  1296 through 1300, 1306 through 1310, and 1318
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
@@ -95,8 +95,8 @@ Current orchestration queue:
   and React core/hooks next-lane candidates. Scouts 1313 and 1314 returned no
   report. Workers 1316 and 1317 were attempted from the 1311/1312 reports but
   returned no implementation report and are not accepted input.
-- Worker 1318 is under audit for the React DOM createRoot container
-  capability-alias blocker retry from Scout 1312.
+- Worker 1318 has been reviewed, merged, and recorded as accepted history for
+  the React DOM createRoot container capability-alias blocker from Scout 1312.
 - Active Worker 1319 is implementing the startTransition rootless currentness
   option-alias hardening from Scout 1315.
 - Active Worker 1320 is retrying the queued minimal HostRoot update-to-null
