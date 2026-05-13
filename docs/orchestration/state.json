@@ -177,11 +177,14 @@
 		{
 			"id": 1269,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Queued minimal HostRoot source preflight inertness",
 			"agent": "worker_1269_queued_minimal_source_preflight",
 			"branch": "worker/1269-queued-minimal-source-preflight",
-			"audits": []
+			"audits": [
+				"audit_1269_source_contract",
+				"audit_1269_verification"
+			]
 		},
 		{
 			"id": 1270,
