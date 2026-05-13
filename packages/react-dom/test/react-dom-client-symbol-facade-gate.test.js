@@ -75,6 +75,9 @@ const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-element-prototype-nonenumerable-publicRootExecution-prop',
   'unsupported-element-prototype-nonenumerable-nativeExecutionClaimed-prop',
   'unsupported-element-prototype-nonenumerable-listenerInstallationClaimed-prop',
+  'unsupported-element-prototype-nonenumerable-publicRootCreated-prop',
+  'unsupported-element-prototype-nonenumerable-publicDispatchEnabled-prop',
+  'unsupported-element-prototype-nonenumerable-publicControlledBehaviorEnabled-prop',
   'unsupported-keyed-div',
   'unsupported-span-type',
   'unsupported-nested-sibling',
@@ -93,6 +96,7 @@ const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-nested-element-prototype-ref-prop',
   'unsupported-nested-element-prototype-publicHydrateRootCompatibilityClaimed-prop',
   'unsupported-nested-element-prototype-resource-form-alias-prop',
+  'unsupported-nested-element-prototype-publicRootTouched-prop',
   'unsupported-nested-component',
   'unsupported-nested-compatibility-alias',
   'unsupported-inherited-parent-children-prop',
@@ -1258,6 +1262,18 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
       'unsupported-element-prototype-nonenumerable-listenerInstallationClaimed-prop',
       'listenerInstallationClaimed'
     ),
+    createNonEnumerableInheritedElementClaimRejectionCaseFactory(
+      'unsupported-element-prototype-nonenumerable-publicRootCreated-prop',
+      'publicRootCreated'
+    ),
+    createNonEnumerableInheritedElementClaimRejectionCaseFactory(
+      'unsupported-element-prototype-nonenumerable-publicDispatchEnabled-prop',
+      'publicDispatchEnabled'
+    ),
+    createNonEnumerableInheritedElementClaimRejectionCaseFactory(
+      'unsupported-element-prototype-nonenumerable-publicControlledBehaviorEnabled-prop',
+      'publicControlledBehaviorEnabled'
+    ),
     () => ({
       label: 'unsupported-keyed-div',
       element: React.createElement('div', {key: 'blocked'}, 'blocked key')
@@ -1357,6 +1373,11 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
         publicFormActionCompatibilityClaimed: true,
         publicResourceCompatibilityClaimed: true
       },
+      false
+    ),
+    createInheritedNestedSpanElementPrototypeRejectionCaseFactory(
+      'unsupported-nested-element-prototype-publicRootTouched-prop',
+      {publicRootTouched: true},
       false
     ),
     createUnsupportedNestedComponentRejectionCase,
@@ -3182,6 +3203,18 @@ function createCases() {
       'unsupported-element-prototype-nonenumerable-listenerInstallationClaimed-prop',
       'listenerInstallationClaimed'
     ),
+    nonEnumerableInheritedElementClaimCase(
+      'unsupported-element-prototype-nonenumerable-publicRootCreated-prop',
+      'publicRootCreated'
+    ),
+    nonEnumerableInheritedElementClaimCase(
+      'unsupported-element-prototype-nonenumerable-publicDispatchEnabled-prop',
+      'publicDispatchEnabled'
+    ),
+    nonEnumerableInheritedElementClaimCase(
+      'unsupported-element-prototype-nonenumerable-publicControlledBehaviorEnabled-prop',
+      'publicControlledBehaviorEnabled'
+    ),
     {
       label: 'unsupported-keyed-div',
       element: React.createElement('div', {key: 'blocked'}, 'blocked key')
@@ -3289,6 +3322,11 @@ function createCases() {
         publicFormActionCompatibilityClaimed: true,
         publicResourceCompatibilityClaimed: true
       },
+      false
+    ),
+    inheritedNestedSpanElementPrototypeCase(
+      'unsupported-nested-element-prototype-publicRootTouched-prop',
+      {publicRootTouched: true},
       false
     ),
     {

@@ -599,6 +599,10 @@ function isPublicHostCompatibilityAliasName(name) {
     return false;
   }
 
+  if (normalized.startsWith('public')) {
+    return true;
+  }
+
   if (rootBridgeCapabilityClaimNormalizedNames.has(normalized)) {
     return true;
   }
@@ -638,7 +642,6 @@ function isPublicHostCompatibilityAliasName(name) {
   }
 
   return (
-    normalized.startsWith('public') ||
     normalized.startsWith('browser') ||
     normalized.startsWith('native') ||
     normalized.startsWith('package') ||

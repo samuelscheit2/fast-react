@@ -1036,6 +1036,33 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
       blockedSurface: "compatibility-claim"
     }),
     publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-element-prototype-nonenumerable-publicrootcreated-prop",
+      label:
+        "unsupported-element-prototype-nonenumerable-publicRootCreated-prop",
+      publicApi:
+        "root.render(forged <div> with non-enumerable inherited element publicRootCreated)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-element-prototype-nonenumerable-publicdispatchenabled-prop",
+      label:
+        "unsupported-element-prototype-nonenumerable-publicDispatchEnabled-prop",
+      publicApi:
+        "root.render(forged <div> with non-enumerable inherited element publicDispatchEnabled)",
+      category: "event-listener-prop",
+      blockedSurface: "event"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-element-prototype-nonenumerable-publiccontrolledbehaviorenabled-prop",
+      label:
+        "unsupported-element-prototype-nonenumerable-publicControlledBehaviorEnabled-prop",
+      publicApi:
+        "root.render(forged <div> with non-enumerable inherited element publicControlledBehaviorEnabled)",
+      category: "resource-form-controlled",
+      blockedSurface: "controlled-input"
+    }),
+    publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-keyed-div",
       label: "unsupported-keyed-div",
       publicApi: "root.render(<div key=\"blocked\">text</div>)",
@@ -1175,6 +1202,14 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_CAPABILITY_REJECTION_ROWS =
         "root.render(forged <div><span inherited element resource/form compatibility aliases /></div>)",
       category: "resource-form-controlled",
       blockedSurface: "resource"
+    }),
+    publicFacadeCapabilityRejectionRow({
+      id: "public-render-unsupported-nested-element-prototype-publicroottouched-prop",
+      label: "unsupported-nested-element-prototype-publicRootTouched-prop",
+      publicApi:
+        "root.render(forged <div><span inherited element publicRootTouched /></div>)",
+      category: "browser-dom-expansion",
+      blockedSurface: "compatibility-claim"
     }),
     publicFacadeCapabilityRejectionRow({
       id: "public-render-unsupported-nested-component",
