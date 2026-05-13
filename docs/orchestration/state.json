@@ -225,7 +225,7 @@
 		{
 			"id": 1273,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Rust root/work-loop next-lane scout",
 			"agent": "scout_1273_rust_root_next"
 		},
@@ -246,9 +246,27 @@
 		{
 			"id": 1276,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "react-test-renderer private/public blocker next-lane scout",
 			"agent": "scout_1276_test_renderer_next"
+		},
+		{
+			"id": 1277,
+			"type": "worker",
+			"status": "active",
+			"title": "Queued minimal HostRoot cleanup extra-sibling drift canary",
+			"agent": "worker_1277_queued_cleanup_extra_sibling_drift",
+			"branch": "worker/1277-queued-cleanup-extra-sibling-drift",
+			"audits": []
+		},
+		{
+			"id": 1278,
+			"type": "worker",
+			"status": "active",
+			"title": "react-test-renderer root handle WeakMap ownership canaries",
+			"agent": "worker_1278_test_renderer_root_handle_weakmap",
+			"branch": "worker/1278-test-renderer-root-handle-weakmap",
+			"audits": []
 		}
 	]
 }
