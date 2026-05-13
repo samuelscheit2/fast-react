@@ -124,7 +124,8 @@ test("private Children traversal currentness report records source-owned anchors
     [
       "explicit-key-escaping",
       "path-separator-synthesis",
-      "user-provided-slash-escaping"
+      "user-provided-slash-escaping",
+      "object-key-default-coercion"
     ]
   );
   assert.deepEqual(
@@ -672,6 +673,7 @@ test("private Children traversal currentness is accepted only from the helper so
     elementAndFragmentLeavesCurrent: true,
     portalShapeLeafCurrent: true,
     keyPathEscapingCurrent: true,
+    objectKeyDefaultCoercionCurrent: true,
     arrayReturnKeyEscapingCurrent: true,
     setAndGeneratorIterablesCurrent: true,
     mapEntryIterableCurrent: true,
@@ -1063,6 +1065,15 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
   );
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
+      sourceReport: {
+        reactChildrenSource:
+          "packages/react/src/ReactChildren.js#caller-smuggled"
+      }
+    }),
+    "children-traversal-currentness-source-report"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
       validChildShapeRows: report.validChildShapeRows.map((row) => ({
         ...row
       }))
@@ -1074,6 +1085,20 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
       keyPathEscapingRows: report.keyPathEscapingRows.map((row) => ({
         ...row
       }))
+    }),
+    "children-traversal-currentness-key-path-escaping"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      keyPathEscapingRows: report.keyPathEscapingRows.map((row) =>
+        row.id === "object-key-default-coercion"
+          ? {
+              ...row,
+              sourceTokens: ["String(key) string hint accepted"],
+              oracleScenario: "caller-shaped-key-coercion"
+            }
+          : row
+      )
     }),
     "children-traversal-currentness-key-path-escaping"
   );
@@ -1282,6 +1307,14 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
     childrenHelper.createChildrenTraversalCurrentnessReport({
       behaviorCurrentness: {
         keyPathEscapingCurrent: false
+      }
+    }),
+    "children-traversal-currentness-behavior-probes"
+  );
+  assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport({
+      behaviorCurrentness: {
+        objectKeyDefaultCoercionCurrent: false
       }
     }),
     "children-traversal-currentness-behavior-probes"
