@@ -1378,6 +1378,14 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
     "children-traversal-currentness-public-compatibility-claim"
   );
   assertCurrentnessRejected(
+    childrenHelper.createChildrenTraversalCurrentnessReport(
+      Object.create({
+        publicCompatibilityClaimed: true
+      })
+    ),
+    "children-traversal-currentness-public-compatibility-claim"
+  );
+  assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
       publicChildrenTraversalCompatibilityClaimed: true
     }),
@@ -1423,6 +1431,28 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
     }),
     "children-traversal-currentness-prerequisite-smuggling"
   );
+  let rootPrerequisitesGetterCalled = false;
+  const rootPrerequisitesPrototype = {};
+  Object.defineProperty(rootPrerequisitesPrototype, "rootPrerequisitesReady", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      rootPrerequisitesGetterCalled = true;
+      throw new Error(
+        "prototype root prerequisites getter should not be called"
+      );
+    }
+  });
+  const inheritedPrerequisiteReport =
+    childrenHelper.createChildrenTraversalCurrentnessReport(
+      Object.create(rootPrerequisitesPrototype)
+    );
+  assert.equal(rootPrerequisitesGetterCalled, false);
+  assertCurrentnessRejected(
+    inheritedPrerequisiteReport,
+    "children-traversal-currentness-prerequisite-smuggling"
+  );
+  assert.equal(rootPrerequisitesGetterCalled, false);
   assertCurrentnessRejected(
     childrenHelper.createChildrenTraversalCurrentnessReport({
       dispatcherPrerequisitesReady: true
@@ -1537,6 +1567,41 @@ test("private Children traversal currentness rejects forged, stale, and overbroa
     }),
     "children-traversal-currentness-unsupported-edge-claim"
   );
+
+  const pollutedAliasName = "publicChildrenTraversalCompatibilityClaimed";
+  const previousPollutedAliasDescriptor = Object.getOwnPropertyDescriptor(
+    Object.prototype,
+    pollutedAliasName
+  );
+  Object.defineProperty(Object.prototype, pollutedAliasName, {
+    configurable: true,
+    enumerable: true,
+    value: true
+  });
+  try {
+    const noArgumentReport =
+      childrenHelper.createChildrenTraversalCurrentnessReport();
+    assert.equal(
+      childrenHelper.validateChildrenTraversalCurrentnessReport(
+        noArgumentReport
+      ),
+      null
+    );
+    assertCurrentnessRejected(
+      childrenHelper.createChildrenTraversalCurrentnessReport({}),
+      "children-traversal-currentness-report-shape"
+    );
+  } finally {
+    if (previousPollutedAliasDescriptor === undefined) {
+      delete Object.prototype[pollutedAliasName];
+    } else {
+      Object.defineProperty(
+        Object.prototype,
+        pollutedAliasName,
+        previousPollutedAliasDescriptor
+      );
+    }
+  }
 });
 
 function loadFreshReactChildrenModules() {
