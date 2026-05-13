@@ -308,6 +308,200 @@ assert.equal(reactDomClient.createRoot.name, 'createRoot');
 }
 
 {
+  const publicDocument = createDocument('public-nested');
+  const publicContainer = publicDocument.createElement('div');
+  publicDocument.__mutationLog.length = 0;
+  const root = reactDomClient.createRoot(publicContainer);
+  const initialElement = React.createElement(
+    'div',
+    {id: 'nested&<>"'},
+    React.createElement('span', null, 'nested & < >')
+  );
+  const updateElement = React.createElement(
+    'div',
+    {id: 'nested-next&<>"'},
+    React.createElement('span', null, 'nested again & < >')
+  );
+  const idOnlyUpdateElement = React.createElement(
+    'div',
+    {id: 'nested-final&<>"'},
+    React.createElement('span', null, 'nested again & < >')
+  );
+  const idRemovalUpdateElement = React.createElement(
+    'div',
+    null,
+    React.createElement('span', null, 'nested again & < >')
+  );
+
+  assert.equal(root.render(initialElement), undefined);
+  const parentNode = publicContainer.firstChild;
+  const childNode = parentNode.firstChild;
+  const textNode = childNode.firstChild;
+  assert.equal(parentNode.nodeName, 'DIV');
+  assert.equal(parentNode.getAttribute('id'), 'nested&<>"');
+  assert.equal(childNode.nodeName, 'SPAN');
+  assert.equal(textNode.nodeValue, 'nested & < >');
+  assert.equal(publicContainer.textContent, 'nested & < >');
+  assert.equal(
+    publicContainer.innerHTML,
+    '<div id="nested&amp;&lt;&gt;&quot;"><span>nested &amp; &lt; &gt;</span></div>'
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), initialElement.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    initialElement.props.children.props
+  );
+
+  assert.equal(root.render(updateElement), undefined);
+  assert.equal(publicContainer.firstChild, parentNode);
+  assert.equal(parentNode.firstChild, childNode);
+  assert.equal(childNode.firstChild, textNode);
+  assert.equal(parentNode.getAttribute('id'), 'nested-next&<>"');
+  assert.equal(textNode.nodeValue, 'nested again & < >');
+  assert.equal(publicContainer.textContent, 'nested again & < >');
+  assert.equal(
+    publicContainer.innerHTML,
+    '<div id="nested-next&amp;&lt;&gt;&quot;"><span>nested again &amp; &lt; &gt;</span></div>'
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), updateElement.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    updateElement.props.children.props
+  );
+
+  assert.equal(root.render(idOnlyUpdateElement), undefined);
+  assert.equal(publicContainer.firstChild, parentNode);
+  assert.equal(parentNode.firstChild, childNode);
+  assert.equal(childNode.firstChild, textNode);
+  assert.equal(parentNode.getAttribute('id'), 'nested-final&<>"');
+  assert.equal(textNode.nodeValue, 'nested again & < >');
+  assert.equal(
+    publicContainer.innerHTML,
+    '<div id="nested-final&amp;&lt;&gt;&quot;"><span>nested again &amp; &lt; &gt;</span></div>'
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), idOnlyUpdateElement.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    idOnlyUpdateElement.props.children.props
+  );
+
+  assert.equal(root.render(idRemovalUpdateElement), undefined);
+  assert.equal(publicContainer.firstChild, parentNode);
+  assert.equal(parentNode.firstChild, childNode);
+  assert.equal(childNode.firstChild, textNode);
+  assert.equal(parentNode.getAttribute('id'), null);
+  assert.deepEqual(attributeEntries(parentNode), []);
+  assert.equal(textNode.nodeValue, 'nested again & < >');
+  assert.equal(
+    publicContainer.innerHTML,
+    '<div><span>nested again &amp; &lt; &gt;</span></div>'
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), idRemovalUpdateElement.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    idRemovalUpdateElement.props.children.props
+  );
+
+  assert.equal(root.render(null), undefined);
+  assert.equal(publicContainer.childNodes.length, 0);
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(childNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.equal(root.render(initialElement), undefined);
+  assert.notEqual(publicContainer.firstChild, parentNode);
+  assert.equal(root.unmount(), undefined);
+  assert.equal(root.unmount(), undefined);
+  assert.equal(publicContainer.childNodes.length, 0);
+  assert.throws(() => root.render(initialElement), {
+    code: 'FAST_REACT_UNIMPLEMENTED',
+    entrypoint: 'react-dom/client',
+    exportName: 'createRoot().render'
+  });
+  const freshRoot = reactDomClient.createRoot(publicContainer);
+  assert.equal(freshRoot.render(updateElement), undefined);
+  assert.equal(
+    publicContainer.innerHTML,
+    '<div id="nested-next&amp;&lt;&gt;&quot;"><span>nested again &amp; &lt; &gt;</span></div>'
+  );
+  assert.equal(freshRoot.unmount(), undefined);
+  assert.equal(publicContainer.childNodes.length, 0);
+  assert.equal(publicContainer.__registrations.length, 0);
+  assert.equal(publicDocument.__registrations.length, 0);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(publicContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(publicContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(publicDocument), false);
+
+  const nestedNoIdDocument = createDocument('public-nested-no-id');
+  const nestedNoIdContainer = nestedNoIdDocument.createElement('div');
+  const nestedNoIdRoot = reactDomClient.createRoot(nestedNoIdContainer);
+  const nestedNoIdElement = React.createElement(
+    'div',
+    null,
+    React.createElement('span', null, 'nested no id')
+  );
+  assert.equal(nestedNoIdRoot.render(nestedNoIdElement), undefined);
+  assert.deepEqual(attributeEntries(nestedNoIdContainer.firstChild), []);
+  assert.equal(nestedNoIdContainer.textContent, 'nested no id');
+  assert.equal(
+    nestedNoIdContainer.innerHTML,
+    '<div><span>nested no id</span></div>'
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(nestedNoIdContainer.firstChild),
+    nestedNoIdElement.props
+  );
+  assert.equal(nestedNoIdRoot.unmount(), undefined);
+
+  const atomicDocument = createDocument('public-nested-atomic');
+  const atomicContainer = atomicDocument.createElement('div');
+  const atomicRoot = reactDomClient.createRoot(atomicContainer);
+  const atomicInitialElement = React.createElement(
+    'div',
+    {id: 'atomic-initial'},
+    React.createElement('span', null, 'atomic initial')
+  );
+  const atomicNextElement = React.createElement(
+    'div',
+    {id: 'atomic-next'},
+    React.createElement('span', null, 'atomic next')
+  );
+  assert.equal(atomicRoot.render(atomicInitialElement), undefined);
+  const atomicParentNode = atomicContainer.firstChild;
+  const atomicChildNode = atomicParentNode.firstChild;
+  const atomicTextNode = atomicChildNode.firstChild;
+  const originalAtomicSetAttribute = atomicParentNode.setAttribute;
+  atomicParentNode.setAttribute = function setAttribute(name, value) {
+    if (String(name) === 'id') {
+      throw new Error('atomic parent id setAttribute failure');
+    }
+    return originalAtomicSetAttribute.call(this, name, value);
+  };
+  assert.throws(
+    () => {
+      atomicRoot.render(atomicNextElement);
+    },
+    /atomic parent id setAttribute failure/
+  );
+  assert.equal(atomicContainer.firstChild, atomicParentNode);
+  assert.equal(atomicParentNode.firstChild, atomicChildNode);
+  assert.equal(atomicChildNode.firstChild, atomicTextNode);
+  assert.deepEqual(attributeEntries(atomicParentNode), [
+    ['id', 'atomic-initial']
+  ]);
+  assert.equal(atomicTextNode.nodeValue, 'atomic initial');
+  assert.equal(
+    componentTree.getLatestPropsFromNode(atomicParentNode),
+    atomicInitialElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(atomicChildNode),
+    atomicInitialElement.props.children.props
+  );
+  atomicParentNode.setAttribute = originalAtomicSetAttribute;
+  assert.equal(atomicRoot.unmount(), undefined);
+}
+
+{
   const publicDocument = createDocument('public-null-before-render');
   const publicContainer = publicDocument.createElement('div');
   publicDocument.__mutationLog.length = 0;
@@ -1225,11 +1419,41 @@ function createPublicRenderCapabilityRejectionCases() {
       element: React.createElement('span', null, 'blocked type')
     }),
     () => ({
-      label: 'unsupported-nested-child',
+      label: 'unsupported-nested-sibling',
       element: React.createElement(
         'div',
         null,
-        React.createElement('span', null, 'blocked nested')
+        React.createElement('span', null, 'blocked nested'),
+        React.createElement('span', null, 'blocked sibling')
+      )
+    }),
+    () => ({
+      label: 'unsupported-nested-span-id-prop',
+      element: React.createElement(
+        'div',
+        null,
+        React.createElement('span', {id: 'blocked'}, 'blocked nested id')
+      )
+    }),
+    () => ({
+      label: 'unsupported-nested-span-className-prop',
+      element: React.createElement(
+        'div',
+        null,
+        React.createElement(
+          'span',
+          {className: 'blocked'},
+          'blocked nested class'
+        )
+      )
+    }),
+    createUnsupportedNestedComponentRejectionCase,
+    () => ({
+      label: 'unsupported-nested-compatibility-alias',
+      element: React.createElement(
+        'div',
+        {compatibilityClaimed: true},
+        React.createElement('span', null, 'blocked compatibility claim')
       )
     }),
     () => ({
@@ -1342,6 +1566,24 @@ function createUnsupportedComponentRejectionCase() {
       componentCalls++;
       return React.createElement('div', null, 'blocked component');
     }),
+    assertNoCapabilityEffects() {
+      assert.equal(componentCalls, 0);
+    }
+  };
+}
+
+function createUnsupportedNestedComponentRejectionCase() {
+  let componentCalls = 0;
+  return {
+    label: 'unsupported-nested-component',
+    element: React.createElement(
+      'div',
+      null,
+      React.createElement(function UnsupportedNestedComponent() {
+        componentCalls++;
+        return React.createElement('span', null, 'blocked nested component');
+      })
+    ),
     assertNoCapabilityEffects() {
       assert.equal(componentCalls, 0);
     }

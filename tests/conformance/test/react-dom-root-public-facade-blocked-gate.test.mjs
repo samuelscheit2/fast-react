@@ -900,6 +900,108 @@ function assertMinimalPublicRootBoundary(publicBoundary) {
   assertMinimalPublicDivTextRecreateAfterUnmountLifecycle(publicBoundary);
 }
 
+test("React DOM public root facade accepts one nested fake-DOM host lifecycle", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const React = require(path.join(repoRoot, "packages/react/index.js"));
+  const componentTree = require(
+    path.join(repoRoot, "packages/react-dom/src/client/component-tree.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const document = createPrivateGateDocument(
+    "public-nested-host-lifecycle",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const root = reactDomClient.createRoot(container);
+  const initialElement = React.createElement(
+    "div",
+    { id: "nested" },
+    React.createElement("span", null, "nested")
+  );
+  const updateElement = React.createElement(
+    "div",
+    { id: "nested-next" },
+    React.createElement("span", null, "nested updated")
+  );
+  const idOnlyUpdateElement = React.createElement(
+    "div",
+    { id: "nested-final" },
+    React.createElement("span", null, "nested updated")
+  );
+
+  assert.equal(root.render(initialElement), undefined);
+  const parentNode = container.firstChild;
+  const childNode = parentNode.firstChild;
+  const textNode = childNode.firstChild;
+  assert.equal(parentNode.nodeName, "DIV");
+  assert.equal(childNode.nodeName, "SPAN");
+  assert.equal(textNode.nodeValue, "nested");
+  assert.deepEqual(attributeEntries(parentNode), [["id", "nested"]]);
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), initialElement.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    initialElement.props.children.props
+  );
+
+  assert.equal(root.render(updateElement), undefined);
+  assert.equal(container.firstChild, parentNode);
+  assert.equal(parentNode.firstChild, childNode);
+  assert.equal(childNode.firstChild, textNode);
+  assert.equal(textNode.nodeValue, "nested updated");
+  assert.deepEqual(attributeEntries(parentNode), [["id", "nested-next"]]);
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), updateElement.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    updateElement.props.children.props
+  );
+
+  assert.equal(root.render(idOnlyUpdateElement), undefined);
+  assert.equal(container.firstChild, parentNode);
+  assert.equal(parentNode.firstChild, childNode);
+  assert.equal(childNode.firstChild, textNode);
+  assert.equal(textNode.nodeValue, "nested updated");
+  assert.deepEqual(attributeEntries(parentNode), [["id", "nested-final"]]);
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), idOnlyUpdateElement.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    idOnlyUpdateElement.props.children.props
+  );
+
+  assert.equal(root.render(null), undefined);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(childNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.equal(root.render(initialElement), undefined);
+  assert.notEqual(container.firstChild, parentNode);
+  assert.equal(root.unmount(), undefined);
+  assert.equal(root.unmount(), undefined);
+  assert.equal(container.childNodes.length, 0);
+  assert.throws(() => root.render(initialElement), {
+    code: "FAST_REACT_UNIMPLEMENTED",
+    entrypoint: "react-dom/client",
+    exportName: "createRoot().render"
+  });
+  const freshRoot = reactDomClient.createRoot(container);
+  assert.equal(freshRoot.render(updateElement), undefined);
+  assert.equal(container.textContent, "nested updated");
+  assert.equal(freshRoot.unmount(), undefined);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+});
+
 test("React DOM public root facade gate blocks placeholders while oracle prerequisites remain accepted", () => {
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
@@ -5775,6 +5877,34 @@ test("React DOM public root facade records hostile render capability rejections"
       (row) =>
         row.label === "unsupported-suppressHydrationWarning-prop" &&
         row.blockedSurface === "hydration"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-nested-span-id-prop" &&
+        row.blockedSurface === "nested-child-prop"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-nested-span-className-prop" &&
+        row.blockedSurface === "nested-child-prop"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-nested-component" &&
+        row.blockedSurface === "nested-component"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-nested-compatibility-alias" &&
+        row.blockedSurface === "compatibility-claim"
     )
   );
   assert.ok(
