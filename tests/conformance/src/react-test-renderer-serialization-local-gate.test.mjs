@@ -6266,6 +6266,370 @@ test("react-test-renderer serialization gate rejects placeholder oracle status a
   }
 });
 
+test("react-test-renderer serialization gate rejects partial placeholder entrypoint drift", () => {
+  const driftedEntrypoints = [
+    "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+    "packages/react-test-renderer/cjs/react-test-renderer.production.js",
+    "packages/react-test-renderer/shallow.js"
+  ];
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: driftedEntrypoints.map((evidencePath) => ({
+      evidencePath,
+      mutate(text) {
+        assert.equal(
+          text.includes("__FAST_REACT_PLACEHOLDER__"),
+          true,
+          `${evidencePath} contains the placeholder metadata key`
+        );
+        return text.replaceAll(
+          "__FAST_REACT_PLACEHOLDER__",
+          "__FAST_REACT_PLACEHOLDER_DRIFTED__"
+        );
+      }
+    }))
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+    assert.equal(gate.privateToJSONFacadeGateReady, false);
+    assert.equal(gate.privateToTreeMetadataGateReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization gate rejects placeholder marker comment string template and regex spoofing", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/index.js",
+    mutate(text) {
+      assert.equal(
+        text.includes("__FAST_REACT_PLACEHOLDER__: {"),
+        true,
+        "package root entrypoint exposes placeholder metadata"
+      );
+      return (
+        text.replace(
+          "__FAST_REACT_PLACEHOLDER__: {",
+          "__FAST_REACT_PLACEHOLDER_SPOOFED__: {"
+        ) +
+        "\n// __FAST_REACT_PLACEHOLDER__\n" +
+        "const placeholderSpoofString = '__FAST_REACT_PLACEHOLDER__';\n" +
+        "const placeholderSpoofTemplate = `__FAST_REACT_PLACEHOLDER__`;\n" +
+        "/__FAST_REACT_PLACEHOLDER__/u;\n"
+      );
+    }
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization gate rejects package-root compatibility alias smuggling", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/package.json",
+    mutate(text) {
+      const packageJson = JSON.parse(text);
+      packageJson.name = "react-test-renderer";
+      packageJson.exports = {
+        ".": "./index.js"
+      };
+      packageJson.packageCompatibilityClaimed = true;
+      return `${JSON.stringify(packageJson, null, 2)}\n`;
+    }
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization gate rejects sibling package-root alias smuggling", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFiles({
+    mutations: []
+  });
+  const aliasRoot = join(workspace.root, "packages/fast-react-test-renderer");
+
+  try {
+    mkdirSync(aliasRoot, { recursive: true });
+    writeFileSync(
+      join(aliasRoot, "package.json"),
+      JSON.stringify(
+        {
+          name: "fast-react-test-renderer",
+          version: "0.0.0",
+          main: "index.js",
+          packageCompatibilityClaimed: true
+        },
+        null,
+        2
+      )
+    );
+    writeFileSync(
+      join(aliasRoot, "index.js"),
+      "module.exports = require('../react-test-renderer');\n"
+    );
+
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization gate rejects public native and package export smuggling", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+    mutate(text) {
+      assert.equal(
+        text.includes("exports.version = placeholderVersion;"),
+        true,
+        "development CJS entrypoint exports placeholder version"
+      );
+      return text.replace(
+        "exports.version = placeholderVersion;",
+        "exports.version = placeholderVersion;\n" +
+          "exports.ReactTestInstance = function ReactTestInstance() {};\n" +
+          "exports.nativeBridgeAvailable = true;\n" +
+          "exports.packageCompatibilityClaimed = true;"
+      );
+    }
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+    assert.equal(gate.publicCompatibilityReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization gate rejects pre-metadata public export alias smuggling", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/index.js",
+    mutate(text) {
+      assert.equal(
+        text.includes("const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';"),
+        true,
+        "package root entrypoint has an early constant before metadata"
+      );
+      return text.replace(
+        "const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';",
+        "exports.default = {};\n" +
+          "exports.native = {};\n" +
+          "module.exports.default = {};\n" +
+          "const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';"
+      );
+    }
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization gate rejects trivia bracket and defineProperty export smuggling", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+    mutate(text) {
+      assert.equal(
+        text.includes("const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';"),
+        true,
+        "development CJS entrypoint has an early constant"
+      );
+      return text.replace(
+        "const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';",
+        "exports . default = createExport;\n" +
+          "exports [\"nativeBridgeAvailable\"] = true;\n" +
+          "Object.defineProperty (exports, \"packageCompatibilityClaimed\", { value: true });\n" +
+          "Object.assign (exports, { publicCompatibilityClaimed: true });\n" +
+          "const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';"
+      );
+    }
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization gate rejects simple CommonJS export aliases", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/index.js",
+    mutate(text) {
+      assert.equal(
+        text.includes("const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';"),
+        true,
+        "package root entrypoint has an early constant"
+      );
+      return text.replace(
+        "const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';",
+        "const out = exports;\n" +
+          "out.default = createExport;\n" +
+          "const moduleOut = module . exports;\n" +
+          "moduleOut.nativeBridgeAvailable = true;\n" +
+          "const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';"
+      );
+    }
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization gate rejects executable template export smuggling", () => {
+  const standaloneTemplateWorkspace =
+    createSerializationGateWorkspaceWithMutatedFile({
+      evidencePath: "packages/react-test-renderer/index.js",
+      mutate(text) {
+        assert.equal(
+          text.includes("const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';"),
+          true,
+          "package root entrypoint has an early constant"
+        );
+        return text.replace(
+          "const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';",
+          "`${exports.default = createExport}`;\n" +
+            "`prefix ${Object.defineProperty (exports, \"nativeExecution\", { value: true })} suffix`;\n" +
+            "const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';"
+        );
+      }
+    });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: standaloneTemplateWorkspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    standaloneTemplateWorkspace.cleanup();
+  }
+
+  const exportValueTemplateWorkspace =
+    createSerializationGateWorkspaceWithMutatedFile({
+      evidencePath: "packages/react-test-renderer/index.js",
+      mutate(text) {
+        const blockedExport =
+          "exports.unstable_batchedUpdates = createUnsupportedFunction(\n" +
+          "  'unstable_batchedUpdates',\n" +
+          "  2\n" +
+          ");";
+        assert.equal(
+          text.includes(blockedExport),
+          true,
+          "package root entrypoint has the expected blocked export value"
+        );
+        return text.replace(
+          blockedExport,
+          "exports.unstable_batchedUpdates = createUnsupportedFunction(\n" +
+            "  'unstable_batchedUpdates',\n" +
+            "  2,\n" +
+            "  `${exports.default = createExport}`\n" +
+            ");"
+        );
+      }
+    });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: exportValueTemplateWorkspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    exportValueTemplateWorkspace.cleanup();
+  }
+});
+
+test("react-test-renderer serialization gate rejects repeated shallow module exports", () => {
+  const workspace = createSerializationGateWorkspaceWithMutatedFile({
+    evidencePath: "packages/react-test-renderer/shallow.js",
+    mutate(text) {
+      assert.equal(
+        text.includes("module.exports = shallow;"),
+        true,
+        "shallow entrypoint has the expected placeholder export"
+      );
+      return `${text}\nconst proxyRenderer = {};\nmodule.exports = proxyRenderer;\n`;
+    }
+  });
+
+  try {
+    const gate = evaluateReactTestRendererSerializationLocalGate({
+      oracle,
+      workspaceRoot: workspace.root
+    });
+
+    assertPlaceholderStatusRejectedAsPresent(gate);
+    assert.equal(gate.requiredLocalTargetsReady, false);
+  } finally {
+    workspace.cleanup();
+  }
+});
+
 test("react-test-renderer serialization gate rejects local Fast React comparison or compatibility status claims", () => {
   const claimedOracle = JSON.parse(JSON.stringify(oracle));
   claimedOracle.localFastReactStatus.comparedToReactTestRenderer = true;
@@ -6389,6 +6753,24 @@ test("react-test-renderer serialization local status and admission records are i
   assert.deepEqual(gate.admittedScenarios, []);
   assert.deepEqual(gate.violations, []);
 });
+
+function assertPlaceholderStatusRejectedAsPresent(gate) {
+  assert.equal(gate.status, "blocked-with-violations");
+  assert.equal(gate.localChecks.publicJsReactTestRendererFacadePresent, true);
+  assert.equal(gate.localChecks.publicJsReactTestRendererFacadePlaceholder, false);
+  assert.equal(gate.localChecks.publicJsReactTestRendererFacadeStatus, "present");
+  assert.deepEqual(
+    gate.violations.map((violation) => violation.id),
+    [
+      "local-fast-react-status-oracle-stale",
+      "local-fast-react-status-source-stale"
+    ]
+  );
+  assert.equal(gate.violations[0].expectedStatus, "present-in-workspace");
+  assert.equal(gate.violations[0].actualStatus, "placeholder-present");
+  assert.equal(gate.violations[1].expectedStatus, "present-in-workspace");
+  assert.equal(gate.violations[1].actualStatus, "placeholder-present");
+}
 
 function createSerializationGateWorkspaceWithMutatedFile({
   evidencePath,

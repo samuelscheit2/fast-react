@@ -731,6 +731,66 @@ const publicJsReactTestRendererEntrypointSourcePaths = freezeArray([
   "packages/react-test-renderer/cjs/react-test-renderer.production.js"
 ]);
 
+const publicJsReactTestRendererExactPlaceholderPackageRoot =
+  "packages/react-test-renderer";
+
+const reactTestRendererCompatibilityTarget = "react-test-renderer@19.2.6";
+
+const reactTestRendererPlaceholderVersion =
+  "0.0.0-fast-react-test-renderer-placeholder";
+
+const reactTestRendererExpectedRendererExportNames = freezeArray([
+  "_Scheduler",
+  "act",
+  "create",
+  "unstable_batchedUpdates",
+  "version"
+]);
+
+const reactTestRendererPlaceholderClaimFieldNames = freezeArray([
+  "ReactTestInstance",
+  "TestInstance",
+  "browserDomCompatibilityClaimed",
+  "compatibilityClaim",
+  "compatibilityClaimed",
+  "createRouteAvailable",
+  "fastReactBehaviorCompatible",
+  "nativeAddonLoaded",
+  "nativeBridgeAvailable",
+  "nativeBridgeLoadingAvailable",
+  "nativeExecution",
+  "nativeExecutionAvailable",
+  "packageCompatibilityClaimed",
+  "publicCompatibilityClaimed",
+  "publicJsFacadeRoutingPresent",
+  "publicSerializationAvailable",
+  "publicTestInstanceWrappersPresent",
+  "reactTestRendererCompatibilityClaimed",
+  "rendererCompatibilityClaimed",
+  "rootCompatibilityClaimed",
+  "serializationAvailable",
+  "serializationCompatibilityClaimed",
+  "testInstanceCompatibilityClaimed"
+]);
+
+const reactTestRendererRendererEntrypointPlaceholderSpecs = freezeArray([
+  freezeRecord({
+    relativePath: "index.js",
+    entrypoint: "react-test-renderer",
+    actExport: "environment-blocked"
+  }),
+  freezeRecord({
+    relativePath: "cjs/react-test-renderer.development.js",
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.development",
+    actExport: "blocked-function"
+  }),
+  freezeRecord({
+    relativePath: "cjs/react-test-renderer.production.js",
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.production",
+    actExport: "undefined"
+  })
+]);
+
 const privateSerializationLifecycleSourceTokens = freezeArray([
   "rootLifecycleExecutionEvidences",
   "validatePrivateSerializationLifecycleExecutionEvidence",
@@ -937,8 +997,14 @@ export function inspectReactTestRendererSerializationLocalTargets({
       existsWorkspacePath(workspaceRoot, `${packageRoot}/package.json`)
     );
   const publicJsReactTestRendererFacadePlaceholder =
-    publicJsReactTestRendererPackageRoots.some((packageRoot) =>
-      isPlaceholderReactTestRendererPackage(workspaceRoot, packageRoot)
+    isPlaceholderReactTestRendererPackage(
+      workspaceRoot,
+      publicJsReactTestRendererExactPlaceholderPackageRoot
+    ) &&
+    publicJsReactTestRendererPackageRoots.every(
+      (packageRoot) =>
+        packageRoot === publicJsReactTestRendererExactPlaceholderPackageRoot ||
+        !existsWorkspacePath(workspaceRoot, `${packageRoot}/package.json`)
     );
   const publicJsReactTestRendererFacadeStatus =
     publicJsReactTestRendererFacadePresent
@@ -2539,28 +2605,1190 @@ function expectedReactTestRendererSerializationLocalFastReactStatus(localChecks)
 }
 
 function isPlaceholderReactTestRendererPackage(workspaceRoot, packageRoot) {
-  if (!existsWorkspacePath(workspaceRoot, `${packageRoot}/package.json`)) {
+  if (packageRoot !== publicJsReactTestRendererExactPlaceholderPackageRoot) {
     return false;
   }
 
-  const packageJson = readWorkspaceFile(workspaceRoot, `${packageRoot}/package.json`);
-  const packageSource = readWorkspaceTree(workspaceRoot, packageRoot);
+  if (!isExactReactTestRendererPlaceholderPackageJson(workspaceRoot)) {
+    return false;
+  }
 
   return (
-    hasSourcePattern(
-      packageJson,
-      /"name"\s*:\s*"@fast-react\/react-test-renderer"/u
+    reactTestRendererRendererEntrypointPlaceholderSpecs.every((spec) =>
+      isExactReactTestRendererPlaceholderRendererEntrypoint(
+        workspaceRoot,
+        spec
+      )
     ) &&
-    hasSourcePattern(packageSource, /\b__FAST_REACT_PLACEHOLDER__\b/u) &&
-    hasSourcePattern(
-      packageSource,
-      /\bFastReactTestRendererUnimplementedError\b/u
-    ) &&
-    hasSourcePattern(
-      packageSource,
-      /\b0\.0\.0-fast-react-test-renderer-placeholder\b/u
-    )
+    isExactReactTestRendererPlaceholderShallowEntrypoint(workspaceRoot)
   );
+}
+
+function isExactReactTestRendererPlaceholderPackageJson(workspaceRoot) {
+  const packageJson = readWorkspaceFile(
+    workspaceRoot,
+    `${publicJsReactTestRendererExactPlaceholderPackageRoot}/package.json`
+  );
+  if (packageJson === "") {
+    return false;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(packageJson);
+  } catch {
+    return false;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return false;
+  }
+
+  return (
+    parsed.name === "@fast-react/react-test-renderer" &&
+    parsed.version === "0.0.0" &&
+    parsed.private === true &&
+    parsed.main === "index.js" &&
+    parsed.dependencies?.scheduler === "^0.27.0" &&
+    parsed.peerDependencies?.["@fast-react/react"] === "0.0.0" &&
+    parsed.engines?.node === ">=26.0.0" &&
+    !Object.hasOwn(parsed, "exports") &&
+    !Object.hasOwn(parsed, "module") &&
+    !Object.hasOwn(parsed, "browser") &&
+    !Object.hasOwn(parsed, "react-native") &&
+    !Object.hasOwn(parsed, "types") &&
+    !jsonRecordContainsClaimField(parsed)
+  );
+}
+
+function jsonRecordContainsClaimField(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => jsonRecordContainsClaimField(item));
+  }
+
+  return Object.entries(value).some(
+    ([key, nestedValue]) =>
+      reactTestRendererPlaceholderClaimFieldNames.includes(key) ||
+      jsonRecordContainsClaimField(nestedValue)
+  );
+}
+
+function isExactReactTestRendererPlaceholderRendererEntrypoint(
+  workspaceRoot,
+  spec
+) {
+  const relativePath =
+    `${publicJsReactTestRendererExactPlaceholderPackageRoot}/` +
+    spec.relativePath;
+  const source = readWorkspaceFile(workspaceRoot, relativePath);
+  if (source === "") {
+    return false;
+  }
+  const sourceHeader = source.slice(0, 20000);
+  const placeholderSurfaceIndex = findJsSourceOutsideCommentsAndStrings(
+    source,
+    "function definePlaceholderMetadata"
+  );
+  if (placeholderSurfaceIndex < 0) {
+    return false;
+  }
+  const sourceFooter = source.slice(placeholderSurfaceIndex);
+
+  return (
+    readJsConstStringLiteral(sourceHeader, "compatibilityTarget") ===
+      reactTestRendererCompatibilityTarget &&
+    readJsConstStringLiteral(sourceHeader, "entrypoint") === spec.entrypoint &&
+    readJsConstStringLiteral(sourceHeader, "placeholderVersion") ===
+      reactTestRendererPlaceholderVersion &&
+    jsPlaceholderMetadataFunctionPass(sourceFooter) &&
+    jsExactSourceStatementPass(
+      sourceFooter,
+      "definePlaceholderMetadata(module.exports);"
+    ) &&
+    jsExactSourceStatementPass(
+      sourceFooter,
+      "exports.version = placeholderVersion;"
+    ) &&
+    jsExactCommonJsNamedExportsPass(
+      source,
+      reactTestRendererExpectedRendererExportNames
+    ) &&
+    jsRendererPublicBlockerSurfacePass(sourceFooter, spec) &&
+    !jsContainsCommonJsAliasSmuggling(source)
+  );
+}
+
+function isExactReactTestRendererPlaceholderShallowEntrypoint(workspaceRoot) {
+  const source = readWorkspaceFile(
+    workspaceRoot,
+    `${publicJsReactTestRendererExactPlaceholderPackageRoot}/shallow.js`
+  );
+  if (source === "") {
+    return false;
+  }
+
+  return (
+    readJsConstStringLiteral(source, "compatibilityTarget") ===
+      reactTestRendererCompatibilityTarget &&
+    readJsConstStringLiteral(source, "entrypoint") ===
+      "react-test-renderer/shallow" &&
+    readJsConstStringLiteral(source, "shallowUnsupportedCode") ===
+      "FAST_REACT_TEST_RENDERER_SHALLOW_UNSUPPORTED" &&
+    jsDefinePropertiesDescriptorsPass({
+      source,
+      targetSource: "shallow",
+      descriptors: reactTestRendererPlaceholderMetadataDescriptors()
+    }) &&
+    jsFunctionDeclarationSourceCallPrefixesPass({
+      source,
+      functionName: "shallow",
+      calls: freezeArray([
+        freezeRecord({
+          callee: "createShallowUnsupportedError",
+          arguments: freezeArray(["'was called'"])
+        })
+      ])
+    }) &&
+    jsExactCommonJsModuleExportPass(source, "shallow") &&
+    !jsContainsCommonJsAliasSmuggling(source, {
+      allowModuleExportsAssignment: "shallow"
+    })
+  );
+}
+
+function reactTestRendererPlaceholderMetadataDescriptors() {
+  return freezeArray([
+    freezeRecord({
+      property: "__FAST_REACT_PLACEHOLDER__",
+      assertions: freezeArray([
+        jsBooleanPropertyAssertion("enumerable", false),
+        jsBooleanPropertyAssertion("value", true)
+      ])
+    }),
+    freezeRecord({
+      property: "__FAST_REACT_ENTRYPOINT__",
+      assertions: freezeArray([
+        jsBooleanPropertyAssertion("enumerable", false),
+        jsSourcePropertyAssertion("value", "entrypoint")
+      ])
+    }),
+    freezeRecord({
+      property: "compatibilityTarget",
+      assertions: freezeArray([
+        jsBooleanPropertyAssertion("enumerable", false),
+        jsSourcePropertyAssertion("value", "compatibilityTarget")
+      ])
+    })
+  ]);
+}
+
+function jsPlaceholderMetadataFunctionPass(source) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName: "definePlaceholderMetadata",
+    afterDeclaration: "function createPlaceholderRenderer"
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  return jsDefinePropertiesDescriptorsPass({
+    source: declaration.body,
+    targetSource: "exportsObject",
+    descriptors: reactTestRendererPlaceholderMetadataDescriptors()
+  });
+}
+
+function jsRendererPublicBlockerSurfacePass(source, spec) {
+  const rendererCallsPass = jsFunctionDeclarationSourceCallPrefixesPass({
+    source,
+    functionName: "createPlaceholderRenderer",
+    calls: freezeArray([
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().toJSON'", "0"])
+      }),
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().toTree'", "0"])
+      }),
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().update'", "1"])
+      }),
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().unmount'", "0"])
+      }),
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().getInstance'", "0"])
+      }),
+      freezeRecord({
+        callee: "createRendererUnsupportedFunction",
+        arguments: freezeArray(["'create().unstable_flushSync'", "1"])
+      }),
+      freezeRecord({
+        callee: "createUnsupportedError",
+        arguments: freezeArray(["'create().root'", "'was accessed'"])
+      })
+    ])
+  });
+
+  if (rendererCallsPass !== true) {
+    return false;
+  }
+
+  const unstableBatchedUpdatesBlocked =
+    jsCallExpressionWithArgumentPrefixPass({
+      source,
+      callee: "createUnsupportedFunction",
+      expectedArgumentsPrefix: freezeArray(["'unstable_batchedUpdates'", "2"])
+    });
+
+  if (
+    !unstableBatchedUpdatesBlocked ||
+    !jsExactSourceStatementPass(source, "exports._Scheduler = schedulerPlaceholder;") ||
+    !jsExactSourceStatementPass(source, "exports.create = createExport;") ||
+    !jsExactSourceStatementPass(source, "const createExport = defineFunctionShape(create, 'create', 2);")
+  ) {
+    return false;
+  }
+
+  if (spec.actExport === "undefined") {
+    return jsExactSourceStatementPass(source, "exports.act = undefined;");
+  }
+
+  const actBlocked = jsCallExpressionWithArgumentPrefixPass({
+    source,
+    callee: "createUnsupportedFunction",
+    expectedArgumentsPrefix: freezeArray(["'act'", "1"])
+  });
+
+  if (spec.actExport === "blocked-function") {
+    return (
+      actBlocked &&
+      jsExactSourceStatementPass(source, "exports.act = createUnsupportedFunction(")
+    );
+  }
+
+  return (
+    actBlocked &&
+    jsExactSourceStatementPass(source, "exports.act = isProduction")
+  );
+}
+
+function jsDefinePropertiesDescriptorsPass({
+  source,
+  targetSource,
+  descriptors
+}) {
+  let searchIndex = 0;
+
+  while (searchIndex < source.length) {
+    const calleeIndex = findJsSourceOutsideCommentsAndStrings(
+      source,
+      "Object.defineProperties",
+      searchIndex
+    );
+    if (calleeIndex < 0) {
+      return false;
+    }
+
+    const callOpenIndex = skipJsTrivia(
+      source,
+      calleeIndex + "Object.defineProperties".length,
+      source.length
+    );
+    if (source[callOpenIndex] !== "(") {
+      searchIndex = calleeIndex + "Object.defineProperties".length;
+      continue;
+    }
+
+    const callCloseIndex = findMatchingJsEnclosure(
+      source,
+      callOpenIndex,
+      "(",
+      ")"
+    );
+    if (callCloseIndex < 0) {
+      return false;
+    }
+
+    const args = extractTopLevelJsCallArguments(
+      source,
+      callOpenIndex,
+      callCloseIndex
+    );
+    if (args.length >= 2 && args[0] === targetSource) {
+      const descriptorObject = extractJsObjectLiteralProperties(args[1]);
+      if (
+        descriptorObject.ok === true &&
+        jsPropertyDescriptorAssertionsPass({
+          properties: descriptorObject.properties,
+          descriptors
+        })
+      ) {
+        return true;
+      }
+    }
+
+    searchIndex = callCloseIndex + 1;
+  }
+
+  return false;
+}
+
+function jsPropertyDescriptorAssertionsPass({ properties, descriptors }) {
+  return descriptors.every((descriptor) => {
+    const descriptorSource = properties.get(descriptor.property);
+    const descriptorProperties = extractJsObjectLiteralProperties(
+      descriptorSource
+    );
+    return (
+      descriptorProperties.ok === true &&
+      descriptor.assertions.every((assertion) =>
+        jsObjectPropertyAssertionPass({
+          properties: descriptorProperties.properties,
+          assertion
+        })
+      )
+    );
+  });
+}
+
+function jsObjectPropertyAssertionPass({ properties, assertion }) {
+  const actualSource = properties.get(assertion.property);
+  if (assertion.kind === "js-boolean-property") {
+    return actualSource === String(assertion.value);
+  }
+  if (assertion.kind === "js-string-property") {
+    return parseJsStringLiteralSource(actualSource) === assertion.value;
+  }
+  if (assertion.kind === "js-source-property") {
+    return actualSource === assertion.value;
+  }
+  return false;
+}
+
+function extractJsObjectLiteralProperties(source) {
+  if (typeof source !== "string") {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-source-not-string"
+    });
+  }
+
+  const openIndex = skipJsTrivia(source, 0, source.length);
+  if (source[openIndex] !== "{") {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-literal-not-found"
+    });
+  }
+
+  const closeIndex = findMatchingJsBrace(source, openIndex);
+  if (closeIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-literal-not-closed"
+    });
+  }
+
+  const endIndex = skipJsTrivia(source, closeIndex + 1, source.length);
+  if (endIndex !== source.length) {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-literal-has-trailing-source"
+    });
+  }
+
+  return extractTopLevelJsObjectProperties(source, openIndex, closeIndex);
+}
+
+function readJsConstStringLiteral(source, constName) {
+  const declarationIndex = findJsSourceOutsideCommentsAndStrings(
+    source,
+    `const ${constName}`
+  );
+  if (declarationIndex < 0) {
+    return null;
+  }
+
+  const afterNameIndex = declarationIndex + `const ${constName}`.length;
+  if (/[A-Za-z0-9_$]/u.test(source[afterNameIndex] ?? "")) {
+    return null;
+  }
+
+  const assignmentIndex = skipJsTrivia(
+    source,
+    afterNameIndex,
+    source.length
+  );
+  if (source[assignmentIndex] !== "=") {
+    return null;
+  }
+
+  const valueStart = skipJsTrivia(
+    source,
+    assignmentIndex + 1,
+    source.length
+  );
+  const valueEnd = skipQuotedJsLiteral(source, valueStart);
+  if (valueEnd === valueStart) {
+    return null;
+  }
+
+  const statementEnd = skipJsTrivia(source, valueEnd, source.length);
+  if (source[statementEnd] !== ";") {
+    return null;
+  }
+
+  return parseJsStringLiteralSource(source.slice(valueStart, valueEnd));
+}
+
+function jsExactSourceStatementPass(source, statement) {
+  return findJsSourceOutsideCommentsAndStrings(source, statement) >= 0;
+}
+
+function jsExactCommonJsNamedExportsPass(source, expectedNames) {
+  const operations = readCommonJsExportOperations(source);
+  const actualNames = operations.map((operation) => operation.property);
+  return (
+    operations.length === expectedNames.length &&
+    operations.every(
+      (operation) =>
+        operation.kind === "property-assignment" &&
+        operation.base === "exports" &&
+        operation.access === "dot"
+    ) &&
+    expectedNames.every((expectedName) => actualNames.includes(expectedName))
+  );
+}
+
+function jsExactCommonJsModuleExportPass(source, expectedValue) {
+  const operations = readCommonJsExportOperations(source);
+  return (
+    operations.length === 1 &&
+    operations[0].kind === "module-assignment" &&
+    operations[0].base === "module.exports" &&
+    operations[0].value === expectedValue
+  );
+}
+
+function readCommonJsNamedExportAssignmentNames(source) {
+  return freezeArray(
+    readCommonJsExportOperations(source)
+      .filter((operation) => operation.kind === "property-assignment")
+      .map((operation) => operation.property)
+  );
+}
+
+function readCommonJsExportOperations(source) {
+  const aliases = new Set();
+  const operations = [];
+  collectCommonJsExportOperations({
+    source,
+    startIndex: 0,
+    endIndex: source.length,
+    aliases,
+    operations
+  });
+  return freezeArray(operations.map((operation) => freezeRecord(operation)));
+}
+
+function collectCommonJsExportOperations({
+  source,
+  startIndex,
+  endIndex,
+  aliases,
+  operations
+}) {
+  let index = startIndex;
+
+  while (index < endIndex) {
+    if (source.startsWith("//", index)) {
+      const lineEnd = source.indexOf("\n", index + 2);
+      index = lineEnd < 0 ? endIndex : Math.min(lineEnd + 1, endIndex);
+      continue;
+    }
+    if (source.startsWith("/*", index)) {
+      const blockEnd = source.indexOf("*/", index + 2);
+      index = blockEnd < 0 ? endIndex : Math.min(blockEnd + 2, endIndex);
+      continue;
+    }
+
+    const character = source[index];
+    if (character === "'" || character === '"') {
+      index = Math.min(skipQuotedJsLiteral(source, index), endIndex);
+      continue;
+    }
+    if (character === "`") {
+      index = collectCommonJsExportOperationsFromTemplate({
+        source,
+        templateStartIndex: index,
+        endIndex,
+        aliases,
+        operations
+      });
+      continue;
+    }
+    if (character === "/" && isJsRegexLiteralStart(source, index)) {
+      const regexEnd = skipJsRegexLiteral(source, index);
+      if (regexEnd !== index) {
+        index = Math.min(regexEnd, endIndex);
+        continue;
+      }
+    }
+
+    const aliasDeclaration = readCommonJsAliasDeclarationAt({
+      source,
+      index,
+      endIndex
+    });
+    if (aliasDeclaration.ok === true) {
+      aliases.add(aliasDeclaration.name);
+      index = aliasDeclaration.end;
+      continue;
+    }
+
+    const objectMutation = readCommonJsObjectMutationCallAt({
+      source,
+      index,
+      endIndex,
+      aliases
+    });
+    if (objectMutation.ok === true) {
+      operations.push(objectMutation.operation);
+      index = objectMutation.end;
+      continue;
+    }
+
+    const assignment = readCommonJsExportAssignmentAt({
+      source,
+      index,
+      endIndex,
+      aliases
+    });
+    if (assignment.ok === true) {
+      operations.push(assignment.operation);
+      index = assignment.end;
+      continue;
+    }
+
+    index += 1;
+  }
+}
+
+function collectCommonJsExportOperationsFromTemplate({
+  source,
+  templateStartIndex,
+  endIndex,
+  aliases,
+  operations
+}) {
+  let index = templateStartIndex + 1;
+
+  while (index < endIndex) {
+    if (source[index] === "\\") {
+      index += 2;
+      continue;
+    }
+    if (source[index] === "`") {
+      return index + 1;
+    }
+    if (source.startsWith("${", index)) {
+      const expressionOpenIndex = index + 1;
+      const expressionCloseIndex = findMatchingJsBrace(
+        source,
+        expressionOpenIndex
+      );
+      if (expressionCloseIndex < 0 || expressionCloseIndex >= endIndex) {
+        return endIndex;
+      }
+      collectCommonJsExportOperations({
+        source,
+        startIndex: expressionOpenIndex + 1,
+        endIndex: expressionCloseIndex,
+        aliases,
+        operations
+      });
+      index = expressionCloseIndex + 1;
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return endIndex;
+}
+
+function readCommonJsAliasDeclarationAt({ source, index, endIndex }) {
+  const declarationKeyword = ["const", "let", "var"].find((keyword) =>
+    jsIdentifierAt(source, index, keyword)
+  );
+  if (declarationKeyword === undefined) {
+    return freezeRecord({
+      ok: false,
+      name: "",
+      end: index
+    });
+  }
+
+  const nameStart = skipJsTrivia(
+    source,
+    index + declarationKeyword.length,
+    endIndex
+  );
+  const name = readJsIdentifier(source, nameStart, endIndex);
+  if (name.ok !== true) {
+    return freezeRecord({
+      ok: false,
+      name: "",
+      end: index
+    });
+  }
+
+  const assignmentIndex = skipJsTrivia(source, name.end, endIndex);
+  if (!isJsAssignmentOperatorAt(source, assignmentIndex)) {
+    return freezeRecord({
+      ok: false,
+      name: "",
+      end: index
+    });
+  }
+
+  const target = readCommonJsExportTargetAt({
+    source,
+    index: assignmentIndex + 1,
+    endIndex,
+    aliases: new Set()
+  });
+  if (
+    target.ok !== true ||
+    (target.base !== "exports" && target.base !== "module.exports")
+  ) {
+    return freezeRecord({
+      ok: false,
+      name: "",
+      end: index
+    });
+  }
+
+  return freezeRecord({
+    ok: true,
+    name: name.name,
+    end: target.end
+  });
+}
+
+function readCommonJsObjectMutationCallAt({
+  source,
+  index,
+  endIndex,
+  aliases
+}) {
+  if (!jsIdentifierAt(source, index, "Object")) {
+    return freezeRecord({
+      ok: false,
+      operation: null,
+      end: index
+    });
+  }
+
+  let cursor = skipJsTrivia(source, index + "Object".length, endIndex);
+  if (source[cursor] !== ".") {
+    return freezeRecord({
+      ok: false,
+      operation: null,
+      end: index
+    });
+  }
+  cursor = skipJsTrivia(source, cursor + 1, endIndex);
+  const method = readJsIdentifier(source, cursor, endIndex);
+  if (
+    method.ok !== true ||
+    !["assign", "defineProperties", "defineProperty"].includes(method.name)
+  ) {
+    return freezeRecord({
+      ok: false,
+      operation: null,
+      end: index
+    });
+  }
+
+  const callOpenIndex = skipJsTrivia(source, method.end, endIndex);
+  if (source[callOpenIndex] !== "(") {
+    return freezeRecord({
+      ok: false,
+      operation: null,
+      end: index
+    });
+  }
+
+  const callCloseIndex = findMatchingJsEnclosure(
+    source,
+    callOpenIndex,
+    "(",
+    ")"
+  );
+  if (callCloseIndex < 0 || callCloseIndex > endIndex) {
+    return freezeRecord({
+      ok: false,
+      operation: null,
+      end: index
+    });
+  }
+
+  const args = extractTopLevelJsCallArguments(
+    source,
+    callOpenIndex,
+    callCloseIndex
+  );
+  if (
+    args.length === 0 ||
+    !isCommonJsExportTargetSource(args[0], aliases)
+  ) {
+    return freezeRecord({
+      ok: false,
+      operation: null,
+      end: index
+    });
+  }
+
+  return freezeRecord({
+    ok: true,
+    operation: {
+      kind: "object-mutation",
+      base: readCommonJsExportTargetSourceBase(args[0], aliases),
+      method: method.name,
+      property:
+        method.name === "defineProperty" && args.length > 1
+          ? parseJsStringLiteralSource(args[1]) ?? "<computed>"
+          : "<computed>",
+      access: method.name,
+      value: "",
+      end: callCloseIndex + 1
+    },
+    end: callCloseIndex + 1
+  });
+}
+
+function readCommonJsExportAssignmentAt({
+  source,
+  index,
+  endIndex,
+  aliases
+}) {
+  const target = readCommonJsExportTargetAt({
+    source,
+    index,
+    endIndex,
+    aliases
+  });
+  if (target.ok !== true) {
+    return freezeRecord({
+      ok: false,
+      operation: null,
+      end: index
+    });
+  }
+
+  let cursor = skipJsTrivia(source, target.end, endIndex);
+  const moduleAssignmentOperator = readJsAssignmentOperatorAt(source, cursor);
+  if (
+    target.base === "module.exports" &&
+    moduleAssignmentOperator.ok === true
+  ) {
+    const valueStart = skipJsTrivia(
+      source,
+      moduleAssignmentOperator.end,
+      endIndex
+    );
+    const valueEnd = findJsStatementEnd(source, valueStart);
+    return freezeRecord({
+      ok: true,
+      operation: {
+        kind: "module-assignment",
+        base: target.base,
+        property: "module.exports",
+        access: "assignment",
+        value:
+          valueEnd < 0
+            ? source.slice(valueStart, endIndex).trim()
+            : source.slice(valueStart, valueEnd).trim(),
+        end: valueEnd < 0 ? endIndex : valueEnd + 1
+      },
+      end: valueStart
+    });
+  }
+
+  const member = readJsMemberPropertyAt({
+    source,
+    index: cursor,
+    endIndex
+  });
+  if (member.ok !== true) {
+    return freezeRecord({
+      ok: false,
+      operation: null,
+      end: index
+    });
+  }
+
+  cursor = skipJsTrivia(source, member.end, endIndex);
+  const assignmentOperator = readJsAssignmentOperatorAt(source, cursor);
+  if (assignmentOperator.ok !== true) {
+    return freezeRecord({
+      ok: false,
+      operation: null,
+      end: index
+    });
+  }
+
+  const valueStart = skipJsTrivia(source, assignmentOperator.end, endIndex);
+  const valueEnd = findJsStatementEnd(source, valueStart);
+  return freezeRecord({
+    ok: true,
+    operation: {
+      kind: "property-assignment",
+      base: target.base,
+      aliasName: target.aliasName,
+      property: member.property,
+      access: member.access,
+      value:
+        valueEnd < 0
+          ? source.slice(valueStart, endIndex).trim()
+          : source.slice(valueStart, valueEnd).trim(),
+      end: valueEnd < 0 ? endIndex : valueEnd + 1
+    },
+    end: valueStart
+  });
+}
+
+function readCommonJsExportTargetAt({ source, index, endIndex, aliases }) {
+  const targetStart = skipJsTrivia(source, index, endIndex);
+  if (jsIdentifierAt(source, targetStart, "exports")) {
+    return freezeRecord({
+      ok: true,
+      base: "exports",
+      aliasName: null,
+      end: targetStart + "exports".length
+    });
+  }
+
+  if (jsIdentifierAt(source, targetStart, "module")) {
+    let cursor = skipJsTrivia(source, targetStart + "module".length, endIndex);
+    if (source[cursor] === ".") {
+      cursor = skipJsTrivia(source, cursor + 1, endIndex);
+      if (jsIdentifierAt(source, cursor, "exports")) {
+        return freezeRecord({
+          ok: true,
+          base: "module.exports",
+          aliasName: null,
+          end: cursor + "exports".length
+        });
+      }
+    }
+  }
+
+  const alias = readJsIdentifier(source, targetStart, endIndex);
+  if (alias.ok === true && aliases.has(alias.name)) {
+    return freezeRecord({
+      ok: true,
+      base: "alias",
+      aliasName: alias.name,
+      end: alias.end
+    });
+  }
+
+  return freezeRecord({
+    ok: false,
+    base: "",
+    aliasName: null,
+    end: index
+  });
+}
+
+function isCommonJsExportTargetSource(source, aliases) {
+  const target = readCommonJsExportTargetAt({
+    source,
+    index: 0,
+    endIndex: source.length,
+    aliases
+  });
+  return (
+    target.ok === true &&
+    skipJsTrivia(source, target.end, source.length) === source.length
+  );
+}
+
+function readCommonJsExportTargetSourceBase(source, aliases) {
+  const target = readCommonJsExportTargetAt({
+    source,
+    index: 0,
+    endIndex: source.length,
+    aliases
+  });
+  return target.ok === true ? target.base : "";
+}
+
+function readJsMemberPropertyAt({ source, index, endIndex }) {
+  let cursor = skipJsTrivia(source, index, endIndex);
+  if (source[cursor] === ".") {
+    cursor = skipJsTrivia(source, cursor + 1, endIndex);
+    const property = readJsIdentifier(source, cursor, endIndex);
+    if (property.ok === true) {
+      return freezeRecord({
+        ok: true,
+        property: property.name,
+        access: "dot",
+        end: property.end
+      });
+    }
+  }
+
+  if (source[cursor] === "[") {
+    const closeIndex = findMatchingJsEnclosure(source, cursor, "[", "]");
+    if (closeIndex < 0 || closeIndex > endIndex) {
+      return freezeRecord({
+        ok: false,
+        property: "",
+        access: "",
+        end: index
+      });
+    }
+    const propertySource = source
+      .slice(cursor + 1, closeIndex)
+      .trim();
+    return freezeRecord({
+      ok: true,
+      property: parseJsStringLiteralSource(propertySource) ?? "<computed>",
+      access: "bracket",
+      end: closeIndex + 1
+    });
+  }
+
+  return freezeRecord({
+    ok: false,
+    property: "",
+    access: "",
+    end: index
+  });
+}
+
+function isJsAssignmentOperatorAt(source, index) {
+  return (
+    source[index] === "=" &&
+    source[index + 1] !== "=" &&
+    source[index + 1] !== ">" &&
+    source[index - 1] !== "=" &&
+    source[index - 1] !== "!" &&
+    source[index - 1] !== "<" &&
+    source[index - 1] !== ">"
+  );
+}
+
+function readJsAssignmentOperatorAt(source, index) {
+  if (isJsAssignmentOperatorAt(source, index)) {
+    return freezeRecord({
+      ok: true,
+      end: index + 1
+    });
+  }
+
+  for (const operator of [
+    ">>>=",
+    "&&=",
+    "||=",
+    "??=",
+    "**=",
+    "<<=",
+    ">>=",
+    "+=",
+    "-=",
+    "*=",
+    "/=",
+    "%=",
+    "&=",
+    "|=",
+    "^="
+  ]) {
+    if (source.startsWith(operator, index)) {
+      return freezeRecord({
+        ok: true,
+        end: index + operator.length
+      });
+    }
+  }
+
+  return freezeRecord({
+    ok: false,
+    end: index
+  });
+}
+
+function readJsIdentifier(source, startIndex, endIndex) {
+  if (!/[A-Za-z_$]/u.test(source[startIndex] ?? "")) {
+    return freezeRecord({
+      ok: false,
+      name: "",
+      end: startIndex
+    });
+  }
+
+  let index = startIndex + 1;
+  while (index < endIndex && /[A-Za-z0-9_$]/u.test(source[index])) {
+    index += 1;
+  }
+
+  return freezeRecord({
+    ok: true,
+    name: source.slice(startIndex, index),
+    end: index
+  });
+}
+
+function jsFunctionDeclarationSourceCallPrefixesPass({
+  source,
+  functionName,
+  calls
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  return calls.every((call) =>
+    jsCallExpressionWithArgumentPrefixPass({
+      source: declaration.body,
+      callee: call.callee,
+      expectedArgumentsPrefix: call.arguments
+    })
+  );
+}
+
+function jsCallExpressionWithArgumentPrefixPass({
+  source,
+  callee,
+  expectedArgumentsPrefix
+}) {
+  let searchIndex = 0;
+
+  while (searchIndex < source.length) {
+    const calleeIndex = findJsSourceOutsideCommentsAndStrings(
+      source,
+      callee,
+      searchIndex
+    );
+    if (calleeIndex < 0) {
+      return false;
+    }
+
+    const beforeCallee = source[calleeIndex - 1] ?? "";
+    const afterCalleeIndex = calleeIndex + callee.length;
+    const afterCallee = source[afterCalleeIndex] ?? "";
+    if (
+      /[A-Za-z0-9_$]/u.test(beforeCallee) ||
+      /[A-Za-z0-9_$]/u.test(afterCallee)
+    ) {
+      searchIndex = afterCalleeIndex;
+      continue;
+    }
+
+    const callOpenIndex = skipJsTrivia(
+      source,
+      afterCalleeIndex,
+      source.length
+    );
+    if (source[callOpenIndex] !== "(") {
+      searchIndex = afterCalleeIndex;
+      continue;
+    }
+
+    const callCloseIndex = findMatchingJsEnclosure(
+      source,
+      callOpenIndex,
+      "(",
+      ")"
+    );
+    if (callCloseIndex < 0) {
+      return false;
+    }
+
+    const actualArguments = extractTopLevelJsCallArguments(
+      source,
+      callOpenIndex,
+      callCloseIndex
+    );
+    if (
+      actualArguments.length >= expectedArgumentsPrefix.length &&
+      expectedArgumentsPrefix.every(
+        (expectedArgument, index) =>
+          actualArguments[index] === expectedArgument
+      )
+    ) {
+      return true;
+    }
+
+    searchIndex = callCloseIndex + 1;
+  }
+
+  return false;
+}
+
+function jsContainsCommonJsAliasSmuggling(
+  source,
+  { allowModuleExportsAssignment = null } = {}
+) {
+  return readCommonJsExportOperations(source).some((operation) => {
+    if (
+      operation.kind === "property-assignment" &&
+      operation.base === "exports" &&
+      operation.access === "dot" &&
+      reactTestRendererExpectedRendererExportNames.includes(operation.property)
+    ) {
+      return false;
+    }
+    if (
+      operation.kind === "module-assignment" &&
+      operation.base === "module.exports" &&
+      operation.value === allowModuleExportsAssignment
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function findJsStatementEnd(source, startIndex) {
+  let index = startIndex;
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (source[index] === ";") {
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return -1;
 }
 
 function existsWorkspacePath(workspaceRoot, relativePath) {
