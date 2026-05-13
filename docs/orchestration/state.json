@@ -125,11 +125,14 @@
 		{
 			"id": 1263,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "FunctionComponent deleted-subtree teardown drift canaries",
 			"agent": "worker_1263_deleted_subtree_teardown_drift",
 			"branch": "worker/1263-deleted-subtree-teardown-drift",
-			"audits": []
+			"audits": [
+				"audit_1263_source_contract",
+				"audit_1263_verification"
+			]
 		},
 		{
 			"id": 1264,
