@@ -57,7 +57,7 @@
 		{
 			"id": 1258,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Root-scheduler same-lane transition early rejection canaries",
 			"agent": "worker_1258_scheduler_same_lane_rejection",
 			"branch": "worker/1258-scheduler-same-lane-rejection",
@@ -97,7 +97,7 @@
 		{
 			"id": 1262,
 			"type": "worker",
-			"status": "auditing",
+			"status": "repair-active",
 			"title": "react-test-renderer private root bridge cross-entrypoint currentness",
 			"agent": "worker_1262_test_renderer_cross_entrypoint",
 			"branch": "worker/1262-test-renderer-cross-entrypoint",
