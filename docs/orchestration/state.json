@@ -239,7 +239,7 @@
 		{
 			"id": 1275,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Native/no-load private-ledger next-lane scout",
 			"agent": "scout_1275_native_next"
 		},
@@ -266,6 +266,15 @@
 			"title": "react-test-renderer root handle WeakMap ownership canaries",
 			"agent": "worker_1278_test_renderer_root_handle_weakmap",
 			"branch": "worker/1278-test-renderer-root-handle-weakmap",
+			"audits": []
+		},
+		{
+			"id": 1279,
+			"type": "worker",
+			"status": "active",
+			"title": "Native cleanup-hook preflight evidence exactness",
+			"agent": "worker_1279_native_cleanup_hook_preflight",
+			"branch": "worker/1279-native-cleanup-hook-preflight",
 			"audits": []
 		}
 	]

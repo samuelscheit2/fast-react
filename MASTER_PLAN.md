@@ -70,12 +70,13 @@ Current orchestration queue:
 - Worker 1272 is under audit for test-renderer private-admission source-token
   comment proofing.
 - Scouts 1273 and 1276 reported concrete next-lane candidates.
-- Scouts 1274 and 1275 are active for React hooks/core facade and native/no-load
-  next-lane candidates.
+- Scout 1275 reported a concrete native/no-load next-lane candidate.
+- Scout 1274 is active for React hooks/core facade next-lane candidates.
 - Worker 1277 is active for queued minimal HostRoot cleanup extra-sibling drift
   canaries.
 - Worker 1278 is active for react-test-renderer root handle WeakMap ownership
   canaries.
+- Worker 1279 is active for native cleanup-hook preflight evidence exactness.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
