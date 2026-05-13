@@ -544,11 +544,14 @@
 		{
 			"id": 1306,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Root sync queue-lane source metadata seal",
 			"agent": "worker_1306_root_sync_queue_lane_source_metadata",
 			"branch": "worker/1306-root-sync-queue-lane-source-metadata",
-			"audits": []
+			"audits": [
+				"audit_1306_source_contract",
+				"audit_1306_verification"
+			]
 		},
 		{
 			"id": 1307,

@@ -81,7 +81,7 @@ Current orchestration queue:
   control-flow, spread override, nested-return, guard-binding, duplicate-key,
   helper-order, `var` redeclaration, method duplicate-key, and escaped-key gaps.
 - Scout 1301 reported a Rust root/scheduler source-metadata currentness lane;
-  Worker 1306 is active for that private test-only root sync queue-lane seal.
+  Worker 1306 completed implementation and is under source/verification audit.
 - Scout 1302 reported a React DOM conformance-only nested lifecycle lane;
   Worker 1307 is active for that public blocked-gate canary.
 - Scout 1304 reported a native no-load generation source-ownership lane;
