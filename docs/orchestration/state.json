@@ -307,7 +307,7 @@
 		{
 			"id": 1281,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Rust scheduler/root next-lane scout",
 			"agent": "scout_1281_rust_scheduler_next"
 		},
@@ -338,6 +338,15 @@
 			"status": "active",
 			"title": "React core/hooks next-lane scout",
 			"agent": "scout_1285_react_core_next"
+		},
+		{
+			"id": 1286,
+			"type": "worker",
+			"status": "active",
+			"title": "Same-lane transition nested handoff metadata drift canaries",
+			"agent": "worker_1286_scheduler_nested_handoff_drift",
+			"branch": "worker/1286-scheduler-nested-handoff-drift",
+			"audits": []
 		}
 	]
 }
