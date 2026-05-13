@@ -926,6 +926,13 @@ const childrenTraversalUnsupportedClaimFalseFlags = freezeArray([
   'suspenseLazyRendererBehaviorClaimed'
 ]);
 
+const childrenTraversalReportShapeAliasFlags = freezeArray([
+  'publicChildrenTraversalCompatibilityClaimed',
+  'portalCompatibilityClaimed',
+  Symbol.for('fast-react.public-portal-compatibility-alias'),
+  Symbol.for('fast-react.proxy-renderer-alias')
+]);
+
 const childrenTraversalCurrentnessReportFieldNames = freezeArray([
   'kind',
   'version',
@@ -1370,7 +1377,15 @@ function getUnsupportedKeyTypeName(value) {
   );
 }
 
-function createChildrenTraversalCurrentnessReport(overrides = {}) {
+function createChildrenTraversalCurrentnessReport(overrides) {
+  const callerProvidedOverrides = arguments.length > 0;
+  const inheritedOverrideAliasRejectionReason = callerProvidedOverrides
+    ? getChildrenTraversalInheritedOverrideAliasRejection(overrides)
+    : null;
+  if (overrides == null) {
+    overrides = {};
+  }
+
   const defaults = {
     kind: 'fast-react.private.children_helper_traversal_currentness',
     version: 1,
@@ -1414,7 +1429,7 @@ function createChildrenTraversalCurrentnessReport(overrides = {}) {
     childrenTraversalCurrentnessReportFieldNames
   )
     ? 'children-traversal-currentness-report-shape'
-    : null;
+    : inheritedOverrideAliasRejectionReason;
 
   if (
     Object.hasOwn(overrides, 'sourceReport') &&
@@ -1454,6 +1469,73 @@ function createChildrenTraversalCurrentnessReport(overrides = {}) {
     );
   }
   return frozenReport;
+}
+
+function getChildrenTraversalInheritedOverrideAliasRejection(overrides) {
+  if (
+    overrides === null ||
+    (typeof overrides !== 'object' && typeof overrides !== 'function')
+  ) {
+    return null;
+  }
+
+  return (
+    getChildrenTraversalInheritedPropertyRejection(
+      overrides,
+      childrenTraversalPublicCompatibilityFalseFlags,
+      'children-traversal-currentness-public-compatibility-claim'
+    ) ??
+    getChildrenTraversalInheritedPropertyRejection(
+      overrides,
+      childrenTraversalPrerequisiteFalseFlags,
+      'children-traversal-currentness-prerequisite-smuggling'
+    ) ??
+    getChildrenTraversalInheritedPropertyRejection(
+      overrides,
+      childrenTraversalUnsupportedClaimFalseFlags,
+      'children-traversal-currentness-unsupported-edge-claim'
+    ) ??
+    getChildrenTraversalInheritedPropertyRejection(
+      overrides,
+      childrenTraversalReportShapeAliasFlags,
+      'children-traversal-currentness-report-shape'
+    )
+  );
+}
+
+function getChildrenTraversalInheritedPropertyRejection(
+  value,
+  propertyKeys,
+  rejectionReason
+) {
+  let prototype;
+  try {
+    prototype = Object.getPrototypeOf(value);
+  } catch (_error) {
+    return 'children-traversal-currentness-report-shape';
+  }
+
+  while (prototype !== null) {
+    for (const propertyKey of propertyKeys) {
+      if (safeGetOwnPropertyDescriptor(value, propertyKey) !== undefined) {
+        continue;
+      }
+
+      if (
+        safeGetOwnPropertyDescriptor(prototype, propertyKey) !== undefined
+      ) {
+        return rejectionReason;
+      }
+    }
+
+    try {
+      prototype = Object.getPrototypeOf(prototype);
+    } catch (_error) {
+      return 'children-traversal-currentness-report-shape';
+    }
+  }
+
+  return null;
 }
 
 function consumeChildrenTraversalCurrentnessReport(report) {
