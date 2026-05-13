@@ -5,18 +5,26 @@
 		{
 			"id": 1253,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "React Children object key coercion",
 			"agent": "worker_1253_react_children_key_coercion",
-			"branch": "worker/1253-react-children-key-coercion"
+			"branch": "worker/1253-react-children-key-coercion",
+			"audits": [
+				"audit_1253_source_contract",
+				"audit_1253_verification"
+			]
 		},
 		{
 			"id": 1254,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "startTransition rootless currentness",
 			"agent": "worker_1254_start_transition_currentness",
-			"branch": "worker/1254-start-transition-currentness"
+			"branch": "worker/1254-start-transition-currentness",
+			"audits": [
+				"audit_1254_source_contract",
+				"audit_1254_verification"
+			]
 		},
 		{
 			"id": 1255,
@@ -35,10 +43,28 @@
 		{
 			"id": 1257,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Conformance discovery static re-export coverage",
 			"agent": "worker_1257_conformance_reexport_discovery",
-			"branch": "worker/1257-conformance-reexport-discovery"
+			"branch": "worker/1257-conformance-reexport-discovery",
+			"audits": [
+				"audit_1257_source_contract",
+				"audit_1257_verification"
+			]
+		},
+		{
+			"id": 1258,
+			"type": "scout",
+			"status": "active",
+			"title": "Scheduler variant/root-scheduler replacement scout",
+			"agent": "scout_1258_scheduler_next"
+		},
+		{
+			"id": 1259,
+			"type": "scout",
+			"status": "active",
+			"title": "Native lifecycle/no-load replacement scout",
+			"agent": "scout_1259_native_next"
 		}
 	]
 }
