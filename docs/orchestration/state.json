@@ -544,7 +544,7 @@
 		{
 			"id": 1306,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Root sync queue-lane source metadata seal",
 			"agent": "worker_1306_root_sync_queue_lane_source_metadata",
 			"branch": "worker/1306-root-sync-queue-lane-source-metadata",
@@ -556,16 +556,19 @@
 		{
 			"id": 1307,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "React DOM nested lifecycle conformance canary",
 			"agent": "worker_1307_react_dom_nested_lifecycle_conformance",
 			"branch": "worker/1307-react-dom-nested-lifecycle-conformance",
-			"audits": []
+			"audits": [
+				"audit_1307_source_contract",
+				"audit_1307_verification"
+			]
 		},
 		{
 			"id": 1308,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "Children currentness override prototype-alias hardening",
 			"agent": "worker_1308_children_currentness_override_aliases",
 			"branch": "worker/1308-children-currentness-override-aliases",
@@ -589,7 +592,7 @@
 		{
 			"id": 1310,
 			"type": "worker",
-			"status": "auditing",
+			"status": "accepted",
 			"title": "react-test-renderer error-surface private row contract",
 			"agent": "worker_1310_test_renderer_error_surface_row_contract",
 			"branch": "worker/1310-test-renderer-error-surface-row-contract",

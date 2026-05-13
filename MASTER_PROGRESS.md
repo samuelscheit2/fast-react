@@ -29,6 +29,57 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1310 react-test-renderer Error Surface Row Contract
+
+- Worker 1310 aligned the private react-test-renderer error-boundary oracle rows
+  with the live CJS development implementation, using the accepted `Update` and
+  `Commit` phases instead of stale `Render` wording.
+- The oracle test now compares exported rows with live runtime diagnostics and
+  keeps hostile public callback, public error-boundary behavior, native
+  execution, compatibility claim, descriptor mutability, package-root, and
+  production exposure paths blocked.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed the error-surface oracle target (15/15), create-routing private
+  error-boundary target (46/46), react-test-renderer workspace check, and
+  `git diff --check`.
+- The accepted merge is main `3c13440d` after Worker 1310 commit `a30f8753`.
+
+### Worker 1308 Children Currentness Override Prototype Aliases
+
+- Worker 1308 hardened private Children traversal currentness report creation
+  so caller-provided overrides with inherited compatibility or prerequisite
+  aliases reject before the defaults/overrides normalization can erase the
+  hostile source.
+- Prototype getter aliases are detected without invocation, temporary
+  `Object.prototype` pollution is covered with cleanup, no-argument report
+  creation remains valid, and existing source-proof/freeze/proxy hardening stays
+  intact.
+- The accepted change is private Children currentness evidence only. Public
+  `React.Children` behavior, traversal parity, renderer/root traversal, key
+  coercion, lazy/portal/ref/owner handling, hooks, Scheduler, roots, and package
+  compatibility remain blocked or unchanged.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed the Children currentness gate (6/6), React workspace check, import
+  smoke, and `git diff --check`.
+- The accepted merge is main `2a975262` after Worker 1308 commit `8eae168d`.
+
+### Worker 1306 Root Sync Queue-Lane Source Metadata Seal
+
+- Worker 1306 added private/test-only source metadata to sync queue-lane
+  continuation currentness records so preserved-token drift in
+  `pending_passive_blocker` or `queue_handoff_error` rejects before routed
+  checks or currentness source-token consumption.
+- Hostile Rust canaries assert the source remains pending and unconsumed, host
+  operations stay empty, the original continuation still consumes once, and
+  public root/Scheduler/React DOM/test-renderer/native/package compatibility
+  flags remain false.
+- Accepted validation includes clean source and verification audits. Root reruns
+  passed root scheduler finished-work queue-lane currentness (6/6),
+  queue-lane continuation (13/13), transition queue-lane currentness (4/4),
+  `cargo check -p fast-react-reconciler --all-features`,
+  `cargo fmt --all --check`, and `git diff --check`.
+- The accepted merge is main `37501afa` after Worker 1306 commit `7f08547a`.
+
 ### Worker 1298 startTransition Returned Thenables
 
 - Worker 1298 made rootless `startTransition` observe object returned thenables

@@ -62,7 +62,7 @@ Current orchestration queue:
 
 - Workers 1253, 1254, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264,
   1269, 1270, 1271, 1272, 1277 through 1280, 1286 through 1290,
-  and 1296 through 1299
+  1296 through 1299, and 1306, 1308, and 1310
   have been reviewed, repaired where needed, merged, and recorded as accepted
   history.
 - Scouts 1265, 1266, 1267, and 1268 reported concrete next-lane candidates.
@@ -81,15 +81,15 @@ Current orchestration queue:
   control-flow, spread override, nested-return, guard-binding, duplicate-key,
   helper-order, `var` redeclaration, method duplicate-key, and escaped-key gaps.
 - Scout 1301 reported a Rust root/scheduler source-metadata currentness lane;
-  Worker 1306 completed implementation and is under source/verification audit.
+  Worker 1306 has been reviewed, merged, and recorded as accepted history.
 - Scout 1302 reported a React DOM conformance-only nested lifecycle lane;
-  Worker 1307 is active for that public blocked-gate canary.
+  Worker 1307 completed implementation and is under source/verification audit.
 - Scout 1304 reported a native no-load generation source-ownership lane;
   Worker 1309 completed implementation and is under source/verification audit.
 - Scout 1305 reported a React Children currentness override alias lane; Worker
-  1308 completed implementation and is under source/verification audit.
+  1308 has been reviewed, merged, and recorded as accepted history.
 - Scout 1303 reported a react-test-renderer error-surface row-contract lane;
-  Worker 1310 completed implementation and is under source/verification audit.
+  Worker 1310 has been reviewed, merged, and recorded as accepted history.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
