@@ -29,6 +29,30 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1254 startTransition Rootless Currentness
+
+- Worker 1254 added a private-only `startTransition` rootless currentness
+  report, validator, and consumer. The evidence proves the root React export and
+  CJS development/production aliases expose the same rootless synchronous
+  facade, React Server still lacks `startTransition`, and dispatcher routing,
+  Scheduler callbacks, root lanes, root scheduling, root execution, public
+  transition/root/Scheduler compatibility, and package compatibility remain
+  blocked.
+- A source-audit blocker found that source-owned reports created while
+  `Object.freeze` was wrapped could smuggle extra frozen own properties through
+  top-level and nested array validation. The repair now enforces exact
+  `Reflect.ownKeys` sets for top-level reports, rootless metadata, surface rows,
+  field-name arrays, row arrays, `blockedExecutionPaths`, and
+  `blockedCompatibilityClaims`; hostile freeze-time pollution tests prove
+  validator, predicate, and consumer rejection.
+- Accepted validation includes clean source, repair-source, and verification
+  audits. Root reruns passed the transition facade test (17/17),
+  `npm run check --workspace @fast-react/react`, package-surface guard, import
+  smoke, and `git diff --check`.
+- The accepted state is main `4dcd6bbd` after Worker 1254 merge `4dcd6bbd`,
+  worker commits `494a579c` and repair `a9268d3f`, and orchestration-state
+  commit `8ca99124`.
+
 ### Workers 1253 and 1257 Acceptance Batch
 
 - Worker 1253 aligned direct `React.Children` key coercion with React 19.2.6
