@@ -194,6 +194,12 @@ function replaceField(object, removedField, addedField, value) {
   });
 }
 
+function createObjectWithPrototypeClaims(object, prototypeClaims) {
+  const target = Object.create(Object.freeze(prototypeClaims));
+  Object.defineProperties(target, Object.getOwnPropertyDescriptors(object));
+  return Object.freeze(target);
+}
+
 function assertValidAdmission(admit) {
   const fixture = createFixture('valid-admission');
   const childCountBefore = fixture.container.childNodes.length;
@@ -437,6 +443,81 @@ function assertCapabilityClaimSmugglingRejected(admit) {
     );
     cleanupFixture(fixture);
   }
+
+  {
+    const fixture = createFixture('render-handoff-inherited-native');
+    const claimedHandoff = createObjectWithPrototypeClaims(
+      fixture.renderHandoff,
+      {
+        nativeExecution: true
+      }
+    );
+    assertAdmissionError(
+      () =>
+        admit(
+          fixture.createHandoff.nativeRequestRecord,
+          claimedHandoff,
+          fixture.metadata
+        ),
+      capabilityClaimCode,
+      'render handoff inherited nativeExecution claim'
+    );
+    cleanupFixture(fixture);
+  }
+
+  {
+    const fixture = createFixture('render-handoff-inherited-symbol-public-root');
+    const claimedHandoff = createObjectWithPrototypeClaims(
+      fixture.renderHandoff,
+      {
+        [Symbol.for('publicRootExecution')]: true
+      }
+    );
+    assertAdmissionError(
+      () =>
+        admit(
+          fixture.createHandoff.nativeRequestRecord,
+          claimedHandoff,
+          fixture.metadata
+        ),
+      capabilityClaimCode,
+      'render handoff inherited Symbol.for(publicRootExecution) claim'
+    );
+    cleanupFixture(fixture);
+  }
+
+  {
+    const fixture = createFixture('render-handoff-inherited-accessor-native');
+    let getterInvoked = false;
+    const accessorClaimPrototype = {};
+    Object.defineProperty(accessorClaimPrototype, 'nativeExecution', {
+      get() {
+        getterInvoked = true;
+        return true;
+      },
+      enumerable: true
+    });
+    const claimedHandoff = createObjectWithPrototypeClaims(
+      fixture.renderHandoff,
+      accessorClaimPrototype
+    );
+    assertAdmissionError(
+      () =>
+        admit(
+          fixture.createHandoff.nativeRequestRecord,
+          claimedHandoff,
+          fixture.metadata
+        ),
+      capabilityClaimCode,
+      'render handoff inherited accessor nativeExecution claim'
+    );
+    assert.equal(
+      getterInvoked,
+      false,
+      'render handoff admission must not invoke inherited claim getters'
+    );
+    cleanupFixture(fixture);
+  }
 }
 
 function assertMetadataShapeRejected(admit) {
@@ -501,6 +582,24 @@ function assertMetadataShapeRejected(admit) {
         ),
       capabilityClaimCode,
       'metadata public compatibility claim'
+    );
+    cleanupFixture(fixture);
+  }
+
+  {
+    const fixture = createFixture('metadata-inherited-public-native-compat');
+    const metadata = createObjectWithPrototypeClaims(fixture.metadata, {
+      public_native_compatibility: true
+    });
+    assertAdmissionError(
+      () =>
+        admit(
+          fixture.createHandoff.nativeRequestRecord,
+          fixture.renderHandoff,
+          metadata
+        ),
+      capabilityClaimCode,
+      'metadata inherited public native compatibility claim'
     );
     cleanupFixture(fixture);
   }
