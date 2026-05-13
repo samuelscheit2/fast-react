@@ -89,7 +89,7 @@ Current orchestration queue:
 - Scout 1305 reported a React Children currentness override alias lane; Worker
   1308 is active for that private source-proof hardening.
 - Scout 1303 reported a react-test-renderer error-surface row-contract lane;
-  Worker 1310 is active for that private oracle/source-proof hardening.
+  Worker 1310 completed implementation and is under source/verification audit.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 

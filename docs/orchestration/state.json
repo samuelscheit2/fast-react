@@ -580,11 +580,14 @@
 		{
 			"id": 1310,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "react-test-renderer error-surface private row contract",
 			"agent": "worker_1310_test_renderer_error_surface_row_contract",
 			"branch": "worker/1310-test-renderer-error-surface-row-contract",
-			"audits": []
+			"audits": [
+				"audit_1310_source_contract",
+				"audit_1310_verification"
+			]
 		}
 	]
 }
