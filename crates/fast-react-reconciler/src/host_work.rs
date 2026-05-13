@@ -1311,6 +1311,70 @@ impl HostWorkResult {
         self.detached_hosts
     }
 
+    pub(crate) fn validate_detached_host_cleanup_ownership_for_canary(
+        &self,
+        store: &FiberRootStore<RecordingHost>,
+    ) -> Result<(), HostWorkError> {
+        for &child in &self.completed_children {
+            self.validate_detached_host_cleanup_subtree_ownership_for_canary(store, child)?;
+        }
+        Ok(())
+    }
+
+    fn validate_detached_host_cleanup_subtree_ownership_for_canary(
+        &self,
+        store: &FiberRootStore<RecordingHost>,
+        fiber: FiberId,
+    ) -> Result<(), HostWorkError> {
+        let node = store.fiber_arena().get(fiber)?;
+        let tag = node.tag();
+        let state_node = node.state_node();
+        let mut child = node.child();
+
+        match tag {
+            FiberTag::HostComponent => {
+                if state_node.is_none() {
+                    return Err(HostWorkError::MissingStateNode { fiber, tag });
+                }
+                owned_detached_host_child_for_fiber(
+                    store,
+                    &self.detached_hosts,
+                    self.root,
+                    fiber,
+                    tag,
+                    state_node,
+                )?;
+                while let Some(child_id) = child {
+                    let sibling = store.fiber_arena().get(child_id)?.sibling();
+                    self.validate_detached_host_cleanup_subtree_ownership_for_canary(
+                        store, child_id,
+                    )?;
+                    child = sibling;
+                }
+                Ok(())
+            }
+            FiberTag::HostText => {
+                if state_node.is_none() {
+                    return Err(HostWorkError::MissingStateNode { fiber, tag });
+                }
+                owned_detached_host_child_for_fiber(
+                    store,
+                    &self.detached_hosts,
+                    self.root,
+                    fiber,
+                    tag,
+                    state_node,
+                )?;
+                Ok(())
+            }
+            actual => Err(HostWorkError::ExpectedFiberTag {
+                fiber,
+                expected: FiberTag::HostComponent,
+                actual,
+            }),
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn from_detached_hosts_for_canary(
         root: FiberRootId,
