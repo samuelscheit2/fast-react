@@ -56,6 +56,90 @@ const publicHostInheritedNonClaimPropNames = new Set([
   'type',
   'value'
 ]);
+const rootBridgeCapabilityClaimFieldNames = new Set([
+  'browserDomMutation',
+  'browserDomMutationClaimed',
+  'browser_dom_mutation',
+  'browser_dom_mutation_claimed',
+  'compatibilityClaimed',
+  'compatibility_claimed',
+  'domMutation',
+  'domMutationClaimed',
+  'dom_mutation',
+  'dom_mutation_claimed',
+  'eventDispatch',
+  'eventDispatchClaimed',
+  'event_dispatch',
+  'event_dispatch_claimed',
+  'fakeDomMutation',
+  'fakeDomMutationClaimed',
+  'fake_dom_mutation',
+  'fake_dom_mutation_claimed',
+  'hydration',
+  'hydrationClaimed',
+  'hydration_claimed',
+  'listenerInstallation',
+  'listenerInstallationClaimed',
+  'listener_installation',
+  'listener_installation_claimed',
+  'markerWrites',
+  'markerWritesClaimed',
+  'marker_writes',
+  'marker_writes_claimed',
+  'nativeExecution',
+  'nativeExecutionClaimed',
+  'native_execution',
+  'native_execution_claimed',
+  'publicCompatibilityClaimed',
+  'publicCreateRootCompatibilityClaimed',
+  'publicDomMutationCompatibilityClaimed',
+  'publicEventCompatibilityClaimed',
+  'publicHydrateRootCompatibilityClaimed',
+  'publicHydrationCompatibilityClaimed',
+  'publicNativeCompatibility',
+  'publicNativeCompatibilityClaimed',
+  'publicNativeCompatibilitySurface',
+  'public_compatibility_claimed',
+  'public_create_root_compatibility_claimed',
+  'public_dom_mutation_compatibility_claimed',
+  'public_event_compatibility_claimed',
+  'public_hydrate_root_compatibility_claimed',
+  'public_hydration_compatibility_claimed',
+  'public_native_compatibility',
+  'public_native_compatibility_claimed',
+  'public_native_compatibility_surface',
+  'public_root_compatibility_surface',
+  'public_root_execution',
+  'public_root_render_compatibility_claimed',
+  'public_root_unmount_compatibility_claimed',
+  'public_root_update_compatibility_claimed',
+  'public_test_renderer_compatibility_claimed',
+  'publicRootCompatibilitySurface',
+  'publicRootExecution',
+  'publicRootRenderCompatibilityClaimed',
+  'publicRootUnmountCompatibilityClaimed',
+  'publicRootUpdateCompatibilityClaimed',
+  'publicTestRendererCompatibilityClaimed',
+  'reconcilerExecution',
+  'reconcilerExecutionClaimed',
+  'reconciler_execution',
+  'reconciler_execution_claimed',
+  'refEffects',
+  'refEffectsClaimed',
+  'ref_effects',
+  'ref_effects_claimed',
+  'rootScheduled',
+  'rootScheduledClaimed',
+  'root_scheduled',
+  'root_scheduled_claimed',
+  'rustExecution',
+  'rustExecutionClaimed',
+  'rust_execution',
+  'rust_execution_claimed'
+]);
+const rootBridgeCapabilityClaimNormalizedNames = new Set(
+  [...rootBridgeCapabilityClaimFieldNames].map(normalizePublicHostPropName)
+);
 
 const createRoot = defineFunctionShape(function createRoot(
   container
@@ -371,23 +455,6 @@ function getOwnHostPropDescriptor(props, name) {
 }
 
 function assertNoInheritedHostProps(props) {
-  try {
-    for (const name in props) {
-      if (!hasOwnProperty.call(props, name)) {
-        throwUnsupportedRootRender(
-          `Inherited public host prop ${name} remains blocked.`
-        );
-      }
-    }
-  } catch (error) {
-    if (error?.code === 'FAST_REACT_UNIMPLEMENTED') {
-      throw error;
-    }
-    throwUnsupportedRootRender(
-      'Public host props prototype enumeration remains blocked.'
-    );
-  }
-
   let prototype = getHostPropPrototype(props);
   while (prototype !== null) {
     assertNoProxyObject(
@@ -395,18 +462,26 @@ function assertNoInheritedHostProps(props) {
       'Public host props proxy prototypes remain blocked.'
     );
 
-    let inheritedNames;
+    let inheritedKeys;
     try {
-      inheritedNames = Object.getOwnPropertyNames(prototype);
+      inheritedKeys = Reflect.ownKeys(prototype);
     } catch (_error) {
       throwUnsupportedRootRender(
         'Public host props prototype inspection remains blocked.'
       );
     }
-    for (const name of inheritedNames) {
+    for (const name of inheritedKeys) {
+      const descriptor = getInheritedHostPropDescriptor(prototype, name);
+      if (descriptor?.enumerable === true) {
+        throwUnsupportedRootRender(
+          `Inherited public host prop ${String(name)} remains blocked.`
+        );
+      }
       if (
-        publicHostInheritedNonClaimPropNames.has(name) ||
-        isPublicHostCompatibilityAliasName(name)
+        typeof name === 'string' &&
+        (publicHostInheritedNonClaimPropNames.has(name) ||
+          isPublicHostCompatibilityAliasName(name)
+        )
       ) {
         throwUnsupportedRootRender(
           `Inherited public host prop ${name} remains blocked.`
@@ -415,6 +490,16 @@ function assertNoInheritedHostProps(props) {
     }
 
     prototype = getHostPropPrototype(prototype);
+  }
+}
+
+function getInheritedHostPropDescriptor(prototype, name) {
+  try {
+    return Object.getOwnPropertyDescriptor(prototype, name);
+  } catch (_error) {
+    throwUnsupportedRootRender(
+      'Public host props prototype descriptor inspection remains blocked.'
+    );
   }
 }
 
@@ -433,9 +518,17 @@ function isPublicHostCompatibilityAliasName(name) {
     return false;
   }
 
-  const normalized = name.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+  if (rootBridgeCapabilityClaimFieldNames.has(name)) {
+    return true;
+  }
+
+  const normalized = normalizePublicHostPropName(name);
   if (normalized === '') {
     return false;
+  }
+
+  if (rootBridgeCapabilityClaimNormalizedNames.has(normalized)) {
+    return true;
   }
 
   if (
@@ -462,6 +555,10 @@ function isPublicHostCompatibilityAliasName(name) {
   const hasClaimSignal =
     normalized.endsWith('claim') ||
     normalized.endsWith('claimed') ||
+    normalized.endsWith('execution') ||
+    normalized.endsWith('mutation') ||
+    normalized.endsWith('scheduled') ||
+    normalized.endsWith('effects') ||
     normalized.includes('compatibility') ||
     normalized.includes('surfacechanged');
   if (!hasClaimSignal) {
@@ -478,16 +575,27 @@ function isPublicHostCompatibilityAliasName(name) {
     normalized.startsWith('rust') ||
     normalized.includes('root') ||
     normalized.includes('dom') ||
+    normalized.includes('fake') ||
     normalized.includes('hydration') ||
     normalized.includes('hydrate') ||
     normalized.includes('event') ||
+    normalized.includes('listener') ||
+    normalized.includes('marker') ||
+    normalized.includes('mutation') ||
     normalized.includes('resource') ||
     normalized.includes('form') ||
     normalized.includes('controlled') ||
+    normalized.includes('reconciler') ||
+    normalized.includes('ref') ||
     normalized.includes('renderer') ||
+    normalized.includes('scheduled') ||
     normalized.includes('act') ||
     normalized.includes('flushsync')
   );
+}
+
+function normalizePublicHostPropName(name) {
+  return String(name).replace(/[^A-Za-z0-9]/g, '').toLowerCase();
 }
 
 function assertNoProxyObject(value, detail) {

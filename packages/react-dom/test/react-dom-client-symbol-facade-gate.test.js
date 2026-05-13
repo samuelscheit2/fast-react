@@ -68,6 +68,10 @@ const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-inherited-nonenumerable-publicCreateRootCompatibilityClaimed-prop',
   'unsupported-inherited-nonenumerable-publicRootUpdateCompatibilityClaimed-prop',
   'unsupported-inherited-nonenumerable-publicPackageCompatibilityClaimed-prop',
+  'unsupported-inherited-nonenumerable-listenerInstallationClaimed-prop',
+  'unsupported-inherited-nonenumerable-markerWritesClaimed-prop',
+  'unsupported-inherited-nonenumerable-reconcilerExecutionClaimed-prop',
+  'unsupported-inherited-nonenumerable-refEffectsClaimed-prop',
   'unsupported-keyed-div',
   'unsupported-span-type',
   'unsupported-nested-sibling',
@@ -81,12 +85,16 @@ const publicRenderCapabilityRejectionLabels = Object.freeze([
   'unsupported-nested-inherited-compatibility-prop',
   'unsupported-nested-inherited-nonenumerable-publicHydrateRootCompatibilityClaimed-prop',
   'unsupported-nested-inherited-nonenumerable-snake-root-update-compatibility-prop',
+  'unsupported-nested-inherited-nonenumerable-rootScheduledClaimed-prop',
+  'unsupported-nested-inherited-nonenumerable-fakeDomMutationClaimed-prop',
   'unsupported-nested-component',
   'unsupported-nested-compatibility-alias',
   'unsupported-inherited-parent-children-prop',
   'unsupported-inherited-child-children-prop',
   'unsupported-object-prototype-polluted-public-props',
   'unsupported-object-prototype-nonenumerable-publicDomMutationCompatibilityClaimed-prop',
+  'unsupported-object-prototype-nonenumerable-listenerInstallationClaimed-prop',
+  'unsupported-proxy-prototype-public-props',
   'unsupported-accessor-public-prop',
   'unsupported-proxy-public-props',
   'unsupported-fragment',
@@ -1003,10 +1011,15 @@ test('public createRoot render rejects unsupported inputs before adapter root.re
   assert.equal(result.objectRefCurrent, null);
   assert.equal(result.objectPrototypePollutionCleaned, true);
   assert.equal(result.objectPrototypeNonEnumerablePollutionCleaned, true);
+  assert.equal(result.objectPrototypeMissedRootBridgePollutionCleaned, true);
   assert.equal(result.proxyGetOwnPropertyDescriptorTrapCount, 0);
   assert.equal(result.proxyGetTrapCount, 0);
   assert.equal(result.proxyHasTrapCount, 0);
   assert.equal(result.proxyOwnKeysTrapCount, 0);
+  assert.equal(result.proxyPrototypeGetOwnPropertyDescriptorTrapCount, 0);
+  assert.equal(result.proxyPrototypeGetPrototypeOfTrapCount, 0);
+  assert.equal(result.proxyPrototypeHasTrapCount, 0);
+  assert.equal(result.proxyPrototypeOwnKeysTrapCount, 0);
   assert.equal(result.unsupportedComponentCalls, 0);
   assert.equal(result.unsupportedNestedComponentCalls, 0);
   assert.equal(result.unsupportedMemoComponentCalls, 0);
@@ -1201,6 +1214,22 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
       'unsupported-inherited-nonenumerable-publicPackageCompatibilityClaimed-prop',
       'publicPackageCompatibilityClaimed'
     ),
+    createNonEnumerableInheritedParentClaimRejectionCaseFactory(
+      'unsupported-inherited-nonenumerable-listenerInstallationClaimed-prop',
+      'listenerInstallationClaimed'
+    ),
+    createNonEnumerableInheritedParentClaimRejectionCaseFactory(
+      'unsupported-inherited-nonenumerable-markerWritesClaimed-prop',
+      'markerWritesClaimed'
+    ),
+    createNonEnumerableInheritedParentClaimRejectionCaseFactory(
+      'unsupported-inherited-nonenumerable-reconcilerExecutionClaimed-prop',
+      'reconcilerExecutionClaimed'
+    ),
+    createNonEnumerableInheritedParentClaimRejectionCaseFactory(
+      'unsupported-inherited-nonenumerable-refEffectsClaimed-prop',
+      'refEffectsClaimed'
+    ),
     () => ({
       label: 'unsupported-keyed-div',
       element: React.createElement('div', {key: 'blocked'}, 'blocked key')
@@ -1276,6 +1305,14 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
       'unsupported-nested-inherited-nonenumerable-snake-root-update-compatibility-prop',
       'public_root_update_compatibility_claimed'
     ),
+    createNonEnumerableInheritedNestedSpanClaimRejectionCaseFactory(
+      'unsupported-nested-inherited-nonenumerable-rootScheduledClaimed-prop',
+      'rootScheduledClaimed'
+    ),
+    createNonEnumerableInheritedNestedSpanClaimRejectionCaseFactory(
+      'unsupported-nested-inherited-nonenumerable-fakeDomMutationClaimed-prop',
+      'fakeDomMutationClaimed'
+    ),
     createUnsupportedNestedComponentRejectionCase,
     () => ({
       label: 'unsupported-nested-compatibility-alias',
@@ -1289,6 +1326,8 @@ function createPublicRenderCapabilityRejectionCaseFactories() {
     createInheritedChildChildrenRejectionCase,
     createObjectPrototypePollutionRejectionCase,
     createObjectPrototypeNonEnumerablePollutionRejectionCase,
+    createObjectPrototypeMissedRootBridgePollutionRejectionCase,
+    createProxyPrototypePublicPropsRejectionCase,
     createAccessorPublicPropRejectionCase,
     createProxyPublicPropsRejectionCase,
     () => ({
@@ -1587,6 +1626,57 @@ function createObjectPrototypeNonEnumerablePollutionRejectionCase() {
   };
 }
 
+function createObjectPrototypeMissedRootBridgePollutionRejectionCase() {
+  let callbackCalls = 0;
+
+  return {
+    label:
+      'unsupported-object-prototype-nonenumerable-listenerInstallationClaimed-prop',
+    element: React.createElement(
+      'div',
+      null,
+      'blocked missed root-bridge pollution'
+    ),
+    prepare() {
+      Object.defineProperties(Object.prototype, {
+        listenerInstallationClaimed: {
+          configurable: true,
+          enumerable: false,
+          value: true
+        },
+        markerWritesClaimed: {
+          configurable: true,
+          enumerable: false,
+          value() {
+            callbackCalls++;
+          }
+        }
+      });
+    },
+    cleanup() {
+      delete Object.prototype.listenerInstallationClaimed;
+      delete Object.prototype.markerWritesClaimed;
+    },
+    assertNoCapabilityEffects() {
+      assert.equal(callbackCalls, 0);
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(
+          Object.prototype,
+          'listenerInstallationClaimed'
+        ),
+        false
+      );
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(
+          Object.prototype,
+          'markerWritesClaimed'
+        ),
+        false
+      );
+    }
+  };
+}
+
 function createAccessorPublicPropRejectionCase() {
   let getterCalls = 0;
   let callbackCalls = 0;
@@ -1607,6 +1697,55 @@ function createAccessorPublicPropRejectionCase() {
     element: createForgedHostElement('div', props),
     assertNoCapabilityEffects() {
       assert.equal(getterCalls, 0);
+      assert.equal(callbackCalls, 0);
+    }
+  };
+}
+
+function createProxyPrototypePublicPropsRejectionCase() {
+  let getOwnPropertyDescriptorTrapCalls = 0;
+  let getPrototypeOfTrapCalls = 0;
+  let hasTrapCalls = 0;
+  let ownKeysTrapCalls = 0;
+  let callbackCalls = 0;
+  const proxyPrototype = new Proxy(
+    {
+      listenerInstallationClaimed: true,
+      onClick() {
+        callbackCalls++;
+      }
+    },
+    {
+      getOwnPropertyDescriptor(target, property) {
+        getOwnPropertyDescriptorTrapCalls++;
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+      getPrototypeOf(target) {
+        getPrototypeOfTrapCalls++;
+        return Reflect.getPrototypeOf(target);
+      },
+      has(target, property) {
+        hasTrapCalls++;
+        return Reflect.has(target, property);
+      },
+      ownKeys(target) {
+        ownKeysTrapCalls++;
+        return Reflect.ownKeys(target);
+      }
+    }
+  );
+  const props = Object.assign(Object.create(proxyPrototype), {
+    children: 'blocked proxy prototype'
+  });
+
+  return {
+    label: 'unsupported-proxy-prototype-public-props',
+    element: createForgedHostElement('div', props),
+    assertNoCapabilityEffects() {
+      assert.equal(getOwnPropertyDescriptorTrapCalls, 0);
+      assert.equal(getPrototypeOfTrapCalls, 0);
+      assert.equal(hasTrapCalls, 0);
+      assert.equal(ownKeysTrapCalls, 0);
       assert.equal(callbackCalls, 0);
     }
   };
@@ -2559,6 +2698,10 @@ let proxyGetOwnPropertyDescriptorTrapCount = 0;
 let proxyGetTrapCount = 0;
 let proxyHasTrapCount = 0;
 let proxyOwnKeysTrapCount = 0;
+let proxyPrototypeGetOwnPropertyDescriptorTrapCount = 0;
+let proxyPrototypeGetPrototypeOfTrapCount = 0;
+let proxyPrototypeHasTrapCount = 0;
+let proxyPrototypeOwnKeysTrapCount = 0;
 let refCallbackCalls = 0;
 const objectRef = {current: null};
 const forwardRefRef = {current: null};
@@ -2645,12 +2788,25 @@ process.stdout.write(JSON.stringify({
       Object.prototype,
       'publicEventCompatibilityClaimed'
     ),
+  objectPrototypeMissedRootBridgePollutionCleaned:
+    !Object.prototype.hasOwnProperty.call(
+      Object.prototype,
+      'listenerInstallationClaimed'
+    ) &&
+    !Object.prototype.hasOwnProperty.call(
+      Object.prototype,
+      'markerWritesClaimed'
+    ),
   postAcceptedErrors,
   postAcceptedRejectedLabels: postAcceptedErrors.map((error) => error.label),
   proxyGetOwnPropertyDescriptorTrapCount,
   proxyGetTrapCount,
   proxyHasTrapCount,
   proxyOwnKeysTrapCount,
+  proxyPrototypeGetOwnPropertyDescriptorTrapCount,
+  proxyPrototypeGetPrototypeOfTrapCount,
+  proxyPrototypeHasTrapCount,
+  proxyPrototypeOwnKeysTrapCount,
   refCallbackCalls,
   unsupportedComponentCalls,
   unsupportedForwardRefRenderCalls,
@@ -2771,6 +2927,22 @@ function createCases() {
       'unsupported-inherited-nonenumerable-publicPackageCompatibilityClaimed-prop',
       'publicPackageCompatibilityClaimed'
     ),
+    nonEnumerableInheritedParentClaimCase(
+      'unsupported-inherited-nonenumerable-listenerInstallationClaimed-prop',
+      'listenerInstallationClaimed'
+    ),
+    nonEnumerableInheritedParentClaimCase(
+      'unsupported-inherited-nonenumerable-markerWritesClaimed-prop',
+      'markerWritesClaimed'
+    ),
+    nonEnumerableInheritedParentClaimCase(
+      'unsupported-inherited-nonenumerable-reconcilerExecutionClaimed-prop',
+      'reconcilerExecutionClaimed'
+    ),
+    nonEnumerableInheritedParentClaimCase(
+      'unsupported-inherited-nonenumerable-refEffectsClaimed-prop',
+      'refEffectsClaimed'
+    ),
     {
       label: 'unsupported-keyed-div',
       element: React.createElement('div', {key: 'blocked'}, 'blocked key')
@@ -2850,6 +3022,14 @@ function createCases() {
       'unsupported-nested-inherited-nonenumerable-snake-root-update-compatibility-prop',
       'public_root_update_compatibility_claimed'
     ),
+    nonEnumerableInheritedNestedSpanClaimCase(
+      'unsupported-nested-inherited-nonenumerable-rootScheduledClaimed-prop',
+      'rootScheduledClaimed'
+    ),
+    nonEnumerableInheritedNestedSpanClaimCase(
+      'unsupported-nested-inherited-nonenumerable-fakeDomMutationClaimed-prop',
+      'fakeDomMutationClaimed'
+    ),
     {
       label: 'unsupported-nested-component',
       element: React.createElement(
@@ -2873,6 +3053,8 @@ function createCases() {
     inheritedChildChildrenCase(),
     objectPrototypePollutionCase(),
     objectPrototypeNonEnumerablePollutionCase(),
+    objectPrototypeMissedRootBridgePollutionCase(),
+    proxyPrototypePublicPropsCase(),
     accessorPublicPropCase(),
     proxyPublicPropsCase(),
     {
@@ -3153,6 +3335,38 @@ function objectPrototypeNonEnumerablePollutionCase() {
   };
 }
 
+function objectPrototypeMissedRootBridgePollutionCase() {
+  return {
+    label:
+      'unsupported-object-prototype-nonenumerable-listenerInstallationClaimed-prop',
+    element: React.createElement(
+      'div',
+      null,
+      'blocked missed root-bridge pollution'
+    ),
+    prepare() {
+      Object.defineProperties(Object.prototype, {
+        listenerInstallationClaimed: {
+          configurable: true,
+          enumerable: false,
+          value: true
+        },
+        markerWritesClaimed: {
+          configurable: true,
+          enumerable: false,
+          value() {
+            eventCallbackCalls++;
+          }
+        }
+      });
+    },
+    cleanup() {
+      delete Object.prototype.listenerInstallationClaimed;
+      delete Object.prototype.markerWritesClaimed;
+    }
+  };
+}
+
 function accessorPublicPropCase() {
   const props = {children: 'blocked accessor'};
   Object.defineProperty(props, 'onClick', {
@@ -3168,6 +3382,43 @@ function accessorPublicPropCase() {
 
   return {
     label: 'unsupported-accessor-public-prop',
+    element: forgedHostElement('div', props)
+  };
+}
+
+function proxyPrototypePublicPropsCase() {
+  const proxyPrototype = new Proxy(
+    {
+      listenerInstallationClaimed: true,
+      onClick() {
+        eventCallbackCalls++;
+      }
+    },
+    {
+      getOwnPropertyDescriptor(target, property) {
+        proxyPrototypeGetOwnPropertyDescriptorTrapCount++;
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+      getPrototypeOf(target) {
+        proxyPrototypeGetPrototypeOfTrapCount++;
+        return Reflect.getPrototypeOf(target);
+      },
+      has(target, property) {
+        proxyPrototypeHasTrapCount++;
+        return Reflect.has(target, property);
+      },
+      ownKeys(target) {
+        proxyPrototypeOwnKeysTrapCount++;
+        return Reflect.ownKeys(target);
+      }
+    }
+  );
+  const props = Object.assign(Object.create(proxyPrototype), {
+    children: 'blocked proxy prototype'
+  });
+
+  return {
+    label: 'unsupported-proxy-prototype-public-props',
     element: forgedHostElement('div', props)
   };
 }

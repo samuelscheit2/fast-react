@@ -5856,6 +5856,7 @@ test("React DOM public root facade records hostile render capability rejections"
     [
       "unsupported-callback-ref-prop",
       "unsupported-object-ref-prop",
+      "unsupported-inherited-nonenumerable-refEffectsClaimed-prop",
       "unsupported-nested-inherited-ref-prop"
     ]
   );
@@ -5926,6 +5927,22 @@ test("React DOM public root facade records hostile render capability rejections"
     rejectionRows.some(
       (row) =>
         row.label ===
+          "unsupported-inherited-nonenumerable-listenerInstallationClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-inherited-nonenumerable-reconcilerExecutionClaimed-prop" &&
+        row.blockedSurface === "compatibility-claim"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
           "unsupported-nested-inherited-nonenumerable-publicHydrateRootCompatibilityClaimed-prop" &&
         row.blockedSurface === "compatibility-claim"
     )
@@ -5935,6 +5952,14 @@ test("React DOM public root facade records hostile render capability rejections"
       (row) =>
         row.label ===
           "unsupported-object-prototype-nonenumerable-publicDomMutationCompatibilityClaimed-prop" &&
+        row.blockedSurface === "prototype-pollution"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label ===
+          "unsupported-object-prototype-nonenumerable-listenerInstallationClaimed-prop" &&
         row.blockedSurface === "prototype-pollution"
     )
   );
@@ -5963,6 +5988,13 @@ test("React DOM public root facade records hostile render capability rejections"
     rejectionRows.some(
       (row) =>
         row.label === "unsupported-proxy-public-props" &&
+        row.blockedSurface === "prop-proxy"
+    )
+  );
+  assert.ok(
+    rejectionRows.some(
+      (row) =>
+        row.label === "unsupported-proxy-prototype-public-props" &&
         row.blockedSurface === "prop-proxy"
     )
   );
