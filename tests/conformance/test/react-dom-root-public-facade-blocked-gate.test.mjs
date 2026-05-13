@@ -125,6 +125,18 @@ const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_ESCAPED =
   "id removed &amp; &lt; &gt;";
 const MINIMAL_PUBLIC_DIV_TEXT_ID_ESCAPED = "app&amp;&lt;&gt;&quot;";
 const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_ID_ESCAPED = "next&amp;&lt;&gt;&quot;";
+const MINIMAL_PUBLIC_DIV_SPAN_PARENT_ID = 'nested&<>"';
+const MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID = 'nested-next&<>"';
+const MINIMAL_PUBLIC_DIV_SPAN_TEXT = "nested & < >";
+const MINIMAL_PUBLIC_DIV_SPAN_TEXT_ESCAPED = "nested &amp; &lt; &gt;";
+const MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE = "nested again & < >";
+const MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE_ESCAPED =
+  "nested again &amp; &lt; &gt;";
+const MINIMAL_PUBLIC_DIV_SPAN_PARENT_ID_ESCAPED =
+  "nested&amp;&lt;&gt;&quot;";
+const MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID_ESCAPED =
+  "nested-next&amp;&lt;&gt;&quot;";
+const MINIMAL_PUBLIC_DIV_SPAN_CHILD_ELEMENT_SUMMARY = "react-element:span";
 const SIMPLE_PUBLIC_DIV_TEXT_API =
   'ReactDOMClient.createRoot(container).render(React.createElement("div", { id: "app" }, "text"))';
 
@@ -142,6 +154,10 @@ function rootRenderMinimalPublicDivTextApi(
   return `${rootName}.render(React.createElement("div", { id: ${JSON.stringify(id)} }, ${JSON.stringify(text)}))`;
 }
 
+function rootRenderMinimalPublicDivSpanApi(rootName, text, id) {
+  return `${rootName}.render(React.createElement("div", { id: ${JSON.stringify(id)} }, React.createElement("span", null, ${JSON.stringify(text)})))`;
+}
+
 function rootRenderNullApi(rootName) {
   return `${rootName}.render(null)`;
 }
@@ -154,6 +170,19 @@ const MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API = minimalPublicDivTextApi(
 );
 const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API =
   `${MINIMAL_PUBLIC_DIV_TEXT_RENDER_API}; root.render(React.createElement("div", null, ${JSON.stringify(MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL)}))`;
+const MINIMAL_PUBLIC_DIV_SPAN_UPDATE_API = [
+  "const root = ReactDOMClient.createRoot(container)",
+  rootRenderMinimalPublicDivSpanApi(
+    "root",
+    MINIMAL_PUBLIC_DIV_SPAN_TEXT,
+    MINIMAL_PUBLIC_DIV_SPAN_PARENT_ID
+  ),
+  rootRenderMinimalPublicDivSpanApi(
+    "root",
+    MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+    MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID
+  )
+].join("; ");
 const MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_API = [
   "const root = ReactDOMClient.createRoot(container)",
   rootRenderMinimalPublicDivTextApi("root", MINIMAL_PUBLIC_DIV_TEXT),
@@ -274,6 +303,61 @@ const MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_SNAPSHOT = Object.freeze({
   containerInnerHTML: `<div>${MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_ESCAPED}</div>`,
   containerMutationLog: Object.freeze([Object.freeze(["appendChild", "DIV"])]),
   containerTextContent: MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL,
+  ownerDocumentChildCount: 0,
+  ownerDocumentMutationLog: Object.freeze([])
+});
+const MINIMAL_PUBLIC_DIV_SPAN_UPDATE_SNAPSHOT = Object.freeze({
+  containerChildCount: 1,
+  containerChildNodeNames: Object.freeze(["DIV"]),
+  containerChildrenCount: 1,
+  containerFirstElementChildAttributes: Object.freeze([
+    Object.freeze(["id", MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID])
+  ]),
+  containerFirstElementChildChildNodeNames: Object.freeze(["SPAN"]),
+  containerFirstElementChildChildrenCount: 1,
+  containerFirstElementChildFirstElementChildAttributes: Object.freeze([]),
+  containerFirstElementChildFirstElementChildChildNodeNames:
+    Object.freeze(["#text"]),
+  containerFirstElementChildFirstElementChildFirstChildNodeName: "#text",
+  containerFirstElementChildFirstElementChildFirstChildNodeValue:
+    MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+  containerFirstElementChildFirstElementChildFirstChildTextContent:
+    MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+  containerFirstElementChildFirstElementChildGetAttributeId: null,
+  containerFirstElementChildFirstElementChildInnerHTML:
+    MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE_ESCAPED,
+  containerFirstElementChildFirstElementChildMutationLog: Object.freeze([
+    Object.freeze(["appendChild", "#text"])
+  ]),
+  containerFirstElementChildFirstElementChildNodeName: "SPAN",
+  containerFirstElementChildFirstElementChildStoredPropsChildren:
+    MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+  containerFirstElementChildFirstElementChildStoredPropsHasId: false,
+  containerFirstElementChildFirstElementChildStoredPropsId: null,
+  containerFirstElementChildFirstElementChildStoredPropsSameObject: true,
+  containerFirstElementChildFirstElementChildTagName: "SPAN",
+  containerFirstElementChildFirstElementChildTextContent:
+    MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+  containerFirstElementChildGetAttributeId:
+    MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID,
+  containerFirstElementChildInnerHTML:
+    `<span>${MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE_ESCAPED}</span>`,
+  containerFirstElementChildMutationLog: Object.freeze([
+    Object.freeze(["appendChild", "SPAN"])
+  ]),
+  containerFirstElementChildNodeName: "DIV",
+  containerFirstElementChildStoredPropsChildren:
+    MINIMAL_PUBLIC_DIV_SPAN_CHILD_ELEMENT_SUMMARY,
+  containerFirstElementChildStoredPropsHasId: true,
+  containerFirstElementChildStoredPropsId:
+    MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID,
+  containerFirstElementChildStoredPropsSameObject: true,
+  containerFirstElementChildTagName: "DIV",
+  containerFirstElementChildTextContent: MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
+  containerInnerHTML:
+    `<div id="${MINIMAL_PUBLIC_DIV_SPAN_PARENT_UPDATE_ID_ESCAPED}"><span>${MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE_ESCAPED}</span></div>`,
+  containerMutationLog: Object.freeze([Object.freeze(["appendChild", "DIV"])]),
+  containerTextContent: MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE,
   ownerDocumentChildCount: 0,
   ownerDocumentMutationLog: Object.freeze([])
 });
@@ -648,6 +732,52 @@ function assertMinimalPublicDivTextIdRemovalLifecycle(publicBoundary) {
   );
 }
 
+function assertMinimalPublicDivSpanUpdateLifecycle(publicBoundary) {
+  const renderNestedDivSpan =
+    publicBoundary.publicRootLifecycle.renderNestedDivSpan;
+  assert.equal(
+    renderNestedDivSpan.label,
+    MINIMAL_PUBLIC_DIV_SPAN_UPDATE_API
+  );
+  assert.equal(renderNestedDivSpan.status, "ok");
+  assert.equal(renderNestedDivSpan.value.type, "undefined");
+  assert.equal(renderNestedDivSpan.compatibilityClaimed, false);
+  assertPublicRootLifecycleCompatibilityClaimsFalse(renderNestedDivSpan);
+  assert.equal(renderNestedDivSpan.controlledDomShim, true);
+  assert.equal(renderNestedDivSpan.renderElementType, "div");
+  assert.equal(
+    renderNestedDivSpan.renderTextContent,
+    MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE
+  );
+  assert.equal(renderNestedDivSpan.hostNodeReused, true);
+  assert.equal(renderNestedDivSpan.parentHostNodeReused, true);
+  assert.equal(renderNestedDivSpan.childHostNodeReused, true);
+  assert.equal(renderNestedDivSpan.textNodeReused, true);
+  assert.equal(renderNestedDivSpan.rootObjectCreated, true);
+  assert.equal(renderNestedDivSpan.lifecycleOperationAttempted, true);
+  assert.equal(renderNestedDivSpan.createRootAttempt.status, "ok");
+  assert.deepEqual(
+    renderNestedDivSpan.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_SPAN_UPDATE_SNAPSHOT
+  );
+  assert.equal(renderNestedDivSpan.sideEffects.mutationCount, 1);
+  assert.equal(renderNestedDivSpan.sideEffects.listenerRegistrationCount, 0);
+  assert.equal(
+    renderNestedDivSpan.sideEffects.ownerDocumentListenerRegistrationCount,
+    0
+  );
+  assert.equal(renderNestedDivSpan.sideEffects.ownerDocumentMutationCount, 0);
+  assert.equal(renderNestedDivSpan.sideEffects.containerMarker.propertyCount, 0);
+  assert.equal(
+    renderNestedDivSpan.sideEffects.containerListeningMarker.propertyCount,
+    0
+  );
+  assert.equal(
+    renderNestedDivSpan.sideEffects.ownerDocumentListeningMarker.propertyCount,
+    0
+  );
+}
+
 function assertMinimalPublicRenderNullCleanupLifecycle(publicBoundary) {
   const renderNullCleanup =
     publicBoundary.publicRootLifecycle.renderNullCleanup;
@@ -952,6 +1082,7 @@ function assertMinimalPublicRootBoundary(publicBoundary) {
   assertMinimalPublicDivTextLifecycle(publicBoundary);
   assertMinimalPublicDivTextUpdateLifecycle(publicBoundary);
   assertMinimalPublicDivTextIdRemovalLifecycle(publicBoundary);
+  assertMinimalPublicDivSpanUpdateLifecycle(publicBoundary);
   assertMinimalPublicRenderNullCleanupLifecycle(publicBoundary);
   assertMinimalPublicUnmountAfterNullLifecycle(publicBoundary);
   assertMinimalPublicDivTextUnmountLifecycle(publicBoundary);
@@ -5616,6 +5747,7 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
       MINIMAL_PUBLIC_DIV_TEXT_RENDER_API,
       MINIMAL_PUBLIC_DIV_TEXT_UPDATE_API,
       MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_API,
+      MINIMAL_PUBLIC_DIV_SPAN_UPDATE_API,
       MINIMAL_PUBLIC_DIV_TEXT_RENDER_NULL_API,
       MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_AFTER_NULL_API,
       MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API,
@@ -5682,6 +5814,45 @@ test("React DOM public root facade lifecycle rows admit only minimal fake-DOM sl
   assert.deepEqual(
     publicIdRemovalRow.controlledDomSnapshot,
     MINIMAL_PUBLIC_DIV_TEXT_ID_REMOVAL_SNAPSHOT
+  );
+  const publicNestedDivSpanRow = lifecycleRows.find(
+    (row) => row.id === "public-create-root-render-div-span-update"
+  );
+  assert.ok(publicNestedDivSpanRow);
+  assert.equal(publicNestedDivSpanRow.controlledDomShim, true);
+  assert.equal(publicNestedDivSpanRow.minimalDivSpanHostOutputUpdated, true);
+  assert.equal(publicNestedDivSpanRow.hostNodeReused, true);
+  assert.equal(publicNestedDivSpanRow.parentHostNodeReused, true);
+  assert.equal(publicNestedDivSpanRow.childHostNodeReused, true);
+  assert.equal(publicNestedDivSpanRow.textNodeReused, true);
+  assert.equal(publicNestedDivSpanRow.mutationCount, 1);
+  assert.equal(
+    publicNestedDivSpanRow.privateBridgeEvidence,
+    "wrapped-private-facade-host-output"
+  );
+  assert.equal(publicNestedDivSpanRow.renderReturnType, "undefined");
+  for (const key of PUBLIC_ROOT_LIFECYCLE_COMPATIBILITY_CLAIM_KEYS) {
+    assert.equal(publicNestedDivSpanRow[key], false, key);
+  }
+  assert.deepEqual(
+    publicNestedDivSpanRow.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_SPAN_UPDATE_SNAPSHOT
+  );
+  assert.deepEqual(
+    publicNestedDivSpanRow.nestedDivSpanEvidence.controlledDomSnapshot,
+    MINIMAL_PUBLIC_DIV_SPAN_UPDATE_SNAPSHOT
+  );
+  assert.equal(
+    publicNestedDivSpanRow.nestedDivSpanEvidence.parentHostNodeReused,
+    true
+  );
+  assert.equal(
+    publicNestedDivSpanRow.nestedDivSpanEvidence.childHostNodeReused,
+    true
+  );
+  assert.equal(
+    publicNestedDivSpanRow.nestedDivSpanEvidence.textNodeReused,
+    true
   );
   const publicRenderNullRow = lifecycleRows.find(
     (row) => row.id === "public-create-root-render-null-cleanup"
@@ -5977,6 +6148,19 @@ test("React DOM public root facade records hostile render capability rejections"
         row.blockedSurface === "compatibility-claim"
     )
   );
+  for (const label of [
+    "unsupported-fragment",
+    "unsupported-array",
+    "unsupported-component",
+    "unsupported-nested-span-id-prop",
+    "unsupported-nested-span-className-prop"
+  ]) {
+    const row = rejectionRows.find((candidate) => candidate.label === label);
+    assert.ok(row, label);
+    assert.equal(row.rejectedBeforePrivateBridgeRender, true, label);
+    assert.equal(row.rejectedBeforeNativeExecution, true, label);
+    assert.equal(row.rejectedBeforeListenerMarker, true, label);
+  }
   assert.ok(
     rejectionRows.some(
       (row) =>
@@ -6535,6 +6719,111 @@ test("React DOM public root facade gate records minimal public div text render",
     );
   }
 
+  const nestedFalseGreenCases = [
+    {
+      label: "uses stale nested parent id after update",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerFirstElementChildAttributes = [
+          ["id", MINIMAL_PUBLIC_DIV_SPAN_PARENT_ID]
+        ];
+        operation.controlledDomSnapshot.containerInnerHTML =
+          `<div id="${MINIMAL_PUBLIC_DIV_SPAN_PARENT_ID_ESCAPED}"><span>${MINIMAL_PUBLIC_DIV_SPAN_TEXT_UPDATE_ESCAPED}</span></div>`;
+      }
+    },
+    {
+      label: "keeps stale nested text after update",
+      mutate(operation) {
+        operation.controlledDomSnapshot.containerFirstElementChildInnerHTML =
+          `<span>${MINIMAL_PUBLIC_DIV_SPAN_TEXT_ESCAPED}</span>`;
+        operation.controlledDomSnapshot
+          .containerFirstElementChildFirstElementChildFirstChildNodeValue =
+          MINIMAL_PUBLIC_DIV_SPAN_TEXT;
+        operation.controlledDomSnapshot
+          .containerFirstElementChildFirstElementChildFirstChildTextContent =
+          MINIMAL_PUBLIC_DIV_SPAN_TEXT;
+      }
+    },
+    {
+      label: "drops nested parent node reuse",
+      mutate(operation) {
+        operation.hostNodeReused = false;
+        operation.parentHostNodeReused = false;
+      }
+    },
+    {
+      label: "drops nested child node reuse",
+      mutate(operation) {
+        operation.childHostNodeReused = false;
+      }
+    },
+    {
+      label: "drops nested text node reuse",
+      mutate(operation) {
+        operation.textNodeReused = false;
+      }
+    },
+    {
+      label: "drops nested parent latest props identity",
+      mutate(operation) {
+        operation.controlledDomSnapshot
+          .containerFirstElementChildStoredPropsSameObject = false;
+      }
+    },
+    {
+      label: "drops nested child latest props identity",
+      mutate(operation) {
+        operation.controlledDomSnapshot
+          .containerFirstElementChildFirstElementChildStoredPropsSameObject =
+          false;
+      }
+    },
+    {
+      label: "claims nested public root render compatibility",
+      mutate(operation) {
+        operation.publicRootRenderCompatibilityClaimed = true;
+      }
+    },
+    {
+      label: "claims nested native compatibility",
+      mutate(operation) {
+        operation.publicNativeCompatibilityClaimed = true;
+      }
+    },
+    {
+      label: "writes nested root marker",
+      mutate(operation) {
+        operation.sideEffects.containerMarker.propertyCount = 1;
+      }
+    },
+    {
+      label: "adds nested listener",
+      mutate(operation) {
+        operation.sideEffects.listenerRegistrationCount = 1;
+      }
+    }
+  ];
+  for (const falseGreenCase of nestedFalseGreenCases) {
+    const tamperedBoundary = clone(publicBoundary);
+    falseGreenCase.mutate(
+      tamperedBoundary.publicRootLifecycle.renderNestedDivSpan
+    );
+    const tamperedGate = evaluateReactDomRootPublicFacadeBlockedGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle,
+      clientRootOracle,
+      localPublicFacadeBoundary: tamperedBoundary,
+      privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
+    });
+    assert.equal(tamperedGate.ok, false, falseGreenCase.label);
+    assert.ok(
+      tamperedGate.failures.some(
+        (failure) =>
+          failure.id === "public-create-root-render-div-span-update"
+      ),
+      falseGreenCase.label
+    );
+  }
+
   const staleLifecycleRows = clone(
     REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
   );
@@ -6562,6 +6851,60 @@ test("React DOM public root facade gate records minimal public div text render",
         failure.id === "public-create-root-render-div-text" &&
         failure.publicApi === SIMPLE_PUBLIC_DIV_TEXT_API &&
         failure.expectedPublicApi === MINIMAL_PUBLIC_DIV_TEXT_RENDER_API
+    )
+  );
+
+  const staleNestedLifecycleRows = clone(
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
+  );
+  staleNestedLifecycleRows[4].publicApi = SIMPLE_PUBLIC_DIV_TEXT_API;
+  const staleNestedLifecycleRowGate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: publicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary(),
+    publicFacadeLifecycleRows: staleNestedLifecycleRows
+  });
+  assert.equal(staleNestedLifecycleRowGate.ok, false);
+  assert.ok(
+    staleNestedLifecycleRowGate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+          "public-root-lifecycle-row-public-api-label-mismatch" &&
+        failure.id === "public-create-root-render-div-span-update" &&
+        failure.publicApi === SIMPLE_PUBLIC_DIV_TEXT_API &&
+        failure.expectedPublicApi === MINIMAL_PUBLIC_DIV_SPAN_UPDATE_API
+    )
+  );
+
+  const reorderedLifecycleRows = clone(
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
+  );
+  [
+    reorderedLifecycleRows[4],
+    reorderedLifecycleRows[5]
+  ] = [
+    reorderedLifecycleRows[5],
+    reorderedLifecycleRows[4]
+  ];
+  const reorderedLifecycleRowGate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: publicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary(),
+    publicFacadeLifecycleRows: reorderedLifecycleRows
+  });
+  assert.equal(reorderedLifecycleRowGate.ok, false);
+  assert.ok(
+    reorderedLifecycleRowGate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+          "public-root-lifecycle-row-public-api-label-mismatch" &&
+        failure.expectedId ===
+          "public-create-root-render-div-span-update" &&
+        failure.id === "public-create-root-render-null-cleanup"
     )
   );
 });
@@ -6790,7 +7133,7 @@ test("React DOM public root facade gate records render(null) cleanup and unmount
   const staleLifecycleRows = clone(
     REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
   );
-  staleLifecycleRows[4].publicApi = MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API;
+  staleLifecycleRows[5].publicApi = MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API;
   const staleRowGate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
     currentOracle: rootRenderOracle,
@@ -6813,7 +7156,7 @@ test("React DOM public root facade gate records render(null) cleanup and unmount
   const missingLifecycleRows = clone(
     REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
   );
-  missingLifecycleRows.splice(4, 1);
+  missingLifecycleRows.splice(5, 1);
   const missingRowGate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
     currentOracle: rootRenderOracle,
@@ -6835,9 +7178,9 @@ test("React DOM public root facade gate records render(null) cleanup and unmount
   const wrongOrderLifecycleRows = clone(
     REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
   );
-  [wrongOrderLifecycleRows[4], wrongOrderLifecycleRows[5]] = [
-    wrongOrderLifecycleRows[5],
-    wrongOrderLifecycleRows[4]
+  [wrongOrderLifecycleRows[5], wrongOrderLifecycleRows[6]] = [
+    wrongOrderLifecycleRows[6],
+    wrongOrderLifecycleRows[5]
   ];
   const wrongOrderGate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
@@ -6999,7 +7342,7 @@ test("React DOM public root facade gate records recreate after unmount without c
   const staleLifecycleRows = clone(
     REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS
   );
-  staleLifecycleRows[7].publicApi = MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API;
+  staleLifecycleRows[8].publicApi = MINIMAL_PUBLIC_DIV_TEXT_UNMOUNT_API;
   const staleLifecycleRowGate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
     currentOracle: rootRenderOracle,
