@@ -15,6 +15,7 @@ import {
 } from "../src/react-test-renderer-error-surface-scenarios.mjs";
 import {
   REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME,
+  REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS,
   REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS,
   findReactTestRendererErrorSurfaceObservation,
   readCheckedReactTestRendererErrorSurfaceOracle,
@@ -60,16 +61,6 @@ const privateErrorBoundaryDiagnosticsSymbol = Symbol.for(
 const rootRequestBridgeSymbol = Symbol.for(
   "fast.react_test_renderer.root_request_bridge"
 );
-const ERROR_BOUNDARY_UPDATE_REFRESH_DIAGNOSTIC_ROWS = [
-  {
-    id: "react-test-renderer-update-error-root-option-private-diagnostic",
-    phase: "Update"
-  },
-  {
-    id: "react-test-renderer-commit-error-root-option-private-diagnostic",
-    phase: "Commit"
-  }
-];
 const ERROR_BOUNDARY_UPDATE_REFRESH_DEPENDENCY_IDS = [
   "react-test-renderer-update-private-route",
   "react-test-renderer-serialization-private-json-diagnostic",
@@ -313,13 +304,12 @@ test("React test renderer private update and commit error rows stay metadata onl
     REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS,
     "private-error-boundary-diagnostics-root-options-metadata-public-boundary-blocked"
   );
-  assert.deepEqual(
-    ERROR_BOUNDARY_UPDATE_REFRESH_DIAGNOSTIC_ROWS.map((row) => row.id),
-    [
-      "react-test-renderer-update-error-root-option-private-diagnostic",
-      "react-test-renderer-commit-error-root-option-private-diagnostic"
-    ]
-  );
+  for (const row of REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS) {
+    assert.equal(row.publicRootErrorCallbacksInvoked, false, row.id);
+    assert.equal(row.publicErrorBoundaryBehaviorAvailable, false, row.id);
+    assert.equal(row.nativeExecution, false, row.id);
+    assert.equal(row.compatibilityClaimed, false, row.id);
+  }
 
   const calls = [];
   const developmentEntry = jsEntrypoints.find((entry) =>
@@ -352,6 +342,7 @@ test("React test renderer private update and commit error rows stay metadata onl
 
   assert.notEqual(descriptor, undefined);
   assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.writable, false);
   const diagnostics = descriptor.value;
   assert.equal(
     bridge.getRendererErrorBoundaryDiagnostics(renderer),
@@ -361,16 +352,20 @@ test("React test renderer private update and commit error rows stay metadata onl
     bridge.getRootErrorBoundaryDiagnostics(createRequest),
     diagnostics
   );
-  assert.equal(diagnostics.diagnosticName, REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME);
-  assert.equal(diagnostics.status, REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS);
+  assert.equal(
+    diagnostics.diagnosticName,
+    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME
+  );
+  assert.equal(
+    diagnostics.status,
+    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS
+  );
   assert.equal(diagnostics.rowCount, 2);
   assert.deepEqual(
-    diagnostics.rows.map((row) => row.id),
-    ERROR_BOUNDARY_UPDATE_REFRESH_DIAGNOSTIC_ROWS.map((row) => row.id)
-  );
-  assert.deepEqual(
-    diagnostics.rows.map((row) => row.phase),
-    ERROR_BOUNDARY_UPDATE_REFRESH_DIAGNOSTIC_ROWS.map((row) => row.phase)
+    diagnostics.rows.map(selectPrivateErrorBoundaryDiagnosticRowContract),
+    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS.map(
+      selectPrivateErrorBoundaryDiagnosticRowContract
+    )
   );
   assert.equal(diagnostics.hostOutputUpdateKind, "Update");
   assert.equal(diagnostics.updateErrorRowAvailable, true);
@@ -512,7 +507,9 @@ test("React test renderer private update and commit error rows stay metadata onl
   );
   assert.deepEqual(
     updateError.privateErrorBoundaryDiagnostics.rows.map((row) => row.id),
-    ERROR_BOUNDARY_UPDATE_REFRESH_DIAGNOSTIC_ROWS.map((row) => row.id)
+    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS.map(
+      (row) => row.id
+    )
   );
   assert.deepEqual(
     updateError.privateErrorBoundaryDiagnostics.rows.map(
@@ -974,6 +971,19 @@ function captureThrown(callback) {
   }
 
   assert.fail("Expected callback to throw");
+}
+
+function selectPrivateErrorBoundaryDiagnosticRowContract(row) {
+  return {
+    id: row.id,
+    phase: row.phase,
+    rootErrorChannel: row.rootErrorChannel,
+    publicErrorBoundaryBehaviorAvailable:
+      row.publicErrorBoundaryBehaviorAvailable,
+    publicRootErrorCallbacksInvoked: row.publicRootErrorCallbacksInvoked,
+    nativeExecution: row.nativeExecution,
+    compatibilityClaimed: row.compatibilityClaimed
+  };
 }
 
 function createRustLifecycleDiagnosticSource(request) {
