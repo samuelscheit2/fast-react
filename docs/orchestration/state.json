@@ -255,11 +255,14 @@
 		{
 			"id": 1277,
 			"type": "worker",
-			"status": "active",
+			"status": "auditing",
 			"title": "Queued minimal HostRoot cleanup extra-sibling drift canary",
 			"agent": "worker_1277_queued_cleanup_extra_sibling_drift",
 			"branch": "worker/1277-queued-cleanup-extra-sibling-drift",
-			"audits": []
+			"audits": [
+				"audit_1277_source_contract",
+				"audit_1277_verification"
+			]
 		},
 		{
 			"id": 1278,
