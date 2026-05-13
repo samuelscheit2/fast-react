@@ -516,28 +516,28 @@
 		{
 			"id": 1302,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "React DOM facade/root next-lane scout",
 			"agent": "scout_1302_react_dom_next"
 		},
 		{
 			"id": 1303,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "react-test-renderer next-lane scout",
 			"agent": "scout_1303_test_renderer_next"
 		},
 		{
 			"id": 1304,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "Native/no-load next-lane scout",
 			"agent": "scout_1304_native_next"
 		},
 		{
 			"id": 1305,
 			"type": "scout",
-			"status": "active",
+			"status": "reported",
 			"title": "React core/hooks next-lane scout",
 			"agent": "scout_1305_react_core_next"
 		},
@@ -548,6 +548,42 @@
 			"title": "Root sync queue-lane source metadata seal",
 			"agent": "worker_1306_root_sync_queue_lane_source_metadata",
 			"branch": "worker/1306-root-sync-queue-lane-source-metadata",
+			"audits": []
+		},
+		{
+			"id": 1307,
+			"type": "worker",
+			"status": "active",
+			"title": "React DOM nested lifecycle conformance canary",
+			"agent": "worker_1307_react_dom_nested_lifecycle_conformance",
+			"branch": "worker/1307-react-dom-nested-lifecycle-conformance",
+			"audits": []
+		},
+		{
+			"id": 1308,
+			"type": "worker",
+			"status": "active",
+			"title": "Children currentness override prototype-alias hardening",
+			"agent": "worker_1308_children_currentness_override_aliases",
+			"branch": "worker/1308-children-currentness-override-aliases",
+			"audits": []
+		},
+		{
+			"id": 1309,
+			"type": "worker",
+			"status": "active",
+			"title": "Native generation source ownership map",
+			"agent": "worker_1309_native_generation_source_ownership",
+			"branch": "worker/1309-native-generation-source-ownership",
+			"audits": []
+		},
+		{
+			"id": 1310,
+			"type": "worker",
+			"status": "active",
+			"title": "react-test-renderer error-surface private row contract",
+			"agent": "worker_1310_test_renderer_error_surface_row_contract",
+			"branch": "worker/1310-test-renderer-error-surface-row-contract",
 			"audits": []
 		}
 	]

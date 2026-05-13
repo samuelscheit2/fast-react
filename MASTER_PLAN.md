@@ -82,8 +82,14 @@ Current orchestration queue:
   helper-order, `var` redeclaration, method duplicate-key, and escaped-key gaps.
 - Scout 1301 reported a Rust root/scheduler source-metadata currentness lane;
   Worker 1306 is active for that private test-only root sync queue-lane seal.
-- Scouts 1302 through 1305 are active across React DOM, react-test-renderer,
-  native/no-load, and React core/hooks next-lane discovery.
+- Scout 1302 reported a React DOM conformance-only nested lifecycle lane;
+  Worker 1307 is active for that public blocked-gate canary.
+- Scout 1304 reported a native no-load generation source-ownership lane;
+  Worker 1309 is active for that private ledger hardening.
+- Scout 1305 reported a React Children currentness override alias lane; Worker
+  1308 is active for that private source-proof hardening.
+- Scout 1303 reported a react-test-renderer error-surface row-contract lane;
+  Worker 1310 is active for that private oracle/source-proof hardening.
 - Scouts 1255 and 1256 remain no-report superseded lanes; their replacement
   findings seeded Workers 1258 and 1259.
 
