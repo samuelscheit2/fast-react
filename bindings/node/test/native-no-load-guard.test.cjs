@@ -472,6 +472,24 @@ function generationAdmissionRow(row, overrides = {}) {
   return Object.freeze({ ...row, ...overrides });
 }
 
+function generationAdmissionPrototypeClaimRow(row, prototypeClaims) {
+  return Object.freeze(
+    Object.assign(Object.create(Object.freeze(prototypeClaims)), row)
+  );
+}
+
+function generationAdmissionAccessorClaimRow(row, field) {
+  const nextRow = { ...row };
+  Object.defineProperty(nextRow, field, {
+    get() {
+      return false;
+    },
+    enumerable: true
+  });
+
+  return Object.freeze(nextRow);
+}
+
 function assertPrivateGenerationAdmissionLedger(native) {
   const ledger = getGenerationAdmissionLedger(native);
   const validateGenerationAdmissionRows =
@@ -624,6 +642,86 @@ function assertPrivateGenerationAdmissionLedger(native) {
   const canonicalGuard = ledger.rows[1];
   const canonicalReplay = ledger.rows[5];
   const codes = ledger.rejectionCodes;
+
+  const inheritedCanonicalRowsResult = validateGenerationAdmissionRows(
+    ledger.rows.map((row) => Object.create(row))
+  );
+  assert.equal(inheritedCanonicalRowsResult.acceptedEvidenceCount, 0);
+  assert.equal(
+    inheritedCanonicalRowsResult.rejectedEvidenceCount,
+    ledger.rows.length
+  );
+  assert.equal(
+    inheritedCanonicalRowsResult.canonicalSourceEvidenceAccepted,
+    false
+  );
+  assertNoNativeGenerationLedgerExecution(
+    inheritedCanonicalRowsResult,
+    'generation inherited canonical rows'
+  );
+  for (const row of inheritedCanonicalRowsResult.rows) {
+    assert.equal(row.status, ledger.rejectedStatus);
+    assert.equal(row.code, codes.callerBuilt);
+    assert.equal(row.id, null);
+    assert.equal(row.role, null);
+    assert.equal(row.sourceFile, null);
+    assert.deepEqual(row.sourceFiles, []);
+    assert.equal(row.evidenceKind, null);
+    assert.deepEqual(row.sourceIdentifiers, []);
+    assert.equal(row.sourceOwnedEvidence, false);
+    assert.equal(row.blockedPrivateEvidence, false);
+    assert.equal(row.publicAdmission, false);
+    assert.equal(row.callerShapedEvidence, false);
+    assertNoNativeGenerationLedgerExecution(
+      row,
+      'generation inherited canonical row'
+    );
+  }
+
+  for (const diagnosticCase of [
+    {
+      id: 'generation-ledger-prototype-public-claim-alias',
+      row: generationAdmissionPrototypeClaimRow(canonicalReplay, {
+        publicNativeExecution: true
+      }),
+      code: codes.publicNativeExecutionClaim
+    },
+    {
+      id: 'generation-ledger-prototype-package-claim-alias',
+      row: generationAdmissionPrototypeClaimRow(canonicalReplay, {
+        packageCompatibilityClaimed: true
+      }),
+      code: codes.packageExportClaim
+    },
+    {
+      id: 'generation-ledger-accessor-native-addon-claim',
+      row: generationAdmissionAccessorClaimRow(
+        canonicalReplay,
+        'nativeAddonLoaded'
+      ),
+      code: codes.nativeAddonLoadClaim
+    }
+  ]) {
+    const result = validateGenerationAdmissionRows([diagnosticCase.row]);
+    assert.equal(result.acceptedEvidenceCount, 0, diagnosticCase.id);
+    assert.equal(result.rejectedEvidenceCount, 1, diagnosticCase.id);
+    assert.equal(
+      result.canonicalSourceEvidenceAccepted,
+      false,
+      diagnosticCase.id
+    );
+
+    const [row] = result.rows;
+    assert.equal(row.id, canonicalReplay.id, diagnosticCase.id);
+    assert.equal(row.status, ledger.rejectedStatus, diagnosticCase.id);
+    assert.equal(row.code, diagnosticCase.code, diagnosticCase.id);
+    assert.equal(row.nativeAddonLoaded, false, diagnosticCase.id);
+    assert.equal(row.nativeExecution, false, diagnosticCase.id);
+    assert.equal(row.packageExportCompatibility, false, diagnosticCase.id);
+    assertNoNativeGenerationLedgerExecution(result, diagnosticCase.id);
+    assertNoNativeGenerationLedgerExecution(row, diagnosticCase.id);
+  }
+
   const cases = [
     {
       row: generationAdmissionRow(canonicalGuard, {

@@ -3629,7 +3629,10 @@ function validateNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRows(
 function validateNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRow(
   row
 ) {
-  if (row?.status === nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedStatus) {
+  if (
+    row?.status ===
+    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedStatus
+  ) {
     return freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedRow(
       row,
       row.code ??
@@ -3674,6 +3677,10 @@ function validateNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRow(
   }
 
   if (
+    !hasOwnDataNativeCurrentnessRowFields(
+      row,
+      nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRowFields
+    ) ||
     row?.sourceOwnedEvidence !== true ||
     row?.blockedPrivateEvidence !== true ||
     row?.publicAdmission !== false ||
@@ -3727,18 +3734,19 @@ function validateNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRow(
 function getNativeRootBridgeJsonBatchLifecycleGenerationAdmissionClaimCode(
   row
 ) {
-  if (row === undefined || row === null) {
+  if (!isObjectLike(row)) {
     return null;
   }
 
-  if (row.nativeAddonLoaded === true) {
+  if (isNativeCapabilityClaimFieldClaimed(row, 'nativeAddonLoaded')) {
     return nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectionCodes
       .nativeAddonLoadClaim;
   }
 
   if (
-    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionPublicClaimFields.some(
-      (field) => row[field] === true
+    hasNativeCapabilityClaimFields(
+      row,
+      nativeRootBridgeJsonBatchLifecycleGenerationAdmissionPublicClaimFields
     )
   ) {
     return nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectionCodes
@@ -3746,43 +3754,50 @@ function getNativeRootBridgeJsonBatchLifecycleGenerationAdmissionClaimCode(
   }
 
   if (
-    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionPackageClaimFields.some(
-      (field) => row[field] === true
+    hasNativeCapabilityClaimFields(
+      row,
+      nativeRootBridgeJsonBatchLifecycleGenerationAdmissionPackageClaimFields
     )
   ) {
     return nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectionCodes
       .packageExportClaim;
   }
 
-  if (row.nodeWorkerThreadsExecution === true) {
+  if (
+    isNativeCapabilityClaimFieldClaimed(
+      row,
+      'nodeWorkerThreadsExecution'
+    )
+  ) {
     return nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectionCodes
       .workerThreadExecutionClaim;
   }
 
-  if (row.napiCleanupHookExecution === true) {
+  if (isNativeCapabilityClaimFieldClaimed(row, 'napiCleanupHookExecution')) {
     return nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectionCodes
       .cleanupHookExecutionClaim;
   }
 
   if (
-    row.rendererExecution === true ||
-    row.reconcilerExecution === true ||
-    row.reactBehaviorError === true
+    hasNativeCapabilityClaimFields(row, [
+      'rendererExecution',
+      'reconcilerExecution',
+      'reactBehaviorError'
+    ])
   ) {
     return nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectionCodes
       .rendererReconcilerOutputClaim;
   }
 
-  if (
-    row.compatibilityAlias !== undefined && row.compatibilityAlias !== null
-  ) {
+  if (isNativeCompatibilityAliasFieldClaimed(row, 'compatibilityAlias')) {
     return nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectionCodes
       .compatibilityAliasClaim;
   }
 
   if (
-    nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCompatibilityAliasFields.some(
-      (field) => row[field] === true
+    hasNativeCapabilityClaimFields(
+      row,
+      nativeRootBridgeJsonBatchLifecycleGenerationAdmissionCompatibilityAliasFields
     )
   ) {
     return nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectionCodes
@@ -3831,23 +3846,34 @@ function freezeNativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedRow(
   code
 ) {
   return Object.freeze({
-    id: row?.id ?? null,
-    role: row?.role ?? null,
-    sourceFile: row?.sourceFile ?? null,
-    sourceFiles: Object.freeze([...arrayFromMaybe(row?.sourceFiles)]),
-    evidenceKind: row?.evidenceKind ?? null,
-    sourceIdentifiers: Object.freeze([...arrayFromMaybe(row?.sourceIdentifiers)]),
+    id: getOwnDataPropertyValue(row, 'id', null),
+    role: getOwnDataPropertyValue(row, 'role', null),
+    sourceFile: getOwnDataPropertyValue(row, 'sourceFile', null),
+    sourceFiles: Object.freeze([
+      ...arrayFromMaybe(getOwnDataPropertyValue(row, 'sourceFiles', []))
+    ]),
+    evidenceKind: getOwnDataPropertyValue(row, 'evidenceKind', null),
+    sourceIdentifiers: Object.freeze([
+      ...arrayFromMaybe(getOwnDataPropertyValue(row, 'sourceIdentifiers', []))
+    ]),
     status:
       nativeRootBridgeJsonBatchLifecycleGenerationAdmissionRejectedStatus,
     code,
-    sourceOwnedEvidence: row?.sourceOwnedEvidence === true,
-    blockedPrivateEvidence: row?.blockedPrivateEvidence === true,
+    sourceOwnedEvidence:
+      getOwnDataPropertyValue(row, 'sourceOwnedEvidence', false) === true,
+    blockedPrivateEvidence:
+      getOwnDataPropertyValue(row, 'blockedPrivateEvidence', false) === true,
     publicAdmission: false,
-    callerShapedEvidence: row?.callerShapedEvidence === true,
-    proseEvidence: row?.proseEvidence === true,
-    testTitleEvidence: row?.testTitleEvidence === true,
-    errorMessageEvidence: row?.errorMessageEvidence === true,
-    sourceSyntaxOnly: row?.sourceSyntaxOnly === true,
+    callerShapedEvidence:
+      getOwnDataPropertyValue(row, 'callerShapedEvidence', false) === true,
+    proseEvidence:
+      getOwnDataPropertyValue(row, 'proseEvidence', false) === true,
+    testTitleEvidence:
+      getOwnDataPropertyValue(row, 'testTitleEvidence', false) === true,
+    errorMessageEvidence:
+      getOwnDataPropertyValue(row, 'errorMessageEvidence', false) === true,
+    sourceSyntaxOnly:
+      getOwnDataPropertyValue(row, 'sourceSyntaxOnly', false) === true,
     nativeAddonLoaded: false,
     nativeExecution: false,
     nodeWorkerThreadsExecution: false,
@@ -3970,8 +3996,88 @@ function arrayEquals(actual, expected) {
   return actualArray.every((value, index) => value === expected[index]);
 }
 
+function isObjectLike(value) {
+  return (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function')
+  );
+}
+
 function hasOwn(object, key) {
   return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function hasOwnDataProperty(object, key) {
+  const descriptor = isObjectLike(object)
+    ? Object.getOwnPropertyDescriptor(object, key)
+    : undefined;
+
+  return descriptor !== undefined && hasOwn(descriptor, 'value');
+}
+
+function getOwnDataPropertyValue(object, key, fallback) {
+  if (!hasOwnDataProperty(object, key)) {
+    return fallback;
+  }
+
+  return Object.getOwnPropertyDescriptor(object, key).value;
+}
+
+function hasOwnDataNativeCurrentnessRowFields(row, fields) {
+  if (!isObjectLike(row)) {
+    return false;
+  }
+
+  return fields.every(
+    (field) =>
+      field === 'status' || field === 'code' || hasOwnDataProperty(row, field)
+  );
+}
+
+function getPropertyDescriptorInPrototypeChain(object, key) {
+  if (!isObjectLike(object)) {
+    return undefined;
+  }
+
+  for (
+    let candidate = object;
+    candidate !== null;
+    candidate = Object.getPrototypeOf(candidate)
+  ) {
+    const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
+    if (descriptor !== undefined) {
+      return descriptor;
+    }
+  }
+
+  return undefined;
+}
+
+function isNativeCapabilityClaimFieldClaimed(object, key) {
+  const descriptor = getPropertyDescriptorInPrototypeChain(object, key);
+
+  return (
+    descriptor !== undefined &&
+    isNativeCapabilityClaimDescriptorClaimed(descriptor)
+  );
+}
+
+function hasNativeCapabilityClaimFields(object, fields) {
+  return fields.some((field) =>
+    isNativeCapabilityClaimFieldClaimed(object, field)
+  );
+}
+
+function isNativeCompatibilityAliasFieldClaimed(object, key) {
+  const descriptor = getPropertyDescriptorInPrototypeChain(object, key);
+  if (descriptor === undefined) {
+    return false;
+  }
+  if (!hasOwn(descriptor, 'value')) {
+    return true;
+  }
+
+  return descriptor.value !== undefined && descriptor.value !== null;
 }
 
 function normalizeNativeCapabilityClaimFieldName(field) {
@@ -7264,6 +7370,10 @@ function validateNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRow(
   }
 
   if (
+    !hasOwnDataNativeCurrentnessRowFields(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRowFields
+    ) ||
     row?.sourceOwnedEvidence !== true ||
     row?.blockedPrivateEvidence !== true ||
     row?.publicAdmission !== false ||
@@ -7341,25 +7451,28 @@ function validateNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRow(
 function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   row
 ) {
-  if (row === undefined || row === null) {
+  if (!isObjectLike(row)) {
     return null;
   }
 
   if (
-    row.nativeLoadAttempted === true ||
-    row.nativeAddonLoaded === true ||
-    row.nativeAddonLoadAttempted === true ||
-    row.napiCleanupHookExecution === true ||
-    row.cleanupHookExecutionClaimed === true ||
-    row.cleanupHookPublicExecutionClaimed === true
+    hasNativeCapabilityClaimFields(row, [
+      'nativeLoadAttempted',
+      'nativeAddonLoaded',
+      'nativeAddonLoadAttempted',
+      'napiCleanupHookExecution',
+      'cleanupHookExecutionClaimed',
+      'cleanupHookPublicExecutionClaimed'
+    ])
   ) {
     return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
       .nativeAddonLoadClaim;
   }
 
   if (
-    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPublicClaimFields.some(
-      (field) => row[field] === true
+    hasNativeCapabilityClaimFields(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPublicClaimFields
     )
   ) {
     return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
@@ -7367,8 +7480,9 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   }
 
   if (
-    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPackageClaimFields.some(
-      (field) => row[field] === true
+    hasNativeCapabilityClaimFields(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessPackageClaimFields
     )
   ) {
     return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
@@ -7376,33 +7490,38 @@ function getNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessClaimCode(
   }
 
   if (
-    row.nodeWorkerThreadsExecution === true ||
-    row.workerThreadCreationAttempted === true ||
-    row.workerThreadLoadAttempted === true ||
-    row.childProcessExecution === true ||
-    row.childProcessLoadAttempted === true ||
-    row.httpExecution === true ||
-    row.httpLoadAttempted === true ||
-    row.httpsExecution === true ||
-    row.httpsLoadAttempted === true ||
-    row.networkExecution === true
+    hasNativeCapabilityClaimFields(row, [
+      'nodeWorkerThreadsExecution',
+      'workerThreadCreationAttempted',
+      'workerThreadLoadAttempted',
+      'childProcessExecution',
+      'childProcessLoadAttempted',
+      'httpExecution',
+      'httpLoadAttempted',
+      'httpsExecution',
+      'httpsLoadAttempted',
+      'networkExecution'
+    ])
   ) {
     return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
       .workerOrNetworkExecutionClaim;
   }
 
   if (
-    row.rendererExecution === true ||
-    row.reconcilerExecution === true ||
-    row.reactBehaviorError === true
+    hasNativeCapabilityClaimFields(row, [
+      'rendererExecution',
+      'reconcilerExecution',
+      'reactBehaviorError'
+    ])
   ) {
     return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
       .rendererReconcilerOutputClaim;
   }
 
   if (
-    nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCompatibilityClaimFields.some(
-      (field) => row[field] === true
+    hasNativeCapabilityClaimFields(
+      row,
+      nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessCompatibilityClaimFields
     )
   ) {
     return nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectionCodes
@@ -7459,29 +7578,44 @@ function freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedRo
   code
 ) {
   return Object.freeze({
-    id: row?.id ?? null,
-    role: row?.role ?? null,
-    sourceFile: row?.sourceFile ?? null,
-    sourceFiles: Object.freeze([...arrayFromMaybe(row?.sourceFiles)]),
-    evidenceKind: row?.evidenceKind ?? null,
-    rustIdentifiers: Object.freeze([...arrayFromMaybe(row?.rustIdentifiers)]),
-    jsFactoryFields: Object.freeze([...arrayFromMaybe(row?.jsFactoryFields)]),
-    jsonFieldPaths: Object.freeze([...arrayFromMaybe(row?.jsonFieldPaths)]),
+    id: getOwnDataPropertyValue(row, 'id', null),
+    role: getOwnDataPropertyValue(row, 'role', null),
+    sourceFile: getOwnDataPropertyValue(row, 'sourceFile', null),
+    sourceFiles: Object.freeze([
+      ...arrayFromMaybe(getOwnDataPropertyValue(row, 'sourceFiles', []))
+    ]),
+    evidenceKind: getOwnDataPropertyValue(row, 'evidenceKind', null),
+    rustIdentifiers: Object.freeze([
+      ...arrayFromMaybe(getOwnDataPropertyValue(row, 'rustIdentifiers', []))
+    ]),
+    jsFactoryFields: Object.freeze([
+      ...arrayFromMaybe(getOwnDataPropertyValue(row, 'jsFactoryFields', []))
+    ]),
+    jsonFieldPaths: Object.freeze([
+      ...arrayFromMaybe(getOwnDataPropertyValue(row, 'jsonFieldPaths', []))
+    ]),
     expectedFactoryValues:
       freezeNativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessValue(
-        row?.expectedFactoryValues ?? {}
+        getOwnDataPropertyValue(row, 'expectedFactoryValues', {})
       ),
     status:
       nativeRootWorkLoopFinishedWorkMetadataSourceCurrentnessRejectedStatus,
     code,
-    sourceOwnedEvidence: row?.sourceOwnedEvidence === true,
-    blockedPrivateEvidence: row?.blockedPrivateEvidence === true,
+    sourceOwnedEvidence:
+      getOwnDataPropertyValue(row, 'sourceOwnedEvidence', false) === true,
+    blockedPrivateEvidence:
+      getOwnDataPropertyValue(row, 'blockedPrivateEvidence', false) === true,
     publicAdmission: false,
-    callerShapedEvidence: row?.callerShapedEvidence === true,
-    proseEvidence: row?.proseEvidence === true,
-    testTitleEvidence: row?.testTitleEvidence === true,
-    errorMessageEvidence: row?.errorMessageEvidence === true,
-    sourceSyntaxOnly: row?.sourceSyntaxOnly === true,
+    callerShapedEvidence:
+      getOwnDataPropertyValue(row, 'callerShapedEvidence', false) === true,
+    proseEvidence:
+      getOwnDataPropertyValue(row, 'proseEvidence', false) === true,
+    testTitleEvidence:
+      getOwnDataPropertyValue(row, 'testTitleEvidence', false) === true,
+    errorMessageEvidence:
+      getOwnDataPropertyValue(row, 'errorMessageEvidence', false) === true,
+    sourceSyntaxOnly:
+      getOwnDataPropertyValue(row, 'sourceSyntaxOnly', false) === true,
     nativeAddonLoaded: false,
     nativeExecution: false,
     nodeWorkerThreadsExecution: false,
